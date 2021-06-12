@@ -51,6 +51,7 @@ BEGIN {
           AnalyzePerlCommand
           AttrVal
           AttrNum
+          CommandAttr
           CommandSet
           CommandSetReading
           data
@@ -118,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.52.0" => "12.06.2021  new Attr Css ",
   "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
   "0.51.2" => "05.06.2021  minor fixes ",
   "0.51.1" => "04.06.2021  minor fixes ",
@@ -473,6 +475,21 @@ my $defcmode     = "can";                                                       
 
 my $defflowGSize = 300;                                                           # default flowGraphicSize
 
+                                                                                  # Default CSS-Style
+my $cssdef       = qq{.flowg.text         { stroke: none; fill: gray; }                \n}.
+                   qq{.flowg.sun_active   { stroke: orange; fill: orange; }                                                \n}.
+                   qq{.flowg.sun_inactive { stroke: gray; fill: gray; }                                                    \n}.
+                   qq{.flowg.bat25        { stroke: red; fill: red; }                                                      \n}.
+                   qq{.flowg.bat50        { stroke: yellow; fill: yellow; }                                                \n}.
+                   qq{.flowg.bat75        { stroke: green; fill: green; }                                                  \n}.
+                   qq{.flowg.grid_color1  { fill: green; }                                                                 \n}.
+                   qq{.flowg.grid_color2  { fill: red; }                                                                   \n}.
+                   qq{.flowg.grid_color3  { fill: gray; }                                                                  \n}.
+                   qq{.flowg.inactive_in  { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
+                   qq{.flowg.inactive_out { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
+                   qq{.flowg.active_in    { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_out   { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
+                   ;
 
 my %hef = (                                                                                   # Energiedaktoren für Verbrauchertypen
   "heater"         => { tot => 1.00, f => 0.30, m => 0.40, l => 0.30, mt => 240         },    # tot = Faktor nominaler Gesamtenergieverbrauch 
@@ -528,6 +545,7 @@ sub Initialize {
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
+                                "Css:textField-long ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
@@ -607,6 +625,8 @@ sub Define {
   _readCacheFile ($params);  
     
   readingsSingleUpdate($hash, "state", "initialized", 1); 
+  
+  CommandAttr   (undef,"$name Css $cssdef");                                                             # Css Attribut vorbelegen
 
   centralTask   ($hash);                                                                                 # Einstieg in Abfrage 
   InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0); # Einstieg periodisches Schreiben historische Daten
@@ -4442,8 +4462,13 @@ sub _beamGraphic {
           last if ($ii > $maxhours);
                                                                                                                  # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
           if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-              my ($icon_name, $title) = $hfcg->{$i}{weather} > 100 ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
-              Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
+              my ($icon_name, $title) = $hfcg->{$i}{weather} > 100             ? 
+                                        weather_icon($hfcg->{$i}{weather}-100) : 
+                                        weather_icon($hfcg->{$i}{weather});
+              
+              if($icon_name eq 'unknown') {              
+                  Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
+              }
                   
               $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
               $val        = FW_makeImage($icon_name);
@@ -4475,7 +4500,12 @@ sub _beamGraphic {
           last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
-          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val;                     # negative Zahlen in Fettschrift, 0 aber ohne +
+          $val  = $hfcg->{$i}{diff} < 0 ? 
+                  '<b>'.$val.'<b/>'     : 
+                  $val > 0              ? 
+                  '+'.$val              : 
+                  $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
+          
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
       $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende 
@@ -4529,7 +4559,8 @@ sub _beamGraphic {
           $z3 = int($height - $he - $z2);                                                                        # was von maxVal noch übrig ist
               
           if ($z3 < int($fsize/2)) {                                                                             # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
-              $z2 += $z3; $z3 = 0; 
+              $z2 += $z3; 
+              $z3  = 0; 
           }
       }
 
@@ -4732,40 +4763,37 @@ return $ret;
 #                  Energieflußgrafik
 ################################################################
 sub _flowGraphic {
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $flowgh   = $paref->{flowgh};
-  my $flowgani = $paref->{flowgani};
+  my $paref      = shift;
+  my $name       = $paref->{name};
+  my $flowgh     = $paref->{flowgh};
+  my $flowgani   = $paref->{flowgani};
     
   my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
-  my $fs         = ($flowgh < 300) ? '48px' : '32px';
+  my $fs         = $flowgh < 300 ? '48px' : '32px';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
-
-  my $inactive   = 'stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2;';
-  my $active     = 'stroke-dashoffset: 20; stroke-dasharray: 10; animation: dash 0.5s linear; animation-iteration-count: infinite; opacity: 0.8;' ;
+  my $css        = AttrVal($name, 'Css', $cssdef);
 
   my $cpv        = ReadingsNum($name, 'Current_PV', 0);
-  my $sun_color  = $cpv ? 'orange' : 'gray';
+  my $sun_color  = $cpv ? 'flowg sun_active' : 'flowg sun_inactive';
 
   my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
-  my $cgc_style  = $cgc ? $active : $inactive;
-  my $cgc_color  = $cgc ? 'red'   : 'gray';
+  my $cgc_style  = $cgc ? 'flowg active_in'   : 'flowg inactive_in';
 
   my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn', 0);
-  my $cgfi_style = $cgfi ? $active  : $inactive;
-  my $cgfi_color = $cgfi ? 'yellow' : 'gray';
+  my $cgfi_style = $cgfi ? 'flowg active_out' : 'flowg inactive_out';
 
   my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
-  my $csc_style  = $csc ? $active  : $inactive;
-  my $csc_color  = $csc ? 'yellow' : 'gray';
+  my $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
 
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
-  my $soc        = ReadingsNum($name, 'Current_BatCharge',      -1);
-  my $batcolor   = ($soc < 0) ? 'grey' : ($soc < 26) ? 'red' : ($soc < 76) ? 'yellow' : 'green';
+  my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
   
+  my $bat_color  = $soc < 26 ? 'flowg bat25' : 
+                   $soc < 76 ? 'flowg bat50' : 
+                   'flowg bat75';
+                   
   my $hasbat     = 1;
-  $soc           = q{} if($soc < 0);
 
   if (!defined($batin) && !defined($batout)) {
       $hasbat = 0;
@@ -4774,56 +4802,53 @@ sub _flowGraphic {
       $soc    = 0;
   }
 
-  my $batin_style  = $batin  ? $active  : $inactive;
-  my $batin_color  = $batin  ? 'yellow' : 'gray';
-  my $batout_style = $batout ? $active  : $inactive;
-  my $batout_color = $batout ? 'yellow' : 'gray';
-
-  my $grid_color   = $cgfi ? 'green' : 'red'; 
-  $grid_color      = 'gray' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
+  my $batin_style  = $batin  ? 'flowg active_out'  : 'flowg inactive_out';
+  my $batout_style = $batout ? 'flowg active_in'   : 'flowg inactive_in';
+  my $grid_color   = $cgfi   ? 'flowg grid_color1' : 'flowg grid_color2';
+  $grid_color      = 'flowg grid_color3' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
   
   my $ret;
-  #$ret .= qq{<table class="roomoverview">};
-  #$ret .= qq{<tr><td>};
-  #$ret .= qq{<table class="block"><tr align="center" class="odd">};
-  #$ret .= qq{<td>};
-  
+ 
   $ret .= qq{
+      <style>
+      $css
+      $animation
+      </style>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style" id="SVGPLOT">
-      <style>$animation</style>
+
       <g transform="translate(200,50)">
         <g>
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(45)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(90)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(135)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(180)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(225)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(270)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
         <g transform="rotate(315)">
-            <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
-        <circle cx="0" cy="0" fill="$sun_color" r="16" stroke="orange" stroke-width="2"/>
+        <circle cx="0" cy="0" class="$sun_color" r="16" stroke-width="2"/>
       </g>
 
-      <g id="home" fill="grey" transform="translate(0,150),scale(4)">
+      <g id="home" fill="grey" transform="translate(150,310),scale(4)">
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
       </g>    
 
-      <g id="grid" fill="$grid_color" transform="translate(150,310),scale(3.5)">
+      <g id="grid" class="$grid_color" transform="translate(0,150),scale(3.5)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
   };
@@ -4831,11 +4856,11 @@ sub _flowGraphic {
 
   if ($hasbat) {
       $ret .= qq{
-        <g fill="$batcolor" stroke="$batcolor" transform="translate(270,135),scale(.33)">
+        <g class="$bat_color" transform="translate(410,135),scale(.33) rotate (90)">
         <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
         <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
       };
-        
+
       $ret .= '<path d="m 221.141,266.334 c 0,3.313 -2.688,6 -6,6 h -65.5 c -3.313,0 -6,-2.688 -6,-6 v -6 c 0,-3.314 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.686 6,6 v 26 z"/>'     if ($soc > 12);
       $ret .= '<path d="m 221.141,213.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 38);
       $ret .= '<path d="m 221.141,166.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 63);
@@ -4843,40 +4868,28 @@ sub _flowGraphic {
       $ret .= '</g>';
   }
 
-  $ret .= qq{
-    <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-      <path id="pv-home"  style="$csc_style"  d="M270,100 L270,180 C270,270,270,270,180,270 L100,270" stroke="$csc_color" />
-      <path id="pv-grid"  style="$cgfi_style" d="M300,100 L300,500" stroke="$cgfi_color" />
-  };
+    $ret .= qq{
+	<g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
+        <path id="pv-home"   class="$csc_style"  d="M300,100 L300,510" />
+        <path id="pv-grid"   class="$cgfi_style" d="M270,100 L90,270" />
+        <path id="grid-home" class="$cgc_style"  d="M270,510 L90,305" />
+    };
 
-  $ret .= qq{<text id="pv-home-txt" x="210" y="240" style="fill: #ccc; font-size: $fs; text-anchor: end;">$csc</text>}   if ($csc);
-  $ret .= qq{<text id="pv-home-txt" x="400" y="15"  style="fill: #ccc; font-size: $fs; text-anchor: start;">$cpv</text>} if ($cpv);
-  $ret .= qq{<text id="pv-grid-txt" x="330" y="490" style="fill: #ccc; font-size: $fs; text-anchor: '};
-
-  $ret .= (!$hasbat) ? 'middle;" transform="translate(-120,620) rotate(-90)">' : 'start;">';
-
-  $ret .= $cgfi if ($cgfi);
-
-  $ret .= qq{</text><path id="grid-home" style="$cgc_style"  d="M270,500 L270,420 C270,330,270,330,180,330 L100,330" stroke="$cgc_color" />};
-  $ret .= qq{<text id="grid-home-txt" x="210" y="390" style="fill: #ccc; font-size: $fs; text-anchor: end;">$cgc</text>} if ($cgc);
+    $ret .= qq{
+      <path id="bat-home" class="$batout_style" d="M502,305 L330,510" />
+      <path id="pv-bat"   class="$batin_style"  d="M330,100 L500,270" />
+    } if ($hasbat);
 
 
-  if ($hasbat) {
-      $ret .= qq{    
-          <path id="bat-home" style="$batout_style" d="M500,300 L100,300"  stroke="$batout_color" />
-          <path id="pv-bat"   style="$batin_style"  d="M330,100 L330,180 C330,270,330,270,420,270 L500,270" stroke="$batin_color" />
-          <text x="0" y="500" style="fill: #ccc; font-size: $fs; text-anchor: middle;" transform="translate(150,300) rotate(-90)">$soc %</text>
-      };
-
-      $ret .= qq{<text id="bat-home-txt"  x="390" y="351" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batout</text>} if ($batout);
-      $ret .= qq{<text id="pv-bat-txt"    x="390" y="245" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batin</text>}  if ($batin);
-  }
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="400" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="595" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="330" y="300" style="font-size: $fs; text-anchor: start;">$csc</text>}     if ($csc);
+  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="125" y="200" style="font-size: $fs; text-anchor: end;">$cgfi</text>}      if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="125" y="420" style="font-size: $fs; text-anchor: end;">$cgc</text>}       if ($cgc);
+  $ret .= qq{<text class="flowg text" id="batout-txt"    x="465" y="420" style="font-size: $fs; text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="batin-txt"     x="465" y="200" style="font-size: $fs; text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
 
   $ret .= qq{</g></svg>};
-  #$ret .= qq{</td></tr>};
-  #$ret .= qq{</table>};
-  #$ret .= qq{</td></tr>};
-  #$ret .= qq{</table>};
       
 return $ret;
 }
@@ -7043,6 +7056,12 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </ul> 
        </li>  
        <br>
+       
+       <a id="SolarForecast-attr-Css"></a>
+       <li><b>Css </b><br>
+         Definiert den Style für die Energieflußgrafik. Das Attribut wird mit einem Default automatisch vorbelegt. <br>
+       </li>
+       <br> 
   
        <a id="SolarForecast-attr-disable"></a>
        <li><b>disable</b><br>
@@ -7092,7 +7111,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
-         Wählt die anzuzeigende interne Grafik des Moduls aus. <br><br>
+         Wählt die anzuzeigende interne Grafik des Moduls aus. <br>
+         Zur Anpassung der Energieflußgrafik steht das Attribut <a href="#SolarForecast-attr-Css">Css</a> zur 
+         Verfügung. <br><br>
          
          <ul>   
          <table>  
