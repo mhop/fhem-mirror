@@ -119,7 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.52.1" => "12.06.2021  change Attr Css behavior ",
+  "0.52.1" => "12.06.2021  change Attr Css behavior, new attr consumerAdviceIcon ",
   "0.52.0" => "12.06.2021  new Attr Css ",
   "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
   "0.51.2" => "05.06.2021  minor fixes ",
@@ -304,30 +304,32 @@ my %hqtxt = (                                                                   
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte
-  iaaf  => { EN => qq{Automatic mode off -> Enable automatic mode}, 
-             DE => qq{Automatikmodus aus -> Automatik freigeben}             },
-  ieas  => { EN => qq{Automatic mode on -> Lock automatic mode},
-             DE => qq{Automatikmodus ein -> Automatik sperren}               },
-  iave  => { EN => qq{Off -> Switch on consumer},
-             DE => qq{Aus -> Verbraucher einschalten}                        },
-  ieva  => { EN => qq{On -> Switch off consumer},
-             DE => qq{Ein -> Verbraucher ausschalten}                        },
-  upd   => { EN => qq{Update},
-             DE => qq{Update}                                                },
-  on    => { EN => qq{switched on},
-             DE => qq{eingeschaltet}                                         },
-  off   => { EN => qq{switched off},
-             DE => qq{ausgeschaltet}                                         },
-  undef => { EN => qq{undefined},
-             DE => qq{undefiniert}                                           },
-  dela  => { EN => qq{delayed},
-             DE => qq{verzoegert}                                            },
-  cnsm  => { EN => qq{Consumer},
-             DE => qq{Verbraucher}                                           },
-  eiau  => { EN => qq{On/Off},
-             DE => qq{Ein/Aus}                                               },
-  auto  => { EN => qq{Automatic},
-             DE => qq{Automatik}                                             },
+  iaaf   => { EN => qq{Automatic mode off -> Enable automatic mode}, 
+              DE => qq{Automatikmodus aus -> Automatik freigeben}             },
+  ieas   => { EN => qq{Automatic mode on -> Lock automatic mode},
+              DE => qq{Automatikmodus ein -> Automatik sperren}               },
+  iave   => { EN => qq{Off -> Switch on consumer},
+              DE => qq{Aus -> Verbraucher einschalten}                        },
+  ieva   => { EN => qq{On -> Switch off consumer},
+              DE => qq{Ein -> Verbraucher ausschalten}                        },
+  upd    => { EN => qq{Update},
+              DE => qq{Update}                                                },
+  on     => { EN => qq{switched on},
+              DE => qq{eingeschaltet}                                         },
+  off    => { EN => qq{switched off},
+              DE => qq{ausgeschaltet}                                         },
+  undef  => { EN => qq{undefined},
+              DE => qq{undefiniert}                                           },
+  dela   => { EN => qq{delayed},
+              DE => qq{verzoegert}                                            },
+  cnsm   => { EN => qq{Consumer},
+              DE => qq{Verbraucher}                                           },
+  eiau   => { EN => qq{On/Off},
+              DE => qq{Ein/Aus}                                               },
+  auto   => { EN => qq{Automatic},
+              DE => qq{Automatik}                                             },
+  conrec => { EN => qq{Switching on the consumer recommended},
+              DE => qq{Einschalten des Verbrauchers empfohlen}                },
 );
 
 my %weather_ids = (
@@ -473,6 +475,7 @@ my @ctypes       = qw(dishwasher dryer washingmachine heater other);            
 my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
 my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
+my $caicondef    = 'light_light_dim_100@gold';                                    # default consumerAdviceIcon
 
 my $defflowGSize = 300;                                                           # default flowGraphicSize
 
@@ -544,7 +547,7 @@ sub Initialize {
                                 "beamHeight ".
                                 "beamWidth ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
-                                # "consumerAdviceIcon ".
+                                "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "Css:textField-long ".
                                 "disable:1,0 ".
@@ -2874,6 +2877,15 @@ sub __switchConsumer {
   
   my $stoptime;
   
+  ## Ist Verbraucher empfohlen ?
+  ################################
+  if ($startts && $t >= $startts && $stopts && $t <= $stopts) {
+      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;
+  } 
+  else {
+      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
+  } 
+  
   ## Verbraucher einschalten
   ############################
   my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                            # Set Command für "on"
@@ -3670,7 +3682,8 @@ sub entryGraphic {
       fcolor2    => AttrVal ($name,    'beam2FontColor',       '000000'),  
       beam1cont  => AttrVal ($name,    'beam1Content',     'pvForecast'),
       beam2cont  => AttrVal ($name,    'beam2Content',     'pvForecast'), 
-      caicon     => AttrVal ($name,    'consumerAdviceIcon',      undef),                      # Consumer AdviceIcon
+      caicon     => AttrVal ($name,    'consumerAdviceIcon', $caicondef),                      # Consumer AdviceIcon
+      clegend    => AttrVal ($name,    'consumerLegend',     'icon_top'),                      # Lage und Art Cunsumer Legende
       lotype     => AttrVal ($name,    'layoutType',           'single'),
       kw         => AttrVal ($name,    'Wh/kWh',                   'Wh'),
       height     => AttrNum ($name,    'beamHeight',                200),
@@ -4127,9 +4140,12 @@ sub _graphicConsumerLegend {
   my $paref                    = shift;
   my $hash                     = $paref->{hash};
   my $name                     = $paref->{name};
+  my $caicon                   = $paref->{caicon};                                                  # Consumer AdviceIcon
+  my ($clegendstyle, $clegend) = split('_', $paref->{clegend});
+  
   my $type                     = $hash->{TYPE};
-  my ($clegendstyle, $clegend) = split('_', AttrVal($name, 'consumerLegend', 'icon_top'));
   my @consumers                = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
+  
   $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
   $paref->{clegend}            = $clegend;
   
@@ -4172,13 +4188,14 @@ sub _graphicConsumerLegend {
   my $tro    = 0;
   
   for my $c (@consumers) {          
-      my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
-      my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
-      my $cicon      = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
-      my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
-      my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
-      my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
-      my $auto       = ConsumerVal ($hash, $c, "auto",         1);                                  # Automatic Mode
+      my $cname      = ConsumerVal ($hash, $c, "name",                    "");                      # Name des Consumerdevices
+      my $calias     = ConsumerVal ($hash, $c, "alias",               $cname);                      # Alias des Consumerdevices
+      my $cicon      = ConsumerVal ($hash, $c, "icon",                    "");                      # Icon des Consumerdevices     
+      my $oncom      = ConsumerVal ($hash, $c, "oncom",                   "");                      # Consumer Einschaltkommando
+      my $offcom     = ConsumerVal ($hash, $c, "offcom",                  "");                      # Consumer Ausschaltkommando
+      my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
+      my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
+      my $iscrecomm  = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);                      # ist einschalten Vervracher empfohlen
       
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
@@ -4198,8 +4215,13 @@ sub _graphicConsumerLegend {
       $cmdautooff = q{} if(!$autord); 
 
       my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
-      my $swicon  = q{};
-      my $auicon  = q{};
+      my $swicon  = q{};                                                                              # Schalter ein/aus Icon
+      my $auicon  = q{};                                                                              # Schalter Automatic Icon
+      my $isricon = q{};                                                                              # Zustand IsRecommended Icon
+      
+      if($iscrecomm) {
+          $isricon = "<a title= '$htitles{conrec}{$lang}'</a>".FW_makeImage($caicon, '');
+      }
       
       if($modulo % 2){
           $ctable .= qq{<tr>};
@@ -4229,17 +4251,17 @@ sub _graphicConsumerLegend {
       if ($clegendstyle eq 'icon') {                                                                   
           $cicon   = FW_makeImage($cicon);
           
-          $ctable .= "<td style='text-align:left'   $dstyle>$calias  </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$cicon   </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$swicon  </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$auicon  </td>";
+          $ctable .= "<td style='text-align:left'   $dstyle>$calias         </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$cicon $isricon </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$swicon         </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$auicon         </td>";
       } 
       else {
           my (undef,$co) = split('\@',$cicon);
           $co      = '' if (!$co);                                                                        
           
           $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
-          $ctable .= "<td>                                                                   </td>";
+          $ctable .= "<td>                                  $isricon                         </td>";
           $ctable .= "<td style='text-align:center' $dstyle>$swicon                          </td>";
           $ctable .= "<td style='text-align:center' $dstyle>$auicon                          </td>";
       }
@@ -6318,6 +6340,7 @@ return $def;
 #       uetotal   - Unit der Leistungsmessung
 #       avgenergy - gemessener Durchschnittsverbrauch eines Tages
 #       epieces   - prognostizierte Energiescheiben (Hash)
+#       isConsumptionRecommended - ist Verbrauch empfohlen ?
 #
 # $def: Defaultwert
 #
@@ -7016,6 +7039,13 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
          (default: 35)         
        </li>  
+       <br> 
+       
+       <a id="SolarForecast-attr-consumerAdviceIcon"></a>
+       <li><b>consumerAdviceIcon </b><br>
+         Definiert das Icon zur Signalisierung der Aktivierungsempfehlung eines Verbrauchers in der Verbraucherlegende. <br>
+         (default: light_light_dim_100@gold)
+       </li>
        <br> 
 
        <a id="SolarForecast-attr-consumerLegend"></a>
