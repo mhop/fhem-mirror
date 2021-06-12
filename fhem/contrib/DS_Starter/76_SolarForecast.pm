@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.52.1" => "12.06.2021  change Attr Css behavior ",
   "0.52.0" => "12.06.2021  new Attr Css ",
   "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
   "0.51.2" => "05.06.2021  minor fixes ",
@@ -624,9 +625,7 @@ sub Define {
   $params->{cachename}  = $cachename;
   _readCacheFile ($params);  
     
-  readingsSingleUpdate($hash, "state", "initialized", 1); 
-  
-  CommandAttr   (undef,"$name Css $cssdef");                                                             # Css Attribut vorbelegen
+  readingsSingleUpdate($hash, "state", "initialized", 1);
 
   centralTask   ($hash);                                                                                 # Einstieg in Abfrage 
   InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0); # Einstieg periodisches Schreiben historische Daten
@@ -2599,26 +2598,13 @@ sub _manageConsumerData {
       
       ## consumer Hash ergänzen, Reading generieren 
       ###############################################
-      my $costate = ReadingsVal ($consumer, "state",     "");
-      my $pstate  = ConsumerVal ($hash, $c, "planstate", "");
-      
-      $pstate     = $pstate =~ /planned/xs       ? "planned"  : 
-                    $pstate =~ /switched\son/xs  ? "started"  :
-                    $pstate =~ /switched\soff/xs ? "finished" :
-                    "unknown";
-      
-      my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
-      my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
-      
-      my ($starttime,$stoptime);
-      (undef,undef,undef,$starttime) = timestampToTimestring ($startts) if($startts);
-      (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts)  if($stopts);
- 
+      my $costate                               = ReadingsVal             ($consumer, "state", "");
+      my ($pstate,$starttime,$stoptime)         = __planningStateandTimes ($paref);
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
       push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' "; # Consumer Infos 
-      push @$daref, "consumer${c}_planned_start<>"."$starttime" if($startts);                                 # Consumer Start geplant
-      push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stopts);                                  # Consumer Stop geplant            
+      push @$daref, "consumer${c}_planned_start<>"."$starttime" if($starttime);                               # Consumer Start geplant
+      push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stoptime);                                # Consumer Stop geplant            
   }
   
   delete $paref->{consumer};
@@ -2926,6 +2912,31 @@ sub __switchConsumer {
   $paref->{state} = $state;
   
 return;
+}
+
+###################################################################
+#    Consumer Planungsstatus mit Schaltzeiten liefern
+###################################################################
+sub __planningStateandTimes {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $c     = $paref->{consumer};
+  
+  my $pstate  = ConsumerVal ($hash, $c, "planstate", "");
+  
+  $pstate     = $pstate =~ /planned/xs       ? "planned"  : 
+                $pstate =~ /switched\son/xs  ? "started"  :
+                $pstate =~ /switched\soff/xs ? "finished" :
+                "unknown";
+  
+  my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
+  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
+  
+  my ($starttime,$stoptime)      = ('','');
+  (undef,undef,undef,$starttime) = timestampToTimestring ($startts) if($startts);
+  (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts)  if($stopts);
+  
+return ($pstate,$starttime,$stoptime);
 }
 
 ################################################################
@@ -4869,7 +4880,7 @@ sub _flowGraphic {
   }
 
     $ret .= qq{
-	<g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
+    <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
         <path id="pv-home"   class="$csc_style"  d="M300,100 L300,510" />
         <path id="pv-grid"   class="$cgfi_style" d="M270,100 L90,270" />
         <path id="grid-home" class="$cgc_style"  d="M270,510 L90,305" />
@@ -7059,7 +7070,25 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-Css"></a>
        <li><b>Css </b><br>
-         Definiert den Style für die Energieflußgrafik. Das Attribut wird mit einem Default automatisch vorbelegt. <br>
+         Definiert den Style für die Energieflußgrafik. Das Attribut wird automatisch vorbelegt. 
+         Zum Ändern des Css-Attributes bitte den Default übernehmen und anpassen: <br><br>
+         
+         <ul>   
+           .flowg.text         { stroke: none; fill: gray; }            <br>    
+           .flowg.sun_active   { stroke: orange; fill: orange; }        <br>                                          
+           .flowg.sun_inactive { stroke: gray; fill: gray; }            <br>                                         
+           .flowg.bat25        { stroke: red; fill: red; }              <br>                                        
+           .flowg.bat50        { stroke: yellow; fill: yellow; }        <br>                                       
+           .flowg.bat75        { stroke: green; fill: green; }          <br>                                    
+           .flowg.grid_color1  { fill: green; }                         <br>           
+           .flowg.grid_color2  { fill: red; }                           <br>                                    
+           .flowg.grid_color3  { fill: gray; }                          <br>                                    
+           .flowg.inactive_in  { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
+           .flowg.inactive_out { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
+           .flowg.active_in    { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
+           .flowg.active_out   { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
+         </ul>   
+         
        </li>
        <br> 
   
