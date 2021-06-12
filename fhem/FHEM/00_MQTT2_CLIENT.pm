@@ -96,7 +96,7 @@ sub
 MQTT2_CLIENT_connect($)
 {
   my ($hash) = @_;
-  return if($hash->{authError});
+  return if($hash->{authError} || AttrVal($hash->{NAME}, "disable", 0));
   my $disco = (DevIo_getState($hash) eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
@@ -349,6 +349,16 @@ MQTT2_CLIENT_Attr(@)
     }
   }
 
+  if($attrName eq "disable") {
+    if($type eq "set" && $param[0]) {
+      MQTT2_CLIENT_Disco($hash,1)
+        if(DevIo_getState($hash) ne "disconnected");
+
+    } else {
+      InternalTimer(0, \&MQTT2_CLIENT_connect, $hash, 1)
+        if(DevIo_getState($hash) ne "opened");
+    }
+  }
 
   return undef;
 }
@@ -747,8 +757,12 @@ MQTT2_CLIENT_getStr($$)
       </li></br>
 
     <li><a href="#disable">disable</a><br>
-        <a href="#disabledForIntervals">disabledForIntervals</a><br>
-      disable dispatching of messages.
+      disable the connection to the server.
+      </li><br>
+
+    <li><a href="#disabledForIntervals">disabledForIntervals</a><br>
+      disable sending or dispatching of messages but not the connection to the
+      server.
       </li><br>
 
     <a id="MQTT2_CLIENT-attr-disconnectAfter"></a>
