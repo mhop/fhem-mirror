@@ -335,9 +335,6 @@ HttpUtils_Connect($)
   $hash->{displayurl} = $hash->{hideurl} ? "<hidden>" : $hash->{url};
   $hash->{sslargs}    = {} if(!defined($hash->{sslargs}));
 
-  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}"
-    .($hash->{callback} ? " NonBlocking":" Blocking");
-
   if($hash->{url} !~ /
       ^(http|https):\/\/                # $1: proto
        (([^:\/]+):([^:\/]+)@)?          # $2: auth, $3:user, $4:password
@@ -352,7 +349,7 @@ HttpUtils_Connect($)
   ($hash->{protocol},$authstring,$user,$pwd,$host,$port,$hash->{path})
         = (lc($1),$2,$3,$4,$5,$6,$7);
   $hash->{host} = $host;
-  
+
   if(defined($port)) {
     $port =~ s/^://;
   } else {
@@ -373,6 +370,8 @@ HttpUtils_Connect($)
    $hash->{auth} = 0;
   }
   
+  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}"
+    .($hash->{callback} ? " NonBlocking":" Blocking")." via ".$hash->{protocol};
 
   my $proxy = AttrVal("global", "proxy", undef);
   if($proxy) {
