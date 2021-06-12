@@ -79,20 +79,16 @@ if($cmd eq 'next' and ReadingsVal($NAME,'Input','') eq 'Radio') {
 my @easycmd = ('stop','pause','toggle','volumeUp','volumeDown','next','previous');
 if (grep { $_ eq $cmd } @easycmd) {return lc( qq($topic { "command": "$cmd" }) )}
 
-# normally set will fading the volume or could set finalVolume startVolume: set <player> volume <0..100> [startValue]
-#if($cmd eq 'volume') {return qq($topic { "command": "volume", "input": $payload })}
+# special volume handling fading: second value is startvalue, if -1 start is actual value
 if($cmd eq 'volume') {
-   my $vol = ReadingsNum($NAME,'volume',0);
-   my $d = abs $arr[1] - $vol;
-   my $s = $arr[1] <=> $vol;
-   if ($arr[2] or ($d == 1)) {
-      $payload = $arr[2] || $payload;
-      if ($arr[2] and ($arr[1] != $arr[2])) {fhem("sleep 2;set $NAME volume $arr[1]")}
-      return qq($topic { "command": "volume", "input": $payload })
-   } else {
-      for (1..$d) {fhem("sleep $_;set $NAME volume {([$NAME:volume]+$s)}")}
-      return ''
+   $vol = $arr[1];
+   if ($arr[2]) {
+      if ($arr[2] == -1) { $vol = ReadingsNum($NAME,'volume',0) } else { $vol = $arr[2] }
+      my $d = abs $arr[1] - $vol;
+      my $s = $arr[1] <=> $vol;
+      if ($d) { for (1..$d) { fhem("sleep $_;set $NAME volume {([$NAME:volume]+$s)}") } }
    }
+   return qq($topic { "command": "volume", "input": $vol }) 
 }
 
 if ($cmd eq 'play') {
