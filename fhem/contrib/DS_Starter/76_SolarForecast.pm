@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes",
   "0.52.1" => "12.06.2021  change Attr Css behavior, new attr consumerAdviceIcon ",
   "0.52.0" => "12.06.2021  new Attr Css ",
   "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
@@ -304,34 +305,36 @@ my %hqtxt = (                                                                   
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte
-  iaaf   => { EN => qq{Automatic mode off -> Enable automatic mode}, 
-              DE => qq{Automatikmodus aus -> Automatik freigeben}             },
-  ieas   => { EN => qq{Automatic mode on -> Lock automatic mode},
-              DE => qq{Automatikmodus ein -> Automatik sperren}               },
-  iave   => { EN => qq{Off -> Switch on consumer},
-              DE => qq{Aus -> Verbraucher einschalten}                        },
-  ieva   => { EN => qq{On -> Switch off consumer},
-              DE => qq{Ein -> Verbraucher ausschalten}                        },
-  upd    => { EN => qq{Update},
-              DE => qq{Update}                                                },
-  on     => { EN => qq{switched on},
-              DE => qq{eingeschaltet}                                         },
-  off    => { EN => qq{switched off},
-              DE => qq{ausgeschaltet}                                         },
-  undef  => { EN => qq{undefined},
-              DE => qq{undefiniert}                                           },
-  dela   => { EN => qq{delayed},
-              DE => qq{verzoegert}                                            },
-  cnsm   => { EN => qq{Consumer},
-              DE => qq{Verbraucher}                                           },
-  eiau   => { EN => qq{On/Off},
-              DE => qq{Ein/Aus}                                               },
-  auto   => { EN => qq{Automatic},
-              DE => qq{Automatik}                                             },
-  conrec => { EN => qq{Switching on the consumer recommended},
-              DE => qq{Einschalten des Verbrauchers empfohlen}                },
-  pstate => { EN => qq{Planning status: <pstate>\nOn: <start>\nOff: <stop>},
-              DE => qq{Planungsstatus: <pstate>\n\nEin: <start>\nAus: <stop>} },
+  iaaf     => { EN => qq{Automatic mode off -> Enable automatic mode}, 
+                DE => qq{Automatikmodus aus -> Automatik freigeben}             },
+  ieas     => { EN => qq{Automatic mode on -> Lock automatic mode},
+                DE => qq{Automatikmodus ein -> Automatik sperren}               },
+  iave     => { EN => qq{Off -> Switch on consumer},
+                DE => qq{Aus -> Verbraucher einschalten}                        },
+  ieva     => { EN => qq{On -> Switch off consumer},
+                DE => qq{Ein -> Verbraucher ausschalten}                        },
+  upd      => { EN => qq{Update},
+                DE => qq{Update}                                                },
+  on       => { EN => qq{switched on},
+                DE => qq{eingeschaltet}                                         },
+  off      => { EN => qq{switched off},
+                DE => qq{ausgeschaltet}                                         },
+  undef    => { EN => qq{undefined},
+                DE => qq{undefiniert}                                           },
+  dela     => { EN => qq{delayed},
+                DE => qq{verzoegert}                                            },
+  cnsm     => { EN => qq{Consumer},
+                DE => qq{Verbraucher}                                           },
+  eiau     => { EN => qq{On/Off},
+                DE => qq{Ein/Aus}                                               },
+  auto     => { EN => qq{Automatic},
+                DE => qq{Automatik}                                             },
+  conrec   => { EN => qq{Current time is within the consumption planning},
+                DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}   },
+  connorec => { EN => qq{Consumption planning is outside current time},
+                DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit}     },
+  pstate   => { EN => qq{Planning status: <pstate>\nOn: <start>\nOff: <stop>},
+                DE => qq{Planungsstatus: <pstate>\n\nEin: <start>\nAus: <stop>} },
 );
 
 my %weather_ids = (
@@ -552,6 +555,7 @@ sub Initialize {
                                 "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "Css:textField-long ".
+                                "debug:1,0 ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
@@ -2677,7 +2681,7 @@ sub __planSwitchTimes {
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   
-  return if(ConsumerVal ($hash, $c, "planstate", undef));                          # Verbraucher ist schon geplant/gestartet/fertig
+  return if(ConsumerVal ($hash, $c, "planstate", undef));                                  # Verbraucher ist schon geplant/gestartet/fertig
   
   my $type   = $hash->{TYPE};
   
@@ -2718,10 +2722,6 @@ sub __planSwitchTimes {
       $order++;
   }
   
-  #for my $o (sort{$a<=>$b} keys %max) {                                                   # nur für Debugging
-  #    Log3 ($name, 1, "$name - maxkey: $maxkey, $o, $max{$o}{surplus}, $max{$o}{starttime}, $max{$o}{nexthour}, $max{$o}{today}");
-  #}
-  
   my $epiece1 = (~0 >> 1);
   my $epieces = ConsumerVal ($hash, $c, "epieces", "");
   
@@ -2737,13 +2737,18 @@ sub __planSwitchTimes {
   my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
   my $stopdiff = ceil($mintime / 60) * 3600;
   
-  # my ($startts,$stopts,$stoptime,$starttime,$maxts,$half);
-  
   $paref->{maxref}   = \%max;
   $paref->{mintime}  = $mintime;
   $paref->{stopdiff} = $stopdiff;
   
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
+      if(AttrVal ($name, "debug", 0)) {                                                                # nur für Debugging
+          Log (1, "DEBUG> $name - consumer: $c, mode: $mode, relevant hash: mtimes");
+          for my $m (sort{$a<=>$b} keys %mtimes) {                                                   
+              Log (1, "DEBUG> $name - hash: mtimes, surplus: $mtimes{$m}{surplus}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}"); 
+          }
+      }
+      
       for my $ts (sort{$a<=>$b} keys %mtimes) {
           if($mtimes{$ts}{surplus} >= $epiece1) {                                                      # die früheste Startzeit sofern Überschuß größer als Bedarf 
               my $starttime                    = $mtimes{$ts}{starttime};
@@ -2764,6 +2769,13 @@ sub __planSwitchTimes {
       }
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
+      if(AttrVal ($name, "debug", 0)) {                                                                # nur für Debugging
+          Log (1, "DEBUG> $name - consumer: $c, mode: $mode, relevant hash: max");
+          for my $o (sort{$a<=>$b} keys %max) {                                                   
+              Log (1, "DEBUG> $name - hash: max, surplus: $max{$o}{surplus}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}"); 
+          }
+      }
+      
       for my $o (sort{$a<=>$b} keys %max) {
           next if(!$max{$o}{today});                                                                   # der max-Wert ist _nicht_ heute
           $paref->{elem} = $o;
@@ -2866,7 +2878,7 @@ sub __switchConsumer {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                # aktueller Unixtimestamp
+  my $t     = $paref->{t};                                                   # aktueller Unixtimestamp
   my $state = $paref->{state};
   
   my $type  = $hash->{TYPE};
@@ -4221,18 +4233,24 @@ sub _graphicConsumerLegend {
       my $swicon  = q{};                                                                              # Schalter ein/aus Icon
       my $auicon  = q{};                                                                              # Schalter Automatic Icon
       my $isricon = q{};                                                                              # Zustand IsRecommended Icon
-      
-      if($iscrecomm) {
-          $isricon = "<a title= '$htitles{conrec}{$lang}'</a>".FW_makeImage($caicon, '');
-      }
-      
+            
       $paref->{consumer} = $c;
       
       my ($planstate,$starttime,$stoptime) = __planningStateandTimes ($paref);      
       my $pstate = $htitles{pstate}{$lang};
       $pstate    =~ s/<pstate>/$planstate/xs;
       $pstate    =~ s/<start>/$starttime/xs;
-      $pstate    =~ s/<stop>/$stoptime/xs;      
+      $pstate    =~ s/<stop>/$stoptime/xs;     
+
+      if($caicon ne "none") {
+          if($iscrecomm) {
+              $isricon = "<a title= '$htitles{conrec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon, '');
+          }
+          else {
+              ($caicon) = split('\@', $caicon);
+              $isricon  = "<a title= '$htitles{connorec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon.'@gray', '');
+          }
+      }      
       
       if($modulo % 2){
           $ctable .= qq{<tr>};
@@ -4241,12 +4259,12 @@ sub _graphicConsumerLegend {
       
       if(!$auto) {
           $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
-          $auicon   = "<a title= '$pstate\n\n$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
+          $auicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
       } 
       
       if ($auto) {
           $staticon = FW_makeImage('ios_on_till_fill@orange', $htitles{ieas}{$lang});
-          $auicon   = "<a title='$pstate\n\n$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
+          $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
       }
       
       if ($cmdon && $swstate eq "off") {
@@ -4268,7 +4286,7 @@ sub _graphicConsumerLegend {
           $ctable .= "<td style='text-align:center' $dstyle>$auicon         </td>";
       } 
       else {
-          my (undef,$co) = split('\@',$cicon);
+          my (undef,$co) = split('\@', $cicon);
           $co      = '' if (!$co);                                                                        
           
           $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
@@ -4919,7 +4937,7 @@ sub _flowGraphic {
     <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
         <path id="pv-home"   class="$csc_style"  d="M300,100 L300,510" />
         <path id="pv-grid"   class="$cgfi_style" d="M270,100 L90,270" />
-        <path id="grid-home" class="$cgc_style"  d="M270,510 L90,305" />
+        <path id="grid-home" class="$cgc_style"  d="M90,305 L270,510" />
     };
 
     $ret .= qq{
@@ -7057,6 +7075,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
          Definiert das Icon zur Signalisierung der Aktivierungsempfehlung eines Verbrauchers in der Verbraucherlegende. <br>
+         Ist 'none' angegeben wird kein Icon für die Aktivierungsempfehlung angezeigt. <br>
          (default: light_light_dim_100@gold)
        </li>
        <br> 
@@ -7097,7 +7116,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>on</b>         </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>notbefore</b>  </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                         </td></tr>
-            <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht vor angegebener Stunde (01..23) ausschalten (optional)                                                         </td></tr>
+            <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                        </td></tr>
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
             <tr><td>                   </td><td>Readingwert = 1: Schalten freigegeben (default),  0: Schalten blockiert                                                          </td></tr>
             <tr><td> <b>etotal</b>     </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
@@ -7136,6 +7155,12 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br> 
   
+       <a id="SolarForecast-attr-debug"></a>
+       <li><b>debug</b><br>
+         Aktiviert/deaktiviert Debug-Meldungen im Modul.
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-disable"></a>
        <li><b>disable</b><br>
          Aktiviert/deaktiviert das Device.
