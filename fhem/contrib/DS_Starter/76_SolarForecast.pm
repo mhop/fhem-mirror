@@ -298,43 +298,45 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
   awd    => { EN => qq{Waiting for solar forecast data ...},
               DE => qq{Warten auf Solarvorhersagedaten ...}                                                             },
+  cnsm   => { EN => qq{Consumer},
+              DE => qq{Verbraucher}                                                                                     },
+  eiau   => { EN => qq{On/Off},
+              DE => qq{Ein/Aus}                                                                                         },
+  auto   => { EN => qq{Auto},
+              DE => qq{Auto}                                                                                            },
+  pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
+              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                          },
   strok  => { EN => qq{Congratulations &#128522, your string configuration checked without found errors !},
               DE => qq{Herzlichen Glückwunsch &#128522, Ihre String-Konfiguration wurde ohne gefundene Fehler geprüft!} },
   strnok => { EN => qq{Oh no &#128577, your string configuration is inconsistent.\nPlease check the settings of modulePeakString, moduleDirection, moduleTiltAngle !},
               DE => qq{Oh nein &#128577, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen von modulePeakString, moduleDirection, moduleTiltAngle !}},
 );
 
-my %htitles = (                                                                                                 # Hash Hilfetexte
+my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
   iaaf     => { EN => qq{Automatic mode off -> Enable automatic mode}, 
-                DE => qq{Automatikmodus aus -> Automatik freigeben}             },
+                DE => qq{Automatikmodus aus -> Automatik freigeben}                                         },
   ieas     => { EN => qq{Automatic mode on -> Lock automatic mode},
-                DE => qq{Automatikmodus ein -> Automatik sperren}               },
+                DE => qq{Automatikmodus ein -> Automatik sperren}                                           },
   iave     => { EN => qq{Off -> Switch on consumer},
-                DE => qq{Aus -> Verbraucher einschalten}                        },
+                DE => qq{Aus -> Verbraucher einschalten}                                                    },
   ieva     => { EN => qq{On -> Switch off consumer},
-                DE => qq{Ein -> Verbraucher ausschalten}                        },
+                DE => qq{Ein -> Verbraucher ausschalten}                                                    },
   upd      => { EN => qq{Update},
-                DE => qq{Update}                                                },
+                DE => qq{Update}                                                                            },
   on       => { EN => qq{switched on},
-                DE => qq{eingeschaltet}                                         },
+                DE => qq{eingeschaltet}                                                                     },
   off      => { EN => qq{switched off},
-                DE => qq{ausgeschaltet}                                         },
+                DE => qq{ausgeschaltet}                                                                     },
   undef    => { EN => qq{undefined},
-                DE => qq{undefiniert}                                           },
+                DE => qq{undefiniert}                                                                       },
   dela     => { EN => qq{delayed},
-                DE => qq{verzoegert}                                            },
-  cnsm     => { EN => qq{Consumer},
-                DE => qq{Verbraucher}                                           },
-  eiau     => { EN => qq{On/Off},
-                DE => qq{Ein/Aus}                                               },
-  auto     => { EN => qq{Automatic},
-                DE => qq{Automatik}                                             },
+                DE => qq{verzoegert}                                                                        },
   conrec   => { EN => qq{Current time is within the consumption planning},
-                DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}   },
+                DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                               },
   connorec => { EN => qq{Consumption planning is outside current time},
-                DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit}     },
-  pstate   => { EN => qq{Planning status: <pstate>\nOn: <start>\nOff: <stop>},
-                DE => qq{Planungsstatus: <pstate>\n\nEin: <start>\nAus: <stop>} },
+                DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit}                                 },
+  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>},
+                DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>}              },
 );
 
 my %weather_ids = (
@@ -4177,21 +4179,24 @@ sub _graphicConsumerLegend {
   my $ctable = qq{<table align='left' width='100%'>}; 
   $ctable   .= qq{<tr style='font-weight:bold; text-align:center'>};
   
-  $ctable   .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
-  $ctable   .= qq{<td>                                                        </td>};
-  $ctable   .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
-  $ctable   .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+  $ctable   .= qq{<td style='text-align:left' $dstyle> $hqtxt{cnsm}{$lang}  </td>};
+  $ctable   .= qq{<td>                                                      </td>};
+  $ctable   .= qq{<td>                                                      </td>};
+  $ctable   .= qq{<td $dstyle>                         $hqtxt{eiau}{$lang}  </td>};
+  $ctable   .= qq{<td $dstyle>                         $hqtxt{auto}{$lang}  </td>};
   
   my $cnum   = @consumers; 
   if($cnum > 1) {
-      $ctable .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
-      $ctable .= qq{<td>                                                        </td>};
-      $ctable .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
-      $ctable .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+      $ctable .= qq{<td style='text-align:left' $dstyle> $hqtxt{cnsm}{$lang}  </td>};
+      $ctable .= qq{<td>                                                      </td>};
+      $ctable .= qq{<td>                                                      </td>};
+      $ctable .= qq{<td $dstyle>                         $hqtxt{eiau}{$lang}  </td>};
+      $ctable .= qq{<td $dstyle>                         $hqtxt{auto}{$lang}  </td>};
   }
   else {
       my $blk  = '&nbsp;' x 8;
       $ctable .= qq{<td $dstyle> $blk </td>};
+      $ctable .= qq{<td>         $blk </td>};
       $ctable .= qq{<td>         $blk </td>};
       $ctable .= qq{<td $dstyle> $blk </td>};
       $ctable .= qq{<td $dstyle> $blk </td>};   
@@ -4237,18 +4242,30 @@ sub _graphicConsumerLegend {
       $paref->{consumer} = $c;
       
       my ($planstate,$starttime,$stoptime) = __planningStateandTimes ($paref);      
-      my $pstate = $htitles{pstate}{$lang};
+      my $pstate = $caicon eq "times" ? $hqtxt{pstate}{$lang} : $htitles{pstate}{$lang};
+      
       $pstate    =~ s/<pstate>/$planstate/xs;
       $pstate    =~ s/<start>/$starttime/xs;
-      $pstate    =~ s/<stop>/$stoptime/xs;     
+      $pstate    =~ s/<stop>/$stoptime/xs; 
+      $pstate    =~ s/\s+/&nbsp;/gxs         if($caicon eq "times");      
 
       if($caicon ne "none") {
           if($iscrecomm) {
-              $isricon = "<a title= '$htitles{conrec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon, '');
+              if($caicon eq "times") {
+                  $isricon = $pstate;
+              }
+              else {
+                  $isricon = "<a title= '$htitles{conrec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon, '');
+              }
           }
           else {
-              ($caicon) = split('\@', $caicon);
-              $isricon  = "<a title= '$htitles{connorec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon.'@gray', '');
+              if($caicon eq "times") {
+                  $isricon = $pstate;
+              }
+              else {
+                  ($caicon) = split('\@', $caicon);
+                  $isricon  = "<a title= '$htitles{connorec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon.'@gray', '');
+              }
           }
       }      
       
@@ -4281,7 +4298,8 @@ sub _graphicConsumerLegend {
           $cicon   = FW_makeImage($cicon);
           
           $ctable .= "<td style='text-align:left'   $dstyle>$calias         </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$cicon $isricon </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$cicon          </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$isricon        </td>";
           $ctable .= "<td style='text-align:center' $dstyle>$swicon         </td>";
           $ctable .= "<td style='text-align:center' $dstyle>$auicon         </td>";
       } 
@@ -4290,6 +4308,7 @@ sub _graphicConsumerLegend {
           $co      = '' if (!$co);                                                                        
           
           $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
+          $ctable .= "<td>                                                                   </td>";
           $ctable .= "<td>                                  $isricon                         </td>";
           $ctable .= "<td style='text-align:center' $dstyle>$swicon                          </td>";
           $ctable .= "<td style='text-align:center' $dstyle>$auicon                          </td>";
@@ -7074,9 +7093,17 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
-         Definiert das Icon zur Signalisierung der Aktivierungsempfehlung eines Verbrauchers in der Verbraucherlegende. <br>
-         Ist 'none' angegeben wird kein Icon für die Aktivierungsempfehlung angezeigt. <br>
-         (default: light_light_dim_100@gold)
+         Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.
+         <br><br>       
+         <ul>   
+         <table>  
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
+            <tr><td> <b>&lt;Icon&gt@&lt;Farbe&gt</b>  </td><td>Aktivierungsempfehlung  wird durch Icon und Farbe (optional) dargestellt (default: light_light_dim_100@gold)  </td></tr>
+            <tr><td>                                  </td><td>(die Planungsdaten werden als Mouse-Over Text angezeigt                                                       </td></tr>
+            <tr><td> <b>times</b>                     </td><td>es werden der Planungsstatus und die geplanten Schaltzeiten als Text angezeigt                                </td></tr>
+            <tr><td> <b>none</b>                      </td><td>keine Anzeige der Planungsdaten                                                                               </td></tr>
+         </table>
+         </ul>
        </li>
        <br> 
 
