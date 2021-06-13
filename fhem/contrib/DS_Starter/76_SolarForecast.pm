@@ -119,7 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes",
+  "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes, write consumers cachefile ",
   "0.52.1" => "12.06.2021  change Attr Css behavior, new attr consumerAdviceIcon ",
   "0.52.0" => "12.06.2021  new Attr Css ",
   "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
@@ -465,6 +465,7 @@ my $defslidenum  = 3;                                                           
 my $pvhcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 my $plantcfg     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
+my $csmcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
 
 my $calcmaxd     = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -624,17 +625,17 @@ sub Define {
 
   createNotifyDev ($hash);
   
-  my $file              = $pvhcache.$name;                                         # Cache File PV History lesen wenn vorhanden
-  my $cachename         = "pvhist";
-  $params->{file}       = $file;
-  $params->{cachename}  = $cachename;
+  $params->{file}       = $pvhcache.$name;                                         # Cache File PV History lesen wenn vorhanden
+  $params->{cachename}  = "pvhist";
   _readCacheFile ($params);
 
-  $file                 = $pvccache.$name;                                         # Cache File PV Circular lesen wenn vorhanden
-  $cachename            = "circular";
-  $params->{file}       = $file;
-  $params->{cachename}  = $cachename;
+  $params->{file}       = $pvccache.$name;                                         # Cache File PV Circular lesen wenn vorhanden
+  $params->{cachename}  = "circular";
   _readCacheFile ($params);  
+  
+  $params->{file}       = $csmcache.$name;                                         # Cache File Consumer lesen wenn vorhanden
+  $params->{cachename}  = "consumers";
+  _readCacheFile ($params);
     
   readingsSingleUpdate($hash, "state", "initialized", 1);
 
@@ -663,6 +664,7 @@ sub _readCacheFile {
       
       if($success) {
            $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
+           Log3($name, 3, qq{$name - SolarForecast cache "$cachename" restored});
       }
       else {
           Log3($name, 2, qq{$name - WARNING - The content of file "$file" is not readable and may be corrupt});
@@ -1242,7 +1244,7 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{selfconsumption};
       delete $data{$type}{$name}{current}{selfconsumptionrate};
       
-      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
   
   if($prop eq "currentBatteryDev") {
@@ -1253,17 +1255,17 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
       
-      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
   
   if($prop eq "currentInverterDev") {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);           # Anlagenkonfiguration File schreiben
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
   
-  if($prop eq "consumerPlanning") {                                        # Verbraucherplanung resetten
-      my $c = $paref->{prop1} // "";                                       # bestimmten Verbraucher setzen falls angegeben
+  if($prop eq "consumerPlanning") {                                                  # Verbraucherplanung resetten
+      my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
       
       if ($c) {
           deleteConsumerPlanning ($hash, $c);
@@ -1277,6 +1279,8 @@ sub _setreset {                          ## no critic "not used"
               Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
           }           
       }
+      
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
   }  
   
   createNotifyDev ($hash);
@@ -1592,6 +1596,8 @@ sub _attrconsumer {                      ## no critic "not used"
       delete $data{$type}{$name}{consumers}{$co};                                          # Consumer Hash Verbraucher löschen
   }  
 
+  writeDataToFile ($hash, "consumers", $csmcache.$name);                                   # Cache File Consumer schreiben
+  
   InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createNotifyDev", $hash, 0);
 
 return;
@@ -1682,8 +1688,9 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  writeDataToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
-  writeDataToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeDataToFile ($hash, "pvhist",    $pvhcache.$name);             # Cache File für PV History schreiben
+  writeDataToFile ($hash, "circular",  $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeDataToFile ($hash, "consumers", $csmcache.$name);             # Cache File Consumer schreiben
   
 return; 
 }
@@ -1744,6 +1751,14 @@ sub Delete {
   if ($error) {
       Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
   }
+  
+  $error = qq{};
+  $file  = $csmcache.$name;                                                   # File Consumer löschen
+  $error = FileDelete($file); 
+  
+  if ($error) {
+      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
+  }
       
 return;
 }
@@ -1760,8 +1775,8 @@ sub periodicWriteCachefiles {
   
   return if(IsDisabled($name));
   
-  writeDataToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeDataToFile ($hash, "pvhist",      $pvhcache.$name);             # Cache File für PV History schreiben
+  writeDataToFile ($hash, "circular",  $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeDataToFile ($hash, "pvhist",    $pvhcache.$name);             # Cache File für PV History schreiben
   
 return;
 }
@@ -2109,7 +2124,9 @@ sub _additionalActivities {
               Log3 ($name, 3, qq{$name - Consumer planning of "$calias" deleted});
           }
           
-          deleteReadingspec ($hash, "consumer.*_planned.*");          
+          deleteReadingspec ($hash, "consumer.*_planned.*"); 
+
+          writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben          
           
           $hash->{HELPER}{H00DONE} = 1;
       }
@@ -2793,6 +2810,9 @@ sub __planSwitchTimes {
   }
   
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
+  
+  writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+  
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
   
 return;
@@ -2904,15 +2924,15 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                            # Set Command für "on"
+  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                             # Set Command für "on"
   my $auto   = ConsumerVal ($hash, $c, "auto",   1);
  
-  if($auto && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {                  # Verbraucher Start ist geplant && Startzeit überschritten
-      my $surplus = CurrentVal  ($hash, "surplus",          0);                                  # aktueller Überschuß
-      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                  # Consumer Planungsmode
-      my $power   = ConsumerVal ($hash, $c, "power",        0);                                  # Consumer nominale Leistungsaufnahme (W)
+  if($auto && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {                   # Verbraucher Start ist geplant && Startzeit überschritten
+      my $surplus = CurrentVal  ($hash, "surplus",          0);                                   # aktueller Überschuß
+      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
+      my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
       
-      if($mode eq "must" || $surplus >= $power) {                                                # "Muss"-Planung oder Überschuß > Leistungsaufnahme
+      if($mode eq "must" || $surplus >= $power) {                                                 # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
           my (undef,undef,undef,$starttime)                 = timestampToTimestring ($t);
           my $stopdiff                                      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
@@ -2921,6 +2941,8 @@ sub __switchConsumer {
           $data{$type}{$name}{consumers}{$c}{planswitchon}  = $t;
           $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t + $stopdiff;
           $state                                            = qq{Consumer "$calias" switched on};
+          
+          writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
           Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
@@ -2934,6 +2956,8 @@ sub __switchConsumer {
       $data{$type}{$name}{consumers}{$c}{planstate}     = "switched off: ".$stoptime;
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t;                                     # tatsächliche Ausschaltzeit
       $state                                            = qq{Consumer "$calias" switched off};
+      
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   } 
   
