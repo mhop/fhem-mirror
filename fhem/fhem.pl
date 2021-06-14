@@ -5371,7 +5371,7 @@ json2nameValue($;$$$)
       $in = $2;
 
     } else {
-      Log 1, "Error parsing >$val< for $prefix$name";
+      Log 1, "json2namevalue: Error parsing >$val< for prefix/name:$prefix$name";
       $in = "";
     }
     return (undef, $in);
