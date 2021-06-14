@@ -669,7 +669,7 @@ sub SMAInverter_getstatusDoParse($) {
              elsif ($i eq "sup_SpotACVoltage") {
                  ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
              }
-		     elsif ($i eq "sup_BatteryInfo" && (ReadingsVal($name,"INV_TYPE","") =~ /SBS(6.0|5.0|3.7)/xs)) {
+		     elsif ($i eq "sup_BatteryInfo" && (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5|6\.0|5\.0|3\.7)/xs)) {
 
 				 ($sup_BatteryInfo,$inv_BAT_TEMP,$inv_BAT_TEMP_A,$inv_BAT_TEMP_B,$inv_BAT_TEMP_C,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00492600, 0x00492610);
                  ($sup_BatteryInfo,$inv_BAT_TEMP,$inv_BAT_TEMP_A,$inv_BAT_TEMP_B,$inv_BAT_TEMP_C,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495B00, 0x00495B10);
