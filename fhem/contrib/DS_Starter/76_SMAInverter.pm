@@ -676,9 +676,9 @@ sub SMAInverter_getstatusDoParse($) {
                  ($sup_BatteryInfo,$inv_BAT_UDC,$inv_BAT_UDC_A,$inv_BAT_UDC_B,$inv_BAT_UDC_C,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495C00, 0x00495C10);
                  ($sup_BatteryInfo,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495D00, 0x00495D10);
 		     }                                      
-             elsif ($i eq "sup_BatteryInfo") {
-                 ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
-             }
+#             elsif ($i eq "sup_BatteryInfo") {
+#                 ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
+#             }
              elsif ($i eq "sup_SpotGridFrequency") {
                  ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
              }
