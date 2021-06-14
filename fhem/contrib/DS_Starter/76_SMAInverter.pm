@@ -827,6 +827,12 @@ sub SMAInverter_getstatusDoParse($) {
                  if($sup_BatteryInfo) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
                      push(@row_array, "bat_idc ".$inv_BAT_IDC."\n");
+					 push(@row_array, "bat_udc_a ".$inv_BAT_UDC_A."\n");
+					 push(@row_array, "bat_udc_b ".$inv_BAT_UDC_B."\n");
+					 push(@row_array, "bat_udc_c ".$inv_BAT_UDC_C."\n");                                                        
+					 push(@row_array, "bat_idc_a ".$inv_BAT_IDC_A."\n");
+					 push(@row_array, "bat_idc_b ".$inv_BAT_IDC_B."\n");
+					 push(@row_array, "bat_idc_c ".$inv_BAT_IDC_C."\n"); 
                  }
                  if($sup_SpotBatteryLoad) {
                      push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n");
@@ -839,6 +845,9 @@ sub SMAInverter_getstatusDoParse($) {
                  if($sup_BatteryInfo) {
                      push(@row_array, "bat_cycles ".$inv_BAT_CYCLES."\n");
                      push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
+					 push(@row_array, "bat_temp_a ".$inv_BAT_TEMP_A."\n");
+					 push(@row_array, "bat_temp_b ".$inv_BAT_TEMP_B."\n");
+					 push(@row_array, "bat_temp_c ".$inv_BAT_TEMP_C."\n");
                  }
                  if($sup_SpotGridFrequency) {
                      push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
