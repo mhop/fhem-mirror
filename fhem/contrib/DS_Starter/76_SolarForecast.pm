@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.52.3" => "14.06.2021  consumer on/off icon gray if no on/off command is defined, more consumer debug log ",
   "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes, write consumers cachefile ",
   "0.52.1" => "12.06.2021  change Attr Css behavior, new attr consumerAdviceIcon ",
   "0.52.0" => "12.06.2021  new Attr Css ",
@@ -319,8 +320,12 @@ my %htitles = (                                                                 
                 DE => qq{Automatikmodus ein -> Automatik sperren}                                           },
   iave     => { EN => qq{Off -> Switch on consumer},
                 DE => qq{Aus -> Verbraucher einschalten}                                                    },
+  ians     => { EN => qq{Off -> no on-command defined!},
+                DE => qq{Aus -> kein on-Kommando definiert!}                                                },
   ieva     => { EN => qq{On -> Switch off consumer},
                 DE => qq{Ein -> Verbraucher ausschalten}                                                    },
+  iens     => { EN => qq{On -> no off-command defined!},
+                DE => qq{Ein -> kein off-Kommando definiert!}                                               },  
   upd      => { EN => qq{Update},
                 DE => qq{Update}                                                                            },
   on       => { EN => qq{switched on},
@@ -2703,6 +2708,7 @@ sub __planSwitchTimes {
   return if(ConsumerVal ($hash, $c, "planstate", undef));                                  # Verbraucher ist schon geplant/gestartet/fertig
   
   my $type   = $hash->{TYPE};
+  my $debug  = AttrVal ($name, "debug", 0);
   
   my $nh     = $data{$type}{$name}{nexthours};
   my $maxkey = (scalar keys %{$data{$type}{$name}{nexthours}}) - 1;
@@ -2751,6 +2757,10 @@ sub __planSwitchTimes {
       return;
   }
   
+  if($debug) {                                                                                         # nur für Debugging
+      Log (1, "DEBUG> $name - consumer: $c, epiece1: $epiece1");
+  }
+  
   my $mode     = ConsumerVal ($hash, $c, "mode",          "can");
   my $calias   = ConsumerVal ($hash, $c, "alias",            "");
   my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
@@ -2761,7 +2771,7 @@ sub __planSwitchTimes {
   $paref->{stopdiff} = $stopdiff;
   
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
-      if(AttrVal ($name, "debug", 0)) {                                                                # nur für Debugging
+      if($debug) {                                                                                     # nur für Debugging
           Log (1, "DEBUG> $name - consumer: $c, mode: $mode, relevant hash: mtimes");
           for my $m (sort{$a<=>$b} keys %mtimes) {                                                   
               Log (1, "DEBUG> $name - hash: mtimes, surplus: $mtimes{$m}{surplus}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}"); 
@@ -2785,10 +2795,13 @@ sub __planSwitchTimes {
               $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime;             
               last;
           }
+          else {
+              $data{$type}{$name}{consumers}{$c}{planstate} = "not planned: the max expected surplus is less $epiece1";
+          }
       }
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
-      if(AttrVal ($name, "debug", 0)) {                                                                # nur für Debugging
+      if($debug) {                                                                                     # nur für Debugging
           Log (1, "DEBUG> $name - consumer: $c, mode: $mode, relevant hash: max");
           for my $o (sort{$a<=>$b} keys %max) {                                                   
               Log (1, "DEBUG> $name - hash: max, surplus: $max{$o}{surplus}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}"); 
@@ -4308,14 +4321,26 @@ sub _graphicConsumerLegend {
           $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
       }
       
-      if ($cmdon && $swstate eq "off") {
-          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
-          $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
+      if ($swstate eq "off") {
+          if($cmdon) {
+              $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
+              $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
+          }
+          else {
+              $staticon = FW_makeImage('ios_off_fill@grey', $htitles{ians}{$lang});
+              $swicon   = "<a title='$htitles{ians}{$lang}'> $staticon</a>";              
+          }
       } 
       
-      if ($cmdoff && $swstate eq "on") {
-          $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
-          $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
+      if ($swstate eq "on") {
+          if($cmdoff) {
+              $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
+              $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
+          }
+          else {
+              $staticon = FW_makeImage('ios_on_fill@grey', $htitles{iens}{$lang});  
+              $swicon   = "<a title='$htitles{iens}{$lang}'> $staticon</a>";              
+          }
       }
       
       if ($clegendstyle eq 'icon') {                                                                   
