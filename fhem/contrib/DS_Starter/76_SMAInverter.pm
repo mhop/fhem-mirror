@@ -1371,23 +1371,6 @@ sub SMAInverter_SMAcommand($$$$$) {
      Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and SPOT_IAC1=$inv_SPOT_IAC1 and SPOT_IAC2=$inv_SPOT_IAC2 and SPOT_IAC3=$inv_SPOT_IAC3";
      return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
  }
-
- if($data_ID eq 0x491E) {
-     $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
-     $inv_BAT_TEMP   = unpack("V*", substr $data, 90, 4) / 10;
-     $inv_BAT_UDC    = unpack("V*", substr $data, 118, 4) / 100;
-     $inv_BAT_IDC    = unpack("l*", substr $data, 146, 4);
-     
-     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = 0; 
-     } 
-     else { 
-         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
-     }
-     
-     Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
-     return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
- }
  
  if($data_ID eq 0x495B) {
 	 $inv_BAT_TEMP = unpack("V*", substr $data, 62, 4) / 10;
@@ -1408,12 +1391,29 @@ sub SMAInverter_SMAcommand($$$$$) {
  }
 
  if($data_ID eq 0x495D) {
-	 $inv_BAT_IDC = unpack("V*", substr $data, 62, 4) / 100;
-	 $inv_BAT_IDC_A = unpack("V*", substr $data, 66, 4) / 100;
-     $inv_BAT_IDC_B = unpack("V*", substr $data, 70, 4) / 100;
-     $inv_BAT_IDC_C = unpack("V*", substr $data, 74, 4) / 100;
+	 $inv_BAT_IDC = unpack("l*", substr $data, 62, 4) / 1000;
+	 $inv_BAT_IDC_A = unpack("l*", substr $data, 66, 4) / 1000;
+     $inv_BAT_IDC_B = unpack("l*", substr $data, 70, 4) / 1000;
+     $inv_BAT_IDC_C = unpack("l*", substr $data, 74, 4) / 1000;
 	 Log3 $name, 5, "$name - Found Data and BAT_IDC=$inv_BAT_IDC and BAT_IDC_A=$inv_BAT_IDC_A and BAT_IDC_B=$inv_BAT_IDC_B and BAT_IDC_C=$inv_BAT_IDC_C";
 	 return (1,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial);
+ }
+ 
+ if($data_ID eq 0x491E) {
+     $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
+     $inv_BAT_TEMP   = unpack("V*", substr $data, 90, 4) / 10;
+     $inv_BAT_UDC    = unpack("V*", substr $data, 118, 4) / 100;
+     $inv_BAT_IDC    = unpack("l*", substr $data, 146, 4);
+     
+     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+         $inv_BAT_IDC = 0; 
+     } 
+     else { 
+         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+     }
+     
+     Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+     return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
  }
  
  if($data_ID eq 0x495F) {
@@ -1432,7 +1432,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
 	 return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
  }
-
+ 
  if($data_ID eq 0x2377) {
      $inv_TEMP = unpack("l*", substr $data, 62, 4);
      
