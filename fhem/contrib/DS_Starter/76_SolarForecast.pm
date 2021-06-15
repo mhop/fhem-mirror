@@ -7204,8 +7204,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>
       
        <ul>
-         <b>Beispiel: </b> <br>
-         attr wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh <br>
+         <b>Beispiele: </b> <br>
+         attr consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh <br>
+         attr consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12
        </ul> 
        </li>  
        <br>
