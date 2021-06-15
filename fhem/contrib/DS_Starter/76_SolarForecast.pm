@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
   "0.52.3" => "14.06.2021  consumer on/off icon gray if no on/off command is defined, more consumer debug log ",
   "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes, write consumers cachefile ",
   "0.52.1" => "12.06.2021  change Attr Css behavior, new attr consumerAdviceIcon ",
@@ -2367,10 +2368,10 @@ sub _transferInverterValues {
   
   my $nhour  = $chour+1;
   
-  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", undef);           # etotal zu Beginn einer Stunde
+  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", 0);               # etotal zu Beginn einer Stunde
   
   my $ethishour;
-  if(!defined $histetot) {                                                                    # etotal der aktuelle Stunde gesetzt ?                                          
+  if(!$histetot) {                                                                            # etotal der aktuelle Stunde gesetzt ?                                          
       $paref->{etotal}   = $etotal;
       $paref->{nhour}    = sprintf("%02d",$nhour);
       $paref->{histname} = "etotal";
@@ -3600,10 +3601,12 @@ sub collectAllRegConsumers {
           ($rtot,$utot) = split ":",$etotal;
       }
       
+      my $rauto     = $hc->{auto}     // q{};
       my $ctype     = $hc->{type}     // $defctype;
       my $hours     = ($hc->{mintime} // $hef{$ctype}{mt}) / 60;
       my $avgenergy = $hc->{power} * $hours * $hef{$ctype}{tot};                                  # Wh
-      my $auto      = ReadingsVal ($consumer, $hc->{auto}, 1);                                    # Reading für Ready-Bit -> Einschalten möglich ?
+      my $auto      = 1;
+      $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                              # Reading für Ready-Bit -> Einschalten möglich ?
 
       $data{$type}{$name}{consumers}{$c}{name}         = $consumer;                               # Name des Verbrauchers (Device)
       $data{$type}{$name}{consumers}{$c}{alias}        = $alias;                                  # Alias des Verbrauchers (Device)
@@ -3615,7 +3618,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{icon}         = $hc->{icon}      // q{};                 # Icon für den Verbraucher
       $data{$type}{$name}{consumers}{$c}{oncom}        = $hc->{on}        // q{};                 # Setter Einschaltkommando 
       $data{$type}{$name}{consumers}{$c}{offcom}       = $hc->{off}       // q{};                 # Setter Ausschaltkommando
-      $data{$type}{$name}{consumers}{$c}{autoreading}  = $hc->{auto}      // q{};                 # Readingname zur Automatiksteuerung
+      $data{$type}{$name}{consumers}{$c}{autoreading}  = $rauto;                                  # Readingname zur Automatiksteuerung
       $data{$type}{$name}{consumers}{$c}{auto}         = $auto;                                   # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
       $data{$type}{$name}{consumers}{$c}{retotal}      = $rtot            // q{};                 # Reading der Leistungsmessung
       $data{$type}{$name}{consumers}{$c}{uetotal}      = $utot            // q{};                 # Unit der Leistungsmessung
