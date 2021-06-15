@@ -1404,11 +1404,12 @@ sub collect_setValue
       }
     }
 
-    ${$collect}{avg} = defined ${$collect}{max_value} ? (${$collect}{max_value}-${$collect}{min_value})/2 + ${$collect}{min_value}: $r;
+    ##${$collect}{avg} = defined ${$collect}{max_value} ? (${$collect}{max_value}-${$collect}{min_value})/2 + ${$collect}{min_value}: $r;
     
-    if (!defined ${$va}[$dim-1] or ($r >= ${$collect}{avg} and $r > ${$va}[$dim-1] or $r < ${$collect}{avg} and $r < ${$va}[$dim-1])) {
+    if (!defined ${$va}[$dim-1] or !defined ${$collect}{last_v} or (abs($r-${$collect}{last_v}) >  abs(${$va}[$dim-1]-${$collect}{last_v}))) {
+ ##   if (!defined ${$va}[$dim-1] or ($r >= ${$collect}{avg} and $r > ${$va}[$dim-1] or $r < ${$collect}{avg} and $r < ${$va}[$dim-1])) {
       ${$va}[$dim-1]=$r;
-      ${$ta}[$dim-1]=$seconds;  
+      ${$ta}[$dim-1]=$seconds;
     } elsif (${$va}[$dim-1] != $r) {
        ${$collect}{last}=$r;
     }
@@ -1421,7 +1422,6 @@ sub collect_setValue
   my $minValTime;
   my $minValSlot;
 
-  
   for (my $i=0;$i<@{$va};$i++) {
     my $value=${$va}[$i];
     my $time=${$ta}[$i];
@@ -1439,6 +1439,15 @@ sub collect_setValue
       }
     }
   }
+  
+  ${$collect}{last_v}= undef;
+  for (my $i=@{$va}-2;$i >= 0;$i--) {
+    if (defined ${$va}[$i]) {
+       ${$collect}{last_v}=${$va}[$i];
+      last;
+    }
+  }
+
   
   ${$collect}{max_value}=$maxVal;
   ${$collect}{max_value_time}=$maxValTime;
@@ -4554,7 +4563,7 @@ sub footer {
 
 sub plot {
   
-  my ($collect,$min_a,$max_a,$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim,$noColor,$lmm,$ln,$lr,$plot,$bwidth,$footerPos,$fill,$pos,$anchor,$fillColor)=@_;
+  my ($collect,$min_a,$max_a,$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim,$noColor,$lmm,$ln,$lr,$plot,$bwidth,$footerPos,$fill,$pos,$anchor,$unitColor)=@_;
   
   my $points="";
   my $v;
@@ -4669,17 +4678,24 @@ sub plot {
   my ($minValColor)=get_color(${$collect}{min_value},$min,$max,$minColor,$maxColor,$func);
   
   $out.= '<defs>';
-  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
-  $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:%s"/>',color($topValColor,$lr),$topOpacity);
-  $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:%s"/>',$nullProp,color($nullColor,$lr),$nullOpacity) if (defined $nullProp);
-  $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:%s"/></linearGradient>',color($bottomValColor,$lr),$bottomOpacity);
-
-  $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
-  for (my $i=0; $i<=1;$i+=0.10) {
-    my ($color)=get_color(($topVal-$bottomVal)*(1-$i)+$bottomVal,$min,$max,$minColor,$maxColor,$func);
-    $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:1"/>',$i,color($color,$lr));
+  if (!defined $unitColor) {
+    $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
+    $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:%s"/>',color($topValColor,$lr),$topOpacity);
+    $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:%s"/>',$nullProp,color($nullColor,$lr),$nullOpacity) if (defined $nullProp);
+    $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:%s"/></linearGradient>',color($bottomValColor,$lr),$bottomOpacity);
+    
+    $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
+    for (my $i=0; $i<=1;$i+=0.10) {
+      my ($color)=get_color(($topVal-$bottomVal)*(1-$i)+$bottomVal,$min,$max,$minColor,$maxColor,$func);
+      $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:1"/>',$i,color($color,$lr));
+    }
+    $out.= '</linearGradient>';
+  } else {
+    $out.= sprintf('<linearGradient id="gradplotLight_%s" x1="0" y1="0" x2="0" y2="1">',$unitColor);
+    $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:%s"/>',$unitColor,$topOpacity);
+    $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:%s"/>',$nullProp,$unitColor,$nullOpacity) if (defined $nullProp);
+    $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:%s"/></linearGradient>',$unitColor,$bottomOpacity);
   }
-  $out.= '</linearGradient>';
   $out.= '</defs>';
   if ($noColor ne "-1") {
     for (my $i=0;$i<=4;$i++) {
@@ -4722,40 +4738,40 @@ sub plot {
       $points.=$chart_dim.",".$last." " if ($steps eq "1");
       $points.=$chart_dim.",".(50-int(($val*$m+$n)*10)/10)." ";
     }
-    $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
-    $out.= $points;
-    if (!defined $fill) {
+    if (!defined $unitColor) {
+      $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
+      $out.= $points;
       $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
     } else {
-      $out.= sprintf('" style="fill:none; stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
+      $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
+      $out.= $points;
+      $out.= sprintf('" style="fill:url(#gradplotLight_%s);stroke:%s;stroke-width:0.5" />',$unitColor,$unitColor);
     }
-    #$out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
-    #$out.= $points;
-    #$out.= sprintf('" style="fill:none;stroke:%s;stroke-width:0.2" />',$fillColor);
-    
   }
   $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-opacity:1" />',$xpos,$chart_dim,$xpos);
 
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$chart_dim,(50-int(($value*$m+$n)*10)/10),color($currColor,$ln)) if ($val ne "N/A");
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$chart_dim,(50-int(($value*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($currColor,$ln)) if ($val ne "N/A");
   
   my $footer="";
   
   if ($footerPos) {
     if (defined $maxValTime) {
       if ($hours > 168) {
-        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:#CCCCCC;font-size:7px">▲%s</text>',$footerPos,::strftime("%d.%m %H:%M",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:8px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($maxValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:#CCCCCC;font-size:8px">▲%s</text>',$footerPos,::strftime("%a %H:%M",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:9px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a %H:%M",localtime($maxValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:9px;%s">%s</text>',$bwidth/2+7,$footerPos,color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
     }
     if (defined $minValTime) {
       if ($hours > 168) {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',$bwidth/2+9,$footerPos,::strftime("%d.%m %H:%M",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
+        ##$footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',$bwidth/2+9,$footerPos,::strftime("%d.%m %H:%M",localtime($minValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',$bwidth/2+9,$footerPos,::strftime("%a %H:%M",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a %H:%M",localtime($minValTime)));
+       ## $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',$bwidth/2+9,$footerPos,::strftime("%a %H:%M",localtime($minValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:9px;%s">%s</text>', $bwidth+7,$footerPos,color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
     }
@@ -4921,7 +4937,10 @@ sub card
       if (ref($col) eq "ARRAY") {
         for (my $i=0;$i< @{$col};$i++) {
           $out.=sprintf('<g transform="translate(%s,1)">',defined $collect2 ? $bwidth-35-(@{$col}-$i)*21.5:$bwidth+7-(@{$col}-$i)*43);
-          $out.= ui_Table::ring(${$col}[$i]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? ${$unit_a}[$i]:$unit ,"70,1",$func,$decfont,$model,$lightness,undef,undef);
+          my $unitColor=(split(",",${$unit_a}[$i]))[1];
+          $decfont="" if (!defined $decfont);
+        ##  $out.= ui_Table::ring(${$col}[$i]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? "$decfont,,fill:".color($unitColor,$ln):$unit ,"70,1",$func,defined $unitColor ? "$decfont,,fill:".color($unitColor,$ln):$decfont,$model,$lightness,undef,undef);
+          $out.= ui_Table::ring(${$col}[$i]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[$i]))[0]:$unit ,"70,1",$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,$model,$lightness,undef,undef);
           $out.='</g>';
         }
       } else {
@@ -4972,14 +4991,14 @@ sub card
   if (defined $scale) {
     my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($timebeginn);
     my $beginhour=int($hour/$scale)*$scale;
-    my $diffminutes=($hour-$beginhour)*60+$minutes;
-    my $pos=(int ($diffminutes/($scale*60)*1000)/100-9)*$x_prop; 
-
-   ## $out.=sprintf('<text text-anchor="middle" x="-0.5" y="60" style="fill:#CCCCCC;font-size:7px">%02d</text>',$beginhour) if ($pos == 0);
+    my $diffsec=($hour-$beginhour)*3600+$minutes*60+$sec;
+    my $pos=(1-$diffsec/($scale*3600))*$chart_dim/$strokes-$x_prop;
+    
+    ##$out.=sprintf('<text text-anchor="start" x="0" y="40" style="fill:#CCCCCC;font-size:7px">%s</text>',"chart_dim:$chart_dim, pos:$pos");
     for (my $i=0;$i<$strokes;$i++) {
       my $h=$beginhour+($i+1)*$scale;
       $hour=($h >= 24 ? $h % 24:$h);
-      my $x=int(($i*($chart_dim/$strokes)-$pos)*100)/100;
+      my $x=int((($i*($chart_dim/$strokes)+$pos))*10)/10;
       $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
       if ($hour == 0) {
         if ($hours <= 168) {
@@ -5021,7 +5040,7 @@ sub card
       $maxVal=$max if (!defined $maxVal or $max > $maxVal);
     }
     for (my $i=0;$i<@{$col};$i++) {
-      ($outplot,$outfooter) = plot (${$col}[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $i ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$i*10,undef,-2.5,"end");
+      ($outplot,$outfooter) = plot (${$col}[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $i ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$i*10,undef,-2.5,"end",(split(",",${$unit_a}[$i]))[1]);
       $out.=$outplot;
       push (@outfooter,$outfooter);
     }
@@ -5042,7 +5061,12 @@ sub card
     $out.=sprintf('<g transform="translate(%s,6)">',$bwidth-49);
     if (!defined $collect2) {
       if (ref($col) eq "ARRAY" and scalar (@{$col}) >= 2 ) {
-        $out.= ui_Table::ring2(${$col}[0]{value},$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,${$col}[1]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? ${$unit_a}[1]:$unit,$func,$decfont,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
+          my $unitColor=(split(",",${$unit_a}[0]))[1];
+          my $unitColor2=(split(",",${$unit_a}[1]))[1];
+          $decfont="" if (!defined $decfont);
+          $decfont2="" if (!defined $decfont2);
+          $out.= ui_Table::ring2(${$col}[0]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[0]))[0]:$unit,92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
+                 ${$col}[1]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[1]))[0]:$unit,$func,defined $unitColor2 ? $decfont2.",,fill:".$unitColor2:$decfont2,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
       } else {
         $out.= ui_Table::ring(${$collect}{value},$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
       }
@@ -5507,7 +5531,8 @@ sub ring
   ($monochrom,$minMax,$innerRing,$pointer)=split (/,/,$mode) if (defined $mode);
  
   my ($dec,$fontformat,$unitformat);
-  ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
+  ($dec,$fontformat,$unitformat)=split (/,/,$decfont,3) if (defined $decfont);
+  $dec="" if (!defined $dec);
   $fontformat="" if (!defined $fontformat);
   $unitformat="" if (!defined $unitformat);
   
@@ -5548,7 +5573,7 @@ sub ring
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
   
-  $dec=1 if (!defined $dec);
+  $dec=1 if ($dec eq "");
   
   ($format,$value,$val)=format_value($val,$min,$dec);
 
@@ -5712,11 +5737,13 @@ sub ring2
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
+  $dec="" if (!defined $dec);
   $fontformat="" if (!defined $fontformat);
   $unitformat="" if (!defined $unitformat);
   
   my ($dec2,$fontformat2,$unitformat2);
   ($dec2,$fontformat2,$unitformat2)=split (/,/,$decfont2) if (defined $decfont2);
+  $dec2="" if (!defined $dec2);
   $fontformat2="" if (!defined $fontformat2);
   $unitformat2="" if (!defined $unitformat2);
   
@@ -5752,7 +5779,7 @@ sub ring2
 
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
-  $dec=1 if (!defined $dec);
+  $dec=1 if ($dec eq "");
 
   ($format,$value,$val)=format_value($val,$min,$dec);
 
@@ -5785,7 +5812,7 @@ sub ring2
   
   $min2=0 if (!defined $min2);
   $max2=100 if (!defined $max2);
-  $dec2=1 if (!defined $dec2);
+  $dec2=1 if ($dec2 eq "");
   
   ($format2,$value2,$val2)=format_value($val2,$min2,$dec2);
 
