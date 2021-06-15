@@ -1,11 +1,11 @@
-REV 24627
+REV 24635
 DIR unused
 UPD 2021-06-12_07:45:02 363601 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-05-26_07:45:02 43322 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2021-06-06_07:45:12 168173 ./fhem.pl
+UPD 2021-06-15_07:45:12 168201 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2021-06-08_07:45:02 57931 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -740,8 +740,8 @@ UPD 2021-06-13_07:45:07 4524784 docs/commandref.html
 UPD 2021-06-12_07:45:09 2799305 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-06-14_07:45:10 243079 docs/commandref_modular.html
-UPD 2021-06-14_07:45:11 254077 docs/commandref_modular_DE.html
+UPD 2021-06-15_07:45:10 243079 docs/commandref_modular.html
+UPD 2021-06-15_07:45:12 254077 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
