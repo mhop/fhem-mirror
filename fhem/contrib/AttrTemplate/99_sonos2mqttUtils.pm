@@ -82,14 +82,14 @@ if (grep { $_ eq $cmd } @easycmd) {return lc( qq($topic { "command": "$cmd" }) )
 
 # special volume handling fading: second value is startvalue, if -1 start is actual value
 if($cmd eq 'volume') {
-   $vol = $arr[1];
    if ($arr[2]) {
-      if ($arr[2] == -1) { $vol = ReadingsNum($NAME,'volume',0) } else { $vol = $arr[2] }
-      my $d = abs $arr[1] - $vol;
-      my $s = $arr[1] <=> $vol;
-      if ($d) { for (1..$d) { fhem("sleep $_;set $NAME volume {([$NAME:volume]+$s)}") } }
+      if ($arr[2] == -1) { $arr[2] = ReadingsNum($NAME,'volume',0) }
+      my $d = abs $arr[1] - $arr[2];
+      my $s = $arr[1] <=> $arr[2];
+      $arr[1] = $arr[2];
+      if ($d) { for (1..$d) { $vol = $arr[1] + $_*$s; fhem("sleep $_;set $NAME volume $vol") } }
    }
-   return qq($topic { "command": "volume", "input": $vol }) 
+   return qq($topic { "command": "volume", "input": $arr[1] }) 
 }
 
 if ($cmd eq 'play') {
