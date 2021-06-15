@@ -361,6 +361,7 @@ MQTT2_SERVER_Read($@)
 
     my $ret = Authenticate($hash, "basicAuth:".encode_base64("$usr:$pwd"));
     if($ret == 2) { # CONNACK, Error
+      delete($hash->{lwt}); # Avoid autocreate, #121587
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 4), $dump, 
                                 sub{ CommandDelete(undef, $hash->{NAME}); });
     }
