@@ -4304,7 +4304,7 @@ sub _graphicConsumerLegend {
               }
               else {
                   ($caicon) = split('\@', $caicon);
-                  $isricon  = "<a title= '$htitles{connorec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon.'@gray', '');
+                  $isricon  = "<a title= '$htitles{connorec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon.'@grey', '');
               }
           }
       }      
