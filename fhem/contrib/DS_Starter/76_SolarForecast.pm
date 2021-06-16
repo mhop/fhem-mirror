@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
   "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
   "0.52.3" => "14.06.2021  consumer on/off icon gray if no on/off command is defined, more consumer debug log ",
   "0.52.2" => "13.06.2021  attr consumerAdviceIcon can be 'none', new attr debug, minor fixes, write consumers cachefile ",
@@ -2603,13 +2604,13 @@ sub _manageConsumerData {
           delete $paref->{histname};
       }
       
-      ## Durchschnittsverbrauch ermitteln + speichern
-      ############################################################
+      ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
+      ################################################################
       my $consumerco = 0;
       my $runhours   = 0;
       my $dnum       = 0;
       
-      for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {                           # gemessenen Verbrauch ermitteln
+      for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {                                             # gemessenen Verbrauch ermitteln
           my $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
           next if(!$csme);
           my $hours = HistoryVal ($hash, $n, 99, "hourscsme${c}", 0);
@@ -2619,16 +2620,19 @@ sub _manageConsumerData {
           $dnum++;      
       }
 
-      if ($dnum) {   
-          $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);             # Durchschnittsverbrauch eines Tages aus History  
-          $data{$type}{$name}{consumers}{$c}{mintime}   = (ceil($runhours/$dnum)) * 60;         # Durchschnittslaufzeit in Minuten 
+      if ($dnum) {         
+          $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);                               # Durchschnittsverbrauch eines Tages aus History  
+          my $mintime                                   = ConsumerVal ($hash, $c, "mintime", $defmintime);
+          my $avgruntime                                = (ceil($runhours/$dnum)) * 60;                           # Durchschnittslaufzeit in Minuten 
+          $mintime                                      = $avgruntime < $mintime ? $mintime : $avgruntime;
+          $data{$type}{$name}{consumers}{$c}{mintime}   = $mintime;
       }
       
       $paref->{consumer} = $c;
       
-      __calcEnergyPieces ($paref);                                                              # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
-      __planSwitchTimes  ($paref);                                                              # Consumer Switch Zeiten planen
-      __switchConsumer   ($paref);                                                              # Consumer schalten
+      __calcEnergyPieces ($paref);                                                                                # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
+      __planSwitchTimes  ($paref);                                                                                # Consumer Switch Zeiten planen
+      __switchConsumer   ($paref);                                                                                # Consumer schalten
       
       ## consumer Hash ergänzen, Reading generieren 
       ###############################################
@@ -2636,9 +2640,9 @@ sub _manageConsumerData {
       my ($pstate,$starttime,$stoptime)         = __planningStateandTimes ($paref);
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
-      push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' "; # Consumer Infos 
-      push @$daref, "consumer${c}_planned_start<>"."$starttime" if($starttime);                               # Consumer Start geplant
-      push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stoptime);                                # Consumer Stop geplant            
+      push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' ";     # Consumer Infos 
+      push @$daref, "consumer${c}_planned_start<>"."$starttime" if($starttime);                                   # Consumer Start geplant
+      push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stoptime);                                    # Consumer Stop geplant            
   }
   
   delete $paref->{consumer};
@@ -4196,8 +4200,7 @@ return;
 sub _graphicConsumerLegend {                                
   my $paref                    = shift;
   my $hash                     = $paref->{hash};
-  my $name                     = $paref->{name};
-  my $caicon                   = $paref->{caicon};                                                  # Consumer AdviceIcon
+  my $name                     = $paref->{name};                                                 # Consumer AdviceIcon
   my ($clegendstyle, $clegend) = split('_', $paref->{clegend});
   
   my $type                     = $hash->{TYPE};
@@ -4205,7 +4208,7 @@ sub _graphicConsumerLegend {
   
   $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
   $paref->{clegend}            = $clegend;
-  
+
   return if(!$clegend );
   
   my $ftui   = $paref->{ftui};
@@ -4247,7 +4250,8 @@ sub _graphicConsumerLegend {
   my $modulo = 1;
   my $tro    = 0;
   
-  for my $c (@consumers) {          
+  for my $c (@consumers) { 
+      my $caicon     = $paref->{caicon}; 
       my $cname      = ConsumerVal ($hash, $c, "name",                    "");                      # Name des Consumerdevices
       my $calias     = ConsumerVal ($hash, $c, "alias",               $cname);                      # Alias des Consumerdevices
       my $cicon      = ConsumerVal ($hash, $c, "icon",                    "");                      # Icon des Consumerdevices     
@@ -4303,7 +4307,7 @@ sub _graphicConsumerLegend {
                   $isricon = $pstate;
               }
               else {
-                  ($caicon) = split('\@', $caicon);
+                  ($caicon) = split('@', $caicon);
                   $isricon  = "<a title= '$htitles{connorec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon.'@grey', '');
               }
           }
@@ -4552,13 +4556,10 @@ sub _beamGraphic {
   my $weather    = $paref->{weather};
   my $show_night = $paref->{show_night};                     # alle Balken (Spalten) anzeigen ?
   my $show_diff  = $paref->{show_diff};                      # zusätzliche Anzeige $di{} in allen Typen
-  my $colorw     = $paref->{colorw};                         # Wetter Icon Farbe
-  my $colorwn    = $paref->{colorwn};                        # Wetter Icon Farbe Nacht
   my $lotype     = $paref->{lotype};
   my $height     = $paref->{height};
   my $fsize      = $paref->{fsize};
   my $kw         = $paref->{kw};
-  my $width      = $paref->{width};
   my $colorfc    = $paref->{colorfc};
   my $colorc     = $paref->{colorc};
   my $fcolor1    = $paref->{fcolor1};
@@ -4581,49 +4582,9 @@ sub _beamGraphic {
   my ($val,$z2,$z3,$z4,$he);
   my $ret;
   
+  $ret .= __weatherOnBeam ($paref);
+  
   my $m = $paref->{modulo} % 2;
-
-  if ($weather) {
-      $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
-
-      my $ii;
-      for my $i (0..($maxhours*2)-1) {
-          last if (!exists($hfcg->{$i}{weather}));
-          next if (!$show_night  && defined($hfcg->{$i}{weather}) 
-                                 && ($hfcg->{$i}{weather} > 99) 
-                                 && !$hfcg->{$i}{beam1} 
-                                 && !$hfcg->{$i}{beam2});
-                                                                                                                 # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
-          $ii++;                                                                                                 # wieviele Stunden Icons haben wir bisher beechnet  ?
-          last if ($ii > $maxhours);
-                                                                                                                 # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
-          if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-              my ($icon_name, $title) = $hfcg->{$i}{weather} > 100             ? 
-                                        weather_icon($hfcg->{$i}{weather}-100) : 
-                                        weather_icon($hfcg->{$i}{weather});
-              
-              if($icon_name eq 'unknown') {              
-                  Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
-              }
-                  
-              $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
-              $val        = FW_makeImage($icon_name);
-
-              if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
-                  $val = '<b>???<b/>';                                                       
-                  Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
-              }
-              
-              $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
-          } 
-          else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
-              $ret .= "<td></td>";  
-              $hfcg->{$i}{weather} = undef;                                                                      # ToDo : prüfen ob noch nötig
-          }
-      }
-
-      $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende der Icon Zeile
-  }
 
   if($show_diff eq 'top') {                                                                                      # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
@@ -4891,6 +4852,69 @@ sub _beamGraphic {
 
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
+
+return $ret;
+}
+
+################################################################
+#                   Wetter Icon Zeile 
+################################################################
+sub __weatherOnBeam {
+  my $paref      = shift;
+  my $name       = $paref->{name};
+  my $hfcg       = $paref->{hfcg};
+  my $maxhours   = $paref->{maxhours};
+  my $weather    = $paref->{weather};
+  my $show_night = $paref->{show_night};                     # alle Balken (Spalten) anzeigen ?
+  my $colorw     = $paref->{colorw};                         # Wetter Icon Farbe
+  my $colorwn    = $paref->{colorwn};                        # Wetter Icon Farbe Nacht
+  my $width      = $paref->{width};
+  
+  my $ret = q{};
+  
+  return $ret if(!$weather);
+  
+  my $m = $paref->{modulo} % 2;
+
+  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
+
+  my $ii;
+  for my $i (0..($maxhours*2)-1) {
+      last if (!exists($hfcg->{$i}{weather}));
+      next if (!$show_night  && defined($hfcg->{$i}{weather}) 
+                             && ($hfcg->{$i}{weather} > 99) 
+                             && !$hfcg->{$i}{beam1} 
+                             && !$hfcg->{$i}{beam2});
+                                                                                                             # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
+      $ii++;                                                                                                 # wieviele Stunden Icons haben wir bisher beechnet  ?
+      last if ($ii > $maxhours);
+                                                                                                             # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
+      if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
+          my ($icon_name, $title) = $hfcg->{$i}{weather} > 100             ? 
+                                    weather_icon($hfcg->{$i}{weather}-100) : 
+                                    weather_icon($hfcg->{$i}{weather});
+          
+          if($icon_name eq 'unknown') {              
+              Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
+          }
+              
+          $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
+          my $val     = FW_makeImage($icon_name);
+
+          if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+              $val = '<b>???<b/>';                                                       
+              Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+          }
+          
+          $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
+      } 
+      else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
+          $ret .= "<td></td>";  
+          $hfcg->{$i}{weather} = undef;                                                                      # ToDo : prüfen ob noch nötig
+      }
+  }
+
+  $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende der Icon Zeile
 
 return $ret;
 }
@@ -7205,8 +7229,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       
        <ul>
          <b>Beispiele: </b> <br>
-         attr consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh <br>
-         attr consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12
+         attr &lt;name&gt; consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh <br>
+         attr &lt;name&gt; consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12
        </ul> 
        </li>  
        <br>
