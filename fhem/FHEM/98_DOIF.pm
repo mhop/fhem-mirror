@@ -5064,9 +5064,9 @@ sub card
           my $unitColor=(split(",",${$unit_a}[0]))[1];
           my $unitColor2=(split(",",${$unit_a}[1]))[1];
           $decfont="" if (!defined $decfont);
-          $decfont2="" if (!defined $decfont2);
+          ##$decfont2="" if (!defined $decfont2);
           $out.= ui_Table::ring2(${$col}[0]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[0]))[0]:$unit,92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
-                 ${$col}[1]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[1]))[0]:$unit,$func,defined $unitColor2 ? $decfont2.",,fill:".$unitColor2:$decfont2,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
+                 ${$col}[1]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[1]))[0]:$unit,$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
       } else {
         $out.= ui_Table::ring(${$collect}{value},$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
       }
