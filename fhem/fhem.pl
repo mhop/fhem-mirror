@@ -3882,7 +3882,7 @@ CallFn(@)
     return undef;
   }
   my $fn = $modules{$defs{$d}{TYPE}}{$n};
-  return "" if(!$fn);
+  return "" if(!$fn || $defs{$d}{"disable$n"}); #121631
   if(wantarray) {
     no strict "refs";
     my @ret = &{$fn}(@_);
