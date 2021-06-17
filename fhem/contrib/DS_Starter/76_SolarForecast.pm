@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
   "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
   "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
   "0.52.3" => "14.06.2021  consumer on/off icon gray if no on/off command is defined, more consumer debug log ",
@@ -583,6 +584,7 @@ sub Initialize {
                                 "maxVariancePerDay ".
                                 "maxValBeam ".
                                 "numHistDays:slider,1,1,30 ".
+                                "preferredChargeBattery:slider,0,1,100 ".
                                 "rainFactorDamping:slider,0,1,100 ".
                                 "sameWeekdaysForConsfc:1,0 ".
                                 "showDiff:no,top,bottom ".
@@ -1331,7 +1333,7 @@ sub _setconsumerAction {                 ## no critic "not used"
   
   my $action = shift @args;                                                 # z.B. set, setreading
   my $cname  = shift @args;                                                 # Consumername
-  my $tail   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     # restliche Befehlsargumente ## no critic 'Map blocks'
+  my $tail   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente 
   
   if($action eq "set") {
       CommandSet (undef,"$cname $tail");
@@ -1651,7 +1653,7 @@ sub Notify {
           $event  = "" if(!defined($event));
           my @evl = split(/\s+/x, $event);
                     
-          my @parts   = split(/: /,$event, 2);
+          my @parts   = split(/: /x,$event, 2);
           my $reading = shift @parts;
 
           if ($reading eq "state" || $reading eq $autoreading) {
@@ -2637,7 +2639,7 @@ sub _manageConsumerData {
       ## consumer Hash ergänzen, Reading generieren 
       ###############################################
       my $costate                               = ReadingsVal             ($consumer, "state", "");
-      my ($pstate,$starttime,$stoptime)         = __planningStateandTimes ($paref);
+      my ($pstate,$starttime,$stoptime)         = __planningStateAndTimes ($paref);
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
       push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' ";     # Consumer Infos 
@@ -2943,14 +2945,20 @@ sub __switchConsumer {
   ## Verbraucher einschalten
   ############################
   my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                             # Set Command für "on"
-  my $auto   = ConsumerVal ($hash, $c, "auto",   1);
+  my $auto   = ConsumerVal ($hash, $c, "auto",    1);
  
-  if($auto && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {                   # Verbraucher Start ist geplant && Startzeit überschritten
+  if($auto && $oncom && $pstate =~ /planned|priority/xs && $startts && $t >= $startts) {          # Verbraucher Start ist geplant && Startzeit überschritten
       my $surplus = CurrentVal  ($hash, "surplus",          0);                                   # aktueller Überschuß
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
       my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
+      my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
       
-      if($mode eq "must" || $surplus >= $power) {                                                 # "Muss"-Planung oder Überschuß > Leistungsaufnahme
+      Log3 ($name, 1, "$name - Is consumer switch enabled by battery: $enable");
+      
+      if($mode eq "can" && !$enable) {
+          $data{$type}{$name}{consumers}{$c}{planstate}     = "priority charging battery";
+      }
+      elsif($mode eq "must" || $surplus >= $power) {                                              # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
           my (undef,undef,undef,$starttime)                 = timestampToTimestring ($t);
           my $stopdiff                                      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
@@ -2984,10 +2992,33 @@ sub __switchConsumer {
 return;
 }
 
+################################################################
+# Freigabe Einschalten Verbraucher durch Batterie Vorrangladung 
+#    return 0 -> keine Einschaltfreigabe Verbraucher
+#    return 1 -> Einschaltfreigabe Verbraucher
+################################################################
+sub ___enableSwitchByBatPrioCharge {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  
+  my $ena     = 1;
+  my $pcb     = AttrVal ($name, "preferredChargeBattery", 0);                # Vorrangladung Batterie zu X%
+  my ($badev) = hasBattery ($name);
+  
+  return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
+  
+  my $cbcharge = CurrentVal ($hash, "batcharge", 0);                         # aktuelle Batterieladung
+  $ena         = 0 if($cbcharge < $pcb);                                     # keine Freigabe wenn Batterieladung kleiner Soll-Ladung
+
+return $ena;
+}
+
 ###################################################################
 #    Consumer Planungsstatus mit Schaltzeiten liefern
 ###################################################################
-sub __planningStateandTimes {
+sub __planningStateAndTimes {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $c     = $paref->{consumer};
@@ -2997,6 +3028,7 @@ sub __planningStateandTimes {
   $pstate     = $pstate =~ /planned/xs       ? "planned"  : 
                 $pstate =~ /switched\son/xs  ? "started"  :
                 $pstate =~ /switched\soff/xs ? "finished" :
+                $pstate =~ /priority/xs      ? $pstate    :
                 "unknown";
   
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
@@ -3021,10 +3053,8 @@ sub _transferBatteryValues {
   my $day   = $paref->{day};
   my $daref = $paref->{daref};  
 
-  my $badev  = ReadingsVal($name, "currentBatteryDev", "");                                   # aktuelles Meter device für Batteriewerte
-  my ($a,$h) = parseParams ($badev);
-  $badev     = $a->[0] // "";
-  return if(!$badev || !$defs{$badev});
+  my ($badev,$a,$h) = hasBattery ($name);
+  return if(!$badev);
   
   my $type = $hash->{TYPE}; 
   
@@ -3043,16 +3073,16 @@ sub _transferBatteryValues {
   
   Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit), totalin: $bin ($binunit), totalout: $bout ($boutunit), charge: $batchr");
   
-  my $piuf   = $piunit   =~ /^kW$/xi  ? 1000 : 1;
-  my $pouf   = $pounit   =~ /^kW$/xi  ? 1000 : 1;
-  my $binuf  = $binunit  =~ /^kWh$/xi ? 1000 : 1;
-  my $boutuf = $boutunit =~ /^kWh$/xi ? 1000 : 1;  
+  my $piuf      = $piunit   =~ /^kW$/xi  ? 1000 : 1;
+  my $pouf      = $pounit   =~ /^kW$/xi  ? 1000 : 1;
+  my $binuf     = $binunit  =~ /^kWh$/xi ? 1000 : 1;
+  my $boutuf    = $boutunit =~ /^kWh$/xi ? 1000 : 1;  
   
-  my $pbo       = ReadingsNum ($badev, $pou,      0) * $pouf;                                  # aktuelle Batterieentladung (W)
-  my $pbi       = ReadingsNum ($badev, $pin,      0) * $piuf;                                  # aktueller Batterieladung (W)
-  my $btotout   = ReadingsNum ($badev, $bout,     0) * $boutuf;                                # totale Batterieentladung (Wh)
-  my $btotin    = ReadingsNum ($badev, $bin,      0) * $binuf;                                 # totale Batterieladung (Wh)
-  my $batcharge = ReadingsNum ($badev, $batchr, "-");
+  my $pbo       = ReadingsNum ($badev, $pou,    0) * $pouf;                                    # aktuelle Batterieentladung (W)
+  my $pbi       = ReadingsNum ($badev, $pin,    0) * $piuf;                                    # aktueller Batterieladung (W)
+  my $btotout   = ReadingsNum ($badev, $bout,   0) * $boutuf;                                  # totale Batterieentladung (Wh)
+  my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
+  my $batcharge = ReadingsNum ($badev, $batchr, 0);
   
   my $params;
   
@@ -4285,7 +4315,7 @@ sub _graphicConsumerLegend {
             
       $paref->{consumer} = $c;
       
-      my ($planstate,$starttime,$stoptime) = __planningStateandTimes ($paref);      
+      my ($planstate,$starttime,$stoptime) = __planningStateAndTimes ($paref);      
       my $pstate = $caicon eq "times" ? $hqtxt{pstate}{$lang} : $htitles{pstate}{$lang};
       
       $pstate    =~ s/<pstate>/$planstate/xs;
@@ -4300,6 +4330,11 @@ sub _graphicConsumerLegend {
               }
               else {
                   $isricon = "<a title= '$htitles{conrec}{$lang}\n\n$pstate'</a>".FW_makeImage($caicon, '');
+                  if($planstate =~ /priority/xs) {
+                      my (undef,$color) = split('@', $caicon);
+                      $color            = $color ? '@'.$color : '';  
+                      $isricon          = "<a title= '$htitles{conrec}{$lang}\n\n$pstate'</a>".FW_makeImage('it_ups_charging'.$color, '');
+                  }
               }
           }
           else {
@@ -4360,8 +4395,8 @@ sub _graphicConsumerLegend {
           $ctable .= "<td style='text-align:center' $dstyle>$auicon         </td>";
       } 
       else {
-          my (undef,$co) = split('\@', $cicon);
-          $co      = '' if (!$co);                                                                        
+          my (undef,$co) = split('@', $cicon);
+          $co            = '' if (!$co);                                                                        
           
           $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
           $ctable .= "<td>                                                                   </td>";
@@ -4967,15 +5002,13 @@ sub _flowGraphic {
   my $grid_color   = $cgfi   ? 'flowg grid_color1' : 'flowg grid_color2';
   $grid_color      = 'flowg grid_color3' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
   
-  my $ret;
- 
-  $ret .= qq{
+  my $ret = << "END0";
       <style>
       $css
       $animation
       </style>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style" id="SVGPLOT">
-
+      
       <g transform="translate(200,50)">
         <g>
             <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
@@ -5011,15 +5044,15 @@ sub _flowGraphic {
       <g id="grid" class="$grid_color" transform="translate(0,150),scale(3.5)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
-  };
+END0
 
 
   if ($hasbat) {
-      $ret .= qq{
-        <g class="$bat_color" transform="translate(410,135),scale(.33) rotate (90)">
-        <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
-        <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
-      };
+      $ret .= << "END1";
+      <g class="$bat_color" transform="translate(410,135),scale(.33) rotate (90)">
+      <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
+      <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
+END1
 
       $ret .= '<path d="m 221.141,266.334 c 0,3.313 -2.688,6 -6,6 h -65.5 c -3.313,0 -6,-2.688 -6,-6 v -6 c 0,-3.314 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.686 6,6 v 26 z"/>'     if ($soc > 12);
       $ret .= '<path d="m 221.141,213.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 38);
@@ -5028,18 +5061,19 @@ sub _flowGraphic {
       $ret .= '</g>';
   }
 
-    $ret .= qq{
+    $ret .= << "END2";
     <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-        <path id="pv-home"   class="$csc_style"  d="M300,100 L300,510" />
-        <path id="pv-grid"   class="$cgfi_style" d="M270,100 L90,270" />
-        <path id="grid-home" class="$cgc_style"  d="M90,305 L270,510" />
-    };
+    <path id="pv-home"   class="$csc_style"  d="M300,100 L300,510" />
+    <path id="pv-grid"   class="$cgfi_style" d="M270,100 L90,270" />
+    <path id="grid-home" class="$cgc_style"  d="M90,305 L270,510" />
+END2
 
-    $ret .= qq{
+  if ($hasbat) {
+      $ret .= << "END3";
       <path id="bat-home" class="$batout_style" d="M502,305 L330,510" />
       <path id="pv-bat"   class="$batin_style"  d="M330,100 L500,270" />
-    } if ($hasbat);
-
+END3
+  }
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="400" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="595" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
@@ -5186,6 +5220,21 @@ sub checkdwdattr {
   Log3 ($name, 2, "$name - $err") if($err);
   
 return $err;
+}
+
+################################################################
+#       ist Batterie installiert ?
+#       1 - ja, 0 - nein
+################################################################
+sub hasBattery {               
+  my $name   = shift;
+
+  my $badev  = ReadingsVal($name, "currentBatteryDev", "");                  # aktuelles Meter device für Batteriewerte
+  my ($a,$h) = parseParams ($badev);
+  $badev     = $a->[0] // "";
+  return if(!$badev || !$defs{$badev});
+  
+return ($badev, $a ,$h);
 }
 
 ##################################################################################################
@@ -7429,6 +7478,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Anzahl der historischen Tage die zur Autokorrektur der PV Vorhersage verwendet werden sofern
          aktiviert. <br>
          (default: 30)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-preferredChargeBattery"></a>
+       <li><b>preferredChargeBattery </b><br>
+         Es werden Verbraucher mit dem Mode <b>can</b> erst dann eingeschaltet, wenn die angegebene Batterieladung (%)
+         erreicht ist. <br>
+         Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht. <br>
+         (default: 0)
        </li>
        <br>
        
