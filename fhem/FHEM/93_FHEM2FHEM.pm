@@ -32,9 +32,19 @@ FHEM2FHEM_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
-  $hash->{AttrList}= "addStateEvent:1,0 dummy:1,0 disable:0,1 ".
-                     "disabledForIntervals eventOnly:1,0 excludeEvents ".
-                     "setState";
+  no warnings 'qw';
+  my @attrList = qw(
+    addStateEvent:1,0
+    dummy:1,0
+    disable:0,1
+    disabledForIntervals
+    eventOnly:1,0
+    excludeEvents
+    setState
+    reportConnected:1,0
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
 }
 
 #####################################
@@ -277,6 +287,8 @@ FHEM2FHEM_OpenDev($$)
     my $msg = $hash->{informType} eq "LOG" ? 
                   "inform $type $hash->{regexp}" : "inform raw";
     syswrite($hash->{TCPDev}, $msg . "\n");
+    syswrite($hash->{TCPDev}, "trigger global CONNECTED $name\n")
+      if(AttrVal($name, "reportConnected", 0));
   };
 
   return HttpUtils_Connect({     # Nonblocking
@@ -473,6 +485,11 @@ FHEM2FHEM_Attr(@)
       if set to 1, and there is a local device with the same name, then remote
       set commands will be executed for the local device.
       </li>
+     <li><a id="FHEM2FHEM-attr-reportConnected">reportConnected</a>
+       if set (to 1), a  "global CONNECTED &lt;name&gt;" Event will be generated
+       after connection established on the telnet server. This might be used to
+       resend changed values.
+       </li> 
   </ul>
 
 </ul>
@@ -609,8 +626,12 @@ FHEM2FHEM_Attr(@)
        existiert, dann werden set Befehle vom entfernten Ger&auml;t als Solches
        &uuml;bertragen.
        </li>
+     <li><a id="FHEM2FHEM-attr-reportConnected">reportConnected</a>
+       falls gesetzt (auf 1), dann wird auf dem Telnet-Server nach dem
+       Verbinden das "global CONNECTED &lt;name&gt;" Event erzeugt. Das
+       erm&ouml;glicht z.Bsp. das erneute Senden ge&auml;nderter Zust&auml;nde.
+       </li> 
    </ul>
-
 </ul>
 
 =end html_DE
