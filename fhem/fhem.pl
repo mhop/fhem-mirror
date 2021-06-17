@@ -135,7 +135,7 @@ sub json2nameValue($;$$$);
 sub json2reading($$;$$$$);
 sub latin1ToUtf8($);
 sub myrename($$$);
-sub notifyRegexpChanged($$);
+sub notifyRegexpChanged($$;$);
 sub parseParams($;$$$);
 sub prepareFhemTestFile();
 sub perlSyntaxCheck($%);
@@ -3882,7 +3882,7 @@ CallFn(@)
     return undef;
   }
   my $fn = $modules{$defs{$d}{TYPE}}{$n};
-  return "" if(!$fn || $defs{$d}{"disable$n"}); #121631
+  return "" if(!$fn);
   if(wantarray) {
     no strict "refs";
     my @ret = &{$fn}(@_);
@@ -5516,6 +5516,7 @@ createNtfyHash()
   my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
                  grep { $defs{$_}{NTFY_ORDER} && 
                         $defs{$_}{TYPE} && 
+                        !$defs{$_}{disableNotifyFn} && 
                         $modules{$defs{$_}{TYPE}}{NotifyFn} } keys %defs;
   my %d2a_cache;
   %ntfyHash = ("*" => []);
@@ -5565,10 +5566,17 @@ notifyRegexpCheck($)
 }
 
 sub
-notifyRegexpChanged($$)
+notifyRegexpChanged($$;$)
 {
-  my ($hash, $re) = @_;
+  my ($hash, $re, $disableNotifyFn) = @_;
 
+  %ntfyHash = ();
+  if($disableNotifyFn) {
+    delete($hash->{NOTIFYDEV});
+    $hash->{disableNotifyFn}=1;
+    return;
+  }
+  delete($hash->{disableNotifyFn});
   my @list2 = split(/\|/, $re);
   my @list = grep { m/./ }                                     # Forum #62369
              map  { (m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/ && 
@@ -5580,7 +5588,6 @@ notifyRegexpChanged($$)
   } else {
     delete($hash->{NOTIFYDEV});
   }
-  %ntfyHash = ();
 }
 
 sub
