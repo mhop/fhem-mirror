@@ -46,7 +46,7 @@ watchdog_Initialize($)
               ($tTime && $tTime gt $aTime) ||
               time_str2num($aTime)+$wh->{TO} <= $now);
       my $remaining = time_str2num($aTime)+$wh->{TO};
-      watchdog_Activate($wh, $remaining);
+      watchdog_Activate($wh, undef, undef, $remaining);
     }
   }, 1) if(!$init_done);
 }
@@ -57,6 +57,10 @@ watchdog_reset($)
   my ($watchdog) = @_;
   $watchdog->{STATE} = "defined";
   setReadingsVal($watchdog, "Reset", "reset", TimeNow());
+  if($watchdog->{READINGS}) {
+    delete($watchdog->{READINGS}{triggeredByDev}) ;
+    delete($watchdog->{READINGS}{triggeredByEvent}) ;
+  }
 }
 
 #####################################
@@ -99,7 +103,7 @@ watchdog_Define($$)
   $watchdog->{CMD} = $cmd;
 
   if($re1 eq ".") {
-    watchdog_Activate($watchdog)
+    watchdog_Activate($watchdog);
 
   } else {
     $watchdog->{STATE} = "defined"; # do not set the reading
@@ -154,7 +158,7 @@ watchdog_Notify($$)
         RemoveInternalTimer($watchdog);
 
         if($re1 eq $re2 || $re1 eq "." || $re2act) {
-          watchdog_Activate($watchdog);
+          watchdog_Activate($watchdog, $n, $s);
           return "";
 
         } else {
@@ -163,13 +167,13 @@ watchdog_Notify($$)
         }
 
       } elsif($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/) {
-        watchdog_Activate($watchdog) if(!$dontReAct);
+        watchdog_Activate($watchdog, $n, $s) if(!$dontReAct);
 
       }
 
     } elsif($watchdog->{STATE} eq "defined") {
       if($dotTrigger || ($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/)) {
-        watchdog_Activate($watchdog)
+        watchdog_Activate($watchdog, $n, $s)
       }
 
     } elsif($dotTrigger) {
@@ -193,11 +197,15 @@ watchdog_Trigger($)
   }
 
   Log3 $name, 3, "Watchdog $name triggered";
-  my $exec = SemicolonEscape($watchdog->{CMD});
+  my %specials= (
+    "%NAME" => ReadingsVal($name, "triggeredByDev", ""),
+    "%EVENT" => ReadingsVal($name, "triggeredByEvent", "")
+  );
+  my $exec = EvalSpecials($watchdog->{CMD}, %specials);
   $watchdog->{STATE} = "triggered";
-  
+
   setReadingsVal($watchdog, "Triggered", "triggered", TimeNow());
-  
+
   my $ret = AnalyzeCommandChain(undef, $exec);
   Log3 $name, 3, $ret if($ret);
 
@@ -207,13 +215,18 @@ watchdog_Trigger($)
 }
 
 sub
-watchdog_Activate($;$)
+watchdog_Activate($;$$$)
 {
-  my ($watchdog, $remaining) = @_;
-  my $nt = ($remaining ? $remaining : gettimeofday() + $watchdog->{TO});
+  my ($watchdog, $dev, $event, $remaining) = @_;
+  my $now = gettimeofday();
+  my $nt = ($remaining ? $remaining : $now + $watchdog->{TO});
   $watchdog->{STATE} = "Next: " . FmtTime($nt);
   RemoveInternalTimer($watchdog);
   InternalTimer($nt, "watchdog_Trigger", $watchdog, 0);
+
+  my $fmtNow = FmtDateTime($now);
+  setReadingsVal($watchdog, "triggeredByDev",   $dev,   $fmtNow) if($dev);
+  setReadingsVal($watchdog, "triggeredByEvent", $event, $fmtNow) if($event);
 
   my $eor = AttrVal($watchdog->{NAME}, "execOnReactivate", undef);
   if($eor) {
@@ -346,6 +359,8 @@ watchdog_Set($@)
           currently not possible.</li>
       <li>with modify all parameters are optional, and will not be changed if
           not specified.</li>
+      <li>the device and the event triggering the watchdog is available as $DEV
+          and $EVENT in the executable.</li>
     </ul>
 
     <br>
@@ -486,6 +501,9 @@ watchdog_Set($@)
 
       <li>Bei modify sind alle Parameter optional, und werden nicht geaendert,
       falls nicht spezifiziert.</li>
+
+      <li>Das aktivierende Ger&auml;t und Event sind al $DEV und $EVENT im
+      ausf&uuml;hrenden Teil verf&uuml;gbar.</li>
 
     </ul>
 
