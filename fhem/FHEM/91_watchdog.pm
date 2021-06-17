@@ -198,7 +198,7 @@ watchdog_Trigger($)
 
   Log3 $name, 3, "Watchdog $name triggered";
   my %specials= (
-    "%NAME" => ReadingsVal($name, "triggeredByDev", ""),
+    "%DEV" => ReadingsVal($name, "triggeredByDev", ""),
     "%EVENT" => ReadingsVal($name, "triggeredByEvent", "")
   );
   my $exec = EvalSpecials($watchdog->{CMD}, %specials);
