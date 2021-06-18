@@ -153,6 +153,12 @@ sub Netzfrequenz_StartTimer {
 	return;
 };
 
+sub Netzfrequenz_StopTimer {
+	my ($hash) = @_;
+	RemoveInternalTimer($hash, \&Netzfrequenz_ApiRequest);
+	return;
+};
+
 sub Netzfrequenz_ApiRequest {
 	my ($hash) = @_;
 
