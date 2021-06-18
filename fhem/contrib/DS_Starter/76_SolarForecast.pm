@@ -345,6 +345,8 @@ my %htitles = (                                                                 
                 DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit}                                 },
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>},
                 DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>}              },
+  akorron  => { EN => qq{Enable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on},
+                DE => qq{Einschalten Autokorrektur mit:\nset <NAME> pvCorrectionFactor_Auto on}             },
 );
 
 my %weather_ids = (
@@ -2953,7 +2955,7 @@ sub __switchConsumer {
       my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
       
-      Log3 ($name, 1, "$name - Is consumer switch enabled by battery: $enable");
+      Log3 ($name, 4, "$name - Consumer switch enabled by battery: $enable");
       
       if($mode eq "can" && !$enable) {
           $data{$type}{$name}{consumers}{$c}{planstate}     = "priority charging battery";
@@ -4097,7 +4099,8 @@ sub _graphicHeader {
           $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang});
       } 
       elsif ($pcfa eq "off") {
-          $acicon = "off";
+          $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;
+          $acicon = "<a title='$htitles{akorron}{$lang}'</a>off";         
       } 
       elsif ($pcfa =~ /standby/ix) {
           my ($rtime) = $pcfa =~ /for (.*?) hours/x;
@@ -4114,9 +4117,9 @@ sub _graphicHeader {
       
       $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
                  $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
-                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);              
-      $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
+                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);
       
+      $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
 
       ## erste Header-Zeilen
       #######################
@@ -5557,14 +5560,6 @@ sub calcAvgFromHistory {
           $ei--;
       }
       
-      if(scalar(@efa)) {
-          Log3 ($name, 4, "$name - PV History -> Raw Days ($calcmaxd) for average check: ".join " ",@efa); 
-      }
-      else {                                                                               # vermeide Fehler: Illegal division by zero
-          Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Use only current day for average calc");
-          return;
-      }
-      
       my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", undef);                           # Wolkenbedeckung Heute & abgefragte Stunde
       
       if(!defined $chwcc) {
@@ -5572,7 +5567,15 @@ sub calcAvgFromHistory {
           return;
       }
            
-      my $range = calcRange ($chwcc);                                                      # V 0.50.1       
+      my $range = calcRange ($chwcc);                                                      # V 0.50.1  
+      
+      if(scalar(@efa)) {
+          Log3 ($name, 4, "$name - PV History -> Raw Days ($calcmaxd) for average check: ".join " ",@efa); 
+      }
+      else {                                                                               # vermeide Fehler: Illegal division by zero
+          Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Use only current day for average calc");
+          return (undef,undef,undef,$range);
+      }     
       
       Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $range");
       
