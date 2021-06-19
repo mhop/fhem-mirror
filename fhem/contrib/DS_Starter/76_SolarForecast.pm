@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.54.0" => "19.06.2021  new calcVariance, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
   "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
   "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
   "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
@@ -175,7 +176,7 @@ my %vNotesIntern = (
   "0.29.0" => "03.04.2021  new setter powerTrigger ",
   "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
   "0.27.0" => "02.04.2021  additional readings ",
-  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalActivities ",
+  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _specialActivities ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
   "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
                            "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
@@ -1224,7 +1225,30 @@ sub _setreset {                          ## no critic "not used"
   }
   
   if($prop eq "pvCorrection") {
-      deleteReadingspec ($hash, "pvCorrectionFactor_.*");
+      for my $n (1..24) {
+          $n = sprintf "%02d", $n;
+          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+      }
+      
+      my $circ  = $paref->{prop1} // 'no';                                   # alle pvKorr-Werte aus Circular-Hash löschen ?
+      my $circh = $paref->{prop2} // q{};                                    # pvKorr-Werte einer bestimmten Stunde aus Circular-Hash löschen ?
+      
+      if ($circ eq "circular") {
+          if ($circh) {
+              delete $data{$type}{$name}{circular}{$circh}{pvcorrf};
+              delete $data{$type}{$name}{circular}{$circh}{quality}; 
+
+              Log3($name, 3, qq{$name - stored PV correction factor of hour "$circh" in pvCircular deleted});
+              return;              
+          }
+          
+          for my $hod (keys %{$data{$type}{$name}{circular}}) {
+              delete $data{$type}{$name}{circular}{$hod}{pvcorrf};
+              delete $data{$type}{$name}{circular}{$hod}{quality};
+          }
+          
+          Log3($name, 3, qq{$name - all stored PV correction factors in pvCircular deleted});
+      }
       return;
   }
   
@@ -1945,7 +1969,7 @@ sub centralTask {
       
       collectAllRegConsumers     ($params);                                                        # alle Verbraucher Infos laden
       
-      _additionalActivities      ($params);                                                        # zusätzliche Events generieren + Sonderaufgaben
+      _specialActivities         ($params);                                                        # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
@@ -2057,7 +2081,7 @@ return $interval;
 #     Zusätzliche Readings/ Events für Logging generieren und
 #     Sonderaufgaben !
 ################################################################
-sub _additionalActivities {
+sub _specialActivities {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -2955,7 +2979,7 @@ sub __switchConsumer {
       my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
       
-      Log3 ($name, 4, "$name - Consumer switch enabled by battery: $enable");
+      Log3 ($name, 4, "$name - Consumer switch enabled by battery: $enable");  
       
       if($mode eq "can" && !$enable) {
           $data{$type}{$name}{consumers}{$c}{planstate}     = "priority charging battery";
@@ -2985,7 +3009,7 @@ sub __switchConsumer {
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t;                                     # tatsächliche Ausschaltzeit
       $state                                            = qq{Consumer "$calias" switched off};
       
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   } 
   
@@ -3007,7 +3031,7 @@ sub ___enableSwitchByBatPrioCharge {
   
   my $ena     = 1;
   my $pcb     = AttrVal ($name, "preferredChargeBattery", 0);                # Vorrangladung Batterie zu X%
-  my ($badev) = hasBattery ($name);
+  my ($badev) = useBattery ($name);
   
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
   
@@ -3055,7 +3079,7 @@ sub _transferBatteryValues {
   my $day   = $paref->{day};
   my $daref = $paref->{daref};  
 
-  my ($badev,$a,$h) = hasBattery ($name);
+  my ($badev,$a,$h) = useBattery ($name);
   return if(!$badev);
   
   my $type = $hash->{TYPE}; 
@@ -5229,7 +5253,7 @@ return $err;
 #       ist Batterie installiert ?
 #       1 - ja, 0 - nein
 ################################################################
-sub hasBattery {               
+sub useBattery {               
   my $name   = shift;
 
   my $badev  = ReadingsVal($name, "currentBatteryDev", "");                  # aktuelles Meter device für Batteriewerte
@@ -5238,6 +5262,41 @@ sub hasBattery {
   return if(!$badev || !$defs{$badev});
   
 return ($badev, $a ,$h);
+}
+
+################################################################
+#       wird PV Autokorrektur verwendet ?
+#       1 - ja, 0 - nein
+################################################################
+sub useAutoCorrection {               
+  my $name = shift;
+
+  my $dcauto = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
+
+  return 1 if($dcauto eq 'on');
+  
+return;
+}
+
+################################################################
+#       Ist Attribut 'numHistDays' gesetzt ?
+#       $usenhd: 1 - ja, 0 - nein
+#       $nhd   : Anzahl der zu verwendenden HistDays
+################################################################
+sub useNumHistDays {               
+  my $name = shift;
+
+  my $usenhd = 0;
+  my $nhd    = AttrVal($name, 'numHistDays', $calcmaxd+1);
+  
+  if($nhd == $calcmaxd+1) {
+      $nhd = $calcmaxd;
+  }
+  else {
+      $usenhd = 1;
+  }
+  
+return ($usenhd, $nhd);
 }
 
 ##################################################################################################
@@ -5445,12 +5504,8 @@ sub calcVariance {
   my $t     = $paref->{t};                                                              # aktuelle Unix-Zeit
   my $chour = $paref->{chour};
   my $day   = $paref->{day};                                                            # aktueller Tag (01,02,03...31)
-  
-  my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
-  if($dcauto =~ /^off/x) {
-      Log3 ($name, 4, "$name - automatic Variance calculation is switched off."); 
-      return;      
-  }
+   
+  return if(!useAutoCorrection ($name));                                                # nur bei "on" automatische Varianzkalkulation
   
   my $idts = ReadingsTimestamp($name, "currentInverterDev", "");                        # Definitionstimestamp des Inverterdevice
   return if(!$idts);
@@ -5486,19 +5541,34 @@ sub calcVariance {
       }    
       
       Log3 ($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
-      
+            
       $paref->{hour}                  = $h;
       my ($pvhis,$fchis,$dnum,$range) = calcAvgFromHistory ($paref);                                      # historische PV / Forecast Vergleichswerte ermitteln
-      $dnum                           = $dnum  ? $dnum+1 : 1;                                             # der aktuelle Wert ist nun der erste AVG im Store
-      $pvval                          = $pvhis ? ($pvval + $pvhis) / $dnum : $pvval;                      # Ertrag aktuelle Stunde berücksichtigen
-      $fcval                          = $fchis ? ($fcval + $fchis) / $dnum : $fcval;                      # Vorhersage aktuelle Stunde berücksichtigen
       
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
       $oldfac             = 1 if(1*$oldfac == 0);
       
-      Log3 ($name, 4, "$name - New PV Variance -> range: $range, hour: $h, days: $dnum, real: $pvval, forecast: $fcval");
+      my $factor;
+      my ($usenhd) = useNumHistDays ($name);                                                              # ist Attr numHistDays gesetzt ?
+    
+      if($dnum) {                                                                                         # Werte in History vorhanden -> haben Prio !
+          $dnum   = $dnum + 1;                                                                            
+          $pvval  = ($pvval + $pvhis) / $dnum;                                                            # Ertrag aktuelle Stunde berücksichtigen
+          $fcval  = ($fcval + $fchis) / $dnum;                                                            # Vorhersage aktuelle Stunde berücksichtigen
+          $factor = sprintf "%.2f", ($pvval / $fcval);                                                    # Faktorberechnung: reale PV / Prognose
+      }
+      elsif($oldfac && !$usenhd) {                                                                        # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr numHistDays
+          $dnum   = $oldq + 1;
+          $factor = sprintf "%.2f", ($pvval / $fcval);
+          $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
+      }
+      else {                                                                                              # ganz neuer Wert
+          $factor = sprintf "%.2f", ($pvval / $fcval);
+          $dnum   = 1;          
+      }
       
-      my $factor = sprintf "%.2f", ($pvval / $fcval);                                                     # Faktorberechnung: reale PV / Prognose
+      Log3 ($name, 4, "$name - variance -> range: $range, hour: $h, days: $dnum, real: $pvval, forecast: $fcval, factor: $factor");                                               
+      
       if(abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
           Log3 ($name, 3, "$name - new limited Variance factor: $factor (old: $oldfac) for hour: $h");
@@ -5543,8 +5613,8 @@ sub calcAvgFromHistory {
   my $type  = $hash->{TYPE};  
   my $pvhh  = $data{$type}{$name}{pvhist};
   
-  my $calcd = AttrVal($name, "numHistDays", $calcmaxd);
-  
+  my ($usenhd, $calcd) = useNumHistDays ($name);                                          # ist Attr numHistDays gesetzt ? und welcher Wert
+
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
   my ($idx) = grep {$k[$_] eq "$day"} (0..@k-1);                                          # Index des aktuellen Tages
@@ -5590,7 +5660,7 @@ sub calcAvgFromHistory {
               next;
           }  
         
-          $histwcc = calcRange ($histwcc);                                                 # V 0.50.1       
+          $histwcc = calcRange ($histwcc);                                                 # V 0.50.1         
 
           if($range == $histwcc) {               
               $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
@@ -6919,7 +6989,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-set-pvCorrectionFactor_Auto"></a>
-      <li><b>pvCorrectionFactor_Auto &lt;on | off&gt; </b> <br><br>  
+      <li><b>pvCorrectionFactor_Auto on | off </b> <br><br>  
       
       Schaltet die automatische Vorhersagekorrektur ein/aus. <br>
       Ist die Automatik eingeschaltet, wird für jede Stunde ein Korrekturfaktor der Solarvorhersage berechnet und intern 
@@ -6952,19 +7022,32 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <li><b>reset </b> <br><br> 
        
        Löscht die aus der Drop-Down Liste gewählte Datenquelle, zu der Funktion gehörende Readings oder weitere interne 
-       Datenstrukturen. Die Bedeutung der Argumente ist: <br><br>
+       Datenstrukturen. <br><br>
 
       <ul>
          <table>  
-         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                                   </td></tr>         
-            <tr><td> <b>consumerPlanning</b>  </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                   </td></tr>
-            <tr><td>                          </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                      </td></tr>
-            <tr><td>                          </td><td>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt;                                          </td></tr>
-            <tr><td> <b>pvHistory</b>         </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                    </td></tr>
-            <tr><td>                          </td><td>Um einen bestimmten historischen Tag zu löschen:                                                           </td></tr>
-            <tr><td>                          </td><td>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08)                  </td></tr>
-            <tr><td>                          </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                              </td></tr>
-            <tr><td>                          </td><td>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </td></tr>
+         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                                              </td></tr>         
+            <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                             </td></tr>
+            <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                          </td></tr>
+            <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                   </td></tr>
+            <tr><td> <b>currentForecastDev</b> </td><td>löscht das eingestellte Device für Wetterdaten                                                                       </td></tr>
+            <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                   </td></tr>
+            <tr><td> <b>currentMeterDev</b>    </td><td>löscht das eingestellte Meterdevice und korrespondierende Daten                                                      </td></tr>
+            <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                           </td></tr>
+            <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                            </td></tr>
+            <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                      </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht die aktuell ermittelten PV Tageskorrekturfaktoren                                                             </td></tr>
+            <tr><td>                           </td><td>Um PV Korrekturfaktoren einer bestimmte Stunde aus pvCircular zu löschen:                                            </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection circular &lt;Stunde&gt;  </ul>                                               </td></tr>    
+            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection circular 10)       </ul>                                               </td></tr>            
+            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus pvCircular zu löschen:                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection circular </ul>                                                               </td></tr>
+            <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                              </td></tr>
+            <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                     </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                  </td></tr>
+            <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                        </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul> </td></tr>
          </table>
       </ul>      
       </li>
@@ -7478,9 +7561,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-numHistDays"></a>
        <li><b>numHistDays </b><br>
-         Anzahl der historischen Tage die zur Autokorrektur der PV Vorhersage verwendet werden sofern
-         aktiviert. <br>
-         (default: 30)
+         Anzahl der historischen Tage aus Cache 'pvHistory' die zur Autokorrektur der PV Vorhersage verwendet werden. <br>
+         (default: alle verfügbaren Daten in pvHistory und pvCircular)
        </li>
        <br>
        
