@@ -531,7 +531,6 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_ChargeStatus,
      $sup_SpotDCVoltage,
      $sup_SpotACVoltage,
-	 $sup_SpotACCurrent,
      $sup_BatteryInfo,
 	 $sup_BatteryInfo_2, 			#SBS(1.5|2.0|2.5)
 	 $sup_BatteryInfo_TEMP,
@@ -557,9 +556,7 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_SPOT_UDC1, $inv_SPOT_UDC2,
      $inv_SPOT_IDC1, $inv_SPOT_IDC2,
      $inv_SPOT_UAC1, $inv_SPOT_UAC2, $inv_SPOT_UAC3,
-	 $inv_SPOT_UAC1_2, $inv_SPOT_UAC2_3, $inv_SPOT_UAC3_1,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
-	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
@@ -634,7 +631,6 @@ sub SMAInverter_getstatusDoParse($) {
          # Detail Level 1 or 2 >> get voltage and current levels
          push(@commands, "sup_SpotDCVoltage");         # Check SpotDCVoltage
          push(@commands, "sup_SpotACVoltage");         # Check SpotACVoltage
-		 push(@commands, "sup_SpotACCurrent");         # Check SpotACCurrent
 		 
 		 if (ReadingsVal($name,"INV_TYPE","") =~ /SBS(6\.0|5\.0|3\.7)/xs || ReadingsVal($name,"device_type","") =~ /SBS(6\.0|5\.0|3\.7)/xs)
 		 {
@@ -698,11 +694,7 @@ sub SMAInverter_getstatusDoParse($) {
                  ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
              }
              elsif ($i eq "sup_SpotACVoltage") {
-                 ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004656FF);
-             }
-			 elsif ($i eq "sup_SpotACCurrent") {
-				 Log3 $name, 5, "$name -> sup_SpotACCurrent";
-                 ($sup_SpotACCurrent,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465300, 0x004655FF);
+                 ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
              }
 		     elsif ($i eq "sup_BatteryInfo_TEMP") {
 			     Log3 $name, 5, "$name -> sup_BatteryInfo_TEMP";
@@ -869,15 +861,9 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n");
                      push(@row_array, "phase_2_uac ".sprintf("%.2f",$inv_SPOT_UAC2)."\n");
                      push(@row_array, "phase_3_uac ".sprintf("%.2f",$inv_SPOT_UAC3)."\n");
-                     push(@row_array, "phase_1_2_uac ".sprintf("%.3f",$inv_SPOT_UAC1_2)."\n");
-                     push(@row_array, "phase_2_3_uac ".sprintf("%.3f",$inv_SPOT_UAC2_3)."\n");
-                     push(@row_array, "phase_3_1_uac ".sprintf("%.3f",$inv_SPOT_UAC3_1)."\n");
-					 push(@row_array, "CosPhi ".sprintf("%.3f",$inv_SPOT_CosPhi)."\n");
-                 }
-				 if($sup_SpotACCurrent) {
-                     push(@row_array, "phase_1_iac ".sprintf("%.2f",$inv_SPOT_IAC1)."\n");
-                     push(@row_array, "phase_2_iac ".sprintf("%.2f",$inv_SPOT_IAC2)."\n");
-                     push(@row_array, "phase_3_iac ".sprintf("%.2f",$inv_SPOT_IAC3)."\n");
+                     push(@row_array, "phase_1_iac ".sprintf("%.3f",$inv_SPOT_IAC1)."\n");
+                     push(@row_array, "phase_2_iac ".sprintf("%.3f",$inv_SPOT_IAC2)."\n");
+                     push(@row_array, "phase_3_iac ".sprintf("%.3f",$inv_SPOT_IAC3)."\n");
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
@@ -992,15 +978,9 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n");
                      push(@row_array, "SPOT_UAC2 ".$inv_SPOT_UAC2."\n");
                      push(@row_array, "SPOT_UAC3 ".$inv_SPOT_UAC3."\n");
-                     push(@row_array, "SPOT_UAC1_2 ".sprintf("%.3f",$inv_SPOT_UAC1_2)."\n");
-                     push(@row_array, "SPOT_UAC2_3 ".sprintf("%.3f",$inv_SPOT_UAC2_3)."\n");
-                     push(@row_array, "SPOT_UAC3_1 ".sprintf("%.3f",$inv_SPOT_UAC3_1)."\n");
-					 push(@row_array, "SPOT_CosPhi ".sprintf("%.3f",$inv_SPOT_CosPhi)."\n");
-                 }
-				 if($sup_SpotACCurrent) {
-                     push(@row_array, "SPOT_IAC1 ".sprintf("%.2f",$inv_SPOT_IAC1)."\n");
-                     push(@row_array, "SPOT_IAC2 ".sprintf("%.2f",$inv_SPOT_IAC2)."\n");
-                     push(@row_array, "SPOT_IAC3 ".sprintf("%.2f",$inv_SPOT_IAC3)."\n");
+                     push(@row_array, "SPOT_IAC1 ".$inv_SPOT_IAC1."\n");
+                     push(@row_array, "SPOT_IAC2 ".$inv_SPOT_IAC2."\n");
+                     push(@row_array, "SPOT_IAC3 ".$inv_SPOT_IAC3."\n");
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");                                                     
@@ -1199,9 +1179,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_UDC1, $inv_SPOT_UDC2,
      $inv_SPOT_IDC1, $inv_SPOT_IDC2,
      $inv_SPOT_UAC1, $inv_SPOT_UAC2, $inv_SPOT_UAC3,
-	 $inv_SPOT_UAC1_2, $inv_SPOT_UAC2_3, $inv_SPOT_UAC3_1,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
-	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
@@ -1443,37 +1421,18 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_UAC1 = unpack("l*", substr $data, 62, 4);
      $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
      $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
-     $inv_SPOT_UAC1_2 = unpack("l*", substr $data, 146, 4);
-     $inv_SPOT_UAC2_3 = unpack("l*", substr $data, 174, 4);
-     $inv_SPOT_UAC3_1 = unpack("l*", substr $data, 202, 4);
-	 
-	 $inv_SPOT_CosPhi = unpack("l*", substr $data, 230, 4);
-	 
+     $inv_SPOT_IAC1 = unpack("l*", substr $data, 146, 4);
+     $inv_SPOT_IAC2 = unpack("l*", substr $data, 174, 4);
+     $inv_SPOT_IAC3 = unpack("l*", substr $data, 202, 4);
      if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = 0; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = 0; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = 0; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC1_2 eq -2147483648) || ($inv_SPOT_UAC1_2 eq 0xFFFFFFFF)) {$inv_SPOT_UAC1_2 = 0; } else {$inv_SPOT_UAC1_2 = $inv_SPOT_UAC1_2 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC2_3 eq -2147483648) || ($inv_SPOT_UAC2_3 eq 0xFFFFFFFF)) {$inv_SPOT_UAC2_3 = 0; } else {$inv_SPOT_UAC2_3 = $inv_SPOT_UAC2_3 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC3_1 eq -2147483648) || ($inv_SPOT_UAC3_1 eq 0xFFFFFFFF)) {$inv_SPOT_UAC3_1 = 0; } else {$inv_SPOT_UAC3_1 = $inv_SPOT_UAC3_1 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF)) {$inv_SPOT_IAC1 = 0; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF)) {$inv_SPOT_IAC2 = 0; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF)) {$inv_SPOT_IAC3 = 0; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      
-	 if(($inv_SPOT_CosPhi eq -2147483648) || ($inv_SPOT_CosPhi eq 0xFFFFFFFF)) {$inv_SPOT_CosPhi = 0; } else {$inv_SPOT_CosPhi = $inv_SPOT_CosPhi / 100; }
-	 
-	 
-     Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and inv_SPOT_UAC1_2=$inv_SPOT_UAC1_2 and inv_SPOT_UAC2_3=$inv_SPOT_UAC2_3 and inv_SPOT_UAC3_1=$inv_SPOT_UAC3_1 and inv_SPOT_CosPhi=$inv_SPOT_CosPhi";
-     return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial);
- }
- 
-  if($data_ID eq 0x4653) {
-     $inv_SPOT_IAC1 = unpack("l*", substr $data, 62, 4);
-     $inv_SPOT_IAC2 = unpack("l*", substr $data, 90, 4);
-     $inv_SPOT_IAC3 = unpack("l*", substr $data, 118, 4);
-	 
-     if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF) || $inv_SPOT_IAC1 < 0) {$inv_SPOT_IAC1 = 0; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF) || $inv_SPOT_IAC2 < 0) {$inv_SPOT_IAC2 = 0; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF) || $inv_SPOT_IAC3 < 0) {$inv_SPOT_IAC3 = 0; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-
-     Log3 $name, 5, "$name - Found Data inv_SPOT_IAC1=$inv_SPOT_IAC1 and inv_SPOT_IAC2=$inv_SPOT_IAC2 and inv_SPOT_IAC3=$inv_SPOT_IAC3";
-     return (1,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and SPOT_IAC1=$inv_SPOT_IAC1 and SPOT_IAC2=$inv_SPOT_IAC2 and SPOT_IAC3=$inv_SPOT_IAC3";
+     return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
  }
  
  if ($data_ID eq 0x495B && (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || 
