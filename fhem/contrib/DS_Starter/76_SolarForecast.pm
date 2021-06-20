@@ -6998,9 +6998,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
       Zukünftig erwartete PV Erzeugungen werden mit den gespeicherten Korrekturfaktoren optimiert. <br> 
-      Bei aktivierter Autokorrektur wird das Attribut <a href="#cloudFactorDamping">cloudFactorDamping</a> übersteuert und hat
-      nur noch eine untergeordnete Bedeutung. <br>
-      <b>Die automatische Vorhersagekorrektur ist lernend und benötigt einige Tage um die Korrekturwerte zu optimieren.
+      Bei aktivierter Autokorrektur haben die Attribute <a href="#cloudFactorDamping">cloudFactorDamping</a> und
+      <a href="#rainFactorDamping">rainFactorDamping</a> nur noch eine untergeordnete Bedeutung. <br>
+      <b>Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
       (default: off)      
       </li>
