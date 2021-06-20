@@ -32,6 +32,8 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.15.0" => "14.06.2021  MadMax: SBS5.0-10, SBS6.0-10 read battery data included ",
+  "2.14.2" => "02.06.2021  new inverter type 9359=SBS6.0-10 ",
   "2.14.1" => "27.02.2021  change save .etotal_yesterday, Forum: https://forum.fhem.de/index.php/topic,56080.msg1134664.html#msg1134664 ",
   "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P, Forum: #topic,56080.msg986302.html#msg986302",
   "2.13.4" => "30.08.2019  STP10.0-3AV-40 298 included into %SMAInverter_devtypes ",
@@ -90,7 +92,7 @@ our %SMAInverter_vNotesIntern = (
 # $inv_SPOT_ETODAY                # Today yield
 # $inv_SPOT_ETOTAL                # Total yield
 # $inv_SPOT_PDC1                  # DC power input 1
-# $inv_SPOT_PDC2	              # DC power input 2
+# $inv_SPOT_PDC2                  # DC power input 2
 # $inv_SPOT_PAC1                  # Power L1
 # $inv_SPOT_PAC2                  # Power L2
 # $inv_SPOT_PAC3                  # Power L3
@@ -98,7 +100,7 @@ our %SMAInverter_vNotesIntern = (
 # $inv_PACMAX2                    # Nominal power in Warning Mode
 # $inv_PACMAX3                    # Nominal power in Fault Mode
 # $inv_PACMAX1_2                  # Maximum active power device (Some inverters like SB3300/SB1200)
-# $inv_SPOT_PACTOT		          # Total Power
+# $inv_SPOT_PACTOT                # Total Power
 # $inv_ChargeStatus               # Battery Charge status
 # $inv_SPOT_UDC1                  # DC voltage input
 # $inv_SPOT_UDC2                  # DC voltage input
@@ -126,6 +128,7 @@ our %SMAInverter_vNotesIntern = (
 # $inv_BAT_LOADTOTAL              # Total Batteryload
 
 # Aufbau Wechselrichter Type-Hash
+# https://github.com/SBFspot/SBFspot/blob/master/SBFspot/TagListDE-DE.txt
 my %SMAInverter_devtypes = (
 0000 => "Unknown Inverter Type",
 9015 => "SB 700",
@@ -255,6 +258,7 @@ my %SMAInverter_devtypes = (
 9348 => "STP10.0-3AV-40 (Sunny Tripower 10.0)",
 9356 => "SBS3.7-1VL-10 (Sunny Boy Storage 3.7)",
 9358 => "SBS5.0-10 (Sunny Boy Storage 5.0)",
+9359 => "SBS6.0-10 (Sunny Boy Storage 6.0)",
 9366 => "STP3.0-3AV-40 (Sunny Tripower 3.0)",
 9401 => "SB3.0-1AV-41 (Sunny Boy 3.0 AV-41)",
 9402 => "SB3.6-1AV-41 (Sunny Boy 3.6 AV-41)",
@@ -303,8 +307,8 @@ sub SMAInverter_Initialize($) {
                       "offset ".
                       "suppressSleep:1,0 ".
                       "SBFSpotComp:1,0 " .
-					  "showproctime:1,0 ".
-					  "timeout " .
+                      "showproctime:1,0 ".
+                      "timeout " .
                       "target-susyid " .
                       "target-serial " .
                       $readingFnAttributes;
@@ -415,7 +419,7 @@ sub SMAInverter_Attr(@) {
     my $hash = $defs{$name};
     my $do;
 
-	if ($aName eq "mode") {
+    if ($aName eq "mode") {
         if ($cmd eq "set" && $aVal eq "manual") {
             $hash->{INTERVAL} = $aVal;
         } else {
@@ -453,8 +457,8 @@ sub SMAInverter_Attr(@) {
     if ($aName eq "interval") {
         if ($cmd eq "set") {
             $hash->{HELPER}{INTERVAL} = $aVal;
-			$hash->{INTERVAL} = $aVal if(AttrVal($name, "mode", "") ne "manual");
-			delete($hash->{HELPER}{AVERAGEBUF}) if($hash->{HELPER}{AVERAGEBUF});
+            $hash->{INTERVAL} = $aVal if(AttrVal($name, "mode", "") ne "manual");
+            delete($hash->{HELPER}{AVERAGEBUF}) if($hash->{HELPER}{AVERAGEBUF});
             Log3 $name, 3, "$name - Set $aName to $aVal";
         } else {
             $hash->{INTERVAL} = $hash->{HELPER}{INTERVAL} = 60;
@@ -464,7 +468,7 @@ sub SMAInverter_Attr(@) {
     if ($cmd eq "set" && $aName eq "offset") {
             if($aVal !~ /^\d+$/ || $aVal < 0 || $aVal > 7200) { return "The Value of $aName is not valid. Use value between 0 ... 7200 !";}
     }
-	if ($cmd eq "set" && $aName eq "timeout") {
+    if ($cmd eq "set" && $aName eq "timeout") {
         unless ($aVal =~ /^[0-9]+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
     }
 return;
@@ -483,7 +487,7 @@ sub SMAInverter_GetData($) {
 
  if ($init_done != 1) {
      InternalTimer(gettimeofday()+5, "SMAInverter_GetData", $hash, 0);
-	 return;
+     return;
  }
 
  return if(IsDisabled($name));
@@ -501,7 +505,7 @@ sub SMAInverter_GetData($) {
  # decide of operation
  if(AttrVal($name,"mode","automatic") eq "automatic") {
      # automatic operation mode
-	 InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);
+     InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);
  }
 
 $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAInverter_getstatusDoParse", "$name", "SMAInverter_getstatusParseDone", $timeout, "SMAInverter_getstatusParseAborted", $hash);
@@ -528,6 +532,11 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_SpotDCVoltage,
      $sup_SpotACVoltage,
      $sup_BatteryInfo,
+	 $sup_BatteryInfo_2, 			#SBS(1.5|2.0|2.5)
+	 $sup_BatteryInfo_TEMP,
+	 $sup_BatteryInfo_UDC,
+	 $sup_BatteryInfo_IDC,
+	 $sup_BatteryInfo_Capac,
      $sup_SpotGridFrequency,
      $sup_TypeLabel,
      $sup_OperationTime,
@@ -537,7 +546,7 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_DeviceStatus);
  
  my ($inv_TYPE, $inv_CLASS,
-	 $inv_SPOT_ETODAY, $inv_SPOT_ETOTAL,
+     $inv_SPOT_ETODAY, $inv_SPOT_ETOTAL,
      $inv_susyid,
      $inv_serial,
      $inv_SPOT_PDC1, $inv_SPOT_PDC2,
@@ -548,9 +557,10 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_SPOT_IDC1, $inv_SPOT_IDC2,
      $inv_SPOT_UAC1, $inv_SPOT_UAC2, $inv_SPOT_UAC3,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
-     $inv_BAT_UDC, $inv_BAT_IDC,
-     $inv_BAT_CYCLES,
-     $inv_BAT_TEMP,
+     $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
+     $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
+     $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
+     $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,);
 
@@ -602,7 +612,7 @@ sub SMAInverter_getstatusDoParse($) {
  if (($oper_start <= $dt_now && $dt_now <= $oper_stop) || AttrVal($name,"suppressSleep",0)) {
      # normal operation or suppressed sleepmode
 
-	 # Abfrage Inverter Startzeit
+     # Abfrage Inverter Startzeit
      $ist = [gettimeofday];
 
      # Get the current attributes
@@ -615,82 +625,125 @@ sub SMAInverter_getstatusDoParse($) {
                      "sup_SpotACPower",                # Check SpotACPower
                      "sup_SpotACTotalPower",           # Check SpotACTotalPower
                      "sup_ChargeStatus"                # Check BatteryChargeStatus
-				     );
+                     );
 
      if($detail_level > 0) {
          # Detail Level 1 or 2 >> get voltage and current levels
-	     push(@commands, "sup_SpotDCVoltage");         # Check SpotDCVoltage
-	     push(@commands, "sup_SpotACVoltage");         # Check SpotACVoltage
-	     push(@commands, "sup_BatteryInfo");           # Check BatteryInfo
-         push(@commands, "sup_SpotBatteryLoad");       # Check Batteryload
+         push(@commands, "sup_SpotDCVoltage");         # Check SpotDCVoltage
+         push(@commands, "sup_SpotACVoltage");         # Check SpotACVoltage
+		 
+		 if (ReadingsVal($name,"INV_TYPE","") =~ /SBS(6\.0|5\.0|3\.7)/xs || ReadingsVal($name,"device_type","") =~ /SBS(6\.0|5\.0|3\.7)/xs)
+		 {
+			push(@commands, "sup_BatteryInfo_UDC");     # Check BatteryInfo Voltage
+			push(@commands, "sup_BatteryInfo_IDC");     # Check BatteryInfo current
+		 }
+		 elsif (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || ReadingsVal($name,"device_type","") =~ /SBS(1\.5|2\.0|2\.5)/xs)
+		 {
+			push(@commands, "sup_BatteryInfo_2");     # Check BatteryInfo Voltage
+		 }
+		 else{
+			push(@commands, "sup_BatteryInfo");        	# Check BatteryInfo 
+		 }
+		 
+         push(@commands, "sup_SpotBatteryLoad");       	# Check Batteryload
      }
 
      if($detail_level > 1) {
           # Detail Level 2 >> get all data
-	      push(@commands, "sup_SpotGridFrequency");     # Check SpotGridFrequency
+          push(@commands, "sup_SpotGridFrequency");     # Check SpotGridFrequency
           push(@commands, "sup_OperationTime");         # Check OperationTime
           push(@commands, "sup_InverterTemperature");   # Check InverterTemperature
           push(@commands, "sup_MaxACPower");            # Check MaxACPower
           push(@commands, "sup_MaxACPower2");           # Check MaxACPower2
           push(@commands, "sup_GridRelayStatus");       # Check GridRelayStatus
-          push(@commands, "sup_DeviceStatus");	        # Check DeviceStatus
+          push(@commands, "sup_DeviceStatus");          # Check DeviceStatus
+		  
+		  if (ReadingsVal($name,"INV_TYPE","") =~ /SBS(6\.0|5\.0|3\.7)/xs || ReadingsVal($name,"device_type","") =~ /SBS(6\.0|5\.0|3\.7)/xs)
+		  {
+			push(@commands, "sup_BatteryInfo_TEMP");    # Check BatteryInfo Temperatur
+			push(@commands, "sup_BatteryInfo_Capac");   # Check BatteryInfo 
+		  }
      }
 
+     Log3 $name, 5, "$name - ".ReadingsVal($name,"INV_TYPE","")."".ReadingsVal($name,"device_type","");
+	 
+	 
      if(SMAInverter_SMAlogon($hash->{HOST}, $hash->{PASS}, $hash)) {
          Log3 $name, 5, "$name - Logged in now";
 
-	     foreach my $i(@commands) {
+         for my $i(@commands) {
              if ($i eq "sup_TypeLabel") {
-		         ($sup_TypeLabel,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00821E00, 0x008220FF);
-		     }
-			 elsif ($i eq "sup_EnergyProduction") {
-		         ($sup_EnergyProduction,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00260100, 0x002622FF);
-		     }
-		     elsif ($i eq "sup_SpotDCPower") {
-		         ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
-		     }
-		     elsif ($i eq "sup_SpotACPower") {
-		         ($sup_SpotACPower,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464000, 0x004642FF);
-	         }
-		     elsif ($i eq "sup_SpotACTotalPower") {
-		         ($sup_SpotACTotalPower,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00263F00, 0x00263FFF);
-		     }
-		     elsif ($i eq "sup_ChargeStatus") {
-		         ($sup_ChargeStatus,$inv_ChargeStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00295A00, 0x00295AFF);
-		     }
-		     elsif ($i eq "sup_SpotDCVoltage") {
-		         ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
-		     }
-		     elsif ($i eq "sup_SpotACVoltage") {
-		         ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
-		     }
-		     elsif ($i eq "sup_BatteryInfo") {
-		         ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
-		     }
-		     elsif ($i eq "sup_SpotGridFrequency") {
-		         ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
-		     }
-		     elsif ($i eq "sup_OperationTime") {
-		         ($sup_OperationTime,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00462E00, 0x00462FFF);
-		     }
-		     elsif ($i eq "sup_InverterTemperature") {
-		         ($sup_InverterTemperature,$inv_TEMP,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x52000200, 0x00237700, 0x002377FF);
-		     }
-		     elsif ($i eq "sup_MaxACPower") {
-		         ($sup_MaxACPower,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00411E00, 0x004120FF);
-		     }
-		     elsif ($i eq "sup_MaxACPower2") {
-		         ($sup_MaxACPower2,$inv_PACMAX1_2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00832A00, 0x00832AFF);
-		     }
-		     elsif ($i eq "sup_GridRelayStatus") {
-		         ($sup_GridRelayStatus,$inv_GRIDRELAY,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00416400, 0x004164FF);
-		     }
-		     elsif ($i eq "sup_DeviceStatus") {
-		         ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
-		     }
-		     elsif ($i eq "sup_SpotBatteryLoad") {
-		     	 ($sup_SpotBatteryLoad,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00496700, 0x004967FF);
-		     }
+                 ($sup_TypeLabel,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00821E00, 0x008220FF);
+             }
+             elsif ($i eq "sup_EnergyProduction") {
+                 ($sup_EnergyProduction,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00260100, 0x002622FF);
+             }
+             elsif ($i eq "sup_SpotDCPower") {
+                 ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
+             }
+             elsif ($i eq "sup_SpotACPower") {
+                 ($sup_SpotACPower,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464000, 0x004642FF);
+             }
+             elsif ($i eq "sup_SpotACTotalPower") {
+                 ($sup_SpotACTotalPower,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00263F00, 0x00263FFF);
+             }
+             elsif ($i eq "sup_ChargeStatus") {
+                 ($sup_ChargeStatus,$inv_ChargeStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00295A00, 0x00295AFF);
+             }
+             elsif ($i eq "sup_SpotDCVoltage") {
+                 ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
+             }
+             elsif ($i eq "sup_SpotACVoltage") {
+                 ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
+             }
+		     elsif ($i eq "sup_BatteryInfo_TEMP") {
+			     Log3 $name, 5, "$name -> sup_BatteryInfo_TEMP";
+                 ($sup_BatteryInfo_TEMP,$inv_BAT_TEMP,$inv_BAT_TEMP_A,$inv_BAT_TEMP_B,$inv_BAT_TEMP_C,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495B00, 0x00495B10);
+		     }    
+			 elsif ($i eq "sup_BatteryInfo_UDC") {
+			     Log3 $name, 5, "$name -> sup_BatteryInfo_UDC";
+                 ($sup_BatteryInfo_UDC,$inv_BAT_UDC,$inv_BAT_UDC_A,$inv_BAT_UDC_B,$inv_BAT_UDC_C,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495C00, 0x00495C10);
+		     }  
+			 elsif ($i eq "sup_BatteryInfo_IDC") {
+				 Log3 $name, 5, "$name -> sup_BatteryInfo_IDC";
+                 ($sup_BatteryInfo_IDC,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00495D00, 0x00495D10);
+		     } 
+		     elsif ($i eq "sup_BatteryInfo_Capac") {
+				 Log3 $name, 5, "$name -> sup_BatteryInfo_Capac";
+                 #($sup_BatteryInfo_IDC,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial)     = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00496800, 0x004968FF);
+		     }  			 
+             elsif ($i eq "sup_BatteryInfo") {
+			     Log3 $name, 5, "$name -> sup_BatteryInfo";
+                 ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
+             }
+			 elsif ($i eq "sup_BatteryInfo_2") {
+			     Log3 $name, 5, "$name -> sup_BatteryInfo_2";
+                 ($sup_BatteryInfo_2,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
+		     } 
+             elsif ($i eq "sup_SpotGridFrequency") {
+                 ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
+             }
+             elsif ($i eq "sup_OperationTime") {
+                 ($sup_OperationTime,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00462E00, 0x00462FFF);
+             }
+             elsif ($i eq "sup_InverterTemperature") {
+                 ($sup_InverterTemperature,$inv_TEMP,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x52000200, 0x00237700, 0x002377FF);
+             }
+             elsif ($i eq "sup_MaxACPower") {
+                 ($sup_MaxACPower,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00411E00, 0x004120FF);
+             }
+             elsif ($i eq "sup_MaxACPower2") {
+                 ($sup_MaxACPower2,$inv_PACMAX1_2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00832A00, 0x00832AFF);
+             }
+             elsif ($i eq "sup_GridRelayStatus") {
+                 ($sup_GridRelayStatus,$inv_GRIDRELAY,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00416400, 0x004164FF);
+             }
+             elsif ($i eq "sup_DeviceStatus") {
+                 ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
+             }
+             elsif ($i eq "sup_SpotBatteryLoad") {
+                 ($sup_SpotBatteryLoad,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00496700, 0x004967FF);
+             }
          }
 
          # nothing more to do, just log out
@@ -699,123 +752,134 @@ sub SMAInverter_getstatusDoParse($) {
          # Inverter Laufzeit ermitteln
          $irt = tv_interval($ist);
 
-	     # Aufbau Ergebnis-Array
-	     push(@row_array, "modulstate normal"."\n");
-	     push(@row_array, "opertime_start ".$opertime_start."\n");
-	     push(@row_array, "opertime_stop ".$opertime_stop."\n");
+         # Aufbau Ergebnis-Array
+         push(@row_array, "modulstate normal"."\n");
+         push(@row_array, "opertime_start ".$opertime_start."\n");
+         push(@row_array, "opertime_stop ".$opertime_stop."\n");
 
-	     # Durchschnittswerteberechnung Energieerzeugung der letzten 5, 10, 15 Messungen
+         # Durchschnittswerteberechnung Energieerzeugung der letzten 5, 10, 15 Messungen
 
-		 my ($sum05, $sum10, $sum15);
-	     my $cnt05  = int(300/$interval);          # Anzahl der Zyklen innerhalb 5 Minuten
+         my ($sum05, $sum10, $sum15);
+         my $cnt05  = int(300/$interval);          # Anzahl der Zyklen innerhalb 5 Minuten
          my $cnt10  = int(600/$interval);          # Anzahl der Zyklen innerhalb 10 Minuten
-         my $cnt15  = int(900/$interval);		   # Anzahl der Zyklen innerhalb 15 Minuten = Summe aller Messzyklen
-		 my $cntsum = $cnt15+1;                    # Sicherheitszuschlag Summe Anzahl aller Zyklen
-		 my @averagebuf;
-	     if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS eq 8001) {
-		     # only for this block because of warnings if values not set at restart
+         my $cnt15  = int(900/$interval);          # Anzahl der Zyklen innerhalb 15 Minuten = Summe aller Messzyklen
+         my $cntsum = $cnt15+1;                    # Sicherheitszuschlag Summe Anzahl aller Zyklen
+         my @averagebuf;
+         if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS =~ /8001|8002|8007/xs) {
+             # only for this block because of warnings if values not set at restart
              no warnings 'uninitialized';
-	         if (!$hash->{HELPER}{AVERAGEBUF}) {
-		         for my $count (0..$cntsum) {
-			         # fill with new values
-					 $inv_SPOT_PACTOT = $inv_SPOT_PACTOT?$inv_SPOT_PACTOT:0;
-				     push(@averagebuf, $inv_SPOT_PACTOT);
-			     }
-		     } else {
-			     @averagebuf = split(/,/, $hash->{HELPER}{AVERAGEBUF})
-			 }
+             if (!$hash->{HELPER}{AVERAGEBUF}) {
+                 for my $count (0..$cntsum) {
+                     # fill with new values
+                     $inv_SPOT_PACTOT = $inv_SPOT_PACTOT // 0;
+                     push(@averagebuf, $inv_SPOT_PACTOT);
+                 }
+             } else {
+                 @averagebuf = split(/,/, $hash->{HELPER}{AVERAGEBUF})
+             }
 
-		     # rechtes Element aus average buffer löschen
-		     pop(@averagebuf);
-		     # und links mit neuem Wert füllen
-		     unshift(@averagebuf, $inv_SPOT_PACTOT);
-		     $avg = join(',', @averagebuf);
+             pop(@averagebuf);                                                     # rechtes Element aus average buffer löschen
+             unshift(@averagebuf, $inv_SPOT_PACTOT);                               # und links mit neuem Wert füllen
+             $avg = join(',', @averagebuf);
 
              # calculate average energy and write to array for generate readings
              my $k = 1;
-			 my $avgsum = $averagebuf[0];
-			 while ($k < $cntsum) {
-			     $avgsum = $avgsum + $averagebuf[$k] if($averagebuf[$k]);
-				 if ($k == $cnt05) {
-				     $sum05 = $avgsum;
-					 Log3 $name, 5, "$name - CNT05: $cnt05 SUM05: $sum05";
-				 }
-				 if ($k == $cnt10) {
-				     $sum10 = $avgsum;
-					 Log3 $name, 5, "$name - CNT10: $cnt10 SUM10: $sum10";
-				 }
-				 if ($k == $cnt15) {
-				     $sum15 = $avgsum;
-					 Log3 $name, 5, "$name - CNT15: $cnt15 SUM15: $sum15";
-				 }
-			     $k++;
-			 }
+             my $avgsum = $averagebuf[0];
+             while ($k < $cntsum) {
+                 $avgsum = $avgsum + $averagebuf[$k] if($averagebuf[$k]);
+                 if ($k == $cnt05) {
+                     $sum05 = $avgsum;
+                     Log3 $name, 5, "$name - CNT05: $cnt05 SUM05: $sum05";
+                 }
+                 if ($k == $cnt10) {
+                     $sum10 = $avgsum;
+                     Log3 $name, 5, "$name - CNT10: $cnt10 SUM10: $sum10";
+                 }
+                 if ($k == $cnt15) {
+                     $sum15 = $avgsum;
+                     Log3 $name, 5, "$name - CNT15: $cnt15 SUM15: $sum15";
+                 }
+                 $k++;
+             }
 
-		     my $AvP05 = int( $sum05 / ($cnt05+1) );
-		     my $AvP10 = int( $sum10 / ($cnt10+1) );
-		     my $AvP15 = int( $sum15 / ($cnt15+1) );
-	         Log3 $name, 5, "$name - Content of Averagebuffer:";
-		     Log3 $name, 5, "$name - $avg";
-		     Log3 $name, 5, "$name - avg_power_lastminutes_05 = $AvP05, avg_power_lastminutes_10 = $AvP10, avg_power_lastminutes_15 = $AvP15";
+             my $AvP05 = int( $sum05 / ($cnt05+1) );
+             my $AvP10 = int( $sum10 / ($cnt10+1) );
+             my $AvP15 = int( $sum15 / ($cnt15+1) );
+             Log3 $name, 5, "$name - Content of Averagebuffer:";
+             Log3 $name, 5, "$name - $avg";
+             Log3 $name, 5, "$name - avg_power_lastminutes_05 = $AvP05, avg_power_lastminutes_10 = $AvP10, avg_power_lastminutes_15 = $AvP15";
 
-		     push(@row_array, "avg_power_lastminutes_05 ".$AvP05."\n");   # Average Energy (last) 5 minutes
-	         push(@row_array, "avg_power_lastminutes_10 ".$AvP10."\n");   # Average Energy (last) 10 minutes
-	         push(@row_array, "avg_power_lastminutes_15 ".$AvP15."\n");   # Average Energy (last) 15 minutes
+             push(@row_array, "avg_power_lastminutes_05 ".$AvP05."\n");   # Average Energy (last) 5 minutes
+             push(@row_array, "avg_power_lastminutes_10 ".$AvP10."\n");   # Average Energy (last) 10 minutes
+             push(@row_array, "avg_power_lastminutes_15 ".$AvP15."\n");   # Average Energy (last) 15 minutes
 
-			 use warnings;
-	     }
+             use warnings;
+         }
 
-         if ($sc) {                                            # SBFSpot Kompatibilitätsmodus
+         if ($sc) {                                                                                      # SBFSpot Kompatibilitätsmodus
              if($sup_EnergyProduction) {
-	             push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n");
-	             push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n");
+                 push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n");
+                 push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n");
              }
              if($sup_SpotDCPower) {
-	             push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
-	             push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");
+                 push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
+                 push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");
              }
              if($sup_SpotACPower) {
-	             push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n");
-	             push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n");
-	             push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n");
+                 push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n");
+                 push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n");
+                 push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n");
              }
              if($sup_SpotACTotalPower) {
-	             push(@row_array, "total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
-	             push(@row_array, "state ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
+                 push(@row_array, "total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
+                 push(@row_array, "state ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
              }
              if($sup_ChargeStatus) {
-	             push(@row_array, "chargestatus ".$inv_ChargeStatus."\n");
+                 push(@row_array, "chargestatus ".$inv_ChargeStatus."\n");
              }
 
-             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {  # V2.10.1 28.04.2019
+             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {                         # V2.10.1 28.04.2019
                  if($inv_SPOT_PACTOT < 0) {
-	                 push(@row_array, "power_out "."0"."\n");
-	                 push(@row_array, "power_in ".(-1 * $inv_SPOT_PACTOT)."\n");
-                 } else {
-	                 push(@row_array, "power_out ".$inv_SPOT_PACTOT."\n");
-	                 push(@row_array, "power_in "."0"."\n");
+                     push(@row_array, "power_out "."0"."\n");
+                     push(@row_array, "power_in ".(-1 * $inv_SPOT_PACTOT)."\n");
+                 } 
+                 else {
+                     push(@row_array, "power_out ".$inv_SPOT_PACTOT."\n");
+                     push(@row_array, "power_in "."0"."\n");
                  }
              }
 
              if($detail_level > 0) {
                  # For Detail Level 1
                  if($sup_SpotDCVoltage) {
-	                 push(@row_array, "string_1_udc ".sprintf("%.2f",$inv_SPOT_UDC1)."\n");
-	                 push(@row_array, "string_2_udc ".sprintf("%.2f",$inv_SPOT_UDC2)."\n");
-	                 push(@row_array, "string_1_idc ".sprintf("%.3f",$inv_SPOT_IDC1)."\n");
-	                 push(@row_array, "string_2_idc ".sprintf("%.3f",$inv_SPOT_IDC2)."\n");
+                     push(@row_array, "string_1_udc ".sprintf("%.2f",$inv_SPOT_UDC1)."\n");
+                     push(@row_array, "string_2_udc ".sprintf("%.2f",$inv_SPOT_UDC2)."\n");
+                     push(@row_array, "string_1_idc ".sprintf("%.3f",$inv_SPOT_IDC1)."\n");
+                     push(@row_array, "string_2_idc ".sprintf("%.3f",$inv_SPOT_IDC2)."\n");
                  }
                  if($sup_SpotACVoltage) {
-	                 push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n");
-	                 push(@row_array, "phase_2_uac ".sprintf("%.2f",$inv_SPOT_UAC2)."\n");
-	                 push(@row_array, "phase_3_uac ".sprintf("%.2f",$inv_SPOT_UAC3)."\n");
-	                 push(@row_array, "phase_1_iac ".sprintf("%.3f",$inv_SPOT_IAC1)."\n");
-	                 push(@row_array, "phase_2_iac ".sprintf("%.3f",$inv_SPOT_IAC2)."\n");
-	                 push(@row_array, "phase_3_iac ".sprintf("%.3f",$inv_SPOT_IAC3)."\n");
+                     push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n");
+                     push(@row_array, "phase_2_uac ".sprintf("%.2f",$inv_SPOT_UAC2)."\n");
+                     push(@row_array, "phase_3_uac ".sprintf("%.2f",$inv_SPOT_UAC3)."\n");
+                     push(@row_array, "phase_1_iac ".sprintf("%.3f",$inv_SPOT_IAC1)."\n");
+                     push(@row_array, "phase_2_iac ".sprintf("%.3f",$inv_SPOT_IAC2)."\n");
+                     push(@row_array, "phase_3_iac ".sprintf("%.3f",$inv_SPOT_IAC3)."\n");
                  }
-                 if($sup_BatteryInfo) {
-	                 push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
-	                 push(@row_array, "bat_idc ".$inv_BAT_IDC."\n");
+                 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
+                     push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
+                     push(@row_array, "bat_idc ".$inv_BAT_IDC."\n");
+                 }
+				 if($sup_BatteryInfo_UDC) {
+                     push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
+					 push(@row_array, "bat_udc_a ".$inv_BAT_UDC_A."\n");
+					 push(@row_array, "bat_udc_b ".$inv_BAT_UDC_B."\n");
+					 push(@row_array, "bat_udc_c ".$inv_BAT_UDC_C."\n");                                                        
+                 }
+				 if($sup_BatteryInfo_IDC) {
+                     push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");                                                       
+					 push(@row_array, "bat_idc_a ".$inv_BAT_IDC_A."\n");
+					 push(@row_array, "bat_idc_b ".$inv_BAT_IDC_B."\n");
+					 push(@row_array, "bat_idc_c ".$inv_BAT_IDC_C."\n"); 
                  }
                  if($sup_SpotBatteryLoad) {
                      push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n");
@@ -825,92 +889,114 @@ sub SMAInverter_getstatusDoParse($) {
 
              if($detail_level > 1) {
                  # For Detail Level 2
-                 if($sup_BatteryInfo) {
-	                 push(@row_array, "bat_cycles ".$inv_BAT_CYCLES."\n");
-	                 push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
+                 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
+                     push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
+                 }
+				 if($sup_BatteryInfo) {
+                     push(@row_array, "bat_cycles ".$inv_BAT_CYCLES."\n");
+                 }
+				 if($sup_BatteryInfo_TEMP) {
+                     push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
+					 push(@row_array, "bat_temp_a ".$inv_BAT_TEMP_A."\n");
+					 push(@row_array, "bat_temp_b ".$inv_BAT_TEMP_B."\n");
+					 push(@row_array, "bat_temp_c ".$inv_BAT_TEMP_C."\n");
                  }
                  if($sup_SpotGridFrequency) {
-	                 push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
+                     push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
                  }
                  if($sup_TypeLabel) {
-	                 push(@row_array, "device_type ".SMAInverter_devtype($inv_TYPE)."\n");
-	                 push(@row_array, "device_class ".SMAInverter_classtype($inv_CLASS)."\n");
-					 push(@row_array, "susyid ".$inv_susyid." - SN: ".$inv_serial."\n") if($inv_susyid && $inv_serial);
-	                 push(@row_array, "device_name "."SN: ".$inv_serial."\n") if($inv_serial);
-	                 push(@row_array, "serial_number ".$inv_serial."\n") if($inv_serial);
+                     push(@row_array, "device_type ".SMAInverter_devtype($inv_TYPE)."\n");
+                     push(@row_array, "device_class ".SMAInverter_classtype($inv_CLASS)."\n");
+                     push(@row_array, "susyid ".$inv_susyid." - SN: ".$inv_serial."\n") if($inv_susyid && $inv_serial);
+                     push(@row_array, "device_name "."SN: ".$inv_serial."\n") if($inv_serial);
+                     push(@row_array, "serial_number ".$inv_serial."\n") if($inv_serial);
                  }
                  if($sup_MaxACPower) {
-	                 push(@row_array, "pac_max_phase_1 ".$inv_PACMAX1."\n");
-	                 push(@row_array, "pac_max_phase_2 ".$inv_PACMAX2."\n");
-	                 push(@row_array, "pac_max_phase_3 ".$inv_PACMAX3."\n");
+                     push(@row_array, "pac_max_phase_1 ".$inv_PACMAX1."\n");
+                     push(@row_array, "pac_max_phase_2 ".$inv_PACMAX2."\n");
+                     push(@row_array, "pac_max_phase_3 ".$inv_PACMAX3."\n");
                  }
                  if($sup_MaxACPower2) {
-	                 push(@row_array, "pac_max_phase_1_2 ".$inv_PACMAX1_2."\n");
+                     push(@row_array, "pac_max_phase_1_2 ".$inv_PACMAX1_2."\n");
                  }
                  if($sup_InverterTemperature) {
-	                 push(@row_array, "device_temperature ".sprintf("%.1f",$inv_TEMP)."\n");
+                     push(@row_array, "device_temperature ".sprintf("%.1f",$inv_TEMP)."\n");
                  }
                  if($sup_OperationTime) {
-	                 push(@row_array, "feed-in_time ".$inv_SPOT_FEEDTM."\n");
-	                 push(@row_array, "operation_time ".$inv_SPOT_OPERTM."\n");
+                     push(@row_array, "feed-in_time ".$inv_SPOT_FEEDTM."\n");
+                     push(@row_array, "operation_time ".$inv_SPOT_OPERTM."\n");
                  }
                  if($sup_GridRelayStatus) {
-	                 push(@row_array, "gridrelay_status ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
+                     push(@row_array, "gridrelay_status ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
                  }
                  if($sup_DeviceStatus) {
-	                 push(@row_array, "device_status ".SMAInverter_StatusText($inv_STATUS)."\n");
+                     push(@row_array, "device_status ".SMAInverter_StatusText($inv_STATUS)."\n");
                  }
              }
          
-         } else {                                                         # kein SBFSpot Compatibility Mode
+         } 
+         else {                                                                                # kein SBFSpot Compatibility Mode
              if($sup_EnergyProduction) {
-	             push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n");
-	             push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n");
+                 push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n");
+                 push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n");
              }
              if($sup_SpotDCPower) {
-	             push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
-	             push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n");
+                 push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
+                 push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n");
              }
              if($sup_SpotACPower) {
-	             push(@row_array, "SPOT_PAC1 ".$inv_SPOT_PAC1."\n");
-	             push(@row_array, "SPOT_PAC2 ".$inv_SPOT_PAC2."\n");
-	             push(@row_array, "SPOT_PAC3 ".$inv_SPOT_PAC3."\n");
+                 push(@row_array, "SPOT_PAC1 ".$inv_SPOT_PAC1."\n");
+                 push(@row_array, "SPOT_PAC2 ".$inv_SPOT_PAC2."\n");
+                 push(@row_array, "SPOT_PAC3 ".$inv_SPOT_PAC3."\n");
              }
              if($sup_SpotACTotalPower) {
-	             push(@row_array, "SPOT_PACTOT ".$inv_SPOT_PACTOT."\n");
-	             push(@row_array, "state ".$inv_SPOT_PACTOT."\n");
+                 push(@row_array, "SPOT_PACTOT ".$inv_SPOT_PACTOT."\n");
+                 push(@row_array, "state ".$inv_SPOT_PACTOT."\n");
              }
              if($sup_ChargeStatus) {
-	             push(@row_array, "ChargeStatus ".$inv_ChargeStatus."\n");
+                 push(@row_array, "ChargeStatus ".$inv_ChargeStatus."\n");
              }
-             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {  # V2.10.1 28.04.2019
+             if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {               # V2.10.1 28.04.2019
                  if($inv_SPOT_PACTOT < 0) {
-	                 push(@row_array, "POWER_OUT "."0"."\n");
-	                 push(@row_array, "POWER_IN ".(-1 * $inv_SPOT_PACTOT)."\n");
-                 } else {
-	                 push(@row_array, "POWER_OUT ".$inv_SPOT_PACTOT."\n");
-	                 push(@row_array, "POWER_IN "."0"."\n");
+                     push(@row_array, "POWER_OUT "."0"."\n");
+                     push(@row_array, "POWER_IN ".(-1 * $inv_SPOT_PACTOT)."\n");
+                 } 
+                 else {
+                     push(@row_array, "POWER_OUT ".$inv_SPOT_PACTOT."\n");
+                     push(@row_array, "POWER_IN "."0"."\n");
                  }
              }
              if($detail_level > 0) {
                  # For Detail Level 1
                  if($sup_SpotDCVoltage) {
-	                 push(@row_array, "SPOT_UDC1 ".$inv_SPOT_UDC1."\n");
-	                 push(@row_array, "SPOT_UDC2 ".$inv_SPOT_UDC2."\n");
-	                 push(@row_array, "SPOT_IDC1 ".$inv_SPOT_IDC1."\n");
-	                 push(@row_array, "SPOT_IDC2 ".$inv_SPOT_IDC2."\n");
+                     push(@row_array, "SPOT_UDC1 ".$inv_SPOT_UDC1."\n");
+                     push(@row_array, "SPOT_UDC2 ".$inv_SPOT_UDC2."\n");
+                     push(@row_array, "SPOT_IDC1 ".$inv_SPOT_IDC1."\n");
+                     push(@row_array, "SPOT_IDC2 ".$inv_SPOT_IDC2."\n");
                  }
                  if($sup_SpotACVoltage) {
-	                 push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n");
-	                 push(@row_array, "SPOT_UAC2 ".$inv_SPOT_UAC2."\n");
-	                 push(@row_array, "SPOT_UAC3 ".$inv_SPOT_UAC3."\n");
-	                 push(@row_array, "SPOT_IAC1 ".$inv_SPOT_IAC1."\n");
-	                 push(@row_array, "SPOT_IAC2 ".$inv_SPOT_IAC2."\n");
-	                 push(@row_array, "SPOT_IAC3 ".$inv_SPOT_IAC3."\n");
+                     push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n");
+                     push(@row_array, "SPOT_UAC2 ".$inv_SPOT_UAC2."\n");
+                     push(@row_array, "SPOT_UAC3 ".$inv_SPOT_UAC3."\n");
+                     push(@row_array, "SPOT_IAC1 ".$inv_SPOT_IAC1."\n");
+                     push(@row_array, "SPOT_IAC2 ".$inv_SPOT_IAC2."\n");
+                     push(@row_array, "SPOT_IAC3 ".$inv_SPOT_IAC3."\n");
                  }
-                 if($sup_BatteryInfo) {
-	                 push(@row_array, "BAT_UDC ".$inv_BAT_UDC."\n");
-	                 push(@row_array, "BAT_IDC ".$inv_BAT_IDC."\n");
+                 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
+                     push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");                                                     
+                     push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n");                               
+                 }
+				 if($sup_BatteryInfo_UDC) {
+                     push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");
+					 push(@row_array, "BAT_UDC_A ".$inv_BAT_UDC_A."\n");
+					 push(@row_array, "BAT_UDC_B ".$inv_BAT_UDC_B."\n");
+					 push(@row_array, "BAT_UDC_C ".$inv_BAT_UDC_C."\n");                                                                                       
+                 }
+				 if($sup_BatteryInfo_IDC) {                                                      
+                     push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n");
+					 push(@row_array, "BAT_IDC_A ".$inv_BAT_IDC_A."\n");
+					 push(@row_array, "BAT_IDC_B ".$inv_BAT_IDC_B."\n");
+					 push(@row_array, "BAT_IDC_C ".$inv_BAT_IDC_C."\n");                                
                  }
                  if($sup_SpotBatteryLoad) {
                      push(@row_array, "BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL."\n");
@@ -920,58 +1006,68 @@ sub SMAInverter_getstatusDoParse($) {
 
              if($detail_level > 1) {
                  # For Detail Level 2
-                 if($sup_BatteryInfo) {
-	                 push(@row_array, "BAT_CYCLES ".$inv_BAT_CYCLES."\n");
-	                 push(@row_array, "BAT_TEMP ".$inv_BAT_TEMP."\n");
+                 if($sup_BatteryInfo || $sup_BatteryInfo_2) {
+                     push(@row_array, "BAT_TEMP ".  $inv_BAT_TEMP."\n");
+                 }
+				 if($sup_BatteryInfo) {
+                     push(@row_array, "BAT_CYCLES ".$inv_BAT_CYCLES."\n");
+                 }
+				 if($sup_BatteryInfo_TEMP) {
+                     push(@row_array, "BAT_TEMP ".  $inv_BAT_TEMP."\n");
+					 push(@row_array, "BAT_TEMP_A ".$inv_BAT_TEMP_A."\n");
+					 push(@row_array, "BAT_TEMP_B ".$inv_BAT_TEMP_B."\n");
+					 push(@row_array, "BAT_TEMP_C ".$inv_BAT_TEMP_C."\n");
                  }
                  if($sup_SpotGridFrequency) {
-	                 push(@row_array, "SPOT_FREQ ".$inv_SPOT_FREQ."\n");
+                     push(@row_array, "SPOT_FREQ ".$inv_SPOT_FREQ."\n");
                  }
                  if($sup_TypeLabel) {
-	                 push(@row_array, "INV_TYPE ".SMAInverter_devtype($inv_TYPE)."\n");
-	                 push(@row_array, "INV_CLASS ".SMAInverter_classtype($inv_CLASS)."\n");
-				     push(@row_array, "SUSyID ".$inv_susyid."\n") if($inv_susyid);
-	                 push(@row_array, "Serialnumber ".$inv_serial."\n") if($inv_serial);
+                     push(@row_array, "INV_TYPE ".    SMAInverter_devtype($inv_TYPE)."\n");
+                     push(@row_array, "INV_CLASS ".   SMAInverter_classtype($inv_CLASS)."\n");
+                     push(@row_array, "SUSyID ".      $inv_susyid."\n") if($inv_susyid);
+                     push(@row_array, "Serialnumber ".$inv_serial."\n") if($inv_serial);
                  }
                  if($sup_MaxACPower) {
-	                 push(@row_array, "INV_PACMAX1 ".$inv_PACMAX1."\n");
-	                 push(@row_array, "INV_PACMAX2 ".$inv_PACMAX2."\n");
-	                 push(@row_array, "INV_PACMAX3 ".$inv_PACMAX3."\n");
+                     push(@row_array, "INV_PACMAX1 ".$inv_PACMAX1."\n");
+                     push(@row_array, "INV_PACMAX2 ".$inv_PACMAX2."\n");
+                     push(@row_array, "INV_PACMAX3 ".$inv_PACMAX3."\n");
                  }
                  if($sup_MaxACPower2) {
-	                 push(@row_array, "INV_PACMAX1_2 ".$inv_PACMAX1_2."\n");
+                     push(@row_array, "INV_PACMAX1_2 ".$inv_PACMAX1_2."\n");
                  }
                  if($sup_InverterTemperature) {
-	                 push(@row_array, "INV_TEMP ".$inv_TEMP."\n");
+                     push(@row_array, "INV_TEMP ".$inv_TEMP."\n");
                  }
                  if($sup_OperationTime) {
-	                 push(@row_array, "SPOT_FEEDTM ".$inv_SPOT_FEEDTM."\n");
-	                 push(@row_array, "SPOT_OPERTM ".$inv_SPOT_OPERTM."\n");
+                     push(@row_array, "SPOT_FEEDTM ".$inv_SPOT_FEEDTM."\n");
+                     push(@row_array, "SPOT_OPERTM ".$inv_SPOT_OPERTM."\n");
                  }
                  if($sup_GridRelayStatus) {
-	                 push(@row_array, "INV_GRIDRELAY ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
+                     push(@row_array, "INV_GRIDRELAY ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
                  }
                  if($sup_DeviceStatus) {
-	                 push(@row_array, "INV_STATUS ".SMAInverter_StatusText($inv_STATUS)."\n");
+                     push(@row_array, "INV_STATUS ".SMAInverter_StatusText($inv_STATUS)."\n");
                  }
              }
          }
-     } else {
+     } 
+     else {
          # Login failed/not possible
-	     push(@row_array, "state Login failed"."\n");
-	     push(@row_array, "modulstate login failed"."\n");
+         push(@row_array, "state Login failed"."\n");
+         push(@row_array, "modulstate login failed"."\n");
      }
- } else {
+ } 
+ else {
      # sleepmode at current time and not suppressed
-	 push(@row_array, "modulstate sleep"."\n");
-	 push(@row_array, "opertime_start ".$opertime_start."\n");
-	 push(@row_array, "opertime_stop ".$opertime_stop."\n");
-	 push(@row_array, "state done"."\n");
+     push(@row_array, "modulstate sleep"."\n");
+     push(@row_array, "opertime_start ".$opertime_start."\n");
+     push(@row_array, "opertime_stop ".$opertime_stop."\n");
+     push(@row_array, "state done"."\n");
  }
 
  Log3 ($name, 5, "$name -> row_array before encoding:");
- foreach my $row (@row_array) {
-	 chomp $row;
+ for my $row (@row_array) {
+     chomp $row;
      Log3 ($name, 5, "$name -> $row");
  }
 
@@ -1027,7 +1123,7 @@ sub SMAInverter_getstatusParseDone ($) {
  readingsBeginUpdate($hash);
  foreach my $row (@row_array) {
      chomp $row;
-	 my @a = split(" ", $row, 2);
+     my @a = split(" ", $row, 2);
      $hash->{MODEL} = $a[1] if($a[0] eq "device_type");
      readingsBulkUpdate($hash, $a[0], $a[1]);
  }
@@ -1068,12 +1164,12 @@ return;
 sub SMAInverter_SMAcommand($$$$$) {
  # Parameters: $hash - host - command - first - last
  my ($hash,$host,$command,$first,$last) = @_;
- my $name = $hash->{NAME};
- my $cmdheader = "534D4100000402A00000000100";
- my $pktlength = "26";		              # length = 38 for data commands
+ my $name       = $hash->{NAME};
+ my $cmdheader  = "534D4100000402A00000000100";
+ my $pktlength  = "26";                                                            # length = 38 for data commands
  my $esignature = "0010606509A0";
  my ($inv_TYPE, $inv_CLASS,
-	 $inv_SPOT_ETODAY, $inv_SPOT_ETOTAL,
+     $inv_SPOT_ETODAY, $inv_SPOT_ETOTAL,
      $inv_susyid,
      $inv_serial,
      $inv_SPOT_PDC1, $inv_SPOT_PDC2,
@@ -1084,16 +1180,17 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_IDC1, $inv_SPOT_IDC2,
      $inv_SPOT_UAC1, $inv_SPOT_UAC2, $inv_SPOT_UAC3,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
-     $inv_BAT_UDC, $inv_BAT_IDC,
-     $inv_BAT_CYCLES,
-     $inv_BAT_TEMP,
+     $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
+     $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
+     $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
+     $inv_BAT_TEMP, $inv_BAT_TEMP_A, $inv_BAT_TEMP_B, $inv_BAT_TEMP_C,
      $inv_BAT_LOADTODAY, $inv_BAT_LOADTOTAL,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS);
- my $mysusyid = $hash->{HELPER}{MYSUSYID};
+ my $mysusyid       = $hash->{HELPER}{MYSUSYID};
  my $myserialnumber = $hash->{HELPER}{MYSERIALNUMBER};
  my ($cmd, $myID, $target_ID, $spkt_ID, $cmd_ID);
  my ($socket,$data,$size,$data_ID);
- my ($i, $temp);                          # Variables for loops and calculation
+ my ($i, $temp, $count);                                                                  # Variables for loops and calculation
 
  # Seriennummer und SuSyID des Ziel-WR setzen
  my $default_target_susyid = $hash->{HELPER}{DEFAULT_TARGET_SUSYID};
@@ -1146,27 +1243,30 @@ sub SMAInverter_SMAcommand($$$$$) {
  # Nothing received -> exit
  if (not defined $size) {
      Log3 $name, 1, "$name - Nothing received...";
-	 return 0;
- } else {
+     return 0;
+ } 
+ else {
      # We have received something!
      if ($size > 58) {
-	     # Check all parameters of answer
-		 my $r_susyid = unpack("v*", substr $data, 20, 2);
-		 my $r_serial = unpack("V*", substr $data, 22, 4);
-		 my $r_pkt_ID = unpack("v*", substr $data, 40, 2);
-		 my $r_error  = unpack("V*", substr $data, 36, 4);
-		 if (($r_susyid ne $mysusyid) || ($r_serial ne $myserialnumber) || ($r_pkt_ID ne $hash->{HELPER}{PKT_ID}) || ($r_error ne 0)) {
-		     # Response does not match the parameters we have sent, maybe different target
-			 Log3 $name, 3, "$name - Inverter answer does not match our parameters.";
-			 Log3 $name, 5, "$name - Request/Response: SusyID $mysusyid/$r_susyid, Serial $myserialnumber/$r_serial, Packet ID $hash->{HELPER}{PKT_ID}/$r_pkt_ID, Error $r_error";
-			 $socket->close();
-			 return 0;
-		 }
-	 } else {
-	     Log3 $name, 3, "$name - Format of inverter response does not fit.";
-		 $socket->close();
-		 return 0;
-	 }
+         # Check all parameters of answer
+         my $r_susyid = unpack("v*", substr $data, 20, 2);
+         my $r_serial = unpack("V*", substr $data, 22, 4);
+         my $r_pkt_ID = unpack("v*", substr $data, 40, 2);
+         my $r_error  = unpack("V*", substr $data, 36, 4);
+         
+         if (($r_susyid ne $mysusyid) || ($r_serial ne $myserialnumber) || ($r_pkt_ID ne $hash->{HELPER}{PKT_ID}) || ($r_error ne 0)) {
+             # Response does not match the parameters we have sent, maybe different target
+             Log3 $name, 3, "$name - Inverter answer does not match our parameters.";
+             Log3 $name, 5, "$name - Request/Response: SusyID $mysusyid/$r_susyid, Serial $myserialnumber/$r_serial, Packet ID $hash->{HELPER}{PKT_ID}/$r_pkt_ID, Error $r_error";
+             $socket->close();
+             return 0;
+         }
+     } 
+     else {
+         Log3 $name, 3, "$name - Format of inverter response does not fit.";
+         $socket->close();
+         return 0;
+     }
  }
 
  # All seems ok, data received
@@ -1177,6 +1277,7 @@ sub SMAInverter_SMAcommand($$$$$) {
  if (AttrVal($name, "target-serial", undef)) {
      return 0 unless($target_serial eq $inv_serial);
  }
+ 
  if (AttrVal($name, "target-susyid", undef)) {
      return 0 unless($target_susyid eq $inv_susyid);
  }
@@ -1185,23 +1286,24 @@ sub SMAInverter_SMAcommand($$$$$) {
  $data_ID = unpack("v*", substr $data, 55, 2);
  Log3 ($name, 5, "$name - Data identifier $data_ID");
 
- if($data_ID eq 0x2601)	{
+ if($data_ID eq 0x2601) {
      if (length($data) >= 66) {
-		 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
-	 } else {
+         $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
+     } 
+     else {
          Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
          $inv_SPOT_ETOTAL = 0;
-	 }
+     }
 
      if (length($data) >= 82) {
-		 $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
-	 } 
+         $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
+     } 
      else {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
-         my $etotold = ReadingsNum($name, ".etotal_yesterday", undef);
+         my $etotold = ReadingsNum($name, ".etotal_yesterday", 0);
          
-         if(defined $etotold && $inv_SPOT_ETOTAL > $etotold) {
+         if($etotold && $inv_SPOT_ETOTAL > $etotold) {
              $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
              Log3 ($name, 3, "$name - ETODAY calculated successfully !");
          } 
@@ -1209,193 +1311,297 @@ sub SMAInverter_SMAcommand($$$$$) {
              Log3 ($name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !");
              $inv_SPOT_ETODAY = 0;
          }
-	 }
+     }
 
-	 Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
-	 return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
+     return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
  }
 
- if($data_ID eq 0x4967)	{
+ if($data_ID eq 0x4967) {
      if (length($data) >= 66) {
-		 $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
-	 } else {
+         $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
+     } 
+     else {
          Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
          $inv_SPOT_ETOTAL = 0;
-	 }
+     }
 
      if (length($data) >= 82) {
-		 $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
-	 } else {
+         $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
+     } 
+     else {
          # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
-         my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", undef);
-         if(defined $bltotold && $inv_BAT_LOADTOTAL > $bltotold) {
+         my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
+         
+         if($bltotold && $inv_BAT_LOADTOTAL > $bltotold) {
              $inv_BAT_LOADTODAY = $inv_BAT_LOADTOTAL - $bltotold;
              Log3 $name, 3, "$name - BATTERYLOAD_TODAY calculated successfully !";
-         } else {
+         } 
+         else {
              Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYLOAD_TODAY ... set it to \"0\" !";
              $inv_BAT_LOADTODAY = 0;
          }
-	 }
+     }
 
-	 Log3 $name, 5, "$name - Data BAT_LOADTOTAL=$inv_BAT_LOADTOTAL and BAT_LOADTODAY=$inv_BAT_LOADTODAY";
-	 return (1,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Data BAT_LOADTOTAL=$inv_BAT_LOADTOTAL and BAT_LOADTODAY=$inv_BAT_LOADTODAY";
+     return (1,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x251E) {
      $inv_SPOT_PDC1 = unpack("V*", substr $data, 62, 4);
-	 if($size < 90) {$inv_SPOT_PDC2 = 0; } else {$inv_SPOT_PDC2 = unpack("V*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
-	 $inv_SPOT_PDC1 = ($inv_SPOT_PDC1 == 2147483648) ? 0 : $inv_SPOT_PDC1;
-	 $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 == 2147483648) ? 0 : $inv_SPOT_PDC2;
-	 Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1 and SPOT_PDC2=$inv_SPOT_PDC2";
-	 return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial);
+     if($size < 90) {$inv_SPOT_PDC2 = 0; } else {$inv_SPOT_PDC2 = unpack("V*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
+     $inv_SPOT_PDC1 = ($inv_SPOT_PDC1 == 2147483648) ? 0 : $inv_SPOT_PDC1;
+     $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 == 2147483648) ? 0 : $inv_SPOT_PDC2;
+     Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1 and SPOT_PDC2=$inv_SPOT_PDC2";
+     return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x4640) {
      $inv_SPOT_PAC1 = unpack("l*", substr $data, 62, 4);
-	 if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = 0; }	# Catch 0x80000000 as 0 value
-	 $inv_SPOT_PAC2 = unpack("l*", substr $data, 90, 4);
-	 if($inv_SPOT_PAC2 eq -2147483648) {$inv_SPOT_PAC2 = 0; }	# Catch 0x80000000 as 0 value
-	 $inv_SPOT_PAC3 = unpack("l*", substr $data, 118, 4);
-	 if($inv_SPOT_PAC3 eq -2147483648) {$inv_SPOT_PAC3 = 0; }	# Catch 0x80000000 as 0 value
-	 Log3 $name, 5, "$name - Found Data SPOT_PAC1=$inv_SPOT_PAC1 and SPOT_PAC2=$inv_SPOT_PAC2 and SPOT_PAC3=$inv_SPOT_PAC3";
-	 return (1,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial);
+     if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = 0; }   # Catch 0x80000000 as 0 value
+     $inv_SPOT_PAC2 = unpack("l*", substr $data, 90, 4);
+     if($inv_SPOT_PAC2 eq -2147483648) {$inv_SPOT_PAC2 = 0; }   # Catch 0x80000000 as 0 value
+     $inv_SPOT_PAC3 = unpack("l*", substr $data, 118, 4);
+     if($inv_SPOT_PAC3 eq -2147483648) {$inv_SPOT_PAC3 = 0; }   # Catch 0x80000000 as 0 value
+     Log3 $name, 5, "$name - Found Data SPOT_PAC1=$inv_SPOT_PAC1 and SPOT_PAC2=$inv_SPOT_PAC2 and SPOT_PAC3=$inv_SPOT_PAC3";
+     return (1,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x411E) {
      $inv_PACMAX1 = unpack("V*", substr $data, 62, 4);
-	 $inv_PACMAX2 = unpack("V*", substr $data, 90, 4);
-	 $inv_PACMAX3 = unpack("V*", substr $data, 118, 4);
-	 Log3 $name, 5, "$name - Found Data INV_PACMAX1=$inv_PACMAX1 and INV_PACMAX2=$inv_PACMAX2 and INV_PACMAX3=$inv_PACMAX3";
-	 return (1,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial);
+     $inv_PACMAX2 = unpack("V*", substr $data, 90, 4);
+     $inv_PACMAX3 = unpack("V*", substr $data, 118, 4);
+     Log3 $name, 5, "$name - Found Data INV_PACMAX1=$inv_PACMAX1 and INV_PACMAX2=$inv_PACMAX2 and INV_PACMAX3=$inv_PACMAX3";
+     return (1,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x832A) {
      $inv_PACMAX1_2 = unpack("V*", substr $data, 62, 4);
-	 Log3 $name, 5, "$name - Found Data INV_PACMAX1_2=$inv_PACMAX1_2";
-	 return (1,$inv_PACMAX1_2,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Found Data INV_PACMAX1_2=$inv_PACMAX1_2";
+     return (1,$inv_PACMAX1_2,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x263F) {
      $inv_SPOT_PACTOT = unpack("l*", substr $data, 62, 4);
-	 if($inv_SPOT_PACTOT eq -2147483648) {$inv_SPOT_PACTOT = 0; }	# Catch 0x80000000 as 0 value
-	 Log3 $name, 5, "$name - Found Data SPOT_PACTOT=$inv_SPOT_PACTOT";
-	 return (1,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial);
+     if($inv_SPOT_PACTOT eq -2147483648) {$inv_SPOT_PACTOT = 0; }   # Catch 0x80000000 as 0 value
+     
+     Log3 $name, 5, "$name - Found Data SPOT_PACTOT=$inv_SPOT_PACTOT";
+     return (1,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x295A) {
      $inv_ChargeStatus = unpack("V*", substr $data, 62, 4);
-	 Log3 $name, 5, "$name - Found Data Battery Charge Status=$inv_ChargeStatus";
-	 return (1,$inv_ChargeStatus,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Found Data Battery Charge Status=$inv_ChargeStatus";
+     return (1,$inv_ChargeStatus,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x451F) {
      $inv_SPOT_UDC1 = unpack("l*", substr $data, 62, 4);
-	 # catch shorter responses in case not second string supported
-	 if($size < 146) {
-		$inv_SPOT_UDC2 = 0;
-		$inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
-		$inv_SPOT_IDC2 = 0;
-	 } else {
-		$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
-		$inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
-		$inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
-	 }
-	 if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } else {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } else {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } else {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } else {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1 and SPOT_UDC2=$inv_SPOT_UDC2 and SPOT_IDC1=$inv_SPOT_IDC1 and SPOT_IDC2=$inv_SPOT_IDC2";
-	 return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial);
+     # catch shorter responses in case not second string supported
+     if($size < 146) {
+        $inv_SPOT_UDC2 = 0;
+        $inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
+        $inv_SPOT_IDC2 = 0;
+     } else {
+        $inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
+        $inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
+        $inv_SPOT_IDC2 = unpack("l*", substr $data, 146, 4);
+     }
+     if(($inv_SPOT_UDC1 eq -2147483648) || ($inv_SPOT_UDC1 eq 0xFFFFFFFF)) {$inv_SPOT_UDC1 = 0; } else {$inv_SPOT_UDC1 = $inv_SPOT_UDC1 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UDC2 eq -2147483648) || ($inv_SPOT_UDC2 eq 0xFFFFFFFF)) {$inv_SPOT_UDC2 = 0; } else {$inv_SPOT_UDC2 = $inv_SPOT_UDC2 / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IDC1 eq -2147483648) || ($inv_SPOT_IDC1 eq 0xFFFFFFFF)) {$inv_SPOT_IDC1 = 0; } else {$inv_SPOT_IDC1 = $inv_SPOT_IDC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IDC2 eq -2147483648) || ($inv_SPOT_IDC2 eq 0xFFFFFFFF)) {$inv_SPOT_IDC2 = 0; } else {$inv_SPOT_IDC2 = $inv_SPOT_IDC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     
+     Log3 $name, 5, "$name - Found Data SPOT_UDC1=$inv_SPOT_UDC1 and SPOT_UDC2=$inv_SPOT_UDC2 and SPOT_IDC1=$inv_SPOT_IDC1 and SPOT_IDC2=$inv_SPOT_IDC2";
+     return (1,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x4648) {
      $inv_SPOT_UAC1 = unpack("l*", substr $data, 62, 4);
-	 $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
-	 $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
-	 $inv_SPOT_IAC1 = unpack("l*", substr $data, 146, 4);
-	 $inv_SPOT_IAC2 = unpack("l*", substr $data, 174, 4);
-	 $inv_SPOT_IAC3 = unpack("l*", substr $data, 202, 4);
-	 if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = 0; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = 0; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = 0; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF)) {$inv_SPOT_IAC1 = 0; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF)) {$inv_SPOT_IAC2 = 0; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF)) {$inv_SPOT_IAC3 = 0; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and SPOT_IAC1=$inv_SPOT_IAC1 and SPOT_IAC2=$inv_SPOT_IAC2 and SPOT_IAC3=$inv_SPOT_IAC3";
-	 return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
+     $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
+     $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
+     $inv_SPOT_IAC1 = unpack("l*", substr $data, 146, 4);
+     $inv_SPOT_IAC2 = unpack("l*", substr $data, 174, 4);
+     $inv_SPOT_IAC3 = unpack("l*", substr $data, 202, 4);
+     if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = 0; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = 0; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = 0; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF)) {$inv_SPOT_IAC1 = 0; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF)) {$inv_SPOT_IAC2 = 0; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF)) {$inv_SPOT_IAC3 = 0; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     
+     Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and SPOT_IAC1=$inv_SPOT_IAC1 and SPOT_IAC2=$inv_SPOT_IAC2 and SPOT_IAC3=$inv_SPOT_IAC3";
+     return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
+ }
+ 
+ if ($data_ID eq 0x495B && (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || 
+     ReadingsVal($name,"device_type","") =~ /SBS(1\.5|2\.0|2\.5)/xs)) {
+     
+     $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
+     $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
+     $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
+     
+     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+         $inv_BAT_IDC = 0; 
+     } 
+     else { 
+         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+     }
+     
+     Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+     return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+ }
+ elsif($data_ID eq 0x495B) {
+     $count = 0;
+	 $inv_BAT_TEMP = 0;
+	 $inv_BAT_TEMP_A = unpack("V*", substr $data, 62, 4);
+     $inv_BAT_TEMP_B = unpack("V*", substr $data, 90, 4);
+     $inv_BAT_TEMP_C = unpack("V*", substr $data, 118, 4);
+	 if(($inv_BAT_TEMP_A eq -2147483648) || ($inv_BAT_TEMP_A eq 0x80000000) || $inv_BAT_TEMP_A < 0) {$inv_BAT_TEMP_A = "-"; } else {$inv_BAT_TEMP_A = $inv_BAT_TEMP_A / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_A;}
+	 if(($inv_BAT_TEMP_B eq -2147483648) || ($inv_BAT_TEMP_B eq 0x80000000) || $inv_BAT_TEMP_B < 0) {$inv_BAT_TEMP_B = "-"; } else {$inv_BAT_TEMP_B = $inv_BAT_TEMP_B / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_B;}
+	 if(($inv_BAT_TEMP_C eq -2147483648) || ($inv_BAT_TEMP_C eq 0x80000000) || $inv_BAT_TEMP_C < 0) {$inv_BAT_TEMP_C = "-"; } else {$inv_BAT_TEMP_C = $inv_BAT_TEMP_C / 10; $count = $count + 1; $inv_BAT_TEMP = $inv_BAT_TEMP + $inv_BAT_TEMP_C;}
+	 
+	 $inv_BAT_TEMP = $inv_BAT_TEMP / $count;
+	 
+	 Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_TEMP_A=$inv_BAT_TEMP_A and BAT_TEMP_B=$inv_BAT_TEMP_B and BAT_TEMP_C=$inv_BAT_TEMP_C";
+	 return (1,$inv_BAT_TEMP,$inv_BAT_TEMP_A,$inv_BAT_TEMP_B,$inv_BAT_TEMP_C,$inv_susyid,$inv_serial);
+ }
+ 
+ if($data_ID eq 0x495C) {
+	 $count = 0;
+	 $inv_BAT_UDC = 0;
+	 $inv_BAT_UDC_A = unpack("V*", substr $data, 62, 4);
+     $inv_BAT_UDC_B = unpack("V*", substr $data, 90, 4);
+     $inv_BAT_UDC_C = unpack("V*", substr $data, 118, 4);
+	 if(($inv_BAT_UDC_A eq -2147483648) || ($inv_BAT_UDC_A eq 0xFFFFFFFF) || $inv_BAT_UDC_A < 0) {$inv_BAT_UDC_A = "-"; } else {$inv_BAT_UDC_A = $inv_BAT_UDC_A / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_A;}
+	 if(($inv_BAT_UDC_B eq -2147483648) || ($inv_BAT_UDC_B eq 0xFFFFFFFF) || $inv_BAT_UDC_B < 0) {$inv_BAT_UDC_B = "-"; } else {$inv_BAT_UDC_B = $inv_BAT_UDC_B / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_B;}
+	 if(($inv_BAT_UDC_C eq -2147483648) || ($inv_BAT_UDC_C eq 0xFFFFFFFF) || $inv_BAT_UDC_C < 0) {$inv_BAT_UDC_C = "-"; } else {$inv_BAT_UDC_C = $inv_BAT_UDC_C / 100; $count = $count + 1; $inv_BAT_UDC = $inv_BAT_UDC + $inv_BAT_UDC_C;}
+	 
+	 $inv_BAT_UDC = $inv_BAT_UDC / $count;
+	 
+	 Log3 $name, 5, "$name - Found Data and BAT_UDC=$inv_BAT_UDC and BAT_UDC_A=$inv_BAT_UDC_A and BAT_UDC_B=$inv_BAT_UDC_B and BAT_UDC_C=$inv_BAT_UDC_C";
+	 return (1,$inv_BAT_UDC,$inv_BAT_UDC_A,$inv_BAT_UDC_B,$inv_BAT_UDC_C,$inv_susyid,$inv_serial);
  }
 
+ if($data_ID eq 0x495D) {
+	 $count = 0;
+	 $inv_BAT_IDC = 0;
+	 $inv_BAT_IDC_A = unpack("l*", substr $data, 62, 4);
+     $inv_BAT_IDC_B = unpack("l*", substr $data, 90, 4);
+     $inv_BAT_IDC_C = unpack("l*", substr $data, 118, 4);
+	 if(($inv_BAT_IDC_A eq -2147483648) || ($inv_BAT_IDC_A eq 0x80000000)) {$inv_BAT_IDC_A = "-"; } else {$inv_BAT_IDC_A = $inv_BAT_IDC_A / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_A;}
+	 if(($inv_BAT_IDC_B eq -2147483648) || ($inv_BAT_IDC_B eq 0x80000000)) {$inv_BAT_IDC_B = "-"; } else {$inv_BAT_IDC_B = $inv_BAT_IDC_B / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_B;}
+	 if(($inv_BAT_IDC_C eq -2147483648) || ($inv_BAT_IDC_C eq 0x80000000)) {$inv_BAT_IDC_C = "-"; } else {$inv_BAT_IDC_C = $inv_BAT_IDC_C / 1000; $count = $count + 1; $inv_BAT_IDC = $inv_BAT_IDC + $inv_BAT_IDC_C;}
+	 
+	 #$inv_BAT_IDC = $inv_BAT_IDC / $count;
+	 
+	 Log3 $name, 5, "$name - Found Data and BAT_IDC=$inv_BAT_IDC and BAT_IDC_A=$inv_BAT_IDC_A and BAT_IDC_B=$inv_BAT_IDC_B and BAT_IDC_C=$inv_BAT_IDC_C";
+	 return (1,$inv_BAT_IDC,$inv_BAT_IDC_A,$inv_BAT_IDC_B,$inv_BAT_IDC_C,$inv_susyid,$inv_serial);
+ }
+ 
  if($data_ID eq 0x491E) {
+     $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
+     $inv_BAT_TEMP   = unpack("V*", substr $data, 90, 4) / 10;
+     $inv_BAT_UDC    = unpack("V*", substr $data, 118, 4) / 100;
+     $inv_BAT_IDC    = unpack("l*", substr $data, 146, 4);
+     
+     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+         $inv_BAT_IDC = 0; 
+     } 
+     else { 
+         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+     }
+     
+     Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+     return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+ }
+ 
+ if($data_ID eq 0x495F) {
+ 
      $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
 	 $inv_BAT_TEMP = unpack("V*", substr $data, 90, 4) / 10;
 	 $inv_BAT_UDC = unpack("V*", substr $data, 118, 4) / 100;
 	 $inv_BAT_IDC = unpack("l*", substr $data, 146, 4);
-	 if($inv_BAT_IDC eq -2147483648) {$inv_BAT_IDC = 0; } else { $inv_BAT_IDC = $inv_BAT_IDC / 1000;} 	# Catch 0x80000000 as 0 value
-	 Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+	 
+     if($inv_BAT_IDC eq -2147483648) {                                                          # Catch 0x80000000 as 0 value
+         $inv_BAT_IDC = 0; 
+     } 
+     else { 
+         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+     } 	
+	 
+     Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
 	 return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
  }
-
+ 
  if($data_ID eq 0x2377) {
      $inv_TEMP = unpack("l*", substr $data, 62, 4);
-	 if($inv_TEMP eq -2147483648) {$inv_TEMP = 0; } else { $inv_TEMP = $inv_TEMP / 100;} 	# Catch 0x80000000 as 0 value
-	 Log3 $name, 5, "$name - Found Data Inverter Temp=$inv_TEMP";
-	 return (1,$inv_TEMP,$inv_susyid,$inv_serial);
+     
+     if($inv_TEMP eq -2147483648) {                                                             # Catch 0x80000000 as 0 value
+         $inv_TEMP = 0; 
+     } 
+     else { 
+         $inv_TEMP = $inv_TEMP / 100;
+     }
+     
+     Log3 $name, 5, "$name - Found Data Inverter Temp=$inv_TEMP";
+     return (1,$inv_TEMP,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x462E) {
      $inv_SPOT_OPERTM = int(unpack("V*", substr $data, 62, 4) / 36) / 100;
-	 $inv_SPOT_FEEDTM = int(unpack("V*", substr $data, 78, 4) / 36) / 100;
-	 Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=$inv_SPOT_FEEDTM";
-	 return (1,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial);
+     $inv_SPOT_FEEDTM = int(unpack("V*", substr $data, 78, 4) / 36) / 100;
+     Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=$inv_SPOT_FEEDTM";
+     return (1,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x4657) {
      $inv_SPOT_FREQ = unpack("V*", substr $data, 62, 4);
-	 if(($inv_SPOT_FREQ eq -2147483648) || ($inv_SPOT_FREQ eq 0xFFFFFFFF)) {$inv_SPOT_FREQ = 0; } else {$inv_SPOT_FREQ = $inv_SPOT_FREQ / 100; }	# Catch 0x80000000 and 0xFFFFFFFF as 0 value
-	 Log3 $name, 5, "$name - Found Data SPOT_FREQ=$inv_SPOT_FREQ";
-	 return (1,$inv_SPOT_FREQ,$inv_susyid,$inv_serial);
+     if(($inv_SPOT_FREQ eq -2147483648) || ($inv_SPOT_FREQ eq 0xFFFFFFFF)) {$inv_SPOT_FREQ = 0; } else {$inv_SPOT_FREQ = $inv_SPOT_FREQ / 100; }    # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     Log3 $name, 5, "$name - Found Data SPOT_FREQ=$inv_SPOT_FREQ";
+     return (1,$inv_SPOT_FREQ,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x821E) {
      $inv_CLASS = unpack("V*", substr $data, 102, 4) & 0x00FFFFFF;
-	 $i = 142;		# start address of INV_TYPE
-	 $inv_TYPE = 0; # initialize to unknown inverter type
-	 do {
-		$temp = unpack("V*", substr $data, $i, 4);
-		if(($temp & 0xFF000000) eq 0x01000000) { $inv_TYPE = $temp & 0x00FFFFFF; }				# in some models a catalogue is transmitted, right model marked with: 0x01000000 OR INV_Type
-		$i = $i+4;
-	 } while ((unpack("V*", substr $data, $i, 4) ne 0x00FFFFFE) && ($i<$size));			# 0x00FFFFFE is the end marker for attributes
+     $i = 142;                                                                                  # start address of INV_TYPE
+     $inv_TYPE = 0;                                                                             # initialize to unknown inverter type
+     do {
+        $temp = unpack("V*", substr $data, $i, 4);
+        if(($temp & 0xFF000000) eq 0x01000000) { $inv_TYPE = $temp & 0x00FFFFFF; }              # in some models a catalogue is transmitted, right model marked with: 0x01000000 OR INV_Type
+        $i = $i+4;
+     } while ((unpack("V*", substr $data, $i, 4) ne 0x00FFFFFE) && ($i<$size));                 # 0x00FFFFFE is the end marker for attributes
 
-	 Log3 $name, 5, "$name - Found Data CLASS=$inv_CLASS and TYPE=$inv_TYPE";
-	 return (1,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Found Data CLASS=$inv_CLASS and TYPE=$inv_TYPE";
+     return (1,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial);
  }
 
  if($data_ID eq 0x4164) {
      $i = 0;
-	 $temp = 0;
-	 $inv_GRIDRELAY = 0x00FFFFFD;		# Code for No Information;
-	 do {
-	     $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-		 if(($temp & 0xFF000000) ne 0) { $inv_GRIDRELAY = $temp & 0x00FFFFFF; }
-		 $i = $i + 1;
-	 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));		# 0x00FFFFFE is the end marker for attributes
-		 Log3 $name, 5, "$name - Found Data INV_GRIDRELAY=$inv_GRIDRELAY";
-		 return (1,$inv_GRIDRELAY,$inv_susyid,$inv_serial);
-	 }
+     $temp = 0;
+     $inv_GRIDRELAY = 0x00FFFFFD;                                                               # Code for No Information;
+     do {
+         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+         if(($temp & 0xFF000000) ne 0) { $inv_GRIDRELAY = $temp & 0x00FFFFFF; }
+         $i = $i + 1;
+     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));            # 0x00FFFFFE is the end marker for attributes
+         Log3 $name, 5, "$name - Found Data INV_GRIDRELAY=$inv_GRIDRELAY";
+         return (1,$inv_GRIDRELAY,$inv_susyid,$inv_serial);
+     }
 
  if($data_ID eq 0x2148) {
      $i = 0;
-	 $temp = 0;
-	 $inv_STATUS = 0x00FFFFFD;		# Code for No Information;
-	 do {
-	     $temp = unpack("V*", substr $data, 62 + $i*4, 4);
-		 if(($temp & 0xFF000000) ne 0) { $inv_STATUS = $temp & 0x00FFFFFF; }
-		 $i = $i + 1;
-	 } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5)); 	# 0x00FFFFFE is the end marker for attributes
-		 Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
-		 return (1,$inv_STATUS,$inv_susyid,$inv_serial);
-	 }
+     $temp = 0;
+     $inv_STATUS = 0x00FFFFFD;      # Code for No Information;
+     do {
+         $temp = unpack("V*", substr $data, 62 + $i*4, 4);
+         if(($temp & 0xFF000000) ne 0) { $inv_STATUS = $temp & 0x00FFFFFF; }
+         $i = $i + 1;
+     } while ((unpack("V*", substr $data, 62 + $i*4, 4) ne 0x00FFFFFE) && ($i < 5));    # 0x00FFFFFE is the end marker for attributes
+         Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
+         return (1,$inv_STATUS,$inv_susyid,$inv_serial);
+     }
 
 return 0;
 }
@@ -1424,13 +1630,13 @@ sub SMAInverter_SMAlogon($$$) {
 
  #Encode the password
  my $encpasswd = "888888888888888888888888"; # template for password
- for my $index (0..length $pass )	     # encode password
+ for my $index (0..length $pass )        # encode password
  {
      if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
-		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
-	} else {
-		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),1,2);
-	}
+        substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
+    } else {
+        substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),1,2);
+    }
  }
 
  # Get current timestamp in epoch format (unix format)
@@ -1439,7 +1645,7 @@ sub SMAInverter_SMAlogon($$$) {
  # Define own ID and target ID and packet ID
  $myID      = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$myserialnumber));
  $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
- $pkt_ID    = 0x8001;	# Reset to 0x8001
+ $pkt_ID    = 0x8001;   # Reset to 0x8001
  $spkt_ID   = SMAInverter_ByteOrderShort(sprintf("%04X",$pkt_ID));
 
  #Logon command
@@ -1473,7 +1679,7 @@ sub SMAInverter_SMAlogon($$$) {
  };
 
  # check if something was received
- if (defined $size)	{
+ if (defined $size) {
      my $received = unpack("H*", $data);
      Log3 $name, 5, "$name - Received: $received";
  }
@@ -1567,7 +1773,7 @@ sub SMAInverter_SMAlogout($$) {
  my ($hash,$host)   = @_;
  my $name           = $hash->{NAME};
  my $cmdheader      = "534D4100000402A00000000100";
- my $pktlength      = "22";		# length = 34 for logout command
+ my $pktlength      = "22";     # length = 34 for logout command
  my $esignature     = "0010606508A0";
  my $mysusyid       = $hash->{HELPER}{MYSUSYID};
  my $myserialnumber = $hash->{HELPER}{MYSERIALNUMBER};
@@ -1635,22 +1841,22 @@ sub SMAInverter_setVersionInfo($) {
   $hash->{HELPER}{VERSION} = $v;
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
-	  } else {
-		  $modules{$type}{META}{x_version} = $v;
-	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
-	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+      # META-Daten sind vorhanden
+      $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+          $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+      } else {
+          $modules{$type}{META}{x_version} = $v;
+      }
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
       }
   } else {
-	  # herkömmliche Modulstruktur
-	  $hash->{VERSION} = $v;
+      # herkömmliche Modulstruktur
+      $hash->{VERSION} = $v;
   }
 
 return;
@@ -1753,9 +1959,9 @@ This module requires:
 <ul>
     <li>Perl Module: IO::Socket::INET  (apt-get install libio-socket-multicast-perl) </li>
     <li>Perl Module: Date::Time        (apt-get install libdatetime-perl) </li>
-	<li>Perl Module: Time::HiRes</li>
+    <li>Perl Module: Time::HiRes</li>
     <li>FHEM Module: 99_SUNRISE_EL.pm</li>
-	<li>FHEM Module: Blocking.pm</li>
+    <li>FHEM Module: Blocking.pm</li>
 </ul>
 <br>
 <br>
@@ -1767,7 +1973,7 @@ This module requires:
 <br>
 <li>pin: password of the inverter. Default is 0000. <br>
          <b>inverter without webinterface:</b> The password for the inverter can be changed by "Sunny Explorer" Client Software <br>
-		 <b>inverter with webinterface:</b> The password changed by the webinterface is also valid for the device definition. </li>
+         <b>inverter with webinterface:</b> The password changed by the webinterface is also valid for the device definition. </li>
 <li>hostname/ip: Hostname or IP-Adress of the inverter (or it's speedwire piggyback module).</li>
 <li>The Speedwire port is 9522 by default. A Firewall has to allow connection on this port if present !</li>
 </ul>
@@ -1818,14 +2024,14 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
   <li><b>detail-level [0|1|2] </b><br>
     Defines the complexity of the generated readings. <br><br>
 
-		<ul>
-		<table>
-		<colgroup> <col width=10%> <col width=90%> </colgroup>
-		  <tr><td> 0  </td><td>- only Power and Energy </td></tr>
-		  <tr><td> 1  </td><td>- as 0, additional voltage and current </td></tr>
-		  <tr><td> 2  </td><td>- all values </td></tr>
-		</table>
-		</ul>
+        <ul>
+        <table>
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> 0  </td><td>- only Power and Energy </td></tr>
+          <tr><td> 1  </td><td>- as 0, additional voltage and current </td></tr>
+          <tr><td> 2  </td><td>- all values </td></tr>
+        </table>
+        </ul>
 
   </li>
   <br>
@@ -1846,13 +2052,13 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
   <li><b>mode [automatic|manual] </b><br>
     The request mode of the inverter. (default: automatic) <br><br>
 
-		<ul>
-		<table>
-		<colgroup> <col width=10%> <col width=90%> </colgroup>
-		  <tr><td> automatic  </td><td>- the inverter will be polled regularly as defined by attribute "interval" </td></tr>
-		  <tr><td> manual     </td><td>- query only by command "get &lt;name&gt; data" </td></tr>
-		</table>
-		</ul>
+        <ul>
+        <table>
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> automatic  </td><td>- the inverter will be polled regularly as defined by attribute "interval" </td></tr>
+          <tr><td> manual     </td><td>- query only by command "get &lt;name&gt; data" </td></tr>
+        </table>
+        </ul>
 
   </li>
   <br>
@@ -1987,9 +2193,9 @@ Dieses Modul benötigt:
 <ul>
     <li>Perl Modul: IO::Socket::INET   (apt-get install libio-socket-multicast-perl) </li>
     <li>Perl Modul: Datetime           (apt-get install libdatetime-perl) </li>
-	<li>Perl Modul: Time::HiRes</li>
+    <li>Perl Modul: Time::HiRes</li>
     <li>FHEM Modul: 99_SUNRISE_EL.pm</li>
-	<li>FHEM Modul: Blocking.pm</li>
+    <li>FHEM Modul: Blocking.pm</li>
 </ul>
 <br>
 <br>
@@ -2050,14 +2256,14 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
   <li><b>detail-level [0|1|2] </b><br>
     Legt den Umfang der ausgegebenen Readings fest. <br><br>
 
-		<ul>
-		<table>
-		<colgroup> <col width=10%> <col width=90%> </colgroup>
-		  <tr><td> 0  </td><td>- nur Leistung und Energie </td></tr>
-		  <tr><td> 1  </td><td>- wie 0, zusätzlich Strom und Spannung </td></tr>
-		  <tr><td> 2  </td><td>- alle Werte </td></tr>
-		</table>
-		</ul>
+        <ul>
+        <table>
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> 0  </td><td>- nur Leistung und Energie </td></tr>
+          <tr><td> 1  </td><td>- wie 0, zusätzlich Strom und Spannung </td></tr>
+          <tr><td> 2  </td><td>- alle Werte </td></tr>
+        </table>
+        </ul>
 
   </li>
   <br>
@@ -2078,13 +2284,13 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
   <li><b>mode [automatic|manual] </b><br>
     Abfragemodus des Wechselrichters. (default: automatic) <br><br>
 
-		<ul>
-		<table>
-		<colgroup> <col width=10%> <col width=90%> </colgroup>
-		  <tr><td> automatic  </td><td>- die Wechselrichterwerte werden im eingestellten Interval abgefragt (Attribut "interval") </td></tr>
-		  <tr><td> manual     </td><td>- Abfrage nur mit "get &lt;name&gt; data" </td></tr>
-		</table>
-		</ul>
+        <ul>
+        <table>
+        <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> automatic  </td><td>- die Wechselrichterwerte werden im eingestellten Interval abgefragt (Attribut "interval") </td></tr>
+          <tr><td> manual     </td><td>- Abfrage nur mit "get &lt;name&gt; data" </td></tr>
+        </table>
+        </ul>
 
   </li>
   <br>
