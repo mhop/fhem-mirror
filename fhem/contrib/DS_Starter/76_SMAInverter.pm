@@ -1,5 +1,5 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 23909 2021-03-07 20:06:59Z DS_Starter $
+# $Id: 76_SMAInverter.pm 24664 2021-06-20 20:50:44Z DS_Starter $
 #################################################################################################################
 #
 #  Copyright notice
@@ -1843,12 +1843,12 @@ sub SMAInverter_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 23909 2021-03-07 20:06:59Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 24664 2021-06-20 20:50:44Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 23909 2021-03-07 20:06:59Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 24664 2021-06-20 20:50:44Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
