@@ -1,5 +1,8 @@
 ﻿# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - feature: 76_SMAInverter: hide unavailable data
+ - feature: 76_SMAInverter: AC Voltage and AC Curren read fixed
+ - feature: 76_SMAInverter: SBS1.5, SBS2.0, SBS2.5 read battery data included
  - feature: 76_SMAInverter: SBS5.0-10, SBS6.0-10 read battery data included
                             Thanks to MadMax!
  - change:  60_allergy: removed deprecated extended API
