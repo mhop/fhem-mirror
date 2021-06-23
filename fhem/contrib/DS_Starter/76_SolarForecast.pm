@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
   "0.54.0" => "19.06.2021  new calcVariance, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
   "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
   "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
@@ -4965,7 +4966,7 @@ sub __weatherOnBeam {
 
           if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
               $val = '<b>???<b/>';                                                       
-              Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+              Log3 ($name, 2, qq{$name - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
           }
           
           $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
