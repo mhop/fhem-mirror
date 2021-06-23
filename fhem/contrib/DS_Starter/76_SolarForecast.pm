@@ -4963,7 +4963,7 @@ sub __weatherOnBeam {
               
           $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
           my $val     = FW_makeImage($icon_name);
-Log3 ($name, 2, qq{$name - Icon val: $val , $icon_name: icon_name });
+Log3 ($name, 5, qq{$name - Icon val: $val , $icon_name: icon_name });
           if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
               $val = '<b>???<b/>';                                                       
               Log3 ($name, 2, qq{$name - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
