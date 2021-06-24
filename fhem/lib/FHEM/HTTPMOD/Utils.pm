@@ -18,7 +18,11 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-                    
+#
+# todo: rights checking for eval
+#       timeout functions
+#
+
 package FHEM::HTTPMOD::Utils;
 
 use strict;
@@ -245,7 +249,7 @@ sub ValidRegex {
 #
 # var names can not only start with % but also @ and $
 # when a hash is passed and the target variable name starts with $
-# then it is assigned the hash reference not a new copy of the hash
+# then it is assigned the hash reference not a new copy of the hash.
 # same for arrays.
 #
 # special keys:
@@ -561,7 +565,7 @@ sub StoreKeyValue {
     my $key   = getUniqueId().$index;    
     my $enc   = "";
     
-    if(eval { use Digest::MD5; 1 }) {
+    if(eval "use Digest::MD5; 1") {
         $key = Digest::MD5::md5_hex(unpack "H*", $key);
         $key .= Digest::MD5::md5_hex($key);
     }
@@ -598,7 +602,7 @@ sub ReadKeyValue {
         Log3 $name, 4, "$name: ReadKeyValue could not find key $kName in file";
         return;
     }
-    if (eval { use Digest::MD5; 1 }) {
+    if (eval "use Digest::MD5; 1") {
         $key = Digest::MD5::md5_hex(unpack "H*", $key);
         $key .= Digest::MD5::md5_hex($key);
     }
@@ -668,7 +672,7 @@ sub FlattenJSON {
     my $buffer  = shift;                # buffer containing JSON data       
     my $name    = $hash->{NAME};        # Fhem device name
 
-    eval { use JSON };                  
+    eval "use JSON";                  
     return if($@);
 
     my $decoded = eval { decode_json($buffer) };

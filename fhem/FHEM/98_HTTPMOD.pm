@@ -140,7 +140,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.08 - 1.4.2021';
+my $Module_Version = '4.1.09 - 24.6.2021';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -2151,7 +2151,7 @@ sub CheckRedirects {
         Log3 $name, 4, "$name: no header to look for redirects";
         return;
     }
-    my @header  = split("\r\n", $header);
+    my @header  = split("[\r\n]+", $header);
     my @header0 = split(" ", shift @header);
     my $code    = $header0[1];
     Log3 $name, 4, "$name: checking for redirects, code=$code, ignore=$request->{ignoreredirects}";
@@ -2171,6 +2171,7 @@ sub CheckRedirects {
     map { $redirAdr = $1 if ( $_ =~ m{ [Ll]ocation: \s* (\S+) $ }xms ) } @header;
     if (!$redirAdr) {
         Log3 $name, 3, "$name: Error: got Redirect but no Location-Header from server";
+        return;
     }
     $redirAdr = "/$redirAdr" if($redirAdr !~ m/^http/ && $redirAdr !~ m/^\//);
     my $rurl = ($redirAdr =~ m/^http/) ? $redirAdr : $addr.$redirAdr;
