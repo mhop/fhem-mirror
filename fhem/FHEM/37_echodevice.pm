@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2021.06.24 v0.2.12
+# - FEATURE: Unterstützung A15996VY63BQ2D Echo Show 8 Gen2
+#            Unterstützung A2WFDCBDEXOXR8 Bose Soundbar 700
+#
 # 2021.05.18 v0.2.11
 # - FEATURE: Unterstützung A1DL2DVDQVK3Q Fire Tab HD 10
 #
@@ -463,7 +467,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.11";
+my $ModulVersion     = "0.2.12";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -559,25 +563,29 @@ sub echodevice_Define($$$) {
 		InternalTimer(gettimeofday() + 10 , "echodevice_GetSettings", $hash, 0);
 	}
 	else {
+		# Attribute
+		my $DeviceTyp    = $a[2];
+		my $DeviceSerial = $a[3];
+		
 		# Amazon ECHO Device
 		$hash->{STATE} = "INITIALIZED";
 
-		$hash->{model} = echodevice_getModel($a[2]);#$a[2];
+		$hash->{model} = echodevice_getModel($DeviceTyp);#$a[2];
 		
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "model", $hash->{model}, 1);
 		readingsBulkUpdate($hash, "state", "INITIALIZED", 1);
 		readingsEndUpdate($hash,1);
 		
-		$hash->{helper}{DEVICETYPE}  = $a[2];
-		$hash->{helper}{".SERIAL"}   = $a[3];
+		$hash->{helper}{DEVICETYPE}  = $DeviceTyp;
+		$hash->{helper}{".SERIAL"}   = $DeviceSerial;
 		$hash->{LOGINMODE}           = "IODEV";
 
-		$modules{$hash->{TYPE}}{defptr}{$a[3]} = $hash;
+		$modules{$hash->{TYPE}}{defptr}{$DeviceSerial} = $hash;
 
 		my $account = $modules{$hash->{TYPE}}{defptr}{"account"};
 		
-		Log3 $name, 0, "[echodevice] load ECHO Device $name";
+		Log3 $name, 0, "[echodevice_Define] load ECHO Devicename=$name Devicetype=" . $DeviceTyp . " Devicemodel=" . $hash->{model};
 		
 		$hash->{IODev} = $account;
 		$attr{$name}{IODev} = $account->{NAME} if( !defined($attr{$name}{IODev}) && $account);
@@ -2749,10 +2757,6 @@ sub echodevice_Parse($$$) {
 					# Device ID herausfiltern
 					my $sourceDeviceIds = ""; 
 					foreach my $cards (@{$card->{sourceDeviceIds}}) {
-						#next if (echodevice_getModel($cards->{deviceType}) eq "Echo Multiroom");
-						#next if (echodevice_getModel($cards->{deviceType}) eq "Sonos Display");
-						#next if (echodevice_getModel($cards->{deviceType}) eq "Echo Stereopaar");
-						#next if (echodevice_getModel($cards->{deviceType}) eq "unbekannt");
 						$sourceDeviceIds = $cards->{serialNumber};
 					}
 				
@@ -3557,6 +3561,7 @@ sub echodevice_Parse($$$) {
 
 				}
 				elsif($device->{deviceFamily} eq "ECHO") {
+					Log3 $name, 4, "[echodevice_GetSettings] SET 2 DEF=" . $hash->{DEF} . " TYPE=".$device->{deviceType} . 'SN Hash=' . $hash->{helper}{".SERIAL"} . ' SN Result=' . $device->{serialNumber} ;
 					$hash->{helper}{VERSION} = $device->{softwareVersion} if(!defined($hash->{helper}{VERSION}));
 					$hash->{helper}{".CUSTOMER"} = $device->{deviceOwnerCustomerId} if(!defined($hash->{helper}{".CUSTOMER"}));
 					$hash->{helper}{".SERIAL"} = $device->{serialNumber} if(!defined($hash->{helper}{".SERIAL"}));
@@ -3594,6 +3599,7 @@ sub echodevice_Parse($$$) {
 				$devicehash->{helper}{".CUSTOMER"} = $device->{deviceOwnerCustomerId};
 
 				if ($device->{deviceFamily} eq "ECHO" || $device->{deviceFamily} eq "KNIGHT") {
+					Log3 $name, 4, "[echodevice_GetSettings] SET 4 DEF=" . $devicehash->{DEF} . " TYPE=".$device->{deviceType} . 'SN Hash=' . $devicehash->{helper}{".SERIAL"} . ' SN Result=' . $device->{serialNumber} ;
 					$hash->{helper}{".SERIAL"} = $device->{serialNumber};
 					$hash->{helper}{DEVICETYPE} = $device->{deviceType};
 				}
@@ -3620,7 +3626,7 @@ sub echodevice_Parse($$$) {
 					next if( !defined($devicehash) );
 		
 					$devicehash->{model} = echodevice_getModel($device->{deviceType});#$device->{deviceType};
-
+					Log3 $name, 4, "[echodevice_GetSettings] SET 6 DEF=" . $devicehash->{DEF} . " TYPE=".$device->{deviceType}. 'SN Hash=' . $devicehash->{helper}{".SERIAL"} . ' SN Result=' . $device->{serialNumber} . " Model=" .$devicehash->{model} ;
 					readingsBeginUpdate($devicehash);
 					readingsBulkUpdate($devicehash, "model", $devicehash->{model}, 1);
 					readingsBulkUpdate($devicehash, "presence", ($device->{online}?"present":"absent"), 1);
@@ -3635,6 +3641,7 @@ sub echodevice_Parse($$$) {
 					$devicehash->{helper}{".CUSTOMER"} = $device->{deviceOwnerCustomerId};
 
 					if ($device->{deviceFamily} eq "ECHO" || $device->{deviceFamily} eq "KNIGHT") {
+						Log3 $name, 4, "[echodevice_GetSettings] SET 5 DEF=" . $devicehash->{DEF} . " TYPE=".$device->{deviceType}. 'SN Hash=' . $devicehash->{helper}{".SERIAL"} . ' SN Result=' . $device->{serialNumber} ;
 						$hash->{helper}{".SERIAL"} = $device->{serialNumber};
 						$hash->{helper}{DEVICETYPE} = $device->{deviceType};
 					}
@@ -4025,6 +4032,8 @@ sub echodevice_GetSettings($) {
 		}
 		else {
 		
+			Log3 $name, 4, "[echodevice_GetSettings] Devicename=$name DEF=" . $hash->{DEF} . " DEVICETYPE=" . $hash->{helper}{DEVICETYPE} . " Model=" . $hash->{model};
+		
 			if ($hash->{model} eq "Reverb" || $hash->{model} eq "Sonos One" || $hash->{model} eq "Sonos Beam") {
 				if ($hash->{IODev}{STATE} eq "connected") {
 					readingsBeginUpdate($hash);
@@ -4327,7 +4336,6 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A1RABVCI4QCIKC" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A3RMGO6LYLH7YN" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
 	elsif($ModelNumber eq "A2U21SRK4QGSE1" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
-	 
 	elsif($ModelNumber eq "A2H4LV5GIZ1JFT" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4 with Clock";}
 	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
@@ -4335,6 +4343,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "AIPK7MM90V7TB"  || $ModelNumber eq "Echo Show")				{return "Echo Show Gen3";}
 	elsif($ModelNumber eq "A4ZP7ZC4PI6TO"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5";}
 	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")            {return "Echo Show 8";}
+	elsif($ModelNumber eq "A15996VY63BQ2D" || $ModelNumber eq "Echo Show 8")			{return "Echo Show 8 Gen2";}
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")				{return "Echo Plus";}
 	elsif($ModelNumber eq "A1JJ0KFC4ZPNJ3" || $ModelNumber eq "Echo Input")				{return "Echo Input";}
 	elsif($ModelNumber eq "A18O6U1UQFJ0XK" || $ModelNumber eq "Echo Plus 2")			{return "Echo Plus 2";}
@@ -4350,7 +4359,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A7WXQPH584YP"   || $ModelNumber eq "Echo Gen2")				{return "Echo Gen2";}
 	elsif($ModelNumber eq "A3C9PE6TNYLTCH" || $ModelNumber eq "Echo Multiroom")  		{return "Echo Multiroom";}
 	elsif($ModelNumber eq "AP1F6KUH00XPV"  || $ModelNumber eq "Echo Stereopaar")		{return "Echo Stereopaar";}
-	elsif($ModelNumber eq "A1DL2DVDQVK3Q" || $ModelNumber eq "Fire Tab HD 10")			{return "Fire Tab HD 10";}
+	elsif($ModelNumber eq "A1DL2DVDQVK3Q"  || $ModelNumber eq "Fire Tab HD 10")			{return "Fire Tab HD 10";}
 	elsif($ModelNumber eq "A3R9S4ZZECZ6YL" || $ModelNumber eq "Fire Tab HD 10")			{return "Fire Tab HD 10";}
 	elsif($ModelNumber eq "A3L0T0VL9A921N" || $ModelNumber eq "Fire Tab HD 8")			{return "Fire Tab HD 8";}
 	elsif($ModelNumber eq "A2M4YX06LWP8WI" || $ModelNumber eq "Fire Tab 7")				{return "Fire Tab 7";}	
@@ -4388,6 +4397,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A17LGWINFBUTZZ" || $ModelNumber eq "Anker Roav Car Charger")	{return "Anker Roav Car Charger";}
 	elsif($ModelNumber eq "A2XPGY5LRKB9BE" || $ModelNumber eq "FitBit watch")			{return "FitBit watch";}
 	elsif($ModelNumber eq "A2Y04QPFCANLPQ" || $ModelNumber eq "Bose QC35 II")			{return "Bose QC35 II";}
+	elsif($ModelNumber eq "A2WFDCBDEXOXR8" || $ModelNumber eq "Bose Soundbar")			{return "Bose Soundbar";}
 	elsif($ModelNumber eq "A3BW5ZVFHRCQPO" || $ModelNumber eq "Alexa Car")				{return "Alexa Car";}
 	elsif($ModelNumber eq "A303PJF6ISQ7IC" || $ModelNumber eq "Echo Auto")				{return "Echo Auto";}
 	elsif($ModelNumber eq "A1ZB65LA390I4K" || $ModelNumber eq "Fire HD 10 Tablet")		{return "Fire HD 10 Tablet";}
@@ -4397,7 +4407,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A7S41FQ5TWBC9"  || $ModelNumber eq "Sony WH-1000XM4")		{return "Sony WH-1000XM4";}
 	elsif($ModelNumber eq "A2WN1FJ2HG09UN" || $ModelNumber eq "Ultimate Alexa")	        {return "Ultimate Alexa";}
 	elsif($ModelNumber eq "A23FPV4BT7FH68" || $ModelNumber eq "Yamaha YAS-209 Soundbar"){return "Yamaha YAS-209 Soundbar";}
-
+	
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
 	else {return "unbekannt";}
