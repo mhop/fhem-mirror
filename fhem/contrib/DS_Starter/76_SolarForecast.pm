@@ -4961,12 +4961,14 @@ sub __weatherOnBeam {
               Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
           }
               
-          $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
-          my $val     = FW_makeImage($icon_name);
-Log3 ($name, 5, qq{$name - Icon val: $val , $icon_name: icon_name });
+          $icon_name .= $hfcg->{$i}{weather} < 100 ? '@'.$colorw  : '@'.$colorwn;
+          my $val     = FW_makeImage($icon_name) // q{};
+
           if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
-              $val = '<b>???<b/>';                                                       
-              Log3 ($name, 2, qq{$name - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+              $val = '<b>???<b/>';
+              if(AttrVal ($name, "debug", 0)) {                                                              # nur für Debugging
+                  Log (1, qq{DEBUG> $name - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+              }
           }
           
           $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
