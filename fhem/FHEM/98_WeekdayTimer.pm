@@ -31,10 +31,11 @@ use strict;
 use warnings;
 
 use Time::Local qw( timelocal_nocheck );
+use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
 $Data::Dumper::Sortkeys = 1;
 use FHEM::Core::Timer::Register qw(:ALL);
-
+use JSON qw(decode_json);
 use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
@@ -75,12 +76,8 @@ BEGIN {
           devspec2array
           addToDevAttrList
           FmtDateTime
-          sunrise_abs
-          sunset_abs
-          trim
           stacktrace
-          decode_json
-          looks_like_number
+          trim
           )
     );
 }
@@ -182,7 +179,9 @@ sub WDT_Start {
   my $conditionOrCommand   = join q{ }, @arr;
   my @errors;
   # test if device is defined
-  if ( !$defs{$device} ) { 
+  #if ( !$defs{$device} ) { 
+  my @devices = devspec2array($device);
+  if ( !$defs{$devices[0]} ) { 
     Log3( $hash, 3, "[$name] device <$device> in fhem not defined, but accepted") ;
     if ( $init_done ) { push @errors, qq(device <$device> in fhem not defined) };
   }
@@ -220,7 +219,7 @@ sub WDT_Start {
   WDT_SetTimerOfDay({ HASH => $hash});
 
   return if !$init_done;
-  return join('\n', @errors) if (@errors); 
+  return join '\n', @errors if (@errors); 
   return;
 }
 
@@ -373,7 +372,7 @@ sub _Profile {
     $hash->{profil}{$idx}{WE_Override} = $overrulewday;
   }
 # ---- Texte Readings aufbauen -----------------------------------------
-  Log3( $hash, 4,  "[$hash->{NAME}] " . sunrise_abs() . " " . sunset_abs() . " " . $longDays{$language}[$wday] );
+  #Log3( $hash, 4,  "[$hash->{NAME}] " . sunrise_abs() . " " . sunset_abs() . " " . $longDays{$language}[$wday] );
   for  my $d (sort keys %{$hash->{profile}}) {
     my $profiltext = q{};
     for  my $t (sort keys %{$hash->{profile}{$d}}) {
