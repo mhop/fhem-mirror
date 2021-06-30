@@ -58,6 +58,7 @@
 # 2019-05-26 V 0222 correct parse of result in EnduserAPISetupGateways
 # 2019-06-15 V 0222 new Attribute levelRound
 # 2021-03-05 V 0223 new Attributes intervalLoginMin and intervalLoginMax
+# 2021-06-08 V 0224 response 'TOO_MANY_OPERATIONS_IN_PROGRESS' didn't start a re-login
 
 package main;
 
@@ -981,7 +982,7 @@ sub tahoma_dispatch($$$)
 
     if( (ref $json eq 'HASH') && ($json->{error}) ) {
       $hash->{lastError} = $json->{error};
-      $hash->{logged_in} = 0;
+      $hash->{logged_in} = 0 if ($json->{errorCode} ne 'TOO_MANY_OPERATIONS_IN_PROGRESS');
       Log3 $name, 3, "$name: tahoma_dispatch error: $hash->{lastError}";
       return;
     }
