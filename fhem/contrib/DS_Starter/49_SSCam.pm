@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 23781 2021-02-20 14:22:03Z DS_Starter $
+# $Id: 49_SSCam.pm 24484 2021-05-21 21:07:42Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -184,6 +184,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.0" => "01.07.2021  DSM7 ",
+  "9.9.0"  => "21.05.2021  new get command saveLastSnap ",
   "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
   "9.8.4"  => "20.02.2021  sub Define minor fix ",
   "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
@@ -276,6 +278,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.9.0"   => "21.05.2021 The new get command 'saveLastSnap' to save the last snapshot locally is now available. ",
   "9.8.0"   => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it.  ", 
   "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
                            "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
@@ -493,6 +496,7 @@ my %hget = (                                                                # Ha
   listLog           => { fn => "_getlistLog",           needcred => 1 },
   listPresets       => { fn => "_getlistPresets",       needcred => 1 },
   saveRecording     => { fn => "_getsaveRecording",     needcred => 1 },
+  saveLastSnap      => { fn => "_getsaveLastSnap",      needcred => 0 },
   svsinfo           => { fn => "_getsvsinfo",           needcred => 1 },
   storedCredentials => { fn => "_getstoredCredentials", needcred => 1 },
   snapGallery       => { fn => "_getsnapGallery",       needcred => 1 },
@@ -4094,6 +4098,7 @@ sub Get {
                     (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
                     "snapinfo:noArg ".
                     "saveRecording ".
+                    "saveLastSnap ".
                     "snapfileinfo:noArg ".
                     "eventlist:noArg ".
                     "stmUrlPath:noArg " 
@@ -4243,6 +4248,57 @@ sub _getsaveRecording {                  ## no critic "not used"
   $hash->{HELPER}{RECSAVEPATH} = $arg if($arg);
   __getRecAndSave($hash);
         
+return;
+}
+
+################################################################
+#                      Getter saveLastSnap
+#                Letzten Snap in File speichern
+################################################################
+sub _getsaveLastSnap {                   ## no critic 'not used'                 
+  my $paref = shift;
+  my $hash  = $paref->{hash}; 
+  my $name  = $paref->{name};
+  my $path  = $paref->{arg} // $attr{global}{modpath};
+  
+  return if(!IsModelCam($hash));
+  
+  my ($imgdata,$err);
+   
+  my $cache = cache($name, "c_init");                                                            # Cache initialisieren  
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure") if(!$cache);                                 
+  
+  if(!$cache || $cache eq "internal" ) {
+      $imgdata = $data{SSCam}{$name}{LASTSNAP};
+  } 
+  else {
+      $imgdata = cache($name, "c_read", "{LASTSNAP}");                           
+  }
+  
+  if(!$imgdata) {
+      Log3($name, 2, "$name - No image data available to save locally")
+  }
+  
+  my $fname = ReadingsVal($name, "LastSnapFilename", "");
+  my $file  = $path."/$fname";
+
+  open my $fh, '>', $file or do { $err = qq{Can't open file "$file": $!};
+                                  Log3($name, 2, "$name - $err");
+                                };       
+
+  if(!$err) {
+      $err = "none";      
+      binmode $fh;
+      print $fh MIME::Base64::decode_base64($imgdata);
+      close($fh);
+      Log3($name, 3, qq{$name - Last Snapshot was saved to local file "$file"});
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Errorcode", "none");
+  readingsBulkUpdate  ($hash, "Error",     $err  );
+  readingsEndUpdate   ($hash, 1);
+  
 return;
 }
 
@@ -5287,10 +5343,21 @@ sub getApiSites_Parse {
                     push @mods, "PTZ:5"; 
                 } 
                 elsif ($actvs =~ /^820/x) {
-                    # ab API v2.8 kein "SYNO.SurveillanceStation.VideoStream", "SYNO.SurveillanceStation.AudioStream",
-                    # "SYNO.SurveillanceStation.Streaming" mehr enthalten
-                    push @mods, "VIDEOSTMS:0";
-                    push @mods, "AUDIOSTM:0";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "CAM:9";
+                    push @mods, "SNAPSHOT:1";
+                    push @mods, "PTZ:5";
+                    push @mods, "PRESET:1";
+                    push @mods, "CAMEVENT:1";
+                    push @mods, "EVENT:5";
+                    push @mods, "VIDEOSTM:1";
+                    push @mods, "EXTEVT:1";
+                    push @mods, "STM:1";
+                    push @mods, "HMODE:1";
+                    push @mods, "LOG:3";
+                    push @mods, "AUDIOSTM:2";
+                    push @mods, "VIDEOSTMS:1";
                 }
                 
                 for my $elem (@mods) {
@@ -6172,7 +6239,7 @@ sub _parseSaveRec {                                     ## no critic "not used"
          
   my $err;
   
-  my $lrec = ReadingsVal("$name", "CamLastRec", "");
+  my $lrec = ReadingsVal($name, "CamLastRec", "");
   $lrec    = (split("/",$lrec))[1]; 
   my $sp   = $hash->{HELPER}{RECSAVEPATH} // $attr{global}{modpath};
   my $file = $sp."/$lrec";
@@ -7017,13 +7084,13 @@ sub _parsegetsnapinfo {                                 ## no critic "not used"
 
   Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
 
-  __saveLastSnap   ($paref);                                                 # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern                
-  __doSnapRotation ($paref);                                                 # Rotationsfeature
+  __saveLastSnapToCache ($paref);                                               # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern                
+  __doSnapRotation      ($paref);                                               # Rotationsfeature
   
-  setReadingErrorNone($hash, 1);               
+  setReadingErrorNone   ($hash, 1);               
 
-  closeTrans         ($hash);                                                # Transaktion beenden falls gestartet
-  __refreshAfterSnap ($hash);                                                # fallabhängige Eventgenerierung 
+  closeTrans            ($hash);                                                # Transaktion beenden falls gestartet
+  __refreshAfterSnap    ($hash);                                                # fallabhängige Eventgenerierung 
 
 return;
 }
@@ -7047,9 +7114,9 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
 
   Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
   
-  __saveLastSnap      ($paref);                                                                              # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
-  __doSnapRotation    ($paref);                                                                              # Rotationsfeature
-  __moveSnapCacheToOld($paref);                                                                              # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
+  __saveLastSnapToCache ($paref);                                                                            # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
+  __doSnapRotation      ($paref);                                                                            # Rotationsfeature
+  __moveSnapCacheToOld  ($paref);                                                                            # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
        
        
   #####   transaktionaler Versand der erzeugten Schnappschüsse #####
@@ -7117,12 +7184,12 @@ return;
 ###############################################################################
 #  aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern 
 ###############################################################################
-sub __saveLastSnap {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $data    = $paref->{data};                                                                 # decodierte JSON Daten
+sub __saveLastSnapToCache {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};                                                                 # decodierte JSON Daten
   
-  my $cache   = cache($name, "c_init");                                                         # Cache initialisieren  
+  my $cache = cache($name, "c_init");                                                         # Cache initialisieren  
   
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
 
@@ -11779,7 +11846,7 @@ return;
        <li>Activation / Deactivation of a camera integrated PIR sensor  </li>
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
-       <li>save the last recording of camera locally </li>
+       <li>save the last recording or the last snapshot of camera locally </li>
        <li>Selection of several cache types for image data storage (attribute cacheType) </li>
        <li>execute Zoom actions (only if PTZ camera supports Zoom) </li>
     </ul>
@@ -12795,6 +12862,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Get a popup with a lists of presets saved for the camera.
   </ul>
   <br><br>
+  
+  <ul>
+  <li><b>  saveLastSnap [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  The (last) snapshot currently specified in the reading "LastSnapId" is saved locally as a jpg file. 
+  Optionally, the path to save the file can be specified in the command (default: modpath in global Device). <br>
+  The file is locally given the same name as contained in the reading "LastSnapFilename". <br>
+  The resolution of the snapshot is determined by the attribute "snapGallerySize".
+  
+  <br><br>
+  
+  <ul>
+    <b>Example:</b> <br><br>
+    get &lt;name&gt; saveLastSnap /opt/fhem/log
+  </ul>
+  
+  </ul>
+  <br><br>
 
   <ul>
   <li><b>  saveRecording [&lt;path&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
@@ -12804,7 +12889,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The name of the saved local file is the same as displayed in Reading "CamLastRec". <br><br>
   
   <ul>
-    <b>Beispiel:</b> <br><br>
+    <b>Example:</b> <br><br>
     get &lt;name&gt; saveRecording /opt/fhem/log
   </ul>
   
@@ -13731,7 +13816,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <li>Aktivierung / Deaktivierung eines kamerainternen PIR-Sensors </li>
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
       <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
-      <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
+      <li>lokales Abspeichern der letzten Kamera-Aufnahme bzw. des letzten Schnappschusses </li>
       <li>Auswahl unterschiedlicher Cache-Typen zur Bilddatenspeicherung (Attribut cacheType) </li>
       <li>ausführen von Zoom-Aktionen (bei PTZ-Kameras die Zoom unterstützen) </li>
      </ul> 
@@ -14783,6 +14868,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
+  <li><b>  saveLastSnap [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Der aktuell im Reading "LastSnapId" angegebene (letzte) Schnappschuß wird lokal als jpg-File gespeichert. 
+  Optional kann der Pfad zur Speicherung des Files im Befehl angegeben werden (default: modpath im global Device). <br>
+  Das File erhält lokal den gleichen Namen wie im Reading "LastSnapFilename" enthalten. <br>
+  Die Auflösung des Schnappschusses wird durch das Attribut "snapGallerySize" bestimmt.
+  
+  <br><br>
+  
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    get &lt;name&gt; saveLastSnap /opt/fhem/log
+  </ul>
+  
+  </ul>
+  <br><br> 
+  
+  <ul>
   <li><b>  saveRecording [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Die aktuell im Reading "CamLastRec" angegebene Aufnahme wird lokal als MP4-File gespeichert. Optional kann der Pfad zur 
@@ -14795,7 +14898,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   </ul>
-  <br><br> 
+  <br><br>
 
   <ul>
   <li><b>  scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
