@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
   "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
   "0.54.0" => "19.06.2021  new calcVariance, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
   "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
@@ -3528,7 +3529,7 @@ sub _calcSummaries {
   my $batout  = CurrentVal ($hash, "powerbatout",         0);                                           # aktuelle Batterieentladung
   
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
-  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
+  my $selfconsumption     = int ($pvgen - $gfeedin - $batin + $batout);
   $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
   my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
   my $selfconsumptionrate = 0;
