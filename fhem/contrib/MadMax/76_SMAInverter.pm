@@ -1356,13 +1356,13 @@ sub SMAInverter_SMAcommand($$$$$) {
      } 
      else {
          Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
-         $inv_SPOT_ETOTAL = "-";
+         $inv_BAT_LOADTOTAL = "-";
      }
 
      if (length($data) >= 82) {
          $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
      } 
-     elsif($inv_SPOT_ETOTAL ne "-")  {
+     elsif($inv_BAT_LOADTOTAL ne "-")  {
          # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
          my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
