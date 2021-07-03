@@ -184,7 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.10.0" => "01.07.2021  DSM7 ",
+  "9.10.0" => "03.07.2021  change getApiSites_Parse for better simu_SVSversion, new value 8.2.8-xxxx for attr simu_SVSversion ",
   "9.9.0"  => "21.05.2021  new get command saveLastSnap ",
   "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
   "9.8.4"  => "20.02.2021  sub Define minor fix ",
@@ -629,6 +629,30 @@ my %sdswfn = (                                                             # Fun
   "hls"       => {fn => "__switchedHLS"       },
 );
 
+my %hsimu = (                                                              # Funktionshash Version Simulation
+  "71xxxx-simu"   => {AUTH      => "4", EXTREC   => "2", CAM      => "8", SNAPSHOT => "1", PTZ       => "4", 
+                      PRESET    => "1", SVSINFO  => "5", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
+                      EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "4"                    },
+  "72xxxx-simu"   => {AUTH      => "6", EXTREC   => "3", CAM      => "8", SNAPSHOT => "1", PTZ       => "5", 
+                      PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
+                      EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "4"                    },
+  "800xxxx-simu"  => {AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", PTZ       => "5", 
+                      PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
+                      EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "6"                    },
+  "815xxxx-simu"  => {AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", PTZ       => "5", 
+                      PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
+                      EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3", AUDIOSTM  => "2", 
+                      VIDEOSTMS => "1", REC      => "6"                                                      },
+  "820xxxx-simu"  => {AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", PTZ       => "5", 
+                      PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
+                      EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3", AUDIOSTM  => "2", 
+                      VIDEOSTMS => "1", REC      => "6"                                                      },
+  "828xxxx-simu"  => {AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", PTZ       => "6", 
+                      PRESET    => "1", SVSINFO  => "8", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
+                      EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3", AUDIOSTM  => "2", 
+                      VIDEOSTMS => "1", REC      => "6"                                                      },
+);
+
 # Standardvariablen und Forward-Deklaration
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
@@ -830,7 +854,7 @@ sub Initialize {
                      "session:SurveillanceStation,DSM ".
                      "showPassInLog:1,0 ".
                      "showStmInfoFull:1,0 ".
-                     "simu_SVSversion:7.2-xxxx,7.1-xxxx,8.0.0-xxxx,8.1.5-xxxx,8.2.0-xxxx ".
+                     "simu_SVSversion:7.1-xxxx,7.2-xxxx,8.0.0-xxxx,8.1.5-xxxx,8.2.0-xxxx,8.2.8-xxxx ".
                      "videofolderMap ".
                      "webCmd ".
                      $readingFnAttributes;   
@@ -5286,7 +5310,7 @@ sub getApiSites_Parse {
             
             Log3($name, 4, "$name - installed SVS version is: $actvs"); 
                         
-            if(AttrVal($name,"simu_SVSversion",0)) {
+            if (AttrVal($name,"simu_SVSversion",0)) {
                 my @vl  = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
                 $actvs  = $vl[0];
                 $actvs .= $vl[1];
@@ -5294,7 +5318,8 @@ sub getApiSites_Parse {
                 $actvs .= "-simu";
             }
             
-            # Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
+            ### Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll    
+            ###########################################################################################################            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
             my @sims;
@@ -5311,60 +5336,17 @@ sub getApiSites_Parse {
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
                                     
-            # Simulation älterer SVS-Versionen
+            ### Simulation älterer SVS-Versionen
+            #####################################
             Log3($name, 4, "$name - ------- Begin of simulation section -------");
             
             if (AttrVal($name, "simu_SVSversion", undef)) {
-                my @mods;
                 Log3($name, 4, "$name - SVS version $actvs will be simulated");
-                
-                if ($actvs =~ /^71/x) {
-                    push @mods, "CAM:8";
-                    push @mods, "AUTH:4";
-                    push @mods, "EXTREC:2";
-                    push @mods, "PTZ:4";           
-                } 
-                elsif ($actvs =~ /^72/x) {
-                    push @mods, "CAM:8";
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "PTZ:5"; 
-                } 
-                elsif ($actvs =~ /^800/x) {
-                    push @mods, "CAM:9";
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "PTZ:5"; 
-                } 
-                elsif ($actvs =~ /^815/x) {
-                    push @mods, "CAM:9";
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "PTZ:5"; 
-                } 
-                elsif ($actvs =~ /^820/x) {
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "CAM:9";
-                    push @mods, "SNAPSHOT:1";
-                    push @mods, "PTZ:5";
-                    push @mods, "PRESET:1";
-                    push @mods, "CAMEVENT:1";
-                    push @mods, "EVENT:5";
-                    push @mods, "VIDEOSTM:1";
-                    push @mods, "EXTEVT:1";
-                    push @mods, "STM:1";
-                    push @mods, "HMODE:1";
-                    push @mods, "LOG:3";
-                    push @mods, "AUDIOSTM:2";
-                    push @mods, "VIDEOSTMS:1";
-                }
-                
-                for my $elem (@mods) {
-                    my($k,$v) = split ":", $elem;
-                    $hash->{HELPER}{API}{$k}{VER} = $v;
+
+                for my $k (sort keys %{$hsimu{$actvs}}) {
+                    $hash->{HELPER}{API}{$k}{VER} = $hsimu{$actvs}{$k};
                     $hash->{HELPER}{API}{$k}{MOD} = "yes";
-                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");  
                 }
             } 
             
@@ -13467,7 +13449,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
-    simulates another SVS version. (only a lower version than the installed one is possible !)  </li><br>
+    A logical "downgrade" to the specified SVS version is performed. The attribute is useful to temporarily eliminate 
+    incompatibilities that may occur when updating/upgrading Synology Surveillance Station.
+    Incompatibilities should be reported to the maitainer in a timely manner.  
+  </li>
+  <br>
     
   <a name="smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
@@ -15490,8 +15476,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
-    Simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
-    Version möglich !) </li><br>
+    Es wird ein logisches "Downgrade" auf die angegebene SVS-Version ausgeführt. Das Attribut ist hilfreich um eventuell 
+    bei einem Update/Upgrade der Synology Surveillance Station auftretende Inkompatibilitäten temporär zu eliminieren.
+    Auftretende Inkompatibilitäten sollten zeitnah dem Maitainer mitgeteilt werden.
+  </li>
+  <br>
   
   <a name="smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
