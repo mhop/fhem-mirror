@@ -32,10 +32,11 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
-  "2.16.1" => "21.06.2021  MadMax: hide unavailable data",
-  "2.16.0" => "21.06.2021  MadMax: AC Voltage and AC Curren read fixed, read CosPhi included ",
-  "2.15.1" => "18.06.2021  MadMax: SBS1.5, SBS2.0, SBS2.5 read battery data included ",
-  "2.15.0" => "14.06.2021  MadMax: SBS5.0-10, SBS6.0-10, SBS3.7-10 read battery data included ",
+  "2.17.0" => "01.07.2021  fix ETOTAL/LOADTOTAL bug",
+  "2.16.1" => "21.06.2021  hide unavailable data",
+  "2.16.0" => "21.06.2021  AC Voltage and AC Curren read fixed, read CosPhi included ",
+  "2.15.1" => "18.06.2021  SBS1.5, SBS2.0, SBS2.5 read battery data included ",
+  "2.15.0" => "14.06.2021  SBS5.0-10, SBS6.0-10, SBS3.7-10 read battery data included ",
   "2.14.2" => "02.06.2021  new inverter type 9359=SBS6.0-10 ",
   "2.14.1" => "27.02.2021  change save .etotal_yesterday, Forum: https://forum.fhem.de/index.php/topic,56080.msg1134664.html#msg1134664 ",
   "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P, Forum: #topic,56080.msg986302.html#msg986302",
@@ -832,8 +833,8 @@ sub SMAInverter_getstatusDoParse($) {
 
          if ($sc) {                                                                                      # SBFSpot Kompatibilitätsmodus
              if($sup_EnergyProduction) {
-                 push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n");
-                 push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n");
+                 push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n")  if ($inv_SPOT_ETOTAL ne "-");
+                 push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n") if ($inv_SPOT_ETODAY ne "-");
              }
              if($sup_SpotDCPower) {
                  push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
@@ -902,8 +903,8 @@ sub SMAInverter_getstatusDoParse($) {
 					 push(@row_array, "bat_idc_c ".$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-"); 
                  }
                  if($sup_SpotBatteryLoad) {
-                     push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n");
-                     push(@row_array, "bat_loadtoday ".($inv_BAT_LOADTODAY/1000)."\n");
+                     push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n") if ($inv_BAT_LOADTOTAL ne "-");
+                     push(@row_array, "bat_loadtoday ".($inv_BAT_LOADTODAY/1000)."\n") if ($inv_BAT_LOADTODAY ne "-");
                  }
              }
 
@@ -957,8 +958,8 @@ sub SMAInverter_getstatusDoParse($) {
          } 
          else {                                                                                # kein SBFSpot Compatibility Mode
              if($sup_EnergyProduction) {
-                 push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n");
-                 push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n");
+                 push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n") if ($inv_SPOT_ETOTAL ne "-");
+                 push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n") if ($inv_SPOT_ETODAY ne "-");
              }
              if($sup_SpotDCPower) {
                  push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
@@ -1025,8 +1026,8 @@ sub SMAInverter_getstatusDoParse($) {
 					 push(@row_array, "BAT_IDC_C ".$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-");                                
                  }
                  if($sup_SpotBatteryLoad) {
-                     push(@row_array, "BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL."\n");
-                     push(@row_array, "BAT_LOADTODAY ".$inv_BAT_LOADTODAY."\n");
+                     push(@row_array, "BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL."\n") if ($inv_BAT_LOADTOTAL ne "-");
+                     push(@row_array, "BAT_LOADTODAY ".$inv_BAT_LOADTODAY."\n") if ($inv_BAT_LOADTODAY ne "-");
                  }
              }
 
@@ -1320,13 +1321,13 @@ sub SMAInverter_SMAcommand($$$$$) {
      } 
      else {
          Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
-         $inv_SPOT_ETOTAL = 0;
+         $inv_SPOT_ETOTAL = "-";
      }
 
      if (length($data) >= 82) {
          $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
      } 
-     else {
+     elsif($inv_SPOT_ETOTAL ne "-") {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
          my $etotold = ReadingsNum($name, ".etotal_yesterday", 0);
@@ -1337,9 +1338,13 @@ sub SMAInverter_SMAcommand($$$$$) {
          } 
          else {
              Log3 ($name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !");
-             $inv_SPOT_ETODAY = 0;
+             $inv_SPOT_ETODAY = "-";
          }
      }
+	 else
+	 {
+		$inv_SPOT_ETODAY = "-";
+	 }
 
      Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
      return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
@@ -1351,13 +1356,13 @@ sub SMAInverter_SMAcommand($$$$$) {
      } 
      else {
          Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
-         $inv_SPOT_ETOTAL = 0;
+         $inv_BAT_LOADTOTAL = "-";
      }
 
      if (length($data) >= 82) {
          $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
      } 
-     else {
+     elsif($inv_BAT_LOADTOTAL ne "-")  {
          # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
          my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
@@ -1368,9 +1373,13 @@ sub SMAInverter_SMAcommand($$$$$) {
          } 
          else {
              Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYLOAD_TODAY ... set it to \"0\" !";
-             $inv_BAT_LOADTODAY = 0;
+             $inv_BAT_LOADTODAY = "-";
          }
      }
+	 else
+	 {
+		$inv_BAT_LOADTODAY = "-";
+	 }
 
      Log3 $name, 5, "$name - Data BAT_LOADTOTAL=$inv_BAT_LOADTOTAL and BAT_LOADTODAY=$inv_BAT_LOADTODAY";
      return (1,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial);
