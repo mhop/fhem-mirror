@@ -410,7 +410,7 @@ my %ra = (
 %cmds = (
   "?"       => { ReplacedBy => "help" },
   "attr"    => { Fn=>"CommandAttr",
-           Hlp=>"[-a] [-r] <devspec> <attrname> [<attrval>],".
+           Hlp=>"[-a] [-r] [-silent] <devspec> <attrname> [<attrval>],".
                 "set attribute for <devspec>"},
   "cancel"  => { Fn=>"CommandCancel",
            Hlp=>"[<id> [quiet]],list sleepers, cancel sleeper with <id>" },
@@ -421,7 +421,7 @@ my %ra = (
            Hlp=>"[-temporary] <name> <type> <options>,".
                 "define or modify a device" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
-           Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
+           Hlp=>"[-silent] <devspec> [<attrname>],delete attribute for <devspec>" },
   "deletereading" => { Fn=>"CommandDeleteReading",
             Hlp=>"<devspec> <readingname> [older-than-seconds],".
                  "delete user defined readings" },
@@ -2340,6 +2340,10 @@ CommandDeleteAttr($$)
 {
   my ($cl, $def) = @_;
 
+  my $optRegexp = '-silent';
+  my %opt;
+  $def = cmd_parseOpts($def, $optRegexp, \%opt);
+
   my @a = split(" ", $def, 2);
   return "Usage: deleteattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
@@ -2378,7 +2382,7 @@ CommandDeleteAttr($$)
       }
 
     }
-    addStructChange("deleteAttr", $sdev, join(" ", @a));
+    addStructChange("deleteAttr", $sdev, join(" ", @a)) if(!$opt{silent});
     DoTrigger("global", "DELETEATTR ".join(" ",@a), 1) if($init_done);
 
   }
