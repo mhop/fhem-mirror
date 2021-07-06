@@ -7468,6 +7468,13 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
+       <a id="SolarForecast-attr-historyHour"></a>
+       <li><b>hourCount </b><br>
+         Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
+         (default: 0)
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-hourCount"></a>
        <li><b>hourCount &lt;4...24&gt; </b><br>
          Anzahl der Balken/Stunden. <br>
