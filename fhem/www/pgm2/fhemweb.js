@@ -309,7 +309,8 @@ FW_jqueryReadyFn()
       return;
     $("#devSpecHelp").remove();
     var sel=this, devName=m[2], selType=m[1];
-    FW_displayHelp(devName, sel, selType, val, 1);
+    var group = $(this).parent().find(':selected').parent().attr('label');
+    FW_displayHelp(devName, sel, selType, val, group);
   });
 
   FW_smallScreenCommands();
@@ -334,8 +335,17 @@ FW_jqueryReadyFn()
 }
 
 function
-FW_displayHelp(devName, sel, selType, val, level)
+FW_displayHelp(devName, sel, selType, val, group)
 {
+  if(group) {
+    if(group.indexOf("userattr") >= 0)
+      return;
+    if(group == "framework")
+      devName = "commandref";
+    else if(group != "Module")
+      devName = group;
+  }
+
   FW_getHelp(devName, function(data) { // show either the next or the outer li
     $("#content")
       .append("<div id='workbench' style='display:none'></div>");
@@ -345,7 +355,8 @@ FW_displayHelp(devName, sel, selType, val, level)
     var mtype = wb.find("a[id]").attr("id"), aTag;
     if(!mtype)
       mtype = wb.find("a[name]").attr("name");
-    if(level == 3) // commandref
+
+    if(devName == "commandref")
       mtype = "";
 
     if(mtype) {             // current syntax: FHEMWEB-attr-webCmd
@@ -384,14 +395,6 @@ FW_displayHelp(devName, sel, selType, val, level)
     }
     wb.remove();
 
-    if(!$(aTag).length) {
-      while(++level <= 3) {
-        if(level == 2 && devName != "FHEMWEB")
-          return FW_displayHelp("FHEMWEB", sel, selType, val, level);
-        if(level == 3 && devName != "commandref")
-          return FW_displayHelp("commandref", sel, selType, val, level);
-      }
-    }
   });
 }
 

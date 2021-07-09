@@ -218,7 +218,7 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } (
+  map { addToAttrList($_, "FHEMWEB") } (
     "cmdIcon",
     "devStateIcon:textField-long",
     "devStateStyle",

@@ -104,10 +104,10 @@ sub Value($);
 sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$;$);
-sub addToDevAttrList($$);
+sub addToDevAttrList($$;$);
 sub applyGlobalAttrFromEnv();
 sub delFromDevAttrList($$);
-sub addToAttrList($);
+sub addToAttrList($;$);
 sub delFromAttrList($);
 sub addToWritebuffer($$@);
 sub attrSplit($);
@@ -388,8 +388,8 @@ my @attrList = qw(
   timestamp-on-change-reading
 );
 $readingFnAttributes = join(" ", @attrList);
-my %framework_attrList = map { s/:.*//; $_ => 1 } @attrList;
-map { $framework_attrList{$_} = 1 } qw(
+my %attrSource = map { s/:.*//; $_ => "framework" } @attrList;
+map { $attrSource{$_} = "framework" } qw(
   ignore
   disable
   disabledForIntervals
@@ -2802,7 +2802,7 @@ getAllAttr($;$$)
     $list .= " " if($list);
     $list .= $v;
     map { s/:.*//; 
-          $typeHash->{$_} = $framework_attrList{$_} ? "framework" : $type }
+          $typeHash->{$_} = $attrSource{$_} ? $attrSource{$_} : $type }
         split(" ",$v) if($typeHash);
   };
 
@@ -4276,10 +4276,11 @@ AddDuplicate($$)
 }
 
 # Add an attribute to the userattr list, if not yet present
+# module is the source, needed when searching for help
 sub
-addToDevAttrList($$)
+addToDevAttrList($$;$)
 {
-  my ($dev,$arg) = @_;
+  my ($dev,$arg,$module) = @_;
 
   my $ua = $attr{$dev}{userattr};
   $ua = "" if(!$ua);
@@ -4287,6 +4288,7 @@ addToDevAttrList($$)
              grep { " $AttrList " !~ m/ $_ / }
              split(" ", "$ua $arg");
   $attr{$dev}{userattr} = join(" ", sort keys %hash);
+  map { s/:.*//; $attrSource{$_} = $module; } split(" ", $arg) if($module);
 }
 
 # The counterpart: delete it.
@@ -4308,9 +4310,10 @@ delFromDevAttrList($$)
 
 
 sub
-addToAttrList($)
+addToAttrList($;$)
 {
-  addToDevAttrList("global", shift);
+  my ($arg,$module) = @_;
+  addToDevAttrList("global", $arg, $module);
 }
 
 sub 
