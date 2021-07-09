@@ -340,10 +340,7 @@ FW_displayHelp(devName, sel, selType, val, group)
   if(group) {
     if(group.indexOf("userattr") >= 0)
       return;
-    if(group == "framework")
-      devName = "commandref";
-    else if(group != "Module")
-      devName = group;
+    devName = (group == "framework" ? "commandref" : group);
   }
 
   FW_getHelp(devName, function(data) { // show either the next or the outer li
