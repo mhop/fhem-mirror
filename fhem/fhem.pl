@@ -4699,14 +4699,11 @@ setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
 
-  my $t = $hash->{TYPE};
-  if($t) {
-    my $m = $modules{$t}; # Forum 120603
-    if($m && $m->{ignoredReadings} && $m->{ignoredReadings}{$rname}) {
-      Log 4, "setReadingsVal: IGNORING $hash->{NAME} reading";
-      return;
-    }
+  if($rname eq "IODev") {
+    my $attrList = getAllAttr($hash->{NAME}); # Forum #120603
+    return if(" $attrList " !~ m/ IODev[ :;]/);
   }
+
   if($hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
     if(defined($hash->{READINGS}{$rname}) && 
        defined($hash->{READINGS}{$rname}{VAL}) &&
