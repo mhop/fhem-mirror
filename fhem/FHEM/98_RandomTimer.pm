@@ -818,22 +818,19 @@ __END__
         <ul>
           <li><code>attr ZufallsTimerZ disableCondCmd offCmd</code></li>
         </ul>
-      </li><br><br>
-      <li><a id="RandomTimer-attr-disabledForIntervals"></a>
-        <code>disabledForIntervals</code><br>
-        See <a href="#disabledForIntervals">commandref for at - disabledForIntervals</a>
       </li><br>
-      <li><a id="RandomTimer-attr-onCmd"></a></li>
-      <li><a id="RandomTimer-attr-offCmd"></a>
+      <li><a href="#disabledForIntervals"><code>disabledForIntervals</code></a>
+      </li><br>
+      <li><a id="RandomTimer-attr-offCmd" data-pattern="o.*Cmd"></a>
         <code>onCmd, offCmd</code><br>
-        Setting the on-/offCmd changes the command sent to the device. Standard is: "set &lt;device&gt; on". The device can be specified by a @.<br>
+        Setting the on-/offCmd changes the command sent to the device. Default <code>onCmd</code> is <code>set &lt;device&gt; on</code>. The device can be specified by a @.<br>
         <br>
         <b>Examples</b>
         <ul>
           <li><code>
             attr Timer oncmd  {fhem("set @ on-for-timer 14")}
-          </code></li>
-          <br>NOTE: using on-for-timer commands might lead to irritating results!
+          </code><br>
+          NOTE: using on-for-timer commands might lead to irritating results!</li>
           <li><code>
             attr Timer offCmd {fhem("set @ off 16")}
           </code></li>
@@ -853,7 +850,7 @@ __END__
            [EDIPlug] result of function Value(EDIPlug_01) must be 'on' or 'off'
         </code>
         NOTE: From $featurelevel 6.1 on or if attribute offState is set, the funktion ReadingsVal(&lt;device&gt;,"state",undef) will be used instead of Value(). If "state" of the device exactly matches the regex provided in the attribute "offState" or lowercase of "state" contains a part matching to "off", device will be considered to be "off" (or "on" in all other cases respectively).
-      </li>
+      </li><br>
       <li><a id="RandomTimer-attr-offState"></a>
         <code>offState</code><br>
         Setting this attribute, evaluation of on of will use ReadingsVal(&lt;device&gt;,"state",undef) instead of Value(). The attribute value will be used as regex, so e.g. also "dim00" beside "off" may be considered as indication the device is "off". You may use an optional second parameter (space separated) to check a different reading, e.g. for a HUEDevice-group "0 any_on" might be usefull.
