@@ -30,9 +30,9 @@
 # $data = eval{decode_json($data)};
 #
 # if($@){
-#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
+#   ::Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
 #
-#   readingsSingleUpdate($hash, "state", "error", 1);
+#   ::readingsSingleUpdate($hash, "state", "error", 1);
 #
 #   return;
 # }
@@ -52,12 +52,13 @@
 ##
 ##
 
-package FHEM::Tesla::Powerwall;
+package FHEM::Devices::Tesla::Powerwall;
 
 use strict;
 use warnings;
-use GPUtils qw(GP_Import GP_Export);
 use HttpUtils;
+use FHEM::Core::Authentication::Passwords qw(:ALL);
+
 use Data::Dumper;
 
 # try to use JSON::MaybeXS wrapper
@@ -131,45 +132,6 @@ if ($@) {
     }
 }
 
-## Import der FHEM Funktionen
-#-- Run before package compilation
-BEGIN {
-
-    # Import from main context
-    GP_Import(
-        qw(
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsEndUpdate
-          setKeyValue
-          getKeyValue
-          getUniqueId
-          CommandAttr
-          defs
-          Log3
-          readingFnAttributes
-          HttpUtils_NonblockingGet
-          AttrVal
-          ReadingsVal
-          IsDisabled
-          deviceEvents
-          init_done
-          gettimeofday
-          InternalTimer
-          RemoveInternalTimer)
-    );
-}
-
-#-- Export to main context with different name
-GP_Export(
-    qw(
-        Initialize
-        Timer_GetData
-        Write
-      )
-);
 
 my %paths = (
     'statussoe'         => 'system_status/soe',
@@ -206,13 +168,35 @@ sub Define {
     $hash->{HOST}        = $host;
     $hash->{INTERVAL}    = 300;
     $hash->{VERSION}     = version->parse($VERSION)->normal;
-    $hash->{NOTIFYDEV}   = qq(global,${name});
+    $hash->{NOTIFYDEV}   = qq(global,$name);
     $hash->{actionQueue} = [];
 
-    CommandAttr( undef, $name . q{ room Tesla} )
-      if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
-    Log3($name, 3,
-qq(TeslaPowerwall2AC \(${name}\) - defined TeslaPowerwall2AC Device with Host ${host} and Interval $hash->{INTERVAL}));
+    ::CommandAttr( undef, $name . q{ room Tesla} )
+      if ( ::AttrVal( $name, 'room', 'none' ) eq 'none' );
+    ::Log3($name, 3,
+qq(TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host and Interval $hash->{INTERVAL}));
+
+    ### create password object to handle pass keystore
+    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
+    
+    
+    ## kann nach einiger Zeit gelöscht werden genauso wie auch ReadPassword und DeletePassword
+    if ( defined( ReadPassword( $hash, $name ) ) ) {
+        my ($passResp,$passErr);
+        ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,ReadPassword( $hash, $name ));
+        
+        ::Log3($name, 1,
+qq(TeslaPowerwall2AC ($name) - error while saving the password - $passErr))
+          if ( !defined($passResp)
+           and defined($passErr) );
+
+        ::Log3($name, 1,
+qq(TeslaPowerwall2AC ($name) - password successfully saved))
+          if ( defined($passResp)
+           and !defined($passErr) );
+           
+        DeletePassword($hash);
+    }
 
     return;
 }
@@ -221,25 +205,25 @@ sub Undef {
     my $hash    = shift;
     my $name    = shift;
 
-    RemoveInternalTimer($hash);
-    Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - Device ${name} deleted));
+    ::RemoveInternalTimer($hash);
+    ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - Device $name deleted));
 
     return;
 }
 
 sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $defs{$name};
+    my $hash = $::defs{$name};
 
     if ( $attrName eq 'disable' ) {
         if ( $cmd eq 'set' && $attrVal eq '1' ) {
-            RemoveInternalTimer($hash);
-            readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
-            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - disabled));
+            ::RemoveInternalTimer($hash);
+            ::readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - disabled));
 
         }
         elsif ( $cmd eq 'del' ) {
-            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - enabled));
+            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - enabled));
         }
     }
 
@@ -248,38 +232,38 @@ sub Attr {
             return
 'check disabledForIntervals Syntax HH:MM-HH:MM or \'HH:MM-HH:MM HH:MM-HH:MM ...\''
               unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
-            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - disabledForIntervals));
-            readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - disabledForIntervals));
+            ::readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
 
         }
         elsif ( $cmd eq 'del' ) {
-            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - enabled));
-            readingsSingleUpdate( $hash, 'state', 'active', 1 );
+            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - enabled));
+            ::readingsSingleUpdate( $hash, 'state', 'active', 1 );
         }
     }
 
     if ( $attrName eq 'interval' ) {
         if ( $cmd eq 'set' ) {
             if ( $attrVal < 60 ) {
-                Log3($name, 3,
-qq(TeslaPowerwall2AC \(${name}\) - interval too small, please use something >= 60 (sec), default is 300 (sec)));
+                ::Log3($name, 3,
+qq(TeslaPowerwall2AC ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec)));
                 return
 q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 
             }
             else {
-                RemoveInternalTimer($hash);
+                ::RemoveInternalTimer($hash);
                 $hash->{INTERVAL} = $attrVal;
-                Log3($name, 3,
-                  qq(TeslaPowerwall2AC \(${name}\) - set interval to ${attrVal}));
+                ::Log3($name, 3,
+                  qq(TeslaPowerwall2AC ($name) - set interval to $attrVal));
                 Timer_GetData($hash);
             }
         }
         elsif ( $cmd eq 'del' ) {
-            RemoveInternalTimer($hash);
+            ::RemoveInternalTimer($hash);
             $hash->{INTERVAL} = 300;
-            Log3($name, 3,
-              qq(TeslaPowerwall2AC \(${name}\) - set interval to default));
+            ::Log3($name, 3,
+              qq(TeslaPowerwall2AC ($name) - set interval to default));
             Timer_GetData($hash);
         }
     }
@@ -292,11 +276,11 @@ sub Notify {
     my $dev     = shift;
     
     my $name    = $hash->{NAME};
-    return if ( IsDisabled($name) );
+    return if ( ::IsDisabled($name) );
 
     my $devname = $dev->{NAME};
     my $devtype = $dev->{TYPE};
-    my $events  = deviceEvents( $dev, 1 );
+    my $events  = ::deviceEvents( $dev, 1 );
     return if ( !$events );
 
     Timer_GetData($hash)
@@ -306,7 +290,7 @@ sub Notify {
           or grep /^DELETEATTR.$name.disable$/, @{$events}
           or grep /^DELETEATTR.$name.interval$/, @{$events}
           or grep /^DEFINED.$name$/, @{$events} )
-        and $init_done
+        and $::init_done
       );
     return;
 }
@@ -316,7 +300,7 @@ sub Get {
     my $aArg = shift;
 
     my $name = shift @$aArg;
-    my $cmd  = shift @$aArg // return qq(get ${name} needs at least one argument);
+    my $cmd  = shift @$aArg // return qq(get $name needs at least one argument);
     my $arg;
 
     if ( $cmd eq 'statusSOE' ) {
@@ -359,8 +343,9 @@ sub Get {
         my $list = '';
         $list .=
 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
-  if(  AttrVal($name,'emailaddr','none') ne 'none'
-    && defined(ReadPassword($hash, $name))
+  if(  ::AttrVal($name,'emailaddr','none') ne 'none'
+    && exists($hash->{helper}->{passObj})
+    && defined($hash->{helper}->{passObj}->getReadPassword($name))
     && defined($hash->{TOKEN}) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
@@ -382,7 +367,7 @@ sub Set {
     my $hArg = shift;
 
     my $name = shift @$aArg;
-    my $cmd  = shift @$aArg // return qq(set ${name} needs at least one argument);
+    my $cmd  = shift @$aArg // return qq(set $name needs at least one argument);
     my $arg;
 
 
@@ -391,25 +376,45 @@ sub Set {
     }
     elsif ( lc $cmd eq 'setpassword' ) {
         return q{please set Attribut emailaddr first}
-          if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
-        return qq(usage: ${cmd} pass=<password>) if ( scalar( @{$aArg} ) != 0
+          if ( ::AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+        return qq(usage: $cmd pass=<password>) if ( scalar( @{$aArg} ) != 0
                                                    || scalar(keys %{$hArg}) != 1 );
+        my ($passResp,$passErr);
+        ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,$hArg->{'pass'});
+        
+        return qq{error while saving the password - $passErr}
+          if ( !defined($passResp)
+           and defined($passErr) );
 
-        StorePassword( $hash, $name, $hArg->{'pass'} );
-        return Timer_GetData($hash);
+        return Timer_GetData($hash)
+          if ( defined($passResp)
+           and !defined($passErr) );
     }
     elsif ( lc $cmd eq 'removepassword' ) {
         return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
 
-        DeletePassword($hash);
-        return Timer_GetData($hash);
+        my ($passResp,$passErr);
+        ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($name);
+        
+        return qq{error while saving the password - $passErr}
+          if ( !defined($passResp)
+           and defined($passErr) );
+
+        return q{password successfully removed}
+          if ( defined($passResp)
+           and !defined($passErr) );
     }
     else {
 
-        my $list = ( defined(ReadPassword($hash, $name)) ? 'removePassword:noArg ' : 'setPassword ');
+        my $list = ( exists($hash->{helper}->{passObj})
+            && defined($hash->{helper}->{passObj}->getReadPassword($name))
+          ? 'removePassword:noArg '
+          : 'setPassword ');
+
         $list .= 'powerwalls:run,stop'
-          if ( AttrVal( $name, 'devel', 0 ) == 1
-            && defined(ReadPassword($hash, $name))
+          if ( ::AttrVal( $name, 'devel', 0 ) == 1
+            && exists($hash->{helper}->{passObj})
+            && defined($hash->{helper}->{passObj}->getReadPassword($name))
             && defined($hash->{TOKEN}) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
@@ -425,18 +430,22 @@ sub Timer_GetData {
     my $hash = shift;
     my $name = $hash->{NAME};
 
-    RemoveInternalTimer($hash);
+    ::RemoveInternalTimer($hash);
 
     if ( defined( $hash->{actionQueue} )
       && scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
-        if ( !IsDisabled($name) ) {
-            return readingsSingleUpdate( $hash, 'state',
+        if ( !::IsDisabled($name) ) {
+            return ::readingsSingleUpdate( $hash, 'state',
               'please set Attribut emailaddr first', 1 )
-                if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
-            return readingsSingleUpdate( $hash, 'state',
+                if ( ::AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+            return ::readingsSingleUpdate( $hash, 'state',
               'please set password first', 1 )
-                if ( !defined( ReadPassword( $hash, $name ) ) );
+                if (   !exists($hash->{helper}->{passObj})
+                  || ( exists($hash->{helper}->{passObj})
+                    && !defined($hash->{helper}->{passObj}->getReadPassword($name))
+                  )
+                );
         
             if ( !defined( $hash->{TOKEN}) ) {
                 unshift( @{ $hash->{actionQueue} }, 'login' );
@@ -450,14 +459,14 @@ sub Timer_GetData {
             Write($hash);
         }
         else {
-            return readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+            return ::readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
         }
     }
 
-    InternalTimer( gettimeofday() + $hash->{INTERVAL},
-        'Powerwall_Timer_GetData', $hash );
-    Log3($name, 4,
-      qq(TeslaPowerwall2AC \(${name}\) - Call InternalTimer Timer_GetData));
+    ::InternalTimer( ::gettimeofday() + $hash->{INTERVAL},
+        \&FHEM::Devices::Tesla::Powerwall::Timer_GetData, $hash );
+    ::Log3($name, 4,
+      qq(TeslaPowerwall2AC ($name) - Call ::InternalTimer Timer_GetData));
 }
 
 sub Write {
@@ -467,7 +476,7 @@ sub Write {
     my ( $uri, $method, $header, $data, $path ) =
       CreateUri( $hash, pop( @{ $hash->{actionQueue} } ) );
 
-    readingsSingleUpdate(
+    ::readingsSingleUpdate(
         $hash,
         'state',
         'fetch data - '
@@ -476,7 +485,7 @@ sub Write {
         1
     );
 
-    HttpUtils_NonblockingGet(
+    ::HttpUtils_NonblockingGet(
         {
             url       => 'https://' . $uri,
             timeout   => 5,
@@ -485,12 +494,13 @@ sub Write {
             header    => $header,
             hash      => $hash,
             setCmd    => $path,
+            sslargs => { SSL_hostname => 0, verify_hostname => 0, SSL_verify_mode => 0 },
             doTrigger => 1,
             callback  => \&ErrorHandling,
         }
     );
 
-    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Send with URI: https://${uri}));
+    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Send with URI: https://$uri));
 }
 
 sub ErrorHandling {
@@ -506,12 +516,12 @@ sub ErrorHandling {
     if ( defined($err) ) {
         if ( $err ne '' ) {
 
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, 'state',            $err, 1 );
-            readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
-            readingsEndUpdate( $hash, 1 );
+            ::readingsBeginUpdate($hash);
+            ::readingsBulkUpdate( $hash, 'state',            $err, 1 );
+            ::readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
+            ::readingsEndUpdate( $hash, 1 );
 
-            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - RequestERROR: ${err}));
+            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - RequestERROR: $err));
 
             $hash->{actionQueue} = [];
             return;
@@ -523,18 +533,18 @@ sub ErrorHandling {
       && $param->{code} != 200 )
     {
 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
 
-        readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
+        ::readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
 
-        Log3($name, 3,
-          qq(TeslaPowerwall2AC \(${name}\) - RequestERROR: " . $param->{code}));
+        ::Log3($name, 3,
+          qq(TeslaPowerwall2AC ($name) - RequestERROR: " . $param->{code}));
 
-        readingsEndUpdate( $hash, 1 );
+        ::readingsEndUpdate( $hash, 1 );
 
-        Log3($name, 5,
-            qq(TeslaPowerwall2AC \(${name}\) - RequestERROR: received http code "
+        ::Log3($name, 5,
+            qq(TeslaPowerwall2AC ($name) - RequestERROR: received http code "
           . $param->{code}
           . " without any data after requesting));
 
@@ -544,10 +554,10 @@ sub ErrorHandling {
 
     if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
 
-        readingsBeginUpdate($hash);
+        ::readingsBeginUpdate($hash);
 
-        readingsBulkUpdate( $hash, 'state', $1, 1 );
-        readingsBulkUpdate(
+        ::readingsBulkUpdate( $hash, 'state', $1, 1 );
+        ::readingsBulkUpdate(
             $hash,
             'lastRequestError',
             'Path: '
@@ -560,15 +570,15 @@ sub ErrorHandling {
             1
         );
 
-        readingsEndUpdate( $hash, 1 );
+        ::readingsEndUpdate( $hash, 1 );
     }
     #### End Error Handling
 
-    InternalTimer( gettimeofday() + 3, 'Powerwall_Write', $hash )
+    ::InternalTimer( ::gettimeofday() + 3, \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
-    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Recieve JSON data: ${data}));
+    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Recieve JSON data: $data));
 
     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
@@ -584,11 +594,11 @@ sub ResponseProcessing {
 
     $decode_json = eval { decode_json($json) };
     if ($@) {
-        Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - error while request: $@));
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, 'JSON Error', $@ );
-        readingsBulkUpdate( $hash, 'state',      'JSON error' );
-        readingsEndUpdate( $hash, 1 );
+        ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - error while request: $@));
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'JSON Error', $@ );
+        ::readingsBulkUpdate( $hash, 'state',      'JSON error' );
+        ::readingsEndUpdate( $hash, 1 );
         return;
     }
 
@@ -631,31 +641,31 @@ sub WriteReadings {
 
     my $name        = $hash->{NAME};
 
-    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Write Readings));
+    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Write Readings));
 
-    readingsBeginUpdate($hash);
+    ::readingsBeginUpdate($hash);
     while ( my ( $r, $v ) = each %{$readings} ) {
-        readingsBulkUpdate( $hash, $path . '-' . $r, $v );
+        ::readingsBulkUpdate( $hash, $path . '-' . $r, $v );
     }
 
-    readingsBulkUpdate( $hash, 'batteryLevel',
+    ::readingsBulkUpdate( $hash, 'batteryLevel',
         sprintf( "%.1f", $readings->{percentage} ) )
       if ( defined( $readings->{percentage} ) );
-    readingsBulkUpdate(
+    ::readingsBulkUpdate(
         $hash,
         'batteryPower',
         sprintf(
             "%.1f",
             (
-                ReadingsVal( $name, 'siteinfo-nominal_system_energy_kWh', 0 ) /
+                ::ReadingsVal( $name, 'siteinfo-nominal_system_energy_kWh', 0 ) /
                   100
-            ) * ReadingsVal( $name, 'statussoe-percentage', 0 )
+            ) * ::ReadingsVal( $name, 'statussoe-percentage', 0 )
         )
     );
 
-    readingsBulkUpdateIfChanged( $hash, 'actionQueue',
+    ::readingsBulkUpdateIfChanged( $hash, 'actionQueue',
         scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue' );
-    readingsBulkUpdateIfChanged(
+    ::readingsBulkUpdateIfChanged(
         $hash, 'state',
         (
             defined( $hash->{actionQueue} )
@@ -667,7 +677,7 @@ sub WriteReadings {
         )
     );
 
-    readingsEndUpdate( $hash, 1 );
+    ::readingsEndUpdate( $hash, 1 );
 }
 
 sub ReadingsProcessing_Aggregates {
@@ -891,9 +901,9 @@ sub CreateUri {
         $header     = 'Content-Type: application/json';
         $data       = 
               '{"username":"customer","password":"'
-            . ReadPassword( $hash, $name )
+            . $hash->{helper}->{passObj}->getReadPassword($name)
             . '","email":"'
-            . AttrVal($name,'emailaddr','test@test.de')
+            . ::AttrVal($name,'emailaddr','test@test.de')
             . '","force_sm_off":false}'
     }
     elsif ( $path eq 'powerwallsstop'
@@ -905,51 +915,23 @@ sub CreateUri {
     return ( $uri, $method, $header, $data, $path );
 }
 
-sub StorePassword {
-    my $hash     = shift;
-    my $name     = shift;
-    my $password = shift;
-
-    my $index   = $hash->{TYPE} . q{_} . $name . q{_passwd};
-    my $key     = getUniqueId() . $index;
-    my $enc_pwd = q{};
-
-    if ( eval qq(use Digest::MD5;1) ) {
-
-        $key = Digest::MD5::md5_hex( unpack "H*", $key );
-        $key .= Digest::MD5::md5_hex($key);
-    }
-
-    for my $char ( split //, $password ) {
-
-        my $encode = chop($key);
-        $enc_pwd .= sprintf( "%.2x", ord($char) ^ ord($encode) );
-        $key = $encode . $key;
-    }
-
-    my $err = setKeyValue( $index, $enc_pwd );
-    return qq(error while saving the password - ${err})
-      if ( defined($err) );
-
-    return q{password successfully saved};
-}
-
+### Kann nach einiger Zeit entfernt werden
 sub ReadPassword {
     my $hash = shift;
     my $name = shift;
 
     my $index = $hash->{TYPE} . q{_} . $name . q{_passwd};
-    my $key   = getUniqueId() . $index;
+    my $key   = ::getUniqueId() . $index;
     my ( $password, $err );
 
-    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Read password from file));
+    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Read password from file));
 
-    ( $err, $password ) = getKeyValue($index);
+    ( $err, $password ) = ::getKeyValue($index);
 
     if ( defined($err) ) {
 
-        Log3($name, 3,
-qq(TeslaPowerwall2AC \(${name}\) - unable to read password from file: ${err}));
+        ::Log3($name, 3,
+qq(TeslaPowerwall2AC ($name) - unable to read password from file: $err));
         return;
 
     }
@@ -975,19 +957,18 @@ qq(TeslaPowerwall2AC \(${name}\) - unable to read password from file: ${err}));
     }
     else {
 
-        Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - No password in file));
+        ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - No password in file));
         return;
     }
 
     return;
 }
 
-
-
+#### kann nach einiger Zeit gelöscht werden, entferne auch Code aus der Define Fn
 sub DeletePassword {
     my $hash    = shift;
 
-    setKeyValue( $hash->{TYPE} . q{_} . $hash->{NAME} . q{_passwd}, undef );
+    ::setKeyValue( $hash->{TYPE} . q(_) . $hash->{NAME} . q(_passwd), undef );
 
     return;
 }
@@ -995,40 +976,24 @@ sub DeletePassword {
 sub Rename {
     my $new     = shift;
     my $old     = shift;
+    
+    my $hash    = $::defs{$new};
 
-    my $hash    = $defs{$new};
+    my ($passResp,$passErr);
+    ($passResp,$passErr) = $hash->{helper}->{passObj}->setRename($new,$old);
+    
+    ::Log3($new, 1,
+qq(TeslaPowerwall2AC ($new) - error while change the password hash after rename - $passErr))
+        if ( !defined($passResp)
+        and defined($passErr) );
 
-    StorePassword( $hash, $new, ReadPassword( $hash, $old ) );
-    setKeyValue( $hash->{TYPE} . q{_} . $old . q{_passwd}, undef );
+    ::Log3($new, 1,
+qq(TeslaPowerwall2AC ($new) - change password hash after rename successfully))
+        if ( defined($passResp)
+        and !defined($passErr) );
 
     return;
 }
 
-# My little Helpers
-sub PathTimestamp {
-    my $hash = shift;
-    my $path = shift // return;
-
-    $hash->{helper}->{pathTimestamp}->{$path}->{TIME} =
-      gettimeofday();
-}
-
-sub PathTimeAge {
-    my $hash = shift;
-    my $path = shift;
-
-    $hash->{helper}{updateTimeCallBattery} = 0
-      if ( not defined( $hash->{helper}{updateTimeCallBattery} ) );
-    my $UpdateTimeAge = gettimeofday() - $hash->{helper}{updateTimeCallBattery};
-
-    return $UpdateTimeAge;
-}
-
-sub IsPathTimeAgeToOld {
-    my $hash   = shift;
-    my $maxAge = shift;
-
-    return ( CallBattery_UpdateTimeAge($hash) > $maxAge ? 1 : 0 );
-}
 
 1;

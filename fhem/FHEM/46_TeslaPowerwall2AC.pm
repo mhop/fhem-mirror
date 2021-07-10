@@ -57,47 +57,39 @@ package FHEM::TeslaPowerwall2AC;
 use strict;
 use warnings;
 use FHEM::Meta;
-use GPUtils qw(GP_Import GP_Export);
+use GPUtils qw(GP_Export);
 
-require FHEM::Tesla::Powerwall;
+require FHEM::Devices::Tesla::Powerwall;
 
-## Import der FHEM Funktionen
 #-- Run before package compilation
 BEGIN {
 
-    # Import from main context
-    GP_Import(
+    #-- Export to main context with different name
+    GP_Export(
         qw(
-          readingFnAttributes
+            Initialize
           )
     );
 }
-
-#-- Export to main context with different name
-GP_Export(
-    qw(
-      Initialize
-      )
-);
 
 sub Initialize {
 
     my $hash            = shift;
 
-    $hash->{GetFn}          = 'FHEM::Tesla::Powerwall::Get';
-    $hash->{SetFn}          = 'FHEM::Tesla::Powerwall::Set';
-    $hash->{DefFn}          = 'FHEM::Tesla::Powerwall::Define';
-    $hash->{UndefFn}        = 'FHEM::Tesla::Powerwall::Undef';
-    $hash->{NotifyFn}       = 'FHEM::Tesla::Powerwall::Notify';
-    $hash->{RenameFn}       = 'FHEM::Tesla::Powerwall::Rename';
+    $hash->{GetFn}          = \&FHEM::Devices::Tesla::Powerwall::Get;
+    $hash->{SetFn}          = \&FHEM::Devices::Tesla::Powerwall::Set;
+    $hash->{DefFn}          = \&FHEM::Devices::Tesla::Powerwall::Define;
+    $hash->{UndefFn}        = \&FHEM::Devices::Tesla::Powerwall::Undef;
+    $hash->{NotifyFn}       = \&FHEM::Devices::Tesla::Powerwall::Notify;
+    $hash->{RenameFn}       = \&FHEM::Devices::Tesla::Powerwall::Rename;
 
-    $hash->{AttrFn}         = 'FHEM::Tesla::Powerwall::Attr';
+    $hash->{AttrFn}         = \&FHEM::Devices::Tesla::Powerwall::Attr;
     $hash->{AttrList}       =
                       'interval '
                     . 'disable:1 '
                     . 'devel:1 '
                     . 'emailaddr '
-                    . $readingFnAttributes;
+                    . $::readingFnAttributes;
 
     $hash->{parseParams}    = 1;
 
@@ -207,7 +199,7 @@ sub Initialize {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.2.0",
+  "version": "v2.0.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
