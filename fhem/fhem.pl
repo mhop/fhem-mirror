@@ -2507,10 +2507,8 @@ CommandSetReading($$)
 
     if($b1 eq "IODev") {
       my $ret = fhem_setIoDev($hash, $b[2]);
-      if($ret) {
-        push @rets, $ret;
-        next;
-      }
+      push @rets, $ret if($ret);
+      next;
     }
 
     if($hash->{".updateTime"}) { # Called from userReadings, #110375
@@ -3219,8 +3217,7 @@ CommandSetstate($$)
       if(!defined($d->{READINGS}{$sname}) ||
          !defined($d->{READINGS}{$sname}{TIME}) ||
          $d->{READINGS}{$sname}{TIME} lt $tim) {
-        $d->{READINGS}{$sname}{VAL} = $sval;
-        $d->{READINGS}{$sname}{TIME} = $tim;
+        setReadingsVal($d, $sname, $sval, $tim);
       }
 
 
@@ -4702,6 +4699,14 @@ setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
 
+  my $t = $hash->{TYPE};
+  if($t) {
+    my $m = $modules{$t}; # Forum 120603
+    if($m && $m->{ignoredReadings} && $m->{ignoredReadings}{$rname}) {
+      Log 4, "setReadingsVal: IGNORING $hash->{NAME} reading";
+      return;
+    }
+  }
   if($hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
     if(defined($hash->{READINGS}{$rname}) && 
        defined($hash->{READINGS}{$rname}{VAL}) &&
