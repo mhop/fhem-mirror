@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 57_SSCal.pm 23315 2020-12-08 10:27:50Z DS_Starter $
+# $Id: 57_SSCal.pm 23365 2020-12-16 14:40:38Z DS_Starter $
 #########################################################################################################################
 #       57_SSCal.pm
 #
-#       (c) 2019 - 2020 by Heiko Maaz
+#       (c) 2019 - 2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module integrate the Synology Calendar into FHEM
@@ -140,6 +140,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.9"  => "11.07.2021  set adaption of AUTH for DSM7 compatibility ",
   "2.4.8"  => "16.12.2020  accep umlauts in calendar name ",
   "2.4.7"  => "08.12.2020  fix handle code recognition in createAtDevices as single line ",
   "2.4.6"  => "06.11.2020  bugfix weekly byDay ",
@@ -215,6 +216,11 @@ my %hget = (                                                                # Ha
   getCalendars      => { fn => \&_getgetCalendars,         needcred => 1 },
   storedCredentials => { fn => \&_getstoredCredentials,    needcred => 1 },
   versionNotes      => { fn => \&_getversionNotes,         needcred => 0 },
+);
+
+my %hvada = (                                                              # Funktionshash Version Adaption
+  "a01"  => {AUTH  => "6", INFO  => "1", CAL  => "2", 
+             EVENT => "3", SHARE => "1", TODO => "1"  },
 );
 
 # Versions History extern
@@ -873,6 +879,8 @@ sub _setlogout {
   my $name  = $paref->{name};
   
   logout($hash, $data{SSCal}{$name}{calapi}, $splitstr); 
+  
+  delete $data{SSCal}{$name}{calapi}{PARSET};                      # erzwinge Abruf API beim nächsten Login
 
 return;
 }
@@ -1247,15 +1255,14 @@ sub getApiSites_parse {                                    ## no critic 'complex
             # Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-            my @sims;
+            my $adavs = "a01";                                                             # adaptierte Version
             
-            push @sims, "EVENT:3";
-            
-            for my $esim (@sims) {
-                my($k,$v) = split ":", $esim;
-                $data{SSCal}{$name}{calapi}{$k}{VER} = $v;
-                $data{SSCal}{$name}{calapi}{$k}{MOD} = "yes";
-                Log3($name, 4, "$name - Version of $data{SSCal}{$name}{calapi}{$k}{NAME} adapted to: $data{SSCal}{$name}{calapi}{$k}{VER}");
+            if($adavs) {
+                for my $av (sort keys %{$hvada{$adavs}}) {
+                    $data{SSCal}{$name}{calapi}{$av}{VER} = $hvada{$adavs}{$av};
+                    $data{SSCal}{$name}{calapi}{$av}{MOD} = "yes";
+                    Log3($name, 4, "$name - Version of $data{SSCal}{$name}{calapi}{$av}{NAME} adapted to: $data{SSCal}{$name}{calapi}{$av}{VER}");
+                }
             }
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
