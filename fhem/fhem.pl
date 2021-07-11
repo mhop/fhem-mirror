@@ -243,7 +243,6 @@ use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
 use vars qw($lastDefChange);    # number of last def/attr change
 use vars qw($lastWarningMsg);   # set by the warnings-sub
 use vars qw($nextat);           # Time when next timer will be triggered.
-use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 use vars qw($reread_active);
 use vars qw($selectTimestamp);  # used to check last select exit timestamp
 use vars qw($winService);       # the Windows Service object
@@ -258,7 +257,6 @@ use vars qw(%intAt);            # Internal timer hash, used by apptime
 use vars qw(%logInform);        # Used by FHEMWEB/Event-Monitor
 use vars qw(%modules);          # List of loaded modules (device/log/etc)
 use vars qw(%ntfyHash);         # hash of devices needed to be notified.
-use vars qw(%oldvalue);         # Old values, see commandref.html
 use vars qw(%prioQueues);       #
 use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
@@ -293,6 +291,7 @@ my $namedef = "where <name> is a single device name, a list separated by comma (
 my $rcvdquit;                   # Used for quit handling in init files
 my $readingsUpdateDelayTrigger; # needed internally
 my $gotSig;                     # non-undef if got a signal
+my %oldvalue;                   # Old values, see commandref.html
 my $wbName = ".WRITEBUFFER";    # Buffer-name for delayed writing via select
 my %comments;                   # Comments from the include files
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
@@ -302,9 +301,10 @@ my %delayedShutdowns;           # definitions needing delayed shutdown
 my %fuuidHash;                  # for duplicate checking
 my $globalUniqueID;             # cache it
 
+my $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
+
 $init_done = 0;
 $lastDefChange = 0;
-$readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 $featurelevel = 6.0; # see also GlobalAttr
 $numCPUs = `grep -c ^processor /proc/cpuinfo 2>&1` if($^O eq "linux");
 $numCPUs = ($numCPUs && $numCPUs =~ m/(\d+)/ ? $1 : 1);
