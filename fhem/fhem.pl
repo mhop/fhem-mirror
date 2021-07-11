@@ -2504,8 +2504,8 @@ CommandSetReading($$)
     return "$sdev: bad reading name '$b1' (allowed chars: A-Za-z/\\d_\\.-)"
       if(!goodReadingName($b1));
 
-
     if($b1 eq "IODev") {
+      next if(!fhem_devSupportsAttr($sdev, "IODev"));
       my $ret = fhem_setIoDev($hash, $b[2]);
       push @rets, $ret if($ret);
       next;
@@ -3203,6 +3203,7 @@ CommandSetstate($$)
       }
 
       if($sname eq "IODev") {
+        next if(!fhem_devSupportsAttr($sdev, "IODev"));
         my $ret = fhem_setIoDev($d, $sval);
         if($ret) {
           push @rets, $ret if($init_done);
@@ -4692,6 +4693,14 @@ AttrNum($$$;$)
   return $val;
 }
 
+sub
+fhem_devSupportsAttr($$)
+{
+  my ($devName,$attrName) = @_;
+  my $attrList = getAllAttr($devName);
+  return (" $attrList " =~ m/ $attrName[ :;]/);
+}
+
 ################################################################
 # Functions used by modules.
 sub
@@ -4699,10 +4708,7 @@ setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
 
-  if($rname eq "IODev") {
-    my $attrList = getAllAttr($hash->{NAME}); # Forum #120603
-    return if(" $attrList " !~ m/ IODev[ :;]/);
-  }
+  return if($rname eq "IODev" && !fhem_devSupportsAttr($hash->{NAME}, "IODev"));
 
   if($hash->{".or"} && grep($rname =~ m/^$_$/, @{$hash->{".or"}}) ) {
     if(defined($hash->{READINGS}{$rname}) && 
