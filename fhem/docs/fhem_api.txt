@@ -1,0 +1,256 @@
+FHEM Application Programming Interface for Modules.
+
+Description of the fhem.pl functions offered to modules, and used Modules
+interfaces. 
+NOTE: if there is a difference between this description and fhem.pl, then this
+document is to be fixed, and not fhem.pl.
+
+
+Global Variables
+================
+
+------
+$addTimerStacktrace
+  if set to one, InternalTimer calls will add a stacktrace to the internal hash
+  holding all the Timers. Used by fhemdebug
+
+$auth_refresh
+  if set one, refresh the authorization caches. Used by the allowed module.
+
+$cmdFromAnalyze
+  holds the command which will be executed by eval. Used by the __WARN__
+  handler or stacktrace to report better error messages.
+
+$devcount
+  global devicecounter, used to give a unique sequential number (NR) to each
+  created device. Devices are saved in NR order.
+
+$featurelevel
+  supported FHEM feature level. Its default value is the current FHEM version,
+  (6.1, etc), and can be set by the user to a lower level by the attribute
+  featurelevel to have more backward compatibility, if the module supports it.
+
+$fhemForked
+  set to 1 if we are in a forked process. Set only, if the fhemFork() routine
+  is used for forking.
+
+$fhemTestFile
+  file to include if -t is specified. Uset for Unit tests, see the t
+  subdirectory for details.
+
+$fhem_started
+  set to the current UNIX time upon FHEM startup.
+
+$haveInet6
+  set to true if the IO::Socker::INET6 module is available and the global
+  variable useInet6 is set.
+
+$init_done
+  set to one, if the fhem.cfg and fhem.state are processed.
+  The global INITIALIZED trigger is sent after this value is set to one,
+  InternalTimers are processed next.
+
+$internal_data
+  global variable, to avoid data copying between modules. E.g. FileLog_get will
+  set this variable when the outfile parameter is specified as "-".
+
+$lastDefChange
+  this variable is increased each time a definition or attribute changes. Used
+  by modules to invalidate their private caches.
+
+$lastWarningMsg
+  set to the last __WARN__ message.
+
+$nextat
+  set to the time of the next InternalTimer call.
+
+$numCPUs
+  number of CPUs, if running on a Linux system.
+
+$reread_active
+  set to one while the rereadcfg operation is active.
+
+$selectTimestamp
+  set to the time before the last select was started. Can be used to identify
+  busy loops, where a select was not called betweeen function calls.
+
+$winService
+  the Windows Service object.
+
+------
+%attr
+  hash of Attributes. The Attributes are reerences by Devicename.
+
+%cmds
+  hash of available FHEM Commands. The command Name is specified by the hash
+  key. 
+  Mandatory entries:
+  - Fn
+    String, holding the name of the function to be called. The function will be
+    called with the Client-Hash (Source-Channel of the command) and the
+    command-line parameters as one string, without the command name.
+  - Hlp
+    One-line help, displayed by the help command
+  Optional entries:
+  - ReplacedBy
+    Name of the new entry
+  - Modulename
+    Name of the module to load when this command is entered (autoloading the
+    command)
+  - ClientFilter
+    Name of a module, this command is only valid if it is entered through this
+    channel (e.g. quit is only valid for telnet connections)
+
+%data
+  Global variable, can be used by modules or enduser to store arbitrary data.
+
+%defs
+  hash of FHEM definitions.
+  Mandatory entries:
+  - NAME: name od the FHEM definition
+  - FUUID: unique id, remains the same even after renaming
+  - TYPE: name of the corresponding module or global
+  - NR: number of this definition, used when saving
+  - STATE: the "general" state of the device
+  - DEF: additional parameters at definition
+
+  Optional entries
+  - CFGFN: name of the configuration file the definition is coming from, used
+    to save it again to this file
+  - CL: input channel from where the definition was entered (telnet, FHEMWEB,
+    etc). Set temporarily for DefFn/SetFn/GetFn/DeleteFn/ModifyFn/etc calls
+  - EXCEPT_FD: the Filedescriptor to be monitored by select. Note: in order to
+    be used, selectlist must be filled.
+  - FD: the Filedescriptor to be monitored by select. Note: in order to be
+    used, selectlist must be filled.
+  - TEMPORARY: if set, do not save this definition, nor trigger the
+    structure-change flag
+  - VOLATILE: if set, save this definition to the state file, and do not
+    trigger the structure-change flag
+  - .AttrList
+    List of device specific attributes. If absent, the module specific ones
+    will be used by getAllAttr()
+  - NTFY_ORDER
+    The order in which the NotifyFn functions of the different devices are
+    called. If not specified, is set to 50-name, or
+    $module{NotifyOrderPrefix}-name
+    
+%inform
+  telnet connections to be notified for generated events.
+  
+%intAt
+  hash of InternalTimer entries. Maintained in parallel to the intAtA array.
+  Mandatory filed for each entry:
+  - TRIGGERTIME: UNIX timestamp
+  - FN: function name or reference to be called
+  - ARG: parameter to call the function with when the timer triggers
+  - atNr: key in the hash, for cross-referencing to the array.  Optional field:
+  - STACKTRACE: set if $addTimerStacktrace is specified, holding the current
+    (as of the time of calling InternalTimer) stack trace.
+
+%logInform
+  hash of functions to be called for each Log call. Used e.g by FHEMWEB to show
+  the FHEM-Log or notify, when the readLog attribute is set.
+
+%modules
+  hash of the modules. Modules are loaded only on request, e.g. when define is
+  specified.
+
+  Mandatory Entries:
+  - ORDER: used for notifying devices for dispatched raw messages
+
+  Optional Entries:
+  - AttrFn: name of the function to be called when an attribute is set or
+    deleted.  Function parameters: set or del, and an array of parameters.
+  - AttrList: list of supported attributes. Used if the device hash (%defs) has
+    no .AttrList entry.
+  - AuthenticateFn: name of the function called to check if a connection is
+    authenticated. Called with the hash of the authentication-instance, the
+    connection hash, and the authentication arguments. Returns 0 if the
+    authentication is not needed, 1 if authenticated and 2 if the
+    authentication failed.
+  - AuthorizeFn: name of the function called to check if an operation is
+    authorized. Called with the hash of the authorization-instance, the
+    connection hash, the type of the check (cmd or  devicename), the
+    authorization arguments, and a $silent parameter. Returns 1 if authorized
+    and 0 else.
+  - CanAuthenticate: set by the module to 1 if it requires authentication. Used
+    for Security-Checks.
+  - Clients: list of potential modules which will be notified by Dispatch.
+  - DefFn: the function called upon definition of a device. Called with the
+    prefilled §defs hash and the command-line parameters as one string.
+  - DelayedShutdownFn: called before FHEM shutdown, this function can delay the
+    shutdown if returns 1. Called with the instance of the device.
+  - DeleteFn: the function called upon deleting a definition, called with the
+    hash of the device to be deleted.
+  - defptr: hash of module-specific data, will be restored after a reload
+    operation.
+  - ExceptFn: function called when the select exception-Field reported an
+    action. Called with the hash of the device, selectlist mus be filled, and
+    EXCEP_FD must be set in the device hash.
+  - FingerPrintFn: name of a function to prepare data for duplicate detection.
+  - GetFn: name of the function to be called when the get command is called.
+    Parameters: hash of the device, and an array of parameters
+  - ldata: hash of module-specific data, will be restored after a reload
+    operation.
+  - LOADED: set to 1 if the module is loaded
+  - Match: Regexp used in Dispatch, to identify if a message is relevant for a
+    module. Set in the logical module.
+  - MatchList: Hash of Modulename=>regexps, in order to search the right module
+    in Dispatch. Set in the physical module, used after no defined instance is
+    found to process the data, to trigger a module load.
+  - NotifyFn: name of the function to be called when an event is triggered.
+    Parameters: hash of the notify device, hash of the device producing the
+    events. The events themselves are available by calling the deviceEvents
+    function.
+  - NotifyOrderPrefix: used to crate the NTFY_ORDER, if it is not set
+    explicitely by the module.
+  - ParseFn: Name of a function called by Dispatch to interpret data received
+    by the physical (aka IO) module. Called with the IO-Instance and the raw
+    data.
+  - parseParams: if set, the SetFn/GetFn/DefFn parameters are called with the
+    results of the parseParams function and not an array, which consists of the
+    space separated command line.
+  - ReadFn: name of the function to be called if dta is available. Called with
+    the hash of the instance. In order to be called, %selectlist must contain a
+    hash of the entry, and FD must contain the Filedescriptor to be monitored.
+  - ReadyFn: called for all definitions in the %readyfnlist. On unix/osx/linux
+    this is used to check if a device becomes available again, on Windows it is
+    used to check if it has data, as serial devices on windows do not support
+    the select call.
+  - RenameFn: called when a device is renamed, with the new and the old name as
+    parameters.
+  - SetFn: name of the function to be called when the set command is called.
+    Parameters: hash of the device, and an array of parameters.
+  - ShutdownFn: called before FHEM-shutdown, to enable a cleanup.
+  - StateFn: called from the setstate command, to align internal values to the
+    state. Called with the device name, timestamp, readingname and value as
+    parameters.
+  - WriteFn: name of the function used to Write data to the device (called by
+    IOWrite). Parameters: hash of the IO Device, and an array of data.
+  - UndefFn: called from rereadcfg and delete to clean up (close
+    filedescriptors, etc). Called with the hash of the device instance.
+
+%ntfyHash
+  hash of devices to be notified. If cleared, it will be recomputed before
+  any device can be notified. Note: this computation is CPU intensive.
+
+%prioQueues
+  List of (low-)priority queues, added by PrioQueue_add
+
+%readyfnlist
+  List of devices scheduled for calling their ReadyFn
+
+%selectlist
+  List of devices scheduled for calling their ReadFn/WriteFn or ExceptFn, if
+  the select of the corresponding FD/EXCEPT_FD returns activity.
+
+%value
+  hash used for featurelist <= 5.6, holding the value of each device.
+  Replaced by the Value() function for featurelist > 5.6
+
+@intAtA
+  array of InternalTimer entries, see the %intAt hash for details.
+
+@structChangeHist
+  array of structural changes not saved.
