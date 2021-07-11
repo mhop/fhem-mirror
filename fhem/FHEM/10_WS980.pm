@@ -33,7 +33,7 @@ use warnings;
 use IO::Socket::INET;
 use POSIX qw(strftime);
 
-my $version = "1.4.0";
+my $version = "1.5.0";
 
 #------------------------------------------------------------------------------------------------------
 # global constants
@@ -451,10 +451,18 @@ sub WS980_autodiscoverIP($)
 	WS980_Log($hash, 4, "received raw reply: " . WS980_hexDump($rawbuf));
 
 	my ($typeStr, $buf) = WS980_handleReply($hash, $rawbuf);
-	my ($ip1, $ip2, $ip3, $ip4, $port, $stationName) = unpack("x[6]CCCCnC/A", $buf);
-	WS980_Log($hash, 2, "reply: $ip1, $ip2, $ip3, $ip4, $port, $stationName");
 
-	return (sprintf("%d.%d.%d.%d", $ip1, $ip2, $ip3, $ip4), $port);
+	if (defined($buf)) {
+		my ($ip1, $ip2, $ip3, $ip4, $port, $stationName) = unpack("x[6]CCCCnC/A", $buf);
+		WS980_Log($hash, 2, "autodiscovery-reply: $ip1, $ip2, $ip3, $ip4, $port, $stationName");
+
+		return (sprintf("%d.%d.%d.%d", $ip1, $ip2, $ip3, $ip4), $port);
+	}
+	else
+	{
+		WS980_Log($hash, 1, "autodiscovery failed: looks like the reply could not be decoded");
+		return (undef,undef);
+	}
 }
 
 
