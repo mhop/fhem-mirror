@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
   "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
   "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
   "0.54.0" => "19.06.2021  new calcVariance, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
@@ -5027,6 +5028,11 @@ sub _flowGraphic {
       $batout = 0;
       $soc    = 0;
   }
+  
+  if($batout) {
+      $csc       -= $batout;
+      $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
+  }
 
   my $batin_style  = $batin  ? 'flowg active_out'  : 'flowg inactive_out';
   my $batout_style = $batout ? 'flowg active_in'   : 'flowg inactive_in';
@@ -5108,7 +5114,7 @@ END3
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="400" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="595" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="330" y="300" style="font-size: $fs; text-anchor: start;">$csc</text>}     if ($csc);
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="330" y="300" style="font-size: $fs; text-anchor: start;">$csc</text>}     if ($csc && $cpv);
   $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="125" y="200" style="font-size: $fs; text-anchor: end;">$cgfi</text>}      if ($cgfi);
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="125" y="420" style="font-size: $fs; text-anchor: end;">$cgc</text>}       if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="465" y="420" style="font-size: $fs; text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
