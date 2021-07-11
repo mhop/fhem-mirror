@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - change:  10_WS980: allow to ignore invalid values
  - feature: 49_SSCam: new value 8.2.8-xxxx for attr simu_SVSversion
  - bugfix:  76_SMAInverter:fix ETOTAL/LOADTOTAL bug
  - feature: 76_SMAInverter: hide unavailable data

@@ -33,7 +33,7 @@ use warnings;
 use IO::Socket::INET;
 use POSIX qw(strftime);
 
-my $version = "1.3.0";
+my $version = "1.4.0";
 
 #------------------------------------------------------------------------------------------------------
 # global constants
@@ -165,6 +165,7 @@ sub WS980_Initialize($)
 	$hash->{AttrList}  = "altitude ".
 	                     "events:textField-long ".
 	                     "connection:Keep-Alive,Close ".
+	                     "invalidValues:updateReading,skip,skipAndLog ".
 	                     "requests:multiple-strict,".join(",", sort keys %{REQUESTS()})." ".
 	                     "showRawBuffer:1 ".
 	                     "silentReconnect:1 ".
@@ -289,6 +290,20 @@ sub WS980_AttrFn(@)
 			}
 			else {
 				return "'connection' must be either Keep-Alive or Close";
+			}
+		}
+	}
+
+	#######################
+	#### invalidValues ####
+
+	if ($attrName eq "invalidValues") {
+		if ($cmd eq "set") {
+			if ($attrVal eq "updateReading" || $attrVal eq "skip" || $attrVal eq "skipAndLog") {
+				return undef;
+			}
+			else {
+				return "'invalidValues' must be either updateReading, skip or skipAndLog";
 			}
 		}
 	}
@@ -522,6 +537,7 @@ sub WS980_handleMultiValuesUpdate($$$)
 	WS980_Log($hash, 5, "decoding block: " . WS980_hexDump($buf));
 
 	my $showRawBuffer = AttrVal($name, "showRawBuffer", "0") eq "1" ? 1 : 0;
+	my $invalidValues = AttrVal($name, "invalidValues", "updateReading");
 
 	for (my $i = 0; $i < length($buf); )
 	{
@@ -564,7 +580,12 @@ sub WS980_handleMultiValuesUpdate($$$)
 
 		my $value = hex(WS980_binToHex($rawValue));
 		if ($value eq $errVal) {
-			$value = "n/a";
+			if ($invalidValues eq "updateReading") {
+				$value = 'n/a';
+			} else {
+				WS980_Log($hash, 4, "skipping invalid value of \"$reading\"") if ($invalidValues eq "skipAndLog");
+				next;
+			}
 		} else {
 			# convert negative values
 			my $lbit = 1 << ($bytes * 2 * 4) - 1;
@@ -1365,14 +1386,14 @@ sub WS980_Log($$$)
 
 =begin html
 
-<a name="WS980"></a>
+<a id="WS980"></a>
 <h3>WS980</h3>
 <ul>
 	<b>WS980 - Requests weather data locally from WS980WiFi weather stations</b><br>
 
 	<br>
 
-	<a name="WS980define"></a>
+	<a id="WS980-define"></a>
 	<b>Define</b><br>
 	<br>
 	<code>define &lt;name&gt; WS980 [IP] [INTERVAL]</code><br>
@@ -1389,7 +1410,7 @@ sub WS980_Log($$$)
 	<br>
 	<br>
 
-	<a name="WS980readings"></a>
+	<!-- <a name="WS980readings"></a> -->
 	<b>Readings</b>
 	<ul>
 		<li>
@@ -1499,29 +1520,35 @@ sub WS980_Log($$$)
 	</ul>
 	<br>
 
-	<a name="WS980set"></a>
+	<a id="WS980-set"></a>
 	<b>Set</b>
 	<ul>
-		<li>
+		<li><a id="WS980-set-update"></a>
 			<i>update</i><br>
 			manually update current weather data
 		</li>
 	</ul>
 	<br>
 
-	<a name="WS980attribut"></a>
+	<a id="WS980-attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li><a name="altitude"></a>
+		<li><a id="WS980-attr-altitude"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>altitude </b>&lt;<b>height</b>&gt;</code></dt>
 			Specifies the mean sea level in meters. Default is 0. Used to calculate the <code>pressureRel_calculated</code>-reading. If unset, the altitude from global is used.
 		</li>
-		<li><a name="connection"></a>
+		<li><a id="WS980-attr-connection"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>connection </b>&lt;<b>Keep-Alive</b>|<b>Close</b>&gt;</code></dt>
 			<code>Keep-Alive</code>: The connection to the WS980 is kept open as long as possible. Reconnect is only done if necessary. <code>Keep-Alive</code> is default and a good setting in most cases.<br>
 			<code>Close</code>: The connection is opened on-the-fly and closed directly after doing requests. <code>Close</code> should only be used if you have multiple clients connection to your WS980 which might cause frequent read-timeouts. <code>ConnectionState</code> will display <code>disconnected</code> most of the time, this is OK!
 		</li>
-		<li><a name="events"></a>
+		<li><a id="WS980-attr-invalidValues"></a>
+			<dt><code><b>attr</b> &lt;name&gt; <b>invalidValues </b>&lt;<b>updateReading</b>|<b>skip</b>|<b>skipAndLog</b>&gt;</code></dt>
+			<code>updateReading</code>: The reading will be set to n/a when an invalid value is received. <code>updateReading</code> is default.<br>
+			<code>skip</code>: Invalid values will silently be skipped, the corresponding reading will not be updated.<br>
+			<code>skipAndLog</code>: Invalid values will be logged, and the corresponding reading will not be updated.<br>
+		</li>
+		<li><a id="WS980-attr-events"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>events </b>&lt;<b>Configuration</b>&gt;|&lt;<b>Configuration</b>&gt;|...</code></dt>
 			Allows to configure custom events based on the readings of this instance.<br>
 			&lt;<b>Configuration</b>&gt; must have the form:
@@ -1544,40 +1571,40 @@ sub WS980_Log($$$)
 			<dt><code><b>attr</b> &lt;name&gt; <b>dusk:brightness&lt;30,20|brightSunlight:brightness&gt;80000,5000</b></code></dt>
 			<br>
 		</li>
-		<li><a name="requests"></a>
+		<li><a id="WS980-attr-requests"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>requests </b>current todayMax ... </code></dt>
 			A comma or space separated list of values to requests. If empty, all known values are requested.<br>
 			Valid values: firmware, current, todayMax, todayMin, historyMax, historyMin.
 		</li>
-		<li><a name="showRawBuffer"></a>
+		<li><a id="WS980-attr-showRawBuffer"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>showRawBuffer </b>1</code></dt>
 			used for development: show raw data received from the WS980WiFi
 		</li>
-		<li><a name="silentReconnect"></a>
+		<li><a id="WS980-attr-silentReconnect"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>silentReconnect </b>1</code></dt>
 			If set to 1, then it will set the loglevel for connect- and reconnect-messages to 2 instead of 1
 		</li>
-		<li><a name="unit_temperature"></a>
+		<li><a id="WS980-attr-unit_temperature"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>unit_temperature </b>&lt;<b>unit</b>&gt;</code></dt>
 			set the unit used for temperature-readings. Default: °C
 		</li>
-		<li><a name="unit_pressure"></a>
+		<li><a id="WS980-attr-unit_pressure"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>unit_pressure </b>&lt;<b>unit</b>&gt;</code></dt>
 			set the unit used for pressure-readings. Default: hPa
 		</li>
-		<li><a name="unit_wind"></a>
+		<li><a id="WS980-attr-unit_wind"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>unit_wind </b>&lt;<b>unit</b>&gt;</code></dt>
 			set the unit used for wind-readings. Default: m/s
 		</li>
-		<li><a name="unit_rain"></a>
+		<li><a id="WS980-attr-unit_rain"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>unit_rain </b>&lt;<b>unit</b>&gt;</code></dt>
 			set the unit used for rain-readings. Default: mm
 		</li>
-		<li><a name="unit_light"></a>
+		<li><a id="WS980-attr-unit_light"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>unit_light </b>&lt;<b>unit</b>&gt;</code></dt>
 			set the unit used for brightness-readings. Default: lux
 		</li>
-		<li><a name="disable"></a>
+		<li><a id="WS980-attr-disable"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>disable </b>1</code></dt>
 			disables this WS980-instance
 		</li>
