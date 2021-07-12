@@ -4663,11 +4663,14 @@ sub _beamGraphic {
           last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
+          
+          if ($val ne '&nbsp;') {                                                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
           $val  = $hfcg->{$i}{diff} < 0 ? 
                   '<b>'.$val.'<b/>'     : 
                   $val > 0              ? 
                   '+'.$val              : 
                   $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
+          }
           
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
