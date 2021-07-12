@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.17.1" => "12.07.2021  fix ETOTAL/LOADTOTAL bug",
   "2.17.0" => "01.07.2021  fix ETOTAL/LOADTOTAL bug",
   "2.16.1" => "21.06.2021  hide unavailable data",
   "2.16.0" => "21.06.2021  AC Voltage and AC Curren read fixed, read CosPhi included ",
@@ -1318,6 +1319,10 @@ sub SMAInverter_SMAcommand($$$$$) {
  if($data_ID eq 0x2601) {
      if (length($data) >= 66) {
          $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
+		 
+		 if(($inv_SPOT_ETOTAL eq -2147483648) || ($inv_SPOT_ETOTAL eq 0xFFFFFFFF) || $inv_SPOT_ETOTAL <= 0) {$inv_SPOT_ETOTAL = "-"; }
+		 
+		 
      } 
      else {
          Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
@@ -1353,6 +1358,8 @@ sub SMAInverter_SMAcommand($$$$$) {
  if($data_ID eq 0x4967) {
      if (length($data) >= 66) {
          $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
+		 
+		 if(($inv_BAT_LOADTOTAL eq -2147483648) || ($inv_BAT_LOADTOTAL eq 0xFFFFFFFF) || $inv_BAT_LOADTOTAL <= 0) {$inv_BAT_LOADTOTAL = "-"; }
      } 
      else {
          Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
