@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.54.4" => "12.07.2021  round Current_PV in _transferInverterValues ",
   "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
   "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
   "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
@@ -2385,9 +2386,9 @@ sub _transferInverterValues {
   
   Log3 ($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etotal=$edread ($etunit)");
   
-  my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
-  my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
-  $pv        = $pv < 0 ? 0 : $pv;                                                             # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718
+  my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
+  my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                        # aktuelle Erzeugung (W)  
+  $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
   
   push @$daref, "Current_PV<>". $pv." W";                                          
   $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
