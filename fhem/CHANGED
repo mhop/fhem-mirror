@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-# Do not insert empty lines here, update check depends on it. 
+# Do not insert empty lines here, update check depends on it.
+ - change:  57_SSCal: compatibility to DSM7 
  - bugfix:  10_WS980: v.1.5.0 fix fhem-crash when autodiscovery fails
  - change:  10_WS980: allow to ignore invalid values
  - feature: 49_SSCam: new value 8.2.8-xxxx for attr simu_SVSversion
