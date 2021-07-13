@@ -131,7 +131,7 @@ sub getAllSets($;$);
 sub getPawList($);
 sub getUniqueId();
 sub hashKeyRename($$$);
-sub json2nameValue($;$$$);
+sub json2nameValue($;$$$$);
 sub json2reading($$;$$$$);
 sub latin1ToUtf8($);
 sub myrename($$$);
@@ -262,8 +262,6 @@ use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
 
-use vars qw(@authenticate);     # List of authentication devices
-use vars qw(@authorize);        # List of authorization devices
 use vars qw(@intAtA);           # Internal timer array
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($numCPUs);          # Number of CPUs on Linux, else 1
@@ -281,6 +279,8 @@ my $AttrList = "alias comment:textField-long eventMap:textField-long ".
                "group room suppressReading userattr ".
                "userReadings:textField-long verbose:0,1,2,3,4,5 ";
 
+my @authenticate;               # List of authentication devices
+my @authorize;                  # List of authorization devices
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
 my $duplidx=0;                  # helper for the above pool
@@ -5262,9 +5262,9 @@ toJSON($)
 # will return a hash of name:value pairs.  in is a json_string, prefix will be
 # prepended to each name, map is a hash for mapping the names
 sub
-json2nameValue($;$$$)
+json2nameValue($;$$$$)
 {
-  my ($in, $prefix, $map, $filter) = @_;
+  my ($in, $prefix, $map, $filter, $negFilter) = @_;
   $prefix = "" if(!defined($prefix));
   my %ret;
 
@@ -5406,12 +5406,13 @@ json2nameValue($;$$$)
 
   my %ret2;
   for my $name (keys %ret) {
-    next if($filter && $name !~ m/$filter/);
+    next if($negFilter && $name =~ m/$negFilter/);
     my $oname = $name;
     if(defined($map->{$name})) {
       next if(!$map->{$name});
       $name = $map->{$name};
     }
+    next if($filter && $name !~ m/$filter/);
     $ret2{$name} = $ret{$oname};
   }
   return \%ret2;
