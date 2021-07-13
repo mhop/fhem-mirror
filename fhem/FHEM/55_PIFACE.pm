@@ -525,36 +525,34 @@ sub PIFACE_Shutdown($) {
        <code>define &lt;name&gt; PIFACE</code><br>
     </ul><br>
 
-	<a id="PIFACE-set"></a>
-	<b>Set</b><br/>
-	<ul>
-
-		<br/>
-		<code>set &lt;name&gt; &lt;port&gt; &lt;value&gt;</code>
-		<br/><br/>
-		<ul>
-			<li>set single port n to 1 (on) or 0 (off)<br/><br/>
-				Examples:<br/>
-				set &lt;name&gt; 3 1 =&gt; set port 3 on<br/>
-				set &lt;name&gt; 5 0 =&gt; set port 5 off<br/></li>
-			<br/>
-			<li>set all ports in one command by bitmask<br/><br/>
-				Example:<br/>
-				set &lt;name&gt; all 255 =&gt; set all ports on<br/>
-				set &lt;name&gt; all 0 =&gt; set all ports off<br/>
-				set &lt;name&gt; all 170 =&gt; bitmask(170) = 10101010 =&gt; set ports 1 3 5 7 on, ports 0 2 4 6 off<br/>
-				<br/>
-				<ul>
-					<code>port 76543210<br/>
-					bit&nbsp; 10101010</code>
-				</ul></li>
-		</ul>
-
+  <a id="PIFACE-set"></a>
+  <b>Set</b><br/>
+    <ul><br/>
+      <code>set &lt;name&gt; &lt;port&gt; &lt;value&gt;</code>
+    <br/><br/>
+      <ul>
+        <li>set single port n to 1 (on) or 0 (off)<br/><br/>
+	  Examples:<br/>
+	  set &lt;name&gt; 3 1 =&gt; set port 3 on<br/>
+	  set &lt;name&gt; 5 0 =&gt; set port 5 off<br/>
+	</li>
+	<br/>
+	<li>set all ports in one command by bitmask<br/><br/>
+	  Example:<br/>
+	  set &lt;name&gt; all 255 =&gt; set all ports on<br/>
+	  set &lt;name&gt; all 0 =&gt; set all ports off<br/>
+	  set &lt;name&gt; all 170 =&gt; bitmask(170) = 10101010 =&gt; set ports 1 3 5 7 on, ports 0 2 4 6 off<br/>
+	<br/>
+	  <ul>
+	    <code>port 76543210<br/>
+	    bit&nbsp; 10101010</code>
+	  </ul></li>
 	</ul>
-	<br>
+      </ul>
+      <br>
 
-	<a id="PIFACE-get"></a>
-	<b>Get</b><br/>
+  <a id="PIFACE-get"></a>
+  <b>Get</b><br/>
 	<ul>
 
 		<br/>
@@ -592,10 +590,10 @@ sub PIFACE_Shutdown($) {
             [defaultState] = off is default.<br>
             Restoration of the status of the output port after a Fhem reboot.
           </li>
-          <li><a href="#PIFACE_disable">disable</a> 0|1<br>
+          <li><a href="#disable">disable</a> 0|1<br>
             If applied set commands will not be executed.
           </li>
-          <li><a href="#PIFACE_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...<br>
+          <li><a href="#disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...<br>
             Space separated list of HH:MM tupels. If the current time is between
             the two time specifications, set commands will not be executed. Instead of
             HH:MM you can also specify HH or HH:MM:SS. To specify an interval
@@ -608,7 +606,14 @@ sub PIFACE_Shutdown($) {
             [pollInterval] = off is default.<br>
             Define the polling interval of the input ports in seconds.
           </li>
-          <li><a id="PIFACE-attr-portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
+          <li><a id="PIFACE-attr-portMode0">portMode0</a><br>
+              <a id="PIFACE-attr-portMode1">portMode1</a><br>
+              <a id="PIFACE-attr-portMode2">portMode2</a><br>
+              <a id="PIFACE-attr-portMode3">portMode3</a><br>
+              <a id="PIFACE-attr-portMode4">portMode4</a><br>
+              <a id="PIFACE-attr-portMode5">portMode5</a><br>
+              <a id="PIFACE-attr-portMode6">portMode6</a><br>
+              <a id="PIFACE-attr-portMode7">portMode7</a> tri|up,
             [portMode&lt;0..7&gt;] = tri is default.<br>
             This enables (up) or disables (tri) the internal pull-up resistor on the given input port.
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
