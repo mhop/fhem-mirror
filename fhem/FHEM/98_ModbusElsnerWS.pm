@@ -884,7 +884,7 @@ sub ModbusElsnerWS_Delete($$) {
 =item summary_DE ModbusElsnerWS Elsner Wetterstation P03/3-Modbus RS485 Auswertemodul
 =begin html
 
-<a name="ModbusElsnerWS"></a>
+<a id="ModbusElsnerWS"></a>
 <h3>ModbusElsnerWS</h3>
 <ul>
     The ModbusElsnerWS weather evaluation modul serves as a connecting link between the
@@ -913,11 +913,11 @@ sub ModbusElsnerWS_Delete($$) {
       <li>Adjustable switching thresholds and delay times</li>
       <li>Day/night signal</li>
       <li>Display of date, time, sun azimuth, sun elevation, longitude and latitude</li>
-      <li>Execution of custom alarm commands, see <a href="#ModbusElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> and
-      <a href="#ModbusElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a>.</li>
+      <li>Execution of custom alarm commands, see <a href="#ModbusElsnerWS-attr-customCmdAlarmOff">customCmdAlarmOff</a> and
+      <a href="#ModbusElsnerWS-attr-customCmdAlarmOn">customCmdAlarmOn</a>.</li>
       <li>Execution of custom up and down commands that can be triggered by the readings dayNight, isRaining, isStormy,
-      isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> and
-      <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a>.</li>
+      isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#ModbusElsnerWS-attr-customCmdDown">customCmdDown</a> and
+      <a href="#ModbusElsnerWS-attr-customCmdUp">customCmdUp</a>.</li>
     </ul><br>
 
     <b>Prerequisites</b>
@@ -942,7 +942,7 @@ sub ModbusElsnerWS_Delete($$) {
         are successfully tested at a Raspberry PI in conjunction with the weather sensor.
       </ul><br>
 
-    <a name="ModbusElsnerWSDefine"></a>
+    <a id="ModbusElsnerWS-Define"></a>
     <b>Define</b>
     <ul>
       <code>define &lt;name&gt; ModbusElsnerWS id=&lt;ID&gt; interval=&lt;Interval&gt;|passive</code><br><br>
@@ -969,57 +969,57 @@ sub ModbusElsnerWS_Delete($$) {
       </ul>
     </ul><br>
 
-    <a name="ModbusElsnerWSattr"></a>
+    <a id="ModbusElsnerWS-attr"></a>
     <b>Attributes</b>
     <ul>
       <ul>
-        <li><a name="ModbusElsnerWS_brightnessDayNight">brightnessDayNight</a> E_min/lx:E_max/lx,
+        <li><a id="ModbusElsnerWS-attr-brightnessDayNight">brightnessDayNight</a> E_min/lx:E_max/lx,
           [brightnessDayNight] = 0...99000:0...99000, 10:20 is default.<br>
           Set switching thresholds for reading dayNight based on the reading brightness.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
           [brightnessDayNightDelay] = 0...3600:0...3600, 600:600 is default.<br>
           Set switching delay for reading dayNight based on the reading brightness. The reading dayNight is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunny">brightnessSunny</a> E_min/lx:E_max/lx,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunny">brightnessSunny</a> E_min/lx:E_max/lx,
           [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunny based on the reading brightness.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
           [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunny based on the reading brightness. The reading isSunny is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
           [brightnessSunnyEast] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnyEast based on the reading sunEast.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
           [brightnessSunnyEastDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnyEast based on the reading sunEast. The reading isSunnyEast is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
           [brightnessSunnySouth] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnySouth based on the reading sunSouth.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
           [brightnessSunnySouthDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnySouth based on the reading sunSouth. The reading isSunnySouth is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
           [brightnessSunnyWest] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnyWest based on the reading sunWest.
         </li>
-        <li><a name="ModbusElsnerWS_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
           [brightnessSunnyWestDelay] = 0...99000:0...99000, 120:30 is default.<br>
           Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
-        <li><a name="ModbusElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> &lt;command&gt;<br>
-          <a name="ModbusElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a> &lt;command&gt;<br>
+        <li><a id="ModbusElsnerWS-attr-customCmdAlarmOff">customCmdAlarmOff</a> &lt;command&gt;<br>
+          <a id="ModbusElsnerWS-attr-customCmdAlarmOn">customCmdAlarmOn</a> &lt;command&gt;<br>
           Command being executed if an alarm is set (on) or deleted (off).  If &lt;command&gt; is enclosed in {},
           then it is a perl expression, if it is enclosed in "", then it is a shell command,
           else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
@@ -1032,10 +1032,10 @@ sub ModbusElsnerWS_Delete($$) {
           scripts, and will be textually replaced for Fhem commands.<br>
           The alarm commands have a higher priority than the up and down commands.
         </li>
-        <li><a name="ModbusElsnerWS_customCmdDown">customCmdDown</a> &lt;command&gt;<br>
-          <a name="ModbusElsnerWS_customCmdUp">customCmdUp</a> &lt;command&gt;<br>
-          The command is executed if the Up or Down command is triggered, see <a href="#ModbusElsnerWS_customCmdDownTrigger">customCmdDownTrigger</a> or
-          <a href="#ModbusElsnerWS_customCmdUpTrigger">customCmdUpTrigger</a>. If &lt;command&gt; is enclosed in {},
+        <li><a id="ModbusElsnerWS-attr-customCmdDown">customCmdDown</a> &lt;command&gt;<br>
+          <a id="ModbusElsnerWS-attr-customCmdUp">customCmdUp</a> &lt;command&gt;<br>
+          The command is executed if the Up or Down command is triggered, see <a href="#ModbusElsnerWS-attr-customCmdDownTrigger">customCmdDownTrigger</a> or
+          <a href="#ModbusElsnerWS-attr-customCmdUpTrigger">customCmdUpTrigger</a>. If &lt;command&gt; is enclosed in {},
           then it is a perl expression, if it is enclosed in "", then it is a shell command,
           else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
           and the current readings<br>
@@ -1047,13 +1047,13 @@ sub ModbusElsnerWS_Delete($$) {
           scripts, and will be textually replaced for Fhem commands.<br>
           The alarm commands have a higher priority than the up and down commands.
         </li>
-        <li><a name="ModbusElsnerWS_customCmdDownPeriod">customCmdDownPeriod</a> once|threeTimes|3|10|180|600<br>
-          <a name="ModbusElsnerWS_customCmdUpPeriod">customCmdUpPeriod</a> once|threeTimes|3|10|180|600<br>
+        <li><a id="ModbusElsnerWS-attr-customCmdDownPeriod">customCmdDownPeriod</a> once|threeTimes|3|10|180|600<br>
+          <a id="ModbusElsnerWS-attr-customCmdUpPeriod">customCmdUpPeriod</a> once|threeTimes|3|10|180|600<br>
           [customCmdDownPeriod] = once|threeTimes|3|10|180|600, once is default.<br>
           Number or period of custom command to be executed.
         </li>
-        <li><a name="ModbusElsnerWS_customCmdDownTrigger">customCmdDownTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
-          The commands in the attribute <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> are executed if one of the selected readings is triggered as follows:
+        <li><a id="ModbusElsnerWS-attr-customCmdDownTrigger">customCmdDownTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+          The commands in the attribute <a href="#ModbusElsnerWS-attr-customCmdDown">customCmdDown</a> are executed if one of the selected readings is triggered as follows:
           <ul>
             <li>[dayNight] = night</li>
             <li>[isRaining] = no</li>
@@ -1064,10 +1064,10 @@ sub ModbusElsnerWS_Delete($$) {
             <li>[isSunnyWest] = yes</li>
             <li>[isWindy] = no</li>
            </ul>
-          The commands in the attribute <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> are executed periodically every second if the attribute is not set.
+          The commands in the attribute <a href="#ModbusElsnerWS-attr-customCmdDown">customCmdDown</a> are executed periodically every second if the attribute is not set.
         </li>
-        <li><a name="ModbusElsnerWS_customCmdUpTrigger">customCmdUpTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
-          The commands in the attribute <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a> are executed if one of the selected readings is triggered as follows:
+        <li><a id="ModbusElsnerWS-attr-customCmdUpTrigger">customCmdUpTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+          The commands in the attribute <a href="#ModbusElsnerWS-attr-customCmdUp">customCmdUp</a> are executed if one of the selected readings is triggered as follows:
           <ul>
              <li>[dayNight] = day</li>
               <li>[isRaining] = yes</li>
@@ -1078,43 +1078,43 @@ sub ModbusElsnerWS_Delete($$) {
               <li>[isSunnyWest] = no</li>
               <li>[isWindy] = yes</li>
            </ul>
-          The commands in the attribute <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a> are executed periodically every second if the attribute is not set.
+          The commands in the attribute <a href="#ModbusElsnerWS-attr-customCmdUp">customCmdUp</a> are executed periodically every second if the attribute is not set.
         </li>
-        <li><a name="ModbusElsnerWS_customCmdPriority">customCmdPriority</a> down|up,
+        <li><a id="ModbusElsnerWS-attr-customCmdPriority">customCmdPriority</a> down|up,
           [customCmdPriority] = down|up, up is default.<br>
           Priority of custom commands. If both the up and down command are triggered, only the prioritized command is executed.
         </li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-        <li><a name="ModbusElsnerWS_signOfLife">signOfLife</a> off|on,
+        <li><a id="ModbusElsnerWS-attr-signOfLife">signOfLife</a> off|on,
           [signOfLife] = off|on, on is default.<br>
           Monitoring of the periodic telegrams from sensor.
         </li>
-        <li><a name="ModbusElsnerWS_signOfLifeInterval">signOfLifeInterval</a> t/s,
+        <li><a id="ModbusElsnerWS-attr-signOfLifeInterval">signOfLifeInterval</a> t/s,
           [signOfLifeInterval] = 1 ... 15, 3 is default.<br>
           Monitoring period in seconds of the periodic telegrams from sensor.
         </li>
-        <li><a name="ModbusElsnerWS_timeEvent">timeEvent</a> no|yes,
+        <li><a id="ModbusElsnerWS-attr-timeEvent">timeEvent</a> no|yes,
           [timeEvent] = no|yes, no is default.<br>
           Update the reading time periodically.
         </li>
-        <li><a name="ModbusElsnerWS_updateGlobalAttr">updateGlobalAttr</a> no|yes,
+        <li><a id="ModbusElsnerWS-attr-updateGlobalAttr">updateGlobalAttr</a> no|yes,
           [updateGlobalAttr] = no|yes, no is default.<br>
           Update the global attributes latitude and longitude with the received GPS coordinates.
         </li>
-        <li><a name="ModbusElsnerWS_windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
+        <li><a id="ModbusElsnerWS-attr-windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
           [windSpeedStormy] = 0...35:0...35, 13.9:17.2 (windStrength = 7 B - 8 B) is default.<br>
           Set switching thresholds for reading isStormy based on the reading windSpeed.
         </li>
-        <li><a name="ModbusElsnerWS_windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
           [windSpeedStormyDelay] = 0...3600:0...3600, 60:3 is default.<br>
           Set switching delay for reading isStormy based on the reading windSpeed. The reading isStormy is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
-        <li><a name="ModbusElsnerWS_windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
+        <li><a id="ModbusElsnerWS-attr-windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
           [windSpeedWindy] = 0...35:0...35, 1.6:3.4 (windStrength = 2 B - 3 B) is default.<br>
           Set switching thresholds for reading isWindy based on the reading windSpeed.
         </li>
-        <li><a name="ModbusElsnerWS_windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
+        <li><a id="ModbusElsnerWS-attr-windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
           [windSpeedWindyDelay] = 0...3600:0...3600, 60:3 is default.<br>
           Set switching delay for reading isWindy based on the reading windSpeed. The reading isWindy is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
@@ -1122,7 +1122,7 @@ sub ModbusElsnerWS_Delete($$) {
       </ul>
     </ul><br>
 
-  <a name="ModbusElsnerWSevents"></a>
+  <a id="ModbusElsnerWS-events"></a>
   <b>Generated events</b>
   <ul>
     <ul>
