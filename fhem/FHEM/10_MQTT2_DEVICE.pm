@@ -617,7 +617,7 @@ MQTT2_DEVICE_addReading($$)
         $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
       }
     } else {
-      if($re =~ m/^([^\?.*\[\](|)]+):\.\*$/) {
+      if($re =~ m/^([^\\\?.*\[\](|)]+):\.\*$/) {
         $modules{MQTT2_DEVICE}{defptr}{"re:*:$1"}{$re}{"$name,$code"} = 1;
       } else {
         $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = 1;
