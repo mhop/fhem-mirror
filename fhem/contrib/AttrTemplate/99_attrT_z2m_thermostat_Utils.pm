@@ -6,6 +6,7 @@ package FHEM::attrT_z2m_thermostat_Utils;    ## no critic 'Package declaration'
 
 use strict;
 use warnings;
+use JSON qw(decode_json);
 #use Time::HiRes qw( gettimeofday );
 #use List::Util qw( min max );
 
@@ -29,9 +30,9 @@ BEGIN {
           ReadingsVal
           ReadingsNum
           ReadingsAge
-          decode_json
           json2nameValue
           defs
+          Log3
           )
     );
 }
