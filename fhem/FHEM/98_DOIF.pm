@@ -5512,18 +5512,18 @@ sub temp_temp_ring {
 } 
 
 sub icon_ring {
-  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$l,$mode) = @_;
-  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$l,$icon));
+  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$l,$model) = @_;
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$model,$l,$icon));
 }
 
 sub icon_mring {
   my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$l) = @_;
-  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,1,$l,$icon,$icon));
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,1,$l,$icon));
 }
 
 sub icon_uring {
-  my ($mode,$icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$l) = @_;
-  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$l,$icon));
+  my ($model,$icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$l) = @_;
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$model,$l,$icon));
 }
 
 sub mring
@@ -5534,13 +5534,13 @@ sub mring
 
 sub uring
 {
-  my ($mode,$val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$l) = @_;
-  return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$l));
+  my ($model,$val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$l) = @_;
+  return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$model,$l));
 }
 
 sub icon_ring2 {
-    my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$l) = @_;
-    return (ring2($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$l,$icon));
+    my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$l,$model) = @_;
+    return (ring2($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$l,$icon,$model));
 }
 
 
