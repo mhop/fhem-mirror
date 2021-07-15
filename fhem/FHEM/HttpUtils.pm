@@ -621,6 +621,8 @@ HttpUtils_Connect2($)
   $s = 0 if($hash->{protocol} eq "https");
 
   if($hash->{callback}) { # Nonblocking read
+    $hash->{EventSource} = 1 if($hdr =~ m/Accept:\s*text\/event-stream/i);
+
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
     delete($hash->{httpdatalen});
@@ -729,7 +731,16 @@ HttpUtils_DataComplete($)
         return 1;
       }
       return 0 if(length($r) < $l);
-      $hash->{httpdata} .= substr($r, 0, $l);
+
+      my $ret = substr($r, 0, $l);
+      if( $hash->{EventSource} ) {
+        $hash->{callback}($hash, undef, $ret);
+
+      } else {
+        $hash->{httpdata} .= $ret;
+
+      }
+
       $hash->{buf} = substr($r, $l);
     }
     return 0;
