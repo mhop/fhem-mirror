@@ -32,6 +32,7 @@ allowed_Initialize($)
     basicAuthExpiry
     basicAuthMsg
     disable:1,0
+    disabledForIntervals
     globalpassword
     password
     reportAuthAttempts
@@ -95,7 +96,7 @@ allowed_Authorize($$$$;$)
 {
   my ($me, $cl, $type, $arg, $silent) = @_;
 
-  return 0 if($me->{disabled});
+  return 0 if($me->{disabled} && IsDisabled($me->{NAME}));
   my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
   return 0 if(!$me->{".validFor"}{$vName});
   my $mName = $me->{NAME};
@@ -150,7 +151,7 @@ allowed_Authenticate($$$$)
     return $r;
   };
 
-  return 0 if($me->{disabled});
+  return 0 if($me->{disabled} && IsDisabled($aName));
   my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
   return 0 if(!$me->{".validFor"}{$vName});
 
@@ -306,8 +307,10 @@ allowed_Attr(@)
 
   my $set = ($type eq "del" ? 0 : (!defined($param[0]) || $param[0]) ? 1 : 0);
 
-  if($attrName eq "disable") {
-    readingsSingleUpdate($hash, "state", $set ? "disabled" : "active", 1);
+  if($attrName eq "disable" ||
+     $attrName eq "disabledForIntervals") {
+    readingsSingleUpdate($hash, "state", $set ? "disabled" : "active", 1)
+      if($attrName eq "disable");
     if($set) {
       $hash->{disabled} = 1;
     } else {
@@ -454,8 +457,6 @@ EOF
   <a name="allowedattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#disable">disable</a></li><br>
-
     <a name="allowedCommands"></a>
     <li>allowedCommands<br>
         A comma separated list of commands allowed from the matching frontend
@@ -510,6 +511,9 @@ EOF
         after the given period.
         Only valid if basicAuth is set.
     </li><br>
+
+    <li><a href="#disable">disable</a></li></br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li></br>
 
     <a name="password"></a>
     <li>password<br>
@@ -605,9 +609,6 @@ EOF
   <a name="allowedattr"></a>
   <b>Attribute</b>
   <ul>
-    <li><a href="#disable">disable</a>
-      </li><br>
-
     <a name="allowedCommands"></a>
     <li>allowedCommands<br>
         Eine Komma getrennte Liste der erlaubten Befehle des passenden
@@ -655,6 +656,9 @@ EOF
         &Uuml;berschrift angezeigt.<br>
     </li><br>
 
+
+    <li><a href="#disable">disable</a><br>disable</li></br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li></br>
 
     <a name="password"></a>
     <li>password<br>
