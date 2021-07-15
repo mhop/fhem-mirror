@@ -1,5 +1,5 @@
 ###########################################
-# $Id: mqtt2.ebus.template 2019-04-03 21:00:00 Reinhart $
+# $Id$
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -255,7 +255,7 @@ attr eBusSet commands {'eBusSet.sollcurve'=>'Hc1HeatCurve_curve_value:uzsuDropDo
 attr eBusSet model eBus_Calormatic_readingsgroup_Set_Hcurve_Hotwater
      
  
-name:Bus_bai_readingsgroup_eBusCounter
+name:eBus_bai_readingsgroup_eBusCounter
 filter:TYPE=MQTT2_DEVICE
 desc:Format ebus Statusmessages comming from broadcast
 par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }

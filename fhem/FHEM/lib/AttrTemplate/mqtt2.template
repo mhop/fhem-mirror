@@ -3390,15 +3390,22 @@ filter:TYPE=MQTT2_DEVICE
 desc:Device containing all status messages from the ebus daemon itself<br>NOTE: acts also as a bridge device to split up the hardware on the bus into different mqtt2_devices<br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the Device with the same clientId than the IO, delete original's readingList after applying the template!<br>- this might change the devices CID
 order:E_01a
 par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
-par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z])[^/]*[/].*:, ? $1 : "ebusd" }
+par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z][^/]*)[/].*:, ? $1 : "ebusd" }
 par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
 { Svn_GetFile("contrib/AttrTemplate/99_attrTmqtt2_ebus_Utils.pm", "FHEM/99_attrTmqtt2_ebus_Utils.pm", sub(){ CommandReload(undef, "99_attrTmqtt2_ebus_Utils") }) }
 { Svn_GetFile("contrib/AttrTemplate/mqtt2.ebus.template", "FHEM/lib/AttrTemplate/mqtt2.ebus.template", sub(){ AttrTemplate_Initialize() }) }
 attr DEVICE icon ICON
 modify DEVICE DEV_ID
 attr DEVICE autocreate 1
-attr DEVICE bridgeRegexp (ebus..*?)/(bai|\d+|cc|e7f|ehp|f\d\d|hc|he.|hmu|hwc|mc|mc.\d|omu|omu.\d|pms|rcc|rcc.\d|sc|sdr_p|solar|ui|uih|v\d\d|v81.\d|vd\d|vl\d|vr_\d\d|zeo)/.*:.* "$1_$2"\
-(ebus..*?)/(global|broadcast|general|scan([^/]*))/.*:.* "$1"
+attr DEVICE bridgeRegexp (ebus\S[^/]*?)/(bai|\d+|cc|e7f|ehp|f\d\d|hc|hc\d+|he.|hmu|hwc|mc|mc.\d|omu|omu.\d|pms|rcc|rcc.\d|sc|sdr_p|solar|ui|uih|v\d\d|v81.\d|vd\d|vl\d|vr_\d\d|zeo)/.*:.* "$1_$2"\
+(ebus\S[^/]*?)/(global|broadcast|general|scan[^/]+)/.*:.* "$1"
+attr DEVICE readingList DEV_ID/scan.\d+/.*:.* { $TOPIC =~ m,scan.(\d+)/,; json2nameValue($EVENT,"scan_${1}_") }\
+  DEV_ID/global/uptime:.* uptime\
+  DEV_ID/global/running:.* running\
+  DEV_ID/global/version:.* version\
+  DEV_ID/global/signal:.* signal\
+  DEV_ID/global/updatecheck:.* updatecheck\
+  DEV_ID/global/scan:.* scan
 attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
 attr DEVICE stateFormat Status: \
 1:running\
@@ -3409,7 +3416,7 @@ attr DEVICE devStateIcon 1.true:it_net 1.false:it_net@red  2.true:lan_rs485 2.fa
 attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
   getAll:noArg DEV_ID/list
 set DEVICE getKnown
-attr DEVICE comment NOTE: additional templates and code have been downloaded from svn (contrib).
+attr DEVICE comment NOTE: additional templates and code have been downloaded from svn (contrib).<br>Pls. inform the maintainer, if the bridgeRegexp doesn't fit to all of your devices connected to the bus.
 farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>.
 attr DEVICE model eBus_daemon_splitter
 setreading DEVICE attrTemplateVersion 20200824
