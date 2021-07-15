@@ -1,5 +1,5 @@
 ##############################################
-# $Id: attrTmqtt2_ebus_Utils.pm 2021-07-15 Beta-User $
+# $Id$
 #
 
 package FHEM::aTm2u_ebus;    ## no critic 'Package declaration'
