@@ -1096,16 +1096,16 @@ sub SYSMON_updateReadings($$) {
   }
     
   # Nicht mehr benoetigte Readings loeschen
-  my $omap = SYSMON_getObsoleteReadingsMap($hash);
-  
+  #my $omap = SYSMON_getObsoleteReadingsMap($hash);
+  #
   # UserFn Keys entfernen
-  foreach my $aName (@a_keys) {
-    delete($omap->{$aName});
-  }
-  foreach my $aName (keys %{$omap}) {
-    #  SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>> ".$aName."->".Dumper($defs{$name}{READINGS}{$aName}));
-      delete $defs{$name}{READINGS}{$aName};
-  }
+  #foreach my $aName (@a_keys) {
+  #  delete($omap->{$aName});
+  #}
+  #foreach my $aName (keys %{$omap}) {
+  #  #  SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>> ".$aName."->".Dumper($defs{$name}{READINGS}{$aName}));
+  #    delete $defs{$name}{READINGS}{$aName};
+  #}
 
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
 }
