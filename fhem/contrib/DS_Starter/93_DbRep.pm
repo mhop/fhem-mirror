@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 23639 2021-01-30 08:29:42Z DS_Starter $
+# $Id: 93_DbRep.pm 23888 2021-03-04 19:58:00Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.42.8"  => "17.07.2021  more log data verbose 5 ",
   "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
   "8.42.6"  => "25.02.2021  fix commandref ",
   "8.42.5"  => "02.02.2021  correct possible values for attr seqDoubletsVariance ",
@@ -1610,7 +1611,11 @@ sub DbRep_firstconnect {
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
       
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", "$name|$opt|$prop|$fret", "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
-      $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
+
+      if($hash->{HELPER}{RUNNING_PID}) {                                                           # Forum #77057
+           $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;
+           Log3 ($name, 5, qq{DbRep $name - start getInitData with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+      }
   } 
   else {
       InternalTimer(time+1, "DbRep_firstconnect", "$name|$opt|$prop|$fret", 0);
@@ -1737,36 +1742,38 @@ sub DbRep_getInitDataDone {
   my $mints          = decode_base64($a[1]);
   my $bt             = $a[2];
   my ($rt,$brt)      = split(",", $bt);
-  my $err            = $a[3]?decode_base64($a[3]):undef;
+  my $err            = $a[3] ? decode_base64($a[3]) : undef;
   my $opt            = $a[4];
   my $prop           = $a[5];
   my $fret;
   $fret              = \&{$a[6]} if($a[6]);
   
-  my ($idxstate,$grants);
-  $idxstate          = $a[7]?decode_base64($a[7]):"";
-  $grants            = $a[8]?decode_base64($a[8]):"";
+  my $idxstate       = $a[7] ? decode_base64($a[7]) : "";
+  my $grants         = $a[8] ? decode_base64($a[8]) : "";
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn         = $dbloghash->{dbconn};
+  
+  Log3 ($name, 5, qq{DbRep $name - getInitData finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
   if ($err) {
-      readingsBeginUpdate($hash);
+      readingsBeginUpdate     ($hash);
       ReadingsBulkUpdateValue ($hash, "errortext", $err);
       ReadingsBulkUpdateValue ($hash, "state", "disconnected");
-      readingsEndUpdate($hash, 1);
+      readingsEndUpdate       ($hash, 1);
+      
       Log3 ($name, 2, "DbRep $name - DB connect failed. Make sure credentials of database $hash->{DATABASE} are valid and database is reachable.");
-  
-  } else {
+  } 
+  else {
       my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
       $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
 
-      readingsBeginUpdate($hash);
-      ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
-      ReadingsBulkUpdateValue ($hash, "index_state", $idxstate) if($hash->{LASTCMD} ne "minTimestamp");
-      ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-      readingsEndUpdate($hash, 1);
+      readingsBeginUpdate         ($hash);
+      ReadingsBulkUpdateValue     ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
+      ReadingsBulkUpdateValue     ($hash, "index_state", $idxstate) if($hash->{LASTCMD} ne "minTimestamp");
+      ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
+      readingsEndUpdate           ($hash, 1);
       
       Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
       
@@ -1782,18 +1789,19 @@ return &$fret($hash,$opt,$prop);
 #                                 Abbruchroutine DbRep_getInitData 
 ####################################################################################################
 sub DbRep_getInitDataAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
+  my $hash  = shift;
+  my $cause = shift;
+  my $name  = $hash->{NAME};
+   
+  $cause //= "Timeout: process terminated";
+  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  $cause = $cause?$cause:"Timeout: process terminated";
-  Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
-  
-  readingsBeginUpdate($hash);
+  readingsBeginUpdate     ($hash);
   ReadingsBulkUpdateValue ($hash, "errortext", $cause);
   ReadingsBulkUpdateValue ($hash, "state", "disconnected");
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate       ($hash, 1);
   
 return;
 }
@@ -11710,12 +11718,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 23639 2021-01-30 08:29:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 23888 2021-03-04 19:58:00Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 23639 2021-01-30 08:29:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 23888 2021-03-04 19:58:00Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
