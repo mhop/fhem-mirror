@@ -4568,7 +4568,7 @@ sub _beamGraphicRemainingHours {
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "confc", 0);
               
-              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "weatherid", undef);
+              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "weatherid", 999);
           }
           else {
               $nh = sprintf('%02d', $i+$offset);
@@ -4579,9 +4579,9 @@ sub _beamGraphicRemainingHours {
       }
 
       if (defined($nh)) {
-          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",    0);
-          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, "confc",         0);
-          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid", undef);
+          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",  0);
+          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, "confc",       0);
+          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid", 999);
           #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
 
