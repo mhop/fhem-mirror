@@ -973,22 +973,30 @@ sub DbRep_Get {
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       DbRep_delread($hash);                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "DbRep_ParseAborted", $hash);    
-  
-  } elsif ($opt eq "svrinfo") {
+      if($hash->{HELPER}{RUNNING_PID}) {                                                           
+          $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;                             # Forum #77057
+          Log3 ($name, 5, qq{DbRep $name - start BlockingCall with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+      }
+  } 
+  elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("dbmeta_DoParse", "$name|$opt", "dbmeta_ParseDone", $to, "DbRep_ParseAborted", $hash);      
-  
-  } elsif ($opt eq "blockinginfo") {
+      if($hash->{HELPER}{RUNNING_PID}) {                                                           
+          $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;                             # Forum #77057
+          Log3 ($name, 5, qq{DbRep $name - start BlockingCall with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+      }
+  } 
+  elsif ($opt eq "blockinginfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
       DbRep_delread($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
-      DbRep_getblockinginfo($hash);   
-  
-  } elsif ($opt eq "minTimestamp") {
+      DbRep_getblockinginfo($hash);
+  } 
+  elsif ($opt eq "minTimestamp") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       DbRep_delread($hash); 
@@ -996,8 +1004,8 @@ sub DbRep_Get {
       $hash->{HELPER}{IDRETRIES}   = 3;                             # Anzahl wie oft versucht wird initiale Daten zu holen      
       $prop = $prop?$prop:'';
       DbRep_firstconnect("$name|$opt|$prop|");    
-  
-  } elsif ($opt =~ /sqlCmdBlocking|dbValue/) {
+  } 
+  elsif ($opt =~ /sqlCmdBlocking|dbValue/) {
       return qq{get "$opt" needs at least an argument} if ( @a < 3 );
       
       if($opt eq "dbValue") {
@@ -1018,17 +1026,19 @@ sub DbRep_Get {
       ReadingsSingleUpdateValue ($hash, "state", "running", 1); 
       
       return DbRep_sqlCmdBlocking($name,$sqlcmd);
-  
-  } elsif ($opt eq "storedCredentials") {
+  } 
+  elsif ($opt eq "storedCredentials") {
         # Credentials abrufen
         my $atxt;
         my $username   = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
         my $dblogname  = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
         my $password   = $attr{"sec$dblogname"}{secret};
         my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+        
         if($success) {
             $atxt = "Username: $admusername, Password: $admpassword\n";
-        } else {
+        } 
+        else {
             $atxt = "Credentials of $name couldn't be read. Make sure you've set it with \"set $name adminCredentials username password\" (only valid for DbRep device type \"Client\")";        
         }
         
@@ -1043,7 +1053,8 @@ sub DbRep_Get {
                "\n"
                ;
                 
-    } elsif ($opt =~ /versionNotes/) {
+    } 
+    elsif ($opt =~ /versionNotes/) {
       my $header  = "<b>Module release information</b><br>";
       my $header1 = "<b>Helpful hints</b><br>";
       my %hs;
@@ -1118,8 +1129,8 @@ sub DbRep_Get {
       $ret .= "</html>";
                     
       return $ret;
-  
-  } else {
+  } 
+  else {
       return "$getlist";
   } 
   
@@ -1612,9 +1623,9 @@ sub DbRep_firstconnect {
       
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", "$name|$opt|$prop|$fret", "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
 
-      if($hash->{HELPER}{RUNNING_PID}) {                                                           # Forum #77057
-           $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;
-           Log3 ($name, 5, qq{DbRep $name - start getInitData with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+      if($hash->{HELPER}{RUNNING_PID}) {                                                           
+          $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;                             # Forum #77057
+          Log3 ($name, 5, qq{DbRep $name - start BlockingCall with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
       }
   } 
   else {
@@ -1640,7 +1651,7 @@ sub DbRep_getInitData {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $mintsdef   = "1970-01-01 01:00:00";
   my $idxstate   = "";
-  my ($dbh,$sth,$sql,$err,$mints);
+  my ($dbh,$sth,$sql,$err);
 
   # Background-Startzeit
   my $bst = [gettimeofday];
@@ -1655,6 +1666,7 @@ sub DbRep_getInitData {
   my $st = [gettimeofday];
  
   # ältesten Datensatz der DB ermitteln
+  my $mints     = qq{};
   eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;"); }; 
  
   # Report_Idx Status ermitteln
@@ -1672,12 +1684,14 @@ sub DbRep_getInitData {
   if($@) {
       $idxstate = "state of Index $idx can't be determined !";
       Log3($name, 2, "DbRep $name - WARNING - $idxstate");
-  } else {
+  } 
+  else {
       if($hash->{LASTCMD} ne "minTimestamp") {
           if($ava) {
               $idxstate = "Index $idx exists";
               Log3($name, 3, "DbRep $name - $idxstate. Check ok");
-          } else {
+          } 
+          else {
               $idxstate = "Index $idx doesn't exist. Please create the index by \"set $name index recreate_Report_Idx\" command !";
               Log3($name, 3, "DbRep $name - WARNING - $idxstate");
           }
@@ -1690,21 +1704,22 @@ sub DbRep_getInitData {
       eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();"); $sth->execute();};
       if($@) {
           Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
-      } else {
+      } 
+      else {
           my $row = "";
           while (my @line = $sth->fetchrow_array()) {
-              foreach (@line) {
-                  next if($_!~/(\s+ON \*\.\*\s+|\s+ON `$database`)/ );
+              for my $l (@line) {
+                  next if($l !~ /(\s+ON \*\.\*\s+|\s+ON `$database`)/ );
                   $row .= "," if($row); 
-                  $row .= (split(" ON ",(split("GRANT ",$_,2))[1],2))[0];                 
+                  $row .= (split(" ON ",(split("GRANT ", $l, 2))[1], 2))[0];                 
               }
           }
           $sth->finish;
           my %seen = ();
-          my @g = split(/,(\s?)/,$row);
-          foreach (@g) {
-              next if(!$_ || $_=~/^\s+$/);
-              $seen{$_}++;
+          my @g    = split(/,(\s?)/, $row);
+          for my $e (@g) {
+              next if(!$e || $e =~ /^\s+$/);
+              $seen{$e}++;
           }
           @uniq   = keys %seen;
           $grants = join(",",@uniq);
@@ -1716,19 +1731,25 @@ sub DbRep_getInitData {
  
   # SQL-Laufzeit ermitteln
   my $rt = tv_interval($st);
+  
+  Log3 ($name, 5, "DbRep $name - minimum timestamp found in database: $mints");
  
-  $mints    = $mints?encode_base64($mints,""):encode_base64($mintsdef,"");
-  $idxstate = encode_base64($idxstate,"");
-  $grants   = encode_base64($grants,"") if($grants);
+  $mints    = $mints ? encode_base64($mints, "") : encode_base64($mintsdef, "");
+  $idxstate = encode_base64($idxstate, "");
+  $grants   = encode_base64($grants,   "") if($grants);
  
   # Background-Laufzeit ermitteln
   my $brt = tv_interval($bst);
 
-  $rt   = $rt.",".$brt;
+  $rt = $rt.",".$brt;
+  
   no warnings 'uninitialized';
-  Log3 ($name, 3, "DbRep $name - Initial data information retrieved successfully - total time used: ".sprintf("%.4f",$brt)." seconds");
+  
+  my $ret = "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
+  
+  Log3 ($name, 5, "DbRep $name - return summary string: $ret");
  
-return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
+return $ret;
 }
 
 ####################################################################################################
@@ -1752,11 +1773,7 @@ sub DbRep_getInitDataDone {
   my $grants         = $a[8] ? decode_base64($a[8]) : "";
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn         = $dbloghash->{dbconn};
-  
-  Log3 ($name, 5, qq{DbRep $name - getInitData finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
-  
-  delete($hash->{HELPER}{RUNNING_PID});
-  
+    
   if ($err) {
       readingsBeginUpdate     ($hash);
       ReadingsBulkUpdateValue ($hash, "errortext", $err);
@@ -1766,8 +1783,10 @@ sub DbRep_getInitDataDone {
       Log3 ($name, 2, "DbRep $name - DB connect failed. Make sure credentials of database $hash->{DATABASE} are valid and database is reachable.");
   } 
   else {
+      Log3 ($name, 3, "DbRep $name - Initial data information retrieved - total time used: ".sprintf("%.4f",$brt)." seconds");
+      
       my $state = ($hash->{LASTCMD} eq "minTimestamp")?"done":"connected";
-      $state    = "invalid timestamp \"$mints\" found in database - please delete it" if($mints =~ /^0000-00-00.*$/);
+      $state    = qq{invalid timestamp "$mints" found in database - please delete it} if($mints =~ /^0000-00-00.*$/);
 
       readingsBeginUpdate         ($hash);
       ReadingsBulkUpdateValue     ($hash, "timestamp_oldest_dataset", $mints) if($hash->{LASTCMD} eq "minTimestamp");
@@ -1780,6 +1799,10 @@ sub DbRep_getInitDataDone {
       $hash->{HELPER}{MINTS}  = $mints;
       $hash->{HELPER}{GRANTS} = $grants if($grants);
   }
+  
+  Log3 ($name, 5, qq{DbRep $name - getInitData finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
+  delete($hash->{HELPER}{RUNNING_PID});
 
 return if(!$fret);
 return &$fret($hash,$opt,$prop);
@@ -1790,10 +1813,9 @@ return &$fret($hash,$opt,$prop);
 ####################################################################################################
 sub DbRep_getInitDataAborted {
   my $hash  = shift;
-  my $cause = shift;
+  my $cause = shift // "Timeout: process terminated";
   my $name  = $hash->{NAME};
    
-  $cause //= "Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -2153,8 +2175,11 @@ sub DbRep_Main {
      ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
      return;
  }
-                              
-$hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
+
+ if($hash->{HELPER}{RUNNING_PID}) {                                                           
+     $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;                             # Forum #77057
+     Log3 ($name, 5, qq{DbRep $name - start BlockingCall with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+ }
 
 return;
 }
@@ -3192,6 +3217,8 @@ sub averval_ParseDone {
   my $reading_runtime_string;
   my $erread;
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   # Befehl nach Procedure ausführen
@@ -3402,6 +3429,8 @@ sub count_ParseDone {
   my $err        = $a[4]?decode_base64($a[4]):undef;
   my $table      = $a[5];
   my $reading_runtime_string;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -3647,10 +3676,12 @@ sub maxval_ParseDone {
      $reading   =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt        = $a[4];
   my ($rt,$brt) = split(",", $bt);
-  my $err       = $a[5]?decode_base64($a[5]):undef;
+  my $err       = $a[5] ? decode_base64($a[5]) : undef;
   my $irowdone  = $a[6];
   my $reading_runtime_string;
   my $erread;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -3902,6 +3933,8 @@ sub minval_ParseDone {
   my $irowdone  = $a[6];
   my $reading_runtime_string;
   my $erread;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4246,6 +4279,8 @@ sub diffval_ParseDone {
   my $difflimit  = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
   my $erread;
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   # Befehl nach Procedure ausführen
@@ -4453,6 +4488,8 @@ sub sumval_ParseDone {
   
   my ($reading_runtime_string,$erread);
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");                          # Befehl nach Procedure ausführen
@@ -4585,6 +4622,8 @@ sub del_ParseDone {
   my $reading    = $a[6];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   my $erread;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4736,6 +4775,8 @@ sub insert_Done {
   my $i_value     = delete $hash->{HELPER}{I_VALUE};
   my $i_unit      = delete $hash->{HELPER}{I_UNIT}; 
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   if ($err) {
@@ -4886,6 +4927,8 @@ sub currentfillup_Done {
 
   undef $device if ($device =~ m(^%$));
   undef $reading if ($reading =~ m(^%$));
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5212,6 +5255,8 @@ sub change_Done {
   
   my $renmode = delete $hash->{HELPER}{RENMODE};
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   # Befehl nach Procedure ausführen
@@ -5367,6 +5412,8 @@ sub fetchrows_ParseDone {
   my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
   my @row;
   my $reading_runtime_string;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5861,6 +5908,8 @@ sub delseqdoubl_ParseDone {
   my $reading_runtime_string;
   my $erread;
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   if ($err) {
@@ -6074,6 +6123,8 @@ sub expfile_ParseDone {
   my $outfile    = $a[6];
   my $erread;
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   # Befehl nach Procedure ausführen
@@ -6272,6 +6323,8 @@ sub impfile_PushDone {
   my $name       = $hash->{NAME};
   my $infile     = $a[4];
   my $erread;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -6535,6 +6588,8 @@ sub sqlCmd_ParseDone {
   my $srf        = AttrVal($name, "sqlResultFormat", "separated");
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   my $erread;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -6860,6 +6915,8 @@ sub dbmeta_ParseDone {
   my $opt        = $a[3];
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[4]?decode_base64($a[4]):undef;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -8832,6 +8889,8 @@ sub DbRep_syncStandbyDone {
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $erread;
   
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   # Befehl nach Procedure ausführen
@@ -9333,6 +9392,8 @@ sub DbRep_ParseAborted {
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
   my $erread = "";
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -10156,12 +10217,12 @@ sub DbRep_getblockinginfo {
       foreach my $k (@allk) {
           Log3 ($name, 5, "DbRep $name -> $k : ".$h->{$k});
       }
-      my $fn   = (ref($h->{fn})  ? ref($h->{fn})  : $h->{fn});
-      my $arg  = (ref($h->{arg}) ? ref($h->{arg}) : $h->{arg});
+      my $fn   = ref($h->{fn})  ? ref($h->{fn})  : $h->{fn};
+      my $arg  = ref($h->{arg}) ? ref($h->{arg}) : $h->{arg};
       my $arg1 = substr($arg,0,$len);
       $arg1    = $arg1."..." if(length($arg) > $len+1);
-      my $to   = ($h->{timeout}  ? $h->{timeout}  : "N/A");
-      my $conn = ($h->{telnet}   ? $h->{telnet}   : "N/A");
+      my $to   = $h->{timeout} ? $h->{timeout} : "N/A";
+      my $conn = $h->{telnet}  ? $h->{telnet}  : "N/A";
       push @rows, "$h->{pid}|ESCAPED|$fn|ESCAPED|$arg1|ESCAPED|$to|ESCAPED|$conn";
   } 
    
