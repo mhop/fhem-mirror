@@ -4656,10 +4656,13 @@ sub _beamGraphic {
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
       for my $i (0..($maxhours*2)-1) {                                                                           # gleiche Bedingung wie oben
-          next if (!$show_night && ($hfcg->{$i}{weather} > 99) 
-                                && !$hfcg->{$i}{beam1} 
-                                && !$hfcg->{$i}{beam2});
+          next if (!$show_night && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
           $ii++;                                                                                                 # wieviele Stunden haben wir bisher angezeigt ?
+          
+          if(AttrVal ($name, "debug", 0)) {                                                                      # nur für Debugging
+              Log (1, qq{DEBUG> $name - ii: $ii, maxhours: $maxhours});
+          } 
+          
           last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
@@ -7613,7 +7616,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
    
        <a id="SolarForecast-attr-showDiff"></a>
        <li><b>showDiff &lt;no | top | bottom&gt; </b><br>
-         Zusätzliche Anzeige der Differenz "Ertrag - Verbrauch" wie beim Anzeigetyp Differential (diff). <br>
+         Zusätzliche Darstellung der Differenz "beam1Content - beam2Content" im Kopf- oder Fußbereich der Anzeige. <br>
          (default: no)
        </li>
        <br>
