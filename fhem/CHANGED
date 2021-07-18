@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: Forum: topic,53584.msg1167044.html#msg1167044
  - change:  49_SSCam: set compatibility to SVS version 8.2.9
  - bugfix:  76_SMAInverter:fix ETOTAL/LOADTOTAL bug
  - change:  57_SSCal: compatibility to DSM7 
