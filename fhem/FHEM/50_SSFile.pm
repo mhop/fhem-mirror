@@ -145,6 +145,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.0.1"  => "18.07.2021  compatibility to DSM7 ",
   "1.0.0"  => "25.05.2021  ready for check in ",
   "0.8.1"  => "24.05.2021  fix FHEM crash when malfomed JSON is received ".
                            "Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531 ",
@@ -200,6 +201,10 @@ my %hmodep = (                                                              # Ha
     download         => { fn => \&_parseDownload,           doevt => 1 },
     upload           => { fn => \&_parseUpload,             doevt => 1 },
     deleteRemoteObj  => { fn => \&_parsedeleteRemoteObject, doevt => 1 },
+);
+
+my %hvada = (                                                              # Funktionshash Version Adaption
+  "a01"  => {AUTH => "6", LIST => "1", UPLOAD => "2" },
 );
 
 # Versions History extern
@@ -1495,19 +1500,17 @@ sub getApiSites_parse {                                    ## no critic 'complex
                 return;                
             }
             
-            # Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
+            ### Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
+                        
+            my $adavs = "a01";                                                        # adaptierte Version
             
-            my @sims;
-            
-            push @sims, "LIST:1";
-            push @sims, "UPLOAD:2";
-            
-            for my $esim (@sims) {
-                my($k,$v) = split ":", $esim;
-                $data{$type}{$name}{fileapi}{$k}{VER} = $v;
-                $data{$type}{$name}{fileapi}{$k}{MOD} = "yes";
-                Log3($name, 4, "$name - Version of $data{$type}{$name}{fileapi}{$k}{NAME} adapted to: $data{$type}{$name}{fileapi}{$k}{VER}");
+            if($adavs) {
+                for my $av (sort keys %{$hvada{$adavs}}) {
+                    $data{$type}{$name}{fileapi}{$av}{VER} = $hvada{$adavs}{$av};
+                    $data{$type}{$name}{fileapi}{$av}{MOD} = "yes";
+                    Log3($name, 4, "$name - Version of $data{$type}{$name}{fileapi}{$av}{NAME} adapted to: $data{$type}{$name}{fileapi}{$av}{VER}"); 
+                }
             }
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
@@ -1516,7 +1519,7 @@ sub getApiSites_parse {                                    ## no critic 'complex
 
             Log3 ($name, 4, "$name - API completed:\n".Dumper $data{$type}{$name}{fileapi});   
 
-            if ($opmode eq "apiInfo") {                                             # API Infos in Popup anzeigen
+            if ($opmode eq "apiInfo") {                                              # API Infos in Popup anzeigen
                 showAPIinfo          ($hash, $data{$type}{$name}{fileapi});          # übergibt Referenz zum instanziierten API-Hash)
                 readingsSingleUpdate ($hash, "state", "done", 1);  
                 checkSendRetry       ($name, 0, $queueStartFn);
