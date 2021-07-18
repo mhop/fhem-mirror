@@ -620,13 +620,13 @@ sub HMtemplate_noDup(@) {#return list with no duplicates#######################
 sub HMtemplate_sourceList($){
   my $type = shift;
   my $match;
-  if   ($type =~ m/peer-(Long|Short)/){$match = "RegL_03.*"}
-  elsif($type =~ m/peer/             ){$match = "RegL_..\..*"}
-  elsif($type eq "basic"             ){$match = "RegL_..\."}
-  
+  if   ($type =~ m/peer-(Long|Short)/){$match = 'RegL_03.*'}
+  elsif($type =~ m/peer/             ){$match = 'RegL_..\..+'}
+  elsif($type eq "basic"             ){$match = 'RegL_..\.'}
+
   my @list;
-  foreach my $e (devspec2array("TYPE=CUL_HM:FILTER=subType!=virtual")){
-    my @l1 = grep/$match$/,CUL_HM_reglUsed($e);
+  foreach my $e (grep{!$defs{$_}{helper}{role}{vrt}} devspec2array("TYPE=CUL_HM")){
+    my @l1 = grep {$_ =~ m/$match$/} CUL_HM_reglUsed($e);
     $_ = $e foreach(@l1);
     push @list,@l1;
   }
