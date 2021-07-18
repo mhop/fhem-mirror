@@ -184,6 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.1" => "18.07.2021  set SVS compatibility to 8.2.9 ",
   "9.10.0" => "03.07.2021  change getApiSites_Parse for better simu_SVSversion, new value 8.2.8-xxxx for attr simu_SVSversion ",
   "9.9.0"  => "21.05.2021  new get command saveLastSnap ",
   "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
@@ -629,6 +630,10 @@ my %sdswfn = (                                                             # Fun
   "hls"       => {fn => "__switchedHLS"       },
 );
 
+my %hvada = (                                                              # Funktionshash Version Adaption
+  "a01"  => {AUTH  => "6" },
+);
+
 my %hsimu = (                                                              # Funktionshash Version Simulation
   "71xxxx-simu"   => {AUTH      => "4", EXTREC   => "2", CAM      => "8", SNAPSHOT => "1", PTZ       => "4", 
                       PRESET    => "1", SVSINFO  => "5", CAMEVENT => "1", EVENT    => "5", VIDEOSTM  => "1",  
@@ -657,7 +662,7 @@ my %hsimu = (                                                              # Fun
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $compstat          = "8.2.8";                           # getestete SVS-Version
+my $compstat          = "8.2.9";                           # getestete SVS-Version
 my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
@@ -5322,16 +5327,14 @@ sub getApiSites_Parse {
             ###########################################################################################################            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-            my @adapts;
+            my $adavs = "a01";                                                             # adaptierte Version
             
-            # push @adapts, "CAM:8";
-            # push @adapts, "PTZ:4";
-            
-            for my $ada (@adapts) {
-                my($k,$v) = split ":", $ada;
-                $hash->{HELPER}{API}{$k}{VER} = $v;
-                $hash->{HELPER}{API}{$k}{MOD} = "yes";
-                Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+            if($adavs) {
+                for my $av (sort keys %{$hvada{$adavs}}) {
+                    $hash->{HELPER}{API}{$av}{VER} = $hvada{$adavs}{$av};
+                    $hash->{HELPER}{API}{$av}{MOD} = "yes";
+                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$av}{NAME} adapted to: $hash->{HELPER}{API}{$av}{VER}");  
+                }
             }
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
