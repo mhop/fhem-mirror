@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.42.8"  => "17.07.2021  more log data verbose 5 ",
+  "8.42.8"  => "17.07.2021  more log data verbose 5, delete whitespaces in sub getInitData ",
   "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
   "8.42.6"  => "25.02.2021  fix commandref ",
   "8.42.5"  => "02.02.2021  correct possible values for attr seqDoubletsVariance ",
@@ -1743,11 +1743,12 @@ sub DbRep_getInitData {
 
   $rt = $rt.",".$brt;
   
-  no warnings 'uninitialized';
+  $opt  = DbRep_trim ($opt)  if($opt);
+  $prop = DbRep_trim ($prop) if($prop);
   
   my $ret = "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
   
-  Log3 ($name, 5, "DbRep $name - return summary string: $ret");
+  # Log3 ($name, 5, "DbRep $name - return summary string: $ret");
  
 return $ret;
 }
@@ -1987,7 +1988,7 @@ sub DbRep_Main {
      my $dbname = $hash->{DATABASE};
      $hash->{HELPER}{IDRETRIES} = 3 if($hash->{HELPER}{IDRETRIES} < 0);
      Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
-     $prop = $prop?$prop:'';
+     $prop //= '';
      DbRep_firstconnect("$name|$opt|$prop|DbRep_Main") if($hash->{HELPER}{IDRETRIES} > 0);
      $hash->{HELPER}{IDRETRIES}--;
  return;
@@ -7183,12 +7184,12 @@ return;
 #                    Abbruchroutine Index operation
 ####################################################################################################
 sub DbRep_IndexAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
-  my $dbh = $hash->{DBH}; 
+  my $hash   = shift;
+  my $cause  = shift // "Timeout: process terminated";
+  my $name   = $hash->{NAME};
+  my $dbh    = $hash->{DBH}; 
   my $erread = "";
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_INDEX}{fn} pid:$hash->{HELPER}{RUNNING_INDEX}{pid} $cause");
   
   # Befehl nach Procedure ausführen
@@ -9331,12 +9332,12 @@ return;
 #                                Abbruchroutine Timeout reduceLog
 ####################################################################################################
 sub DbRep_reduceLogAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH}; 
+  my $hash  = shift;
+  my $cause = shift // "Timeout: process terminated";
+  my $name  = $hash->{NAME};
+  my $dbh   = $hash->{DBH}; 
   my $erread;
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_REDUCELOG}{fn} pid:$hash->{HELPER}{RUNNING_REDUCELOG}{pid} $cause") if($hash->{HELPER}{RUNNING_REDUCELOG});
 
   # Befehl nach Procedure ausführen
@@ -9360,12 +9361,12 @@ return;
 #                    Abbruchroutine Timeout Restore
 ####################################################################################################
 sub DbRep_restoreAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH}; 
+  my $hash  = shift;
+  my $cause = shift // "Timeout: process terminated";
+  my $name  = $hash->{NAME};
+  my $dbh   = $hash->{DBH}; 
   my $erread;
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_RESTORE}{fn} pid:$hash->{HELPER}{RUNNING_RESTORE}{pid} $cause") if($hash->{HELPER}{RUNNING_RESTORE});
 
   # Befehl nach Procedure ausführen
@@ -9388,16 +9389,16 @@ return;
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
 sub DbRep_ParseAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
-  my $dbh = $hash->{DBH}; 
+  my $hash   = shift;
+  my $cause  = shift // "Timeout: process terminated";
+  my $name   = $hash->{NAME};
+  my $dbh    = $hash->{DBH}; 
   my $erread = "";
   
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   
   # Befehl nach Procedure ausführen
@@ -9418,12 +9419,12 @@ return;
 #                    Abbruchroutine Timeout DB-Dump
 ####################################################################################################
 sub DbRep_DumpAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH}; 
+  my $hash  = shift;
+  my $cause = shift // "Timeout: process terminated";
+  my $name  = $hash->{NAME};
+  my $dbh   = $hash->{DBH}; 
   my ($erread);
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_BACKUP_CLIENT}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_BCKPREST_SERVER}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
@@ -9447,12 +9448,12 @@ return;
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
 sub DbRep_OptimizeAborted {
-  my ($hash,$cause) = @_;
-  my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBH}; 
-  my ($erread);
+  my $hash  = shift;
+  my $cause = shift // "Timeout: process terminated";
+  my $name  = $hash->{NAME};
+  my $dbh   = $hash->{DBH}; 
+  my $erread;
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} pid:$hash->{HELPER}{RUNNING_OPTIMIZE}{pid} $cause");
   
   # Befehl nach Procedure ausführen
@@ -9474,13 +9475,13 @@ return;
 #                    Abbruchroutine Repair SQlite
 ####################################################################################################
 sub DbRep_RepairAborted {
-  my ($hash,$cause) = @_;
+  my $hash      = shift;
+  my $cause     = shift // "Timeout: process terminated";
   my $name      = $hash->{NAME};
   my $dbh       = $hash->{DBH}; 
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $erread;
   
-  $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_REPAIR}{fn} pid:$hash->{HELPER}{RUNNING_REPAIR}{pid} $cause");
   
   # Datenbankverbindung in DbLog wieder öffenen
@@ -9997,12 +9998,15 @@ return ($idevs,$idevswc,$idanz,$irdgs,$iranz,$irdswc,$edevs,$edevswc,$edanz,$erd
 }
 
 ####################################################################################################
-#             Leerzeichen am Anfang / Ende eines strings entfernen           
+#             Whitespace am Anfang / Ende eines Strings entfernen           
 ####################################################################################################
 sub DbRep_trim {
- my $str = shift;
- $str =~ s/^\s+|\s+$//g;
-return ($str);
+  my $str = shift;
+ 
+  return if(!$str);
+  $str =~ s/^\s+|\s+$//g;
+  
+return $str;
 }
 
 ####################################################################################################
