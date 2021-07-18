@@ -3387,7 +3387,7 @@ setreading DEVICE attrTemplateVersion 20200602
 #ebus daemon device
 name:eBus_daemon_splitter
 filter:TYPE=MQTT2_DEVICE
-desc:Device containing all status messages from the ebus daemon itself<br>NOTE: acts also as a bridge device to split up the hardware on the bus into different mqtt2_devices<br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the Device with the same clientId than the IO, delete original's readingList after applying the template!<br>- this might change the devices CID
+desc:Device containing all status messages from the ebus daemon itself<br>NOTE: acts also as a bridge device to split up the hardware on the bus into different mqtt2_devices<br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the Device with the same clientId than the IO, delete original's readingList after applying the template!<br>- this might change the devices CID<br>-To configure further parts of your ebus ecosystem, additional templates will be available, for details see <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>, to see more info about the provided code, issue <i>help attrTmqtt2_ebus_Utils</i>.
 order:E_01a
 par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE",'TYPE',undef)}
 par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE",'readingList','') =~ m,[^:]+:?(ebus[a-zA-Z][^/]*)[/].*:, ? $1 : 'ebusd' }
@@ -3418,10 +3418,17 @@ attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
   getAll:noArg DEV_ID/list
 set DEVICE getKnown
 attr DEVICE comment NOTE: additional templates and code have been downloaded from svn (contrib).<br>Pls. inform the maintainer, if the bridgeRegexp doesn't fit to all of your devices connected to the bus.
-farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>.
+farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>, to see more info about the provided code, issue <i>help attrTmqtt2_ebus_Utils</i>.
 attr DEVICE model eBus_daemon_splitter
 setreading DEVICE attrTemplateVersion 20210715
 
+name:ebus_update_files_from_svn
+filter:TYPE=MQTT2_DEVICE
+desc:template to download or update additional code and attrTemplates from svn. Might be usefull in case there had been some updates...
+order:E_01a1
+{ Svn_GetFile('contrib/AttrTemplate/99_attrTmqtt2_ebus_Utils.pm', 'FHEM/99_attrTmqtt2_ebus_Utils.pm', sub(){ CommandReload(undef, '99_attrTmqtt2_ebus_Utils') }) }
+{ Svn_GetFile("contrib/AttrTemplate/mqtt2.ebus.template", "FHEM/lib/AttrTemplate/mqtt2.ebus.template", sub(){ AttrTemplate_Initialize() }) }
+farewell:Download has been initiated. You may find <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a> usefull; to see more info about the provided code, issue <i>help attrTmqtt2_ebus_Utils</i>
 
 ###########################################
 # ems-esp
