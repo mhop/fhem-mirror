@@ -5265,6 +5265,7 @@ sub
 json2nameValue($;$$$$)
 {
   my ($in, $prefix, $map, $filter, $negFilter) = @_;
+  return if(!$in); # 122048
   $prefix = "" if(!defined($prefix));
   my %ret;
 
