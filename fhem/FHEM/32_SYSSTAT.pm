@@ -550,7 +550,7 @@ SYSSTAT_Parse($$$)
   } elsif( $key eq '#temp1000' && $data ) {
     SYSSTAT_Parse($hash, '#temp', $data/1000);
 
-  } elsif( $data && $key =~ m/#filesystems(:(.*))/ ) {
+  } elsif( $data && $key =~ m/#filesystems(:(.*))?/ ) {
     my $cl = $2;
     my %filesystems = ();
     foreach my $line (split(/\n/, $data)) {
