@@ -1,11 +1,11 @@
-REV 24774
+REV 24777
 DIR unused
 UPD 2021-07-19_07:45:03 364426 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-06-22_07:45:04 43320 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2021-07-14_07:45:11 168965 ./fhem.pl
+UPD 2021-07-20_07:45:11 168993 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2021-06-08_07:45:02 57931 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -645,7 +645,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-07-19_07:45:03 322714 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-07-20_07:45:02 322721 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-02-23_07:45:06 13896 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-05-28_07:45:02 9415 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -741,8 +741,8 @@ UPD 2021-07-17_07:45:09 4533211 docs/commandref.html
 UPD 2021-07-17_07:45:12 2801018 docs/commandref_DE.html
 UPD 2021-07-07_07:45:03 82624 docs/commandref_frame.html
 UPD 2021-07-07_07:45:03 92532 docs/commandref_frame_DE.html
-UPD 2021-07-19_07:45:11 245919 docs/commandref_modular.html
-UPD 2021-07-19_07:45:12 256895 docs/commandref_modular_DE.html
+UPD 2021-07-20_07:45:10 245919 docs/commandref_modular.html
+UPD 2021-07-20_07:45:11 256895 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
