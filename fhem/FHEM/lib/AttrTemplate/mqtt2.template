@@ -3398,7 +3398,7 @@ attr DEVICE icon ICON
 modify DEVICE DEV_ID
 attr DEVICE autocreate 1
 attr DEVICE bridgeRegexp (ebus\S[^/]*?)/(bai|\d+|cc|e7f|ehp|f\d\d|hc|hc\d+|he.|hmu|hwc|mc|mc.\d|omu|omu.\d|pms|rcc|rcc.\d|sc|sdr_p|solar|ui|uih|v\d\d|v81.\d|vd\d|vl\d|vr_\d\d|zeo)/.*:.* "$1_$2"\
-(ebus\S[^/]*?)/(global|broadcast|general|scan[^/]+)/.*:.* "$1"
+(ebus\S[^/]*?)/(global|broadcast|general|scan[^/]+|memory)/.*:.* "$1"
 attr DEVICE readingList DEV_ID/scan[^/]+/.*:.* { $TOPIC =~ m,scan.([^/]+)/,; FHEM::aTm2u_ebus::j2nv($EVENT,"scan_${1}_") }\
   DEV_ID/global/uptime:.* uptime\
   DEV_ID/global/running:.* running\
@@ -3420,7 +3420,7 @@ set DEVICE getKnown
 attr DEVICE comment NOTE: additional templates and code have been downloaded from svn (contrib).<br>Pls. inform the maintainer, if the bridgeRegexp doesn't fit to all of your devices connected to the bus.
 farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>, to see more info about the provided code, issue <i>help attrTmqtt2_ebus_Utils</i>.
 attr DEVICE model eBus_daemon_splitter
-setreading DEVICE attrTemplateVersion 20210715
+setreading DEVICE attrTemplateVersion 20210720
 
 name:ebus_update_files_from_svn
 filter:TYPE=MQTT2_DEVICE
