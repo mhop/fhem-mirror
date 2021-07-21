@@ -299,7 +299,13 @@ sub JsonMod_DoReadings {
 		my ($args, $cmd);
 
 		next if ($readingList =~ s/^\s*#.*\R*//); # remove comments
+		$readingList =~ s/\//\\\//g; # escape slash forum 122166
 		($args, $readingList, $cmd) = extract_codeblock ($readingList, '()', '(?m)[^(]*');
+		$readingList =~ s/\\\//\//g; # revert escaped slash
+		$args =~ s/\\\//\//g; # revert escaped slash
+		# say 'A:'.$args;
+		# say 'R:'.$readingList;
+		# say 'C:'.$cmd;
 		if (not $cmd or $@) {
 			JsonMod_Logger($hash, 2, 'syntax error in readingList statement: \'%s%s\' %s', $readingList);
 			last;
