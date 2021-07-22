@@ -4655,13 +4655,10 @@ sub _beamGraphic {
   if($show_diff eq 'top') {                                                                                      # Zusätzliche Zeile Ertrag - Verbrauch
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
-      for my $i (0..($maxhours*2)-1) {                                                                           # gleiche Bedingung wie oben
-          
-          if(AttrVal ($name, "debug", 0)) {                                                                      # nur für Debugging
-              Log (1, qq{DEBUG> $name - show_night: $show_night, weather: $hfcg->{$i}{weather}, beam1: $hfcg->{$i}{beam1}, beam2: $hfcg->{$i}{beam2}});
-          } 
-          
-          next if (!$show_night && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
+      for my $i (0..($maxhours*2)-1) {                                                                           # gleiche Bedingung wie oben      
+          next if (!$show_night && ($hfcg->{$i}{weather} > 99) 
+                                && !$hfcg->{$i}{beam1} 
+                                && !$hfcg->{$i}{beam2});
           $ii++;                                                                                                 # wieviele Stunden haben wir bisher angezeigt ?
           
           last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
