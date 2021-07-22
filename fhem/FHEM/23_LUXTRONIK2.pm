@@ -52,8 +52,8 @@ sub LUXTRONIK2_readData ($);
 
 
 #List of firmware versions that are known to be compatible with this modul
-my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#";
-my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#";
+my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#V1.86.2#";
+my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#V1.86.2#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
