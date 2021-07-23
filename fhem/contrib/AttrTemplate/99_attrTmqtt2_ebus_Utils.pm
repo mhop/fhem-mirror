@@ -28,7 +28,7 @@ BEGIN {
           CommandAttr
           CommandDefine
           CommandDeleteReading
-          CommandVersion
+          FileRead
           FmtDateTime
           readingsSingleUpdate
           readingsBulkUpdate
@@ -40,6 +40,7 @@ BEGIN {
           json2nameValue
           addToDevAttrList
           defs
+          attr
           Log3
           trim
           )
@@ -221,7 +222,7 @@ sub analyzeReadingList {
 
     my $cid = $defs{$name}{CID};
     my $dt = $defs{$name}{DEVICETOPIC};
-    my $revsn = (split q{\n}, CommandVersion(undef, 'attrTmqtt2_ebus_Utils noheader'))[0] // 'unknown';
+    my $revsn = _getVersion();
     $revsn = FmtDateTime(time) . " $revsn";
     my $attrTemplt = q{ebus_analyzeReadingList};
 
@@ -363,6 +364,7 @@ sub analyzeReadingList {
             $func = q<{ FHEM::aTm2u_ebus::j2singleReading( > . qq{'$short', }. q<$EVENT, '', $JSONMAP ) }>;
             $newline = qq{$newtop $func};
             $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            CommandDeleteReading(undef, "$name ${short}_.*");
             next;
         }
 
@@ -446,6 +448,23 @@ sub createBarView {
   return $stylestring;
 }
 
+sub _getVersion {
+    my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
+    my $fn = "$modpath.FHEM/99_attrTmqtt2_ebus_Utils.pm"; # configDB
+    my ($ret, @content) = FileRead($fn);
+    if ($ret) {
+        Log3(undef, 1, "Error reading file $fn!") ;
+        return 'unknown';
+    }
+    for (@content) {
+        chomp;
+        if(m{#.*\$Id\:[^\$\n\r].+\$}xm) {
+           return $_;
+        }
+    }
+    return 'unknown';
+}
+
 1;
 
 __END__
@@ -462,9 +481,17 @@ __END__
   <code>FHEM::aTm2u_ebus::j2nv($,$$$)</code><br>
   This is just a wrapper to fhem.pl json2nameValue() to prevent the "_value" postfix. It will first clean the first argument by applying <code>$EVENT=~ s,[{]"value":\s("?[^"}]+"?)[}],$1,g</code>. 
   </li>
+  <li><b>FHEM::aTm2u_ebus::j2singleReading</b><br>
+  <code>FHEM::aTm2u_ebus::j2singleReading($$,$$$)</code><br>
+  This is another wrapper to fhem.pl json2nameValue(), that will write all key/value pairs to a single reading. the name of the reading has to be handed over as first argument, the others (starting with JSON string ($EVENT) are identical to json2nameValue/j2nv. 
+  </li>
   <li><b>FHEM::aTm2u_ebus::upd_day_profile</b><br>
   <code>FHEM::aTm2u_ebus::upd_day_profile($$$,$)</code><br>
   Helper function to collect weekprofile info received over different topics. $NAME, $TOPIC and $EVENT are obligatory to be handed over, additionally you may provide a <i>daylist</i> as 4th argument. <i>daylist</i> defaults to Su|Mo|Tu|We|Th|Fr|Sa. Generated readings will be named Sunday, Monday, ..., so make sure to use different MQTT2-devices for each topic-group, if there's more than one item attached to your ebus capable to use weekly profiles.
+  </li>
+  <li><b>FHEM::aTm2u_ebus::analyzeReadingList</b><br>
+  <code>FHEM::aTm2u_ebus::($)</code><br>
+  This is a helper function. It analyzes a reading list of a given FHEM device (and the existing reading names) and tries to assign one of the above mentionned special functions to each line instead of json2nameValue(). Lines without Perl statements or already using these functions are ignored. This works best, if autocreate in "complex" mode had been used to automatically build the readingList. 
   </li>
   <li><b>FHEM::aTm2u_ebus::send_weekprofile</b><br>
   <code>FHEM::aTm2u_ebus::send_weekprofile($$$,$$)</code><br>
