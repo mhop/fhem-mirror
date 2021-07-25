@@ -1,4 +1,4 @@
-REV 24793
+REV 24795
 DIR unused
 UPD 2021-07-23_07:45:03 364489 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -558,7 +558,7 @@ UPD 2021-05-06_07:45:02 90141 FHEM/98_todoist.pm
 UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
-UPD 2021-07-17_07:45:05 98347 FHEM/98_vitoconnect.pm
+UPD 2021-07-25_07:45:04 100078 FHEM/98_vitoconnect.pm
 UPD 2021-01-24_07:45:03 8535 FHEM/98_weblink.pm
 UPD 2021-02-18_07:45:03 71993 FHEM/98_weekprofile.pm
 UPD 2021-04-15_07:45:26 20417 FHEM/99_SUNRISE_EL.pm
@@ -741,8 +741,8 @@ UPD 2021-07-17_07:45:09 4533211 docs/commandref.html
 UPD 2021-07-17_07:45:12 2801018 docs/commandref_DE.html
 UPD 2021-07-07_07:45:03 82624 docs/commandref_frame.html
 UPD 2021-07-07_07:45:03 92532 docs/commandref_frame_DE.html
-UPD 2021-07-24_07:45:11 245919 docs/commandref_modular.html
-UPD 2021-07-24_07:45:12 256895 docs/commandref_modular_DE.html
+UPD 2021-07-25_07:45:12 245919 docs/commandref_modular.html
+UPD 2021-07-25_07:45:13 256895 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
