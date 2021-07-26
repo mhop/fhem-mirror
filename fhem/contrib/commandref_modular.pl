@@ -85,10 +85,8 @@ for my $lang (@lang) {
         push @lang,($1 eq "" ? "EN":substr($1,1)) if($l =~ m/^=begin html(.*)/);
         $modData{$mName}{type}=$1 if($l =~ m/^=item\s+(helper|command|device)/);
         $modData{$mName}{$1}  =$2 if($l =~ m/^=item\s+(summary[^ ]*)\s(.*)$/);
-        $modData{$mName}{modLinks}{$1} = 1
-                 if($l =~ m/<a\s+name=['"]([^ '"]+)['"]>/);
-        $modData{$mName}{modLinks}{$1} = 1
-                 if($l =~ m/<a\s+id=['"]([^ '"]+)['"]>/);
+        $modData{$mName}{modLinks}{$2} = 1
+                 if($l =~ m/<a\s+(name|id)=['"]([^ '"]+)['"]>/);
       }
       $modData{$mName}{modLangs} = join(",", @lang);
       close(FH);
@@ -101,7 +99,7 @@ for my $lang (@lang) {
 
   $cmdref = ">docs/commandref${sfx}.html";
   open(OUT, $cmdref) || die("Cant open $cmdref: $!\n");
-  
+
   my $linkDumped = 0;
   while(my $l = <IN>) {
 

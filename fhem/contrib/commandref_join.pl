@@ -79,7 +79,7 @@ sub
 chkAndGenLangLinks($$$)
 {
   my ($l, $lang, $fh) = @_;
-  $var = $1 if($l =~ m/<a name="(.*?)"(.*?)><\/a>/);
+  $var = $2 if($l =~ m/<a (name|id)="(.*?)".*><\/a>/);
   if($fh && $l =~ m/(.*?)<\/h3>/ && $var) {
     print $fh "<div class='langLinks'>[".join(" ", map { 
         $_ eq $lang ? $_ : 
@@ -112,7 +112,7 @@ foreach my $lang (@lang) {
 
   # Second run: create the file
   while(my $l = <IN>) { # Header
-    last if($l =~ m/name="perl"/);
+    last if($l =~ m/(name|id)="perl"/);
     print OUT $l;
     chkAndGenLangLinks($l, $lang, \*OUT);
     
@@ -125,7 +125,7 @@ foreach my $lang (@lang) {
   }
 
   # Copy the tail
-  print OUT '<a name="perl"></a>',"\n";
+  print OUT '<a (name|id)="perl"></a>',"\n";
   $var = "perl"; 
   
   while(my $l = <IN>) {
@@ -186,8 +186,7 @@ generateModuleCommandref($$;$$)
 
         $docCount++;
         next if($noWarnings);
-        $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
-        $hasLink = ($l =~ m/<a id="$mod"/) if(!$hasLink);
+        $hasLink = ($l =~ m/<a (name|id)="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           if($l =~ m/<$tag ([^>]+)>/i) {
             my $attr = $1;
@@ -217,7 +216,7 @@ generateModuleCommandref($$;$$)
     if(!$jsFile && $suffix && !$docCount && !$dosMode) {
       if($lang eq "DE" && $fh) {
         print $fh <<EOF;
-<a name="$mod"></a>
+<a id="$mod"></a>
 <h3>$mod</h3>
 <ul>
   Leider keine deutsche Dokumentation vorhanden. Die englische Version gibt es
