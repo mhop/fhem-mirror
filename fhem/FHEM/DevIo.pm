@@ -261,7 +261,7 @@ DevIo_SimpleWrite($$$;$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  Log3 ($name, 5, $type ? "SW: $msg" : "SW: ".unpack("H*",$msg));
+  Log3 $name, 5, "DevIo_SimpleWrite $name: ".($type ? $msg : unpack("H*",$msg));
 
   $msg = pack('H*', $msg) if($type && $type == 1);
   $msg .= "\n" if($addnl);

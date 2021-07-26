@@ -148,6 +148,7 @@ CUL_Initialize($)
     hmId maxid longids 
     hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger 
     model:CUL,CUN,CUNO,SCC,nanoCUL
+    noRawReadLog:1,0
     rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S,WMBus_C,KOPP_FC 
     sendpool
     showtime:1,0
@@ -549,6 +550,7 @@ CUL_ReadAnswer($$$$)
   $mculdata = $hash->{PARTIAL} if(defined($hash->{PARTIAL}));
 
   $to = $ohash->{RA_Timeout} if($ohash->{RA_Timeout});  # ...or less
+  my $name = $ohash->{NAME};
   for(;;) {
 
     if($^O =~ m/Win/ && $hash->{USBDev}) {
@@ -568,7 +570,7 @@ CUL_ReadAnswer($$$$)
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         my $err = $!;
         DevIo_Disconnected($hash);
-        return("CUL_ReadAnswer $arg: $err", undef);
+        return("CUL_ReadAnswer $name $arg: $err", undef);
       }
       return ("Timeout reading answer for get $arg", undef)
         if($nfound == 0);
@@ -578,7 +580,7 @@ CUL_ReadAnswer($$$$)
     }
 
     if(defined($buf)) {
-      Log3 $ohash->{NAME}, 5, "CUL/RAW (ReadAnswer): $buf";
+      Log3 $name, 5, "CUL_ReadAnswer $name: $buf" if(!$hash->{".noRawReadLog"});
       $mculdata .= $buf;
     }
 
@@ -590,7 +592,7 @@ CUL_ReadAnswer($$$$)
       (undef, $line) = CUL_prefix(0, $ohash, $line); # Delete prefix
       if($regexp && $line !~ m/$regexp/) {
         $line =~ s/[\n\r]+//g;
-        CUL_Parse($ohash, $hash, $ohash->{NAME}, $line) if($init_done);
+        CUL_Parse($ohash, $hash, $name, $line) if($init_done);
         $mculdata = $hash->{PARTIAL};
       } else {
         return (undef, $line);
@@ -822,7 +824,7 @@ CUL_Read($)
   my $name = $hash->{NAME};
 
   my $culdata = $hash->{PARTIAL};
-  Log3 $name, 5, "CUL/RAW: $culdata/$buf";
+  Log3 $name, 5, "CUL_Read: $name $culdata/$buf" if(!$hash->{".noRawReadLog"});
   $culdata .= $buf;
 
   while($culdata =~ m/\n/) {
@@ -1001,8 +1003,6 @@ CUL_Attr(@)
   my $hash = $defs{$name};
 
   if($aName eq "rfmode") {
-
-
     $aVal = "SlowRF" if(!$aVal ||
                          ($aVal ne "HomeMatic" 
                           && $aVal ne "MAX" 
@@ -1112,6 +1112,13 @@ CUL_Attr(@)
   } elsif($aName eq "connectCommand"){
     CUL_SimpleWrite($hash, $aVal) if($cmd eq "set");
 
+  } elsif($aName eq "noRawReadLog"){
+    if($cmd eq "set" && $aVal) {
+      $hash->{".noRawReadLog"} = 1
+    } else {
+      delete($hash->{".noRawReadLog"});
+    }
+      
   }
 
   return undef;
@@ -1136,7 +1143,7 @@ CUL_prefix($$$)
 =item summary_DE Anbindung von Geraeten mit dem culfw Firmware, z.Bsp. Busware CUL
 =begin html
 
-<a name="CUL"></a>
+<a id="CUL"></a>
 <h3>CUL</h3>
 <ul>
 
@@ -1172,7 +1179,7 @@ CUL_prefix($$$)
   </td></tr>
   </table>
 
-  <a name="CULdefine"></a>
+  <a id="CUL-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
@@ -1213,18 +1220,24 @@ CUL_prefix($$$)
   </ul>
   <br>
 
-  <a name="CULset"></a>
+  <a id="CUL-set"></a>
   <b>Set </b>
   <ul>
+    <a id="CUL-set-reopen"></a>
     <li>reopen<br>
        Reopens the connection to the device and reinitializes it.
        </li><br>
+    <a id="CUL-set-raw"></a>
     <li>raw<br>
         Issue a CUL firmware command.  See the <a
         href="http://culfw.de/commandref.html">this</a> document
         for details on CUL commands.
         </li><br>
 
+    <a id="CUL-set-freq"></a>
+    <a id="CUL-set-bWidth"></a>
+    <a id="CUL-set-rAmpl"></a>
+    <a id="CUL-set-sens"></a>
     <li>freq / bWidth / rAmpl / sens<br>
         <a href="#rfmode">SlowRF</a> mode only.<br>
         Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity<br>
@@ -1249,13 +1262,13 @@ CUL_prefix($$$)
             signals. Default is 4 dB.</li>
         </ul>
         </li><br>
-    <a name="hmPairForSec"></a>
+    <a id="CUL-set-hmPairForSec"></a>
     <li>hmPairForSec<br>
        <a href="#rfmode">HomeMatic</a> mode only.<br>
        Set the CUL in Pairing-Mode for the given seconds. Any HM device set into
        pairing mode in this time will be paired with FHEM.
        </li><br>
-    <a name="hmPairSerial"></a>
+    <a id="CUL-set-hmPairSerial"></a>
     <li>hmPairSerial<br>
        <a href="#rfmode">HomeMatic</a> mode only.<br>
        Try to pair with the given device. The argument is a 10 character
@@ -1263,29 +1276,34 @@ CUL_prefix($$$)
        the backside of the device. It is not necessary to put the given device
        in learning mode if it is a receiver.
        </li><br>
-    <a name="hmPairForSec"></a>
+    <a id="CUL-set-led"></a>
     <li>led<br>
         Set the CUL led off (00), on (01) or blinking (02).
         </li><br>
+    <a id="CUL-set-ITClock"></a>
     <li>ITClock</br>
         Set the IT clock for Intertechno V1 protocol. Default 250.
         </li><br>
   </ul>
 
-  <a name="CULget"></a>
+  <a id="CUL-get"></a>
   <b>Get</b>
   <ul>
+    <a id="CUL-get-version"></a>
     <li>version<br>
         returns the CUL firmware version
         </li><br>
+    <a id="CUL-get-uptime"></a>
     <li>uptime<br>
         returns the CUL uptime (time since CUL reset)
         </li><br>
+    <a id="CUL-get-raw"></a>
     <li>raw<br>
         Issues a CUL firmware command, and waits for one line of data returned by
         the CUL. See the CUL firmware README document for details on CUL
         commands.
         </li><br>
+    <a id="CUL-get-fhtbuf"></a>
     <li>fhtbuf<br>
         CUL has a message buffer for the FHT. If the buffer is full, then newly
         issued commands will be dropped, and an "EOB" message is issued to the
@@ -1298,38 +1316,44 @@ CUL_prefix($$$)
         these FHT commands are sent at once to the FHT.
         </li> <br>
 
+    <a id="CUL-get-ccconf"></a>
     <li>ccconf<br>
         Read some CUL radio-chip (cc1101) registers (frequency, bandwidth, etc.),
         and display them in human readable form.
         </li><br>
 
+    <a id="CUL-get-cmds"></a>
     <li>cmds<br>
         Depending on the firmware installed, CULs have a different set of
         possible commands. Please refer to the README of the firmware of your
         CUL to interpret the response of this command. See also the raw command.
         </li><br>
+    <a id="CUL-get-credit10ms"></a>
     <li>credit10ms<br>
         One may send for a duration of credit10ms*10 ms before the send limit
         is reached and a LOVF is generated.
         </li><br>
   </ul>
 
-  <a name="CULattr"></a>
+  <a id="CUL-attr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="addvaltrigger">addvaltrigger</a><br>
+    <a id="CUL-attr-addvaltrigger"></a>
+    <li>addvaltrigger<br>
         Create triggers for additional device values. Right now these are RSSI
         and RAWMSG for the CUL family and RAWMSG for the FHZ.
         </li><br>
 
-    <li><a name="connectCommand">connectCommand</a><br>
+    <a id="CUL-attr-connectCommand"></a>
+    <li>connectCommand<br>
       raw culfw command sent to the CUL after a (re-)connect of the USB device,
       and sending the usual initialization needed for the configured rfmode.
       </li>
 
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a name="hmId">hmId</a><br>
+    <a id="CUL-attr-hmId"></a>
+    <li>hmId<br>
         Set the HomeMatic ID of this device. If this attribute is absent, the
         ID will be F1&lt;FHTID&gt;. Note 1: After setting or changing this
         attribute you have to relearn all your HomeMatic devices. Note 2: The
@@ -1337,7 +1361,8 @@ CUL_prefix($$$)
         won't complain if it is not correct, but the communication won't work.
         </li><br>
 
-    <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
+    <a id="CUL-attr-hmProtocolEvents"></a>
+    <li>hmProtocolEvents<br>
         Generate events for HomeMatic protocol messages. These are normally
         used for debugging, by activating "inform timer" in a telnet session,
         or looking at the Event Monitor window in the FHEMWEB frontend.<br>
@@ -1350,7 +1375,8 @@ CUL_prefix($$$)
         </ul>
         </li><br>
     
-    <li><a name="longids">longids</a><br>
+    <a id="CUL-attr-longids"></a>
+    <li>longids</a><br>
         Comma separated list of device-types for CUL that should be handled 
         using long IDs. This additional ID allows it to differentiate some 
         weather sensors, if they are sending on the same channel. 
@@ -1372,8 +1398,16 @@ CUL_prefix($$$)
         </code></ul>
         </li><br>
 
-    <li><a href="#model">model</a> (CUL,CUN,etc)</li>
-    <li><a name="sendpool">sendpool</a><br>
+    <li><a href="#model">model</a> (CUL,CUN,etc)</li><br>
+
+    <a id="CUL-attr-noRawReadLog"></a>
+    <li>noRawReadLog<br>
+        Do not log RAW read events at verbose 5, as sometimes makes this the
+        log unreadable (Forum #122160).
+        </li><br>
+
+    <a id="CUL-attr-sendpool"></a>
+    <li>sendpool<br>
         If using more than one CUL for covering a large area, sending
         different events by the different CUL's might disturb each other. This
         phenomenon is also known as the Palm-Beach-Resort effect.
@@ -1384,7 +1418,8 @@ CUL_prefix($$$)
         attr CUN2 sendpool CUN1,CUN2,CUN3<br>
         attr CUN3 sendpool CUN1,CUN2,CUN3</code><br>
         </li><br>
-    <li><a name="rfmode">rfmode</a><br>
+    <a id="CUL-attr-rfmode"></a>
+    <li>rfmode<br>
         Configure the RF Transceiver of the CUL (the CC1101). Available
         arguments are:
         <ul>
@@ -1421,7 +1456,7 @@ CUL_prefix($$$)
 
 =begin html_DE
 
-<a name="CUL"></a>
+<a id="CUL"></a>
 <h3>CUL</h3>
 <ul>
 
@@ -1461,7 +1496,7 @@ CUL_prefix($$$)
   </td></tr>
   </table>
 
-  <a name="CULdefine"></a>
+  <a id="CUL-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
@@ -1510,18 +1545,24 @@ CUL_prefix($$$)
   </ul>
   <br>
 
-  <a name="CULset"></a>
+  <a id="CUL-set"></a>
   <b>Set </b>
   <ul>
+    <a id="CUL-set-reopen"></a>
     <li>reopen<br>
         &Ouml;ffnet die Verbindung zum Ger&auml;t neu und initialisiert es.
         </li><br>
+    <a id="CUL-set-raw"></a>
     <li>raw<br>
         Sendet einen CUL Firmware Befehl. Siehe auch
         <a href="http://culfw.de/commandref.html">hier</a> f&uuml;r
         n&auml;here Erl&auml;uterungen der CUL Befehle.
         </li><br>
 
+    <a id="CUL-set-freq"></a>
+    <a id="CUL-set-bWidth"></a>
+    <a id="CUL-set-rAmpl"></a>
+    <a id="CUL-set-sens"></a>
     <li>freq / bWidth / rAmpl / sens<br>
         Nur in der Betriebsart <a href="#rfmode">SlowRF</a>.<br> Bestimmt die
         CUL Frequenz / Bandbreite / Empf&auml;nger Amplitude /
@@ -1554,14 +1595,14 @@ CUL_prefix($$$)
             dB.</li>
         </ul>
         </li><br>
-    <a name="hmPairForSec"></a>
+    <a id="CUL-set-hmPairForSec"></a>
     <li>hmPairForSec<br>
        Nur in der Betriebsart <a href="#rfmode">HomeMatic</a>.<br> Versetzt den
        CUL f&uuml;r die angegebene Zeit in Sekunden in den Anlern-Modus.  Jedes
        HM Ger&auml;t, das sich im Anlern-Modus befindet, wird an FHEM
        angelernt.  </li><br>
 
-    <a name="hmPairSerial"></a>
+    <a id="CUL-set-hmPairSerial"></a>
     <li>hmPairSerial<br>
        Nur in der Betriebsart <a href="#rfmode">HomeMatic</a>.<br>
        Versucht, das angegebene Ger&auml;t anzulernen (zu "pairen"). Der
@@ -1571,30 +1612,35 @@ CUL_prefix($$$)
        Empf&auml;nger ist, ist es nicht notwendig, das angegebene Ger&auml;t in
        den Anlern-Modus zu versetzen.  </li><br>
 
-    <a name="hmPairForSec"></a>
+    <a id="CUL-set-led"></a>
     <li>led<br>
         Schaltet die LED des CUL: aus (00), an (01) oder blinkend (02).
         </li><br>
+    <a id="CUL-set-ITClock"></a>
     <li>ITClock</br>
         Setzt die IT clock f&uuml; Intertechno V1 Protokoll. Default 250.
         </li><br>
   </ul>
 
-  <a name="CULget"></a>
+  <a id="CUL-get"></a>
   <b>Get</b>
   <ul>
+    <a id="CUL-get-version"></a>
     <li>version<br>
         gibt die Version der CUL Firmware zur&uuml;ck
         </li><br>
+    <a id="CUL-get-uptime"></a>
     <li>uptime<br>
         gibt die Betriebszeit des CULs zur&uuml;ck (Zeit seit dem letzten Reset
         des CULs) </li><br>
 
+    <a id="CUL-get-raw"></a>
     <li>raw<br>
         Sendet einen CUL Firmware Befehl und wartet auf eine R&uuml;ckgabe des
         CULs.  Siehe auch README der Firmware f&uuml;r n&auml;here
         Erl&auml;uterungen zu den CUL Befehlen.  </li><br>
 
+    <a id="CUL-get-fhtbuf"></a>
     <li>fhtbuf<br>
         Der CUL hat einen Puffer f&uuml;r Nachrichten f&uuml;r FHT. Wenn der
         Puffer voll ist, werden neu empfangene Telegramme ignoriert und eine
@@ -1608,11 +1654,13 @@ CUL_prefix($$$)
         dass diese FHT Befehle in einem "Paket" zum FHT Ger&auml;t gesendet werden.
         </li> <br>
 
+    <a id="CUL-get-ccconf"></a>
     <li>ccconf<br>
         Liest einige CUL Register des CC1101 (Sende- und Empf&auml;ngerchips)
         aus (Frequenz, Bandbreite, etc.) und stellt diese in lesbarer Form dar.
         </li><br>
 
+    <a id="CUL-get-cmds"></a>
     <li>cmds<br>
         In abh&auml;gigkeit der installierten Firmware hat der CUL/CUN(O)
         unterschiedliche Befehlss&auml;tze. N&auml;here Informationen &uuml;ber
@@ -1620,20 +1668,23 @@ CUL_prefix($$$)
         verwendeten CUL Firmware. Siehe auch Anmerkungen beim raw Befehl.
         </li><br>
 
+    <a id="CUL-get-credit10ms"></a>
     <li>credit10ms<br>
         Der Funkraum darf f&uuml;r eine Dauer von credit10ms*10 ms belegt
         werden, bevor die gesetzliche 1% Grenze erreicht ist und eine
         LOVF Meldung ausgegeben wird.  </li><br> </ul>
 
-  <a name="CULattr"></a>
+  <a id="CUL-attr"></a>
   <b>Attribute</b>
   <ul>
-    <li><a name="addvaltrigger">addvaltrigger</a><br>
+    <a id="CUL-attr-addvaltrigger"></a>
+    <li>addvaltrigger<br>
         Generiert Trigger f&uuml;r zus&auml;tzliche Werte. Momentan sind dies
         RSSI und RAWMSG f&uuml;r die CUL Familie und RAWMSG f&uuml;r FHZ.
         </li><br>
 
-    <li><a name="connectCommand">connectCommand</a><br>
+    <a id="CUL-attr-connectCommand"></a>
+    <li>connectCommand<br>
       culfw Befehl, was nach dem Verbindungsaufbau mit dem USB-Ger&auml;t, nach
       Senden der zum Initialisieren der konfigurierten rfmode ben&ouml;tigten
       Befehle gesendet wird.
@@ -1642,7 +1693,8 @@ CUL_prefix($$$)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
 
-    <li><a name="hmId">hmId</a><br>
+    <a id="CUL-attr-hmId"></a>
+    <li>hmId<br>
         Setzt die HomeMatic ID des Ger&auml;tes. Wenn dieses Attribut fehlt,
         wird die ID zu F1&lt;FHTID&gt; gesetzt. Bemerkung 1: Nach dem Setzen
         bzw. Ver&auml;ndern dieses Attributes m&uuml;ssen alle HomeMatic
@@ -1651,7 +1703,8 @@ CUL_prefix($$$)
         &uuml;berpr&uuml;ft nicht, ob die ID korrekt ist, im Zweifelsfall
         funktioniert die Kommunikation nicht.  </li><br>
 
-    <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
+    <a id="CUL-attr-hmProtocolEvents"></a>
+    <li>hmProtocolEvents<br>
         Generiert Ereignisse f&uuml;r HomeMatic Telegramme. Diese werden
         normalerweise f&uuml;r die Fehlersuche verwendet, z.B. durch Aktivieren
         von <code>inform timer</code> in einer telnet Sitzung bzw. im
@@ -1665,7 +1718,8 @@ CUL_prefix($$$)
         </ul>
         </li><br>
 
-    <li><a name="longids">longids</a><br>
+    <a id="CUL-attr-longids"></a>
+    <li>longids<br>
         Durch Kommata getrennte Liste von Device-Typen f&uuml;r Empfang von
         langen IDs mit den CUL. Diese zus&auml;tzliche ID erlaubt es
         Wettersensoren, welche auf dem gleichen Kanal senden zu unterscheiden.
@@ -1689,7 +1743,8 @@ CUL_prefix($$$)
     
     <li><a href="#model">model</a> (CUL,CUN)</li><br>
 
-    <li><a name="rfmode">rfmode</a><br>
+    <a id="CUL-attr-rfmode"></a>
+    <li>rfmode<br>
         Konfiguriert den RF Transceiver des CULs (CC1101). Verf&uuml;gbare
         Argumente sind:
         <ul>
@@ -1715,7 +1770,15 @@ CUL_prefix($$$)
         </ul>
         </li><br>
 
-    <li><a name="sendpool">sendpool</a><br>
+    <a id="CUL-attr-noRawReadLog"></a>
+    <li>noRawReadLog<br>
+        In manchen F&auml;llen ist der Empfang von verbose 5 / raw Logmeldungen
+        st&ouml;rend, mit diesem Attribut kann man diese Ausgabe deaktivieren
+        (Forum #122160)
+        </li><br>
+
+    <a id="CUL-attr-sendpool"></a>
+    <li>sendpool<br>
         Wenn mehr als ein CUL verwendet wird, um einen gr&ouml;&szlig;eren
         Bereich abzudecken, k&ouml;nnen diese sich gegenseitig
         beeinflussen. Dieses Ph&auml;nomen wird auch Palm-Beach-Resort Effekt
