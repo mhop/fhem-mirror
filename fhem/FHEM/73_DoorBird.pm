@@ -4651,12 +4651,16 @@ sub DoorBird_parseChangelog($$) {
 	my $all_versions;
 	my $version;
 
+	### Log Entry for debugging purposes
+	# Log3 $name, 5, $name. " : DoorBird_parseChangelog - data                    : " . $data;
+
+
 	### For all lines do
 	while(my $line = <$lines>) 	{
 
 		### If the line contains the keywords "Firmware version " followed by a number then obtain it
-		if ($line =~ /^Firmware version (\d{6})$/) 	{
-			$version = $1;
+		if ($line =~ m/^Firmware version /) {
+			( $version ) = $line =~ /(\d+)/;
 		}
 
 		### If the line contains the keywords "Products affected: " then obtain it
@@ -4667,6 +4671,9 @@ sub DoorBird_parseChangelog($$) {
 				
 				### Split the product names into an array
 				my @products = split(/,\s*/, $1);
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_parseChangelog - found product           : " . $version;
 
 				### For each product name mentioned in the changelog
 				foreach my $product (@products) {
