@@ -1,4 +1,4 @@
-REV 24797
+REV 24801
 DIR unused
 UPD 2021-07-26_07:45:03 364530 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -7,7 +7,7 @@ UPD 2021-04-19_07:45:05 41645 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2021-07-20_07:45:11 168993 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
-UPD 2021-06-08_07:45:02 57931 FHEM/00_CUL.pm
+UPD 2021-07-27_07:45:03 59735 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
 UPD 2021-07-14_07:45:02 63966 FHEM/00_ElsnerWS.pm
 UPD 2021-06-08_07:45:02 15575 FHEM/00_FBAHA.pm
@@ -568,7 +568,7 @@ UPD 2020-12-02_07:45:02 8469 FHEM/Blocking.pm
 UPD 2021-03-22_07:45:03 10678 FHEM/CoProcess.pm
 UPD 2019-12-23_07:45:02 12997 FHEM/Color.pm
 UPD 2021-01-31_07:45:03 57036 FHEM/DarkSkyAPI.pm
-UPD 2021-06-09_07:45:02 21428 FHEM/DevIo.pm
+UPD 2021-07-27_07:45:03 21443 FHEM/DevIo.pm
 UPD 2015-07-28_14:05:29 562 FHEM/FhemUtils/release.pm
 UPD 2015-07-28_14:05:29 5739 FHEM/FhemUtils/update-20130127-001
 UPD 2021-02-13_09:02:50 3613 FHEM/FritzBoxUtils.pm
@@ -720,8 +720,8 @@ UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
 UPD 2020-03-26_07:45:03 391 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
 UPD 2019-09-14_07:45:02 34993 FHEM/wundergroundAPI.pm
-UPD 2021-02-28_07:45:29 6797 contrib/commandref_join.pl
-UPD 2021-02-23_22:34:10 5032 contrib/commandref_modular.pl
+UPD 2021-07-27_07:45:13 6754 contrib/commandref_join.pl
+UPD 2021-07-27_07:45:13 4934 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
 UPD 2019-03-15_07:45:03 390 demolog/LightScenes.save
 UPD 2015-07-28_14:05:35 28600 demolog/cellar.log
@@ -737,12 +737,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-07-26_07:45:07 4533168 docs/commandref.html
-UPD 2021-07-26_07:45:10 2800949 docs/commandref_DE.html
-UPD 2021-07-07_07:45:03 82624 docs/commandref_frame.html
+UPD 2021-07-27_07:45:07 4533912 docs/commandref.html
+UPD 2021-07-27_07:45:10 2801751 docs/commandref_DE.html
+UPD 2021-07-27_07:45:03 82622 docs/commandref_frame.html
 UPD 2021-07-07_07:45:03 92532 docs/commandref_frame_DE.html
-UPD 2021-07-26_07:45:11 245919 docs/commandref_modular.html
-UPD 2021-07-26_07:45:12 256895 docs/commandref_modular_DE.html
+UPD 2021-07-27_07:45:11 246237 docs/commandref_modular.html
+UPD 2021-07-27_07:45:12 257215 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
