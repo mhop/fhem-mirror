@@ -519,8 +519,8 @@ sub Set {
 	return send_packet($hash, 0x6a, @payload);
     }
 
-    if ( $cmd =~ m{ /^(day|we)-profile[1-8]-time$/ }x ) {
-	return "Time must be between 0:00 and 23:59" if ($subcmd !~ m{/(?:[01]\d|2[0123]):(?:[012345]\d)/gm}x);
+    if ( $cmd =~ m{(day|we)-profile[1-8]-time}x ) {
+	return "Time must be between 0:00 and 23:59" if ($subcmd !~ /(?:[01]\d|2[0123]):(?:[012345]\d)/gmx);
 	my $day = $cmd;
 	$day =~ s/(day|we)-profile//;
 	$day =~ s/-time//;
@@ -534,7 +534,7 @@ sub Set {
 	return send_packet($hash, 0x6a, @payload);
     }
 
-    if ( $cmd =~ m{ /^(day|we)-profile[1-8]-temp$/ }x ) {
+    if ( $cmd =~ m{(day|we)-profile[1-8]-temp}x ) {
 	my $temp = int($subcmd*2);
 	return "Temperature must be between 5 and 99" if (($temp < 10) || ($temp > 198));
 
