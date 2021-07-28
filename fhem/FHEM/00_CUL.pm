@@ -639,25 +639,30 @@ CUL_XmitDlyHM($$$)
 
   my ($mTy,$id);
   (undef,$mTy,undef,$id) = unpack 'A8A2A6A6',$fn if(length($fn)>19);
+  my $validid = ($id &&
+                 $id ne '000000' && # 000000 is broadcast and action detector
+                 $modules{CUL_HM}{defptr}{$id});
 
-  if($id &&
-     $modules{CUL_HM}{defptr}{$id} &&
+  if($validid &&
      $modules{CUL_HM}{defptr}{$id}{helper}{io} &&
      $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend}) {
     my $dDly = $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} - $now;
-    #$dDly -= 0.04 if ($mTy eq "02");# while HM devices need a rest there are
-                                     # still some devices that need faster
-                                     # reactionfor ack.
-                                     # Mode needs to be determined
     if ($dDly > 0.01){# wait less then 10 ms will not work
-      $dDly = 0.1 if($dDly > 0.1);
+      $dDly = 0.12 if($dDly > 0.12);
       Log3 $hash->{NAME}, 5, "CUL $id dly:".int($dDly*1000)."ms";
       select(undef, undef, undef, $dDly);
+      $now += $dDly;
     }
   }
   shift(@{$hash->{helper}{$id}{QUEUE}});
-  InternalTimer($now+0.1, "CUL_XmitDlyHMTo", "$hash->{NAME}:$id", 1)
-        if (scalar(@{$hash->{helper}{$id}{QUEUE}}));
+  $now += (($mTy =~ m/^C[AB]/s) ? 0.0    #noansi: delay for FUP data
+                                : 0.06); #noansi: minimum delay for next send
+  if(scalar(@{$hash->{helper}{$id}{QUEUE}})) {
+    InternalTimer($now, "CUL_XmitDlyHMTo", "$hash->{NAME}:$id", 1);
+    $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} = undef if($validid);
+  } else {
+    $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} = $now if($validid);
+  }
   return 0;
 }
 
@@ -925,8 +930,21 @@ CUL_Parse($$$$@)
   } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
     my $src = substr($dmsg,9,6);
     if($modules{CUL_HM}{defptr}{$src}){
-      $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} =
-          gettimeofday() + 0.100;
+      my $recvtime = gettimeofday();
+      my $flgh = hex(substr($dmsg,5,2));
+      my $waitTgt = 0.100;  
+      $waitTgt    += 0.200
+        if($flgh & 0x20 &&       #noansi: see HMUARTLGW, not to collide with it
+           $modules{CUL_HM}{defptr}{$src}->{IODev}->{TYPE} =~
+                        m/^(?:TSCUL|HMUARTLGW)$/s);
+      $waitTgt    -= 0.044 if ($flgh & 0x40);       # received from Repeater
+      my $nextSend = $recvtime + $waitTgt;
+      $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = $nextSend
+        if(!defined($modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend})   ||
+           $nextSend < $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} ||
+           ($recvtime - $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend}) >
+                ($waitTgt*1.07)); # not allready set by previous IO
+            
     }
     $dmsg .= "::$rssi:$name" if(defined($rssi));
 
@@ -1118,7 +1136,7 @@ CUL_Attr(@)
     } else {
       delete($hash->{".noRawReadLog"});
     }
-      
+
   }
 
   return undef;
@@ -1376,7 +1394,7 @@ CUL_prefix($$$)
         </li><br>
     
     <a id="CUL-attr-longids"></a>
-    <li>longids</a><br>
+    <li>longids<br>
         Comma separated list of device-types for CUL that should be handled 
         using long IDs. This additional ID allows it to differentiate some 
         weather sensors, if they are sending on the same channel. 
@@ -1446,7 +1464,7 @@ CUL_prefix($$$)
         </li><br>
     <li><a href="#showtime">showtime</a></li>
 
-        
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>

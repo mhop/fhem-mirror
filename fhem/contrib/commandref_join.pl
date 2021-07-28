@@ -125,7 +125,7 @@ foreach my $lang (@lang) {
   }
 
   # Copy the tail
-  print OUT '<a (name|id)="perl"></a>',"\n";
+  print OUT '<a id="perl"></a>',"\n";
   $var = "perl"; 
   
   while(my $l = <IN>) {
