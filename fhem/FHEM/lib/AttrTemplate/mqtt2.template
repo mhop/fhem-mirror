@@ -1275,6 +1275,46 @@ set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
+
+# sonoff 2 channel device flashed with Tasmota with dual energy meassuring. Source: https://forum.fhem.de/index.php/topic,122231.0.html
+name:tasmota_2channel_split_energy
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:sonoff 2 channel device with seperate energy measuring options flashed with Tasmota, e.g. Sonoff DUAL R3 (tasmota version >=9.5.0). <br>NOTE: a second device will be created for the second channel
+order:A_02a1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE",'readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE",'readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE",'readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 } 
+set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
+attr DEVICE setExtensionsEvent 1
+attr DEVICE setStateList on off toggle
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  CMNDTOPIC/POWER:.* {}\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,undef,$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,undef,$JSONMAP,undef,'_2$') }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,undef,$JSONMAP) : json2nameValue($EVENT,undef,$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,undef,$JSONMAP) }\
+  STATTOPIC/POWER1:.* state\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,undef,$JSONMAP) }
+copy DEVICE DEVICE_CH2
+deleteattr DEVICE_CH2 alias
+attr DEVICE_CH2 readingList \
+  STATTOPIC/POWER2:.* state\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,undef,$JSONMAP,'_2$') }
+attr DEVICE_CH2 setList \
+  off:noArg    CMNDTOPIC/POWER2 0\
+  on:noArg     CMNDTOPIC/POWER2 1\
+  toggle:noArg CMNDTOPIC/POWER2 2
+attr DEVICE,DEVICE_CH2 model tasmota_2channel_split_energy
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210728
+option:{SETCHANNELINFO}
+set DEVICE attrTemplate set_associatedWith \CHANNELS=2
+option:{ CALLSPEECHRECOGN }  
+set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+
+
 #contributed by 87insane
 # tasmota 2ch as shutter device.
 name:tasmota_2ch_shutter_invert_1
