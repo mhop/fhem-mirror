@@ -4572,7 +4572,7 @@ OldReadingsNum($$$;$)
   return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   return $default if($val eq "");
-  $val = round($val,$round) if($round);
+  $val = round($val,$round) if(defined $round);
   return $val;
 }
 
@@ -4619,7 +4619,7 @@ ReadingsNum($$$;$)
   return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   return $default if($val eq "");
-  $val = round($val,$round) if($round);
+  $val = round($val,$round) if(defined $round);
   return $val;
 }
 
