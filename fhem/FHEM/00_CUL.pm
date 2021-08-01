@@ -943,7 +943,7 @@ CUL_Parse($$$$@)
         if(!defined($modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend})   ||
            $nextSend < $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} ||
            ($recvtime - $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend}) >
-                ($waitTgt*1.07)); # not allready set by previous IO
+                0.09); # not allready set by previous IO
             
     }
     $dmsg .= "::$rssi:$name" if(defined($rssi));
