@@ -98,6 +98,7 @@ sub HMinfo_Define($$){#########################################################
                             ;
   $hash->{nb}{cnt} = 0;
   $modules{HMinfo}{helper}{initDone} = 0;
+  notifyRegexpChanged($hash,"global",0);
   HMinfo_init();
   return;
 }
@@ -432,7 +433,7 @@ sub HMinfo_status($){##########################################################
   push @updates,"ERR__protocol:"  .join(",",sort map {"$_:$protE{$_}"} grep {$protE{$_}} sort keys(%protE));
   push @updates,"W__protocol:"    .join(",",sort map {"$_:$protW{$_}"} grep {$protW{$_}} sort keys(%protW));
 
-  my @tpu = devspec2array("TYPE=CUL_HM:FILTER=state=unreachable");
+  my @tpu = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=state=unreachable");
   push @updates,"ERR__unreachable:".scalar(@tpu);
   push @updates,"I_autoReadPend:"  .scalar @{$modules{CUL_HM}{helper}{qReqConf}};
   # ------- what about rssi low readings ------
@@ -551,7 +552,7 @@ sub HMinfo_regCheck(@) { ######################################################
                      )                                  # content is already displayed
                    );
       }
-      push @regChPend,$eName if (keys %{$ehash->{helper}{shadowReg}});
+      push @regChPend,$eName.":" if (keys %{$ehash->{helper}{shadowReg}});
     }      
                                                       
     push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
@@ -1016,9 +1017,8 @@ sub HMinfo_listOfTempTemplates() { ############################################
   
   $defs{$n}{helper}{weekplanList} = \@tmpl;
   if ($modules{CUL_HM}{AttrList}){
-    my $lst = "none,defaultWeekplan,".join(",",@tmpl);
-    $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.*? )/ tempListTmpl:$lst /;
-    $modules{CUL_HM}{tempListTmplLst} =  $lst;
+    $modules{CUL_HM}{tempListTmplLst} = "none,defaultWeekplan,".join(",",sort @tmpl);
+    CUL_HM_AttrInit($modules{CUL_HM});
   }
   return ;
 }
@@ -1869,9 +1869,9 @@ sub HMinfo_SetFn($@) {#########################################################
       }
     }
     if ($type eq "msgErrors"){#clear message events for all devices which has problems
-      my @devL = split(",",InternalVal($hash->{NAME},"W__protoNames",""));
-      push @devL,split(",",InternalVal($hash->{NAME},"CRI__protoNames",""));
-      push @devL,split(",",InternalVal($hash->{NAME},"ERR__protoNames",""));
+      my @devL = split(",",InternalVal($hash->{NAME},"iW__protoNames"  ,""));
+      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protoNames",""));
+      push @devL,split(",",InternalVal($hash->{NAME},"iERR__protocol"  ,""));
     
       foreach my $dName (HMinfo_noDup(@devL)){
         CUL_HM_Set($defs{$dName},$dName,"clear","msgEvents");
@@ -3744,7 +3744,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   <br><br>
   <a name="HMinfoattr"><b>Attributes</b></a>
    <ul>
-     <li><a name="#HMinfosumStatus">sumStatus</a><br>
+     <a name="sumStatus"><li>sumStatus</a><br>
        Warnings: list of readings that shall be screend and counted based on current presence.
        I.e. counter is the number of entities with this reading and the same value.
        Readings to be searched are separated by comma. <br>
@@ -3759,7 +3759,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        Note: counter with '0' value will not be reported. HMinfo will find all present values autonomously<br>
        Setting is meant to give user a fast overview of parameter that are expected to be system critical<br>
      </li>
-     <li><a name="#HMinfosumERROR">sumERROR</a>
+     <a name="sumERROR"><li>sumERROR</a>
        Similar to sumStatus but with a focus on error conditions in the system.
        Here user can add reading<b>values</b> that are <b>not displayed</b>. I.e. the value is the
        good-condition that will not be counted.<br>
@@ -3777,7 +3777,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          ERR_Activity dead:5<br>
        </code></ul>
      </li>
-     <li><a name="#HMinfoautoUpdate">autoUpdate</a>
+     <a name="autoUpdate"><li>autoUpdate</a>
        retriggers the command update periodically.<br>
        Example:<br>
        <ul><code>
@@ -3785,14 +3785,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        </code></ul>
        will trigger the update every 10 min<br>
      </li>
-     <li><a name="#HMinfoautoArchive">autoArchive</a>
+     <a name="autoArchive"><li>autoArchive</a>
        if set fhem will update the configFile each time the new data is available.
        The update will happen with <a ref="#HMinfoautoUpdate">autoUpdate</a>. It will not 
        work it autoUpdate is not used.<br>
        see also <a ref="#HMinfoarchConfig">archConfig</a>
        <br>
      </li>
-     <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
+     <a name="hmAutoReadScan"><li>hmAutoReadScan</a>
        defines the time in seconds CUL_HM tries to schedule the next autoRead
        from the queue. Despite this timer FHEM will take care that only one device from the queue will be
        handled at one point in time. With this timer user can stretch timing even further - to up to 300sec
@@ -3800,45 +3800,45 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        Setting to 1 still obeys the "only one at a time" prinzip.<br>
        Note that compressing will increase message load while stretch will extent waiting time.<br>
      </li>
-     <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
+     <a name="hmIoMaxDly"><li>hmIoMaxDly</a>
        max time in seconds CUL_HM stacks messages if the IO device is not ready to send.
        If the IO device will not reappear in time all command will be deleted and IOErr will be reported.<br>
        Note: commands will be executed after the IO device reappears - which could lead to unexpected
        activity long after command issue.<br>
        default is 60sec. max value is 3600sec<br>
      </li>
-     <li><a name="#HMinfoconfigDir">configDir</a>
+     <a name="configDir"><li>configDir</a>
        default directory where to store and load configuration files from.
        This path is used as long as the path is not given in a filename of 
        a given command.<br>
        It is used by commands like <a ref="#HMinfotempList">tempList</a> or <a ref="#HMinfosaveConfig">saveConfig</a><br>
      </li>
-     <li><a name="#HMinfoconfigFilename">configFilename</a>
+     <a name="configFilename"><li>configFilename</a>
        default filename used by 
        <a ref="#HMinfosaveConfig">saveConfig</a>, 
        <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
        <a ref="#HMinfoloadConfig">loadConfig</a><br>
        <a ref="#HMinfoverifyConfig">verifyConfig</a><br>
      </li>
-     <li><a name="#HMinfoconfigTempFile">configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
+     <a name="configTempFile"><li>configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
         Liste of Templfiles (weekplan) which are considered in HMInfo and CUL_HM<br>
         Files are comma separated. The first file is default. Its name may be skipped when setting a tempalte.<br>
      </li>
-     <li><a name="#HMinfohmManualOper">hmManualOper</a>
+     <a name="hmManualOper"><li>hmManualOper</a>
        set to 1 will prevent any automatic operation, update or default settings
        in CUL_HM.<br>
      </li>
-     <li><a name="#HMinfohmDefaults">hmDefaults</a>
+     <a name="hmDefaults"><li>hmDefaults</a>
        set default params for HM devices. Multiple attributes are possible, comma separated.<br>
        example:<br>
        attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
      </li>
-     <li><a name="#HMinfoverbCULHM">verbCULHM</a>
+     <a name="verbCULHM"><li>verbCULHM</a>
        set verbose logging for a special action for any CUL_HM entity.<br>
        allSet: all set commands to be executed.<br>
        allGet: all get requests to be executed.<br>
      </li>
-     <li><a name="#HMinfoautoLoadArchive">autoLoadArchive</a>
+     <a name="autoLoadArchive"><li>autoLoadArchive</a>
        if set the register config will be loaded after reboot automatically. See <a ref="#HMinfoloadConfig">loadConfig</a> for details<br>
      </li>
      
@@ -4214,7 +4214,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 
   <a name="HMinfoattr"><b>Attribute</b></a>
    <ul>
-    <li><a name="#HMinfosumStatus">sumStatus</a><br>
+    <a name="sumStatus"><li>sumStatus</a><br>
         erzeugt eine Liste von Warnungen. Die zu untersuchenden Readings werden mittels Komma separiert angegeben.
         Die Readings werden, so vorhanden, von allen Instanzen ausgewertet, gez&auml;hlt und getrennt nach Readings mit
         gleichem Inhalt ausgegeben.<br>
@@ -4229,7 +4229,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         Anmerkung: Z&auml;hler mit Werten von '0' werden nicht angezeigt. HMinfo findet alle vorhanden Werte selbstst&auml;ndig.<br>
         Das Setzen des Attributes erm&ouml;glicht einen schnellen &Uuml;berblick &uuml;ber systemkritische Werte.<br>
     </li>
-    <li><a name="#HMinfosumERROR">sumERROR</a>
+    <a name="sumERROR"><li>sumERROR</a>
         &Auml;hnlich sumStatus, jedoch mit dem Fokus auf signifikante Fehler.
         Hier k&ouml;nnen Reading <b>Werte</b> angegeben werden, die dazu f&uuml;hren, dass diese <b>nicht angezeigt</b> werden.
         Damit kann beispielsweise verhindert werden, dass der zu erwartende Normalwert oder ein anderer nicht
@@ -4246,7 +4246,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         ERR_Activity dead:5<br>
         </code></ul>
     </li>
-    <li><a name="#HMinfoautoUpdate">autoUpdate</a>
+    <a name="autoUpdate"><li>autoUpdate</a>
         f&uuml;hrt den Befehl periodisch aus.<br>
         Beispiel:<br>
         <ul><code>
@@ -4254,55 +4254,55 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         </code></ul>
         f&uuml;hrt den Befehl alle 10 Minuten aus<br>
     </li>
-     <li><a name="#HMinfoautoArchive">autoArchive</a>
+     <a name="autoArchive"><li>autoArchive</a>
         Sobald neue Daten verf&uuml;gbar sind, wird das configFile aktualisiert.
         F&uuml;r die Aktualisierung ist <a ref="#HMinfoautoUpdate">autoUpdate</a> zwingend erforderlich.<br>
         siehe auch <a ref="#HMinfoarchConfig">archConfig</a>
         <br>
      </li>
-     <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
+     <a name="hmAutoReadScan"><li>hmAutoReadScan</a>
         definiert die Zeit in Sekunden bis zum n&auml;chsten autoRead durch CUL_HM. Trotz dieses Zeitwertes stellt
         FHEM sicher, dass zu einem Zeitpunkt immer nur ein Ger&auml;t gelesen wird, auch wenn der Minimalwert von 1
         Sekunde eingestellt ist. Mit dem Timer kann der Zeitabstand
         ausgeweitet werden - bis zu 300 Sekunden zwischen zwei Ausf&uuml;hrungen.<br>
         Das Herabsetzen erh&ouml;ht die Funkbelastung, Heraufsetzen erh&ouml;ht die Wartzezeit.<br>
      </li>
-     <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
+     <a name="hmIoMaxDly"><li>hmIoMaxDly</a>
         maximale Zeit in Sekunden f&uuml;r die CUL_HM Meldungen puffert, wenn das Ger&auml;t nicht sendebereit ist.
         Ist das Ger&auml;t nicht wieder rechtzeitig sendebereit, werden die gepufferten Meldungen verworfen und
         IOErr ausgel&ouml;st.<br>
         Hinweis: Durch die Pufferung kann es vorkommen, dass Aktivit&auml;t lange nach dem Absetzen des Befehls stattfindet.<br>
         Standard ist 60 Sekunden, maximaler Wert ist 3600 Sekunden.<br>
      </li>
-     <li><a name="#HMinfoconfigDir">configDir</a>
+     <a name="configDir"><li>configDir</a>
         Verzeichnis f&uuml;r das Speichern und Lesen der Konfigurationsdateien, sofern in einem Befehl nur ein Dateiname ohne
         Pfad angegen wurde.<br>
         Verwendung beispielsweise bei <a ref="#HMinfotempList">tempList</a> oder <a ref="#HMinfosaveConfig">saveConfig</a><br>
      </li>
-     <li><a name="#HMinfoconfigFilename">configFilename</a>
+     <a name="configFilename"><li>configFilename</a>
         Standard Dateiname zur Verwendung von 
         <a ref="#HMinfosaveConfig">saveConfig</a>, 
         <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
         <a ref="#HMinfoloadConfig">loadConfig</a><br>
      </li>
-     <li><a name="#HMinfoconfigTempFile">configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
+     <a name="configTempFile"><li>configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
         Liste der Templfiles (weekplan) welche in HM berücksichtigt werden<br>
         Die Files werden kommasepariert eingegeben. Das erste File ist der Default. Dessen Name muss beim Template nicht eingegeben werden.<br>
      </li>
-     <li><a name="#HMinfohmManualOper">hmManualOper</a>
+     <a name="hmManualOper"><li>hmManualOper</a>
         auf 1 gesetzt, verhindert dieses Attribut jede automatische Aktion oder Aktualisierung seitens CUL_HM.<br>
      </li>
-     <li><a name="#HMinfohmDefaults">hmDefaults</a>
+     <a name="hmDefaults"><li>hmDefaults</a>
        setzt default Atribute fuer HM devices. Mehrere Attribute sind moeglich, Komma separiert.<br>
        Beispiel:<br>
        attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
      </li>
-     <li><a name="#HMinfoverbCULHM">verbCULHM</a>
+     <a name="verbCULHM"><li>verbCULHM</a>
        set verbose logging fuer ausgewaehlte aktionen von allen CUL_HM entities.<br>
        allSet: alle set Kommandos fertig zur Ausführung.<br>
        allGet: alle get Anfragen fertig zur Ausführung.<br>
      </li>
-     <li><a name="#HMinfoautoLoadArchive">autoLoadArchive</a>
+     <a name="autoLoadArchive"><li>autoLoadArchive</a>
        das Register Archive sowie Templates werden nach reboot automatischgeladen.
        Siehe <a ref="#HMinfoloadConfig">loadConfig</a> fuer details<br>
      </li>
