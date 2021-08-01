@@ -2095,7 +2095,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
         Gibt die erste Zahl aus dem Readingswert zur&uuml;ck.
         Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
-        Dezimalstellen gerundet.
+        Dezimalstellen gerundet und ggf. mit 0 aufgefüllt, wenn &lt;round&gt;
+        gr&ouml;&szlig;er ist als die Anzahl der Dezimalstellen.
         </li><br>
       <li>ReadingsTimestamp(&lt;devicename&gt;,
                             &lt;reading&gt;,&lt;defaultvalue&gt;)<br>
@@ -2135,7 +2136,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
         Gibt die erste Zahl aus dem Attributwert zur&uuml;ck.
         Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
-        Dezimalstellen gerundet.
+        Dezimalstellen gerundet und ggf. mit 0 aufgefüllt, wenn &lt;round&gt;
+        gr&ouml;&szlig;er ist als die Anzahl der Dezimalstellen.
         </li><br>
       <li>
         InternalVal(&lt;devicename&gt;,&lt;internal&gt;,

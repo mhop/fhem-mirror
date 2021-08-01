@@ -1933,30 +1933,31 @@ The following local attributes are used by a wider range of devices:
     <br>
     <ul>
       <li>Value(&lt;devicename&gt;)<br>
-        returns the state of the device (the string you see in paranthesis in
+        Returns the state of the device (the string you see in parenthesis in
         the output of the list command).
         </li><br>
       <li>OldValue(&lt;devicename&gt;)
       <li>OldTimestamp(&lt;devicename&gt;)<br>
-        returns the old value/timestamp of the device.
+        Returns the old value/timestamp of the device.
         </li><br>
       <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
-        Return the reading (the value in the Readings section of "list device")
+        Returns the reading (the value in the Readings section of "list device")
         </li><br>
       <li>
         ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,
                     &lt;defaultvalue&gt;,&lt;round&gt;)<br>
-        Return the first number from a reading value.
-        Round id to &lt;round&gt; devimal places (optional parameter).
+        Returns the first number from a reading value.
+        Round it to &lt;round&gt; decimal places (optional parameter). If &lt;round&gt; exeeds the length of
+          the factional part, 0's will be padded.
         </li><br>
       <li>ReadingsTimestamp(&lt;devicename&gt;,&lt;reading&gt;,&lt;
         defaultvalue&gt;)<br>
-        returns the timestamp of the reading.
+        Returns the timestamp of a reading.
         </li><br>
       <li>ReadingsAge(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)
         <br>
-        returns the age of the reading in seconds.
+        Returns the age of a reading in seconds.
         </li><br>
 
       <li>
@@ -1974,7 +1975,7 @@ The following local attributes are used by a wider range of devices:
 
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
-        Return the attribute of the device
+        Returns the attribute of a device
         <br><br>
         { Value("wz") }<br>
         { OldValue("wz") }<br>
@@ -1999,7 +2000,8 @@ The following local attributes are used by a wider range of devices:
         InternalNum(&lt;devicename&gt;,&lt;property&gt;,
                     &lt;defaultvalue&gt;,&lt;round&gt;)<br>
         Return the first number from an internal value.
-        Round id to &lt;round&gt; devimal places (optional parameter).
+        Round it to &lt;round&gt; decimal places (optional parameter). If &lt;round&gt; exeeds the length of
+        the factional part, 0's will be padded.
         </li><br>
       </ul>
       </li><br>
