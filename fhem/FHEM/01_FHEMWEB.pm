@@ -1408,7 +1408,11 @@ FW_makeTable($$$@)
           FW_pO "<td><div $ifidts>$t</div></td>";
         }
       } else {
-        $val = FW_htmlEscape($val);
+        if($val =~ m,^<html>(.*)</html>$,) {
+          $val = $1;
+        } else {
+          $val = FW_htmlEscape($val);
+        }
         my $tattr = "informId=\"$name-$prefix$n\" class=\"dval\"";
 
         # if possible provide some links
