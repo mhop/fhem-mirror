@@ -67,10 +67,13 @@ consUpdate(evt)
 
   // Extract the FHEM-Log, to avoid escaping its formatting (Forum #104842)
   var logContent = "";
-  var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;'};
-  new_content = new_content.replace(/(<div class='fhemlog'>)(.*?)(<\/div>)/g,
+  var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;', '\n':'<br>' };
+  new_content = new_content.replace(
+  /(<div class='fhemlog'>)([\s\S]*?)(<\/div>)/gm,
   function(all, div1, msg, div2) {
-    logContent += div1+msg.replace(/[<> ]/g, function(a){return rTab[a]})+div2;
+    logContent += div1+
+                  msg.replace(/[<> \n]/g, function(a){return rTab[a]})+
+                  div2;
     return "";
   });
 
