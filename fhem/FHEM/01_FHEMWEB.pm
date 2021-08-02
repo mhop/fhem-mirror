@@ -1408,7 +1408,7 @@ FW_makeTable($$$@)
           FW_pO "<td><div $ifidts>$t</div></td>";
         }
       } else {
-        if($val =~ m,^<html>(.*)</html>$,) {
+        if($val =~ m,^<html>(.*)</html>$,s) {
           $val = $1;
         } else {
           $val = FW_htmlEscape($val);
