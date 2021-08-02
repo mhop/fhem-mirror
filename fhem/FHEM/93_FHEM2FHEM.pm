@@ -40,6 +40,7 @@ FHEM2FHEM_Initialize($)
     disabledForIntervals
     eventOnly:1,0
     excludeEvents
+    loopThreshold
     setState
     reportConnected:1,0
   );
@@ -153,6 +154,7 @@ FHEM2FHEM_Read($)
 
   return if(IsDisabled($name));
   my $excl = AttrVal($name, "excludeEvents", undef);
+  my $threshold = AttrVal($name, "loopThreshold", 0); # 122300
 
   my $data = $hash->{PARTIAL};
   #Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
@@ -185,14 +187,20 @@ FHEM2FHEM_Read($)
         if(AttrVal($name,"eventOnly",0)) {
           DoTrigger($rname, $msg);
         } else {
+          my $reading = "state";
           if($msg =~ m/^([^:]*): (.*)$/) {
-            readingsSingleUpdate($defs{$rname}, $1, $2, 1);
+            $reading = $1; $msg = $2;
+          }
+          my $age = ($threshold ? ReadingsAge($rname, $reading, 0) : 99999);
+          if($age < $threshold) {
+            Log3 $name, 4, "$name: ignoring $rname $reading $msg, ".
+                           "threshold $threshold, age:$age";
+            next;
+          }
+          if($reading eq "state" && AttrVal($name, "setState", 0)) {
+            AnalyzeCommand($hash, "set $rname $msg");
           } else {
-            if(AttrVal($name,"setState",0)) {
-              AnalyzeCommand($hash, "set $rname $msg");
-            } else {
-              readingsSingleUpdate($defs{$rname}, "state", $msg, 1);
-            }
+            readingsSingleUpdate($defs{$rname}, $reading, $msg, 1);
           }
         }
 
@@ -481,6 +489,11 @@ FHEM2FHEM_Attr(@)
       do not publish events matching &lt;regexp&gt;. Note: ^ and $ are
       automatically added to the regexp, like in notify, FileLog, etc.
       </li>
+     <li><a id="FHEM2FHEM-attr-loopThreshold">loopThreshold</a><br>
+       helps avoiding endless loops. If set, the last update of a given
+       reading must be older than the current value in seconds. Take care if
+       event-on-* attributes are also set.
+       </li>
     <li><a id="FHEM2FHEM-attr-setState">setState</a>
       if set to 1, and there is a local device with the same name, then remote
       set commands will be executed for the local device.
@@ -621,6 +634,10 @@ FHEM2FHEM_Attr(@)
        bereitgestellt. Achtung: ^ und $ werden automatisch hinzugefuuml;gt, wie
        bei notify, FileLog, usw.
        </li>
+     <li><a id="FHEM2FHEM-attr-loopThreshold">loopThreshold</a><br>
+       hilft Endlosschleifen zu vermeiden. Falls gesetzt, muss die letzte
+       &Auml;nderung des gleichen Readings mehr als der Wert in Sekunden alt
+       sein. Achtung bei gesetzten event-on-* Attributen.</li>
      <li><a id="FHEM2FHEM-attr-setState">setState</a>
        falls gesetzt (auf 1), und ein lokales Ger&auml;t mit dem gleichen Namen
        existiert, dann werden set Befehle vom entfernten Ger&auml;t als Solches
