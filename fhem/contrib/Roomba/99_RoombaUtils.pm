@@ -4,6 +4,7 @@
 #
 # Collection of various routines
 # Prof. Dr. Peter A. Henning
+# several contributions from hapege
 #
 # $Id: RoombaUtils.pm 2020-09- pahenning $
 #
@@ -28,6 +29,10 @@
 
 package main;
 
+use strict;
+use warnings;
+use SetExtensions;
+
 sub RoombaUtils_Initialize($$){
 
   my ($hash) = @_;
@@ -46,7 +51,19 @@ use Math::Polygon::Calc;
 use Math::ConvexHull qw/convex_hull/;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 
-my $version = "1.0";
+#-- needed for catchall
+use GPUtils qw(:all);
+BEGIN {
+  GP_Import(qw(
+    json2nameValue
+	))
+};
+
+my $roombaversion = "1.3";
+
+my %roomba_transtable_EN = ();
+my %roomba_transtable_DE = ();
+my $roomba_tt;
 
 my %roombaerrs_en = (
         0 => "None",
@@ -166,12 +183,12 @@ my %roombaerrs_de = (
         76 => "Hardwarefehler"
     );     
     
- my %roombastates_en = ("charge" => "Charging",
+ my %roombastates_en = ("charge" => "Charge",
               "new" => "New Mission",
-              "run" => "Running",
+              "run" => "Mission",
               "resume" => "Running",
-              "hmMidMsn" => "Recharging on Mission",
-              "recharge" => "Recharging",
+              "hmMidMsn" => "Recharge on Mission",
+              "recharge" => "Recharge",
               "stuck" => "Stuck",
               "hmUsrDock" => "User Docking",
               "dock" => "Docking",
@@ -180,21 +197,23 @@ my %roombaerrs_de = (
               "stop" => "Stopped",
               "pause" => "Paused",
               "hmPostMsn" => "End Mission");
-              
-my %roombastates_de = ("charge" => "Wird geladen",
-              "new" => "Neue Aufgabe",
-              "run" => "Läuft",
-              "resume" => "Läuft",
-              "hmMidMsn" => "Nachladen während Aufgabe",
-              "recharge" => "Nachladen",
+                            
+my %roombastates_de = ("charge" => "Ladung",
+              "new" => "Neue Mission",
+              "run" => "Mission",
+              "resume" => "Mission",
+              "hmMidMsn" => "Nachladung während Mission",
+              "recharge" => "Nachladung",
               "stuck" => "Steckt fest",
               "hmUsrDock" => "Dockingbefehl",
               "dock" => "Docking",
-              "dockend" => "Docking - Aufgabe beendet",
+              "dockend" => "Docking - Mission beendet",
               "cancelled" => "Abgebrochen",
               "stop" => "Angehalten",
               "pause" => "Pause",
-              "hmPostMsn" => "Aufgabe beendet");
+              "hmPostMsn" => "Mission beendet",
+              "Charged" => "Geladen");
+
   
 ##############################################################################
 #
@@ -205,16 +224,30 @@ my %roombastates_de = ("charge" => "Wird geladen",
 sub command($$@){
   my ($name,$cmd,@evt) = @_;
   my $hash = $main::defs{$name};
-  $hash->{Version} = $version;
+  $hash->{VERSION} = $roombaversion;
+  #$hash->{FW_detailFn}  = "roomba::makeTable";
+  #$hash->{FW_summaryFn} = "roomba::makeShort";
   if( $cmd eq "start"){
-    my $hash = $main::defs{$name};
     my $iodev= $hash->{IODev}->{NAME};
-    main::fhem("attr $iodev disconnectAfter 300");
     if(main::Value($iodev) ne "opened"){
       main::fhem("set $iodev connect");
+      main::fhem("setreading $name cmPhaseE Delay");
+      main::fhem("defmod delay$name at +00:00:10 set $name start");
+      return undef;
     }
   }
   $cmd = 'cmd {"command": "'.$cmd.'", "time": '.time().', "initiator": "localApp"}';
+  
+  #-- language selection
+  if( !defined($roomba_tt) ){
+    #-- in any attribute redefinition readjust language
+    my $lang = main::AttrVal("global","language","EN");
+    if( $lang eq "DE"){
+      $roomba_tt = \%roomba_transtable_DE;
+    }else{
+      $roomba_tt = \%roomba_transtable_EN;
+    }
+  }
   return $cmd;
 }
 
@@ -267,6 +300,158 @@ sub setsched($$$){
   return $cmd;
 }
 
+sub setsched2 ($$$){
+  #my $cmd = 'delta {"state":{"cleanSchedule2":
+  #  [{"enabled": true, "type": 0,
+  #  "start": {"day": [2, 4, 6], "hour": 11, "min": 0},
+  #  "cmd": {"command": "start", "ordered": 1, "pmap_id": "z....g",
+  #  "regions": [{"region_id": "10", "type": "rid"},
+  #  {"region_id": "6", "type": "rid"},
+  #  {"region_id": "5", "type": "rid"},
+  #  {"region_id": "8", "type": "rid"}],
+  #  "user_pmapv_id": "2....7"}}]}}
+  #
+  my ($name,$which,$data) = @_;
+  my @time;
+  my @hour;
+  my @min;
+  my @days;
+  my @daysnum;
+  my @pMapId;
+  my @userPmapvId;
+  my $cmdpre = 'delta {"state": {"cleanSchedule2": [';
+  my $cmdpost = ']}}';
+  my @cmdsched="";
+  my @cmdregs="";
+  my @enabled = "";
+  my @setenable = split(' ',$data);
+  my $numofsched =  main::ReadingsVal($name,"NumOfSchedules","0");
+  my @numofreg;
+  my $cmd = $cmdpre;
+  for (my $i=1; $i<=$numofsched; $i++) {
+    if ($i==$which or $which=="all") {
+    $enabled[$i] = $setenable[1];
+    #main::Log 1,"[RoombaUtils] Schedule $i is $enabled[$i] with which $which";
+    }
+    else {
+    $enabled[$i] = yesnotobool(main::ReadingsVal($name,"Schedule".$i."Enabled",undef));
+    #main::Log 1,"[RoombaUtils] Schedule $i is $enabled[$i] with which $which";
+    }
+    @time = split(":",main::ReadingsVal($name,"Schedule".$i."Time",undef));
+    $hour[$i] = $time[0];
+    $min[$i] = $time[1];
+    # strip leading zero, otherwise Roomba won't accept
+    $min[$i] =~ s/^0//g;
+    $days[$i] = main::ReadingsVal($name,"Schedule".$i."WeekDays",undef);
+    $days[$i] =~ s/So/0/g;
+    $days[$i] =~ s/Mo/1/g;
+    $days[$i] =~ s/Di/2/g;
+    $days[$i] =~ s/Mi/3/g;
+    $days[$i] =~ s/Do/4/g;
+    $days[$i] =~ s/Fr/5/g;
+    $days[$i] =~ s/Sa/6/g;
+    $pMapId[$i] = main::ReadingsVal($name,"Schedule".$i."PMapID",undef);
+    $userPmapvId[$i] = main::ReadingsVal($name,"Schedule".$i."UserPMapvID",undef);
+    #main::Log 1,"[RoombaUtils] Schedule $i, hour: $hour[$i], min: $min[$i], days: $days[$i], pMapID: $pMapId[$i], UserpMapvID: $userPmapvId[$i]";
+    $numofreg[$i] = main::ReadingsVal($name,"Schedule".$i."NumOfRegions",undef);
+    $cmdregs[$i]="";
+    for ( my $j=1; $j<=$numofreg[$i]; $j++) {
+      $cmdregs[$i] = $cmdregs[$i].'{"region_id": "'.main::ReadingsVal($name,"Schedule".$i."Region".$j,undef).'", "type": "rid"}';
+      if ( $j < $numofreg[$i] ) {$cmdregs[$i] = $cmdregs[$i].', '}
+    }
+    $cmdsched[$i] = "";
+    $cmdsched[$i] = '{"enabled": '.$enabled[$i].', "type": 0, "start": {"day": ['.$days[$i].'], "hour": '.$hour[$i].', "min": '.$min[$i].'}, "cmd": {"command": "start", "ordered": 1, "pmap_id": "'.$pMapId[$i].'", "regions": ['.$cmdregs[$i].'], "user_pmapv_id": "'.$userPmapvId[$i].'"}}';
+    $cmd = $cmd.$cmdsched[$i];
+    if ( $i < $numofsched ) {$cmd = $cmd.', '}
+   
+  }
+ 
+  $cmd = $cmd.$cmdpost;
+  main::Log 1,"[RoombaUtils] Command: $cmd";
+  #return;
+  return $cmd;  	
+}
+
+sub cleanRoom($$$) {
+  my ($name,$levelName,$evt) = @_;
+  my $hash = $main::defs{$name};
+
+  my @evts = split(' ',$evt);
+
+  my $pmapId = main::AttrVal($name, 'floor_'.$levelName.'_pMapId', '');
+  my $userPmapvId = main::AttrVal($name, 'floor_'.$levelName.'_userPmapvId', '');
+
+  my $regionString = '"regions": [';
+  my $nrRegions = @evts;
+
+  for(my $regIdx = 1; $regIdx < $nrRegions; $regIdx++){
+    my $regionName = $evts[$regIdx];
+    my $regionId = main::AttrVal($name, 'room_'.$regionName.'_id', '');
+    my $regionType = main::AttrVal($name, 'room_'.$regionName.'_type', '');
+
+    $regionString = $regionString.'{"region_id": "'.$regionId.'", "type": "'.$regionType.'"}';
+    if ($regIdx +1 < $nrRegions) {
+      $regionString = $regionString.',';
+    }
+  }
+  $regionString = $regionString.']';
+
+  my $cmdString = '{"command": "start", "pmap_id": "'.$pmapId.'", '.$regionString.', "user_pmapv_id": "'.$userPmapvId.'", "ordered": 1, "time": '.time().', "initiator": "localApp"}';
+  main::Log 1,"[RoombaUtils] cleanRoom: $cmdString";
+  my $cmd = 'cmd '.$cmdString;
+  return $cmd;
+}
+
+sub createFloor($$) {
+  my ($name, $evt) = @_;
+  my $hash = $main::defs{$name};
+
+  my @evts = split(' ',$evt);
+  my $floorName = main::makeReadingName($evts[1]);
+  my $pMapId = $evts[2];
+  my $userPmapvId = $evts[3];
+
+  my $attrName = 'floor_'.$floorName.'_label';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $evts[1];
+
+  $attrName = 'floor_'.$floorName.'_pMapId';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $pMapId;
+
+  $attrName = 'floor_'.$floorName.'_userPmapvId';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $userPmapvId;
+}
+
+sub createRoom($$) {
+  my ($name, $evt) = @_;
+  my $hash = $main::defs{$name};
+
+  my @evts = split(' ',$evt);
+  my $roomName = main::makeReadingName($evts[1]);
+  my $floor = $evts[2];
+  my $roomId = $evts[3];
+  my $roomType = $evts[4];
+
+  my $attrName = 'room_'.$roomName.'_label';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $evts[1];
+
+  $attrName = 'room_'.$roomName.'_floor';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $floor;
+
+  $attrName = 'room_'.$roomName.'_id';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $roomId;
+
+  $attrName = 'room_'.$roomName.'_type';
+  main::addToDevAttrList($name, $attrName);
+  $main::attr{$name}{$attrName} = $roomType;
+}
+# /hapege
+
 #############################################################################
 #
 #  helper
@@ -276,6 +461,13 @@ sub setsched($$$){
 sub numtobool($){
   my ($num) = @_;
   my $ret = (($num==1)?"true":"false");
+  return $ret;
+}
+
+sub booltoyesno($){
+  my ($num) = @_;
+  my $ret = (($num==1)?"yes":"no");
+  #$ret = $num;
   return $ret;
 }
 
@@ -317,19 +509,29 @@ sub reading($$){
   my $hash = $main::defs{$name};
   my $key  = $hash->{helper}{setting};
   
-  #if( $evt =~ /bbrun/){
-  #  main::Log 1,"[RoombaUtils] bbrun ".$evt;
-  
   if( $evt =~ /cleanMissionStatus/){
     #main::Log 1,"[RoombaUtils] mission event ".$evt;
     my %mission = %{$staterep->{'cleanMissionStatus'}};
     mission($name,\%mission,\%ret);
   }
   
-  if( $evt =~ /cleanSchedule/){
+  if( $evt =~ /bbrun/){
+    main::Log 1,"[RoombaUtils] mission event ".$evt;
+    my %bbrun = %{$staterep->{'bbrun'}};
+    bbrun($name,\%bbrun,\%ret);
+  }
+  
+  if( $evt =~ /cleanSchedule(2?)/){
     #main::Log 1,"[RoombaUtils] schedule event ".$evt;
-    my %cleans = %{$staterep->{'cleanSchedule'}};
-    schedule(\%cleans,\%ret);
+    #-- older devices
+    if( !defined($1) || $1 ne "2" ){
+      my %cleans = %{$staterep->{'cleanSchedule'}};
+      schedule($name,\%cleans,\%ret);
+    #-- for i7
+    }elsif( defined($1) && $1 eq "2" ){
+      my %cleana = %{$staterep};
+      schedule2($name,\%cleana,\%ret);
+    }
   }
 
   #-- getting events of the type
@@ -373,12 +575,19 @@ sub reading($$){
       $hash->{helper}{setting}="done";
     }
   }
+
+  #-- getting events of the type
+  # # {"state":{"reported":{"netinfo":{""bssid":"44:4e:6d:1f:24:20"}}}}
+  my $bssid   = $staterep->{'netinfo'}->{'bssid'};
+  $ret{"signalBssid"} = $bssid
+    if(defined($bssid));
   
   #-- getting events of the type
   # {"state":{"reported":{"batPct":100}}}
   my $bat   = $staterep->{'batPct'};
-  $ret{"battery"} = $bat
-    if(defined($bat));
+  if(defined($bat)) {
+    $ret{"battery"} = $bat;
+  }
   
   #-- getting events of the type
   # {"state":{"reported":{"dock":{"known":false}}}}
@@ -399,8 +608,9 @@ sub reading($$){
   $ret{"cmBinFull"} = numtobool($binf)
     if(defined($binf));
 
-  if( $evt =~ /(connected)|(dock)|(country)|(cloudEnv)|(svcEndpoints)|(mapUpload)|(localtimeoffset)|(mac)|(wlcfg)|(wifistat)|(netinfo)|(langs)|(bbmssn)|(cap)|(navSwVer)|(tz)|(bbsys)|(bbchg)|(bbrun)|(bbnav)|(bbpanic)/){
+  if( $evt =~ /(wifiAnt)|(mssnNavStats)|(bbswitch)|(bbpause)|(connected)|(dock)|(country)|(cloudEnv)|(svcEndpoints)|(mapUpload)|(localtimeoffset)|(utctime)|(mac)|(wlcfg)|(wifistat)|(netinfo)|(langs)|(bbmssn)|(cap)|(navSwVer)|(tz)|(bbsys)|(bbchg)|(bbnav|bbswitch)|(bbpanic)/){
     #-- do nothing
+    # {"state":{"reported":{"bbpause": {"pauses": [24, 24, 3, 18, 24, 46, 18, 43, 18, 24]}}}}
     # {"state":{"reported":{"langs":[{"en-UK":0},{"fr-FR":1},{"es-ES":2},{"it-IT":3},{"de-DE":4},{"ru-RU":5}],"bbnav":{"aMtrack":16,"nGoodLmrks":6,"aGain":4,"aExpo":102},"bbpanic":{"panics":[6,8,9,8,6]},"bbpause":{"pauses":[17,17,16,1,0,0,0,0,0,0]}}}}
     # {"state":{"reported":{"bbmssn":{"nMssn":30,"nMssnOk":2,"nMssnC":26,"nMssnF":2,"aMssnM":13,"aCycleM":13},"bbrstinfo":{"nNavRst":5,"nMobRst":0,"causes":"0000"}}}}
     # {"state":{"reported":{"cap":{"pose":1,"ota":2,"multiPass":2,"carpetBoost":1,"pp":1,"binFullDetect":1,"langOta":1,"maps":1,"edge":1,"eco":1,"svcConf":1},"hardwareRev":3,"sku":"R981040","batteryType":"lith","soundVer":"32","uiSwVer":"4582"}}}
@@ -419,13 +629,33 @@ sub reading($$){
     # {"state":{"reported":{"mapUploadAllowed":true}}}
     # {"state":{"reported":{"localtimeoffset":120,"utctime":1600424239,"pose":{"theta":-46,"point":{"x":318,"y":82}}}}}
     # {"state":{"reported":{"bbsys":{"hr":2583,"min":21}}}}
+    # {"state":{"reported":{"wifiAnt":1}}}
 
   }elsif(int(%ret)==0){
   #  my ($evt) = @_;
     main::Log 1,"[RoombaUtils] uncaught event ".$evt
        if( $evt ne "$name" );
   }
+  if( main::AttrVal($name,"debug","") eq "true" ){
+    my $sub_ret = allevents($evt);
+    @ret{ keys %{$sub_ret} } = values %{$sub_ret};
+  }
   return {%ret}
+}
+
+#############################################################################
+#
+#  For debugging get all data
+#
+#############################################################################
+
+sub allevents($){
+  my ($evt) = @_;
+  my %ans;
+  #-- getting all events 
+  my $dec = json2nameValue($evt);
+  @ans{ keys %{$dec} } = values %{$dec};  
+  return {%ans};
 }
 
 #############################################################################
@@ -463,17 +693,22 @@ sub pose($$){
   my $px    = $pose->{'point'}->{'x'};
   my $py    = $pose->{'point'}->{'y'};
 
-  #-- fast return if mappinge disabled
+  #-- fast return if mapping disabled
   if( main::AttrVal($name,"noMap","") eq "true" ){
       my %ret   = ("positionTheta",$theta,"position","(".$px.",".$py.")");
       return {%ret};
   }
     
   my ($pxp,$pyp);
+  
+  initmap($hash)
+    if( !defined($hash->{helper}{initmap}));
+    
   if($hash->{helper}{initmap}==1){
     $hash->{helper}{startx} = $px;
     $hash->{helper}{starty} = $py;
     $hash->{helper}{initmap}=0;
+    main::Log 1,"[RoombaUtils] initialX = $px, initialY = $py";
   }
   $px -= $hash->{helper}{startx};
   $py -= $hash->{helper}{starty};
@@ -514,9 +749,10 @@ sub pose($$){
 #
 #############################################################################
 
-sub schedule($$){
-  my ($evtptr,$retptr) = @_;
+sub schedule($$$){
+  my ($name,$evtptr,$retptr) = @_;
   my @weekdays = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+  #my @weekdays = ("So","Mo","Di","Mi","Do","Fr","Sa");
   #-- getting events of the type
   # {"state":{"reported":{"cleanSchedule":{"cycle":["none","none","none","none","none","none","none"],"h":[9,9,9,9,9,9,9],"m":[0,0,0,0,0,0,0]},"bbchg3":{"avgMin":374,"hOnDock":199,"nAvail":32,"estCap":12311,"nLithChrg":8,"nNimhChrg":0,"nDocks":35}}}}
   my @acyc   = @{$evtptr->{'cycle'}};
@@ -533,6 +769,121 @@ sub schedule($$){
 
 #############################################################################
 #
+#  schedule data type 2 for I7 
+#
+#############################################################################
+
+sub schedule2($$$){
+  #-- getting events of the type
+  # {"state":{"reported":{"cleanSchedule2": [{"enabled": true, "type": 0,
+  #  "start": {"day": [2, 4, 6], "hour": 11, "min": 0},
+  #  "cmd": {"command": "start", "ordered": 1, "pmap_id": "z...g",
+  #  "regions": [{"region_id": "10", "type": "rid"}, {"region_id": "6", "type": "rid"},
+  #  {"region_id": "5", "type": "rid"}, {"region_id": "8", "type": "rid"}],
+  #  "user_pmapv_id": "2...7"}}]}}}
+  #my ($dec) = @_;
+  my ($name,$evtptr,$retptr) = @_;
+  my @weekdays = ("So","Mo","Di","Mi","Do","Fr","Sa");
+  my @enabled;
+  my @starthour;
+  my @startmin;
+  my @startday;
+  my @userpmapvid;
+  my @pmapid;
+  my @region;
+  my $nsched;
+  my $nreg;
+  my %answer = ();
+  my $oldnreg;
+  my $oldnsched = main::ReadingsVal($name,"NumOfSchedules","");
+  for (my $i = 0; $i<14; $i++){
+    # j is needed since @startday does somehow not work with $i...
+    my $j = $i;
+    $nsched = $i+1;
+   
+    $enabled[$i] = $evtptr->{'cleanSchedule2'}->[$i]->{'enabled'};
+	
+    # if schedules are no longer present in app or roomba, delete them in fhem, too
+    if(!defined($enabled[$i])) {
+      $retptr->{"NumOfSchedules"} = $i;
+	    for (my $k = $i; $k < $oldnsched; $k++) {
+		    main::Log 1,"[RoombaUtils] deleting old schedule ID $k, oldnsched No was $oldnsched";
+		    my $hash = $main::defs{$name};
+		    my $todel = $k+1;
+		    main::readingsDelete($hash, "Schedule".$todel."Enabled");
+		    main::readingsDelete($hash, "Schedule".$todel."Time");
+		    main::readingsDelete($hash, "Schedule".$todel."UserPMapvID");
+		    main::readingsDelete($hash, "Schedule".$todel."PMapID");
+		    main::readingsDelete($hash, "Schedule".$todel."WeekDays");
+      }
+      last;
+    }
+	
+    $retptr->{"Schedule".$nsched."Enabled"} = booltoyesno($enabled[$i]) if(defined($enabled[$i]));
+	
+    $starthour[$i] = $evtptr->{'cleanSchedule2'}->[$i]->{'start'}->{'hour'};
+    $startmin[$i] = sprintf("%02d", $evtptr->{'cleanSchedule2'}->[$i]->{'start'}->{'min'});
+    $retptr->{"Schedule".$nsched."Time"} = $starthour[$i].":".$startmin[$i] if(defined($starthour[$i]));
+	
+    $userpmapvid[$i] = $evtptr->{'cleanSchedule2'}->[$i]->{'cmd'}->{'user_pmapv_id'};
+    $retptr->{"Schedule".$nsched."UserPMapvID"} = $userpmapvid[$i] if(defined($userpmapvid[$i]));
+	
+    $pmapid[$i] = $evtptr->{'cleanSchedule2'}->[$i]->{'cmd'}->{'pmap_id'};
+    $retptr->{"Schedule".$nsched."PMapID"} = $pmapid[$i] if(defined($pmapid[$i]));
+   
+    @startday = @{$evtptr->{'cleanSchedule2'}->[$j]->{'start'}->{'day'}};
+    for (@startday) {s/0/So/g;s/1/Mo/g;s/2/Di/g;s/3/Mi/g;s/4/Do/g;s/5/Fr/g;s/6/Sa/g;}
+    $retptr->{"Schedule".$nsched."WeekDays"} = join(", ",@startday);
+	
+	$oldnreg = main::ReadingsVal($name,"Schedule".$nsched."NumOfRegions","1");
+	for (my $m = 0; $m < 10; $m++) {
+          $nreg = $m + 1;		
+	  $region[$i][$m] = $evtptr->{'cleanSchedule2'}->[$i]->{'cmd'}->{'regions'}->[$m]->{'region_id'};
+	  $retptr->{"Schedule".$nsched."Region".$nreg} = $region[$i][$m] if(defined($region[$i][$m]));
+
+      if(!defined($region[$i][$m])) {
+        $retptr->{"Schedule".$nsched."NumOfRegions"} = $m;
+        for (my $k = $m; $k < $oldnreg; $k++) {
+          main::Log 1,"[RoombaUtils] deleting old region ID $k, oldnreg No was $oldnreg";
+          my $hash = $main::defs{$name};
+          my $todel = $k+1;
+          main::readingsDelete($hash, "Schedule".$nsched."Region".$todel);
+        }
+      last;
+      }
+	}
+  }
+  return
+}
+
+#############################################################################
+#
+#  mission data in bbrun
+#
+#############################################################################
+
+#-- getting events of the type
+# {"state":{"reported":{"bbrun"}}}
+sub bbrun($$$) {
+  my ($name,$evtptr,$retptr) = @_;
+  my $hash = $main::defs{$name};
+
+  my $runh = $evtptr->{'hr'};
+  my $runm = $evtptr->{'min'};
+  my $evacs = $evtptr->{'nEvacs'};
+  $retptr->{"bbrEvacs"} = $evacs;
+  $retptr->{"bbrTime"} = $runh.":".$runm;
+  $retptr->{"bbrTime2"} = int($runh / 24)."d ".($runh % 24)."h ".$runm."m";
+ 
+  #--
+  if(defined($evtptr->{'sqft'})) {
+    my $sqm   = int($evtptr->{'sqft'}*10/10.7639)/10;
+    $retptr->{"bbrArea"} = $sqm." m²";
+  }
+}
+  
+#############################################################################
+#
 #  mission data
 #
 #############################################################################
@@ -543,14 +894,24 @@ sub mission($$$){
   my ($name,$evtptr,$retptr) = @_;
   my $hash = $main::defs{$name};
   my $oldphase = main::ReadingsVal($name,"cmPhase","");
+  my $bat = main::ReadingsVal($name,"battery","");
   $retptr->{"cmCycle"} = $evtptr->{'cycle'};
   my $phase = $evtptr->{'phase'}; 
   $retptr->{"cmPhase"} = $phase;
   $retptr->{"cmPhaseE"} = $roombastates_en{$phase};
   $retptr->{"cmPhaseD"} = $roombastates_de{$phase};
-
-  #-- Manage mission
-  missionmanager($hash,$oldphase,$phase);  
+  
+  #-- sqft is outside cleanMissionStatus in some newer firmware versions ???
+  if(defined($evtptr->{'sqft'})) {
+    my $sqm   = $evtptr->{'sqft'};
+    #main::Log 1,"$name has sqft found in cleanMissionStatus as $sqm";
+  }
+  
+  #-- sqft is outside cleanMissionStatus in some newer firmware versions ???
+  if(defined($evtptr->{'mssnM'})) {
+    my $sqm   = $evtptr->{'mssnM'};
+    #main::Log 1,"$name has mssnM found in cleanMissionStatus as $sqm";
+  }
   
   my $number= $evtptr->{'nMssn'};
   my $rech  = $evtptr->{'rechrgM'};
@@ -573,11 +934,18 @@ sub mission($$$){
   my $notr  = $evtptr->{'notReady'};
   $retptr->{"cmNotReady"} = numtobool($notr)
     if(defined($notr));
-
-  my $sqm   = int($evtptr->{'sqft'}*10/10.7639)/10;
-  $retptr->{"cmArea"}      = $sqm." m²";
+    
+  #-- sqft is outside cleanMissionStatus in some newer firmware versions ???
+  #if(defined($evtptr->{'sqft'})) {
+  #  my $sqm   = int($evtptr->{'sqft'}*10/10.7639)/10;
+  #  $retptr->{"cmArea"}      = $sqm." m²";
+  #}
   
   $retptr->{"cmInitiator"} = $evtptr->{'initiator'};
+  
+  #-- Manage mission
+  missionmanager($hash,$oldphase,$phase);  
+  
   return
   }
  
@@ -594,6 +962,7 @@ sub missionmanager($$$){
   my $iodev    = $hash->{IODev}->{NAME};
   
   #  Normal Sequence is "" -> charge -> run -> hmPostMsn -> charge
+  #  hapege fir I7: charge -> run -> hmPostMsn -> evac -> hmPostMsn -> run -> charge -> hmPostMsn -> run -> charge
   #        Mid mission recharge is "" -> charge -> run -> hmMidMsn -> charge
   #                                   -> run -> hmPostMsn -> charge
   #        Stuck is "" -> charge -> run -> hmPostMsn -> stuck
@@ -615,7 +984,6 @@ sub missionmanager($$$){
     main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start intialization";
     initmap($hash)
       if( main::AttrVal($name,"noMap","") ne "true" );
-    main::fhem("attr $iodev disconnectAfter 300");
   }elsif( $oldphase.$phase eq "runstop" ){
     main::Log 1,"[RoombaUtils] Device $name pausing $oldphase -> $phase";
   }elsif( $oldphase.$phase eq "stoprun" ){
@@ -625,14 +993,18 @@ sub missionmanager($$$){
           $oldphase.$phase eq "hmPostMsnstop" ||
           $oldphase.$phase eq "hmUsrDockcharge" ||
           $oldphase.$phase eq "hmUsrDockstop" ||
-          $oldphase.$phase eq "stophmUsrDock" ){
-    main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start intialization";
+          $oldphase.$phase eq "runcharge" ||
+		  $oldphase.$phase eq "stopcharge"){
+    main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start finalization";
     finalizemap($hash)
       if( main::AttrVal($name,"noMap","") ne "true" );
-    main::fhem("attr $iodev disconnectAfter 7");
+  }elsif( 
+          $oldphase.$phase eq "hmUsrDockhmUsrDock"){
+    main::Log 1,"[RoombaUtils] Device $name sent to dock";
   }elsif(
           $oldphase.$phase eq "hmUsrDockhmUsrDock"){
     main::Log 1,"[RoombaUtils] Device $name arrived in dock after user docking";
+             # $oldphase.$phase eq "stophmUsrDock"  ||
   }elsif( $oldphase.$phase eq "runrun" ||
           $oldphase.$phase eq "stopstop" ||
           $oldphase.$phase eq "chargestop" ||
@@ -658,10 +1030,14 @@ sub initmap($){
   $hash->{helper}{pcount}=0;
   $hash->{helper}{theta}=();
   $hash->{helper}{thetaold}=undef;
+  # hapege
+  my $name = $hash->{NAME};
+  my $oldmap = main::ReadingsVal($name,"cmMap","none");
+  $hash->{helper}{oldmap} = $oldmap;
+  # /hapege
   main::Log 1,"[RoombaUtils] Initialization of map for device ".$hash->{NAME};
   main::fhem("setreading ".($hash->{NAME})." cmMap initialized");
   }
-  
   
 #############################################################################
 #
@@ -673,7 +1049,7 @@ sub listmaps($){
   my ($name) = @_;
   
   my $hash = $main::defs{$name};
-  my $out    = "";
+  my $out    = "<html>";
   #my $now    = main::TimeNow();
   my $run    = 0;
   
@@ -694,13 +1070,14 @@ sub listmaps($){
     while (my $line = <$fhb> ) {
       if( $line =~ /^<.*Roomba.*run on ([\d\-]*) ([\d:]*)/){
         $run++;
-        $out .= "$run: mission $1 $2";
+        $out .= "<button type=\"button\" onclick=\"{var mw=window.open(location.href+'&XHR=1&cmd.global=set%20$name%20mapdel%20$run','','width=10,height=10');;setTimeout(function(){mw.close()},3000)}\">Löschen</button> $run: mission $1 $2";
       }
       if( $line =~ /^.*Path containing (\d*)/){
-        $out .= " with $1 points\n";
+        $out .= " with $1 points<br/>";
       }
     }
     close($fhb);  
+    $out.="</html>";
   }
   #main::Log 1,"[RoombaUtils] setting READING cmMapList for device $name at time $now";
   #$hash->{READINGS}{cmMapList}{VAL}=$out;
@@ -722,7 +1099,7 @@ sub delmap($$){
   my $rundel = $1;
   
   my $hash = $main::defs{$name};
-  my $out    = "";
+  my $out    = "<html>";
   #my $now    = main::TimeNow();
   my $run    = 0;
   
@@ -750,16 +1127,17 @@ sub delmap($$){
       if( $line =~ /^<.*Roomba.*run on ([\d\-]*) ([\d:]*)/){
         $run++;
         if( $run < $rundel ){
-          $out .= "$run: mission $1 $2";
+          $out .= "<button type=\"button\" onclick=\"{var mw=window.open(location.href+'&XHR=1&cmd.global=set%20$name%20mapdel%20$run','','width=10,height=10');;setTimeout(function(){mw.close()},3000)}\">Löschen</button> $run: mission $1 $2";
           #main::Log 1,"=====> run = $run because rundel=$rundel";
         }elsif( $run > $rundel ){
-          $out .= ($run-1).": mission $1 $2";
+          my $runtemp = $run-1;
+          $out .= "<button type=\"button\" onclick=\"{var mw=window.open(location.href+'&XHR=1&cmd.global=set%20$name%20mapdel%20$runtemp','','width=10,height=10');;setTimeout(function(){mw.close()},3000)}\">Löschen</button> $runtemp: mission $1 $2";
           #main::Log 1,"=====> run = $run, but displaying as ".($run-1)." because rundel=$rundel";
         }else{
           #main::Log 1,"=====> run = $run, but not writing this out";
         }
       }elsif( $line =~ /^.*Path containing (\d*)/){
-        $out .= " with $1 points\n"
+        $out .= " with $1 points<br/>"
           if( $run != $rundel );
       }
       print $fhc $line
@@ -767,6 +1145,7 @@ sub delmap($$){
     }
     close($fhc);
     close($fhb);  
+        $out.="</html>";
     rename $svgdir."/".$filename2b.".tmp",$svgdir."/".$filename2b;
   }
 
@@ -786,6 +1165,11 @@ sub finalizemap($){
   my $name   = $hash->{NAME};
   if(!defined($hash->{helper}{path})){
      main::Log 1,"[RoombaUtils] Finalization of map for device $name not possible, path undefined";
+     # hapege
+     my $oldmap = "none";
+     $oldmap =$hash->{helper}{oldmap} if (defined($hash->{helper}{oldmap}));
+     main::fhem("setreading $name cmMap $oldmap");
+     #/hapege
      return
   }
   my @points = @{$hash->{helper}{path}};
@@ -796,6 +1180,11 @@ sub finalizemap($){
   
   if(int(@points) < 1){
     main::Log 1,"[RoombaUtils] Finalization of map for device $name not possible, empty path";
+    # hapege
+    my $oldmap = "none";
+    $oldmap =$hash->{helper}{oldmap} if (defined($hash->{helper}{oldmap}));
+    main::fhem("setreading $name cmMap $oldmap");
+    #/hapege
     return
   }
   main::Log 1,"[RoombaUtils] Finalization of map for device ".$name;
@@ -816,6 +1205,9 @@ sub finalizemap($){
        last;
     }
   }
+  # hapege
+  main::Log 1,"[RoombaUtils] finalizemap numoffset: $numoffset, px: $px, py: $py";
+  # /hapege
   splice @points, 0, 2*$numoffset;
   splice @theta,  0, $numoffset;
   $numcoords -= $numoffset;
@@ -998,7 +1390,7 @@ sub finalizemap($){
   #-- reading start position in order to do translation
   my $startx = main::AttrVal($name,"startx",0);
   my $starty = main::AttrVal($name,"starty",0);
-  $out2 .= "<g id=\"".$collid."|".$collstr."\" transform=\"translate(".$startx." ".$starty.") scale(1 -1) rotate(1)\">\n";
+  $out2 .= "<g id=\"".$collid."|".$collstr."\" transform=\"translate(".$startx." ".$starty.") scale(1 -1)\">\n";
 
   #-- area from robot
   $out2 .= "<!-- area ".main::ReadingsNum($name,"cmArea",0)." -->\n";
@@ -1035,6 +1427,47 @@ sub finalizemap($){
   close($fhb);
   main::fhem("setreading $name cmMap <html>finalized as <a href=\"/fhem/images/".$filename2c."\">".$filename2c."</a></html>");
   listmaps($name)
+}
+
+#######################################################################################
+#
+# makeShort 
+#   
+# FW_summaryFn handler for creating the html output in FHEMWEB
+#
+#######################################################################################
+
+sub makeShort($$$$){
+    my ($FW_wname, $devname, $room, $extPage) = @_;
+    my $hash = $main::defs{$devname};
+    main::Log 1,"==============> roomba:makeShort";
+    
+    my $name = $hash->{NAME};
+    #my $wwwpath = $hash->{HELPER}->{wwwpath};
+    my $alias = main::AttrVal($hash->{NAME}, "alias", $hash->{NAME});
+    my ($state,$timestamp,$number,$result,$duration,$snapshot,$record,$nrecord);
+    
+    # my $cnt = int(@{$hash->{DATA}});
+    my $ret = "</td><td><div class=\"col2\">"."Hello World from makeShort"."</div>";
+    
+    return ($ret);
+}
+
+#######################################################################################
+#
+# makeTable 
+#  
+# FW_detailFn handler for creating the html output in FHEMWEB
+#
+#######################################################################################
+
+sub makeTable($$$$){
+    my ($FW_wname, $devname, $room, $extPage) = @_;
+    my $hash = $main::defs{$devname};
+    main::Log 1,"==============> roomba:makeTable";
+    # my $cnt = int(@{$hash->{DATA}});
+    my $ret = "<div class=\"col2\"><img src=\"http://192.168.0.94:8083/fhem/images/SVG_RoombaSauger.svg\" width=\"600\"></div>";
+
 }
 
 1;
