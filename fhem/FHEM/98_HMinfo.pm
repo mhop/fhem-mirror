@@ -1018,7 +1018,7 @@ sub HMinfo_listOfTempTemplates() { ############################################
   $defs{$n}{helper}{weekplanList} = \@tmpl;
   if ($modules{CUL_HM}{AttrList}){
     $modules{CUL_HM}{tempListTmplLst} = "none,defaultWeekplan,".join(",",sort @tmpl);
-    CUL_HM_AttrInit($modules{CUL_HM});
+    CUL_HM_AttrInit($modules{CUL_HM}) if (eval "defined(&CUL_HM_AttrInit)");
   }
   return ;
 }
