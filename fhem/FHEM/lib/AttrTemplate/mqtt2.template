@@ -2096,6 +2096,29 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20210607
 { AttrTemplate_Initialize() }
 
+name:tasmota_zigbee2tasmota_replace_ID
+prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+desc:As the bridge tends to assign a new ID each time you join a device to the ZigBee network, you may want to update existing devices with the new ID instead of reconfiguring the new ones! Don't forget to delete the autocreated other device afterwards...<br>NOTE: as the ID consists just of four letters, make sure, there's nothing beeing wrongly replaced...
+order:A_01u01a
+par:DEV_ID;Provide the new ZigBee short ID, hex value without leading 0x;{ undef }
+par:DEV_OLD_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:READINGLIST;Existing readingList attribute value;{ AttrVal("DEVICE",'readingList','') }
+par:SETLIST;Existing setList attribute value;{ AttrVal("DEVICE",'setList','') }
+par:GETLIST;Existing getList attribute value;{ AttrVal("DEVICE",'getList','') }
+par:DEVTOPIC;Existing devicetopic attribute value;{ AttrVal("DEVICE",'devicetopic','') }
+par:DEVCID;Existing CID internal value;{ InternalVal("DEVICE",'CID',"z2t_DEV_ID") }
+option:{return 1 if length("DEVCID");return 0}
+{my $new = q(DEVCID); $new =~ s{DEV_OLD_ID}{DEV_ID}g; CommandDefMod(undef, "DEVICE MQTT2_\DEVICE $new")}
+option:{return 1 if qw(READINGLIST);return 0}
+{no warnings qw(constant); my $new = q(READINGLIST); $new =~ s{DEV_OLD_ID}{DEV_ID}g; CommandAttr(undef, "DEVICE readingList $new")}
+option:{return 1 if qw(SETLIST);return 0}
+{no warnings qw(constant); my $new = q(SETLIST); $new =~ s{DEV_OLD_ID}{DEV_ID}g; CommandAttr(undef, "DEVICE setList $new")}
+option:{return 1 if qw(GETLIST);return 0}
+{no warnings qw(constant); my $new = q(GETLIST); $new =~ s{DEV_OLD_ID}{DEV_ID}g; CommandAttr(undef, "DEVICE getList $new")}
+option:{return 1 if length("DEVTOPIC");return 0}
+{my $new = q(DEVTOPIC); $new =~ s{DEV_OLD_ID}{DEV_ID}g; CommandAttr(undef, "DEVICE devicetopic $new")}
+farewell:Template has been applied. NOTE: as the replaced ID consists just of four letters, make sure, there's nothing beeing wrongly replaced...
 
 name:tasmota_zigbee2tasmota_light_dimmer
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
@@ -4670,10 +4693,10 @@ attr DEVICE model McLighting
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924
-name:go_eCharger
+name:go_eCharger_old
 filter:TYPE=MQTT2_DEVICE
-desc:See source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 for details. For complete MQTT-API see https://go-e.co/app/api.pdf
-order:W_02
+desc:Old version! See source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 for details. For complete MQTT-API see https://go-e.co/app/api.pdf
+order:W_02o
 par:BASE_ID;BASE_ID typically is go-eCharger;{ AttrVal("DEVICE","readingList","") =~ m,(go-eCharger)[/][^/]+[/].*:, ? $1 : undef }
 par:SERIAL;Serial number;{ AttrVal("DEVICE","readingList","") =~ m,go-eCharger[/]([^/]+)[/].*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
@@ -4690,8 +4713,33 @@ ALW:Activation\
 attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
 attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
 deletereading -q DEVICE (?!associatedWith|IODev).*
-attr DEVICE model go_eCharger
+attr DEVICE model go_eCharger_old
 setreading DEVICE attrTemplateVersion 20200522 or prior
+
+#source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 with myutils from https://forum.fhem.de/index.php/topic,115620.0.html
+name:go_eCharger
+filter:TYPE=MQTT2_DEVICE
+desc:New version, original source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924, uses myUtils code from https://forum.fhem.de/index.php/topic,115620.0.html. For complete MQTT-API see https://go-e.co/app/api.pdf
+order:W_02
+par:BASE_ID;BASE_ID typically is go-eCharger;{ AttrVal("DEVICE",'readingList','') =~ m,(go-eCharger)[/][^/]+[/].*:, ? $1 : undef }
+par:SERIAL;Serial number;{ AttrVal("DEVICE",'readingList','') =~ m,go-eCharger[/]([^/]+)[/].*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE",'icon','electric_car_icon') }
+{ Svn_GetFile('contrib/AttrTemplate/99_attrT_go_e_Utils.pm', 'FHEM/99_attrT_go_e_Utils.pm', sub(){ CommandReload(undef, '99_attrT_go_e_Utils') }) }
+attr DEVICE icon ICON
+attr DEVICE readingList BASE_ID/SERIAL/status:.* { FHEM::attrT_go_e_Utils::j2rN_extended($NAME,$EVENT,1) }\
+  BASE_ID/SERIAL/ip:.* { json2nameValue($EVENT) }
+attr DEVICE setList Activation:0,1 BASE_ID/SERIAL/cmd/req alw=$EVTPART1\
+  Ampere:selectnumbers,1,1,22,1,lin BASE_ID/SERIAL/cmd/req amp=$EVTPART1\
+  Three_Phases:0,1 BASE_ID/SERIAL/cmd/req fsp=$EVTPART1
+attr DEVICE stateFormat Status: charger_state \
+ALW:Activation\
+ P_akt: energy_akt
+attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE comment NOTE: additional code has been downloaded from svn (contrib).<br>There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html; issue "help attrT_go_e_Utils" for more info about.
+farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>This is in early development stage, there may be room for improvement! Please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html. To see more info about the provided code, issue <i>help attrT_go_e_Utils</i>.
+attr DEVICE model go_eCharger
+setreading DEVICE attrTemplateVersion 20210804
 
 
 ###########################################
