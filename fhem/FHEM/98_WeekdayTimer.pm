@@ -1214,7 +1214,7 @@ sub Switch_Device {
   $attr{$name}{commandTemplate} =
      'set $NAME ' . $setModifier . '$EVENT' if !defined $attr{$name}{commandTemplate};
 
-  $command = AttrVal($hash->{NAME}, 'commandTemplate', 'commandTemplate not found');
+  $command = AttrVal($name, 'commandTemplate', 'commandTemplate not found');
   $command = 'set $NAME $EVENT' if defined $hash->{WDT_EVENTMAP} && defined $hash->{WDT_EVENTMAP}{$newParam};
   $command = $hash->{COMMAND} if defined $hash->{COMMAND} && $hash->{COMMAND} ne '';
   
@@ -1506,16 +1506,13 @@ __END__
       <ul>Example for a <b>weekprofile</b> definition using sunday profile for all $we days, giving exclusive priority to the $we profile:</ul><br>
       <ul><ul><b>weekprofile:&lt;weekprofile-device-name&gt;:true</b></ul><br>  
       NOTE: only temperature profiles can be set via weekprofile, but they have the advantage of possible updates from weekprofile side (including the use of so-called topics) or via the command: 
-      <code>set &lt;device&gt; weekprofile &lt;weekprofile-device:topic:profile&gt;</code><br><br>  
+      <code>set &lt;device&gt; weekprofile &lt;weekprofile-device:topic:profile&gt;</code><br>
     </ul>
-    <p>
     <ul><b>command</b><br>
-      If no condition is set, all the rest is interpreted as a command. Perl-code is setting up
-      by the well-known Block with {}.<br>
-      Note: if a command is defined only this command is executed. In case of executing
+      If no <i>condition</i> is set, all the rest is interpreted as a <i>command</i>. Perl-code is setting upby the well-known Block with {}.<br>
+      Note: if a <i>command</i> is defined only this command is executed. In case of executing
       a "set desired-temp" command, you must define the hole commandpart explicitly by yourself.<br>
-      
-
+      If no explicit <i>command</i> is provided, <i>commandTemplate</i> attribute will indicate the command; this may be a simple <code>set $NAME $EVENT</code> or some variation wrt. to the device beeing recognized as heating type (see <i>WDT_eventMap</i> for even more options!).
   <!----------------------------------------------------------------------------- -->
   <!-- -------------------------------------------------------------------------- -->
       The following parameter are replaced:<br>
@@ -1584,7 +1581,6 @@ __END__
     <b>enable</b>                # enables  the WeekdayTimer, switching times will be recaltulated. 
     <b>WDT_Params [one of: single, WDT_Group or all]</b>
     <b>weekprofile &lt;weekprofile-device:topic:profile&gt;</b></pre>
-    <br>
     You may especially use <b>enable</b> in case one of your global holiday2we devices has changed since 5 seconds past midnight.
     <br><br>
     <b>Examples</b>:
@@ -1592,8 +1588,8 @@ __END__
       <code>set wd disable</code><br>
       <code>set wd enable</code><br>
       <code>set wd WDT_Params WDT_Group</code><br>
-      <code>set wd weekprofile myWeekprofiles:holiday:livingrooms</code><br>
-    </ul>
+      <code>set wd weekprofile myWeekprofiles:holiday:livingrooms</code>
+    </ul><br>
     <ul><li>
     <a id="WeekdayTimer-set-WDT_Params"></a>
     The <i>WDT_Params</i> function can be used to reapply the current switching value to the device, all WDT devices with identical WDT_Group attribute or all WeekdayTimer devices; delay conditions will be obeyed, for non-heating type devices, switchInThePast has to be set.
@@ -1605,14 +1601,14 @@ __END__
     <ul>
       <li><a id="WeekdayTimer-set-weekpofile"></a>
       The <i>weekprofile</i> set will only be successfull, if the <i>&lt;weekprofile-device&gt;</i> is part of the definition of the WeekdayTimer, the mentionned device exists and it provides data for the <i>&lt;topic:profile&gt;</i> combination. If you haven't activated the "topic" feature in the weekprofile device, use "default" as topic.</li> 
-      <li>Once you set a weekprofile for any weekprofile device, you'll find the values set in the reading named "weekprofiles"; for each weekprofile device there's an entry with the set triplett.</li>
-      <li>As WeekdayTimer will recalculate the switching times for each day a few seconds after midnight, 10 minutes pas midnight will be used as a first switching time for weekpofile usage.</li>
-      <li>This set is the way the weekprofile module uses to update a WeekdayTimer device. So aforementioned WeekdayTimer command<br>
+      <li>Once you set a <i>weekprofile</i> for any <i>weekprofile</i> device, you'll find the values set in the reading named "weekprofiles"; for each <i>weekprofile</i> device there's an entry with the set triplett.</li>
+      <li>As WeekdayTimer will recalculate the switching times for each day a few seconds after midnight, 10 minutes pas midnight will be used as a first switching time for <i>weekpofile</i> usage.</li>
+      <li>This set is the way the <i>weekprofile</i> module uses to update a WeekdayTimer device. So aforementioned WeekdayTimer command<br>
       <code>set wd weekprofile myWeekprofiles:holiday:livingrooms</code><br>
       is aequivalent to weekprofile command<br>
       <code>set myWeekprofiles send_to_device holiday:livingrooms wd</code><br>
       </li>
-      <li>Although it's possible to use more than one weekprofile device in a WeekdayTimer, this is explicitly not recommended unless you are exactly knowing what you are doing.</li>
+      <li>Although it's possible to use more than one <i>weekprofile</i> device in a WeekdayTimer, this is explicitly not recommended unless you are exactly knowing what you are doing.</li>
       <li>Note: The userattr <i>weekprofile</i> will automatically be added to the list and can't be removed. The attribute itself is intended to be set to the corresponding profile name (no topic name, just the second part behind the ":") in your weekprofile device allowing easy change using the topic feature.</li>
       </ul>
     </ul>
@@ -1626,34 +1622,28 @@ __END__
     <li><a id="WeekdayTimer-attr-delayedExecutionCond"></a>
     delayedExecutionCond <br>
     defines a delay Function. When returning true, the switching of the device is delayed until the function returns a false value. The behavior is the same as if one of the WDT_delayedExecutionDevices returns "open".
-
-    <br><br>
+    <br>
     <b>Example:</b>
-    <pre>
-    attr wd delayedExecutionCond isDelayed("$WEEKDAYTIMER","$TIME","$NAME","$EVENT")
-    </pre>
-    the parameter $WEEKDAYTIMER(timer name) $TIME $NAME(device name) $EVENT are replaced at runtime by the correct value.
-    <br><br>Note: If the function returns "1" or "true", state of the WeekdayTimer will be "open window", other return values will be used as values for state.<br>
+    <pre>attr wd delayedExecutionCond isDelayed("$WEEKDAYTIMER","$TIME","$NAME","$EVENT")</pre>
+    The parameters <code>$WEEKDAYTIMER</code> (timer name), <code>$TIME</code>, <code>$NAME</code> (device name) and <code>$EVENT</code> will be replaced at runtime by the correct value.
+    <br>Note: If the function returns "1" or "true", state of the WeekdayTimer will be "open window", other return values will be used as values for state.<br>
     <b>Example of a function:</b>
-    <pre>
-    sub isDelayed($$$$) {
+    <pre>sub isDelayed($$$$) {
        my($wdt, $tim, $nam, $event ) = @_;
-
        my $theSunIsStillshining = ...
-
        return ($tim eq "16:30" && $theSunIsStillshining) ;
-    }
-    </pre>
-    </li>
+    }</pre>
+    </li>   
+    <li><a id="WeekdayTimer-attr-commandTemplate"></a>
+    commandTemplate<br>
+    If no explicit <i>command</i> is provided, you may change change the indicated defaults here (see also <i>WDT_eventMap</i> for even more options on how to modify <i>command</i> or <i>$EVENT</i>).</li><br>
     <li><a id="WeekdayTimer-attr-WDT_delayedExecutionDevices"></a>
     WDT_delayedExecutionDevices<br>
     May contain a space separated list of devices (atm. only window sensors are supported). When one of them states to be <b>open</b> (typical reading names and values are known) the aktual switch is delayed, until either the window is closed or the next switching time is reached (this one will also be delayed). This is especially intended to prevent heating commands while windows are opened.</li><br>
-    <br>
+
     <li><a id="WeekdayTimer-attr-WDT_Group"></a>
     WDT_Group<br>
     Used to generate groups of WeekdayTimer devices to be switched together in case one of them is set to WDT_Params with the WDT_Group modifier, e.g. <code>set wd WDT_Params WDT_Group</code>.<br>This originally was intended to allow Heating_Control devices to be migrated to WeekdayTimer by offering an alternative to the former Heating_Control_SetAllTemps() functionality.</li><br>
-
-    <br>
 
     <li><a id="WeekdayTimer-attr-WDT_sendDelay"></a>
     WDT_sendDelay<br>
@@ -1669,16 +1659,17 @@ __END__
     <code>attr wd WDT_eventMap 22.0:dtp20+01 12.0:dtp20+02 18.0:dtp20+03</code><br>
     Notes:<br>
     <ul>
-    <li>New command will be addressed directly to the device, especially commandTemplate content will be ignored. So e.g. if commandTemplate is set to <code>set $NAME desired-temp $EVENT</code>, parameter 22.0 will lead to <code>set $NAME dtp20 01</code>.</li>
+    <li>New command will be addressed directly to the device, especially <i>commandTemplate</i> content will be ignored. So e.g. if <i>commandTemplate</i> is set to <code>set $NAME desired-temp $EVENT</code>, parameter 22.0 will lead to <code>set $NAME dtp20 01</code>.</li>
     <li>When using Perl command syntax for <i>command</i>, $EVENT will be replaced by the new command.</li>
     </ul>
     </li>
+    <br>
     <li><a id="WeekdayTimer-attr-switchInThePast"></a>
     switchInThePast<br>
     defines that the depending device will be switched in the past in definition and startup phase when the device is not recognized as a heating.
     Heatings are always switched in the past.
     </li>
-
+    <br>
     <li><a href="#disable">disable</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
