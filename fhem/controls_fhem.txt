@@ -1,4 +1,4 @@
-REV 24824
+REV 24827
 DIR unused
 UPD 2021-07-28_07:45:02 364585 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -514,7 +514,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
-UPD 2021-06-26_07:45:03 69562 FHEM/98_WeekdayTimer.pm
+UPD 2021-08-05_07:45:04 70198 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -645,7 +645,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-07-29_07:45:02 325053 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-08-05_07:45:04 329512 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-02-23_07:45:06 13896 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-05-28_07:45:02 9415 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -737,12 +737,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-08-03_07:45:07 4534253 docs/commandref.html
+UPD 2021-08-05_07:45:08 4534897 docs/commandref.html
 UPD 2021-08-03_07:45:09 2802164 docs/commandref_DE.html
 UPD 2021-08-02_07:45:03 82793 docs/commandref_frame.html
 UPD 2021-08-02_07:45:03 92754 docs/commandref_frame_DE.html
-UPD 2021-08-04_07:45:10 246346 docs/commandref_modular.html
-UPD 2021-08-04_07:45:11 257375 docs/commandref_modular_DE.html
+UPD 2021-08-05_07:45:11 246380 docs/commandref_modular.html
+UPD 2021-08-05_07:45:13 257409 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
