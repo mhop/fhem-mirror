@@ -393,7 +393,7 @@ SVG_PEdit($$$$)
   $ret .= "</tr>";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Grid aligned</td>";
-  $ret .= "<td>".SVG_cb("gridy", "left", $conf{hasygrid})."</td>";
+  $ret .= "<td>".SVG_cb("gridy1","left", $conf{hasy1grid})."</td>";
   $ret .= "<td>".SVG_cb("gridy2","right",$conf{hasy2grid})."</td>";
   $ret .= "</tr>";
   $ret .= "<tr class=\"odd\">";
@@ -686,7 +686,7 @@ SVG_WriteGplot($)
   push @rows, "set xtics ".$FW_webArgs{xtics} if($FW_webArgs{xtics});
   push @rows, "set ytics ".$FW_webArgs{ytics};
   push @rows, "set y2tics ".$FW_webArgs{y2tics};
-  push @rows, "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
+  push @rows, "set grid".($FW_webArgs{gridy1} ? " ytics" :"").
                       ($FW_webArgs{gridy2} ? " y2tics":"")."";
   push @rows, "set ylabel \"$FW_webArgs{ylabel}\"";
   push @rows, "set y2label \"$FW_webArgs{y2label}\"";
@@ -1297,8 +1297,8 @@ SVG_digestConf($$)
   # Digest grid
   my $t = ($conf{grid} ? $conf{grid} : "");
   #$conf{hasxgrid} = ( $t =~ /.*xtics.*/ ? 1 : 0); # Unused
-  $conf{hasygrid} = ( $t =~ /.*ytics.*/ ? 1 : 0);
-  $conf{hasy2grid}= ( $t =~ /.*y2tics.*/ ? 1 : 0);
+  $conf{hasy1grid} = ( $t =~ /.*ytics.*/ ? 1 : 0);
+  map { $conf{"hasy${_}grid"} = ($t =~ /.*y${_}tics.*/ ? 1 : 0) } (2..8);
 
   # Digest axes/title/etc from $plot (gnuplot) and draw the line-titles
   my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
@@ -1865,11 +1865,8 @@ SVG_render($$$$$$$$$$)
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
         my $off6 = $x+$w;
-        if( ($a eq "x1y1") && $conf{hasygrid} )  {
+        if($a =~ m/^x1y(.)$/ && $conf{"hasy${1}grid"})  {
           SVG_pO "<polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
-            if($tvalue > $hmin{$a} && $tvalue < $hmax{$a});
-        }elsif( ($a eq "x1y2") && $conf{hasy2grid} )  {
-          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
             if($tvalue > $hmin{$a} && $tvalue < $hmax{$a});
         }
         $off2 += $th/4;
@@ -1886,11 +1883,7 @@ SVG_render($$$$$$$$$$)
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
         my $off6 = $x+$w;
-        if( ($a eq "x1y1") && $conf{hasygrid} )  {
-          my $off6 = $x+$w;
-          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
-            if($i > $hmin{$a} && $i < $hmax{$a});
-        }elsif(  ($a eq "x1y2") && $conf{hasy2grid} )  {
+        if($a =~ m/^x1y(.)$/ && $conf{"hasy${1}grid"})  {
           SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
             if($i > $hmin{$a} && $i < $hmax{$a});
         }
