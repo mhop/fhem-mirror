@@ -80,7 +80,7 @@ sub j2singleReading {
     my $values = json2nameValue($EVENT, $pre, $filt, $not);
     my @all;
     for my $item ( sort keys %{$values} ) {
-        push @all, qq{$item: $values->{$item}};
+        push @all, qq{$item: $values->{$item}} if defined $values->{$item};
     }
     return { $rName => join q{ - }, @all };
 }
@@ -450,7 +450,7 @@ sub createBarView {
 
 sub _getVersion {
     my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
-    my $fn = "$modpath.FHEM/99_attrTmqtt2_ebus_Utils.pm"; # configDB
+    my $fn = "$modpath/FHEM/99_attrTmqtt2_ebus_Utils.pm"; # configDB
     my ($ret, @content) = FileRead($fn);
     if ($ret) {
         Log3(undef, 1, "Error reading file $fn!") ;
