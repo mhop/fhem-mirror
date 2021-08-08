@@ -116,7 +116,7 @@ sub HMtemplate_Attr(@) {#######################################################
       elsif ($calc eq "fltCvT60"){ my $calcVal = CUL_HM_CvTflt60(CUL_HM_fltCvT60($attrVal)); return "Value $attrVal not possible. Use $calcVal" if ($attrVal != $calcVal); }
       elsif ($calc eq "min2time"){ my $calcVal = CUL_HM_min2time(CUL_HM_time2min($attrVal)); return "Value $attrVal not possible. Use $calcVal" if ($attrVal != $calcVal); }
       else{
-        return "value $attrVal not numeric for $rN"  if ($attrVal !~/^\d+?\.?\d?$/);
+        return "value $attrVal not numeric for $rN"  if ($attrVal !~/^\d+?\.?\d*$/);
         return "value $attrVal out of range for $rN :"
               .$culHmRegDef->{$ty.$rN}{min} ."..."
               .$culHmRegDef->{$ty.$rN}{max}          if ($culHmRegDef->{$ty.$rN}{min} > $attrVal 
