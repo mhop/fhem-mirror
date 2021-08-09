@@ -2064,6 +2064,7 @@ farewell:template has been applied successfully. <br>Note: some changes have bee
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:BRIDGETOPIC;bridgeRegexp to be set;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\btele(/.*/)[^/].{4}/SENSOR ? qq{${1}tele${2}([^/]+)} : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? qq{${1}([^/]+)/tele} : undef }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SetOption89 1; SetOption83 1; SaveData 1
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
@@ -2077,7 +2078,7 @@ attr DEVICE setList permit_join:0,1,99 CMNDTOPIC/ZbPermitJoin $EVTPART1\
   z_ZbBind_single:textField CMNDTOPIC/ZbBind {"Device":"$EVTPART1","ToDevice":"0x$EVTPART2","Endpoint":$EVTPART3,"ToEndpoint":$EVTPART4,"Cluster":$EVTPART5}\
   z_ZbBind_group:textField CMNDTOPIC/ZbBind {"Device":"$EVTPART1","ToGroup":"0x$EVTPART2","Endpoint":$EVTPART3,"Cluster":$EVTPART4}
 attr DEVICE bridgeRegexp \
-  TELETOPIC/([^/]+)/SENSOR:.* "z2t_$1"
+  BRIDGETOPIC/SENSOR:.* "z2t_$1"
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
@@ -2093,12 +2094,12 @@ attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@re
 set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210607
+setreading DEVICE attrTemplateVersion 20210809
 { AttrTemplate_Initialize() }
 
 name:tasmota_zigbee2tasmota_replace_ID
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:As the bridge tends to assign a new ID each time you join a device to the ZigBee network, you may want to update existing devices with the new ID instead of reconfiguring the new ones! Don't forget to delete the autocreated other device afterwards...<br>NOTE: as the ID consists just of four letters, make sure, there's nothing beeing wrongly replaced...
 order:A_01u01a
 par:DEV_ID;Provide the new ZigBee short ID, hex value without leading 0x;{ undef }
@@ -2122,12 +2123,12 @@ farewell:Template has been applied. NOTE: as the replaced ID consists just of fo
 
 name:tasmota_zigbee2tasmota_light_dimmer
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a dimmable bulb device like Osram A 60 (no hue, no cct).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u02
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2146,17 +2147,16 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model tasmota_zigbee2tasmota_light_dimmer
-setreading DEVICE attrTemplateVersion 20200805_1
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_light_cct
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a dimmable bulb device with color teperature option like TRADFRI bulb E27 WW 806lm (no hue, but cct).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u02a
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
-set DEVICE attrTemplate tasmota_zigbee2tasmota_light_dimmer \CALLSPEECHRECOGN=1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }set DEVICE attrTemplate tasmota_zigbee2tasmota_light_dimmer \CALLSPEECHRECOGN=1
 attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
   off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}\
   brightness:colorpicker,BRI,0,5,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Dimmer":$EVTPART1} }\
@@ -2164,16 +2164,16 @@ attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On
   dimdown:noArg CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"DimmerDown":""} }\
   ct:colorpicker,CT,153,5,370 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"CT":$EVTPART1} }
 attr DEVICE model tasmota_zigbee2tasmota_light_cct
-setreading DEVICE attrTemplateVersion 20200805
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_light_cct_hue
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a dimmable bulb device with ful hue options.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u02c
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 set DEVICE attrTemplate tasmota_zigbee2tasmota_light_dimmer \CALLSPEECHRECOGN=1
 attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
   off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}\
@@ -2184,16 +2184,16 @@ attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On
   hue:colorpicker,HUE,0,1,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Hue":$EVTPART1} }\
   saturation:colorpicker,BRI,0,1,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Sat":$EVTPART1} }
 attr DEVICE model tasmota_zigbee2tasmota_light_cct_hue
-setreading DEVICE attrTemplateVersion 20200805
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_single_switch
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a simple on/off relay switch device like Osram Müller Licht Tint smart switch (on/off).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u03
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
@@ -2210,17 +2210,17 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 option:global
 attr DEVICE model tasmota_zigbee2tasmota_single_switch
-setreading DEVICE attrTemplateVersion 20200806
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_2channel_split
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:zigbee 2 channel switch device like QS-Zigbee-S04-2C-L.<br>NOTE: Early testing version, not yet tested.<br>NOTE: a second device will be created for the second channel
 order:A_01u031
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2241,16 +2241,16 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 option:global
 attr DEVICE,DEVICE_CH2 model tasmota_zigbee2tasmota_2channel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20201206
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_generic_battery_sensor
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure an arbitrary battery powered ZigBee sensor.<br>NOTE: jsonMap also is ok for Xiaomi Temp/Humi Sensor
 order:A_01u04
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to measure_battery_75;{ AttrVal("DEVICE","icon","measure_battery_75") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2261,16 +2261,16 @@ attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryV
 deletereading -q DEVICE (?!associatedWith|IODev).*
 option:{ CALLSPEECHRECOGN }
 attr DEVICE model tasmota_zigbee2tasmota_generic_battery_sensor
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_remote_control
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure an arbitrary zigbee remote control unit.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u04a
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to tradfri_remote;{ AttrVal("DEVICE","icon","tradfri_remote") }
 attr DEVICE icon ICON
 attr DEVICE readingList \
@@ -2278,16 +2278,16 @@ TELETOPIC:.* { $EVENT =~ m,(([0-9])([0-9])([0-9])([0-9])!([0-9][0-9])), ? { 'sta
 attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batteryVoltage Temperature:temperature 
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model tasmota_zigbee2tasmota_remote_control
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_window_contact
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a window contact, e.g. like Xiaomi MCCGQ01LM.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u04b
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to tuer_fenster_kontakt;{ AttrVal("DEVICE","icon","tuer_fenster_kontakt") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2299,16 +2299,16 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING="ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 option:global
 attr DEVICE model tasmota_zigbee2tasmota_window_contact
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20210809
 
 
 name:tasmota_zigbee2tasmota_motion_sensor
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure an ZigBee motion sensor like Sonoff SNZB-03
 order:A_01u04c
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2318,18 +2318,18 @@ attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryV
 attr DEVICE stateFormat Motion: Occupancy
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model tasmota_zigbee2tasmota_motion_sensor
-setreading DEVICE attrTemplateVersion 20201202
+setreading DEVICE attrTemplateVersion 20210809
 
 
 # Eurotronic Spirit ZigBee version
 name:tasmota_zigbee2tasmota_eurotronic_spirit
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc: First version for <a href="https://www.zigbee2mqtt.io/devices/SPZB0001.html">Eurotronic SPZB0001</a> via zigbee2tasmota <br>Not yet tested... <br>tbd (?): map eurotronic_system_mode to readings (userReadings?), see <a href="https://forum.fhem.de/index.php/topic,116094.0.html">Forum Thread</a>
 order:A_01u05a
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
 par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2348,7 +2348,7 @@ attr DEVICE jsonMap Battery:0 Device:0 BatteryPercentage:batteryPercent LocalTem
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_thermostat
 option:global
-setreading DEVICE attrTemplateVersion 20210211
+setreading DEVICE attrTemplateVersion 20210809
 
 ###########################################
 # SHELLY
