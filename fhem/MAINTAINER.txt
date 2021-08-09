@@ -100,11 +100,11 @@ FHEM/14_CUL_REDIRECT.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TCM97001.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TX.pm            rudolfkoenig         SlowRF
 FHEM/14_CUL_WS.pm            rudolfkoenig         SlowRF
-FHEM/14_FLAMINGO.pm          HomeAuto_User        Sonstige Systeme
+FHEM/14_FLAMINGO.pm          HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_Hideki.pm            Sidey/Ralf9          Sonstige Systeme
-FHEM/14_SD_BELL.pm           HomeAuto_User        Sonstige Systeme
+FHEM/14_SD_BELL.pm           HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_SD_RSL.pm            Sidey/Ralf9          Sonstige Systeme
-FHEM/14_SD_UT.pm             HomeAuto_User        Sonstige Systeme
+FHEM/14_SD_UT.pm             HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_SD_WS.pm             Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS09.pm           Sidey/pejonp         Sonstige Systeme
@@ -427,9 +427,9 @@ FHEM/88_HMCCURPC.pm          zap                  HomeMatic
 FHEM/88_HMCCURPCPROC.pm      zap                  HomeMatic
 FHEM/88_IPWE.pm              tdressler            Sonstiges
 FHEM/88_Itach_IRDevice       ulimaass             Sonstige Systeme
-FHEM/88_Timer.pm             HomeAuto_User/elektron-bbs        Automatisierung
-FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme
-FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme
+FHEM/88_Timer.pm             HomeAuto_User/elektron-bbs        Automatisierung (Link als PM an HomeAuto_User)
+FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
+FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/89_FULLY.pm             zap                  Frontends
 FHEM/89_HEATRONIC.pm         heikoranft           Sonstige Systeme
 FHEM/89_VCLIENT.pm           andies               Heizungssteuerung/Raumklima
