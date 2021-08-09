@@ -4,30 +4,36 @@
 # The file is part of the SIGNALduino project.
 # The purpose of this module is to support many wireless BELL devices.
 #
-# 2018-2020 - HomeAuto_User, elektron-bbs
+# 2018-2021 - HomeAuto_User, elektron-bbs
 #
 ####################################################################################################################################
 # - wireless doorbell TCM_234759 Tchibo  [Protocol 15] length 12-20 (3-5)
 ####################################################################################################################################
 # - FreeTec PE-6946  [Protocol 32] length 24 (6)
-#     get sduino_dummy raw MU;;P0=146;;P1=245;;P3=571;;P4=-708;;P5=-284;;P7=-6689;;D=14351435143514143535353535353535353535350704040435043504350435040435353535353535353535353507040404350435043504350404353535353535353535353535070404043504350435043504043535353535353535353535350704040435043504350435040435353535353535353535353507040404350435;;CP=3;;R=0;;O;;
+#     MU;P0=146;P1=245;P3=571;P4=-708;P5=-284;P7=-6689;D=14351435143514143535353535353535353535350704040435043504350435040435353535353535353535353507040404350435043504350404353535353535353535353535070404043504350435043504043535353535353535353535350704040435043504350435040435353535353535353535353507040404350435;CP=3;R=0;O;
 ####################################################################################################################################
 # - Elro (Smartwares) Doorbell DB200 / 16 melodies - unitec Modell:98156+98YK [Protocol 41] length 32 (8) doubleCode
-#     get sduino_dummy raw MS;;P0=-526;;P1=1450;;P2=467;;P3=-6949;;P4=-1519;;D=231010101010242424242424102424101010102410241024101024241024241010;;CP=2;;SP=3;;O;;
+#     MS;P0=-526;P1=1450;P2=467;P3=-6949;P4=-1519;D=231010101010242424242424102424101010102410241024101024241024241010;CP=2;SP=3;O;
 # - KANGTAI Doorbell (Pollin 94-550405) [Protocol 41]  length 32 (8)
-#     get sduino_dummy raw MS;;P0=1399;;P1=-604;;P2=397;;P3=-1602;;P4=-7090;;D=240123010101230123232301230123232301232323230123010101230123230101;;CP=2;;SP=4;;R=248;;O;;m1;;
+#     MS;P0=1399;P1=-604;P2=397;P3=-1602;P4=-7090;D=240123010101230123232301230123232301232323230123010101230123230101;CP=2;SP=4;R=248;O;m1;
 ####################################################################################################################################
 # - Glocke Pollin 551227 [Protocol 42] length 28 (7)
-#     get sduino_dummy raw MU;;P0=-491;;P1=471;;P2=1445;;D=0101010101010101010102020202010101010101010101010202020201010101010101010101020202020101010101010101010102020202010101;;CP=1;;R=67;;
+#     MU;P0=-491;P1=471;P2=1445;D=0101010101010101010102020202010101010101010101010202020201010101010101010101020202020101010101010101010102020202010101;CP=1;R=67;
 ####################################################################################################################################
 # - m-e doorbell fuer FG- und Basic-Serie  [Protocol 57] length 21-24 (6)
-#     get sduino_dummy raw MC;;LL=-653;;LH=665;;SL=-317;;SH=348;;D=D55B58;;C=330;;L=21;;
+#     MC;LL=-653;LH=665;SL=-317;SH=348;D=D55B58;C=330;L=21;
 ####################################################################################################################################
-# - VTX-BELL_Funkklingel  [Protocol 79] length 12 (3)
-#     get sduino_dummy raw MU;;P0=656;;P1=-656;;P2=335;;P3=-326;;P4=-5024;;D=01230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303;;CP=2;;O;;
+# - BELL-201-TX, VTX-BELL_Funkklingel [Protocol 79] length 12 (3)  -->  Heidemann_|_Heidemann_HX_|_VTX-BELL
+#     VTX-BELL, @Ralf9
+#     MU;P0=656;P1=-656;P2=335;P3=-326;P4=-5024;D=01230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303;CP=2;O;
+#     BELL-201-TX, @a13xde
+#     MU;P0=-7152;P1=872;P2=-593;P3=323;P4=-296;P5=622;P6=-4650;D=0123452323232323454545236345234523232323234545452363452345232323232345454523634523452323232323454545236345234523232323234545452363452345232323232345454523634523452323232323454545236345234523232323234545452363452345232323232345454523634523452323232323454;CP=3;R=26;O;
 ####################################################################################################################################
 # - GEA-028DB  [Protocol 98] length 16 (4)
-#     get sduino_dummy raw MU;P0=1488;P1=-585;P2=520;P3=-1509;P4=1949;P5=-5468;CP=2;R=38;D=01232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501;O;
+#     MU;P0=1488;P1=-585;P2=520;P3=-1509;P4=1949;P5=-5468;CP=2;R=38;D=01232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501;O;
+####################################################################################################################################
+# - AVANTEK DB-LE  [Protocol 112] length 16 (4)
+#     MN;D=84608A4220EF87FF;R=48;
 ####################################################################################################################################
 # !!! ToDo´s !!!
 #     - KANGTAI doubleCode must CEHCK | only one Code? - MORE USER MSG needed
@@ -40,6 +46,7 @@ package main;
 use strict;
 use warnings;
 use lib::SD_Protocols;
+use FHEM::Meta;         # https://wiki.fhem.de/wiki/Meta for SVN Revision
 
 ### HASH for all modul models ###
 my %models = (
@@ -84,12 +91,16 @@ my %models = (
                     Protocol    => '98',
                     doubleCode  => 'no'
                   },
+  'AVANTEK' =>  { hex_lengh   => '9',
+                  Protocol    => '112',
+                  doubleCode  => 'no'
+                },
 );
 
 
-sub SD_BELL_Initialize($) {
+sub SD_BELL_Initialize {
   my ($hash) = @_;
-  $hash->{Match}      = '^P(?:15|32|41|42|57|79|96|98)#.*';
+  $hash->{Match}      = '^P(?:15|32|41|42|57|79|96|98|112)#.*';
   $hash->{DefFn}      = 'SD_BELL::Define';
   $hash->{UndefFn}    = 'SD_BELL::Undef';
   $hash->{ParseFn}    = 'SD_BELL::Parse';
@@ -97,6 +108,8 @@ sub SD_BELL_Initialize($) {
   $hash->{AttrFn}     = 'SD_BELL::Attr';
   $hash->{AttrList}   = 'repeats:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30 IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 model:'.join(',', sort keys %models) . " $main::readingFnAttributes";
   $hash->{AutoCreate} = {'SD_BELL.*' => {FILTER => '%NAME', autocreateThreshold => '4:180', GPLOT => ''}};
+
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 ### unterer Teil ###
@@ -107,6 +120,7 @@ use warnings;
 use POSIX;
 
 use GPUtils qw(:all);  # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
 
 my $missingModul = '';
 
@@ -131,23 +145,20 @@ BEGIN {
 
 
 ###################################
-sub Define($$) {
+sub Define {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $hash_name;
   my $name = $hash->{NAME};
   my $protocol = $a[2];
-  my $hex_lengh = length($a[3]);
   my $doubleCode = 'no';
   my $iodevice;
   my $ioname;
 
-  #Log3 $name, 3, "SD_BELL_Def name=$a[0] protocol=$protocol HEX-Value=$a[3] hex_lengh=$hex_lengh";
-
   # Argument                              0     1         2         3           4
   return 'SD_BELL: wrong syntax: define <name> SD_BELL <Protocol> <HEX-Value> <optional IODEV>' if(int(@a) < 3 || int(@a) > 5);
   ### checks - doubleCode yes ###
-  return "SD_BELL: wrong <protocol> $a[2]" if not($a[2] =~ /^(?:15|32|41|42|57|79|96|98)/xms);
+  return "SD_BELL: wrong <protocol> $a[2]" if not($a[2] =~ /^(?:15|32|41|42|57|79|96|98|112)/xms);
   return "SD_BELL: wrong HEX-Value! Protocol $a[2] HEX-Value <$a[3]> not HEX (0-9 | a-f | A-F)" if (($protocol != 41) && not $a[3] =~ /^[0-9a-fA-F]*$/xms);
   return "SD_BELL: wrong HEX-Value! Protocol $a[2] HEX-Value <$a[3]> not HEX (0-9 | a-f | A-F) or length wrong!" if (($protocol == 41) && not $a[3] =~ /^[0-9a-fA-F]{8}_[0-9a-fA-F]{8}$/xms);
 
@@ -155,29 +166,32 @@ sub Define($$) {
   $doubleCode = $models{$hash_name}{doubleCode};                              # read note doubleCode
 
   $hash->{doubleCode} =  'Code alternates between two RAWMSG' if($protocol == 41);
-  $hash->{lastMSG} =  '';
   $hash->{bitMSG} =  '';
+  $hash->{lastMSG} =  '';
+
   $iodevice = $a[4] if($a[4]);
 
   $modules{SD_BELL}{defptr}{$hash->{DEF}} = $hash;
-  $ioname = $modules{SD_BELL}{defptr}{ioname} if (exists $modules{SD_BELL}{defptr}{ioname} && not $iodevice);
+  $ioname = $modules{SD_BELL}{defptr}{ioname} if (exists $modules{SD_BELL}{defptr}{ioname} && !$iodevice);
   $iodevice = $ioname if not $iodevice;
 
   ### Attributes | model set after codesyntax ###
-  $attr{$name}{model} = $hash_name if ( not exists($attr{$name}{model}) );        # set model, if only undef --> new def
-  $attr{$name}{room}  = 'SD_BELL' if ( not exists( $attr{$name}{room} ) );        # set room, if only undef --> new def
+  $attr{$name}{model} = $hash_name if ( not exists($attr{$name}{model}) );    # set model, if only undef --> new def
 
   AssignIoPort($hash, $iodevice);
+
+  return $@ unless ( FHEM::Meta::SetInternals($hash) );
+  return;
 }
 
 ###################################
-sub Set($$$@) {
+sub Set {
   my ( $hash, $name, @a ) = @_;
   my $cmd = $a[0];
   my $ioname = $hash->{IODev}{NAME};
   my $model = AttrVal($name, 'model', 'unknown');
   my @split = split(' ', $hash->{DEF});
-  my @splitCode = '';                                     # for doubleCode
+  my @splitCode = '';                             # for doubleCode
   my $protocol = $split[0];
   my $repeats = AttrVal($name,'repeats', '5');
   my $doubleCodeCheck;
@@ -197,14 +211,14 @@ sub Set($$$@) {
       $msg .= $id;
       my $checksum = sprintf('%02X', ((0x47 + hex(substr($id,0,2)) + hex(substr($id,2,2)) + hex(substr($id,4,2))) & 0xFF));
       $msg .= $checksum;
-      my $model = AttrVal($name,'model', 'Grothe_Mistral_SE_01');
-      $msg .= '3F' if ($model eq 'Grothe_Mistral_SE_03'); # only Grothe_Mistral_SE_03
+      $model = AttrVal($name,'model', 'Grothe_Mistral_SE_01');
+      $msg .= '3F' if ($model eq 'Grothe_Mistral_SE_03');   # only Grothe_Mistral_SE_03
       $msg .= ';';
       IOWrite($hash, 'raw', $msg);
       Log3 $name, 4, "$ioname: $name $msg";
     } else {
       my $rawDatasend = $split[1];                          # hex value from def without protocol
-      if ($rawDatasend =~ /[0-9a-fA-F]_[0-9a-fA-F]/xms) {     # check doubleCode in def
+      if ($rawDatasend =~ /[0-9a-fA-F]_[0-9a-fA-F]/xms) {   # check doubleCode in def
       $doubleCodeCheck = 1;
       @splitCode = split('_', $rawDatasend);
       $rawDatasend = $splitCode[0];
@@ -213,11 +227,16 @@ sub Set($$$@) {
       }
 
       Log3 $name, 4, "$ioname: SD_BELL_Set_doubleCodeCheck doubleCodeCheck=$doubleCodeCheck splitCode[0]=$rawDatasend";
-
-      my $hlen = length($rawDatasend);
-      my $blen = $hlen * 4;
-      my $bitData = unpack("B$blen", pack("H$hlen", $rawDatasend));
-      my $msg = "P$protocol#" . $bitData;
+    
+      my $msg = "P$protocol#";
+      if ($protocol == 112) {
+        $msg .= $rawDatasend . '0123456'; # cc1101 RX FIFO 4, 8 ... Bytes
+      } else {
+        my $hlen = length($rawDatasend);
+        my $blen = $hlen * 4;
+        my $bitData = unpack("B$blen", pack("H$hlen", $rawDatasend));
+        $msg .= $bitData;
+      }
     
       if ($model eq 'Heidemann_|_Heidemann_HX_|_VTX-BELL') {
         $msg .= '#R135';
@@ -235,7 +254,7 @@ sub Set($$$@) {
 }
 
 ###################################
-sub Undef($$) {
+sub Undef {
   my ($hash, $name) = @_;
 
   if(defined($hash->{DEF}) && defined($modules{SD_BELL}{defptr}{$hash->{DEF}})) {
@@ -255,7 +274,7 @@ sub Undef($$) {
 
 
 ###################################
-sub Parse($$) {
+sub Parse {
   my ($iohash, $msg) = @_;
   my $ioname = $iohash->{NAME};
   my ($protocol,$rawData) = split('#',$msg);
@@ -286,11 +305,11 @@ sub Parse($$) {
     $modules{SD_BELL}{defptr}{doubleCode_Time} = 0 if (!exists $modules{SD_BELL}{defptr}{doubleCode_Time});
     Log3 $iohash, 4, "$ioname: SD_BELL_Parse Check P$protocol doubleCode - doubleCode_Time_old=".$modules{SD_BELL}{defptr}{doubleCode_Time}.' Time_now='.time().' Diff='.(time()-$modules{SD_BELL}{defptr}{doubleCode_Time});
 
-    if ((time() - $modules{SD_BELL}{defptr}{doubleCode_Time} > 15) && $doubleCode_known eq '0') {     # max timediff 15 seconds
+    if ((time() - $modules{SD_BELL}{defptr}{doubleCode_Time} > 15) && $doubleCode_known eq '0') {  # max timediff 15 seconds
       Log3 $iohash, 4, "$ioname: SD_BELL_Parse Check P$protocol doubleCode - pointer <doubleCode> not exists!" if (not exists $modules{SD_BELL}{defptr}{doubleCode});
       Log3 $iohash, 4, "$ioname: SD_BELL_Parse Check P$protocol doubleCode - pointer <doubleCode> ".$modules{SD_BELL}{defptr}{doubleCode}.' deleted! RAWMSG too old!' if (exists $modules{SD_BELL}{defptr}{doubleCode});
       delete ($modules{SD_BELL}{defptr}{doubleCode}) if (exists $modules{SD_BELL}{defptr}{doubleCode});
-      $modules{SD_BELL}{defptr}{doubleCode_Time} = time();                              # set time for new RAWMSG
+      $modules{SD_BELL}{defptr}{doubleCode_Time} = time();                                         # set time for new RAWMSG
       return '';
     }
 
@@ -382,7 +401,11 @@ sub Parse($$) {
     $state = 'Alarm' if (substr($bitData,8,1) eq '1');
     $bat = substr($bitData,41,1) eq '0' ? 'ok' : 'low' if ($hlen == 12);  # only Grothe_Mistral_SE_03
     Log3 $iohash, 4, "$ioname: SD_BELL_Parse Grothe_Mistral_SE P$protocol - $rawData";
-
+  ### AVANTEK length 16 ###
+  } elsif ($protocol == 112) {
+    Log3 $iohash, 4, "$ioname: SD_BELL_Parse AVANTEK P$protocol - $rawData";
+    $deviceCode = substr($deviceCode,0,9);
+    $devicedef = $protocol . ' ' .$deviceCode;
   ### doubleCode no without P41 ###
   } else {
     $devicedef = $protocol . ' ' .$deviceCode;
@@ -420,7 +443,7 @@ sub Parse($$) {
 }
 
 ###################################
-sub Attr(@) {
+sub Attr {
   my ($cmd, $name, $attrName, $attrValue) = @_;
   my $hash = $defs{$name};
   my $typ = $hash->{TYPE};
@@ -458,34 +481,36 @@ sub Attr(@) {
 <ul>The module SD_BELL is a universal module of the SIGNALduino for different bells.<br><br>
   <u>Currently, the following models are supported:</u>
   <ul>
-  <li>wireless doorbell TCM 234759 Tchibo  [Protocol 15]</li>
-  <li>FreeTec PE-6946  [Protocol 32]</li>
-  <li>Elro (Smartwares) Doorbell DB200 / 16 melodies - unitec Modell:98156+98YK [Protocol 41]</li>
-  <li>Pollin 551227 [Protocol 42]</li>
-  <li>m-e doorbell fuer FG- and Basic-Serie  [Protocol 57]</li>
-  <li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protocol 79]</li>
-  <li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protocol 96]</li>
-  <li>GEA-028DB [Protokoll 98]</li>
-  <br>
-  <u><i>Special feature Protocol 41, 2 different codes will be sent one after the other!</u></i>
-  </ul><br>
-  <br>
+    <li>wireless doorbell TCM 234759 Tchibo  [Protocol 15]</li>
+    <li>FreeTec PE-6946  [Protocol 32]</li>
+    <li>Elro (Smartwares) Doorbell DB200 / 16 melodies - unitec Modell:98156+98YK [Protocol 41]</li>
+    <li>Pollin 551227 [Protocol 42]</li>
+    <li>m-e doorbell fuer FG- and Basic-Serie  [Protocol 57]</li>
+    <li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protocol 79]</li>
+    <li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protocol 96]</li>
+    <li>GEA-028DB [Protokoll 98]</li>
+    <li>AVANTEK DB-LE [Protokoll 112]</li>
+    <br>
+    <u><i>Special feature Protocol 41, 2 different codes will be sent one after the other!</u></i>
+  </ul>
+  <br><br>
 
   <b>Define</b><br>
   <ul><code>define &lt;NAME&gt; SD_BELL &lt;protocol&gt; &lt;hex-adresse&gt;</code><br><br>
   <u>Examples:</u>
-    <ul>
+  <ul>
     define &lt;NAME&gt; SD_BELL 32 68C1DA<br>
     define &lt;NAME&gt; SD_BELL 41 754485D3_08E8D593<br>
     define &lt;NAME&gt; SD_BELL 79 A3C<br>
-    </ul></ul><br>
+  </ul>
+</ul><br>
 
   <b>Set</b><br>
   <ul>ring</ul><br>
-  
+
   <b>Get</b><br>
   <ul>N/A</ul><br>
-  
+
   <b>Attribute</b><br>
   <ul><li><a href="#do_not_notify">do_not_notify</a></li></ul>
   <ul><li><a href="#ignore">ignore</a></li></ul>
@@ -506,34 +531,35 @@ sub Attr(@) {
 <ul>Das Modul SD_BELL ist ein Universalmodul vom SIGNALduino f&uuml;r verschiedene Klingeln.<br><br>
   <u>Derzeit werden folgende Modelle unters&uuml;tzt:</u>
   <ul>
-  <li>wireless doorbell TCM 234759 Tchibo  [Protokoll 15]</li>
-  <li>FreeTec PE-6946  [Protokoll 32]</li>
-  <li>Elro (Smartwares) Doorbell DB200 / 16 Melodien - unitec Modell:98156+98YK [Protokoll 41]</li>
-  <li>Pollin 551227 [Protokoll 42]</li>
-  <li>m-e doorbell f&uuml;r FG- und Basic-Serie  [Protokoll 57]</li>
-  <li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protokoll 79]</li>
-  <li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protokoll 96]</li>
-  <li>GEA-028DB [Protokoll 98]</li>
-  <br>
-  <u><i>Besonderheit Protokoll 41, es sendet 2 verschiedene Codes nacheinader!</u></i>
-  </ul><br>
-  <br>
+    <li>wireless doorbell TCM 234759 Tchibo  [Protokoll 15]</li>
+    <li>FreeTec PE-6946  [Protokoll 32]</li>
+    <li>Elro (Smartwares) Doorbell DB200 / 16 Melodien - unitec Modell:98156+98YK [Protokoll 41]</li>
+    <li>Pollin 551227 [Protokoll 42]</li>
+    <li>m-e doorbell f&uuml;r FG- und Basic-Serie  [Protokoll 57]</li>
+    <li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protokoll 79]</li>
+    <li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protokoll 96]</li>
+    <li>GEA-028DB [Protokoll 98]</li>
+    <li>AVANTEK DB-LE [Protokoll 112]</li>
+    <br>
+    <u><i>Besonderheit Protokoll 41, es sendet 2 verschiedene Codes nacheinader!</u></i>
+  </ul>
+  <br><br>
 
   <b>Define</b><br>
   <ul><code>define &lt;NAME&gt; SD_BELL &lt;Protokoll&gt; &lt;Hex-Adresse&gt;</code><br><br>
   <u>Beispiele:</u>
-    <ul>
+  <ul>
     define &lt;NAME&gt; SD_BELL 32 68C1DA<br>
     define &lt;NAME&gt; SD_BELL 41 754485D3_08E8D593<br>
     define &lt;NAME&gt; SD_BELL 79 A3C<br>
-    </ul></ul><br>
+  </ul></ul><br>
 
   <b>Set</b><br>
   <ul>ring</ul><br>
-  
+
   <b>Get</b><br>
   <ul>N/A</ul><br>
-  
+
   <b>Attribute</b><br>
   <ul><li><a href="#do_not_notify">do_not_notify</a></li></ul>
   <ul><li><a href="#ignore">ignore</a></li></ul>
@@ -543,8 +569,104 @@ sub Attr(@) {
     Das Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes.<br></li></ul>
     <ul><li><a name="repeats"></a>repeats<br>
     Mit diesem Attribut kann angepasst werden, wie viele Wiederholungen gesendet werden. Standard ist 5.<br>
-    <i>(Bei dem Model Heidemann_|_Heidemann_HX_|_VTX-BELL ist der Wert repeats fest auf 135 gesetzt unabhäning vom eingestellten Attribut!)</i></li></ul><br>
-  <br>
+    <i>(Bei dem Model Heidemann_|_Heidemann_HX_|_VTX-BELL ist der Wert repeats fest auf 135 gesetzt unabhäning vom eingestellten Attribut!)</i></li>
+  </ul>
+  <br><br>
 </ul>
 =end html_DE
+
+=for :application/json;q=META.json 14_SD_BELL.pm
+{
+  "author": [
+    "HomeAuto_User <>",
+    "elektron-bbs"
+  ],
+  "description": "The module is a universal module of the SIGNALduino for different bells.",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::SD_BELL",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "GPUtils": 0,
+        "lib::SD_Protocols": "0",
+        "perl": 5.018,
+        "strict": "0",
+        "warnings": "0"
+      }
+    },
+    "develop": {
+      "requires": {
+        "lib::SD_Protocols": "0",
+        "strict": "0",
+        "warnings": "0"
+      }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/RFD-FHEM/RFFHEM/issues"
+    },
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://github.com/RFD-FHEM/RFFHEM/blob/master/FHEM/14_SD_BELL.pm"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/14_SD_BELL.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/14_SD_BELL.pm",
+      "x_dev": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/FHEM/14_SD_BELL.pm",
+        "x_branch": "master",
+        "x_filepath": "FHEM/",
+        "x_raw": "https://github.com/RFD-FHEM/RFFHEM/blob/master/FHEM/14_SD_BELL.pm"
+      }
+    },
+    "x_commandref": {
+      "web": "https://commandref.fhem.de/#SD_BELL"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "title": "FHEM - Hausautomations-Systeme >> Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    },
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SD_BELL"
+    }
+  },
+  "version": "v1.0.0",
+  "x_fhem_maintainer": [
+    "HomeAuto_User",
+    "elektron-bbs"
+  ],
+  "x_fhem_maintainer_github": [
+    "HomeAutoUser",
+    "elektron-bbs"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut
