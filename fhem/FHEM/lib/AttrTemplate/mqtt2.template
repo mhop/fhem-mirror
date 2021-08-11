@@ -2064,7 +2064,7 @@ farewell:template has been applied successfully. <br>Note: some changes have bee
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:BRIDGETOPIC;bridgeRegexp to be set;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\btele(/.*/)[^/].{4}/SENSOR ? qq{${1}tele${2}([^/]+)} : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? qq{${1}([^/]+)/tele} : undef }
+par:BRIDGETOPIC;bridgeRegexp to be set;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\btele(/.*/)[^/].{4}/SENSOR:, ? qq{${1}tele${2}([^/]+)} : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? qq{${1}([^/]+)/tele} : undef }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SetOption89 1; SetOption83 1; SaveData 1
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
@@ -2126,9 +2126,9 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a dimmable bulb device like Osram A 60 (no hue, no cct).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u02
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR:, ? "${1}/cmnd" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2155,8 +2155,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a dimmable bulb device with color teperature option like TRADFRI bulb E27 WW 806lm (no hue, but cct).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u02a
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }set DEVICE attrTemplate tasmota_zigbee2tasmota_light_dimmer \CALLSPEECHRECOGN=1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR:, ? "${1}/cmnd" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }set DEVICE attrTemplate tasmota_zigbee2tasmota_light_dimmer \CALLSPEECHRECOGN=1
 attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
   off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}\
   brightness:colorpicker,BRI,0,5,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Dimmer":$EVTPART1} }\
@@ -2172,8 +2172,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a dimmable bulb device with ful hue options.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u02c
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR:, ? "${1}/cmnd" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 set DEVICE attrTemplate tasmota_zigbee2tasmota_light_dimmer \CALLSPEECHRECOGN=1
 attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
   off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}\
@@ -2192,8 +2192,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a simple on/off relay switch device like Osram Müller Licht Tint smart switch (on/off).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u03
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR:, ? "${1}/cmnd" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
@@ -2218,9 +2218,9 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:zigbee 2 channel switch device like QS-Zigbee-S04-2C-L.<br>NOTE: Early testing version, not yet tested.<br>NOTE: a second device will be created for the second channel
 order:A_01u031
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR:, ? "${1}/cmnd" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2249,8 +2249,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure an arbitrary battery powered ZigBee sensor.<br>NOTE: jsonMap also is ok for Xiaomi Temp/Humi Sensor
 order:A_01u04
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to measure_battery_75;{ AttrVal("DEVICE","icon","measure_battery_75") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2269,8 +2269,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure an arbitrary zigbee remote control unit.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u04a
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to tradfri_remote;{ AttrVal("DEVICE","icon","tradfri_remote") }
 attr DEVICE icon ICON
 attr DEVICE readingList \
@@ -2286,8 +2286,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure a window contact, e.g. like Xiaomi MCCGQ01LM.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
 order:A_01u04b
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to tuer_fenster_kontakt;{ AttrVal("DEVICE","icon","tuer_fenster_kontakt") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2307,8 +2307,8 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc:This template is meant to configure an ZigBee motion sensor like Sonoff SNZB-03
 order:A_01u04c
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
@@ -2327,9 +2327,9 @@ prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=(.*tele.*/....|/..../tele)/SENSOR:.*
 desc: First version for <a href="https://www.zigbee2mqtt.io/devices/SPZB0001.html">Eurotronic SPZB0001</a> via zigbee2tasmota <br>Not yet tested... <br>tbd (?): map eurotronic_system_mode to readings (userReadings?), see <a href="https://forum.fhem.de/index.php/topic,116094.0.html">Forum Thread</a>
 order:A_01u05a
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR ? "${1}/cmnd" : undef }
-par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR ? qq{${1}/tele/SENSOR} : undef }
-par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR ? "$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}cmnd$3" : $rL =~ m,([^:]*)\b(/.*)/([^/].{4})/tele/SENSOR:, ? "${1}/cmnd" : undef }
+par:TELETOPIC;ack topic prefix, without trailing /;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : $rL =~ m,([^:]*)\b(/.*/[^/].{4})/tele/SENSOR:, ? qq{${1}/tele/SENSOR} : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR:, ? "$3" : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
