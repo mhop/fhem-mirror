@@ -2060,11 +2060,11 @@ name:tasmota_zigbee2tasmota_bridge
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:This template is meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details on zigbee2tasmota visit https://tasmota.github.io/docs/Zigbee/<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Needs still some changes!!!
 order:A_01u01
-farewell:template has been applied successfully. <br>Note: some changes have been applied to the mcu firmware settings. Incoming messages from zigbee devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active. 
+farewell:template has been applied successfully.\n Note: some changes have been applied to the mcu firmware settings. Incoming messages from zigbee devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active. 
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:BRIDGETOPIC;bridgeRegexp to be set;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\btele(/.*/)[^/].{4}/SENSOR:, ? qq{${1}tele${2}([^/]+)} : $rL =~ m,([^:]*)\b(/.*/)([^/].{4})/tele/SENSOR:, ? qq{${1}([^/]+)/tele} : undef }
+par:BRIDGETOPIC;bridgeRegexp to be set;{ my $rL = AttrVal("DEVICE",'readingList',''); $rL =~ m,([^:]*)\btele(/.*/)LWT:, ? qq{${1}tele${2}([^/]+)} : $rL =~ m,([^:]*/)tele/LWT:, ? qq{${1}([^/]+)/tele} : undef }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SetOption89 1; SetOption83 1; SaveData 1
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
@@ -2094,7 +2094,7 @@ attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@re
 set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 { AttrTemplate_Initialize() }
 
 name:tasmota_zigbee2tasmota_replace_ID
@@ -2147,7 +2147,7 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model tasmota_zigbee2tasmota_light_dimmer
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_light_cct
@@ -2164,7 +2164,7 @@ attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On
   dimdown:noArg CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"DimmerDown":""} }\
   ct:colorpicker,CT,153,5,370 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"CT":$EVTPART1} }
 attr DEVICE model tasmota_zigbee2tasmota_light_cct
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_light_cct_hue
@@ -2184,7 +2184,7 @@ attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On
   hue:colorpicker,HUE,0,1,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Hue":$EVTPART1} }\
   saturation:colorpicker,BRI,0,1,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Sat":$EVTPART1} }
 attr DEVICE model tasmota_zigbee2tasmota_light_cct_hue
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_single_switch
@@ -2210,7 +2210,7 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 option:global
 attr DEVICE model tasmota_zigbee2tasmota_single_switch
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_2channel_split
@@ -2241,7 +2241,7 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 option:global
 attr DEVICE,DEVICE_CH2 model tasmota_zigbee2tasmota_2channel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210809
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_generic_battery_sensor
@@ -2261,7 +2261,7 @@ attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryV
 deletereading -q DEVICE (?!associatedWith|IODev).*
 option:{ CALLSPEECHRECOGN }
 attr DEVICE model tasmota_zigbee2tasmota_generic_battery_sensor
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_remote_control
@@ -2278,7 +2278,7 @@ TELETOPIC:.* { $EVENT =~ m,(([0-9])([0-9])([0-9])([0-9])!([0-9][0-9])), ? { 'sta
 attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batteryVoltage Temperature:temperature 
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model tasmota_zigbee2tasmota_remote_control
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_window_contact
@@ -2299,7 +2299,7 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING="ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 option:global
 attr DEVICE model tasmota_zigbee2tasmota_window_contact
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 name:tasmota_zigbee2tasmota_motion_sensor
@@ -2318,7 +2318,7 @@ attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryV
 attr DEVICE stateFormat Motion: Occupancy
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model tasmota_zigbee2tasmota_motion_sensor
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 
 # Eurotronic Spirit ZigBee version
@@ -2348,7 +2348,7 @@ attr DEVICE jsonMap Battery:0 Device:0 BatteryPercentage:batteryPercent LocalTem
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_thermostat
 option:global
-setreading DEVICE attrTemplateVersion 20210809
+setreading DEVICE attrTemplateVersion 20210811
 
 ###########################################
 # SHELLY
