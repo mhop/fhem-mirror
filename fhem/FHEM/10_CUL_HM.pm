@@ -812,8 +812,7 @@ sub CUL_HM_Attr(@) {#################################
     my $chn = substr(CUL_HM_hash2Id($hash),6,2);
     if    ($md eq "HM-SEN-RD-O"    && $chn eq "02"){
       delete $hash->{helper}{param};
-      my @param = split ",",$attrVal;
-      foreach (@param){
+      foreach (split ",",$attrVal){
         if    ($_ eq "offAtPon"){$hash->{helper}{param}{offAtPon} = 1}
         elsif ($_ eq "onAtRain"){$hash->{helper}{param}{onAtRain} = 1}
         else {return "param $_ unknown, use offAtPon or onAtRain";}
@@ -4032,6 +4031,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_rmOldRegs($chnName,$readCont);
           $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
           CUL_HM_cfgStateDelay($chnName);#schedule check when finished
+          Log3 $mhp->{devH},4,'peerlist finished. cmds pending:'.scalar(@{$mhp->{devH}->{cmdStack}});
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -4091,9 +4091,11 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
           CUL_HM_updtRegDisp($mhp->{cHash},$list,CUL_HM_peerChId($peer,$mhp->{devH}{DEF}));
+          Log3 $mhp->{devH},4,'reglist $regLN finished. cmds pending:'.scalar(@{$mhp->{devH}->{cmdStack}});
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
+          Log3 $mhp->{devH},4,'waiting for Reglist $regLN  msgNo:'.$rspWait->{mNo}.'+, rec:'.hex($mhp->{mNo});
         }
       }
       else{
@@ -12555,7 +12557,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
            prior to rewrite data to an entity it is necessary to pair the device with FHEM.<br>
            restore will not delete any peered channels, it will just add peer channels.<br>
            </li>
-       <li><B>list (normal|hidden);</B><a id="CUL_HM-get-list"><br>
+       <li><B>list (normal|hidden);</B><a id="CUL_HM-get-list"></a><br>
            issue list command for the fiven entity normal or including the hidden parameter
            </li>       
        <li><B>listDevice</B><br>
@@ -12578,7 +12580,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
                </ul>
            </li>       
     </ul><br>
-  
+
     <a id="CUL_HM-attr"></a><b>Attributes</b>
     <ul>
       <li><a href="#eventMap">eventMap</a></li>
@@ -12587,7 +12589,107 @@ sub CUL_HM_getIcon($) { ####################################################### 
       <li><a href="#dummy">dummy</a></li>
       <li><a href="#showtime">showtime</a></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-      <li><a href="#readingOnDead">readingOnDead</a>
+      <li><a id="CUL_HM-attr-actAutoTry">actAutoTry</a><br>
+           actAutoTry 0_off,1_on<br>
+           setting this option enables Action Detector to send a statusrequest in case of a device is going to be marked dead.
+           The attribut may be useful in case a device is being checked that does not send messages regularely - e.g. an ordinary switch. 
+          </li>
+      <li><a id="CUL_HM-attr-actCycle">actCycle</a>actCycle &lt;[hhh:mm]|off&gt;<br>
+           Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. 
+           Upon no message received in this period an event will be raised "&lt;device&gt; is dead". 
+           If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
+           This actiondetect will be autocreated for each device with build in cyclic status report.<br>
+           Controlling entity is a pseudo device "ActionDetector" with HMId "000000".<br>
+           Due to performance considerations the report latency is set to 600sec (10min). 
+           It can be controlled by the attribute "actCycle" of "ActionDetector".<br>
+           Once entered to the supervision the HM device has 2 attributes:<br>
+           <ul>
+           actStatus: activity status of the device<br>
+           actCycle:  detection period [hhh:mm]<br>
+           </ul>
+           The overall function can be viewed checking out the "ActionDetector" entity. The status of all entities is present in the READING section.<br>
+           Note: This function can be enabled for devices with non-cyclic messages as well. It is up to the user to enter a reasonable cycletime.
+          </li>
+      <li><a id="CUL_HM-attr-actStatus">actStatus</a><br>
+           readonly<br>
+           This attribut is set by ActionDetector. It cannot be set manually
+          </li>
+      <li><a id="CUL_HM-attr-aesCommReq">aesCommReq</a><br>
+           if set IO is forced to request AES signature before sending ACK to the device.<br>
+           Defautls to 0<br>
+          </li>
+      <li><a id="CUL_HM-attr-aesKey">aesKey</a><br>
+          specifies which aes key is to be used if aesCommReq is active<br>
+          </li>
+      <li><a id="CUL_HM-attr-autoReadReg">autoReadReg</a><br>
+          '0' autoReadReg will be ignored.<br>
+          '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
+          '2' like '1' plus execute after power_on.<br>
+          '3' includes '2' plus updates on writes to the device<br>
+          '4' includes '3' plus tries to request status if it seems to be missing<br>
+          '5' checks reglist and peerlist. If reading seems incomplete getConfig will be scheduled<br>
+          '8_stateOnly' will only update status information but not configuration
+                         data like register and peer<br>
+          Execution will be delayed in order to prevent congestion at startup. Therefore the update
+          of the readings and the display will be delayed depending on the size of the database.<br>
+          Recommendations and constrains upon usage:<br>
+          <ul>
+              usage on devices which only react to 'config' mode is not recommended since executen will
+              not start until config is triggered by the user<br>
+              usage on devices which support wakeup-mode is usefull. But consider that execution is delayed
+              until the device "wakes up".<br>
+              </ul>
+          </li>
+      <li><a id="CUL_HM-attr-burstAccess">burstAccess</a><br>
+          can be set for the device entity if the model allowes conditionalBurst.
+          The attribut will switch off burst operations (0_off) which causes less message load
+          on HMLAN and therefore reduces the chance of HMLAN overload.<br>
+          Setting it on (1_auto) allowes shorter reaction time of the device. User does not
+          need to wait for the device to wake up. <br>
+          Note that also the register burstRx needs to be set in the device.</li>
+      <li><a id="CUL_HM-attr-expert">expert &lt;option1[[,option2],...]&gt;</a><br>
+          This attribut controls the visibility of the register readings. This attibute controls
+          the presentation of device parameter in readings.<br>
+          Options are:<br>
+          <ul>
+          defReg       : default register<br>
+          allReg       : all register<br>
+          rawReg       : raw reading<br>
+          templ        : template assiciation<br>
+          none         : no register<br>
+          </ul>
+          If expert is applied to the device it is used for assotiated channels if not overwritten by it.<br>
+          </li>
+      <li><a id="CUL_HM-attr-commStInCh">communication status copied to channel reading</a><br>
+          on: device communication status not visible in channel entities<br>
+          off: device communication status commState is visiblein channel entities<br>
+          </li>
+      <li><a id="CUL_HM-attr-firmware">firmware &lt;FWversion&gt;</a><br>
+          Firmware version of the device. Should not be overwritten.
+          </li>
+      <li><a id="CUL_HM-attr-hmKey">hmKey &lt;key&gt;</a><br>
+          AES key to be used
+          </li>
+      <li><a id="CUL_HM-attr-hmKey2">hmKey2 &lt;key&gt;</a><br>
+          AES key to be used
+          </li>
+      <li><a id="CUL_HM-attr-hmKey3">hmKey3 &lt;key&gt;</a><br>
+          AES key to be used
+          </li>
+      <li><a id="CUL_HM-attr-hmProtocolEvents">hmProtocolEvents</a><br>
+          parses and logs the device messages. This is performance consuming and may disturb the timing. Use with care.<br>
+          Options:<br>
+          <ul>
+          0_off         : no parsing - default<br>
+          1_dump        : log all messages<br>
+          2_dumpFull    : log with extended parsing<br>
+          3_dumpTrigger : log full and include trigger events<br>
+          </ul>
+          </li>
+      <li><a id="CUL_HM-attr-readOnly">readOnly</a><br>
+          1: restricts commands to read od observ only.
+          </li>
+      <li><a id="CUL_HM-attr-readingOnDead">readingOnDead</a><br>
           defines how readings shall be treated upon device is marked 'dead'.<br>
           The attribute is applicable for devices only. It will modify the readings upon entering dead of the device. 
           Upon leaving state 'dead' the selected readings will be set to 'notDead'. It is expected that useful values will be filled by the normally operating device.<br>
@@ -12609,81 +12711,10 @@ sub CUL_HM_getIcon($) { ####################################################### 
             attr myDevice readingOnDead state,deviceMsg,CommandAccepted # upon entering dead state,deviceMsg and CommandAccepted of the device will be set to 'dead' if available.<br>
           </code></ul>           
           </li>
-      <li><a id="CUL_HM-attr-aesCommReq">aesCommReq</a>
-           if set IO is forced to request AES signature before sending ACK to the device.<br>
-          </li>
-      <li><a id="CUL_HM-attr-actAutoTry">actAutoTry</a>
-           actAutoTry 0_off,1_on<br>
-           setting this option enables Action Detector to send a statusrequest in case of a device is going to be marked dead.
-           The attribut may be useful in case a device is being checked that does not send messages regularely - e.g. an ordinary switch. 
-          </li>
-      <li><a id="CUL_HM-attr-actCycle">actCycle</a>
-           actCycle &lt;[hhh:mm]|off&gt;<br>
-           Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. 
-           Upon no message received in this period an event will be raised "&lt;device&gt; is dead". 
-           If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
-           This actiondetect will be autocreated for each device with build in cyclic status report.<br>
-           Controlling entity is a pseudo device "ActionDetector" with HMId "000000".<br>
-           Due to performance considerations the report latency is set to 600sec (10min). 
-           It can be controlled by the attribute "actCycle" of "ActionDetector".<br>
-           Once entered to the supervision the HM device has 2 attributes:<br>
-           <ul>
-           actStatus: activity status of the device<br>
-           actCycle:  detection period [hhh:mm]<br>
-           </ul>
-           The overall function can be viewed checking out the "ActionDetector" entity. The status of all entities is present in the READING section.<br>
-           Note: This function can be enabled for devices with non-cyclic messages as well. It is up to the user to enter a reasonable cycletime.
-          </li>
-      <li><a id="CUL_HM-attr-autoReadReg">autoReadReg</a><br>
-          '0' autoReadReg will be ignored.<br>
-          '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
-          '2' like '1' plus execute after power_on.<br>
-          '3' includes '2' plus updates on writes to the device<br>
-          '4' includes '3' plus tries to request status if it seems to be missing<br>
-          '5' checks reglist and peerlist. If reading seems incomplete getConfig will be scheduled<br>
-          '8_stateOnly' will only update status information but not configuration
-                         data like register and peer<br>
-          Execution will be delayed in order to prevent congestion at startup. Therefore the update
-          of the readings and the display will be delayed depending on the size of the database.<br>
-          Recommendations and constrains upon usage:<br>
-          <ul>
-              use this attribute on the device or channel 01. Do not use it separate on each channel
-              of a multi-channel device to avoid duplicate execution<br>
-              usage on devices which only react to 'config' mode is not recommended since executen will
-              not start until config is triggered by the user<br>
-              usage on devices which support wakeup-mode is usefull. But consider that execution is delayed
-              until the device "wakes up".<br>
-              </ul>
-          </li>
-      <li><a id="CUL_HM-attr-burstAccess">burstAccess</a><br>
-          can be set for the device entity if the model allowes conditionalBurst.
-          The attribut will switch off burst operations (0_off) which causes less message load
-          on HMLAN and therefore reduces the chance of HMLAN overload.<br>
-          Setting it on (1_auto) allowes shorter reaction time of the device. User does not
-          need to wait for the device to wake up. <br>
-          Note that also the register burstRx needs to be set in the device.</li>
-      <li><a id="CUL_HM-attr-expert">expert</a><br>
-          This attribut controls the visibility of the register readings. This attibute controls
-          the presentation of device parameter in the readings.<br>
-          it is a binary coded number with following presets:<br>
-          <ul>
-          0_defReg       : default register<br>
-          1_allReg       : all register<br>
-          2_defReg+raw   : default register and raw reading<br>
-          3_allReg+raw   : all register and raw reading<br>
-          4_off          : no register<br>
-          8_templ+default: templates and default register<br>
-          12_templOnly   : templates only<br>
-          251_anything   : anything available<br>
-          </ul>
-          If expert is applied a device it is used for assotiated channels.
-          It can be overruled if expert attibute is also applied to the channel device.<br>
-          Make sure to check out attribut showInternalValues in the global values as well.
-          extert takes benefit of the implementation.
-          Nevertheless  - by definition - showInternalValues overrules expert.
-          </li>
-      <li><a id="CUL_HM-attr-readOnly">readOnly</a><br>
-          restircts commands to read od observ only.
+      <li><a id="CUL_HM-attr-rssiLog">rssiLog</a><br>
+          can be given to devices, denied for channels. If switched '1' each RSSI entry will be
+          written to a reading. User may use this to log and generate a graph of RSSI level.<br>
+          Due to amount of readings and events it is NOT RECOMMENDED to switch it on by default.
           </li>
       <li><a id="CUL_HM-attr-IOgrp">IOgrp</a><br>
           can be given to devices and shall point to a virtual CCU. 
@@ -12703,36 +12734,34 @@ sub CUL_HM_getIcon($) { ####################################################### 
             attr myDevice2 IOgrp vccu:prefIO1,prefIO2,none<br>
           </code></ul>
           </li>
-      <li><a id="CUL_HM-attr-levelRange">levelRange</a><br>
-          can be used with dimmer only. It defines the dimmable range to be used with this dimmer-channel. 
-          It is meant to support e.g. LED light that starts at 10% and reaches maxbrightness at 40%.
-          levelrange will normalize the level to this range. I.e. set to 100% will physically set the 
+      <li><a id="CUL_HM-attr-levelRange">levelRange &lt;min,max&gt;</a><br>
+          It defines the usable dimm-range.
+          Can be used for e.g. LED light starting at 10% and reach maxbrightness at 40%.
+          levelRange will normalize the level to this range. I.e. set to 100% will physically set the 
           dimmer to 40%, 1% will set to 10% physically. 0% still switches physially off.<br>
-          Impacted are commands on, up, down, toggle and pct. <b>Not</b> effected is the off command 
-          which still set physically 0%.<br>
-          To be considered:<br>
-          dimmer level set by peers and buttons is not impacted. Those are controlled by device register<br>
-          Readings level may go to negative or above 100%. This simply results from the calculation and reflects
-          physical level is above or below the given range.<br>
-          In case of virtual dimmer channels available present the attribut needs to be set for 
-          each channel<br>
-          User should be careful to set min level other then '0'<br>
+          Applies to all level commands as on, up, down, toggle and pct. off and level 0 still sets to physically 0%.<br>
+          LevelRage does not impact register controlled level and direct peering.<br>
+          The attribut needs to be set for each virtual channel of a device.<br>
           Example:<br>
           <ul><code>
-            attr myChannel levelRange 0,40<br>
             attr myChannel levelRange 10,80<br>
           </code></ul>
           </li>
-      <li><a id="CUL_HM-attr-modelForce">modelForce</a>,
+      <li><a id="CUL_HM-attr-levelMap">levelMap &lt;<val1>=<key1>[:<val2>=<key2>[:...]]&gt;</a><br>
+          the level value valX will be replaced by keyX. Multiple values can be mapped. 
+          </li>
+      <li><a id="CUL_HM-attr-modelForce">modelForce</a><br>
           modelForce overwrites the model attribute. Doing that it converts the device and its channel to the new model.<br>
           Reason for this attribute is an eQ3 bug as some devices are delivered with wrong Module IDs.<br>
           ATTENTION: changing model id automatically starts reconfiguration of the device and its channels! channels may be deleted or incarnated<br>
           </li>
-      <li><a id="CUL_HM-attr-model">model</a>,
-          <a id="subType">subType</a><br>
-          These attributes are set automatically after a successful pairing.
-          They are not supposed to be set by hand, and are necessary in order to
-          correctly interpret device messages or to be able to send them.</li>
+      <li><a id="CUL_HM-attr-model">model</a><br>
+          showes model. This is read only.
+          </li>
+      <li><a id="CUL_HM-attr-subType">subType</a><br>
+          showes models subType. This is read only.</li>
+      <li><a id="CUL_HM-attr-serialNr">serialNr</a><br>
+          device serial number. Should not be set manually</li>
       <li><a id="CUL_HM-attr-msgRepeat">msgRepeat</a><br>
           defines number of repetitions if a device doesn't answer in time. <br>
           Devices which donly support config mode no repeat ist allowed. <br>
@@ -12741,6 +12770,8 @@ sub CUL_HM_getIcon($) { ####################################################### 
           Repeat for burst devices will impact HMLAN transmission capacity.</li>
       <li><a id="CUL_HM-attr-param">param</a><br>
           param defines model specific behavior or functions. See <a href="#CUL_HM-attr-params"><b>available parameter</b></a> for details</li>
+      <li><a id="CUL_HM-attr-peerIDs">peerIDs</a><br>
+          will be filled automatically by getConfig and shows the direct peerings of the channel. Should not be changed by user.</li>
       <li><a id="CUL_HM-attr-rawToReadable">rawToReadable</a><br>
           Used to convert raw KFM100 values to readable data, based on measured
           values. E.g.  fill slowly your container, while monitoring the
@@ -12754,22 +12785,17 @@ sub CUL_HM_getIcon($) { ####################################################### 
           Apply these values with: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
           fhem will do a linear interpolation for values between the bounderies.
           </li>
-      <li><a id="CUL_HM-attr-rssiLog">rssiLog</a><br>
-          can be given to devices, denied for channels. If switched '1' each RSSI entry will be
-          written to a reading. User may use this to log and generate a graph of RSSI level.<br>
-          Due to amount of readings and events it is NOT RECOMMENDED to switch it on by default.
-          </li>
       <li><a id="CUL_HM-attr-tempListTmpl">tempListTmpl</a><br>
           Sets the default template for a heating controller. If not given the detault template is taken from 
           file tempList.cfg using the enitity name as template name (e.g. ./tempLict.cfg:RT1_Clima <br> 
           To avoid template usage set this attribut to  '0'.<br> 
           Format is &lt;file&gt;:&lt;templatename&gt;. lt
           </li>
-      <li><a id="unit">unit</a><br>
+      <li><a id="CUL_HM-attr-unit">unit</a><br>
           set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
           attr KFM100 unit Liter
           </li>
-      <li><a id="cyclicMsgOffset">cyclicMsgOffset</a><br>
+      <li><a id="CUL_HM-attr-cyclicMsgOffset">cyclicMsgOffset</a><br>
           when calculating the timestamp for sending the next cyclic message (e.g. weather or valve data) then the value of this attribute<br>
           in milliseconds is added to the result. So adjusting this might fix problems for example when weather messages of virtual devices are not received reliably
           </li>
@@ -12804,7 +12830,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
                          This results eventually in state on-till which allowes better icon handling.<br>
       </li>
     </ul><br>
-    <a id="CUL_HM-attr-events"><b>Generated events:</b></a>
+    <a id="CUL_HM-events"><b>Generated events:</b></a>
     <ul>
       <li><B>general</B><br>
           recentStateType:[ack|info] # cannot be used ti trigger notifies<br>
@@ -13983,7 +14009,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
         vor dem zur&uuml;ckschreiben der Daten eines Eintrags muss das Ger&auml;t mit FHEM verbunden werden.<br>
         "restore" l&ouml;scht keine verkn&uuml;pften Kan&auml;le, es f&uuml;gt nur neue Peers hinzu.<br>
       </li>
-       <li><B>list (normal|hidden);</B><a id="CUL_HM-get-list"><br>
+       <li><B>list (normal|hidden);</B><a id="CUL_HM-get-list"></a><br>
            triggern des list commandos fuer die entity normal oder inclusive der verborgenen parameter
            </li>       
        <li><B>listDevice</B><br>
@@ -14008,7 +14034,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
       <li><a href="#dummy">dummy</a></li>
       <li><a href="#showtime">showtime</a></li> 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-      <li><a href="#readingOnDead">readingOnDead</a>
+      <li><a id="CUL_HM-attr-readingOnDead">readingOnDead</a><br>
           definiert wie readings behandelt werden sollten wenn das Device als 'dead' mariert wird.<br>
           Das Attribut ist nur auf Devices anwendbar. Es ändert die Readings wenn das Device nach dead geht. 
           Beim Verlasen des Zustandes 'dead' werden die ausgewählten Readings nach 'notDead' geändert. Es kann erwartet werden, dass sinnvolle Werte vom Device eingetragen werden.<br>          Upon leaving state 'dead' the selected readings will be set to 'notDead'. It is expected that useful values will be filled by the normally operating device.<br>
@@ -14030,15 +14056,15 @@ sub CUL_HM_getIcon($) { ####################################################### 
             attr myDevice readingOnDead state,deviceMsg,CommandAccepted # beim Eintreten in dead state,deviceMsg und CommandAccepted des Device werden, wenn verfuegbar, auf 'dead' gesetzt.<br>
           </code></ul>           
           </li>
-      <li><a id="CUL_HM-attr-aesCommReq"></a>aesCommReq<br>
+      <li><a id="CUL_HM-attr-aesCommReq">aesCommReq</a><br>
            wenn gesetzt wird IO AES signature anfordern bevor ACK zum Device gesendet wird.<br>
       </li>
-      <li><a id="CUL_HM-attr-actAutoTry"></a>actAutoTry<br>
+      <li><a id="CUL_HM-attr-actAutoTry">actAutoTry</a><br>
          actAutoTry 0_off,1_on<br>
          setzen erlaubt dem ActionDetector ein statusrequest zu senden falls das Device dead markiert werden soll.
          Das Attribut kann f&uuml;r Devices n&uuml;tzlich sein, welche sich nicht von selbst zyklisch melden.
       </li>
-      <li><a href="#actCycle">actCycle</a>
+      <li><a id="CUL_HM-attr-actCycle">actCycle</a><br>
         actCycle &lt;[hhh:mm]|off&gt;<br>
         Bietet eine 'alive' oder besser 'not alive' Erkennung f&uuml;r Ger&auml;te. [hhh:mm] ist die maximale Zeit ohne Nachricht eines Ger&auml;ts. Wenn innerhalb dieser Zeit keine Nachricht empfangen wird so wird das Event"&lt;device&gt; is dead" generiert.
         Sendet das Ger&auml;t wieder so wird die Nachricht"&lt;device&gt; is alive" ausgegeben. <br>
@@ -14053,8 +14079,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
         Die gesamte Funktion kann &uuml;ber den "ActionDetector"-Eintrag &uuml;berpr&uuml;ft werden. Der Status aller Instanzen liegt im READING-Bereich.<br>
         Hinweis: Diese Funktion kann ebenfalls f&uuml;r Ger&auml;te ohne zyklische &Uuml;bertragung aktiviert werden. Es obliegt dem Nutzer eine vern&uuml;nftige Zeitspanne festzulegen.
       </li>
-
-      <li><a id="CUL_HM-attr-autoReadReg"></a>autoReadReg<br>
+      <li><a id="CUL_HM-attr-autoReadReg">autoReadReg</a><br>
         '0' autoReadReg wird ignorert.<br>
         '1' wird automatisch in getConfig ausgef&uuml;hrt f&uuml;r das Device nach jedem reboot von FHEM. <br>
         '2' wie '1' plus nach Power on.<br>
@@ -14070,7 +14095,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
           Das Setzen auf Level 5 wird f&uuml;r alle Devices und Typen empfohlen, auch wakeup Devices.<br>
         </ul>
         </li>
-      <li><a id="CUL_HM-attr-burstAccess"></a>burstAccess<br>
+      <li><a id="CUL_HM-attr-burstAccess">burstAccess</a><br>
         kann f&uuml;r eine Ger&auml;teinstanz gesetzt werden falls das Model bedingte Bursts erlaubt.
         Das Attribut deaktiviert den Burstbetrieb (0_off) was die Nachrichtenmenge des HMLAN reduziert
         und damit die Wahrscheinlichkeit einer &Uuml;berlast von HMLAN verringert.<br>
@@ -14078,7 +14103,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
         bis das Ger&auml;t wach ist. <br>
         Zu beachten ist, dass das Register "burstRx" im Ger&auml;t ebenfalls gesetzt werden muss.
         </li>
-      <li><a id="CUL_HM-attr-expert"></a>expert<br>
+      <li><a id="CUL_HM-attr-expert">expert</a><br>
         Dieses Attribut steuert die Sichtbarkeit der Register Readngs. Damit wird die Darstellung der Ger&auml;teparameter kontrolliert.<br>
         Es handdelt sich um einen binaer kodierten Wert mit folgenden Empfehlungen:<br>
         <ul>
@@ -14097,10 +14122,10 @@ sub CUL_HM_getIcon($) { ####################################################### 
         "expert" macht sich diese Implementierung zu Nutze.
         Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
         </li>
-      <li><a id="CUL_HM-attr-readOnly"></a>readOnly<br>
+      <li><a id="CUL_HM-attr-readOnly">readOnly</a><br>
           beschränkt kommandos auf Lesen und Beobachten.
           </li>
-      <li><a id="CUL_HM-attr-IOgrp"></a>IOgrp<br>
+      <li><a id="CUL_HM-attr-IOgrp">IOgrp</a><br>
         kann an Devices vergeben werden und zeigt auf eine virtuelle VCCU. 
         Das Setzen des Attributs führt zum Löschen des Attributs IODev da sich diese ausschliessen. 
         Danach wird die VCCU
@@ -14117,7 +14142,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
           attr myDevice2 IOgrp vccu:prefIO1,prefIO2,none<br>
         </code></ul>
         </li>
-      <li><a id="CUL_HM-attr-levelRange"></a>levelRange<br>
+      <li><a id="CUL_HM-attr-levelRange">levelRange</a><br>
         nur f&uuml;r Dimmer! Der Dimmbereich wird eingeschr&auml;nkt. 
         Es ist gedacht um z.B. LED Lichter unterst&uuml;tzen welche mit 10% beginnen und bei 40% bereits das Maximum haben.
         levelrange normalisiert den Bereich entsprechend. D.h. set 100 wird physikalisch den Dimmer auf 40%, 
@@ -14135,32 +14160,31 @@ sub CUL_HM_getIcon($) { ####################################################### 
           attr myChannel levelRange 10,80<br>
         </code></ul>
         </li>
-      <li><a id="CUL_HM-attr-tempListTmpl"></a>tempListTmpl<br>
+      <li><a id="CUL_HM-attr-tempListTmpl">tempListTmpl</a><br>
         Setzt das Default f&uuml;r Heizungskontroller. Ist es nicht gesetzt wird der default filename genutzt und der name
         der entity als templatename. Z.B. ./tempList.cfg:RT_Clima<br> 
         Um das template nicht zu nutzen kann man es auf '0'setzen.<br>
         Format ist &lt;file&gt;:&lt;templatename&gt;. 
         </li>
-      <li><a id="CUL_HM-attr-modelForce"></a>modelForce<br>
+      <li><a id="CUL_HM-attr-modelForce">modelForce</a><br>
           modelForce überschreibt das model attribut. Dabei wird das Device und seine Kanäle reconfguriert.<br>
           Grund für dieses Attribut ist ein eQ3 bug bei welchen Devices mit falscher ID ausgeliefert werden. Das Attribut
           erlaubt dies zu ueberschreiben<br>
           ACHTUNG: Durch das Eintragen eines anderen model werden die Entites modifiziert, ggf. neu angelegt oder gelöscht.<br>
           </li>
-      <li><a id="CUL_HM-attr-model">model</a>,
-        <a id="CUL_HM-attr-subType"></a>subType<br>
-        Diese Attribute werden bei erfolgreichem Pairing automatisch gesetzt.
-        Sie sollten nicht per Hand gesetzt werden und sind notwendig um Ger&auml;tenachrichten
-        korrekt interpretieren oder senden zu k&ouml;nnen.</li>
-      <li><a id="CUL_HM-attr-param"></a>param<br>
+      <li><a id="CUL_HM-attr-model">model</a><br>
+        wird automatisch gesetzt. </li>
+      <li><a id="CUL_HM-attr-subType">subType</a><br>
+        wird automatisch gesetzt. </li>
+      <li><a id="CUL_HM-attr-param">param</a><br>
         'param' definiert modelspezifische Verhalten oder Funktionen. Siehe "models" f&uuml;r Details.</li>
-      <li><a id="CUL_HM-attr-msgRepeat"></a>msgRepeat<br>
+      <li><a id="CUL_HM-attr-msgRepeat">msgRepeat</a><br>
         Definiert die Nummer an Wiederholungen falls ein Ger&auml;t nicht rechtzeitig antwortet. <br>
         F&uuml;r Ger&auml;te die nur den "Config"-Modus unterst&uuml;tzen sind Wiederholungen nicht erlaubt. <br>
         Bei Ger&auml;te mit wakeup-Modus wartet das Ger&auml;t bis zum n&auml;chsten Aufwachen. Eine l&auml;ngere Verz&ouml;gerung
         sollte in diesem Fall angedacht werden. <br>
         Wiederholen von Bursts hat Auswirkungen auf die HMLAN &Uuml;bertragungskapazit&auml;t.</li>
-      <li><a id="CUL_HM-attr-rawToReadable"></a>rawToReadable<br>
+      <li><a id="CUL_HM-attr-rawToReadable">rawToReadable</a><br>
         Wird verwendet um Rohdaten von KFM100 in ein lesbares Fomrat zu bringen, basierend auf
         den gemessenen Werten. Z.B. langsames F&uuml;llen eines Tanks, w&auml;hrend die Werte mit <a href="#inform">inform</a>
         angezeigt werden. Man sieht:
@@ -14173,11 +14197,11 @@ sub CUL_HM_getIcon($) { ####################################################### 
         Anwenden dieser Werte: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
         FHEM f&uuml;r damit eine lineare Interpolation der Werte in den gegebenen Grenzen aus.
       </li>
-      <li><a id="CUL_HM-attr-unit"></a>unit<br>
+      <li><a id="CUL_HM-attr-unit">unit</a><br>
         setzt die gemeldete Einheit des KFM100 falls 'rawToReadable' aktiviert ist. Z.B.<br>
         attr KFM100 unit Liter
       </li>
-      <li><a id="CUL_HM-attr-autoReadReg"></a>autoReadReg<br>
+      <li><a id="CUL_HM-attr-autoReadReg">autoReadReg</a><br>
         '0' autoReadReg wird ignoriert.<br>
         '1' f&uuml;hrt ein "getConfig" f&uuml;r ein Ger&auml;t automatisch nach jedem Neustart von FHEM aus. <br>
         '2' verh&auml;lt sich wie '1',zus&auml;tzlich nach jedem power_on.<br>
