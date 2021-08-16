@@ -10738,9 +10738,9 @@ sub EnOcean_Parse($$) {
         InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
       } else {
         my $in0 = $db[1] & 1;
-        my $in1 = ($db[1] & 2) > 1;
-        my $in2 = ($db[1] & 4) > 2;
-        my $in3 = ($db[1] & 8) > 3;
+        my $in1 = ($db[1] & 2) >> 1;
+        my $in2 = ($db[1] & 4) >> 2;
+        my $in3 = ($db[1] & 8) >> 3;
         my $wake = $db[1] & 16 ? 'high' : 'low';
         push @event, "3:in0:$in0";
         push @event, "3:in1:$in1";
@@ -10753,8 +10753,8 @@ sub EnOcean_Parse($$) {
     } elsif ($st eq "digitalInput.04") {
       # 3 digital inputs, 1 digital input 8 bit (EEP A5-30-04)
       my $in0 = $db[0] & 1;
-      my $in1 = ($db[0] & 2) > 1;
-      my $in2 = ($db[0] & 4) > 2;
+      my $in1 = ($db[0] & 2) >> 1;
+      my $in2 = ($db[0] & 4) >> 2;
       my $in3 = $db[1];
       push @event, "3:in0:$in0";
       push @event, "3:in1:$in1";
