@@ -328,7 +328,7 @@ sub cfgDB_Init {
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define telnetPort telnet 7072 global',6);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define web FHEMWEB 8083 global',7);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr web allowfrom .*',8);
-		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog %L/fhem-%Y-%m-%d.log FakeLog',9);
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog %L/fhem-%Y-%m-%d.log Logfile',9);
 	}
 
 #	create TABLE fhemstate if nonexistent
