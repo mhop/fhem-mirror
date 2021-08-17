@@ -158,6 +158,8 @@
 #
 # 2021-04-17 - bugfix    problem in File.* commands regarding case sensitivity
 #
+# 2021-08-17 - changed   adopt to Rudi's funny fakelog changes
+#
 ##############################################################################
 =cut
 
