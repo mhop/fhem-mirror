@@ -154,6 +154,7 @@ MQTT2_DEVICE_Parse($$)
   }
 
   my ($cid, $topic, $value) = split("\0", $msg, 3);
+  $cid = $iodev->{NAME} if($cid eq "");        # empty cid, #122525
   return "" if(!defined($topic));
   for my $step (1,2,3,4) {
 
