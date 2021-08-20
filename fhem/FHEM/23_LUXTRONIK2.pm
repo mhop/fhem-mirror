@@ -3,6 +3,7 @@
 #
 #  23_LUXTRONIK2.pm 
 #
+#  (c) 2020-2021 Thomas Heiser
 #  (c) 2012-2017 Torsten Poitzsch
 #  (c) 2012-2013 Jan-Hinrich Fessel (oskar at fessel . org)
 #
@@ -292,14 +293,15 @@ LUXTRONIK2_Set($$@)
    }
    # Einstellung->Entlüftung
    elsif( int(@_)==4 && 
-          ( $cmd eq 'hotWaterCircPumpDeaerate' || $cmd eq 'heatingSystemCircPumpDeaerate' ) ) { 
+          ( $cmd eq 'hotWaterCircPumpDeaerate' || $cmd eq 'heatingSystemCircPumpDeaerate' || $cmd eq 'ventBOSUPCircPumpDeaerate' ) ) { 
         Log3 $name, 3, "set $name $cmd $val";
         return "$name Error: Wrong parameter given - use on,off"     if $val !~ /on|off/;
         $hash->{LOCAL} = 1;
         $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
         if( $val eq "on" 
             || ReadingsVal( $name, "heatingSystemCircPumpDeaerate", "off" ) eq "on"
-            || ReadingsVal( $name, "hotWaterCircPumpDeaerate", "off" ) eq "on" ) {    
+            || ReadingsVal( $name, "hotWaterCircPumpDeaerate", "off" ) eq "on"
+            || ReadingsVal( $name, "ventBOSUPCircPumpDeaerate", "off" ) eq "on" ) {    
           $resultStr .= LUXTRONIK2_SetParameter ($hash, "runDeaerate", 1);    
         } 
         # only send "0" if no Deaerate checkbox is selected at all.   
@@ -316,6 +318,7 @@ LUXTRONIK2_Set($$@)
           ." heatingCurveEndPoint"
           ." heatingCurveOffset"
           ." heatingSystemCircPumpDeaerate:on,off"
+          ." ventBOSUPCircPumpDeaerate:on,off"
           ." heatSourceDefrostAirEnd"
           ." heatSourceDefrostAirThreshold"
           ." hotWaterCircPumpDeaerate:on,off"
@@ -623,6 +626,8 @@ sub LUXTRONIK2_DoUpdate($)
   $return_str .= "|".($heatpump_visibility[4]==1 ? $heatpump_parameters[894] : "no");;
   # 80 - heatingSystemCircPumpDeaerate
   $return_str .= "|". ($heatpump_visibility[161]==1 ? $heatpump_parameters[678] : "no");
+  # 81 - ventBOSUPCircPumpDeaerate
+  $return_str .= "|". ($heatpump_visibility[161]==1 ? $heatpump_parameters[681] : "no");
   
    return $return_str;
 }
@@ -1059,6 +1064,7 @@ LUXTRONIK2_UpdateDone($)
    # Deaerate Function
      readingsBulkUpdate( $hash, "hotWaterCircPumpDeaerate",$a[61]?"on":"off")    unless $a[61] eq "no";
      readingsBulkUpdate( $hash, "heatingSystemCircPumpDeaerate",$a[80]?"on":"off")    unless $a[80] eq "no";
+     readingsBulkUpdate( $hash, "ventBOSUPCircPumpDeaerate",$a[81]?"on":"off")    unless $a[81] eq "no";
 
    # bivalentLevel
      readingsBulkUpdate($hash,"bivalentLevel",$a[43]);
@@ -1507,6 +1513,10 @@ sub LUXTRONIK2_SetParameter ($$$)
    }
    elsif ($parameterName eq "hotWaterCircPumpDeaerate") { #isVisible(167) 
      $setParameter = 684;
+     $setValue = $realValue eq "on" ? 1 : 0;
+   }
+   elsif ($parameterName eq "ventBOSUPCircPumpDeaerate") { #isVisible(167) 
+     $setParameter = 681;
      $setValue = $realValue eq "on" ? 1 : 0;
    }
    elsif ($parameterName eq "runDeaerate") {
@@ -2294,6 +2304,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          <br>
          NOTE! It uses the deaerate function of the controller. So, the pump alternates always 5 minutes on and 5 minutes off.
          </li><br>
+      <li><code>ventBOSUPCircPumpDeaerate &lt;on | off&gt;</code><br>
+         Switches the BOSUP circuit circulation pump on or off.
+         <br>
+         NOTE! It uses the deaerate function of the controller. So, the pump alternates always 5 minutes on and 5 minutes off.
+         </li><br>
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in °C
          </li><br>
@@ -2454,6 +2469,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
       <li><code>hotWaterCircPumpDeaerate &lt;on | off&gt;</code><br>
          Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird das Abkühlen des Warmwassers in den Hausleitungen verhindert. Der Wärmeverbrauch steigt jedoch drastisch.
+         <br>
+         Achtung! Es wird die Entlüftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
+         </li><br>
+      <li><code>ventBOSUPCircPumpDeaerate &lt;on | off&gt;</code><br>
+         Schaltet die Umwälzpumpe des BOSUP an oder aus.
          <br>
          Achtung! Es wird die Entlüftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
          </li><br>
