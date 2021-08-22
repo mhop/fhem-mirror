@@ -22,7 +22,9 @@ sub Revolt_Initialize($)
   $hash->{DefFn}     = "Revolt_Define";
   $hash->{UndefFn}   = "Revolt_Undef";
   $hash->{ParseFn}   = "Revolt_Parse";
-  $hash->{AttrList}  = "IODev ".
+  $hash->{AttrList}  = "IODev ignore:1,0 ".
+                       "do_not_notify:0,1 ".
+                       "showtime:0,1 ".
                        "EnergyAdjustValue ".
                        $readingFnAttributes;
 }
@@ -187,6 +189,10 @@ sub Revolt_Parse($$)
   <a name="RevoltAttributes"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
     <li>EnergyAdjustValue: adjust the energy reading (energy = energy - EnergyAdjustValue)</li>
   </ul>
   <br>
