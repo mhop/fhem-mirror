@@ -227,7 +227,11 @@ sub analyzeReadingList {
     my $attrTemplt = q{ebus_analyzeReadingList};
 
     my $rList_old = AttrVal( $name, 'readingList', '');
+    my $sList_old = AttrVal( $name, 'setList', '');
+    my $gList_old = AttrVal( $name, 'getList', '');
     my $rList_new = q{};
+    my $sList_new = q{};
+    my $gList_new = q{};
     my $firstprofile = 0;
     my $dylist = 0;
 
@@ -301,15 +305,15 @@ sub analyzeReadingList {
             if ( !$firstprofile ) {
                 $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
                 $firstprofile = $short;
-                my $sList_old = AttrVal( $name, 'setList', '');
-                my $sList_new = $sList_old;
+                #my $sList_old = AttrVal( $name, 'setList', '');
+                #my $sList_new = $sList_old;
                 for my $i (0..6) {
                     my $sLline = qq{$Dl[$i] $sLtop.$shD[$i]/set};
                     if ( index ($sList_new, $sLline) == -1 ) {
                         $sList_new .= $sList_new ? qq{\n$sLline} : $sLline;
                     }
                 }
-                CommandAttr(undef, "$name setList $sList_new") if $sList_new ne $sList_old;
+                #CommandAttr(undef, "$name setList $sList_new") if $sList_new ne $sList_old;
                 addToDevAttrList($name, 'weekprofile', 'weekprofile');
                 CommandAttr(undef, "$name weekprofile $name") if !defined AttrVal($name, 'weekprofile', undef);
                 next;
@@ -336,7 +340,6 @@ sub analyzeReadingList {
                 my $ac = ReadingsVal($name, 'associatedWith','');
                 $ac .= $ac ? qq{,$newdev} : $newdev;
                 readingsSingleUpdate($defs{$name}, 'associatedWith', $ac, 0);
-                
             }
             my $rl2 = AttrVal($newdev, 'readingList', "");
             $rl2 .= q{\n} if $rl2;
@@ -344,16 +347,29 @@ sub analyzeReadingList {
             next;
         }
 
-        my $prefix ;
-
         #json2nameValue type rL element with dot?
         if ( $re =~ m{(?<start>.+[/])(?<short>[^/:]+)(?:[.]|\\x2e)(?<item>[^.:123]+):}xm ) {
-            $newtop = qq{$+{start}$+{short}.$+{item}:.*};
+            $newtop = qq{$+{start}$+{short}.$+{item}};
             $prefix = qq{$+{short}_$+{item}_};
             
             $func = '{ FHEM::aTm2u_ebus::j2nv( $EVENT, ' . qq{'$prefix', } . '$JSONMAP ) }';
-            $newline = qq{$newtop $func};
+            $newline = qq{$newtop:.* $func};
             $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            $newline = qq{$+{short}_$+{item} $newtop/set \$EVTPART1};
+            $sList_new .= $sList_new ? qq{\n$newline} : qq{$newline};
+            next;
+        }
+
+        #json2nameValue type rL element with StartOf or EndOf?
+        if ( $re =~ m{(?<start>.+[/])(?<short>(?:StartOf|EndOf)[^/:]+):}xm ) {
+            $newtop = qq{$+{start}$+{short}};
+            $prefix = qq{$+{short}_};
+            
+            $func = '{ FHEM::aTm2u_ebus::j2nv( $EVENT, ' . qq{'$prefix', } . '$JSONMAP ) }';
+            $newline = qq{$newtop:.* $func};
+            $rList_new .= $rList_new ? qq{\n$newline} : qq{$newline};
+            $newline = qq{$+{short}:noArg $+{short} ${newtop}/get};
+            $gList_new .= $gList_new ? qq{\n$newline} : qq{$newline};
             next;
         }
 
@@ -383,6 +399,8 @@ sub analyzeReadingList {
     }
     #Log3(undef,3,"readingList new: $rList_new");
     CommandAttr(undef, "$name readingList $rList_new") if index($rList_old, $rList_new) == -1;
+    CommandAttr(undef, "$name getList $gList_new") if index($gList_old, $gList_new) == -1;
+    CommandAttr(undef, "$name setList $sList_new") if index($sList_old, $sList_new) == -1;
     CommandAttr(undef, "$name model $attrTemplt") if AttrVal($name, 'model', '') ne $attrTemplt;
     CommandDeleteReading(undef, "$name .*_value");
     readingsSingleUpdate($defs{$name}, 'attrTemplateVersion', $revsn,0);
