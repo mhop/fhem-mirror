@@ -189,10 +189,9 @@ generateModuleCommandref($$;$$)
         $hasLink = ($l =~ m/<a (name|id)="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           if($l =~ m/<$tag ([^>]+)>/i) {
-            my $attr = $1;
-            print "*** $lang $mod line $line: $tag with attributes (apart ".
-                "from class) is not allowed\n" 
-              if($attr !~ m/class="[^"]*"/ && !$noWarnings);
+            print "*** $lang $mod line $line: $tag with attributes".
+                " is not allowed\n" 
+              if(!$noWarnings);
           }
           $tagcount{$tag} +=()= ($l =~ /<$tag( [^>]+)?>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);

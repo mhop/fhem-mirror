@@ -141,9 +141,8 @@ foreach my $row (split("\n", $fList)) {
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           if($l =~ m/<$tag ([^>]+)>/i) {
-            my $attr = $1;
-            err $fName, "$lang line $line: $tag with attributes (apart ".
-                "from class) is not allowed\n" ;
+            err $fName, "$lang line $line: $tag with attributes".
+                " is not allowed\n" ;
           }
           $tagcount{$tag} +=()= ($l =~ /<$tag( [^>]+)?>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
