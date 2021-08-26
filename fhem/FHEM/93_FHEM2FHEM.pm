@@ -191,8 +191,8 @@ FHEM2FHEM_Read($)
           if($msg =~ m/^([^:]*): (.*)$/) {
             $reading = $1; $msg = $2;
           }
-          my $age = ($threshold ? ReadingsAge($rname, $reading, 0) : 99999);
-          if($age < $threshold) {
+          my $age = ($threshold ? ReadingsAge($rname,$reading,undef) : 99999);
+          if(defined($age) && $age < $threshold) {
             Log3 $name, 4, "$name: ignoring $rname $reading $msg, ".
                            "threshold $threshold, age:$age";
             next;
