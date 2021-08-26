@@ -580,7 +580,7 @@ sub Set {
 	my $j;
 
 	eval { 
-	    $j = decode_json($json);
+	    $j = JSON::decode_json($json);
 	    1;
 	} 
 	or do {
@@ -885,7 +885,7 @@ sub UpdateStatus {
     $val = ($data[13] << 8) + $data[14];
     $hash->{helper}{AdJ} = $val; #  Raumtemp adj -5 - 0 - +5
 
-    my $adj = (($val >=  0) && ($val < 10)) ? sprintf('%.1f', $val / 2) : sprintf('%.1f', (0x10000 - $val) / -2);
+    my $adj = (($val >=  0) && ($val <= 10)) ? sprintf('%.1f', $val / 2) : sprintf('%.1f', (0x10000 - $val) / -2);
 
     readingsBulkUpdate ($hash, 'room-temp-adj', $adj);
 
@@ -893,7 +893,7 @@ sub UpdateStatus {
     readingsBulkUpdate ($hash, 'fre', ($data[15]) ? 'open' : 'close');
 
     $hash->{helper}{PoM} = $data[16];
-    readingsBulkUpdate ($hash, 'power-on-mem',  ($data[16]) ? 'off' : 'on');
+    readingsBulkUpdate ($hash, 'power-on-mem',  ($data[16]) ? 'on' : 'off');
 
     readingsBulkUpdate ($hash, 'unknown',    $data[17]); # ???
     my $floor_temp = sprintf('%0.1f', $data[18] / 2);
