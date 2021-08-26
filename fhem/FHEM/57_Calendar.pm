@@ -1736,6 +1736,7 @@ sub Calendar_Initialize($) {
   $hash->{AttrList}=  "update:none,onUrlChanged ".
                       "synchronousUpdate:0,1 ".
                       "delay " .
+                      "timeout " .
                       "removevcalendar:0,1 " .
                       "ignoreCancelled:0,1 ".
                       "SSLVerify:0,1 ".
@@ -2619,12 +2620,13 @@ sub Calendar_GetUpdate($$$;$) {
       }
     }
 
+    my $timeout= AttrVal($name, "timeout", 30);
     HttpUtils_NonblockingGet({
       url => $url,
       hideurl => 1,
       noshutdown => 1,
       hash => $hash,
-      timeout => 30,
+      timeout => $timeout,
       type => 'caldata',
       removeall => $removeall,
       sslargs => $SSLArgs,
@@ -3739,6 +3741,12 @@ sub CalendarEventsAsHtml($;$) {
         load error rates.
         </li><p>
 
+    <li><code>timeout &lt;time&gt;</code><br>
+        The timeout in seconds for retrieving the calendar from its source. The default is 30. 
+        Increase for very large calendars that take time to be assembled and retrieved from 
+        their sources.
+        </li><p>
+
     <li><code>removevcalendar 0|1</code><br>
         If this attribute is set to 1, the vCalendar will be discarded after the processing to reduce the memory consumption of the module.
         A retrieval via <code>get &lt;name&gt; vcalendar</code> is then no longer possible.
@@ -4395,11 +4403,17 @@ sub CalendarEventsAsHtml($;$) {
         URL seit dem letzten Aufruf ver&auml;ndert hat, insbesondere nach der Auswertung von wildcards im define.<br/>
         </li><p>
 
-    <li><code>delay &lt;time&gt;</code><br>
+     <li><code>delay &lt;time&gt;</code><br>
         Wartezeit in Sekunden nach der Initialisierung von FHEM oder einer Konfigurations&auml;nderung bevor
         der Kalender tats&auml;chlich von der Quelle geladen wird. Wenn nicht gesetzt wird eine
         Zufallszeit zwischen 10 und 29 Sekunden gew&auml;hlt. Wenn mehrere Kalender definiert sind, f&uuml;hren
         gestaffelte Wartezeiten zu einer Verminderung der Ladefehleranf&auml;lligkeit.
+        </li><p>
+
+      <li><code>timeout &lt;time&gt;</code><br>
+        Der Timeout in Sekunden um einen Kalender von seiner Quelle zu holen. Standard ist 30.
+        Erh&ouml;hen f&uuml;r sehr gro&szlig;e Kalender, bei denen es eine Weile dauert,
+        sie an der Quelle zusammenzustellen und herunterzuladen.
         </li><p>
 
     <li><code>removevcalendar 0|1</code><br>
