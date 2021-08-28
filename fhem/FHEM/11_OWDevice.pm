@@ -378,8 +378,8 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
-  $hash->{NotifyFn}  = "OWDevice_Notify";
-  $hash->{NotifyOrderPrefix}= "50b-";
+  #$hash->{NotifyFn}  = "OWDevice_Notify";
+  #$hash->{NotifyOrderPrefix}= "50b-";
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
@@ -580,13 +580,13 @@ OWDevice_Attr($@)
               delete $hash->{fhem}{interfaces} if(defined($hash->{fhem}{interfaces}));
               Log3 $name, 5, "$name: no interfaces";
             }
-        } 
-	elsif($attrName eq "disable" && ($cmd eq 'del' || $attrVal == 0)) { # restart after disable
-		RemoveInternalTimer($hash);
-		InternalTimer(int(gettimeofday()) + $hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
-		   if(defined($hash->{fhem}{interval}));
-	}
-}        
+        } elsif($attrName eq "disable" && ($cmd eq 'del' || !$attrVal)) { # restart after disable
+            $init_done ? RemoveInternalTimer($hash)
+                       : RemoveInternalTimer("OWDevice_UpdateValues");# just to be sure...;
+            InternalTimer(int(gettimeofday()) + $hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
+                if defined $hash->{fhem}{interval};
+        }
+}
 
 ###################################
 sub
@@ -702,28 +702,19 @@ OWDevice_Define($$)
         $hash->{fhem}{alerting}= $alerting;
         Log3 $name, 5, "$name: alerting: $alerting";
 
-        $hash->{NOTIFYDEV} = "global";
-        
-        if( $init_done ) {
-          OWDevice_InitValues($hash);
-          OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
-        }
-
+        InternalTimer(int(gettimeofday())+ 12, 'OWDevice_Start', $hash, 0); # wait for fhem ready
         return undef;
 }
 
 sub
-OWDevice_Notify($$)
+OWDevice_Start($$)
 {
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-
-  return if($attr{$name} && $attr{$name}{disable} == 1);
-
+  return if IsDisabled( $name );
+  
   OWDevice_InitValues($hash);
   RemoveInternalTimer($hash);
   # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
@@ -731,8 +722,9 @@ OWDevice_Notify($$)
   Log3 $name, 5, "$name: initial delay: $delay";
   InternalTimer(int(gettimeofday())+$delay, "OWDevice_UpdateValues", $hash, 0) if(defined($hash->{fhem}{interval}));
 
-  return undef;
+  return;
 }
+
 sub
 OWDevice_InitValues($)
 {
