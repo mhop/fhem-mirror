@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.23.1   correct version format
 # 1.23.0   new sub evalDecodeJSON
 # 1.22.0   new sub addCHANGED
 # 1.21.0   new sub timestringToTimestamp / createReadingsFromArray
@@ -49,7 +50,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.22.0');
+use version; our $VERSION = version->declare('1.231');                    # Format Version beachten: x.xxx!
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
