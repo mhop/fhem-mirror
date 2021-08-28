@@ -214,3 +214,17 @@ attr TARGETDEV MQTTPREFIXAlias dim=pct
 option:{ SENDALLREADINGS && InternalVal("TARGETDEV",'TYPE','none') eq 'FBDECT' }
 attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$device/$name"}
 attr TARGETDEV MQTTPREFIXAlias dim=pct
+
+
+############
+name:mgb_avr
+prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devices[0];return 0}
+filter:TYPE=MQTT_GENERIC_BRIDGE
+desc:This template is intented to allow control for all "FHEM-like" audio/video receivers like PIONEERAVR or YAMAHA_AVR type devices.<br>NOTE: Early testing version, see https://forum.fhem.de/index.php/topic,122632.msg1171882.html#msg1171882 for details.<br>Might still need some changes!
+order:M_10000
+par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BRIDGE controll;{ undef }
+par:MQTTPREFIX;prefix used in MGB;{ InternalVal("DEVICE",'prefix',undef) } 
+
+option:global
+attr TARGETDEV MQTTPREFIXPublish state:topic={"$base/$device"} volume|mute|speakers|input:topic={"$base/$device/$name"}
+attr TARGETDEV MQTTPREFIXSubscribe state:stopic={"$base/$device"} volume|mute|speakers|input:stopic={"$base/$device/$name"}
