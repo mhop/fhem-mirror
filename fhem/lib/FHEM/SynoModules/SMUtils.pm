@@ -50,7 +50,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.231');                    # Format Version beachten: x.xxx!
+use version 0.77; our $VERSION = version->declare('1.23.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
