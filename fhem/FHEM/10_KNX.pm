@@ -75,7 +75,7 @@
 #              new dpt7.600, dpt9.029,dpt9.030  
 # MH  20210818 E04.67 1st checkin SVN version
 #              docu correction
-# MH  20210829 fix crash when using Attr KNX_toogle (related to package)
+# MH  20210829 fix crash when using Attr KNX_toogle & on-until (related to package)
 
 
 #04.65 package main;
@@ -112,6 +112,7 @@ BEGIN {
           FW_detail FW_wname FW_directNotify
           readingFnAttributes
           InternalTimer RemoveInternalTimer
+          GetTimeSpec
           init_done
           IsDisabled IsDummy IsDevice
           deviceEvents devspec2array
