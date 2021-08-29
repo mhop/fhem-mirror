@@ -52,11 +52,13 @@ EOD
   return \%ret;
 }
 
-
-
 1;
 
+__END__
+
 =pod
+=item summary helper functions needed for roborock MQTT2_DEVICE
+=item summary_DE needed Hilfsfunktionen für roborock MQTT2_DEVICE
 =begin html
 
 <a id="attrTmqtt2_roborock_Utils"></a>

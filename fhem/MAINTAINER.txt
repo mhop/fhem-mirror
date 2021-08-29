@@ -307,7 +307,7 @@ FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_PROPLANTA.pm         tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          Beta-User/orphan     https://forum.fhem.de/index.php/topic,114061.0.html
+FHEM/59_Twilight.pm          Beta-User/orphan     Unterstützende Dienste/Wettermodule
 FHEM/59_Weather.pm           neubert              Unterstützende Dienste/Wettermodule
 FHEM/59_Wunderground.pm      loredo               (deprecated)
 FHEM/59_WUup.pm              mahowi               Unterstützende Dienste/Wettermodule

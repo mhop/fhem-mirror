@@ -117,9 +117,11 @@ sub z2t_send_weekprofile {
 __END__
 
 =pod
+=item summary helper functions needed for zigbee2mqtt thermostats in MQTT2_DEVICE
+=item summary_DE needed Hilfsfunktionen für zigbee2mqtt MQTT2_DEVICE-Thermostate 
 =begin html
-
 <a id="attrT_z2m_thermostat_Utils"></a>
+  There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,116535.0.html.
 <h3>attrT_z2m_thermostat_Utils</h3>
 <ul>
   <b>z2t_send_weekprofile</b>

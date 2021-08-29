@@ -139,10 +139,13 @@ sub desiredTemp {
 
 __END__
 =pod
+=item summary helper functions needed for attrTemplate for TYPE ZWave
+=item summary_DE needed Hilfsfunktionen für attrTemplate bei ZWave-TYPE Geräten
 =begin html
-
-<a name="attrT_ZWave_Utils"></a>
+There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,114109.0.html.
+<a id="attrT_ZWave_Utils"></a>
 <h3>attrT_ZWave_Utils</h3>
+
 <ul>
   <b>devStateIcon_shutter</b>
   <br>
