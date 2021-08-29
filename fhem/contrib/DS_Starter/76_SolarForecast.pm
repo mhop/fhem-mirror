@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.54.5" => "29.08.2021  change metadata ",
   "0.54.4" => "12.07.2021  round Current_PV in _transferInverterValues ",
   "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
   "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
@@ -7722,7 +7723,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         "utf8": 0,
         "JSON": 4.020,
         "Data::Dumper": 0,
-        "FHEM::SynoModules::SMUtils": 1.220,
+        "FHEM::SynoModules::SMUtils": 1.0220,
         "Time::HiRes": 0        
       },
       "recommends": {
