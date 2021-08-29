@@ -6692,7 +6692,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       
     Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
     (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto on) bestimmt 
-    werden. <br>
+    werden. <br><br>
+    
+    <b>Hinweis</b><br>
     Es wird empfohlen die automatische Vorhersagekorrektur unmittelbar einzuschalten, da das SolarForecast Device etliche Tage
     benötigt um eine Optimierung der Korrekturfaktoren zu erreichen.    
  
