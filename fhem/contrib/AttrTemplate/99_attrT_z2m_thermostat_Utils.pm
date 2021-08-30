@@ -7,29 +7,28 @@ package FHEM::attrT_z2m_thermostat_Utils;    ## no critic 'Package declaration'
 use strict;
 use warnings;
 use JSON qw(decode_json);
-#use Time::HiRes qw( gettimeofday );
+use Carp qw(carp);
+#use POSIX qw(strftime);
 #use List::Util qw( min max );
+#use Scalar::Util qw(looks_like_number);
+#use Time::HiRes qw( gettimeofday );
 
 use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
 BEGIN {
-
     # Import from main context
     GP_Import(
         qw(
           AttrVal
           InternalVal
-          CommandGet
-          CommandSet
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBeginUpdate
-          readingsEndUpdate
           ReadingsVal
           ReadingsNum
           ReadingsAge
+          CommandGet
+          CommandSet
+          readingsSingleUpdate
           json2nameValue
           defs
           Log3
@@ -37,7 +36,7 @@ BEGIN {
     );
 }
 
-sub main::attrT_z2m_thermostat_Utils_Initialize { goto &Initialize }
+sub ::attrT_z2m_thermostat_Utils_Initialize { goto &Initialize }
 
 # initialize ##################################################################
 sub Initialize {
@@ -47,70 +46,63 @@ sub Initialize {
 
 # Enter you functions below _this_ line.
 
-#attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
-  
-  #attr DEVICE jsonMap alw:Activation amp:Ampere tmp:temperature
-  
-
 my %jsonmap = ( 
-    
+
 );
 
 sub z2t_send_weekprofile {
-  my $name       = shift;
-  my $wp_name    = shift;
-  my $wp_profile = shift // return;
+  my $name       = shift // carp q[No device name provided!]              && return;
+  my $wp_name    = shift // carp q[No weekprofile device name provided!]  && return;
+  my $wp_profile = shift // carp q[No weekprofile profile name provided!] && return;
   my $model      = shift // ReadingsVal($name,'week','5+2');
   my $topic      = shift // AttrVal($name,'devicetopic','') . '/set';
-  
+
   my $hash = $defs{$name};
   $topic   .= ' ';
-    
+
   my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
   if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
     Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
     return;
   }
-    
-  my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+
+  my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
   my $payload;
   my @days = (0..6);
-  my $text = decode_json($wp_profile_data);
-  
+  my $decoded;
+  if ( !eval { $decoded  = decode_json($wp_profile_data) ; 1 } ) {
+    Log3($name, 1, "JSON decoding error in $wp_profile provided by $wp_name: $@");
+    return;
+  }
+
   if ( $model eq '5+2' || $model eq '6+1') {
     @days = (0,1);
-    #$payload = '{"holidays":[';
   } elsif ($model eq '7') {
     @days = (1);
-    #$payload = '{"workdays":[';
   }
-  
+
   for my $i (@days) {
       $payload = '{';
-      
+
       for my $j (0..7) {
-        if (defined $text->{$D[$i]}{'time'}[$j]) {
-          my $time = $text->{$D[$i]}{'time'}[$j-1] // "00:00";
+        if (defined $decoded->{$D[$i]}{'time'}[$j]) {
+          my $time = $decoded->{$D[$i]}{'time'}[$j-1] // "00:00";
           my ($hour,$minute) = split m{:}xms, $time;
           $hour = 0 if $hour == 24;
-          $payload .= '"hour":' . abs($hour) .',"minute":'. abs($minute) .',"temperature":'.$text->{$D[$i]}{'temp'}[$j];
-          $payload .= '},{' if defined $text->{$D[$i]}{'time'}[$j+1];
+          $payload .= '"hour":' . abs($hour) .',"minute":'. abs($minute) .',"temperature":'.$decoded->{$D[$i]}{'temp'}[$j];
+          $payload .= '},{' if defined $decoded->{$D[$i]}{'time'}[$j+1];
         }
       }
       $payload .='}';
       if ( $i == 0 && ( $model eq '5+2' || $model eq '6+1') ) {
-        #$payload .='},'if $i == 0 || $i > 1 && $i != $days[-1];
-        #$payload .='],"workdays":[' if $i == 1;
-        CommandSet($defs{$name},"$name holidays $payload");
+        CommandSet($hash,"$name holidays $payload");
         $payload = '{';
       }
-      CommandSet($defs{$name},"$name workdays $payload") if $model eq '5+2' || $model eq '6+1' || $model eq '7';
+      CommandSet($hash,"$name workdays $payload") if $model eq '5+2' || $model eq '6+1' || $model eq '7';
   }
-  #$payload .=']}';
-  readingsSingleUpdate( $defs{$name}, 'weekprofile', "$wp_name $wp_profile",1);
+  readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
   return;
 }
-  
 
 1;
 
@@ -118,7 +110,7 @@ __END__
 
 =pod
 =item summary helper functions needed for zigbee2mqtt thermostats in MQTT2_DEVICE
-=item summary_DE needed Hilfsfunktionen für zigbee2mqtt MQTT2_DEVICE-Thermostate 
+=item summary_DE Hilfsfunktionen für zigbee2mqtt MQTT2_DEVICE-Thermostate 
 =begin html
 <a id="attrT_z2m_thermostat_Utils"></a>
   There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,116535.0.html.
