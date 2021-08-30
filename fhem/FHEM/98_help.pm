@@ -271,7 +271,7 @@ sub cref_findInfo {
   }
   if($found) {
   $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
-  $line[2] = defined($line[2]) {
+  if defined($line[2]) {
     $line[2] =~ s/\s*http.*//i;
   } else {
     $line[2] = 'no info';
