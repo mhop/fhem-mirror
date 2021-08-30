@@ -307,7 +307,7 @@ FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_PROPLANTA.pm         tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          Beta-User/orphan     Unterstützende Dienste/Wettermodule
+FHEM/59_Twilight.pm          Beta-User/orphan     Unterstützende Dienste/Wettermodule (Forum Thread #114061)   https://forum.fhem.de/index.php/topic,114061.0.html
 FHEM/59_Weather.pm           neubert              Unterstützende Dienste/Wettermodule
 FHEM/59_Wunderground.pm      loredo               (deprecated)
 FHEM/59_WUup.pm              mahowi               Unterstützende Dienste/Wettermodule
@@ -593,7 +593,7 @@ FHEM/lib/*deviceconfig.xml.gz        krikan       ZWave
 FHEM/lib/*manufacturer_specific.xml  krikan       ZWave
 FHEM/lib/AttrTemplate/huedevice.template Shojo    https://forum.fhem.de/index.php/topic,101829.html
 FHEM/lib/AttrTemplate/httpmod.template amenomade  https://forum.fhem.de/index.php/topic,97694.0.html
-FHEM/lib/AttrTemplate/mqtt2.template Beta-User/Otto123    https://forum.fhem.de/index.php/topic,94494.0.html
+FHEM/lib/AttrTemplate/mqtt2.template Beta-User/Otto123 MQTT https://forum.fhem.de/index.php/topic,94494.0.html
 FHEM/lib/AttrTemplate/mysensors.template Beta-User Bastelecke/MySensors
 FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
 FHEM/lib/Device/MySensors/*  Beta-User            Bastelecke/MySensors

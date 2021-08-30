@@ -476,8 +476,8 @@ sub _getVersion {
     }
     for (@content) {
         chomp;
-        if(m{#.*\$Id\:[^\$\n\r].+\$}xm) {
-           return $_;
+        if ( m{#.*(\$Id\:[^\$\n\r].+)\$} ) {
+            return $1;
         }
     }
     return 'unknown';
