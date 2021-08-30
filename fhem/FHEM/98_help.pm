@@ -39,7 +39,7 @@ sub CommandHelp {
     my $modPath = AttrVal('global','modpath','.');
 	my $output = '';
     
-    my $outputInfo = cref_findInfo($modPath,$mod);
+    my $outputInfo = cref_findInfo($modPath,$mod,$cl);
 
     if($cmds{help}{InternalCmds} !~ m/(^|\,)$mod\,/) {
       my %mods;
@@ -260,7 +260,7 @@ sub cref_fill_list(){
 }
 
 sub cref_findInfo {
-  my ($modPath,$mod) = @_;
+  my ($modPath,$mod,$cl) = @_;
   my ($l,@line,$found,$text);
   my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
   foreach my $l (@text) {
@@ -272,7 +272,7 @@ sub cref_findInfo {
   if($found) {
     $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
     if (defined($line[2])) {
-      $line[2] =~ s/\s*http.*//i;
+      $line[2] =~ s/\s*http.*/(link removed for security reasons)/i if ($cl->{TYPE} eq 'FHEMWEB');
     } else {
       $line[2] = 'no info';
     }
