@@ -66,8 +66,8 @@ sub Neuron_Initialize(@) {
     $hash->{AttrFn}         = 'Neuron_Attr';
     $hash->{NotifyFn}       = 'Neuron_Notify';
     $hash->{AttrList}       = "connection:websockets,polling poll_interval "
-							 ."wsFilter:multiple-strict,ai,ao,input,led,relay,wd "
-							 ."logicalDev:multiple-strict,ai,ao,input,led,relay,wd,temp "
+							 ."wsFilter:multiple-strict,ai,ao,input,led,relay,wd,temp,unit_register "
+							 ."logicalDev:multiple-strict,ai,ao,input,led,relay,wd,temp,unit_register "
 							 ."$readingFnAttributes";
     return undef;
 }
@@ -97,7 +97,8 @@ sub Neuron_Set(@) {
 	my ($hash, $name, $cmd, @args) = @_;
 	my $sets = $hash->{HELPER}{SETS};
 	if ($hash->{HELPER}{SETS} && index($hash->{HELPER}{SETS}, $cmd) != -1) {			# dynamisch erzeugte outputs
-		my ($dev, $circuit) = (split '_', $cmd, 2);
+		my ($dev, $circuit) = Neuron_GetExt($hash, $cmd);
+		#my ($dev, $circuit) = (split '_', $cmd, 2);
 		my $value = (looks_like_number($args[0]) ? $args[0] : $setsP{$args[0]});
 		if ($hash->{HELPER}{wsKey} && DevIo_IsOpen($hash)) {
 			my $string = Neuron_wsEncode('{"cmd":"set", "dev":"'.$dev.'", "circuit":"'.$circuit.'", "value":"'.$value.'"}');
@@ -118,8 +119,6 @@ sub Neuron_Set(@) {
 		}
 	} elsif ($cmd eq "clearreadings") {
 		fhem("deletereading $hash->{NAME} .*", 1);
-	} elsif ($cmd eq "testdispatch") {
-		Neuron_ParseWsResponse($hash, '{"dev":"temp","time":1527316294.23915,"temp":"23.4375","vis":"0.0002441","circuit":"2620531402000075","vad":"2.58","interval":15,"typ":"DS2438","humidity":51.9139754019274,"lost":false,"vdd":"5.34"}');
 	} else {
 		return "Unknown argument $cmd, choose one of clearreadings:noArg websocket:open,close " . ($hash->{HELPER}{SETS} ? $hash->{HELPER}{SETS} : '');
 	}
@@ -134,7 +133,7 @@ sub Neuron_Get(@) {
 		Neuron_ReadingstoSets($hash);
 	} elsif ($cmd eq "value") {
 		if (index($hash->{HELPER}{GETS}, $args[0]) != -1) {
-			my ($dev, $circuit) = (split '_', $args[0], 2);
+			my ($dev, $circuit) = Neuron_GetExt($hash, $args[0]);
 			$hash->{HELPER}{CLVAL} = $hash->{CL};
 			Neuron_HTTP($hash, $dev, $circuit);
 		} else {
@@ -142,7 +141,7 @@ sub Neuron_Get(@) {
 		}
 	} elsif ($cmd eq "conf") {
 		if (index($hash->{HELPER}{GETS}, $args[0]) != -1) {
-			my ($dev, $circuit) = (split '_', $args[0], 2);
+			my ($dev, $circuit) = Neuron_GetExt($hash, $args[0]);
 			$hash->{HELPER}{CLCONF} = $hash->{CL};
 			Neuron_HTTP($hash, $dev, $circuit);
 		} else {
@@ -157,6 +156,19 @@ sub Neuron_Get(@) {
 		return "Unknown argument $cmd, choose one of " . join(" ", @gets);
 	}
     return undef;
+}
+
+sub Neuron_GetExt(@) {		# bei Extensions mithilfe von ExtensionNamen splitten (geht sonst bei Typen mit "_" wie unit_register schief)
+	my ($hash, $pinname) = @_;
+	my $n = 2;
+	while (exists($hash->{$n."_CIRCUIT"})){
+		my $pos = index($pinname, $hash->{$n."_CIRCUIT"});
+		if ( $pos != -1) {
+			return (substr($pinname,0,$pos - 1), substr($pinname,$pos));
+		}
+		$n +=1;
+	}
+	return (split '_', $pinname, 2);
 }
 
 sub Neuron_Attr(@) {
@@ -290,7 +302,7 @@ sub Neuron_HTTP(@){
 			$data = '{"value":'.$data.'}';		# Sonderlösung, da der Analoge Ausgang den Wert nur ohne Hochkommas akzeptiert
 		}
 	}
-	Log3($hash, 3,"$hash->{TYPE} ($hash->{NAME}): sending ".($data ? "POST ($data)" : "GET")." request to url $url");
+	Log3($hash, 4,"$hash->{TYPE} ($hash->{NAME}): sending ".($data ? "POST ($data)" : "GET")." request to url $url");
     my $param= {
         url      => $url,
         hash     => $hash,
@@ -333,15 +345,23 @@ sub Neuron_callback(@) {
 	
 	if($err){
         Log3($hash, 3, "$hash->{TYPE} ($hash->{NAME}) received callback with error:\n$err");
+		readingsSingleUpdate($hash,"state",$err,1);
 	} elsif($data){
 		Log3($hash, 5, "$hash->{TYPE} ($hash->{NAME}) received callback with:\n$data");
-	     my $parser = $param->{parser};
-     	&$parser($hash, $data);
-		asyncOutput($hash->{HELPER}{CLCONF}, $data) if $hash->{HELPER}{CLCONF};
-		delete $hash->{HELPER}{CLCONF};
+		if( substr($data,0,6) eq "<html>" ) {
+			(my $title) = $data =~ /\<title\>(.*)\<\/title\>/;
+			readingsSingleUpdate($hash,"state",$title,1);
+		} else {
+			 my $parser = $param->{parser};
+			&$parser($hash, $data);
+			asyncOutput($hash->{HELPER}{CLCONF}, $data) if $hash->{HELPER}{CLCONF};		
+		}
+		#delete $hash->{HELPER}{CLCONF};
  	} else {
         Log3($hash, 2, "$hash->{TYPE} ($hash->{NAME}) received callback without Data and Error String!!!");
+		readingsSingleUpdate($hash,"state","no data received",1);
     }
+	delete $hash->{HELPER}{CLCONF};
    return undef;
 }
  
@@ -377,10 +397,16 @@ sub Neuron_ParseSingle(@){
 		}
 
 		if (ref $result eq 'HASH') {
-			readingsSingleUpdate($hash,$result->{dev}."_".$result->{circuit},$result->{value},1);
+			if (exists $result->{address}) {
+				# {"interval": 15, "value": 23.7, "circuit": "VlTiba", "address": "28751F1F0C000067", "time": 1624541181.043978, "typ": "DS18B20", "lost": false, "dev": "temp"}
+				# Besonderheit für 1Wire, dort ist im circuit scheinbar das alias enthalten
+				readingsSingleUpdate($hash,$result->{dev}."_".$result->{address},$result->{value},1);
+			} else {
+				readingsSingleUpdate($hash,$result->{dev}."_".$result->{circuit},$result->{value},1);
+			}
 			asyncOutput($hash->{HELPER}{CLVAL}, $result->{value}) if $hash->{HELPER}{CLVAL};
 			delete $hash->{HELPER}{CLVAL};
-			Dispatch($hash, $result, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao,temp') , $result->{dev}) != -1;
+			Dispatch($hash, $result, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao,temp,unit_register') , $result->{dev}) != -1;
 		} else {
 			Log3 ($hash, 3, "$hash->{TYPE} ($hash->{NAME}) http response not JSON: ".$result);
 		}
@@ -439,7 +465,7 @@ sub Neuron_ParseAll(@){
 					$value = $subdev->{value};
 					#$value = $rsetsP{$value} if ($subdev->{dev} eq 'input' || $subdev->{dev} eq 'relay' || $subdev->{dev} eq 'led');	# on,off anstelle von 1,0
 					readingsBulkUpdateIfChanged($hash,$subdev->{dev}."_".$subdev->{circuit},$value) if defined($value);
-					Dispatch($hash, $subdev, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao'), $subdev->{dev}) != -1;
+					Dispatch($hash, $subdev, (%addvals ? \%addvals : undef)) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao,temp,,unit_register'), $subdev->{dev}) != -1;
 					delete $subdev->{value};
 					readingsBulkUpdateIfChanged($hash,".".$subdev->{dev}."_".$subdev->{circuit},toJSON($subdev),0);
 					Log3 ($hash, 4, "$hash->{TYPE} ($hash->{NAME}) ".$subdev->{dev}."_".$subdev->{circuit} .": ". toJSON($subdev));			
@@ -494,7 +520,7 @@ sub Neuron_DecodeWsJSON($$){
 	my ($hash, $dev)=@_;
 	eval {
 		readingsBulkUpdate($hash,$dev->{dev}."_".$dev->{circuit},$dev->{value});
-		Dispatch($hash, $dev, undef) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao') , $dev->{dev}) != -1; 
+		Dispatch($hash, $dev, undef) if index(AttrVal($hash->{NAME}, 'logicalDev', 'relay,input,led,ao,temp,unit_register') , $dev->{dev}) != -1; 
 	};
     if ($@) {
         Log3 ($hash, 3, "$hash->{TYPE} ($hash->{NAME}): error decoding JSON $@\nData:\n$dev");
@@ -786,7 +812,7 @@ sub Neuron_wsDecode($$) {
 		}
 		#String kürzer als Längenangabe -> Zwischenspeichern?
 		if (length($wsString) < $offset + $len) {
-			Log3 $hash, 3, "Neuron_wsDecode Incomplete:\n" . $wsString;
+			Log3 $hash, 4, "Neuron_wsDecode Incomplete:\n" . $wsString;
 			return;
 		}
 		my $payload = substr($wsString, $offset, $len);			# Daten aus String extrahieren
@@ -843,51 +869,51 @@ sub Neuron_wsMasking($$) {
 <h3>Neuron</h3>
 <ul>
 	<a name="Neuron"></a>
-		Module for EVOK driven devices like UniPi Neuron.
-		Defines will be automatically created by the Neuron module.
+		Module for EVOK driven devices like UniPi Neuron.<br>
 		<br>
 	<a name="NeuronDefine"></a>
 	<b>Define</b>
 	<ul>
 		<code>define <name> Neuron &lt;dev&gt; &lt;circuit&gt;</code><br><br>
-		&lt;dev&gt; is an device type like input, ai (analog input), relay (digital output) etc.<br>
-		&lt;circuit&gt; ist the number of the device.
-		<br><br>
-		
-    Example:
-    <pre>
-		<code>define <name> Neuron &lt;IP&gt;[:&lt;Port&gt;]</code><br><br>
-    </pre>
-  </ul>
+	</ul>
 
   <a name="NeuronSet"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;args&gt;]</code>
     <br><br>
     where <code>value</code> can be e.g.:<br>
-    <ul><li>for relay
-      <ul><code>
-        off<br>
-        on<br>	
-        </code>
-      </ul>
-      The <a href="#setExtensions"> set extensions</a> are also supported for output devices.<br>
-      </li>
-	  Other set values depending on the options of the device function.
-	  Details can be found in the UniPi Evok documentation.
+    <ul><li>dev_circuit<br>
+			outputs only<br>
+			&lt;args&gt;: on, off for outputs and slider for ao<br>
+		</li>
+		<li>clearreadings<br>
+			delete all readings
+		</li>
+		<li>websocket<br>
+			&lt;arg&gt;: open,close<br>
+			open, close websocket connection
+		</li>
+		<li>postjson<br>
+			&lt;args&gt;: <code>dev circuit type value</code><br>
+			send JSON command to subdevice<br>
+			example: <code>set neuron input 1_01 mode simple</code>
+		</li>
+	  For details please refer to UniPi Evok documentation.
 	</ul>
-  </ul>
+  </ul><br>
 
   <a name="NeuronGet"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <code>get &lt;name&gt; &lt;value&gt; [&lt;arg&gt;]</code>
     <br><br>
 	where <code>value</code> can be<br>
 	<ul>
-		<li>refresh: uptates all readings</li>
-		<li>config: returns the configuration JSON</li>
+		<li>all: refresh all readings</li>
+		<li>config: returns the configuration from the subdevice &lt;arg&gt;</li>
+		<li>updt_sets_gets: updates all set and get options</li>
+		<li>value: returns the state from the subdevice &lt;arg&gt;</li>
 	</ul>
   </ul><br>
 
@@ -896,19 +922,23 @@ sub Neuron_wsMasking($$) {
   <ul>
     <li><a name="connection">connection</a><br>
       Set the connection type to the EVOK device<br>
-      Default: polling, valid values: websockets, polling<br><br>
+      Default: polling<br>
+	  valid values: websockets, polling<br><br>
     </li>							 
     <li><a name="poll_interval">poll_interval</a><br>
       Set the polling interval in minutes to query all readings (and distribute them to logical devices)<br>
-      Default: -, valid values: decimal number<br><br>
+      Default: -<br>
+	  valid values: decimal number<br><br>
     </li>
     <li><a name="wsFilter">wsFilter</a><br>
       Filter to limit the list of devices which should send websocket events<br>
-      Default: all, valid values: all, ai, ao, input, led, relay, wd<br><br>
+      Default: all<br>
+	  valid values: all, ai, ao, input, led, relay, wd, temp, unit_register<br><br>
     </li>
     <li><a name="logicalDev">logicalDev</a><br>
       Filter which subdevices should create / communicate with logical device<br>
-      Default: ao, input, led, relay, valid values: ai, ao, input, led, relay, wd<br><br>
+      Default: ao, input, led, relay<br>
+	  valid values: ai, ao, input, led, relay, wd, temp, unit_register<br><br>
     </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -922,13 +952,12 @@ sub Neuron_wsMasking($$) {
 <h3>Neuron</h3>
 <ul>
 	<a name="Neuron"></a>
-		Modul f&uuml; die Steuerung von Ger&auml;ten auf denen EVOK l&auml;uft z.B. UniPi Neuron.
+		Modul f&uuml;r die Steuerung von Ger&auml;ten auf denen EVOK l&auml;uft z.B. UniPi Neuron.<br>
 		<br>
 	<a name="NeuronDefine"></a>
 	<b>Define</b>
 	<ul>
 		<code>define <name> Neuron &lt;IP&gt;[:&lt;Port&gt;]</code><br><br>
-		<br><br>
 	</ul>
 
   <a name="NeuronSet"></a>
@@ -936,12 +965,10 @@ sub Neuron_wsMasking($$) {
   <ul>
     <code>set &lt;name&gt; &lt;value&gt; [&lt;args&gt;]</code>
     <br><br>
-	clearreadings:noArg websocket:open,close atest postjson
-    where <code>value</code> can be e.g.:<br>
+    Werte f&uuml;r <code>value</code>:<br>
     <ul><li>dev_circuit<br>
-			nur f&uuml; Ausg&auml;nge<br>
+			nur f&uuml;r Ausg&auml;nge<br>
 			&lt;args&gt;: on, off f&uuml;r Ausg&auml;nge und Slider f&uumlr ao<br>
-			<br>
 		</li>
 		<li>clearreadings<br>
 			l&ouml;sche alle Readings
@@ -957,17 +984,17 @@ sub Neuron_wsMasking($$) {
 		</li>
 	  Details dazu sind in der UniPi Evok Dokumentation zu finden.
 	</ul>
-  </ul>
+  </ul><br>
 
   <a name="NeuronGet"></a>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; &lt;value&gt; [&lt;arg&gt;]</code>
     <br><br>
-	where <code>value</code> can be<br>
+	Werte f&uuml;r <code>value</code>:<br>
 	<ul>
 		<li>all: aktualisiert alle readings</li>
-		<li>config: gibt das Konfiguration des Subdevices &lt;arg&gt; zur&uuml;ck</li>
+		<li>config: gibt die Konfiguration des Subdevices &lt;arg&gt; zur&uuml;ck</li>
 		<li>updt_sets_gets: Aktualisierung der Set und Get Auswahllisten</li>
 		<li>value: gibt das Status des Subdevices &lt;arg&gt; zur&uuml;ck</li>
 	</ul>
@@ -978,19 +1005,23 @@ sub Neuron_wsMasking($$) {
   <ul>
     <li><a name="connection">connection</a><br>
       Verbindungsart zum EVOK Device<br>
-      Standard: polling, g&uuml;ltige Werte: websockets, polling<br><br>
+      Standard: polling<br>
+	  g&uuml;ltige Werte: websockets, polling<br><br>
     </li>							 
     <li><a name="poll_interval">poll_interval</a><br>
       Interval in Minuten in dem alle Werte gelesen (und auch an die log. Devices weitergeleitet) werden.<br>
-      Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
+      Standard: -<br>
+	  g&uuml;ltige Werte: Dezimalzahl<br><br>
     </li>
     <li><a name="wsFilter">wsFilter</a>wsFilter<br>
       Filter um die liste der Ger&auml;te zu limitieren welche websocket events generieren sollen<br>
-      Standard: all, g&uuml;ltige Werte: all, ai, ao, input, led, relay, wd<br><br>
+      Standard: all<br>
+	  g&uuml;ltige Werte: all, ai, ao, input, led, relay, wd, temp, unit_register<br><br>
     </li>
     <li><a name="logicalDev">logicalDev</a><br>
       Filter um Ger&auml;te zu limitieren die logische Devices anlegen und mit ihnen kommunizieren.<br>
-      Standard: ao, input, led, relay, g&uuml;ltige Werte: ai, ao, input, led, relay, wd<br><br>
+      Standard: ao, input, led, relay<br>
+	  g&uuml;ltige Werte: ai, ao, input, led, relay, wd, temp, unit_register<br><br>
     </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
