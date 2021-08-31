@@ -874,7 +874,7 @@ sub Neuron_wsMasking($$) {
 	<a name="NeuronDefine"></a>
 	<b>Define</b>
 	<ul>
-		<code>define <name> Neuron &lt;dev&gt; &lt;circuit&gt;</code><br><br>
+		<code>define <name> Neuron &lt;IP&gt;[:&lt;Port&gt;]</code><br><br>
 	</ul>
 
   <a name="NeuronSet"></a>
