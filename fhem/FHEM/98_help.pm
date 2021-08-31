@@ -272,7 +272,7 @@ sub cref_findInfo {
   if($found) {
     $line[0]= (split("/",$line[0]))[1] if $line[0] =~ /\//;
     if (defined($line[2])) {
-      $line[2] =~ s/\s*http.*/ (link removed for security reasons)/i if ($cl->{TYPE} eq 'FHEMWEB');
+      $line[2] =~ s/\s*http.*/ (see MAINTAINER.txt for more info)/i if ($cl->{TYPE} eq 'FHEMWEB');
     } else {
       $line[2] = 'no info';
     }
