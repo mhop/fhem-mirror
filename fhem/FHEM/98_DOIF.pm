@@ -1426,13 +1426,13 @@ sub collect_setValue
     my $value=${$va}[$i];
     my $time=${$ta}[$i];
     if (defined $value and defined $time) {
-      if (!defined $maxVal or $value > $maxVal) {
+      if (!defined $maxVal or $value >= $maxVal) {
          $maxVal=$value;
          $maxValTime=$time;
          $maxValSlot=$i;
          
       }
-      if (!defined $minVal or $value < $minVal) {
+      if (!defined $minVal or $value <= $minVal) {
          $minVal=$value;
          $minValTime=$time;
          $minValSlot=$i;
@@ -5905,6 +5905,16 @@ sub ring2
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
     $ic="" if (!defined($ic));
+  }
+  
+  if (defined $icon and $icon ne "") {
+    if ($ic !~ /@/) {
+      $ic="$ic\@".color($currColor,$li);
+    } elsif ($ic =~ /^(.*\@)colorVal1/) {
+      $ic="$1".color($currColor,$li);
+    } elsif ($ic =~ /^(.*\@)colorVal2/) {
+        $ic="$1".color($currColor2,$li);
+    }
   }
   
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58" width="%d" height="%d" style="width:%dpx; height:%dpx">',$width,$height,$width,$height);
