@@ -544,19 +544,20 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devi
 par:ICON;ICON as set, defaults to fts_shutter_100;{ AttrVal("DEVICE","icon","fts_shutter_100") }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100
-attr DEVICE webCmd open:close:pct:speed
+attr DEVICE webCmd open:close:stop:pct:speed
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE jsonMap position:pct motor_speed:speed
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   open:noArg $\DEVICETOPIC/set {"state":"OPEN"}\
   close:noArg $\DEVICETOPIC/set {"state":"CLOSE"}\
+  stop:noArg $\DEVICETOPIC/set {"state":"STOP"}\
   pct:slider,0,1,100 $\DEVICETOPIC/set {"position":"$EVTPART1"}\
   speed:colorpicker,BRI,0,1,255 $\DEVICETOPIC/set {"options": {"motor_speed":"$EVTPART1"}}
 attr DEVICE stateFormat pct
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
-setreading DEVICE attrTemplateVersion 20210222
+setreading DEVICE attrTemplateVersion 20210902
 
 
 name:zigbee2mqtt_ContactSensor
@@ -1040,7 +1041,8 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices and other Tasmota flashed devices with power measuring abilities.<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 order:A_01c
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=CALLSPEECHRECOGN
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -1051,7 +1053,7 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model tasmota_POW
-setreading DEVICE attrTemplateVersion 20210526
+setreading DEVICE attrTemplateVersion 20210903
 
 
 # sonoff 1 channel + USB device flashed with Tasmota.
@@ -1059,17 +1061,18 @@ name:tasmota_POW_USB_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Plug with additional USB outlet flashed with Tasmota. <br>For use e.g. with Gosund SP112 or Blitzwolf SH5<br>NOTE: a second device will be created for the USB channel.<br>NOTE: still untested template, feedback is welcome!
 order:A_01c1
-set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0
-set DEVICE attrTemplate tasmota_POW
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:ICON;ICON as set, defaults to usb;{ AttrVal("DEVICE_CH2","icon","usb") }
+set DEVICE attrTemplate tasmota_2channel_split \CALLSPEECHRECOGN=0
+set DEVICE attrTemplate tasmota_POW \CALLSPEECHRECOGN=0
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:ICON;ICON as set, defaults to usb;{ AttrVal('DEVICE_CH2','icon','usb') }
 attr DEVICE_CH2 icon ICON
 attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
 attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
 attr DEVICE_CH2 setStateList on off toggle
-set DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200529
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210903
 
 # plug with LED flashed with Tasmota.
 name:tasmota_plug_with_rgbw_split
@@ -1110,9 +1113,9 @@ attr DEVICE_CH2 devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","sta
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
 set DEVICE attrTemplate speechcontrol_type_switch
-set DEVICE_CH2 attrTemplate speechcontrol_type_light_255
+set DEVICE_CH2 attrTemplate speechcontrol_type_light_255 \NOTDELAYED=0
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200828
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210903
 
 #tasmota device with Infrared-circuit
 name:tasmota_ir
@@ -1273,7 +1276,8 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200529
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
-set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 
 
 # sonoff 2 channel device flashed with Tasmota with dual energy meassuring. Source: https://forum.fhem.de/index.php/topic,122231.0.html
@@ -1312,7 +1316,8 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210728
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
-set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch \NOTDELAYED=0
 
 
 #contributed by 87insane
