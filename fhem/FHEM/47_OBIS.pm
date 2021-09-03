@@ -457,11 +457,24 @@ sub OBIS_Parse_List
     $result[3] = $repl // "var";
   }
   if (looks_like_number($result[1])) {
-    $result[5] = (($result[1] == 0xA2) ? "<" : (($result[1] == 0x82) ? ">" : "")) . $result[5];
+    my $direction = "";
+    # Direction: Bit 5 Version 1.0, Bit 11 later
+    if (($result[1] & 0xE2) == 0xA2 || ($result[1] & 0x807) == 0x804) {
+      $direction = "<";
+    } elsif (($result[1] & 0xE2) == 0x82 || ($result[1] & 0x807) == 0x004) {
+      $direction = ">";
+    }
+    $result[5] = $direction . $result[5];
+    $hash->{helper}{DIRECTIONSUM} = $direction;
   }
 
+  if ($result[0]=~/^1-0:16\.7\.0/ && $hash->{helper}{HLYHACK} && $result[5]>0 && $hash->{helper}{DIRECTIONSUM} eq "<") {
+    $result[5] = -$result[5];
+  }
   my $line = $result[0] . "(" . $result[5] . ($result[3] eq "" ? "" : "*".$result[3]) . ")\r\n";
-  $hash->{helper}{DZGHACK} = 1 if ($line=~/^1-0:96\.50\.1\*.*\(DZG/);
+  if ($line=~/^1-0:96\.50\.1\*.*\((DZG|HLY)/) {
+    $hash->{helper}{$1 . "HACK"} = 1;
+  }
   $_[1] .= $line;
   return undef;
 
