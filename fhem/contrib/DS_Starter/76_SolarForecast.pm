@@ -3655,6 +3655,7 @@ sub collectAllRegConsumers {
   
   my $type  = $hash->{TYPE};
   
+  delete $data{$type}{$name}{consumers};             
   delete $data{$type}{$name}{current}{consumerdevs};
   
   for my $c (1..$maxconsumer) {
@@ -5020,6 +5021,7 @@ return $ret;
 ################################################################
 sub _flowGraphic {
   my $paref      = shift;
+  my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $flowgh     = $paref->{flowgh};
   my $flowgani   = $paref->{flowgani};
@@ -5112,6 +5114,39 @@ sub _flowGraphic {
       </g>
 END0
 
+  ## get consumer list and display it in Graphics
+  ################################################
+  my $type              = $hash->{TYPE};
+  my @consumers         = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                       # definierte Verbraucher ermitteln
+  my $consumercount     = scalar @consumers;
+  my $consumer_start    = 0;
+  my $consumer_distance = 100;
+  
+  if ($consumercount % 2) {
+      $consumer_start = 250 - ($consumer_distance  * (($consumercount -1) / 2)); 
+  } 
+  else {
+	  $consumer_start = 250 - ((($consumer_distance ) / 2) * ($consumercount-1));
+  }
+  
+  $consumer_start = 0 if ($consumer_start < 0);
+  my $pos_left    = $consumer_start;
+  
+  for my $c0 (@consumers) {
+      next if (!$c0);
+      my ($cons,$im,$start,$end) = split (':', $c0);
+      #Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show a -> $cons"); 
+      
+      my $cname = ConsumerVal ($hash, $c0, "name", "");                                                # Name des Consumerdevices
+      my $cicon = ConsumerVal ($hash, $c0, "icon", "");                                                # Icon des Consumerdevices
+      
+      $ret      .= '<g id="consumer${cons}" fill="grey" transform="translate('.$pos_left.',480),scale(4)">';
+      #$ret      .= FW_makeImage($cicon,$cname);
+      $ret      .= '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>';
+      $ret      .= '</g> ';
+      $pos_left  = $pos_left + $consumer_distance;
+  }
+
 
   if ($hasbat) {
       $ret .= << "END1";
@@ -5140,6 +5175,23 @@ END2
       <path id="pv-bat"   class="$batin_style"  d="M330,100 L500,270" />
 END3
   }
+  
+  ## get consumer list and display it in Graphics
+  ################################################
+  $pos_left          = $consumer_start * 2;
+  
+  for my $c1 (@consumers) {
+      next if(!$c1);
+      my ($cons,$im,$start,$end) = split (':', $c1);
+      #Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show b -> $cons"); 
+      
+      my $consumer_style = 'flowg inactive_out'; 
+      $consumer_style    = 'flowg active_out'    if(ReadingsNum($name, "consumer${cons}_currentPower", 0) > 0);
+      
+      $ret .= qq{<path id="home-consumer_$cons" class="$consumer_style" d="M500,700 L$pos_left,850" />};
+     
+      $pos_left = $pos_left + ($consumer_distance * 2);
+  }
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="400" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
   $ret .= qq{<text class="flowg text" id="bat-txt"       x="595" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
@@ -5149,6 +5201,22 @@ END3
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="465" y="420" style="font-size: $fs; text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="465" y="200" style="font-size: $fs; text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
 
+  ## get consumer list and display it in Graphics
+  ################################################
+  $pos_left = $consumer_start * 2;
+  
+  for my $c2 (@consumers) {
+      next if(!$c2);
+      my ($cons,$im,$start,$end) = split (':', $c2);
+      #Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show c -> $cons"); 
+      
+      my $power = ReadingsNum($name, "consumer${cons}_currentPower", 0);
+      
+     $ret .= qq{<text class="flowg text" id="consumer-txt_$cons"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
+     
+     $pos_left = $pos_left + ($consumer_distance * 2);
+  }
+  
   $ret .= qq{</g></svg>};
       
 return $ret;
