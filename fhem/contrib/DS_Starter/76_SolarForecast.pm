@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.55.0" => "04.09.2021  new key pcurr for attr customerXX ",
   "0.54.5" => "29.08.2021  change metadata ",
   "0.54.4" => "12.07.2021  round Current_PV in _transferInverterValues ",
   "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
@@ -1582,7 +1583,7 @@ return;
 }
 
 ################################################################
-#                      Setter consumer
+#                      Attr consumer
 ################################################################
 sub _attrconsumer {                      ## no critic "not used"
   my $paref = shift;
@@ -2609,6 +2610,20 @@ sub _manageConsumerData {
   for my $c (sort{$a<=>$b} keys %{$acref}) {
       my $consumer = $acref->{$c}{name};
       my $alias    = $acref->{$c}{alias};
+      
+      ## aktuelle Leistung auslesen 
+      ##############################
+      my $paread = $acref->{$c}{rpcurr};
+      my $up     = $acref->{$c}{upcurr};
+      if($paread) {
+          my $eup   = $up =~ /^kW$/xi ? 1000 : 1;
+          my $pcurr = ReadingsNum ($consumer, $paread, 0) * $eup; 
+          
+          push @$daref, "consumer${c}_currentPower<>". $pcurr." W";  
+      }
+      else {
+          deleteReadingspec ($hash, "consumer${c}_currentPower");
+      }
 
       ## Verbrauch auslesen + speichern
       ##################################
@@ -3666,6 +3681,12 @@ sub collectAllRegConsumers {
           ($rtot,$utot) = split ":",$etotal;
       }
       
+      my ($rpcurr,$upcurr);
+      if(exists $hc->{pcurr}) {       
+          my $pcurr         = $hc->{pcurr};
+          ($rpcurr,$upcurr) = split ":",$pcurr;
+      }
+      
       my $rauto     = $hc->{auto}     // q{};
       my $ctype     = $hc->{type}     // $defctype;
       my $hours     = ($hc->{mintime} // $hef{$ctype}{mt}) / 60;
@@ -3687,6 +3708,8 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{auto}         = $auto;                                   # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
       $data{$type}{$name}{consumers}{$c}{retotal}      = $rtot            // q{};                 # Reading der Leistungsmessung
       $data{$type}{$name}{consumers}{$c}{uetotal}      = $utot            // q{};                 # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{rpcurr}       = $rpcurr          // q{};                 # Reading der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{upcurr}       = $upcurr          // q{};                 # Unit der aktuellen Leistungsaufnahme
       $data{$type}{$name}{consumers}{$c}{notbefore}    = $hc->{notbefore} // q{};                 # nicht einschalten vor Stunde in 24h Format (00-23)
       $data{$type}{$name}{consumers}{$c}{notafter}     = $hc->{notafter}  // q{};                 # nicht einschalten nach Stunde in 24h Format (00-23)
   }
@@ -7343,7 +7366,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>       
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br><br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br><br>
         
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
@@ -7373,7 +7396,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                        </td></tr>
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
             <tr><td>                   </td><td>Readingwert = 1: Schalten freigegeben (default),  0: Schalten blockiert                                                          </td></tr>
-            <tr><td> <b>etotal</b>     </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
+            <tr><td> <b>pcurr</b>      </td><td>Reading welches den aktuellen Energieverbrauch (z.B. Schaltdose mit Energiemessung) liefert und Einheit (W/kW) (optional)        </td></tr>
+            <tr><td> <b>etotal</b>     </td><td>Reading welches die Summe der verbrauchten Energie liefert und Einheit (Wh/kWh) (optional)                                       </td></tr>
          </table>
          </ul>
        <br>
