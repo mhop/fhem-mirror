@@ -1,6 +1,6 @@
-REV 24907
+REV 24910
 DIR unused
-UPD 2021-08-30_07:45:04 365323 ./CHANGED
+UPD 2021-09-04_07:45:03 365394 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-09-03_07:45:02 43768 ./MAINTAINER.txt
 UPD 2021-08-18_07:45:04 41710 ./configDB.pm
@@ -255,7 +255,7 @@ UPD 2020-04-25_07:45:03 57239 FHEM/46_TRX_LIGHT.pm
 UPD 2019-12-23_07:45:02 25474 FHEM/46_TRX_SECURITY.pm
 UPD 2018-12-31_07:45:03 58001 FHEM/46_TRX_WEATHER.pm
 UPD 2021-07-11_07:45:03 7005 FHEM/46_TeslaPowerwall2AC.pm
-UPD 2021-04-13_07:45:04 41985 FHEM/47_OBIS.pm
+UPD 2021-09-04_07:45:03 42430 FHEM/47_OBIS.pm
 UPD 2021-03-25_07:45:03 95637 FHEM/48_BlinkCamera.pm
 UPD 2021-05-26_07:45:02 70099 FHEM/48_MieleAtHome.pm
 UPD 2021-05-26_07:45:02 72668 FHEM/49_Arlo.pm
@@ -645,10 +645,10 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-08-12_07:45:04 331631 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-09-04_07:45:03 332005 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-08-29_07:45:02 14794 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2021-05-28_07:45:02 9415 FHEM/lib/AttrTemplate/speechcontrol.template
+UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-23_07:45:02 9355 FHEM/lib/EnO_ReCom_Device_Descr.xml
 UPD 2015-07-28_14:05:30 11604 FHEM/lib/LiquidCrystal.pm
@@ -741,8 +741,8 @@ UPD 2021-09-01_07:45:07 4544148 docs/commandref.html
 UPD 2021-09-01_07:45:09 2803814 docs/commandref_DE.html
 UPD 2021-08-02_07:45:03 82793 docs/commandref_frame.html
 UPD 2021-08-02_07:45:03 92754 docs/commandref_frame_DE.html
-UPD 2021-09-03_07:45:10 247266 docs/commandref_modular.html
-UPD 2021-09-03_07:45:11 258304 docs/commandref_modular_DE.html
+UPD 2021-09-04_07:45:11 247266 docs/commandref_modular.html
+UPD 2021-09-04_07:45:12 258304 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
