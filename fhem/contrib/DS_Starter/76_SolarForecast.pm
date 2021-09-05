@@ -5074,9 +5074,10 @@ sub _flowGraphic {
       $css
       $animation
       </style>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style" id="SVGPLOT">
+	 
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 580 580" style="$style" id="SVGPLOT">
       
-      <g transform="translate(200,50)">
+      <g transform="translate(300,50)">
         <g>
             <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
@@ -5104,11 +5105,11 @@ sub _flowGraphic {
         <circle cx="0" cy="0" class="$sun_color" r="16" stroke-width="2"/>
       </g>
 
-      <g id="home" fill="grey" transform="translate(150,310),scale(4)">
+      <g id="home" fill="grey" transform="translate(250,310),scale(4)">
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
       </g>    
 
-      <g id="grid" class="$grid_color" transform="translate(0,150),scale(3.5)">
+      <g id="grid" class="$grid_color" transform="translate(100,150),scale(3.5)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
 END0
@@ -5116,7 +5117,7 @@ END0
   ## get consumer list and display it in Graphics
   ################################################
   my $type              = $hash->{TYPE};
-  my @consumers         = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                       # definierte Verbraucher ermitteln
+  my @consumers         = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                 # definierte Verbraucher ermitteln
   my $consumercount     = scalar @consumers;
   my $consumer_start    = 0;
   my $consumer_distance = 100;
@@ -5125,31 +5126,30 @@ END0
       $consumer_start = 250 - ($consumer_distance  * (($consumercount -1) / 2)); 
   } 
   else {
-	  $consumer_start = 250 - ((($consumer_distance ) / 2) * ($consumercount-1));
+      $consumer_start = 250 - ((($consumer_distance ) / 2) * ($consumercount-1));
   }
   
-  $consumer_start = 0 if ($consumer_start < 0);
+  $consumer_start = 0 if $consumer_start < 0;
   my $pos_left    = $consumer_start;
   
   for my $c0 (@consumers) {
-      next if (!$c0);
       my ($cons,$im,$start,$end) = split (':', $c0);
-      #Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show a -> $cons"); 
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
       
-      my $cname = ConsumerVal ($hash, $c0, "name", "");                                                # Name des Consumerdevices
-      my $cicon = ConsumerVal ($hash, $c0, "icon", "");                                                # Icon des Consumerdevices
+      my $cname = ConsumerVal ($hash, $c0, "name", "");                                        # Name des Consumerdevices
+      my $cicon = ConsumerVal ($hash, $c0, "icon", "");                                        # Icon des Consumerdevices
       
-      $ret      .= '<g id="consumer${cons}" fill="grey" transform="translate('.$pos_left.',480),scale(4)">';
-      #$ret      .= FW_makeImage($cicon,$cname);
-      $ret      .= '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>';
-      $ret      .= '</g> ';
-      $pos_left  = $pos_left + $consumer_distance;
+      $ret .= '<g id="consumer_'.$cons.'" fill="grey" transform="translate('.$pos_left.',480),scale(4)">';
+      #$ret .= FW_makeImage($cicon,$cname);
+      $ret .= '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>';
+      $ret .= '</g> ';
+     
+      $pos_left += $consumer_distance;
   }
-
 
   if ($hasbat) {
       $ret .= << "END1";
-      <g class="$bat_color" transform="translate(410,135),scale(.33) rotate (90)">
+      <g class="$bat_color" transform="translate(510,135),scale(.33) rotate (90)">
       <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
       <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
 END1
@@ -5163,59 +5163,58 @@ END1
 
     $ret .= << "END2";
     <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-    <path id="pv-home"   class="$csc_style"  d="M300,100 L300,510" />
-    <path id="pv-grid"   class="$cgfi_style" d="M270,100 L90,270" />
-    <path id="grid-home" class="$cgc_style"  d="M90,305 L270,510" />
+    <path id="pv-home"   class="$csc_style"  d="M500,100 L500,510" />
+    <path id="pv-grid"   class="$cgfi_style" d="M470,100 L290,270" />
+    <path id="grid-home" class="$cgc_style"  d="M290,305 L470,510" />
 END2
 
   if ($hasbat) {
       $ret .= << "END3";
-      <path id="bat-home" class="$batout_style" d="M502,305 L330,510" />
-      <path id="pv-bat"   class="$batin_style"  d="M330,100 L500,270" />
+      <path id="bat-home" class="$batout_style" d="M702,305 L530,510" />
+      <path id="pv-bat"   class="$batin_style"  d="M530,100 L700,270" />
 END3
   }
   
   ## get consumer list and display it in Graphics
   ################################################
   $pos_left          = $consumer_start * 2;
+  my $consumer_style = 'flowg inactive_out'; 
   
   for my $c1 (@consumers) {
-      next if(!$c1);
       my ($cons,$im,$start,$end) = split (':', $c1);
-      #Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show b -> $cons"); 
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
       
-      my $consumer_style = 'flowg inactive_out'; 
-      $consumer_style    = 'flowg active_out'    if(ReadingsNum($name, "consumer${cons}_currentPower", 0) > 0);
+      $consumer_style = 'flowg inactive_out'; 
+      $consumer_style = 'flowg active_out' if(ReadingsNum($name, "consumer${cons}_currentPower", 0) > 0);
       
       $ret .= qq{<path id="home-consumer_$cons" class="$consumer_style" d="M500,700 L$pos_left,850" />};
      
-      $pos_left = $pos_left + ($consumer_distance * 2);
-  }
+      $pos_left += ($consumer_distance * 2);
+  } 
 
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="400" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="595" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="330" y="300" style="font-size: $fs; text-anchor: start;">$csc</text>}     if ($csc && $cpv);
-  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="125" y="200" style="font-size: $fs; text-anchor: end;">$cgfi</text>}      if ($cgfi);
-  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="125" y="420" style="font-size: $fs; text-anchor: end;">$cgc</text>}       if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batout-txt"    x="465" y="420" style="font-size: $fs; text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
-  $ret .= qq{<text class="flowg text" id="batin-txt"     x="465" y="200" style="font-size: $fs; text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="600" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="795" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="530" y="300" style="font-size: $fs; text-anchor: start;">$csc</text>}     if ($csc && $cpv);
+  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="325" y="200" style="font-size: $fs; text-anchor: end;">$cgfi</text>}      if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="325" y="420" style="font-size: $fs; text-anchor: end;">$cgc</text>}       if ($cgc);
+  $ret .= qq{<text class="flowg text" id="batout-txt"    x="665" y="420" style="font-size: $fs; text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="batin-txt"     x="665" y="200" style="font-size: $fs; text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
 
   ## get consumer list and display it in Graphics
   ################################################
-  $pos_left = $consumer_start * 2;
+  $pos_left = ($consumer_start * 2) - 50;
   
   for my $c2 (@consumers) {
-      next if(!$c2);
       my ($cons,$im,$start,$end) = split (':', $c2);
-      #Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show c -> $cons"); 
+      Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
       
       my $power = ReadingsNum($name, "consumer${cons}_currentPower", 0);
       
      $ret .= qq{<text class="flowg text" id="consumer-txt_$cons"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
      
-     $pos_left = $pos_left + ($consumer_distance * 2);
+     $pos_left += ($consumer_distance * 2);
   }
-  
+
   $ret .= qq{</g></svg>};
       
 return $ret;
