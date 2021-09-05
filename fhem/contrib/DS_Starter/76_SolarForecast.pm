@@ -5206,7 +5206,7 @@ END3
   
   for my $c2 (@consumers) {
       my ($cons,$im,$start,$end) = split (':', $c2);
-      Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
       
       my $power = ReadingsNum($name, "consumer${cons}_currentPower", 0);
       
