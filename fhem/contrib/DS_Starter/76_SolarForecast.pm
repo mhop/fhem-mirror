@@ -5134,13 +5134,12 @@ END0
   my $pos_left    = $consumer_start;
   
   for my $c0 (@consumers) {
-      my ($cons,$im,$start,$end) = split (':', $c0);
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c0"); 
       
       my $cname = ConsumerVal ($hash, $c0, "name", "");                                        # Name des Consumerdevices
       my $cicon = ConsumerVal ($hash, $c0, "icon", "");                                        # Icon des Consumerdevices
       
-      $ret .= '<g id="consumer_'.$cons.'" fill="grey" transform="translate('.$pos_left.',480),scale(4)">';
+      $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',480),scale(4)">';
       #$ret .= FW_makeImage($cicon,$cname);
       $ret .= '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>';
       $ret .= '</g> ';
@@ -5182,11 +5181,10 @@ END3
   my $consumer_style = 'flowg inactive_out'; 
   
   for my $c1 (@consumers) {
-      my ($cons,$im,$start,$end) = split (':', $c1);
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c1"); 
       
       my $power          = ConsumerVal ($hash, $c1, "power", 0); 
-	  my $currentPower   = ReadingsNum($name, "consumer${cons}_currentPower", 0);
+	  my $currentPower   = ReadingsNum($name, "consumer${c1}_currentPower", 0);
 	  my $p              = $currentPower;	  
 	  $p                 = (($currentPower / $power) * 100) if ($power > 0);
 		  
@@ -5196,7 +5194,7 @@ END3
 	  my $consumer_color = "";
 	  $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0);
 	  
-      $ret .= qq{<path id="home-consumer_$cons" class="$consumer_style" $consumer_color d="M500,700 L$pos_left,850" />};
+      $ret .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M500,700 L$pos_left,850" />};
      
       $pos_left += ($consumer_distance * 2);
   } 
@@ -5214,12 +5212,11 @@ END3
   $pos_left = ($consumer_start * 2) - 50;
   
   for my $c2 (@consumers) {
-      my ($cons,$im,$start,$end) = split (':', $c2);
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c2"); 
       
-      my $power = sprintf("%.1f",ReadingsNum($name, "consumer${cons}_currentPower", 0));
+      my $power = sprintf("%.1f",ReadingsNum($name, "consumer${c2}_currentPower", 0));
       
-     $ret .= qq{<text class="flowg text" id="consumer-txt_$cons"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
+     $ret .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
      
      $pos_left += ($consumer_distance * 2);
   }
