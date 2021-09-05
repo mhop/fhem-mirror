@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.55.1" => "05.09.2021  delete invalid consumer index, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219 ",
   "0.55.0" => "04.09.2021  new key pcurr for attr customerXX ",
   "0.54.5" => "29.08.2021  change metadata ",
   "0.54.4" => "12.07.2021  round Current_PV in _transferInverterValues ",
@@ -4285,7 +4286,7 @@ return;
 sub _graphicConsumerLegend {                                
   my $paref                    = shift;
   my $hash                     = $paref->{hash};
-  my $name                     = $paref->{name};                                                 # Consumer AdviceIcon
+  my $name                     = $paref->{name};                                                    # Consumer AdviceIcon
   my ($clegendstyle, $clegend) = split('_', $paref->{clegend});
   
   my $type                     = $hash->{TYPE};
@@ -5184,10 +5185,18 @@ END3
       my ($cons,$im,$start,$end) = split (':', $c1);
       # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
       
-      $consumer_style = 'flowg inactive_out'; 
-      $consumer_style = 'flowg active_out' if(ReadingsNum($name, "consumer${cons}_currentPower", 0) > 0);
+      my $power          = ConsumerVal ($hash, $c1, "power", 0); 
+	  my $currentPower   = ReadingsNum($name, "consumer${cons}_currentPower", 0);
+	  my $p              = $currentPower;	  
+	  $p                 = (($currentPower / $power) * 100) if ($power > 0);
+		  
+      $consumer_style    = 'flowg inactive_out'; 
+      $consumer_style    = 'flowg active_out' if($p > 0);
       
-      $ret .= qq{<path id="home-consumer_$cons" class="$consumer_style" d="M500,700 L$pos_left,850" />};
+	  my $consumer_color = "";
+	  $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0);
+	  
+      $ret .= qq{<path id="home-consumer_$cons" class="$consumer_style" $consumer_color d="M500,700 L$pos_left,850" />};
      
       $pos_left += ($consumer_distance * 2);
   } 
@@ -5208,7 +5217,7 @@ END3
       my ($cons,$im,$start,$end) = split (':', $c2);
       # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $cons"); 
       
-      my $power = ReadingsNum($name, "consumer${cons}_currentPower", 0);
+      my $power = sprintf("%.1f",ReadingsNum($name, "consumer${cons}_currentPower", 0));
       
      $ret .= qq{<text class="flowg text" id="consumer-txt_$cons"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
      
@@ -6018,7 +6027,6 @@ return;
 sub listDataPool {                 
   my $hash = shift;
   my $htol = shift;  
-  
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
@@ -6104,6 +6112,10 @@ sub listDataPool {
           return qq{Consumer cache is empty.};
       }
       for my $idx (sort{$a<=>$b} keys %{$h}) {
+          if ($idx !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
+              delete $data{$type}{$name}{consumers}{$idx};
+              Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$idx" was deleted from consumer Hash});
+          }
           my $cret;
           for my $ckey (sort keys %{$h->{$idx}}) {
               if(ref $h->{$idx}{$ckey} eq "HASH") {
@@ -6115,7 +6127,7 @@ sub listDataPool {
                   $cret .= $ckey." => ".$hk."\n      ";
               }
               else {
-                  $cret .= $ckey." => ".$h->{$idx}{$ckey}."\n      ";
+                  $cret .= $ckey." => ".ConsumerVal ($hash, $idx, $ckey, "")."\n      ";
               }
           }
 
