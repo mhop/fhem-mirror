@@ -6113,8 +6113,9 @@ sub listDataPool {
       }
       for my $idx (sort{$a<=>$b} keys %{$h}) {
           if ($idx !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
-              delete $data{$type}{$name}{consumers}{$idx};
+              delete $data{$type}{$name}{consumers}{"$idx"};
               Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$idx" was deleted from consumer Hash});
+              next;
           }
           my $cret;
           for my $ckey (sort keys %{$h->{$idx}}) {
