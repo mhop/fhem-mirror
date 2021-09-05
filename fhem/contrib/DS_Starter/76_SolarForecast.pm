@@ -6108,12 +6108,14 @@ sub listDataPool {
       if (!keys %{$h}) {
           return qq{Consumer cache is empty.};
       }
+      for my $i (keys %{$h}) {
+          if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
+              delete $data{$type}{$name}{consumers}{$i};
+              Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer Hash});
+          }         
+      }
+      
       for my $idx (sort{$a<=>$b} keys %{$h}) {
-          if ($idx !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
-              delete $data{$type}{$name}{consumers}{"$idx"};
-              Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$idx" was deleted from consumer Hash});
-              next;
-          }
           my $cret;
           for my $ckey (sort keys %{$h->{$idx}}) {
               if(ref $h->{$idx}{$ckey} eq "HASH") {
