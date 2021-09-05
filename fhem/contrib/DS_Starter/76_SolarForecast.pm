@@ -5075,7 +5075,7 @@ sub _flowGraphic {
       $css
       $animation
       </style>
-	 
+     
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 580 580" style="$style" id="SVGPLOT">
       
       <g transform="translate(300,50)">
@@ -5181,19 +5181,19 @@ END3
   my $consumer_style = 'flowg inactive_out'; 
   
   for my $c1 (@consumers) {
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c1"); 
-      
-      my $power          = ConsumerVal ($hash, $c1, "power", 0); 
-	  my $currentPower   = ReadingsNum($name, "consumer${c1}_currentPower", 0);
-	  my $p              = $currentPower;	  
-	  $p                 = (($currentPower / $power) * 100) if ($power > 0);
-		  
-      $consumer_style    = 'flowg inactive_out'; 
-      $consumer_style    = 'flowg active_out' if($p > 0);
-      
-	  my $consumer_color = "";
-	  $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0);
-	  
+      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c1");
+     
+      my $power          = ConsumerVal ($hash, $c1, "power", 0);
+      my $currentPower   = ReadingsNum($name, "consumer${c1}_currentPower", 0);
+      my $p              = $currentPower;    
+      $p                 = (($currentPower / $power) * 100) if ($power > 0);
+         
+      $consumer_style    = 'flowg inactive_out';
+      $consumer_style    = 'flowg active_out' if($p > 0.5);
+     
+      my $consumer_color = "";
+      $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0.5);
+     
       $ret .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M500,700 L$pos_left,850" />};
      
       $pos_left += ($consumer_distance * 2);
