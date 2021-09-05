@@ -3654,8 +3654,7 @@ sub collectAllRegConsumers {
   my $name  = $paref->{name}; 
   
   my $type  = $hash->{TYPE};
-  
-  delete $data{$type}{$name}{consumers};             
+              
   delete $data{$type}{$name}{current}{consumerdevs};
   
   for my $c (1..$maxconsumer) {
