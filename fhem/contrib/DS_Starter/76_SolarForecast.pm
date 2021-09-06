@@ -5123,6 +5123,8 @@ END0
   my $consumer_start    = 0;
   my $consumer_distance = 100;
   
+  my $currentPower;
+  
   if ($consumercount % 2) {
       $consumer_start = 250 - ($consumer_distance  * (($consumercount -1) / 2)); 
   } 
@@ -5137,7 +5139,13 @@ END0
       my $color;  
       my $calias      = ConsumerVal ($hash, $c0, "alias", "");                                  # Name des Consumerdevices
       my $cicon       = ConsumerVal ($hash, $c0, "icon",  "");                                  # Icon des Consumerdevices
-      $cicon          = "file_unknown" if (!$cicon);
+      $currentPower   = ReadingsNum ($name, "consumer${c0}_currentPower", 0);
+      
+      if (!$cicon) {  
+          $color = $currentPower ? '@darkorange' : '@grey';
+          $cicon = 'light_light_dim_100'.$color; 
+      }
+      
       ($cicon,$color) = split '@', $cicon;  
       $color          = $color ? '@'.$color : '';     
 
@@ -5191,7 +5199,7 @@ END3
   
   for my $c1 (@consumers) {     
       my $power          = ConsumerVal ($hash, $c1, "power", 0);
-      my $currentPower   = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
+      $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
       my $p              = $currentPower;    
       $p                 = (($currentPower / $power) * 100) if ($power > 0);
          
