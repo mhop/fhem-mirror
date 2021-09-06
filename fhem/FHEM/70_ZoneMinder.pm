@@ -93,10 +93,9 @@ sub ZoneMinder_Define {
 #  Log3 $name, 3, "ZoneMinder ($name) - Define done ... module=$module, zmHost=$zmHost";
 
   DevIo_CloseDev($hash) if (DevIo_IsOpen($hash));
-  DevIo_OpenDev($hash, 0, undef);
+  DevIo_OpenDev($hash, 0, 'ZoneMinder_Trigger_init', 'ZoneMinder_Trigger_callback');
 
   my $triggerPortState = $hash->{STATE};
-  ZoneMinder_updateState( $hash, $triggerPortState, 'n/a' );
 
   if (!$init_done) {
     InternalTimer(gettimeofday()+5, "ZoneMinder_afterInitialized", $hash, 0);
@@ -106,6 +105,28 @@ sub ZoneMinder_Define {
   }
 
   return undef;
+}
+
+sub ZoneMinder_Trigger_init {
+  my ( $hash ) = @_;
+
+  ZoneMinder_updateState( $hash, 'opened', undef );
+
+  return 0; #0 means successful connection
+}
+
+sub ZoneMinder_Trigger_callback {
+  my ( $hash, $error ) = @_;
+  my $name = $hash->{NAME};
+
+  if ( defined ($error) ) {
+    Log3 $name, 0, "ZoneMinder ($name) - Error while connecting to trigger port: $error";
+    ZoneMinder_updateState( $hash, 'error', undef );
+  } else {
+    Log3 $name, 3, "ZoneMinder ($name) - Trigger port connected";
+    ZoneMinder_updateState( $hash, 'opened', undef );
+  }
+
 }
 
 sub ZoneMinder_updateState {
@@ -817,7 +838,7 @@ sub ZoneMinder_Ready {
 
   ZoneMinder_updateState( $hash, 'disappeared', undef );
 
-  return DevIo_OpenDev($hash, 1, undef ); #if success, $err is undef
+  return DevIo_OpenDev($hash, 1, 'ZoneMinder_Trigger_init', 'ZoneMinder_Trigger_callback' ); #if success, $err is undef
 
 }
 
