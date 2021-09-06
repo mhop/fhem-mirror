@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 49_IPCAM: introduced attribute 'blocking'
  - bugfix:  47_OBIS: Support Holley-smartmeters with negative metering
  - change:  10_KNX: major rewrite of the module. pls. check forum #122582
                     before shutdown/restart! fixed crash using Attr KNX_toggle

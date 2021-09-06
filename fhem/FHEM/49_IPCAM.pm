@@ -47,7 +47,7 @@ IPCAM_Initialize($$)
                       "cmd01data cmd02data cmd03data cmd04data cmd05data cmd06data cmd07data ".
                       "cmd08data cmd09data cmd10data cmd11data cmd12data cmd13data cmd14data cmd15data ".
                       "model do_not_notify:1,0 showtime:1,0 scheme:http,https ".
-                      "disable:0,1 unknownFormatRetryDelay handleAnyXmlAsSvg:0,1 unknownFormatRetryCount ".
+                      "disable:0,1 unknownFormatRetryDelay handleAnyXmlAsSvg:0,1 unknownFormatRetryCount blocking:0,1 ".
                       $readingFnAttributes;
 }
 
@@ -90,6 +90,7 @@ BEGIN {
         attr
         TimeNow
         HttpUtils_NonblockingGet
+        GetFileFromURLQuiet
         SetExtensions
         AttrTemplate_Set
         urlEncode
@@ -483,8 +484,9 @@ sub ExecuteSnapshotRequest {
   my ($hash, $callbackCommand) = @_;
   my $name = $hash->{NAME};
 
+  my $blocking = AttrVal($name, 'blocking', 0);
   my $camUrl = createSnapshotUrl($hash);
-  Log3 $name, 3, "IPCAM ($name) - ExecuteSnapshotRequest camUrl: $camUrl";
+  Log3 $name, 3, "IPCAM ($name) - ExecuteSnapshotRequest blocking: $blocking, camUrl: $camUrl";
 
   my $apiParam = {
     url => $camUrl,
@@ -496,12 +498,11 @@ sub ExecuteSnapshotRequest {
     callbackCommand => $callbackCommand
   };
 
-  # trying to fix timeouts by wrapping this in internalTimer
-  if (defined $callbackCommand) {
-    InternalTimer(gettimeofday(), "main::HttpUtils_NonblockingGet", $apiParam);
+  if ($blocking == 1) {
+    my $camret = GetFileFromURLQuiet($camUrl);
+    RequestSnapshot_Callback($apiParam, '', $camret);
   } else {
-    # without callback command, the internal timer has been set before already.
-    HttpUtils_NonblockingGet($apiParam);    
+    HttpUtils_NonblockingGet($apiParam);
   }
   
   return undef;
@@ -879,6 +880,11 @@ DetailFn {
       you have to set the placeholder <code>{USERNAME}</code> and <code>{PASSWORD}</code> in the basicauth string.
       These placeholders will be replaced with the values from the credentials file.<br>
       Example:<br> <code>attr ipcam3 basicauth {USERNAME}:{PASSWORD}</code>
+    </li>
+    <li>
+      blocking<br>
+      If set to 1, FHEM will make a blocking call to the camera. Try this if getting snapshot runs into timeouts regularly.<br>
+      Per default, this is set to 0.
     </li>
     <li>
       cmd01, cmd02, cmd03, .. cmd13, cdm14, cdm15<br>
