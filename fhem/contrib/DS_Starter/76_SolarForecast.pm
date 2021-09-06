@@ -5131,19 +5131,20 @@ END0
   }
   
   $consumer_start = 0 if $consumer_start < 0;
-  my $pos_left    = $consumer_start;
+  my $pos_left    = $consumer_start + 15;
   
-  for my $c0 (@consumers) {
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c0"); 
-      
-      my $cname = ConsumerVal ($hash, $c0, "name", "");                                        # Name des Consumerdevices
-      my $cicon = ConsumerVal ($hash, $c0, "icon", "");                                        # Icon des Consumerdevices
-      
-      $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',480),scale(4)">';
-      #$ret .= FW_makeImage($cicon,$cname);
-      $ret .= '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>';
+  for my $c0 (@consumers) {  
+      my $color;  
+      my $calias      = ConsumerVal ($hash, $c0, "alias", "");                                  # Name des Consumerdevices
+      my $cicon       = ConsumerVal ($hash, $c0, "icon",  "");                                  # Icon des Consumerdevices
+      $cicon          = "file_unknown" if (!$cicon);
+      ($cicon,$color) = split '@', $cicon;  
+      $color          = $color ? '@'.$color : '';     
+
+      $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
+      $ret .= "<title>$calias</title>".FW_makeImage($cicon.$color, '');
       $ret .= '</g> ';
-     
+    
       $pos_left += $consumer_distance;
   }
 
@@ -5178,25 +5179,32 @@ END3
   ## get consumer list and display it in Graphics
   ################################################
   $pos_left          = $consumer_start * 2;
-  my $consumer_style = 'flowg inactive_out'; 
+  my $pos_left_start = 0;
+  my $distance       = 25;
   
-  for my $c1 (@consumers) {
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c1");
-     
+  if ($consumercount % 2) {
+      $pos_left_start = 500 - ($distance  * (($consumercount -1) / 2)); 
+  } 
+  else {
+      $pos_left_start = 500 - ((($distance ) / 2) * ($consumercount-1));
+  }
+  
+  for my $c1 (@consumers) {     
       my $power          = ConsumerVal ($hash, $c1, "power", 0);
-      my $currentPower   = ReadingsNum($name, "consumer${c1}_currentPower", 0);
+      my $currentPower   = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
       my $p              = $currentPower;    
       $p                 = (($currentPower / $power) * 100) if ($power > 0);
          
-      $consumer_style    = 'flowg inactive_out';
+      my $consumer_style = 'flowg inactive_out';
       $consumer_style    = 'flowg active_out' if($p > 0.5);
      
       my $consumer_color = "";
       $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0.5);
      
-      $ret .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M500,700 L$pos_left,850" />};
+      $ret              .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M$pos_left_start,700 L$pos_left,850" />};
      
-      $pos_left += ($consumer_distance * 2);
+      $pos_left         += ($consumer_distance * 2);
+      $pos_left_start   += $distance;
   } 
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="600" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
@@ -5211,14 +5219,10 @@ END3
   ################################################
   $pos_left = ($consumer_start * 2) - 50;
   
-  for my $c2 (@consumers) {
-      # Log3 ($name, 1, "$name - Energieflussgrafik, Consumer to show -> $c2"); 
-      
-      my $power = sprintf("%.1f",ReadingsNum($name, "consumer${c2}_currentPower", 0));
-      
-     $ret .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
-     
-     $pos_left += ($consumer_distance * 2);
+  for my $c2 (@consumers) {      
+      my $power  = sprintf("%.1f",ReadingsNum($name, "consumer${c2}_currentPower", 0));
+      $ret      .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
+      $pos_left += ($consumer_distance * 2);
   }
 
   $ret .= qq{</g></svg>};
