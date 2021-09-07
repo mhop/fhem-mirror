@@ -5139,7 +5139,7 @@ END0
   for my $c0 (@consumers) {
       my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
       $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
-      my $cicon       = substConsumerIcon ($hash, $c0, $currentPower);                          # Icon des Consumerdevices
+      my $cicon       = substConsumerIcon ($hash, $c0);                                         # Icon des Consumerdevices
 
       $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
       $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
@@ -5228,9 +5228,10 @@ END3
   for my $c2 (@consumers) {      
       $currentPower = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
       my $swstate   = ConsumerVal ($hash, $c2, "state", "undef");                                 # Schaltzustand des Consumerdevices
+      my $rpcurr    = ConsumerVal ($hash, $c2, "rpcurr",     "");                                 # Readingname f. current Power
       
-      if (!($currentPower > 0) && $swstate eq "on") {                                             # Workaround wenn Verbraucher ohne Leistungsmessung
-          $currentPower = ' ';
+      if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
+          $currentPower = $swstate eq "on" ? 'on' : 'off';
       }
       
       $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$currentPower</text>};
@@ -5246,18 +5247,16 @@ return $ret;
 #       prüfe ob Verbrauchericon + Farbe angegeben ist
 #       und setze ggf. Ersatzwerte
 #       $csm     - Consumer Nummer
-#       $compval - Vergleichswert (0|1) zur Farbauswahl wenn  
-#                  Farbe nicht gesetzt
 ################################################################
 sub substConsumerIcon {               
   my $hash    = shift;
   my $csm     = shift;
-  my $compval = shift;
   
   my $name = $hash->{NAME};
 
-  my $cicon = ConsumerVal ($hash, $csm, "icon", "");                                  # Icon des Consumerdevices angegeben ?
-  
+  my $cicon   = ConsumerVal ($hash, $csm, "icon",        "");                  # Icon des Consumerdevices angegeben ?
+  my $swstate = ConsumerVal ($hash, $csm, "state",  "undef");                  # Schaltzustand des Consumerdevices
+   
   if (!$cicon) {
       $cicon = 'light_light_dim_100'; 
   }
@@ -5266,10 +5265,10 @@ sub substConsumerIcon {
   ($cicon,$color) = split '@', $cicon;  
   
   if (!$color) {
-      $color = $compval ? 'darkorange' : 'grey';
+      $color = $swstate eq "on" ? 'darkorange' : '';
   }
   
-  $cicon .= '@'.$color;
+  $cicon .= '@'.$color if($color);
   
 return $cicon;
 }
@@ -6751,6 +6750,8 @@ return $def;
 #       offcom    - Setter Ausschaltkommando
 #       retotal   - Reading der Leistungsmessung
 #       uetotal   - Unit der Leistungsmessung
+#       rpcurr    - Readingname des aktuellen Verbrauchs
+#       upcurr    - Unit des aktuellen Verbrauchs
 #       avgenergy - gemessener Durchschnittsverbrauch eines Tages
 #       epieces   - prognostizierte Energiescheiben (Hash)
 #       isConsumptionRecommended - ist Verbrauch empfohlen ?
