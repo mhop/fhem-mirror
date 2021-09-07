@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.55.2" => "07.09.2021  minor fixes ",
   "0.55.1" => "05.09.2021  delete invalid consumer index, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219 ",
   "0.55.0" => "04.09.2021  new key pcurr for attr customerXX ",
   "0.54.5" => "29.08.2021  change metadata ",
@@ -5135,22 +5136,13 @@ END0
   $consumer_start = 0 if $consumer_start < 0;
   my $pos_left    = $consumer_start + 15;
   
-  for my $c0 (@consumers) {  
-      my $color;  
-      my $calias      = ConsumerVal ($hash, $c0, "alias", "");                                  # Name des Consumerdevices
-      my $cicon       = ConsumerVal ($hash, $c0, "icon",  "");                                  # Icon des Consumerdevices
-      $currentPower   = ReadingsNum ($name, "consumer${c0}_currentPower", 0);
-      
-      if (!$cicon) {  
-          $color = $currentPower ? '@darkorange' : '@grey';
-          $cicon = 'light_light_dim_100'.$color; 
-      }
-      
-      ($cicon,$color) = split '@', $cicon;  
-      $color          = $color ? '@'.$color : '';     
+  for my $c0 (@consumers) {
+      my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
+      $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
+      my $cicon       = substConsumerIcon ($hash, $c0, $currentPower);                          # Icon des Consumerdevices
 
       $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
-      $ret .= "<title>$calias</title>".FW_makeImage($cicon.$color, '');
+      $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
       $ret .= '</g> ';
     
       $pos_left += $consumer_distance;
@@ -5199,7 +5191,13 @@ END3
   
   for my $c1 (@consumers) {     
       my $power          = ConsumerVal ($hash, $c1, "power", 0);
+      my $swstate        = ConsumerVal ($hash, $c1, "state", "undef");                         # Schaltzustand des Consumerdevices
       $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
+      
+      if (!$currentPower && $swstate eq "on") {                                                # Workaround wenn Verbraucher ohne Leistungsmessung
+          $currentPower = $power;
+      }
+      
       my $p              = $currentPower;    
       $p                 = (($currentPower / $power) * 100) if ($power > 0);
          
@@ -5228,14 +5226,52 @@ END3
   $pos_left = ($consumer_start * 2) - 50;
   
   for my $c2 (@consumers) {      
-      my $power  = sprintf("%.1f",ReadingsNum($name, "consumer${c2}_currentPower", 0));
-      $ret      .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$power</text>};
-      $pos_left += ($consumer_distance * 2);
+      $currentPower = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
+      my $swstate   = ConsumerVal ($hash, $c2, "state", "undef");                                 # Schaltzustand des Consumerdevices
+      
+      if (!($currentPower > 0) && $swstate eq "on") {                                             # Workaround wenn Verbraucher ohne Leistungsmessung
+          $currentPower = ' ';
+      }
+      
+      $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$currentPower</text>};
+      $pos_left  += ($consumer_distance * 2);
   }
 
   $ret .= qq{</g></svg>};
       
 return $ret;
+}
+
+################################################################
+#       prüfe ob Verbrauchericon + Farbe angegeben ist
+#       und setze ggf. Ersatzwerte
+#       $csm     - Consumer Nummer
+#       $compval - Vergleichswert (0|1) zur Farbauswahl wenn  
+#                  Farbe nicht gesetzt
+################################################################
+sub substConsumerIcon {               
+  my $hash    = shift;
+  my $csm     = shift;
+  my $compval = shift;
+  
+  my $name = $hash->{NAME};
+
+  my $cicon = ConsumerVal ($hash, $csm, "icon", "");                                  # Icon des Consumerdevices angegeben ?
+  
+  if (!$cicon) {
+      $cicon = 'light_light_dim_100'; 
+  }
+  
+  my $color;
+  ($cicon,$color) = split '@', $cicon;  
+  
+  if (!$color) {
+      $color = $compval ? 'darkorange' : 'grey';
+  }
+  
+  $cicon .= '@'.$color;
+  
+return $cicon;
 }
 
 ################################################################
