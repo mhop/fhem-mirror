@@ -30,6 +30,7 @@ use GPUtils qw(GP_Import GP_Export);                      # wird für den Import
 use Time::HiRes qw(gettimeofday);
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;         ## no critic 'eval'
 use Encode;
+use Color;
 use utf8;
 eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # Debian: apt-get install libjson-perl
 
@@ -119,7 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.55.2" => "07.09.2021  minor fixes ",
+  "0.55.2" => "08.09.2021  minor fixes, use Color ",
   "0.55.1" => "05.09.2021  delete invalid consumer index, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219 ",
   "0.55.0" => "04.09.2021  new key pcurr for attr customerXX ",
   "0.54.5" => "29.08.2021  change metadata ",
@@ -7873,6 +7874,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         "POSIX": 0,
         "GPUtils": 0,
         "Encode": 0,
+        "Color": 0,
         "utf8": 0,
         "JSON": 4.020,
         "Data::Dumper": 0,
