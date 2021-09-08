@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.55.3" => "08.09.2021  add powerthreshold to etotal key ",
   "0.55.2" => "08.09.2021  minor fixes, use Color ",
   "0.55.1" => "05.09.2021  delete invalid consumer index, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219 ",
   "0.55.0" => "04.09.2021  new key pcurr for attr customerXX ",
@@ -2633,11 +2634,12 @@ sub _manageConsumerData {
       my $enread = $acref->{$c}{retotal};
       my $u      = $acref->{$c}{uetotal};
       if($enread) {
-          my $eu    = $u =~ /^kWh$/xi ? 1000 : 1;
-          my $etot  = ReadingsNum ($consumer, $enread, 0) * $eu;                                 # Summe Energieverbrauch des Verbrauchers
-          my $ehist = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);       # gespeicherter Totalverbrauch
+          my $eu         = $u =~ /^kWh$/xi ? 1000 : 1;
+          my $etot       = ReadingsNum ($consumer, $enread, 0) * $eu;                                 # Summe Energieverbrauch des Verbrauchers
+          my $ehist      = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
+          my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird               
           
-          if(defined $ehist && $etot >= $ehist) {
+          if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $pthreshold) {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
  
@@ -3678,10 +3680,10 @@ sub collectAllRegConsumers {
       
       my $alias = AttrVal ($consumer, "alias", $consumer);
       
-      my ($rtot,$utot);
+      my ($rtot,$utot,$pthreshold);
       if(exists $hc->{etotal}) {
-          my $etotal    = $hc->{etotal};
-          ($rtot,$utot) = split ":",$etotal;
+          my $etotal                = $hc->{etotal};
+          ($rtot,$utot,$pthreshold) = split ":",$etotal;
       }
       
       my ($rpcurr,$upcurr);
@@ -3697,24 +3699,25 @@ sub collectAllRegConsumers {
       my $auto      = 1;
       $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                              # Reading für Ready-Bit -> Einschalten möglich ?
 
-      $data{$type}{$name}{consumers}{$c}{name}         = $consumer;                               # Name des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{alias}        = $alias;                                  # Alias des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{type}         = $hc->{type}      // $defctype;           # Typ des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{power}        = $hc->{power};                            # Leistungsaufnahme des Verbrauchers in W
-      $data{$type}{$name}{consumers}{$c}{avgenergy}    = $avgenergy;                              # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mintime}      = $hc->{mintime}   // $hef{$ctype}{mt};    # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mode}         = $hc->{mode}      // $defcmode;           # Planungsmode des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{icon}         = $hc->{icon}      // q{};                 # Icon für den Verbraucher
-      $data{$type}{$name}{consumers}{$c}{oncom}        = $hc->{on}        // q{};                 # Setter Einschaltkommando 
-      $data{$type}{$name}{consumers}{$c}{offcom}       = $hc->{off}       // q{};                 # Setter Ausschaltkommando
-      $data{$type}{$name}{consumers}{$c}{autoreading}  = $rauto;                                  # Readingname zur Automatiksteuerung
-      $data{$type}{$name}{consumers}{$c}{auto}         = $auto;                                   # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
-      $data{$type}{$name}{consumers}{$c}{retotal}      = $rtot            // q{};                 # Reading der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{uetotal}      = $utot            // q{};                 # Unit der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{rpcurr}       = $rpcurr          // q{};                 # Reading der aktuellen Leistungsaufnahme
-      $data{$type}{$name}{consumers}{$c}{upcurr}       = $upcurr          // q{};                 # Unit der aktuellen Leistungsaufnahme
-      $data{$type}{$name}{consumers}{$c}{notbefore}    = $hc->{notbefore} // q{};                 # nicht einschalten vor Stunde in 24h Format (00-23)
-      $data{$type}{$name}{consumers}{$c}{notafter}     = $hc->{notafter}  // q{};                 # nicht einschalten nach Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{name}           = $consumer;                             # Name des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{alias}          = $alias;                                # Alias des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{type}           = $hc->{type}      // $defctype;         # Typ des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{power}          = $hc->{power};                          # Leistungsaufnahme des Verbrauchers in W
+      $data{$type}{$name}{consumers}{$c}{avgenergy}      = $avgenergy;                            # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mintime}        = $hc->{mintime}   // $hef{$ctype}{mt};  # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mode}           = $hc->{mode}      // $defcmode;         # Planungsmode des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{icon}           = $hc->{icon}      // q{};               # Icon für den Verbraucher
+      $data{$type}{$name}{consumers}{$c}{oncom}          = $hc->{on}        // q{};               # Setter Einschaltkommando 
+      $data{$type}{$name}{consumers}{$c}{offcom}         = $hc->{off}       // q{};               # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{autoreading}    = $rauto;                                # Readingname zur Automatiksteuerung
+      $data{$type}{$name}{consumers}{$c}{auto}           = $auto;                                 # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
+      $data{$type}{$name}{consumers}{$c}{retotal}        = $rtot            // q{};               # Reading der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{uetotal}        = $utot            // q{};               # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{powerthreshold} = $pthreshold      // 0;                 # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird  
+      $data{$type}{$name}{consumers}{$c}{rpcurr}         = $rpcurr          // q{};               # Reading der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{upcurr}         = $upcurr          // q{};               # Unit der aktuellen Leistungsaufnahme
+      $data{$type}{$name}{consumers}{$c}{notbefore}      = $hc->{notbefore} // q{};               # nicht einschalten vor Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{notafter}       = $hc->{notafter}  // q{};               # nicht einschalten nach Stunde in 24h Format (00-23)
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -6752,6 +6755,8 @@ return $def;
 #       retotal   - Reading der Leistungsmessung
 #       uetotal   - Unit der Leistungsmessung
 #       rpcurr    - Readingname des aktuellen Verbrauchs
+#       powerthreshold - Schwellenwert (Wh pro Stunde) ab der ein 
+#                        Verbraucher als aktiv gewertet wird  
 #       upcurr    - Unit des aktuellen Verbrauchs
 #       avgenergy - gemessener Durchschnittsverbrauch eines Tages
 #       epieces   - prognostizierte Energiescheiben (Hash)
@@ -7494,7 +7499,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>       
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br><br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] </b><br><br>
         
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
@@ -7525,14 +7530,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
             <tr><td>                   </td><td>Readingwert = 1: Schalten freigegeben (default),  0: Schalten blockiert                                                          </td></tr>
             <tr><td> <b>pcurr</b>      </td><td>Reading welches den aktuellen Energieverbrauch (z.B. Schaltdose mit Energiemessung) liefert und Einheit (W/kW) (optional)        </td></tr>
-            <tr><td> <b>etotal</b>     </td><td>Reading welches die Summe der verbrauchten Energie liefert und Einheit (Wh/kWh) (optional)                                       </td></tr>
+            <tr><td> <b>etotal</b>     </td><td>Reading / Einheit (Wh/kWh), welches die Summe der verbrauchten Energie liefert (optional)                                        </td></tr>
+            <tr><td> <b>               </td><td>&lt;Schwellenwert&gt (Wh) = optionaler Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.               </td></tr>
          </table>
          </ul>
        <br>
       
        <ul>
          <b>Beispiele: </b> <br>
-         attr &lt;name&gt; consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh <br>
+         attr &lt;name&gt; consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
          attr &lt;name&gt; consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12
        </ul> 
        </li>  
