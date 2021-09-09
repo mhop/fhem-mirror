@@ -980,6 +980,8 @@ FW_execRawDef(data)
   doNext()
   {
     if(++i1 >= arr.length) {
+      if($("#FW_okDialog").length) // F2F remote cmd execution
+        return;
       return FW_okDialog("Executed everything, no errors found.");
     }
     str += arr[i1];
