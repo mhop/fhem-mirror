@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.014
+#  Version 5.0
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.014';
+my $HMCCURPCPROC_VERSION = '5.0';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -126,6 +126,17 @@ my %RPC_METHODS = (
 );
 
 # RPC event types
+# EV = Event
+# ND = New device
+# DD = Delete device
+# RD = Replace device
+# RA = Readded device
+# UD = Update device
+# IN = Init RPC connection
+# EX = Exit RPC process
+# SL = Server loop
+# ST = Statistics (not in list of event types)
+# TO = Timeout
 my @RPC_EVENT_TYPES = ('EV', 'ND', 'DD', 'RD', 'RA', 'UD', 'IN', 'EX', 'SL', 'TO');
 
 
@@ -138,6 +149,7 @@ sub HMCCURPCPROC_Initialize ($);
 sub HMCCURPCPROC_Define ($$);
 sub HMCCURPCPROC_InitDevice ($$);
 sub HMCCURPCPROC_Undef ($$);
+sub HMCCURPCPROC_Rename ($$);
 sub HMCCURPCPROC_DelayedShutdown ($);
 sub HMCCURPCPROC_Shutdown ($);
 sub HMCCURPCPROC_Attr ($@);
@@ -237,6 +249,7 @@ sub HMCCURPCPROC_Initialize ($)
 
 	$hash->{DefFn}             = 'HMCCURPCPROC_Define';
 	$hash->{UndefFn}           = 'HMCCURPCPROC_Undef';
+	$hash->{RenameFn}          = 'HMCCURPCPROC_Rename';
 	$hash->{SetFn}             = 'HMCCURPCPROC_Set';
 	$hash->{GetFn}             = 'HMCCURPCPROC_Get';
 	$hash->{ReadFn}            = 'HMCCURPCPROC_Read';
@@ -448,6 +461,21 @@ sub HMCCURPCPROC_Undef ($$)
 }
 
 ######################################################################
+# Rename device
+######################################################################
+
+sub HMCCURPCPROC_Rename ($$)
+{
+	my ($newName, $oldName) = @_;
+	my $hash = $defs{$newName};
+
+	my $ioHash = $hash->{IODev};
+	my $ifName = $hash->{rpcinterface};
+
+	$ioHash->{hmccu}{interfaces}{$ifName}{device} = $newName;
+}
+
+######################################################################
 # Delayed shutdown FHEM
 ######################################################################
 
@@ -531,7 +559,9 @@ sub HMCCURPCPROC_Attr ($@)
 			$hash->{hmccu}{localaddr} = $hash->{hmccu}{defaultaddr};
 		}
 	}
-	
+
+	HMCCU_LogDisplay ($hash, 2, 'Please restart RPC server to apply attribute changes') if ($init_done);
+
 	return undef;
 }
 
@@ -2403,6 +2433,11 @@ sub HMCCURPCPROC_HexDump ($$)
 {
 	my ($name, $data) = @_;
 	
+	if (!defined($data)) {
+		HMCCU_Log ($name, 4, 'HexDump called without data');
+		return;
+	}
+
 	my $offset = 0;
 
 	foreach my $chunk (unpack "(a16)*", $data) {
