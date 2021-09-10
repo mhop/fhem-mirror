@@ -198,7 +198,7 @@ sub Twilight_Change_DEF {
         my @wd = devspec2array("TYPE=Weather|PROPLANTA");
         my ($err, $wreading);
         ($err, $wreading) = Twilight_disp_ExtWeather($hash, $wd[0]) if $wd[0];
-        $weather = $err ? "" : $wd[0] ;
+        $weather = $err || !defined $wd[0] ? q{} : $wd[0] ;
     }
     $newdef = "$hash->{helper}{'.LATITUDE'} $hash->{helper}{'.LONGITUDE'}" if $hash->{helper}{'.LATITUDE'} != AttrVal( 'global', 'latitude', 50.112 ) || $hash->{helper}{'.LONGITUDE'} != AttrVal( 'global', 'longitude', 8.686 );
     $newdef .= " $hash->{INDOOR_HORIZON} $weather";
