@@ -5194,11 +5194,12 @@ END3
   }
   
   for my $c1 (@consumers) {     
-      my $power          = ConsumerVal ($hash, $c1, "power", 0);
+      my $power          = ConsumerVal ($hash, $c1, "power",   0);
+      my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                             # Reading für akt. Verbrauch angegeben ?
       my $swstate        = ConsumerVal ($hash, $c1, "state", "undef");                         # Schaltzustand des Consumerdevices
       $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
       
-      if (!$currentPower && $swstate eq "on") {                                                # Workaround wenn Verbraucher ohne Leistungsmessung
+      if (!$rpcurr && $swstate eq "on") {                                                      # Workaround wenn Verbraucher ohne Leistungsmessung
           $currentPower = $power;
       }
       
@@ -7539,7 +7540,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <ul>
          <b>Beispiele: </b> <br>
          attr &lt;name&gt; consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
-         attr &lt;name&gt; consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12
+         attr &lt;name&gt; consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic
        </ul> 
        </li>  
        <br>
