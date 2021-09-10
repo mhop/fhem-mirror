@@ -416,10 +416,22 @@ sub
 FHEM2FHEM_keepalive($)
 {
   my ($hash) = @_;
-  my $ki = AttrVal($hash->{NAME}, "keepaliveInterval", 0);
+  my $name = $hash->{NAME};
+  my $ki = AttrVal($name, "keepaliveInterval", 0);
   return if(!$ki || !$hash->{TCPDev});
-  syswrite($hash->{TCPDev}, "{undef}\n");
-  InternalTimer(gettimeofday()+$ki, "FHEM2FHEM_keepalive", $hash);
+
+  HttpUtils_Connect({
+    url => "http://$hash->{Host}/", noConn2 => 1,
+    callback=> sub {
+      my ($h, $err, undef) = @_;
+      if($err) {
+        Log3 $name, 4, "$name keepalive: $err";
+        return FHEM2FHEM_Disconnected($hash);
+      }
+      $h->{conn}->close();
+      InternalTimer(gettimeofday()+$ki, "FHEM2FHEM_keepalive", $hash);
+    }
+  });
 }
 
 1;
