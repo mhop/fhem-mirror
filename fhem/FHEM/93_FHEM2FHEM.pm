@@ -175,6 +175,7 @@ FHEM2FHEM_Read($)
     } else {
       Log3 $name, 3, "Remote command response:$resp";
     }
+    $hash->{cmdResponse} = $resp;
 
     $data = $1.$3; # Continue with the rest
   }
