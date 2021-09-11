@@ -84,6 +84,7 @@ BEGIN {
     defs
     AttrVal
     ReadingsVal
+    makeReadingName
   ))
 };
 
@@ -248,33 +249,38 @@ sub onmessage($$$) {
       Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME},$reading,$message,1)");
       readingsSingleUpdate($hash,$reading,$message,1);
     }
-  } elsif ($topic =~ $hash->{'.autoSubscribeExpr'}) {
-    Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME},$1,$message,1)");
-    CommandAttr(undef,"$hash->{NAME} subscribeReading_$1 $topic");
-    readingsSingleUpdate($hash,$1,$message,1);
+  } elsif ($topic =~ m{$hash->{'.autoSubscribeExpr'}}) {
+    my $rname = $1;
+    $rname = makeReadingName($rname);
+    return if !defined $rname;
+    Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME}, $rname, $message,1)");
+    CommandAttr(undef,"$hash->{NAME} subscribeReading_$rname $topic");
+    readingsSingleUpdate($hash,$rname,$message,1);
   }
+  return;
 }
 
 1;
+__END__
 
 =pod
 =item [device]
 =item summary MQTT_DEVICE acts as a fhem-device that is mapped to mqtt-topics
 =begin html
 
-<a name="MQTT_DEVICE"></a>
+<a id="MQTT_DEVICE"></a>
 <h3>MQTT_DEVICE</h3>
 <ul>
   <p>acts as a fhem-device that is mapped to <a href="http://mqtt.org/">mqtt</a>-topics.</p>
   <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
      Note: this module is based on <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a> which needs to be installed from CPAN first.</p>
-  <a name="MQTT_DEVICEdefine"></a>
+  <a id="MQTT_DEVICE-define"></a>
   <p><b>Define</b></p>
   <ul>
     <p><code>define &lt;name&gt; MQTT_DEVICE</code><br/>
        Specifies the MQTT device.</p>
   </ul>
-  <a name="MQTT_DEVICEset"></a>
+  <a id="MQTT_DEVICE-set"></a>
   <p><b>Set</b></p>
   <ul>
     <li>
@@ -292,7 +298,7 @@ sub onmessage($$$) {
       <code>attr mqttest eventMap { dev=>{ 'true'=>'on', 'false'=>'off' }, usr=>{ '^on$'=>'true', '^off$'=>'false' }, fw=>{ '^on$'=>'on', '^off$'=>'off' } }</code></p>
     </li>
   </ul>
-  <a name="MQTT_DEVICEattr"></a>
+  <a id="MQTT_DEVICE-attr"></a>
   <p><b>Attributes</b></p>
   <ul>
     <li>
