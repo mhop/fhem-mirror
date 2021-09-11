@@ -1958,6 +1958,7 @@ sub centralTask {
       
       my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
+      my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
       my $chour   = strftime "%H", localtime($t);                                                  # aktuelle Stunde 
       my $minute  = strftime "%M", localtime($t);                                                  # aktuelle Minute
       my $day     = strftime "%d", localtime($t);                                                  # aktueller Tag  (range 01 to 31)
@@ -1967,6 +1968,7 @@ sub centralTask {
           hash    => $hash,
           name    => $name,
           t       => $t,
+          date    => $date,
           minute  => $minute,
           chour   => $chour,
           day     => $day,
@@ -2098,13 +2100,13 @@ sub _specialActivities {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $date  = $paref->{date};                                              # aktuelles Datum
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
-  my $t     = $paref->{t};                                                                     # Epoche Zeit
+  my $t     = $paref->{t};                                                 # aktuelle Zeit
   my $day   = $paref->{day};
   
   my $type  = $hash->{TYPE};
-  my $date  = strftime "%Y-%m-%d", localtime($t);                                              # aktuelles Datum
   
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
   
@@ -2609,7 +2611,8 @@ sub _manageConsumerData {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
-  my $t       = $paref->{t};                      # aktuelle Zeit
+  my $t       = $paref->{t};                                                 # aktuelle Zeit
+  my $date    = $paref->{date};                                              # aktuelles Datum
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
   my $daref   = $paref->{daref};  
@@ -2708,11 +2711,12 @@ sub _manageConsumerData {
             my $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t));
             
             if($chour eq $starthour) {                 
-                my $runtime                                   = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60 ;   # in Minuten ! (gettimeofday sind ms !)          
+                my $runtime                                   = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;    # in Minuten ! (gettimeofday sind ms !)          
                 $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "minutesOn", 0) + $runtime;
             }
-            else {
-                $data{$type}{$name}{consumers}{$c}{minutesOn} = 0;                                                       # neue Stunde hat begonnen
+            else {                                                                                                       # neue Stunde hat begonnen
+                $data{$type}{$name}{consumers}{$c}{startTime} = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
+                $data{$type}{$name}{consumers}{$c}{minutesOn} = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;    # in Minuten ! (gettimeofday sind ms !)                                                       
             }                                                                                     
 	  }
 	  else {
