@@ -4,11 +4,20 @@
 #	RFHEM
 #	Copyright by chris1284
 #
+# 23.8.21 : Modified by Admimarantis
+#	Using Net::Ping for more stable detection of host
+#	Improved display of status/errors in reading
+#	added extra handling to sync "state" reading in case of plan "set xxx on" to be synced
+#	completed "events" case to actually issue a command if limited to certain events
+# 11.9.21 :
+#	Added deprecation message since FHEM2FHEM now covers all functionality in a better way
+#
 #########################################################
 package main;
 
 use strict;
 use warnings;
+use Net::Ping;
 
 sub RFHEM_GetUpdate($);
 sub RFHEM_GetNet($$);
@@ -25,6 +34,8 @@ sub RFHEM_Initialize($)
   my ($hash) = @_;
 
 	$hash->{DefFn}		=	"RFHEM_Define";	
+	$hash->{FW_detailFn}  = "RFHEM_Detail";
+	$hash->{FW_deviceOverview} = 1;
 	$hash->{UndefFn}	=	"RFHEM_Undef";	
 	$hash->{SetFn}		=	"RFHEM_Set";	
 	$hash->{NotifyFn}	=	"RFHEM_Notify";		
@@ -56,6 +67,7 @@ sub RFHEM_Define($$)
 	$hash->{STATE}		= $devstate;
 	$hash->{Interval}	= $inter;
 	InternalTimer(gettimeofday()+2, "RFHEM_GetUpdate", $hash, 0);
+	Log3 $name, 1, "RFHEM is deprecated, please use FHEM2FHEM"; 
 	return undef;
 }
 sub RFHEM_Undef($$)
@@ -76,18 +88,24 @@ sub RFHEM_Set($@)
 	my $HOSTPORT = $hash->{PORT};
 	my $HOSTPW = $hash->{PASSWORD} if ($hash->{PASSWORD});
 	#my $socket = IO::Socket::INET->new('PeerAddr' => $HOSTNAME,'PeerPort' => $HOSTPORT,'Proto' => 'tcp') or die Log3 $name, 3, "Can't create socket ($!)\n";
-	my $socket = IO::Socket::INET->new('PeerAddr' => $HOSTNAME,'PeerPort' => $HOSTPORT,'Proto' => 'tcp') ;
+	my $socket = IO::Socket::INET->new('PeerAddr' => $HOSTNAME,'PeerPort' => $HOSTPORT,'Proto' => 'tcp', Blocking => 0) ;
+	if (!$socket) {
+		readingsSingleUpdate($hash,"statedev","can't open FHEM port",1);
+		return;
+	}
     my $msg = $command."\n" ;
     #Log3 $name, 3, "$msg";
-	my @values =  RFHEM_GetNet($hash,$HOSTNAME);
-	if ( $values[1] eq "present") {
+	my $ret =  RFHEM_GetNet($hash,$HOSTNAME);
+	if ( $ret) {
 		Log3 $name, 3, "Host present, executing command..."; 
 		syswrite($socket, $HOSTPW . "\n")if($hash->{PASSWORD});
 		print $socket $msg;
-		Log3 $name, 3, "Command executed."; }
+		Log3 $name, 3, "Command executed:$msg"; 
+		$socket->close();
+	}
 	else { Log3 $name, 3, "Error: host not present!"; }
-	#$socket->close();
 	#Log3 $name, 3, "Connection closed";
+	return undef;
 }
 sub RFHEM_GetUpdate($)
 {
@@ -95,49 +113,30 @@ sub RFHEM_GetUpdate($)
 	my $hostname = $hash->{HOSTNAME};
 	my $name = $hash->{NAME};
 	InternalTimer(gettimeofday()+$hash->{Interval}, "RFHEM_GetUpdate", $hash, 1);
-	#Log3 $name, 3, "WINPC: GetUpdate called ...";
-	my @values =  RFHEM_GetNet($hash,$hostname);
-	readingsBeginUpdate($hash); #start update
-    readingsBulkUpdate($hash,"ipadress",$values[0]); #doit
-	readingsBulkUpdate($hash,"statedev",$values[1]); #doit
-    readingsEndUpdate($hash,1); #end update
-	#Log3 $name, 3, "WINPC: GetUpdate done.";
+	RFHEM_GetNet($hash,$hostname);
 }
+
 sub RFHEM_GetNet($$)
 {
 	my ($hash, $hostname) = @_;
 	my $name  = $hash->{NAME};
-	my $netstate ;
-	my @return ;
-	my @a ;
-	my $ip ;
-	my $erg = `ping -c 1 -w 2 $hostname` ;
-	#Log3 $name, 3, "NETPC: $erg";
-	if( $erg =~ m/100%/)
-	{
-		$ip = "0.0.0.0";
-		$netstate = "absent";
-		@return =($ip,$netstate);
-		return @return;
+	my $p = Net::Ping->new();
+	my $ret;
+	eval { $ret=$p->ping($hostname,0.5) };
+	if ($@) {
+		Log3 $name, 3 , $@;
+		readingsSingleUpdate($hash,"statedev","unknown hostname",1);
+		return 0;
 	}
-	elsif( $erg =~ m/ping: unknown host/)
-	{
-		$ip = "0.0.0.0";
-		$netstate = "unknown";
-		@return =($ip,$netstate);
-		return @return;
+	$p->close();
+	if ($ret) {
+		readingsSingleUpdate($hash,"statedev","present",1);
+	} else {
+		readingsSingleUpdate($hash,"statedev","absent",1);
 	}
-	elsif( $erg =~ m/0%/ )
-	{
-		@a = split(" ", $erg);
-		$ip = $a[2];
-		$ip =~ tr/(//ds;
-		$ip =~ tr/)//ds;
-		$netstate = "present";
-		@return =($ip,$netstate);
-		return @return;
-	}
+	return $ret;
 }
+
 sub RFHEM_Notify($$)
 {
 	my ($hash, $extDevHash) = @_;
@@ -154,21 +153,28 @@ sub RFHEM_Notify($$)
 				Log3 $name , 3,  "RFHEM $name - triggered by Device:$extDevName (all events) ...";
 				foreach $extevent (@{$extDevHash->{CHANGED}}) { #für jedes event des externen device / dort geänderte readings
 						my @eventparts = split (": ", $extevent);
-						Log3 $name , 3,  "RFHEM $name - event: $eventparts[0] with value $eventparts[1] ...";
+						if (@eventparts == 1) {
+							Log3 $name , 3,  "RFHEM adding state";
+							unshift @eventparts, 'state';
+						}
+						Log3 $name , 3,  "RFHEM $name - event(@eventparts): $eventparts[0] with value $eventparts[1] ...";
 						my $setcmd = "set $name cmd setreading $extDevName $eventparts[0] $eventparts[1]";
 						fhem( $setcmd );
 				}
 			}
 			else {
 				foreach $extevent (@{$extDevHash->{CHANGED}}) { #für jedes event des externen device / dort geänderte readings
-					my @exteventparts = split (": ", $event);
+					my @exteventparts = split (": ", $extevent);
 					foreach $event (@myevents) { # mit jedme event aus rhfme attribut
 						if ($event eq $exteventparts[0]) { 
-							Log3 $name , 3,  "RFHEM $name - triggered by Device:$extDevName with event ...";
+							Log3 $name , 3,  "RFHEM $name - triggered by Device:$extDevName with event $event";
 							my @eventparts = split (": ", $extevent);
+							if (@eventparts == 1) {
+								unshift @eventparts, 'state';
+							}
 							Log3 $name , 3,  "RFHEM $name - event: $eventparts[0] with value $eventparts[1] ...";
-							
-							
+						    my $setcmd = "set $name cmd setreading $extDevName $eventparts[0] $eventparts[1]";
+						    fhem( $setcmd );							
 						}
 					}
 				}
@@ -177,11 +183,18 @@ sub RFHEM_Notify($$)
 	}
 }
 
+sub RFHEM_Detail {
+	my ($FW_wname, $name, $room, $pageHash) = @_;
+	my $hash=$defs{$name};
+	my $ret = "";
+	return "RFHEM is deprecated and will be removed soon. All RFHEM functionality is now available in FHEM2FHEM.<br><br>If you need assistance for the migration please refer to the <a href=https://forum.fhem.de/index.php/topic,23638.msg1174044.html#new>forum</a><br>";
+}
+
 1;
 =pod
 =item helper
-=item summary RFHEM is a easy helper module to connect separate FHEM installations 
-=item summary_DE RFHEM ist ein einfaches Hilfsmodul um separate FHEM Installationen zu verbinden
+=item summary RFHEM is deprecated - please use FHEM2FHEM 
+=item summary_DE RFHEM ist veraltet - bitte FHEM2FHEM verwenden
 =begin html
 
 <a name="RFHEM"></a>

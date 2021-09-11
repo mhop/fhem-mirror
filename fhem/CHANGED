@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_RFHEM: Deprecation message (use FHEM2FHEM), some fixes
  - change:  93_DbRep: SQL code for SQLite, Forum:#122791
  - bugfix:  70_ZoneMinder: Trigger-Port state fixed
  - feature: 49_IPCAM: introduced attribute 'blocking'
