@@ -515,8 +515,13 @@ sub Read {
         GP_ForallClients($hash,\&notify_client_connected);
         foreach my $message_id (keys %{$hash->{messages}}) {
           my $msg = $hash->{messages}->{$message_id}->{message};
-          $msg->{dup} = $msg->message_type == MQTT_PUBLISH;
-          DevIo_SimpleWrite($hash,$msg->bytes,undef);
+          if($msg->message_type != MQTT_SUBSCRIBE) {
+            # alle subscrube messages werden bei client_start bereits neu gesendet
+            $msg->{dup} = $msg->message_type == MQTT_PUBLISH;
+            DevIo_SimpleWrite($hash,$msg->bytes,undef);
+          } else {
+            delete($hash->{messages}->{$message_id});
+          }
         }
         last;
       };
@@ -648,7 +653,7 @@ sub send_connect($) {
   my $pass = getKeyValue($name."_pass");
   
   my $lw = AttrVal($name,"last-will",undef);
-  my $clientId = AttrVal($name,"client-id",undef);
+  my $clientId = AttrVal($name,'client-id', $hash->{FUUID});
   my ($willqos, $willretain,$willtopic, $willmessage) = parsePublishCmdStr($lw);
   
   return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => $hash->{timeout}, user_name => $user, password => $pass, client_id=>$clientId, will_topic => $willtopic,  will_message => $willmessage, will_retain => $willretain, will_qos => $willqos);
