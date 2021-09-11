@@ -1712,7 +1712,7 @@ sub HMCCU_Get ($@)
 	my $rc;
 	
 	if ($opt eq 'vars') {
-		my $varname = shift @$a // return HMCCU_SetError ($hash, "Usage: get $name vars {regexp}[,...]");
+		my $varname = shift @$a // return HMCCU_SetError ($hash, "Usage: get $name vars {regexp}");
 		($rc, $result) = HMCCU_GetVariables ($hash, $varname);
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return HMCCU_SetState ($hash, 'OK', $result);
@@ -10396,7 +10396,8 @@ sub HMCCU_MaxHashEntries ($$)
          time consuming.
       </li><br/>
       <li><b>get &lt;name&gt; vars &lt;regexp&gt;</b><br/>
-         Get CCU system variables matching <i>regexp</i> and store them as readings.
+         Get CCU system variables matching <i>regexp</i> and store them as readings. Use attribute
+		 ccuGetVars to fetch variables periodically.
       </li>
    </ul>
    <br/>
@@ -10505,7 +10506,7 @@ sub HMCCU_MaxHashEntries ($$)
          is queried. Default is 'Value'. Method for write access to datapoints is always
          'State'.
       </li><br/>
-      <li><b>ccuGetVars &lt;interval&gt;[&lt;pattern&gt;]</b><br/>
+      <li><b>ccuGetVars &lt;interval&gt;:[&lt;pattern&gt;]</b><br/>
       	Read CCU system variables periodically and update readings. If pattern is specified
       	only variables matching this expression are stored as readings.
       </li><br/>

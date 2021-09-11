@@ -1765,7 +1765,7 @@ if (oSV) {
 		code        => qq(
 object osysvar;
 string ssysvarid;
-foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
+foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumIDs()) {
   osysvar = dom.GetObject(ssysvarid);
   Write(osysvar.Name());
   if(osysvar.ValueSubType() == 6) {
@@ -1784,7 +1784,7 @@ foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
 		parameters  => 0,
 		code        => qq(
 string sSysVarId;
-foreach (sSysVarId, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
+foreach (sSysVarId, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumIDs()) {
   object oSysVar = dom.GetObject(sSysVarId);
   Write(oSysVar.Name());               
   if (oSysVar.ValueSubType() == 6) {
