@@ -1918,6 +1918,10 @@ sub centralTask {
   #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
   #}
   
+  for my $c (keys %{$data{$type}{$name}{consumers}}) {
+      delete $data{$type}{$name}{consumers}{$c}{OnOff};
+  }
+  
   #deleteReadingspec ($hash, "Today_Hour.*_Consumption");
   #deleteReadingspec ($hash, "ThisHour_.*");
   #deleteReadingspec ($hash, "Today_PV");
@@ -2705,17 +2709,19 @@ sub _manageConsumerData {
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
                 my $stimes                                          = ConsumerVal ($hash, $c, "numberDayStarts", 0);     # Anzahl der On-Schaltungen am Tag
-                $data{$type}{$name}{consumers}{$c}{numberDayStarts} = $stimes+1; 
+                $data{$type}{$name}{consumers}{$c}{numberDayStarts} = $stimes+1;
+                $data{$type}{$name}{consumers}{$c}{lastMinutesOn}   = ConsumerVal ($hash, $c, "minutesOn", 0);               
             }
              
-            my $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t));
-            
-            if($chour eq $starthour) {                 
-                $data{$type}{$name}{consumers}{$c}{minutesOn} = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;    # in Minuten ! (gettimeofday sind ms !)          
+            my $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t)); 
+        
+            if($chour eq $starthour) {         
+                my $runtime                                   = (($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60);                  # in Minuten ! (gettimeofday sind ms !)          
+                $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "lastMinutesOn", 0) + $runtime; 
             }
-            else {                                                                                                       # neue Stunde hat begonnen
-                $data{$type}{$name}{consumers}{$c}{startTime} = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
-                $data{$type}{$name}{consumers}{$c}{minutesOn} = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;    # in Minuten ! (gettimeofday sind ms !)                                                       
+            else {                                                                                                                       # neue Stunde hat begonnen
+                $data{$type}{$name}{consumers}{$c}{startTime}     = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
+                $data{$type}{$name}{consumers}{$c}{lastMinutesOn} = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;                # in Minuten ! (gettimeofday sind ms !)                                                       
             }                                                                                     
 	  }
 	  else {
