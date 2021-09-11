@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.0" => "11.09.2021  new Attr flowGraphicShowConsumer, extend calc consumer power consumption ",
   "0.55.3" => "08.09.2021  add powerthreshold to etotal key ",
   "0.55.2" => "08.09.2021  minor fixes, use Color ",
   "0.55.1" => "05.09.2021  delete invalid consumer index, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219 ",
@@ -507,9 +508,10 @@ my $defcmode     = "can";                                                       
 my $caicondef    = 'light_light_dim_100@gold';                                    # default consumerAdviceIcon
 
 my $defflowGSize = 300;                                                           # default flowGraphicSize
+my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
 
                                                                                   # Default CSS-Style
-my $cssdef       = qq{.flowg.text         { stroke: none; fill: gray; }                \n}.
+my $cssdef       = qq{.flowg.text         { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
                    qq{.flowg.sun_active   { stroke: orange; fill: orange; }                                                \n}.
                    qq{.flowg.sun_inactive { stroke: gray; fill: gray; }                                                    \n}.
                    qq{.flowg.bat25        { stroke: red; fill: red; }                                                      \n}.
@@ -583,6 +585,7 @@ sub Initialize {
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
+                                "flowGraphicShowConsumer:1,0 ".
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast,none ".                                     
@@ -2167,6 +2170,10 @@ sub _specialActivities {
               deleteConsumerPlanning ($hash, $c);
               my $calias = ConsumerVal ($hash, $c, "alias", "");
               Log3 ($name, 3, qq{$name - Consumer planning of "$calias" deleted});
+              
+              $data{$type}{$name}{consumers}{$c}{minutesOn}       = 0;
+              $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 0;
+              $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
           }
           
           deleteReadingspec ($hash, "consumer.*_planned.*"); 
@@ -2602,60 +2609,115 @@ sub _manageConsumerData {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
+  my $t       = $paref->{t};                      # aktuelle Zeit
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
   my $daref   = $paref->{daref};  
   
   my $nhour   = $chour+1;
-  my $type    = $hash->{TYPE};
-  
-  my $acref = $data{$type}{$name}{consumers};                                                 
+  my $type    = $hash->{TYPE};                                               
 
-  for my $c (sort{$a<=>$b} keys %{$acref}) {
-      my $consumer = $acref->{$c}{name};
-      my $alias    = $acref->{$c}{alias};
+  for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {
+      my $consumer = ConsumerVal ($hash, $c, "name",  "");         
+      my $alias    = ConsumerVal ($hash, $c, "alias", "");        
       
       ## aktuelle Leistung auslesen 
       ##############################
-      my $paread = $acref->{$c}{rpcurr};
-      my $up     = $acref->{$c}{upcurr};
+      my $paread = ConsumerVal ($hash, $c, "rpcurr", "");   
+      my $up     = ConsumerVal ($hash, $c, "upcurr", "");   
+      my $pcurr  = 0;
+      
       if($paread) {
-          my $eup   = $up =~ /^kW$/xi ? 1000 : 1;
-          my $pcurr = ReadingsNum ($consumer, $paread, 0) * $eup; 
+          my $eup = $up =~ /^kW$/xi ? 1000 : 1;
+          $pcurr  = ReadingsNum ($consumer, $paread, 0) * $eup; 
           
           push @$daref, "consumer${c}_currentPower<>". $pcurr." W";  
-      }
-      else {
-          deleteReadingspec ($hash, "consumer${c}_currentPower");
       }
 
       ## Verbrauch auslesen + speichern
       ##################################
-      my $enread = $acref->{$c}{retotal};
-      my $u      = $acref->{$c}{uetotal};
+      my $pthreshold = 0;
+      my $enread     = ConsumerVal ($hash, $c, "retotal", ""); 
+      my $u          = ConsumerVal ($hash, $c, "uetotal", ""); 
+      
       if($enread) {
-          my $eu         = $u =~ /^kWh$/xi ? 1000 : 1;
-          my $etot       = ReadingsNum ($consumer, $enread, 0) * $eu;                                 # Summe Energieverbrauch des Verbrauchers
-          my $ehist      = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
-          my $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird               
+          my $eu      = $u =~ /^kWh$/xi ? 1000 : 1;
+          my $etot    = ReadingsNum ($consumer, $enread, 0) * $eu;                                 # Summe Energieverbrauch des Verbrauchers
+          my $ehist   = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
+          $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird               
+          
+          ## aktuelle Leitung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
+          ################################################################################
+          if(!$paread){
+              my $timespan = $t    - ConsumerVal ($hash, $c, "old_etottime",  $t);
+              my $delta    = $etot - ConsumerVal ($hash, $c, "old_etotal", $etot);
+              $pcurr       = sprintf("%.6f", $delta / (3600 * $timespan)) if($delta > 0);                        # Einheitenformel beachten !!: W = Wh / (3600 * s)
+            
+              $data{$type}{$name}{consumers}{$c}{old_etotal}   = $etot;
+              $data{$type}{$name}{consumers}{$c}{old_etottime} = $t;
+            
+              push @$daref, "consumer${c}_currentPower<>". $pcurr." W";
+          }
+          else {
+              deleteReadingspec ($hash, "consumer${c}_currentPower");
+          }
           
           if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $pthreshold) {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
  
               $paref->{consumerco} = $consumerco;
-              $paref->{nhour}      = sprintf("%02d",$nhour);
+              $paref->{nhour}      = sprintf("%02d",$nhour);                                   # Verbrauch des Consumers aktuelle Stunde
               $paref->{histname}   = "csme${c}";
               setPVhistory ($paref);
               delete $paref->{histname};   
           }   
 
-          $paref->{consumerco} = $etot;
+          $paref->{consumerco} = $etot;                                                        # Totalverbrauch des Verbrauchers
           $paref->{nhour}      = sprintf("%02d",$nhour);
           $paref->{histname}   = "csmt${c}";
           setPVhistory ($paref);
           delete $paref->{histname};
       }
+      
+	  ## Verbraucher - Laufzeit und Zyklen pro Tag ermitteln
+      ## Laufzeit (in Minuten) wird pro Stunde erfasst
+      ## bei Tageswechsel Rücksetzen in _specialActivities
+      #######################################################
+      my $nompower = ConsumerVal ($hash, $c, "power",       0);                                # nominale Leistung lt. Typenschild
+      my $rpcurr   = ConsumerVal ($hash, $c, "rpcurr",     "");                                # Reading für akt. Verbrauch angegeben ?
+      my $swstate  = ConsumerVal ($hash, $c, "state", "undef");                                # Schaltzustand des Consumerdevices
+      
+      if (!$rpcurr && $swstate eq "on") {                                                      # Workaround wenn Verbraucher ohne Leistungsmessung
+          $pcurr = $nompower;
+      }
+      
+      my $currpowerpercent = $pcurr;    
+      $currpowerpercent    = (($pcurr / $nompower) * 100) if($nompower > 0);
+	  
+	  $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
+	  
+	  if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {
+            if($data{$type}{$name}{consumers}{$c}{onoff} ne "on") {
+                $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
+                $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
+                my $stimes                                          = ConsumerVal ($hash, $c, "numberDayStarts", 0);     # Anzahl der On-Schaltungen am Tag
+                $data{$type}{$name}{consumers}{$c}{numberDayStarts} = $stimes+1; 
+            }
+             
+            my $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t));
+            
+            if($chour eq $starthour) {                 
+                my $runtime                                   = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60 ;   # in Minuten ! (gettimeofday sind ms !)          
+                $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "minutesOn", 0) + $runtime;
+            }
+            else {
+                $data{$type}{$name}{consumers}{$c}{minutesOn} = 0;                                                       # neue Stunde hat begonnen
+            }                                                                                     
+	  }
+	  else {
+	      $data{$type}{$name}{consumers}{$c}{onoff} = "off";
+	  }
       
       ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
       ################################################################
@@ -3852,6 +3914,7 @@ sub entryGraphic {
       lang       => AttrVal ("global", 'language',                 'EN'),
       flowgh     => AttrVal ($name,    'flowGraphicSize', $defflowGSize),                      # Größe Energieflußgrafik
       flowgani   => AttrVal ($name,    'flowGraphicAnimate',          0),                      # Animation Energieflußgrafik
+      flowgcons  => AttrVal ($name,    'flowGraphicShowConsumer',     1),                      # Verbraucher in der Energieflußgrafik anzeigen
       css        => AttrVal ($name,    'Css',                   $cssdef),                      # Css Styles
   };
   
@@ -5030,10 +5093,11 @@ sub _flowGraphic {
   my $name       = $paref->{name};
   my $flowgh     = $paref->{flowgh};
   my $flowgani   = $paref->{flowgani};
+  my $flowgcons  = $paref->{flowgcons};
   my $css        = $paref->{css};
     
   my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
-  my $fs         = $flowgh < 300 ? '48px' : '32px';
+  # my $fs         = $flowgh < 300 ? '48px' : '32px';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
 
   my $cpv        = ReadingsNum($name, 'Current_PV', 0);
@@ -5047,6 +5111,8 @@ sub _flowGraphic {
 
   my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
   my $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
+  
+  my $cc         = ReadingsNum($name, 'Current_Consumption', 0);
 
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
@@ -5122,34 +5188,39 @@ END0
 
   ## get consumer list and display it in Graphics
   ################################################
-  my $type              = $hash->{TYPE};
-  my @consumers         = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                 # definierte Verbraucher ermitteln
-  my $consumercount     = scalar @consumers;
+  my $pos_left          = 0;
+  my $consumercount     = 0;
   my $consumer_start    = 0;
   my $consumer_distance = 100;
+  my @consumers;
+  my $currentPower      = 0;
   
-  my $currentPower;
-  
-  if ($consumercount % 2) {
-      $consumer_start = 250 - ($consumer_distance  * (($consumercount -1) / 2)); 
-  } 
-  else {
-      $consumer_start = 250 - ((($consumer_distance ) / 2) * ($consumercount-1));
-  }
-  
-  $consumer_start = 0 if $consumer_start < 0;
-  my $pos_left    = $consumer_start + 15;
-  
-  for my $c0 (@consumers) {
-      my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
-      $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
-      my $cicon       = substConsumerIcon ($hash, $c0);                                         # Icon des Consumerdevices
+  if ($flowgcons) {
+      my $type       = $hash->{TYPE};
+      @consumers     = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                        # definierte Verbraucher ermitteln
+      $consumercount = scalar @consumers; 
 
-      $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
-      $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
-      $ret .= '</g> ';
-    
-      $pos_left += $consumer_distance;
+      if ($consumercount % 2) {
+          $consumer_start = 250 - ($consumer_distance  * (($consumercount -1) / 2)); 
+      } 
+      else {
+          $consumer_start = 250 - ((($consumer_distance ) / 2) * ($consumercount-1));
+      }
+      
+      $consumer_start = 0 if $consumer_start < 0;
+      $pos_left       = $consumer_start + 15;
+      
+      for my $c0 (@consumers) {
+          my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
+          $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
+          my $cicon       = substConsumerIcon ($hash, $c0);                                         # Icon des Consumerdevices
+
+          $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
+          $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
+          $ret .= '</g> ';
+        
+          $pos_left += $consumer_distance;
+      }
   }
 
   if ($hasbat) {
@@ -5182,65 +5253,70 @@ END3
   
   ## get consumer list and display it in Graphics
   ################################################
-  $pos_left          = $consumer_start * 2;
-  my $pos_left_start = 0;
-  my $distance       = 25;
-  
-  if ($consumercount % 2) {
-      $pos_left_start = 500 - ($distance  * (($consumercount -1) / 2)); 
-  } 
-  else {
-      $pos_left_start = 500 - ((($distance ) / 2) * ($consumercount-1));
-  }
-  
-  for my $c1 (@consumers) {     
-      my $power          = ConsumerVal ($hash, $c1, "power",   0);
-      my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                             # Reading für akt. Verbrauch angegeben ?
-      my $swstate        = ConsumerVal ($hash, $c1, "state", "undef");                         # Schaltzustand des Consumerdevices
-      $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
+  if ($flowgcons) {
+      $pos_left          = $consumer_start * 2;
+      my $pos_left_start = 0;
+      my $distance       = 25;
       
-      if (!$rpcurr && $swstate eq "on") {                                                      # Workaround wenn Verbraucher ohne Leistungsmessung
-          $currentPower = $power;
+      if ($consumercount % 2) {
+          $pos_left_start = 500 - ($distance  * (($consumercount -1) / 2)); 
+      } 
+      else {
+          $pos_left_start = 500 - ((($distance ) / 2) * ($consumercount-1));
       }
       
-      my $p              = $currentPower;    
-      $p                 = (($currentPower / $power) * 100) if ($power > 0);
+      for my $c1 (@consumers) {     
+          my $power          = ConsumerVal ($hash, $c1, "power",   0);
+          my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                             # Reading für akt. Verbrauch angegeben ?
+          my $swstate        = ConsumerVal ($hash, $c1, "state", "undef");                         # Schaltzustand des Consumerdevices
+          $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
+          
+          if (!$rpcurr && $swstate eq "on") {                                                      # Workaround wenn Verbraucher ohne Leistungsmessung
+              $currentPower = $power;
+          }
+          
+          my $p              = $currentPower;    
+          $p                 = (($currentPower / $power) * 100) if ($power > 0);
+             
+          my $consumer_style = 'flowg inactive_out';
+          $consumer_style    = 'flowg active_out' if($p > $defpopercent);
          
-      my $consumer_style = 'flowg inactive_out';
-      $consumer_style    = 'flowg active_out' if($p > 0.5);
-     
-      my $consumer_color = "";
-      $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0.5);
-     
-      $ret              .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M$pos_left_start,700 L$pos_left,850" />};
-     
-      $pos_left         += ($consumer_distance * 2);
-      $pos_left_start   += $distance;
-  } 
+          my $consumer_color = "";
+          $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0.5);
+         
+          $ret              .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M$pos_left_start,700 L$pos_left,850" />};
+         
+          $pos_left         += ($consumer_distance * 2);
+          $pos_left_start   += $distance;
+      } 
+  }
 
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="600" y="15"  style="font-size: $fs; text-anchor: start;">$cpv</text>}     if ($cpv);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="795" y="370" style="font-size: $fs; text-anchor: middle;">$soc %</text>}  if ($hasbat);
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="530" y="300" style="font-size: $fs; text-anchor: start;">$csc</text>}     if ($csc && $cpv);
-  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="325" y="200" style="font-size: $fs; text-anchor: end;">$cgfi</text>}      if ($cgfi);
-  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="325" y="420" style="font-size: $fs; text-anchor: end;">$cgc</text>}       if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batout-txt"    x="665" y="420" style="font-size: $fs; text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
-  $ret .= qq{<text class="flowg text" id="batin-txt"     x="665" y="200" style="font-size: $fs; text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="600" y="15"  style="text-anchor: start;">$cpv</text>}     if ($cpv);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="795" y="370" style="text-anchor: middle;">$soc %</text>}  if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="530" y="300" style="text-anchor: start;">$csc</text>}     if ($csc && $cpv);
+  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="325" y="200" style="text-anchor: end;">$cgfi</text>}      if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="325" y="420" style="text-anchor: end;">$cgc</text>}       if ($cgc);
+  $ret .= qq{<text class="flowg text" id="batout-txt"    x="665" y="420" style="text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="batin-txt"     x="665" y="200" style="text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
+  # $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: start;">$cc</text>};                                    # Current_Consumption Anlage
 
   ## get consumer list and display it in Graphics
   ################################################
-  $pos_left = ($consumer_start * 2) - 50;
-  
-  for my $c2 (@consumers) {      
-      $currentPower = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
-      my $swstate   = ConsumerVal ($hash, $c2, "state", "undef");                                 # Schaltzustand des Consumerdevices
-      my $rpcurr    = ConsumerVal ($hash, $c2, "rpcurr",     "");                                 # Readingname f. current Power
+  if ($flowgcons) {
+      $pos_left = ($consumer_start * 2) - 50;
       
-      if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
-          $currentPower = $swstate eq "on" ? 'on' : 'off';
+      for my $c2 (@consumers) {      
+          $currentPower = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
+          my $swstate   = ConsumerVal ($hash, $c2, "state", "undef");                                 # Schaltzustand des Consumerdevices
+          my $rpcurr    = ConsumerVal ($hash, $c2, "rpcurr",     "");                                 # Readingname f. current Power
+          
+          if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
+              $currentPower = $swstate eq "on" ? 'on' : 'off';
+          }
+          
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="text-anchor: start;">$currentPower</text>};                          # Current_Consumption Consumer
+          $pos_left  += ($consumer_distance * 2);
       }
-      
-      $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="font-size: $fs; text-anchor: start;">$currentPower</text>};
-      $pos_left  += ($consumer_distance * 2);
   }
 
   $ret .= qq{</g></svg>};
@@ -7551,15 +7627,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Zum Ändern des Css-Attributes bitte den Default übernehmen und anpassen: <br><br>
          
          <ul>   
-           .flowg.text         { stroke: none; fill: gray; }            <br>    
-           .flowg.sun_active   { stroke: orange; fill: orange; }        <br>                                          
-           .flowg.sun_inactive { stroke: gray; fill: gray; }            <br>                                         
-           .flowg.bat25        { stroke: red; fill: red; }              <br>                                        
-           .flowg.bat50        { stroke: yellow; fill: yellow; }        <br>                                       
-           .flowg.bat75        { stroke: green; fill: green; }          <br>                                    
-           .flowg.grid_color1  { fill: green; }                         <br>           
-           .flowg.grid_color2  { fill: red; }                           <br>                                    
-           .flowg.grid_color3  { fill: gray; }                          <br>                                    
+           .flowg.text         { stroke: none; fill: gray; font-size: 32px; } <br>    
+           .flowg.sun_active   { stroke: orange; fill: orange; }              <br>                                          
+           .flowg.sun_inactive { stroke: gray; fill: gray; }                  <br>                                         
+           .flowg.bat25        { stroke: red; fill: red; }                    <br>                                        
+           .flowg.bat50        { stroke: yellow; fill: yellow; }              <br>                                       
+           .flowg.bat75        { stroke: green; fill: green; }                <br>                                    
+           .flowg.grid_color1  { fill: green; }                               <br>           
+           .flowg.grid_color2  { fill: red; }                                 <br>                                    
+           .flowg.grid_color3  { fill: gray; }                                <br>                                    
            .flowg.inactive_in  { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
            .flowg.inactive_out { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
            .flowg.active_in    { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
@@ -7586,6 +7662,13 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Animiert die Energieflußgrafik sofern angezeigt. 
          Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
          (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-flowGraphicShowConsumer"></a>
+       <li><b>flowGraphicShowConsumer </b><br>
+         Unterdrückt die Anzeige der Verbraucher in der Energieflußgrafik wenn auf "0" gesetzt. <br> 
+         (default: 1)
        </li>
        <br>
        
