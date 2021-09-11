@@ -515,7 +515,7 @@ sub Read {
         GP_ForallClients($hash,\&notify_client_connected);
         foreach my $message_id (keys %{$hash->{messages}}) {
           my $msg = $hash->{messages}->{$message_id}->{message};
-          $msg->{dup} = $msg->{ispub};
+          $msg->{dup} = $msg->message_type == MQTT_PUBLISH;
           DevIo_SimpleWrite($hash,$msg->bytes,undef);
         }
         last;
