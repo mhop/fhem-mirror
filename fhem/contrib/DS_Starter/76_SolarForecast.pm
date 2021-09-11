@@ -2654,7 +2654,7 @@ sub _manageConsumerData {
           if(!$paread){
               my $timespan = $t    - ConsumerVal ($hash, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($hash, $c, "old_etotal", $etot);
-              $pcurr       = sprintf("%.6f", $delta / (3600 * $timespan)) if($delta > 0);                        # Einheitenformel beachten !!: W = Wh / (3600 * s)
+              $pcurr       = sprintf("%.6f", $delta / (3600 * $timespan)) if($delta > 0);          # Einheitenformel beachten !!: W = Wh / (3600 * s)
             
               $data{$type}{$name}{consumers}{$c}{old_etotal}   = $etot;
               $data{$type}{$name}{consumers}{$c}{old_etottime} = $t;
@@ -2711,8 +2711,7 @@ sub _manageConsumerData {
             my $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t));
             
             if($chour eq $starthour) {                 
-                my $runtime                                   = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;    # in Minuten ! (gettimeofday sind ms !)          
-                $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "minutesOn", 0) + $runtime;
+                $data{$type}{$name}{consumers}{$c}{minutesOn} = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;    # in Minuten ! (gettimeofday sind ms !)          
             }
             else {                                                                                                       # neue Stunde hat begonnen
                 $data{$type}{$name}{consumers}{$c}{startTime} = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
