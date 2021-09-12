@@ -992,7 +992,11 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients",
+                                                             defined $modules{InternalVal($nIO,"TYPE","")}{Clients}
+                                                                   ? $modules{InternalVal($nIO,"TYPE","")}{Clients}
+                                                                   :"")
+                                                   !~ m /:CUL_HM:/);
       }
       if($attr{$name}{$attrName}){# see who we lost
         foreach my $oldIOs (split(",",$attr{$name}{$attrName})){
@@ -10696,6 +10700,7 @@ sub CUL_HM_UpdtCentral($){
                                    grep{AttrVal($_,"peerIDs","") =~ m/$id/} 
                                    keys %defs)){
     # now for each ccu Channel, that ist peered with someone. 
+    next if ($ccuBId !~ m/^[0-9A-F]{8}$/);
     my $btn = hex(substr($ccuBId,6,2)) + 0;
     CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId") if (!$modules{CUL_HM}{defptr}{$ccuBId});
     foreach my $pn (grep !/^$/,
