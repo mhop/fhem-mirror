@@ -2705,7 +2705,8 @@ sub _manageConsumerData {
 	  
 	  $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
 	  
-	  if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {
+      my $starthour;
+	  if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher soll aktiv sein
             if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
@@ -2714,13 +2715,13 @@ sub _manageConsumerData {
                 $data{$type}{$name}{consumers}{$c}{lastMinutesOn}   = ConsumerVal ($hash, $c, "minutesOn", 0);               
             }
              
-            my $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t)); 
+            $starthour = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t)); 
         
             if($chour eq $starthour) {         
                 my $runtime                                   = (($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60);                  # in Minuten ! (gettimeofday sind ms !)          
                 $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "lastMinutesOn", 0) + $runtime; 
             }
-            else {                                                                                                                       # neue Stunde hat begonnen
+            else {                                                                                                               # neue Stunde hat begonnen
                 if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
                     $data{$type}{$name}{consumers}{$c}{startTime}     = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
                     $data{$type}{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;                # in Minuten ! (gettimeofday sind ms !)                                                       
@@ -2728,10 +2729,21 @@ sub _manageConsumerData {
                 }
             }                                                                                     
 	  }
-	  else {
+	  else {                                                                                  # Verbraucher soll nicht aktiv sein
 	      $data{$type}{$name}{consumers}{$c}{onoff} = "off";
-          delete $data{$type}{$name}{consumers}{$c}{startTime};
+          $starthour                                = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t)); 
+          
+          if($chour ne $starthour) {
+              $data{$type}{$name}{consumers}{$c}{minutesOn} = 0;
+              delete $data{$type}{$name}{consumers}{$c}{startTime};
+          }
 	  }
+      
+      $paref->{val}      = ConsumerVal ($hash, $c, "numberDayStarts", 0);                     # Anzahl Tageszyklen des Verbrauchers speichern
+      $paref->{nhour}    = sprintf("%02d",$nhour);
+      $paref->{histname} = "cyclescsm${c}";
+      setPVhistory ($paref);
+      delete $paref->{histname};
       
       ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
       ################################################################
@@ -5984,9 +5996,9 @@ sub setPVhistory {
   my $wrp            = $paref->{wrp}           // 0;                       # Wahrscheinlichkeit von Niederschlag
   my $pvcorrf        = $paref->{pvcorrf}       // "1.00/0";                # pvCorrectionFactor
   my $temp           = $paref->{temp};                                     # Außentemperatur
+  my $val            = $paref->{val}           // qq{};                    # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
   
   my $type = $hash->{TYPE};
-  my $val  = q{};
   
   $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname; 
 
@@ -6106,6 +6118,10 @@ sub setPVhistory {
       }      
   }
   
+  if($histname =~ /cyclescsm[0-9]+$/xs) {                                                         # Anzahl Tageszyklen des Verbrauchers
+      $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;        
+  }
+  
   if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
       $val = $etotal;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{etotal} = $etotal;
@@ -6210,21 +6226,36 @@ sub listDataPool {
           my $csm;
           for my $c (1..$maxconsumer) {
               $c        = sprintf "%02d", $c;
+              my $nl    = 0;
+              my $csmc  = HistoryVal ($hash, $day, $key, "cyclescsm${c}", undef);
               my $csmt  = HistoryVal ($hash, $day, $key, "csmt${c}",      undef);
               my $csme  = HistoryVal ($hash, $day, $key, "csme${c}",      undef);
               my $csmh  = HistoryVal ($hash, $day, $key, "hourscsme${c}", undef);
+              
+              if(defined $csmc) {
+                  $csm .= "cyclescsm${c}: $csmc";
+                  $nl   = 1;
+              }
+              
               if(defined $csmt) {
-                  $csm .= ", "     if($csm);
+                  $csm .= ", " if($nl);
                   $csm .= "csmt${c}: $csmt";
+                  $nl   = 1;
               }
+              
               if(defined $csme) {
-                  $csm .= ", "     if($csm);
+                  $csm .= ", " if($nl);
                   $csm .= "csme${c}: $csme";
+                  $nl   = 1;
               }
+              
               if(defined $csmh) {
-                  $csm .= ", "          if($csm);
+                  $csm .= ", " if($nl);
                   $csm .= "hourscsme${c}: $csmh";
+                  $nl   = 1;
               }
+              
+              $csm .= "\n            " if($nl);
           }
           
           if($csm) {
@@ -7398,24 +7429,25 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <ul>
          <table>  
          <colgroup> <col width=20%> <col width=80%> </colgroup>
-            <tr><td> <b>etotal</b>      </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                             </td></tr>
-            <tr><td> <b>pvfc</b>        </td><td>der prognostizierte PV Ertrag (Wh)                                          </td></tr>
-            <tr><td> <b>pvrl</b>        </td><td>reale PV Erzeugung (Wh)                                                     </td></tr>
-            <tr><td> <b>gcon</b>        </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                </td></tr>
-            <tr><td> <b>confc</b>       </td><td>erwarteter Energieverbrauch (Wh)                                            </td></tr>
-            <tr><td> <b>con</b>         </td><td>realer Energieverbrauch (Wh) des Hauses                                     </td></tr>
-            <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung (Wh) in das Stromnetz                                     </td></tr>
-            <tr><td> <b>batintotal</b>  </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                             </td></tr>
-            <tr><td> <b>batin</b>       </td><td>Batterieladung der Stunde (Wh)                                              </td></tr>
-            <tr><td> <b>batouttotal</b> </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                          </td></tr>
-            <tr><td> <b>batout</b>      </td><td>Batterieentladung der Stunde (Wh)                                           </td></tr>
-            <tr><td> <b>wid</b>         </td><td>Identifikationsnummer des Wetters                                           </td></tr>
-            <tr><td> <b>wcc</b>         </td><td>effektive Wolkenbedeckung                                                   </td></tr>
-            <tr><td> <b>wrp</b>         </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
-            <tr><td> <b>pvcorrf</b>     </td><td>abgeleiteter Autokorrekturfaktor                                            </td></tr>
-            <tr><td> <b>csmtXX</b>      </td><td>Summe Energieverbrauch von ConsumerXX                                       </td></tr>
-            <tr><td> <b>csmeXX</b>      </td><td>Anteil der jeweiligen Stunde des Tages am Energieverbrauch von ConsumerXX   </td></tr>
-            <tr><td> <b>hourscsmeXX</b> </td><td>Summe Aktivstunden von ConsumerXX des Tages                                 </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                             </td></tr>
+            <tr><td> <b>pvfc</b>           </td><td>der prognostizierte PV Ertrag (Wh)                                          </td></tr>
+            <tr><td> <b>pvrl</b>           </td><td>reale PV Erzeugung (Wh)                                                     </td></tr>
+            <tr><td> <b>gcon</b>           </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                </td></tr>
+            <tr><td> <b>confc</b>          </td><td>erwarteter Energieverbrauch (Wh)                                            </td></tr>
+            <tr><td> <b>con</b>            </td><td>realer Energieverbrauch (Wh) des Hauses                                     </td></tr>
+            <tr><td> <b>gfeedin</b>        </td><td>reale Einspeisung (Wh) in das Stromnetz                                     </td></tr>
+            <tr><td> <b>batintotal</b>     </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                             </td></tr>
+            <tr><td> <b>batin</b>          </td><td>Batterieladung der Stunde (Wh)                                              </td></tr>
+            <tr><td> <b>batouttotal</b>    </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                          </td></tr>
+            <tr><td> <b>batout</b>         </td><td>Batterieentladung der Stunde (Wh)                                           </td></tr>
+            <tr><td> <b>wid</b>            </td><td>Identifikationsnummer des Wetters                                           </td></tr>
+            <tr><td> <b>wcc</b>            </td><td>effektive Wolkenbedeckung                                                   </td></tr>
+            <tr><td> <b>wrp</b>            </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
+            <tr><td> <b>pvcorrf</b>        </td><td>abgeleiteter Autokorrekturfaktor                                            </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>Summe Energieverbrauch von ConsumerXX                                       </td></tr>
+            <tr><td> <b>csmeXX</b>         </td><td>Anteil der jeweiligen Stunde des Tages am Energieverbrauch von ConsumerXX   </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>Summe Aktivstunden von ConsumerXX am Tag                                    </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX am Tag                                  </td></tr>
          </table>
       </ul>
       </li>      
