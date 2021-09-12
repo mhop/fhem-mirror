@@ -1262,7 +1262,7 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
   $doAli = 0;#set default
-  Log3 $hash,2,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
+  Log3 $hash,3,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
   if (@a && ($a[0] =~ m/^(-[dcivpase2]+)/)){# options provided
     $opt = $1;
     $a[0] =~ s/^(-[dcivpase2]*)//;
