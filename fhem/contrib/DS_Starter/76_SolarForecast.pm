@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.1" => "12.09.2021  some fixes ",
   "0.56.0" => "11.09.2021  new Attr flowGraphicShowConsumer, extend calc consumer power consumption ",
   "0.55.3" => "08.09.2021  add powerthreshold to etotal key ",
   "0.55.2" => "08.09.2021  minor fixes, use Color ",
@@ -2705,7 +2706,7 @@ sub _manageConsumerData {
 	  $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
 	  
 	  if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {
-            if($data{$type}{$name}{consumers}{$c}{onoff} ne "on") {
+            if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
                 my $stimes                                          = ConsumerVal ($hash, $c, "numberDayStarts", 0);     # Anzahl der On-Schaltungen am Tag
@@ -2720,12 +2721,16 @@ sub _manageConsumerData {
                 $data{$type}{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($hash, $c, "lastMinutesOn", 0) + $runtime; 
             }
             else {                                                                                                                       # neue Stunde hat begonnen
-                $data{$type}{$name}{consumers}{$c}{startTime}     = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
-                $data{$type}{$name}{consumers}{$c}{lastMinutesOn} = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;                # in Minuten ! (gettimeofday sind ms !)                                                       
+                if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
+                    $data{$type}{$name}{consumers}{$c}{startTime}     = timestringToTimestamp ($date." ".sprintf("%02d",$chour).":00:00");
+                    $data{$type}{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($hash, $c, "startTime", $t)) / 60;                # in Minuten ! (gettimeofday sind ms !)                                                       
+                    $data{$type}{$name}{consumers}{$c}{lastMinutesOn} = 0;
+                }
             }                                                                                     
 	  }
 	  else {
 	      $data{$type}{$name}{consumers}{$c}{onoff} = "off";
+          delete $data{$type}{$name}{consumers}{$c}{startTime};
 	  }
       
       ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
@@ -7408,9 +7413,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>wcc</b>         </td><td>effektive Wolkenbedeckung                                                   </td></tr>
             <tr><td> <b>wrp</b>         </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
             <tr><td> <b>pvcorrf</b>     </td><td>abgeleiteter Autokorrekturfaktor                                            </td></tr>
-            <tr><td> <b>csmtXX</b>      </td><td>gemessene Summe Energieverbrauch von ConsumerXX                             </td></tr>
-            <tr><td> <b>csmeXX</b>      </td><td>Energieverbrauch von ConsumerXX in der jeweiligen Stunde bzw. des Tages     </td></tr>
-            <tr><td> <b>hourscsmeXX</b> </td><td>gemessene Aktivstunden von ConsumerXX des Tages                             </td></tr>
+            <tr><td> <b>csmtXX</b>      </td><td>Summe Energieverbrauch von ConsumerXX                                       </td></tr>
+            <tr><td> <b>csmeXX</b>      </td><td>Anteil der jeweiligen Stunde des Tages am Energieverbrauch von ConsumerXX   </td></tr>
+            <tr><td> <b>hourscsmeXX</b> </td><td>Summe Aktivstunden von ConsumerXX des Tages                                 </td></tr>
          </table>
       </ul>
       </li>      
