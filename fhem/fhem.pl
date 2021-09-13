@@ -1437,6 +1437,7 @@ OpenLogfile($)
     $defs{global}{currentlogfile} = $param;
     $defs{global}{logfile} = $attr{global}{logfile};
 
+    restoreDir_mkDir($currlogfile=~m,^/,? "":".", $currlogfile, 1);
     open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
     redirectStdinStdErr();
     
