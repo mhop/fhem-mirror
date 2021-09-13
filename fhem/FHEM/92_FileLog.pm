@@ -185,6 +185,7 @@ FileLog_Define($@)
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
   if(!$hash->{READONLY}) {
+    restoreDir_mkDir($f=~m,^/,? "":".", $f, 1);
     $fh = new IO::File ">>$f";
     return "Can't open $f: $!" if(!defined($fh));
   }
