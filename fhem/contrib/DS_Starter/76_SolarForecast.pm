@@ -6110,18 +6110,17 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $consumerco;  
 
       if($histname =~ /csme[0-9]+$/xs) {
-          my $sum   = 0;
-          my $hours = 0;
+          my $sum = 0;
+          
           for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
               next if($k eq "99");
               my $csme = HistoryVal ($hash, $day, $k, "$histname", 0);
               next if(!$csme);
               
               $sum += $csme;
-              $hours++;
           }
-          $data{$type}{$name}{pvhist}{$day}{99}{$histname}         = $sum;
-          $data{$type}{$name}{pvhist}{$day}{99}{"hours".$histname} = $hours;        
+          
+          $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $sum;        
       }      
   }
   
@@ -6129,8 +6128,21 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;        
   }
   
-  if($histname =~ /minutescsm[0-9]+$/xs) {                                                         # Anzahl Tageszyklen des Verbrauchers
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;        
+  if($histname =~ /minutescsm[0-9]+$/xs) {                                                         # Anzahl Aktivminuten des Verbrauchers
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
+      my $minutes = 0;
+      my $num     = substr ($histname,10,2);
+      
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          my $csmm = HistoryVal ($hash, $day, $k, "$histname", 0);
+          next if(!$csmm);
+          
+          $minutes += $csmm;
+      }
+      
+      my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
+      $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = ceil ($minutes / $cycles / 60 ) if($cycles);       
   }
   
   if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
@@ -7465,8 +7477,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>csmtXX</b>         </td><td>Summe Energieverbrauch von ConsumerXX                                       </td></tr>
             <tr><td> <b>csmeXX</b>         </td><td>Anteil der jeweiligen Stunde des Tages am Energieverbrauch von ConsumerXX   </td></tr>
             <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                             </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>Summe Aktivstunden von ConsumerXX am Tag                                    </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX am Tag                                  </td></tr>
+            <tr><td> <b>hourscsmeXX</b>    </td><td>durchschnittliche Stunden eines Aktivzyklus von ConsumerXX des Tages        </td></tr>
+            <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                  </td></tr>
          </table>
       </ul>
       </li>      
