@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.2" => "14.09.2021  some fixes, new calculation of hourscsmeXX, new key minutescsmXX ",
   "0.56.1" => "12.09.2021  some fixes ",
   "0.56.0" => "11.09.2021  new Attr flowGraphicShowConsumer, extend calc consumer power consumption ",
   "0.55.3" => "08.09.2021  add powerthreshold to etotal key ",
@@ -2659,7 +2660,7 @@ sub _manageConsumerData {
           if(!$paread){
               my $timespan = $t    - ConsumerVal ($hash, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($hash, $c, "old_etotal", $etot);
-              $pcurr       = sprintf("%.6f", $delta / (3600 * $timespan)) if($delta > 0);          # Einheitenformel beachten !!: W = Wh / (3600 * s)
+              $pcurr       = sprintf("%.6f", $delta / (3600 * $timespan)) if($delta);              # Einheitenformel beachten !!: W = Wh / (3600 * s)
             
               $data{$type}{$name}{consumers}{$c}{old_etotal}   = $etot;
               $data{$type}{$name}{consumers}{$c}{old_etottime} = $t;
@@ -2667,7 +2668,7 @@ sub _manageConsumerData {
               push @$daref, "consumer${c}_currentPower<>". $pcurr." W";
           }
           else {
-              deleteReadingspec ($hash, "consumer${c}_currentPower");
+              deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$enread);
           }
           
           if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $pthreshold) {
@@ -2742,6 +2743,12 @@ sub _manageConsumerData {
       $paref->{val}      = ConsumerVal ($hash, $c, "numberDayStarts", 0);                     # Anzahl Tageszyklen des Verbrauchers speichern
       $paref->{nhour}    = sprintf("%02d",$nhour);
       $paref->{histname} = "cyclescsm${c}";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+      
+      $paref->{val}      = ceil ConsumerVal ($hash, $c, "minutesOn", 0);                      # Verbrauchsminuten akt. Stunde des Consumers
+      $paref->{nhour}    = sprintf("%02d",$nhour);
+      $paref->{histname} = "minutescsm${c}";
       setPVhistory ($paref);
       delete $paref->{histname};
       
@@ -3645,7 +3652,7 @@ sub _calcSummaries {
   my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
-  $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
+  $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen * 1 > 0);
   $autarkyrate            = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100) if($selfconsumption);
   
   $data{$type}{$name}{current}{consumption}         = $consumption;
@@ -5324,7 +5331,7 @@ END3
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="325" y="420" style="text-anchor: end;">$cgc</text>}       if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="665" y="420" style="text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="665" y="200" style="text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
-  # $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: start;">$cc</text>};                                    # Current_Consumption Anlage
+  $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: start;">$cc</text>};                                    # Current_Consumption Anlage
 
   ## get consumer list and display it in Graphics
   ################################################
@@ -6122,6 +6129,10 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;        
   }
   
+  if($histname =~ /minutescsm[0-9]+$/xs) {                                                         # Anzahl Tageszyklen des Verbrauchers
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $val;        
+  }
+  
   if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
       $val = $etotal;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{etotal} = $etotal;
@@ -6227,10 +6238,11 @@ sub listDataPool {
           for my $c (1..$maxconsumer) {
               $c        = sprintf "%02d", $c;
               my $nl    = 0;
-              my $csmc  = HistoryVal ($hash, $day, $key, "cyclescsm${c}", undef);
-              my $csmt  = HistoryVal ($hash, $day, $key, "csmt${c}",      undef);
-              my $csme  = HistoryVal ($hash, $day, $key, "csme${c}",      undef);
-              my $csmh  = HistoryVal ($hash, $day, $key, "hourscsme${c}", undef);
+              my $csmc  = HistoryVal ($hash, $day, $key, "cyclescsm${c}",  undef);
+              my $csmt  = HistoryVal ($hash, $day, $key, "csmt${c}",       undef);
+              my $csme  = HistoryVal ($hash, $day, $key, "csme${c}",       undef);
+              my $csmm  = HistoryVal ($hash, $day, $key, "minutescsm${c}", undef);
+              my $csmh  = HistoryVal ($hash, $day, $key, "hourscsme${c}",  undef);
               
               if(defined $csmc) {
                   $csm .= "cyclescsm${c}: $csmc";
@@ -6246,6 +6258,12 @@ sub listDataPool {
               if(defined $csme) {
                   $csm .= ", " if($nl);
                   $csm .= "csme${c}: $csme";
+                  $nl   = 1;
+              }
+              
+              if(defined $csmm) {
+                  $csm .= ", " if($nl);
+                  $csm .= "minutescsm${c}: $csmm";
                   $nl   = 1;
               }
               
@@ -7446,6 +7464,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>pvcorrf</b>        </td><td>abgeleiteter Autokorrekturfaktor                                            </td></tr>
             <tr><td> <b>csmtXX</b>         </td><td>Summe Energieverbrauch von ConsumerXX                                       </td></tr>
             <tr><td> <b>csmeXX</b>         </td><td>Anteil der jeweiligen Stunde des Tages am Energieverbrauch von ConsumerXX   </td></tr>
+            <tr><td> <b>minutescsmXX</b>   </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                             </td></tr>
             <tr><td> <b>hourscsmeXX</b>    </td><td>Summe Aktivstunden von ConsumerXX am Tag                                    </td></tr>
             <tr><td> <b>cyclescsmXX</b>    </td><td>Anzahl aktive Zyklen von ConsumerXX am Tag                                  </td></tr>
          </table>
