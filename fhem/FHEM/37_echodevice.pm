@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2021.09.15 v0.2.13
+# - CHANGE:  Probleme set tunein (Danke Benutzer adn77)
+#
 # 2021.06.24 v0.2.12
 # - FEATURE: Unterstützung A15996VY63BQ2D Echo Show 8 Gen2
 #            Unterstützung A2WFDCBDEXOXR8 Bose Soundbar 700
@@ -466,8 +469,9 @@ use Date::Parse;
 use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
+use MIME::Base64;
 
-my $ModulVersion     = "0.2.12";
+my $ModulVersion     = "0.2.13";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -1726,10 +1730,10 @@ sub echodevice_SendCommand($$$) {
 	}
 	
 	elsif ($type eq "tunein" || $type eq "ttstunein"  ) {
-        $SendUrl   .= "/api/tunein/queue-and-play?deviceSerialNumber=".$hash->{helper}{".SERIAL"}."&deviceType=".$hash->{helper}{DEVICETYPE}."&guideId=".$SendData."&contentType=station&callSign=&mediaOwnerCustomerId=".$hash->{IODev}->{helper}{".CUSTOMER"};
+		$SendUrl   .= "/api/entertainment/v1/player/queue?deviceSerialNumber=".$hash->{helper}{".SERIAL"}."&deviceType=".$hash->{helper}{DEVICETYPE};
+		$SendData   = encode_json( { contentToken => 'music:'. encode_base64(encode_base64('["music/tuneIn/stationId","'.$SendData.'"]|{"previousPageId":"TuneIn_SEARCH"}', ''), '') } );
 		$SendDataL  = $SendData ;
-		$SendData   = "";
-		$SendMetode = "POST";		
+		$SendMetode = "PUT";		
 	}
 	
 	elsif ($type eq "getnotifications" ) {
