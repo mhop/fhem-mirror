@@ -47,8 +47,6 @@ my @filelist2 = (
   "FHEM/lib/SWAP/.*.xml",
   "FHEM/lib/SWAP/panStamp/.*",
   "FHEM/lib/SWAP/justme/.*",
-  "FHEM/lib/Device/.*.pm",
-  "FHEM/lib/Device/Firmata/.*.pm",
   "FHEM/lib/MP3/.*.pm",
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
