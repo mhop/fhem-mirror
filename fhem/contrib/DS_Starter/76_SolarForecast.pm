@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.3" => "15.09.2021  extent __calcEnergyPieces by MadMax calc (first test implementation) ",
   "0.56.2" => "14.09.2021  some fixes, new calculation of hourscsmeXX, new key minutescsmXX ",
   "0.56.1" => "12.09.2021  some fixes ",
   "0.56.0" => "11.09.2021  new Attr flowGraphicShowConsumer, extend calc consumer power consumption ",
@@ -2622,9 +2623,11 @@ sub _manageConsumerData {
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
   my $daref   = $paref->{daref};  
-  
-  my $nhour   = $chour+1;
-  my $type    = $hash->{TYPE};                                               
+    
+  my $type    = $hash->{TYPE};   
+
+  my $nhour       = $chour+1;
+  $paref->{nhour} = $nhour;  
 
   for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {
       my $consumer = ConsumerVal ($hash, $c, "name",  "");         
@@ -2675,15 +2678,13 @@ sub _manageConsumerData {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
  
-              $paref->{consumerco} = $consumerco;
-              $paref->{nhour}      = sprintf("%02d",$nhour);                                   # Verbrauch des Consumers aktuelle Stunde
+              $paref->{consumerco} = $consumerco;                                              # Verbrauch des Consumers aktuelle Stunde
               $paref->{histname}   = "csme${c}";
               setPVhistory ($paref);
               delete $paref->{histname};   
           }   
 
           $paref->{consumerco} = $etot;                                                        # Totalverbrauch des Verbrauchers
-          $paref->{nhour}      = sprintf("%02d",$nhour);
           $paref->{histname}   = "csmt${c}";
           setPVhistory ($paref);
           delete $paref->{histname};
@@ -2741,13 +2742,11 @@ sub _manageConsumerData {
 	  }
       
       $paref->{val}      = ConsumerVal ($hash, $c, "numberDayStarts", 0);                     # Anzahl Tageszyklen des Verbrauchers speichern
-      $paref->{nhour}    = sprintf("%02d",$nhour);
       $paref->{histname} = "cyclescsm${c}";
       setPVhistory ($paref);
       delete $paref->{histname};
       
       $paref->{val}      = ceil ConsumerVal ($hash, $c, "minutesOn", 0);                      # Verbrauchsminuten akt. Stunde des Consumers
-      $paref->{nhour}    = sprintf("%02d",$nhour);
       $paref->{histname} = "minutescsm${c}";
       setPVhistory ($paref);
       delete $paref->{histname};
@@ -2809,6 +2808,66 @@ sub __calcEnergyPieces {
   my $c     = $paref->{consumer}; 
   
   my $type  = $hash->{TYPE};
+  
+  ## Ergänzung Max:  epieces ermitteln + speichern
+  ###################################################
+  my $epiecHistCounts = 10;
+  
+  if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
+      my $epiecHist       = "";
+      my $epiecHist_hours = "";
+      my $etot            = HistoryVal ($hash, $paref->{day}, sprintf("%02d",$paref->{nhour}), "csmt${c}", 0);
+        
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) < 0) {                                   #neue Aufzeichnung
+          $data{$type}{$name}{consumers}{$c}{epiecHist} += 1;  
+          $data{$type}{$name}{consumers}{$c}{epiecHist}  = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHistCounts);
+            
+          $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
+          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                          # Löschen, wird neu erfasst
+      }
+        
+      $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
+      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";  
+      my $epiecHour    = floor (ConsumerVal ($hash, $c, "minutesOn", 0) / 60) + 1;  
+        
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                         
+          my $epiecHour_last = $epiecHour - 1;
+
+          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
+          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
+      }
+
+      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
+      $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
+      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $epiecHour;
+  } 
+  else {                                                                                  # Durchschnitt ermitteln
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                   # Durchschnittliche Stunden ermitteln
+          my $hours = 0;
+          
+          for my $h (1..$epiecHistCounts) {                
+              $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);    
+          }
+            
+          $hours                                             = ceil ($hours / $epiecHistCounts);
+          $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
+              
+      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                # Durchschnitt für epics ermitteln     
+          for my $hour (1..$hours) {
+              for my $h (1..$epiecHistCounts) {
+                  my $epiecHist = "epiecHist_".$h;
+                    
+                  $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour};
+              }
+                
+              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $epiecHistCounts;
+          }
+      }
+    
+      $data{$type}{$name}{consumers}{$c}{epiecHour} = -1;
+  }
+  
+  ######################################################################################################
   
   delete $data{$type}{$name}{consumers}{$c}{epieces};
   
@@ -6910,7 +6969,8 @@ return $def;
 #       powerthreshold - Schwellenwert (Wh pro Stunde) ab der ein 
 #                        Verbraucher als aktiv gewertet wird  
 #       upcurr    - Unit des aktuellen Verbrauchs
-#       avgenergy - gemessener Durchschnittsverbrauch eines Tages
+#       avgenergy - initialer / gemessener Durchschnittsverbrauch
+#                   eines Tages
 #       epieces   - prognostizierte Energiescheiben (Hash)
 #       isConsumptionRecommended - ist Verbrauch empfohlen ?
 #
