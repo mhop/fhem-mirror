@@ -492,7 +492,7 @@ MQTT2_SERVER_doPublish($$$$;$)
 
   my $serverName = $server->{NAME};
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
-  next if(defined($ir) && "$tp:$val" =~ m/$ir/);
+  return if(defined($ir) && "$tp:$val" =~ m/$ir/);
 
   my $cid = $src->{cid};
   $tp =~ s/:/_/g; # 96608
