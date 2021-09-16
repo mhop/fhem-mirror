@@ -523,6 +523,7 @@ MQTT2_CLIENT_Read($@)
   } else {
     Log 1, "M2: Unhandled packet $cpt, disconneting $name";
     MQTT2_CLIENT_Disco($hash);
+    return;
   }
 
   # Allow some IO inbetween, for overloaded systems
