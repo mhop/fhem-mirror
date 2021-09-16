@@ -301,7 +301,8 @@ doUpdate($$$$)
   }
 
   my $canJoin;
-  my $cmod = AttrVal('global', 'commandref', 'full');
+  my $cmod = AttrVal('global', 'commandref', 
+                        $featurelevel >= 6.1 ? 'modular' : 'full');
   my $cj = "$root/contrib/commandref_".
                 ($cmod eq "full" ? "join":"modular").".pl";
   if(-f $cj &&
