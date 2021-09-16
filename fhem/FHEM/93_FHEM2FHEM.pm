@@ -381,8 +381,9 @@ FHEM2FHEM_Set($@)
     FHEM2FHEM_CloseDev($hash);
     FHEM2FHEM_OpenDev($hash, 0);
   }
+
   if($a[1] eq "cmd") {
-    return "Not connected" if($hash->{STATE} ne "connected");
+    return "Not connected" if(!$hash->{TCPDev});
     my $cmd = join(" ",@a[2..$#a]);
     $cmd = '{my $r=fhem("'.$cmd.'");; defined($r) ? "\\0$r\\0" : $r}'."\n";
     syswrite($hash->{TCPDev}, $cmd);
