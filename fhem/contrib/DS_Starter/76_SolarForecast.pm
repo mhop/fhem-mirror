@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.5" => "16.09.2021  fix sub ___csmSpecificEpieces (rows 2924-2927) ",
   "0.56.4" => "16.09.2021  new sub ___csmSpecificEpieces ",
   "0.56.3" => "15.09.2021  extent __calcEnergyPieces by MadMax calc (first test implementation) ",
   "0.56.2" => "14.09.2021  some fixes, new calculation of hourscsmeXX, new key minutescsmXX ",
@@ -2910,7 +2911,7 @@ sub ___csmSpecificEpieces {
       }
         
       $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
-      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";  
+      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";
       my $epiecHour    = floor (ConsumerVal ($hash, $c, "minutesOn", 0) / 60) + 1;  
         
       if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                         
@@ -2920,9 +2921,10 @@ sub ___csmSpecificEpieces {
           $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
       }
 
-      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
+      my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
+      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $ediff;
       $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
-      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $epiecHour;
+      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $ediff ? $epiecHour : 0;
   } 
   else {                                                                                  # Durchschnitt ermitteln
       if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                   # Durchschnittliche Stunden ermitteln
