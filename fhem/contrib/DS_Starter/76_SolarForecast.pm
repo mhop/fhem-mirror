@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.4" => "16.09.2021  new sub ___csmSpecificEpieces ",
   "0.56.3" => "15.09.2021  extent __calcEnergyPieces by MadMax calc (first test implementation) ",
   "0.56.2" => "14.09.2021  some fixes, new calculation of hourscsmeXX, new key minutescsmXX ",
   "0.56.1" => "12.09.2021  some fixes ",
@@ -504,6 +505,7 @@ my $rdampdef     = 10;                                                          
 my $rain_base    = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my $maxconsumer  = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
+my $epiecHCounts = 10;                                                            # Anzahl Werte für verbraucherspezifische Energiestück Ermittlung
 my @ctypes       = qw(dishwasher dryer washingmachine heater other);              # erlaubte Consumer Typen
 my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
@@ -2809,66 +2811,28 @@ sub __calcEnergyPieces {
   
   my $type  = $hash->{TYPE};
   
-  ## Ergänzung Max:  epieces ermitteln + speichern
-  ###################################################
-  my $epiecHistCounts = 10;
+  ## Consumer specific epieces ermitteln + speichern
+  ####################################################  
+  my $etot = HistoryVal ($hash, $paref->{day}, sprintf("%02d",$paref->{nhour}), "csmt${c}", 0);
   
-  if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
-      my $epiecHist       = "";
-      my $epiecHist_hours = "";
-      my $etot            = HistoryVal ($hash, $paref->{day}, sprintf("%02d",$paref->{nhour}), "csmt${c}", 0);
-        
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) < 0) {                                   #neue Aufzeichnung
-          $data{$type}{$name}{consumers}{$c}{epiecHist} += 1;  
-          $data{$type}{$name}{consumers}{$c}{epiecHist}  = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHistCounts);
-            
-          $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
-          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                          # Löschen, wird neu erfasst
-      }
-        
-      $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
-      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";  
-      my $epiecHour    = floor (ConsumerVal ($hash, $c, "minutesOn", 0) / 60) + 1;  
-        
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                         
-          my $epiecHour_last = $epiecHour - 1;
-
-          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
-          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
-      }
-
-      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
-      $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
-      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $epiecHour;
-  } 
-  else {                                                                                  # Durchschnitt ermitteln
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                   # Durchschnittliche Stunden ermitteln
-          my $hours = 0;
-          
-          for my $h (1..$epiecHistCounts) {                
-              $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);    
-          }
-            
-          $hours                                             = ceil ($hours / $epiecHistCounts);
-          $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
-              
-      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                # Durchschnitt für epics ermitteln     
-          for my $hour (1..$hours) {
-              for my $h (1..$epiecHistCounts) {
-                  my $epiecHist = "epiecHist_".$h;
-                    
-                  $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour};
-              }
-                
-              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $epiecHistCounts;
-          }
-      }
-    
-      $data{$type}{$name}{consumers}{$c}{epiecHour} = -1;
+  if($etot) {
+      $paref->{etot} = $etot;
+      ___csmSpecificEpieces ($paref);
+      delete $paref->{etot};
   }
-  
-  ######################################################################################################
-  
+  else {
+      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};
+      delete $data{$type}{$name}{consumers}{$c}{epiecAVG_hours};
+      delete $data{$type}{$name}{consumers}{$c}{epiecEstart};
+      delete $data{$type}{$name}{consumers}{$c}{epiecHist};
+      delete $data{$type}{$name}{consumers}{$c}{epiecHour};
+      
+      for my $h (1..$epiecHCounts) {
+          delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h};
+          delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
+      }
+  }  
+
   delete $data{$type}{$name}{consumers}{$c}{epieces};
   
   my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
@@ -2903,6 +2867,74 @@ sub __calcEnergyPieces {
       $he = $epiecef + $epiecel + $epiecem if($h == $hours && $hours == 1);                    # kalk. Energieverbrauch wenn max. 1 Stunde Laufzeit
       
       $data{$type}{$name}{consumers}{$c}{epieces}{${h}} = sprintf('%.2f', $he);      
+  }
+  
+return;
+}
+
+###################################################################
+#    Verbraucherspezifische Energiestück Ermittlung
+###################################################################
+sub ___csmSpecificEpieces {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer}; 
+  my $etot  = $paref->{etot};
+  
+  my $type  = $hash->{TYPE};
+   
+  if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
+      my $epiecHist       = "";
+      my $epiecHist_hours = "";
+        
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) < 0) {                                   #neue Aufzeichnung
+          $data{$type}{$name}{consumers}{$c}{epiecHist} += 1;  
+          $data{$type}{$name}{consumers}{$c}{epiecHist}  = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
+            
+          $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
+          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                          # Löschen, wird neu erfasst
+      }
+        
+      $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
+      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";  
+      my $epiecHour    = floor (ConsumerVal ($hash, $c, "minutesOn", 0) / 60) + 1;  
+        
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                         
+          my $epiecHour_last = $epiecHour - 1;
+
+          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
+          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
+      }
+
+      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
+      $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
+      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $epiecHour;
+  } 
+  else {                                                                                  # Durchschnitt ermitteln
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                   # Durchschnittliche Stunden ermitteln
+          my $hours = 0;
+          
+          for my $h (1..$epiecHCounts) {                
+              $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);    
+          }
+            
+          $hours                                             = ceil ($hours / $epiecHCounts);
+          $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
+              
+      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                # Durchschnitt für epics ermitteln     
+          for my $hour (1..$hours) {
+              for my $h (1..$epiecHCounts) {
+                  my $epiecHist = "epiecHist_".$h;
+                    
+                  $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour};
+              }
+                
+              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $epiecHCounts;
+          }
+      }
+    
+      $data{$type}{$name}{consumers}{$c}{epiecHour} = -1;
   }
   
 return;
