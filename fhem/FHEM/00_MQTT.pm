@@ -221,6 +221,8 @@ sub Set($@) {
   return Stop($hash)  if $command eq 'disconnect';
 
   return "unknown command $command" if $command ne 'publish';
+  shift(@a);
+  shift(@a);
   my ($qos, $retain,$topic, $value) = parsePublishCmd(@a);
   return 'missing parameters. usage: publish [qos:?] [retain:?] topic value1 [value2]...' if !$topic;
   return "wrong parameter. topic may not be '#' or '+'" if ($topic eq '#' or $topic eq '+');
