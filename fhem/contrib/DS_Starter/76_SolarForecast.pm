@@ -2874,6 +2874,19 @@ return;
 
 ###################################################################
 #    Verbraucherspezifische Energiestück Ermittlung
+#
+#  epiecHistCounts = x gibt an wie viele Zyklen betrachtet werden
+#                      sollen
+#  epiecHist => x ist der Index des Speicherbereichs der aktuell 
+#               benutzt wird.
+#
+#  epiecHist_x => 1=x 2=x 3=x 4=x epieces eines Index
+#  epiecHist_x_hours => x Stunden des Durchlauf bzw. wie viele 
+#                         Einträge epiecHist_x hat
+#  epiecAVG => 1=x 2=x und epiecAVG_hours => x enthalten die 
+#              durchschnittlichen Werte der in epiecHistCounts 
+#              vorgegebenen Durchläufe.
+#
 ###################################################################
 sub ___csmSpecificEpieces {
   my $paref = shift;
@@ -2902,7 +2915,7 @@ sub ___csmSpecificEpieces {
         
       if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                         
           my $epiecHour_last = $epiecHour - 1;
-
+          
           $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
           $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
       }
