@@ -1390,7 +1390,7 @@ sub weekprofile_Attr($$$)
   return undef;
 }
 ############################################## 
-sub weekprofile_createTempMap($) {
+sub weekprofile_createTempMap($;$) {
     my ($hash, $attrMap) = @_;
     my $me = $hash->{NAME};
     
