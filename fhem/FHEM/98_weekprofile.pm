@@ -15,7 +15,6 @@ use JSON;         #libjson-perl
 use Data::Dumper;
 use Time::HiRes qw(gettimeofday);
 use Storable qw(dclone);
-use List::Util qw[min max];
 
 use vars qw(%defs);
 use vars qw($FW_ME);
@@ -1511,8 +1510,8 @@ sub weekprofile_createTempList($) {
   }
   
   if (scalar(@values)>0) {
-    $defMin = min(@values);
-    $defMax = max(@values);
+    $defMin = List::Util::min(@values);
+    $defMax = List::Util::max(@values);
   }
   my $attrRange = AttrVal($me, "widgetTempRange", "$defMin:$defMax:$defStep");
   my @rangV = split(':',$attrRange);
