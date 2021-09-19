@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.6" => "19.09.2021  bug fix ",
   "0.56.5" => "16.09.2021  fix sub ___csmSpecificEpieces (rows 2924-2927) ",
   "0.56.4" => "16.09.2021  new sub ___csmSpecificEpieces ",
   "0.56.3" => "15.09.2021  extent __calcEnergyPieces by MadMax calc (first test implementation) ",
@@ -2630,7 +2631,7 @@ sub _manageConsumerData {
   my $type    = $hash->{TYPE};   
 
   my $nhour       = $chour+1;
-  $paref->{nhour} = $nhour;  
+  $paref->{nhour} = sprintf("%02d",$nhour); 
 
   for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {
       my $consumer = ConsumerVal ($hash, $c, "name",  "");         
