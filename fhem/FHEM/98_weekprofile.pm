@@ -12,7 +12,6 @@ use strict;
 use warnings;
 
 use JSON;         #libjson-perl
-use Data::Dumper;
 use Time::HiRes qw(gettimeofday);
 use Storable qw(dclone);
 
@@ -774,6 +773,8 @@ sub sort_by_name
 ############################################## 
 sub dumpData($$$) 
 {
+	require Data::Dumper;
+	
 	my ($hash,$prefix,$data) = @_;
 	
 	my $me = $hash->{NAME};	 
@@ -1510,6 +1511,7 @@ sub weekprofile_createTempList($) {
   }
   
   if (scalar(@values)>0) {
+    require List::Util;
     $defMin = List::Util::min(@values);
     $defMax = List::Util::max(@values);
   }
