@@ -564,6 +564,9 @@ sub weekprofile_refreshSendDevList($)
   
   splice(@{$hash->{SNDDEVLIST}});
   
+  my $useTopics = AttrVal($me,"useTopics",0);
+  Log3($me, 5, "$me(weekprofile_refreshSendDevList): start");
+  
   foreach my $d (keys %defs)   
   {
     next if ($defs{$d}{NAME} eq $me);
@@ -581,7 +584,12 @@ sub weekprofile_refreshSendDevList($)
     $dev->{NAME} = $defs{$d}{NAME};
     $dev->{ALIAS} = AttrVal($dev->{NAME},"alias",$dev->{NAME});
     
+    # add userattr weekprofile to device
+    # help of attr weekprofile will come from module weekprofile
+    addToDevAttrList($dev->{NAME},"weekprofile","weekprofile") if ($useTopics);
+    
     push @{$hash->{SNDDEVLIST}} , $dev;
+    Log3($me, 5, "$me(weekprofile_refreshSendDevList): add device $dev->{NAME}");
   }
   my $cnt = scalar(@{$hash->{SNDDEVLIST}});
   Log3($me, 5, "$me(weekprofile_refreshSendDevList): $cnt devices in list");
@@ -1991,6 +1999,12 @@ __END__
     Force to send the complete profile to the device instead of only the changes.
     Possibility to resend a complete week profile
     </li>
+    <a id="weekprofile-attr-weekprofile"></a>
+    <li>weekprofile<br>    
+    This attribute can be a userattr of supported modules of weekprofile to receive a specific profile with the
+    defined name at the <i>restore_topic</i> command. See topics for further information    
+    </li>
+    
   </ul>
 </ul>
 =end html
@@ -2222,6 +2236,11 @@ __END__
     Default: 0
     Ezwingt das Senden eines komplettes Wochenprofiles anstatt der Änderungen
     Es besteht somit die Möglichkeit eines erneuten Senden der Daten an das Thermostats
+    </li>
+    <a id="weekprofile-attr-weekprofile"></a>
+    <li>weekprofile<br>
+    Kann ein userattr eines unterstützten Moduls von weekprofile sein, um ein spezifisches Profil mit dem angegeben Namen
+    beim Befehl <i>restore_topic</i> zu empfangen. Siehe auch 'Topics'.    
     </li>
   </ul>
 </ul>
