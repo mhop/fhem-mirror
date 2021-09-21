@@ -31,7 +31,8 @@ else
 fi
 
 if grep -q docker /proc/1/cgroup; then 
-   echo "You seem to run in a docker environment. Warning: This is experimental"
+   echo "You seem to run in a docker environment. This currently not supported"
+   exit
    export LC_ALL=C
    export DEBIAN_FRONTEND=noninteractive
 	USER=`id | grep root`
@@ -213,6 +214,7 @@ fi
 install_by_file /usr/include/dbus-1.0/dbus/dbus.h libdbus-1-dev
 install_by_file /usr/share/build-essential/essential-packages-list build-essential
 install_by_file /usr/share/doc/libimage-librsvg-perl libimage-librsvg-perl
+install_by_file /usr/share/man/man3/URI::Escape.3pm.gz liburi-perl
 
 cat >$TMPFILE <<EOF
 #!/usr/bin/perl -w
@@ -438,16 +440,16 @@ start_service() {
 test_device() {
 start_service
 echo -n "Checking installation via dbus-send command..."
-REPLY=`dbus-send --system --type=method_call --print-reply --dest="org.asamk.Signal" /org/asamk/Signal org.asamk.Signal.isRegistered`
-REP1=`echo $REPLY | grep "boolean false"`
-REP2=`echo $REPLY | grep "boolean true"`
+REPLY=`dbus-send --system --type=method_call --print-reply --dest="org.asamk.Signal" /org/asamk/Signal org.asamk.Signal.version`
+REP1=`echo $REPLY | grep $SIGNALVERSION`
+#REP2=`echo $REPLY | grep "boolean true"`
 
 if [ -n "$REP1" ]; then
-   echo "success - signal-cli running in standard registration mode"
+   echo "success" # - "signal-cli running in standard registration mode"
 fi
-if [ -n "$REP2"  ]; then
-   echo "partial success - still running in -u mode - check $SYSTEMD/signal.service"
-fi
+#if [ -n "$REP2"  ]; then
+#   echo "partial success - still running in -u mode - check $SYSTEMD/signal.service"
+#fi
 
 cat <<EOF >$TMPFILE
 #!/usr/bin/perl -w
@@ -469,7 +471,7 @@ my @att=();
 	signature => '',
 	body => undef,
 	destination => 'org.asamk.Signal',
-	member => 'isRegistered',
+	member => 'version',
 )->then( sub {
 	print "reply received\n";
 } )->catch( sub {
