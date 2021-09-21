@@ -1901,7 +1901,7 @@ FW_makeDeviceLine($$$$$)
       }
 
       if($htmlTxt) {
-        $htmlTxt =~ s,^<td[^>]*>(.*)</td>$,$1,;
+        $htmlTxt =~ s,^<td[^>]*>(.*)</td>$,$1,s;
       } else {
         my $nCmd = $cmdIcon{$cmd} ?
                       FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
@@ -1915,7 +1915,7 @@ FW_makeDeviceLine($$$$$)
           FW_pO "</tr><tr>"          if($wcl[$i1] =~ m/\n/);
           FW_pO "</tr></table></td>" if($i1 == @cl-1);
         } else {
-          FW_pO  "<td><div class='col3'>$wcl[$i1]$ htmlTxt</div></td>";
+          FW_pO  "<td><div class='col3'>$wcl[$i1]$htmlTxt</div></td>";
         }
 
       } else {
