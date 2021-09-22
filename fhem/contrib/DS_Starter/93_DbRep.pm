@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 24770 2021-07-18 14:28:08Z DS_Starter $
+# $Id: 93_DbRep.pm 24929 2021-09-06 18:47:52Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,7 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.42.9"  => "05.09.2021  minor fixes ",
+  "8.43.0"  => "22.09.2021  consider attr device, reading in sqlCmd ",
+  "8.42.9"  => "05.09.2021  minor fixes, change SQL for SQLite in deldoublets_DoParse ",
   "8.42.8"  => "17.07.2021  more log data verbose 5, delete whitespaces in sub getInitData ",
   "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
   "8.42.6"  => "25.02.2021  fix commandref ",
@@ -2155,6 +2156,7 @@ sub DbRep_Main {
             $prop   = join(" ", @cmd);
         }
     }
+    
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
  } 
  elsif ($opt =~ /syncStandby/ ) {
@@ -6381,6 +6383,8 @@ sub sqlCmd_DoParse {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my $device     = AttrVal($name, "device",  undef);
+  my $reading    = AttrVal($name, "reading", undef);
   my ($err,$dbh,@pms);
 
   # Background-Startzeit
@@ -6504,9 +6508,11 @@ sub sqlCmd_DoParse {
       }
   }
   
-  # Allow inplace replacement of keywords for timings (use time attribute syntax)
+  # Allow inplace replacement of keywords for timings (use time attribute syntax), device, reading
   $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
   $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
+  $sql =~ s/§device§/'$device'/ig;
+  $sql =~ s/§reading§/'$reading'/ig;
   
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
   
@@ -11793,12 +11799,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 24770 2021-07-18 14:28:08Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 24929 2021-09-06 18:47:52Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 24770 2021-07-18 14:28:08Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 24929 2021-09-06 18:47:52Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
