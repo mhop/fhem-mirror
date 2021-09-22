@@ -595,11 +595,7 @@ FHEM/lib/AttrTemplate/huedevice.template Shojo    Zigbee https://forum.fhem.de/i
 FHEM/lib/AttrTemplate/httpmod.template amenomade  Sonstiges https://forum.fhem.de/index.php/topic,97694.0.html
 FHEM/lib/AttrTemplate/mqtt2.template Beta-User/Otto123 MQTT https://forum.fhem.de/index.php/topic,94494.0.html
 FHEM/lib/AttrTemplate/mysensors.template Beta-User Bastelecke/MySensors
-FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
-FHEM/lib/Device/MySensors/*  Beta-User            Bastelecke/MySensors
 FHEM/lib/MP3/*               Reinerlein           Multimedia
-FHEM/lib/Net/MQTT.pod        hexenmeister         MQTT
-FHEM/lib/Net/MQTT/*          hexenmeister         MQTT
 FHEM/lib/ProtoThreads.pm     ntruchsess           FHEM Development
 FHEM/lib/SHC_packet_layout.xml  rr2000            Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme

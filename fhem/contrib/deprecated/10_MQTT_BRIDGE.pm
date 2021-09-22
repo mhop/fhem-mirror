@@ -21,7 +21,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id$
+# $Id: 10_MQTT_BRIDGE.pm 23658 2021-02-01 20:58:53Z hexenmeister $
 #
 ##############################################
 
