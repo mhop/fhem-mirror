@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:3.0beta$
-SCRIPTVERSION="3.0beta$"
+SCRIPTVERSION="3.0"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -31,8 +31,7 @@ else
 fi
 
 if grep -q docker /proc/1/cgroup; then 
-   echo "You seem to run in a docker environment. This currently not supported"
-   exit
+   echo "You seem to run in a docker environment."
    export LC_ALL=C
    export DEBIAN_FRONTEND=noninteractive
 	USER=`id | grep root`
@@ -48,6 +47,7 @@ if grep -q docker /proc/1/cgroup; then
 	SIGNALPATH=/opt/fhem
 fi
 
+if [ -z "$OPERATION" ] || [ "$OPERATION" = "system" ] || [ "$OPERATION" = "install" ] || [ "$OPERATION" = "all" ]; then
 echo "This script will help you to install signal-cli as system dbus service"
 echo "and prepare the use of the FHEM Signalbot module"
 echo
@@ -57,6 +57,7 @@ echo "Signal-cli Install directory: $SIGNALPATH"
 echo "Signal config storage:        $SIGNALVAR"
 echo "Signal version:               $SIGNALVERSION"
 echo "System library path:          $LIBPATH"
+fi
 
 #
 install_and_check() {
@@ -214,7 +215,7 @@ fi
 install_by_file /usr/include/dbus-1.0/dbus/dbus.h libdbus-1-dev
 install_by_file /usr/share/build-essential/essential-packages-list build-essential
 install_by_file /usr/share/doc/libimage-librsvg-perl libimage-librsvg-perl
-install_by_file /usr/share/man/man3/URI::Escape.3pm.gz liburi-perl
+install_by_file /usr/share/perl5/URI.pm liburi-perl
 
 cat >$TMPFILE <<EOF
 #!/usr/bin/perl -w
@@ -421,7 +422,7 @@ start_service() {
 		if [ -z "$SIGSERVICE" ]; then
 			cd $SIGNALPATH/signal/bin
 			echo "Starting signal-cli daemon for Docker"
-			sudo -u $SIGNALUSER ./signal-cli --config $SIGNALVAR -u $PHONE daemon --system >/var/log/signal.log 2>/var/log/signal.err &
+			sudo -u $SIGNALUSER ./signal-cli --config $SIGNALVAR daemon --system >/var/log/signal.log 2>/var/log/signal.err &
 			WAITCHECK="grep dbus /var/log/signal.err"
 		fi
 		echo -n "Waiting for signal-cli to become ready."
@@ -551,6 +552,10 @@ if [ -z "$OPERATION" ] || [ "$OPERATION" = "system" ] || [ "$OPERATION" = "insta
 	echo "Aborting..."
 	exit
   fi
+fi
+
+if [ $OPERATION = "docker" ]; then
+	OPERATION=""
 fi
 
 # Main flow without option: intall, register
