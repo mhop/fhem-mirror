@@ -2077,16 +2077,24 @@ sub Calendar_Get($@) {
         for my $limit (@limits) {
           if($limit =~ /count=([1-9]+\d*)/) {
             $count= $1;
-          } elsif($limit =~ /when=(today|tomorrow)/i) {
-            my ($from,$to);
+          } elsif($limit =~ /^when=(today|tomorrow|(-?\d+)(..(-?\d+))?)$/i) {
+            my ($from,$to,$d1,$d2);
             if (lc($1) eq 'today') {
-              $from  = Calendar_GetSecondsFromMidnight();
-              $to    = DAYSECONDS - $from - 1;
-              $from *= -1;
+              $d1= 0;
+              $d2= 0;
+            } elsif(lc($1) eq 'tomorrow') {
+              $d1= 1;
+              $d2= 1;
             } else {
-              $from  = DAYSECONDS - Calendar_GetSecondsFromMidnight();
-              $to    = $from + DAYSECONDS - 1;
+              $d1= $2;
+              $d2= $d1;
+              if($4 ne '') {
+                $d2= $4;
+              }
+              ($d1,$d2)= ($d2,$d1) if($d1> $d2);
             }
+            $from  = $d1*DAYSECONDS - Calendar_GetSecondsFromMidnight();
+            $to    = $from + ($d2-$d1+1)*DAYSECONDS - 1;
             push @filters, { ref => \&filter_endafter, param => $t+$from };
             push @filters, { ref => \&filter_startbefore, param => $t+$to };
           } elsif($limit =~ /from=([+-]?)(.+)/ ) {
@@ -3591,6 +3599,8 @@ sub CalendarEventsAsHtml($;$) {
       a timespan &lt;timespec&gt; from now; use a minus sign for events in the
       past; &lt;timespec&gt; is described below in the Attributes section</td></tr>
     <tr><td><code>when=today|tomorrow</code></td><td>shows events for today or tomorrow</td></tr>
+    <tr><td><code>when=&lt;D1&gt;</code></td><td>shows events for day &lt;D1&gt; from now, &lt;D1&gt;= 0 stands for today, negative values allowed </td></tr>
+    <tr><td><code>when=&lt;D1&gt;..&lt;D2&gt;</code></td><td>shows events for the day range from day &lt;D1&gt; to day &lt;D2&gt; from now</td></tr>
     </table><br>
 
     Examples:<br>
@@ -4323,6 +4333,9 @@ sub CalendarEventsAsHtml($;$) {
     zeigt nur Termine die vor einer Zeitspanne &lt;timespec&gt; ab jetzt starten;
     Minuszeichen f&uuml;r Termine in der Vergangenheit benutzen; &lt;timespec&gt; wird weiter unten im Attribut-Abschnitt beschrieben.</td></tr>
     <tr><td><code>when=today|tomorrow</code></td><td>zeigt anstehende Termin f&uuml;r heute oder morgen an</td></tr>
+    <tr><td><code>when=&lt;D1&gt;</code></td><td>zeigt Termine f&uuml;r Tag &lt;D1&gt; von heute an, &lt;D1&gt;= 0 steht f&uuml;r heute, negative Werte sind erlaubt</td></tr>
+    <tr><td><code>when=&lt;D1&gt;..&lt;D2&gt;</code></td><td>zeigt Termine f&uuml;r den Tagesbereich von Tag
+     &lt;D1&gt; bis Tag &lt;D2&gt; von heute an</td></tr>
     </table><br>
 
     Examples:<br>
