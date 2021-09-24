@@ -1553,11 +1553,13 @@ sub TCM_Undef($$) {
       last;
     }
   }
-  for (my $i = 0; $i <= @{$modules{"$hash->{TYPE}"}{ChipID}}; $i++) {
-    if (${$modules{"$hash->{TYPE}"}{ChipID}}[$i] eq $hash->{ChipID}) {
-      Log3 $name, 4, "TCM $name remove module ChipID: " . ${$modules{"$hash->{TYPE}"}{ChipID}}[$i];
-      splice(@{$modules{"$hash->{TYPE}"}{ChipID}}, $i, 1);
-      last;
+  if (exists $modules{"$hash->{TYPE}"}{ChipID}) {
+    for (my $i = 0; $i <= @{$modules{"$hash->{TYPE}"}{ChipID}}; $i++) {
+      if (${$modules{"$hash->{TYPE}"}{ChipID}}[$i] eq $hash->{ChipID}) {
+        Log3 $name, 4, "TCM $name remove module ChipID: " . ${$modules{"$hash->{TYPE}"}{ChipID}}[$i];
+        splice(@{$modules{"$hash->{TYPE}"}{ChipID}}, $i, 1);
+        last;
+      }
     }
   }
   RemoveInternalTimer($hash, 'TCM_msgCounter');
