@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.43.0"  => "22.09.2021  consider attr device, reading in sqlCmd ",
+  "8.43.0"  => "22.09.2021  consider attr device, reading in sqlCmd, remove length limit of attr device, reading ",
   "8.42.9"  => "05.09.2021  minor fixes, change SQL for SQLite in deldoublets_DoParse ",
   "8.42.8"  => "17.07.2021  more log data verbose 5, delete whitespaces in sub getInitData ",
   "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
@@ -1443,14 +1443,6 @@ sub DbRep_Attr {
             my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
             unless ($success) {return "The credentials of a database admin user couldn't be read. ".
                                       "Make shure you have set them with command \"set $name adminCredentials <user> <password>\" before. ";}
-        }
-        
-        if ($aName eq "reading" || $aName eq "device") {
-            if ($aVal !~ m/,/ && $dbmodel && $dbmodel ne 'SQLITE') {
-                my $attrname = uc($aName);
-                my $mlen = $hash->{HELPER}{DBREPCOL}{$attrname}?$hash->{HELPER}{DBREPCOL}{$attrname}:$dbrep_col{$attrname}; 
-                return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $mlen" if(length($aVal) > $mlen);
-            }
         }
     } 
     
