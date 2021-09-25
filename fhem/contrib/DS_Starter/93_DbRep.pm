@@ -6511,8 +6511,8 @@ sub sqlCmd_DoParse {
   # Allow inplace replacement of keywords for timings (use time attribute syntax), device, reading
   $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
   $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
-  $sql =~ s/§device§/'$device'/ig;
-  $sql =~ s/§reading§/'$reading'/ig;
+  $sql =~ s/§device§/'$device'/xg   if ($device);
+  $sql =~ s/§reading§/'$reading'/xg if ($reading);
   
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
   
@@ -13470,10 +13470,12 @@ return;
                                  This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
                                  @closed:=NULL;" or the usage of SQLite PRAGMA before execution the SQL-Statement.
                                  If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
-                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                 
-                                 If the attribute <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
-                                 is assumed in the statement, it is possible to use placeholder <b>§timestamp_begin§</b> respectively
-                                 <b>§timestamp_end§</b> on suitable place. <br><br>
+                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                
+                                 If the attributes <a href="#device">device</a>, <a href="#reading">reading</a>, 
+                                 <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
+                                 set in the module are to be taken into account in the statement, 
+                                 the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
+                                 <b>§timestamp_end§</b> can be used for this purpose. <br><br>
                                  
                                  If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
                                  original timestamp. <br><br>
@@ -16116,9 +16118,11 @@ sub bdump {
                                  Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements 
                                  gesetzt werden, kann dafür das Attribut <a href="#sqlCmdVars">sqlCmdVars</a> 
                                  verwendet werden. <br>
-                                 Sollen die im Modul gesetzten Attribute <a href="#timestamp_begin">timestamp_begin</a> bzw. 
+                                 Sollen die im Modul gesetzten Attribute <a href="#device">device</a>, <a href="#reading">reading</a>,
+                                 <a href="#timestamp_begin">timestamp_begin</a> bzw. 
                                  <a href="#timestamp_end">timestamp_end</a> im Statement berücksichtigt werden, können die Platzhalter 
-                                 <b>§timestamp_begin§</b> bzw. <b>§timestamp_end§</b> dafür verwendet werden. <br><br>
+                                 <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> bzw. 
+                                 <b>§timestamp_end§</b> dafür verwendet werden. <br><br>
                                  
                                  Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
                                  originalen Timestamps zu verhindern. <br><br>
