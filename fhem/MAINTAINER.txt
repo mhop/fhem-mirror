@@ -269,6 +269,7 @@ FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
 FHEM/50_SSChatBot.pm         DS_Starter           Sonstiges
 FHEM/50_SSFile.pm            DS_Starter           Sonstiges
 FHEM/50_TelegramBot.pm       viegener             Unterstützende Dienste
+FHEM/50_Signalbot.pm         Adimarantis          Unterstützende Dienste https://forum.fhem.de/index.php/topic,118370.msg1176583.html#new
 FHEM/50_WS300.pm             Dirk                 SlowRF
 FHEM/51_I2C_BH1750.pm        arnoaugustin         Einplatinencomputer (bitte auch PM)
 FHEM/51_I2C_BMP180.pm        Dirk                 Einplatinencomputer
