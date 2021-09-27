@@ -1,4 +1,4 @@
-REV 25020
+REV 25022
 DIR unused
 UPD 2021-09-24_07:45:12 365875 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -740,8 +740,8 @@ UPD 2021-09-24_07:45:16 4542897 docs/commandref.html
 UPD 2021-09-24_07:45:18 2806511 docs/commandref_DE.html
 UPD 2021-09-17_07:45:02 82791 docs/commandref_frame.html
 UPD 2021-08-02_07:45:03 92754 docs/commandref_frame_DE.html
-UPD 2021-09-27_07:45:12 248386 docs/commandref_modular.html
-UPD 2021-09-27_07:45:13 259455 docs/commandref_modular_DE.html
+UPD 2021-09-27_09:11:58 248386 docs/commandref_modular.html
+UPD 2021-09-27_09:11:59 259455 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2357,7 +2357,7 @@ UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
 UPD 2021-06-03_12:07:37 31282 www/pgm2/f18.js
 UPD 2021-09-17_07:45:02 10103 www/pgm2/f18style.css
 UPD 2021-06-03_12:07:37 8559 www/pgm2/fhemdoc_modular.js
-UPD 2021-09-10_07:45:02 65172 www/pgm2/fhemweb.js
+UPD 2021-09-27_09:11:50 65235 www/pgm2/fhemweb.js
 UPD 2020-11-02_07:45:03 13935 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
