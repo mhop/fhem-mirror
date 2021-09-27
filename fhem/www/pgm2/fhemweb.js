@@ -841,6 +841,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     }
     });
     
+  // Set and attr 
   $("div input.psc[type=submit]:not(.get)").click(function(e){
     e.preventDefault();
     var newDef = typeof cm !== 'undefined' ?
@@ -1576,7 +1577,7 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
     vHash[o.value] = 1;
     newEl.options[j-1] = o;
   }
-  if(currVal)
+  if(typeof(currVal) != "undefined")
     $(newEl).val(currVal);
   if(elName)
     $(newEl).attr('name', elName);
@@ -1603,7 +1604,7 @@ FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
 
   if(currVal != undefined)
     currVal = currVal.replace(/[^\d.\-]/g, "");
-    currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
+  currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
   if(max==min)
     return undefined;
   if(!(fun == "lin" || fun == "log10"))
@@ -1643,7 +1644,7 @@ FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
       k++;
     }
   }
-  if(currVal)
+  if(typeof(currVal) != "undefined")
     $(newEl).val(currVal.toFixed(dp));
   if(elName)
     $(newEl).attr('name', elName);
