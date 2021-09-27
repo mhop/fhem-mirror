@@ -53,7 +53,7 @@ option:global
 ## subordintated devices section
 
 name:----subordinated-devices-section--------
-filter:MQTT_GENERIC_BRIDGE
+filter:TYPE=MQTT_GENERIC_BRIDGE
 prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devices[0];return 0}
 order:000002
 
