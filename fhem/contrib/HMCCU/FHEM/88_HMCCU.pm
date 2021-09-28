@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0';
+my $HMCCU_VERSION = '5.0 212691835';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -193,7 +193,7 @@ sub HMCCU_SubstVariables ($$$);
 
 # Update client device readings
 sub HMCCU_BulkUpdate ($$$;$);
-sub HMCCU_GetUpdate ($$$);
+sub HMCCU_GetUpdate ($$;$$);
 sub HMCCU_RefreshReadings ($);
 sub HMCCU_UpdateCB ($$$);
 sub HMCCU_UpdateClients ($$$$;$$);
@@ -9093,12 +9093,14 @@ sub HMCCU_SetVariable ($$$$$)
 # Update all datapoints / readings of device or channel considering
 # attribute ccureadingfilter.
 # Parameter $ccuget can be 'State', 'Value' or 'Attr'.
-# Return 1 on success, <= 0 on error
+# Return 1 on success, < 0 on error
 ######################################################################
 
-sub HMCCU_GetUpdate ($$$)
+sub HMCCU_GetUpdate ($$;$$)
 {
-	my ($clHash, $addr, $ccuget) = @_;
+	my ($clHash, $addr, $filter, $ccuget) = @_;
+	$filter //= '.*';
+	$ccuget //= 'Value';
 	my $name = $clHash->{NAME};
 	my $type = $clHash->{TYPE};
 
@@ -9140,7 +9142,7 @@ sub HMCCU_GetUpdate ($$$)
 	if (HMCCU_IsFlag ($ioHash->{NAME}, 'nonBlocking')) {
 		# Non blocking request
 		HMCCU_HMScriptExt ($ioHash, $script, { list => $list, ccuget => $ccuget },
-			\&HMCCU_UpdateCB);
+			\&HMCCU_UpdateCB, { filter => $filter });
 		return 1;
 	}
 	
@@ -9151,7 +9153,7 @@ sub HMCCU_GetUpdate ($$$)
 		"Script response = \n".$response);
 	return -2 if ($response eq '' || $response =~ /^ERROR:.*/);
 
-	HMCCU_UpdateCB ({ ioHash => $ioHash }, undef, $response);
+	HMCCU_UpdateCB ({ ioHash => $ioHash, filter => $filter }, undef, $response);
 	return 1;
 }
 
@@ -9173,6 +9175,7 @@ sub HMCCU_UpdateCB ($$$)
 	}
 
 	my $hash = $param->{ioHash};
+	my $filter = $param->{filter} // '.*';
 	my $logcount = exists($param->{logCount}) && $param->{logCount} == 1 ? 1 : 0;
 	
 	my $count = 0;
@@ -9186,7 +9189,7 @@ sub HMCCU_UpdateCB ($$$)
 		my ($chnname, $dpspec, $value) = split /=/, $dp;
 		next if (!defined($value));
 		my ($iface, $chnadd, $dpt) = split /\./, $dpspec;
-		next if (!defined($dpt));
+		next if (!defined($dpt) || $dpt !~ /$filter/);
 		my ($add, $chn) = ('', '');
 		if ($iface eq 'sysvar' && $chnadd eq 'link') {
 			($add, $chn) = HMCCU_GetAddress ($hash, $chnname);

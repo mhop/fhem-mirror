@@ -110,12 +110,12 @@ sub HMCCUDEV_Define ($@)
 	
 	# Parse optional command line parameters
 	foreach my $arg (@$a) {
-		if    (lc($arg) eq 'readonly')                 { $hash->{readonly} = 'yes'; }
-		elsif (lc($arg) eq 'nodefaults' && $init_done) { $hash->{hmccu}{nodefaults} = 1; }
-		elsif (lc($arg) eq 'defaults' && $init_done)   { $hash->{hmccu}{nodefaults} = 0; }
-		elsif (lc($arg) eq 'forcedev')                 { $hash->{hmccu}{forcedev} = 1; }
-		elsif ($arg =~ /^[0-9]+$/)                     { $attr{$name}{controlchannel} = $arg; }
-		else                                           { return $usage; }
+		if    (lc($arg) eq 'readonly')   { $hash->{readonly} = 'yes'; }
+		elsif (lc($arg) eq 'nodefaults') { $hash->{hmccu}{nodefaults} = 1 if ($init_done); }
+		elsif (lc($arg) eq 'defaults')   { $hash->{hmccu}{nodefaults} = 0 if ($init_done); }
+		elsif (lc($arg) eq 'forcedev')   { $hash->{hmccu}{forcedev} = 1; }
+		elsif ($arg =~ /^[0-9]+$/)       { $attr{$name}{controlchannel} = $arg; }
+		else                             { return $usage; }
 	}
 	
 	# IO device can be set by command line parameter iodev, otherwise try to detect IO device
@@ -466,7 +466,7 @@ sub HMCCUDEV_Get ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	# Build set command syntax
-	my $syntax = 'update:noArg config:noArg paramsetDesc:noArg deviceInfo:noArg values:noArg';
+	my $syntax = 'update config paramsetDesc:noArg deviceInfo:noArg values extValues';
 	
 	# Command datapoint depends on readable datapoints
 	my @dpRList;
@@ -518,6 +518,11 @@ sub HMCCUDEV_Get ($@)
 		my $result = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $lcopt, \@addList, $filter);
 		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($result));
 		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $result);
+	}
+	elsif ($lcopt eq 'extvalues') {
+		my $filter = shift @$a;
+		my $rc = HMCCU_GetUpdate ($hash, $ccuaddr, $filter);
+		return $rc < 0 ? HMCCU_SetError ($hash, $rc) : 'OK';
 	}
 	elsif ($lcopt eq 'paramsetdesc') {
 		my $result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
@@ -718,7 +723,10 @@ sub HMCCUDEV_Get ($@)
          <li>device and channel description</li>
          </ul>
       </li><br/>
-      <li><b>get &lt;name&gt; update [{State | <u>Value</u>}]</b><br/>
+ 	  <li><b>get &lt;name&gt; extValues [&lt;filter-expr&gt;]</b><br/>
+      	<a href="#HMCCUCHNget">see HMCCUCHN</a>
+	  </li><br/>
+	  <li><b>get &lt;name&gt; update [{State | <u>Value</u>}]</b><br/>
       	<a href="#HMCCUCHNget">see HMCCUCHN</a>
       </li><br/>
       <li><b>get &lt;name&gt; weekProgram [&lt;program-number&gt;|<u>all</u>]</b><br/>

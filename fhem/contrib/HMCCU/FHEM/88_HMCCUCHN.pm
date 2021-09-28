@@ -100,10 +100,10 @@ sub HMCCUCHN_Define ($@)
 	my $n = 0;
 	while (my $arg = shift @$a) {
 		return $usage if ($n == 3);
-		if    ($arg eq 'readonly')                     { $hash->{readonly} = 'yes'; }
-		elsif (lc($arg) eq 'nodefaults' && $init_done) { $hash->{hmccu}{nodefaults} = 1; }
-		elsif (lc($arg) eq 'defaults' && $init_done)   { $hash->{hmccu}{nodefaults} = 0; }
-		else                                           { return $usage; }
+		if    ($arg eq 'readonly')       { $hash->{readonly} = 'yes'; }
+		elsif (lc($arg) eq 'nodefaults') { $hash->{hmccu}{nodefaults} = 1 if ($init_done); }
+		elsif (lc($arg) eq 'defaults')   { $hash->{hmccu}{nodefaults} = 0 if ($init_done); }
+		else                             { return $usage; }
 		$n++;
 	}
 	
@@ -390,7 +390,7 @@ sub HMCCUCHN_Get ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	# Build set command syntax
-	my $syntax = 'update:noArg config:noArg paramsetDesc:noArg deviceInfo:noArg values:noArg';
+	my $syntax = 'update config paramsetDesc:noArg deviceInfo:noArg values extValues';
 	
 	# Command datapoint depends on readable datapoints
 	my ($add, $chn) = split(":", $hash->{ccuaddr});
@@ -427,6 +427,11 @@ sub HMCCUCHN_Get ($@)
 		my $result = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $lcopt, \@addList, $filter);
 		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($result));
 		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $result);
+	}
+	elsif ($lcopt eq 'extvalues') {
+		my $filter = shift @$a;
+		my $rc = HMCCU_GetUpdate ($hash, $ccuaddr, $filter);
+		return $rc < 0 ? HMCCU_SetError ($hash, $rc) : 'OK';
 	}
 	elsif ($lcopt eq 'paramsetdesc') {
 		my $result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
@@ -636,6 +641,11 @@ sub HMCCUCHN_Get ($@)
 		Please add this information to your post in the FHEM forum, if you have a question about
 		the integration of a new device. See also command 'get paramsetDesc'.
       </li><br/>
+	  <li><b>get &lt;name&gt; extValues [&lt;filter-expr&gt;]</b><br/>
+      	Update all readings for all parameters of parameter set VALUES (datapoints) and connected system
+		variables by using CCU Rega (Homematic script).
+		If <i>filter-expr</i> is specified, only datapoints matching the expression are stored as readings.
+	  </li><br/>
       <li><b>get &lt;name&gt; paramsetDesc</b><br/>
 		Display description of parameter sets of channel and device. The output of this command
 		is helpful to gather information about new / not yet supported devices. Please add this
