@@ -2088,7 +2088,7 @@ sub Calendar_Get($@) {
             } else {
               $d1= $2;
               $d2= $d1;
-              if($4 ne '') {
+              if(defined($4) and ($4 ne '')) {
                 $d2= $4;
               }
               ($d1,$d2)= ($d2,$d1) if($d1> $d2);
