@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 22534 2020-08-03 20:10:28Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 22598 2020-08-14 14:09:14Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
-#       (c) 2018-2020 by Heiko Maaz
+#       (c) 2018-2021 by Heiko Maaz
 #       forked from 98_weblink.pm by Rudolf König
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.0" => "27.09.2021  model lastsnap: add setter snap ",
   "2.14.5" => "12.08.2020  avoid loose of adoption after restart ",
   "2.14.4" => "03.08.2020  fix check of ARG in RemoveInternalTimer in _setadoptForTimer sub (sometimes no switch back done) ",             
   "2.14.3" => "01.08.2020  verbose 5 log in _setadoptForTimer sub ",
@@ -165,7 +166,8 @@ my %hset = (                                                                # Ha
     adopt         => { fn => "_setadopt"         },
     adoptForTimer => { fn => "_setadoptForTimer" },
     adoptTime     => { fn => "_setAdoptTimer"    },    
-    reset         => { fn => "_setreset"         },      
+    reset         => { fn => "_setreset"         },
+    snap          => { fn => "_setsnap"          },    
 );
 
 my %sdevs = ();                                                             # Hash der vorhandenen Streaming Devices
@@ -307,7 +309,10 @@ sub Set {
       $setlist = "Unknown argument $opt, choose one of ".
                  "popupStream "
                  ;
-  } else {
+                 
+      $setlist .= "snap " if($hash->{LINKMODEL} eq "lastsnap");
+  }
+  else {
       my $as  = "--reset--,".allStreamDevs();
       my $sd  = AttrVal($name, "adoptSubset", $as);
       $sd     =~ s/\s+/#/gx;      
@@ -341,6 +346,27 @@ sub Set {
   use strict "refs";
 
 return "$setlist";
+}
+
+################################################################
+#                      Setter snap
+################################################################
+sub _setsnap {                           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  
+  my ($num,$lag) = (1,2); 
+  
+  my $num     = @$aref[2] // 1;
+  my $lag     = @$aref[3] // 2;
+  
+  my $camname = $hash->{LINKPARENT}; 
+  my $uuid    = $hash->{FUUID};                      # eindeutige UUID des Streamingdevices
+        
+  CommandSet(undef, "$camname snap $num $lag STRM:$uuid");
+  
+return;
 }
 
 ################################################################
@@ -757,12 +783,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                                     # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCamSTRM}{META}}
-      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22534 2020-08-03 20:10:28Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22598 2020-08-14 14:09:14Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22534 2020-08-03 20:10:28Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22598 2020-08-14 14:09:14Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1065,6 +1091,16 @@ return $ret;
   <br>
   
   <ul>
+  <a name="snap"></a>
+  <li><b> snap [&lt;number&gt;] [&lt;time difference&gt;] </b>  &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = lastsnap)<br>
+  
+  One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
+  each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
   <li><b>popupStream</b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL != master)<br>
   
   The current streaming content is depicted in a popup window. By setting attribute "popupWindowSize" the 
@@ -1329,7 +1365,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <a name="adoptForTimer"></a>
-  <li><b>adoptForTimer &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  <li><b>adoptForTimer &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur bei MODEL = master)<br>
   
   Ein Streaming Device vom Type <b>master</b> übernimmt (adoptiert) den Content eines anderen definierten Streaming Devices
   für eine bestimmte Zeit. <br>
@@ -1341,7 +1377,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <a name="adoptTime"></a>
-  <li><b>adoptTime &lt;Sekunden&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  <li><b>adoptTime &lt;Sekunden&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur bei MODEL = master)<br>
   
   Einstellung der Schaltzeit bei temporärer Übernahme des Contents eines anderen Streaming Devices. 
   Nach Ablauf der Zeit wird die Wiedergabe auf das vorher eingestellte Streaming Device zurückgeschaltet. <br>
@@ -1351,7 +1387,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br>
   
   <ul>
-  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL != master)<br>
+  <a name="snap"></a>
+  <li><b> snap [&lt;number&gt;] [&lt;time difference&gt;] </b>  &nbsp;&nbsp;&nbsp;&nbsp;(nur bei MODEL = lastsnap)<br>
+  
+  Es werden ein oder mehrere Schnappschüsse ausgelöst. Die Anzahl der auszulösenden Schnappschüsse und der Zeitabstand 
+  (in Sekunden) zwischen jedem Snapshot können optional angegeben werden. Ohne Angabe wird nur ein Snapshot ausgelöst. <br>
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur bei MODEL != master)<br>
   
   Der aktuelle Streaminhalt wird in einem Popup-Fenster dargestellt. Mit dem Attribut "popupWindowSize" kann die 
   Darstellungsgröße eingestellt werden. Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest.
