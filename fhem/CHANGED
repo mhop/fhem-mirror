@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 02_RSS: support for more than one directory for background 
+                    images
  - new:     50_Signalbot: Signal Messenger integration (official release)
  - feature: 57_Calender: limit specification when=... amended
  - change:  10_MQTT_BRIDGE: Move to deprecated
