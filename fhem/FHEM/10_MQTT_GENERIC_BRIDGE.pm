@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 #
+# 30.09.2021 1.4.3
+# fix        : IODev fix be Beta-User
+#
 # 16.07.2021 1.4.2
 # doc fix    : improvements by Beta-User
 #
@@ -421,7 +424,7 @@ use GPUtils qw(:all);
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.4.2 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.4.3 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -467,6 +470,7 @@ BEGIN {
     ReadingsVal
     ReadingsTimestamp
     ReadingsAge
+    InternalVal
     deviceEvents
     AssignIoPort
     addToDevAttrList
@@ -484,7 +488,7 @@ BEGIN {
 
 };
 
-sub ::MQTT_GENERIC_BRIDGE_Initialize { goto &MQTT_GENERIC_BRIDGE_Initialize }
+sub ::MQTT_GENERIC_BRIDGE_Initialize { goto &Initialize }
 
 use constant {
   HELPER                      => ".helper",
@@ -518,25 +522,25 @@ use constant {
 };
 
 
-sub MQTT_GENERIC_BRIDGE_Initialize {
+sub Initialize {
   my $hash = shift // return;
 
   # Consumer
-  $hash->{DefFn}    = "MQTT::GENERIC_BRIDGE::Define";
-  $hash->{UndefFn}  = "MQTT::GENERIC_BRIDGE::Undefine";
-  $hash->{SetFn}    = "MQTT::GENERIC_BRIDGE::Set";
-  $hash->{GetFn}    = "MQTT::GENERIC_BRIDGE::Get";
-  $hash->{NotifyFn} = "MQTT::GENERIC_BRIDGE::Notify";
-  $hash->{AttrFn}   = "MQTT::GENERIC_BRIDGE::Attr";
-  $hash->{OnMessageFn} = "MQTT::GENERIC_BRIDGE::onmessage";
+  $hash->{DefFn}    = \&Define;
+  $hash->{UndefFn}  = \&Undefine;
+  $hash->{SetFn}    = \&Set;
+  $hash->{GetFn}    = \&Get;
+  $hash->{NotifyFn} = \&Notify;
+  $hash->{AttrFn}   = \&Attr;
+  $hash->{OnMessageFn} = \&onmessage;
   #$hash->{RenameFn} = "MQTT::GENERIC_BRIDGE::Rename";
 
   $hash->{Match}    = ".*";
-  $hash->{ParseFn}  = "MQTT::GENERIC_BRIDGE::Parse";
+  $hash->{ParseFn}  = \&Parse;
 
-  $hash->{OnClientConnectFn}           = "MQTT::GENERIC_BRIDGE::ioDevConnect";  
-  $hash->{OnClientDisconnectFn}        = "MQTT::GENERIC_BRIDGE::ioDevDisconnect";  
-  $hash->{OnClientConnectionTimeoutFn} = "MQTT::GENERIC_BRIDGE::ioDevDisconnect";  
+  $hash->{OnClientConnectFn}           = \&ioDevConnect;
+  $hash->{OnClientDisconnectFn}        = \&ioDevDisconnect;
+  $hash->{OnClientConnectionTimeoutFn} = \&ioDevDisconnect;
   
   $hash->{AttrList} =
     "IODev ".
@@ -551,8 +555,6 @@ sub MQTT_GENERIC_BRIDGE_Initialize {
     "forceNEXT:0,1 ".
     $readingFnAttributes;
 
-    #main::LoadModule("MQTT");
-
     # Beim ModulReload Deviceliste loeschen (eig. nur fuer bei der Entwicklung nuetzich)
     #if($DEBUG) {
     #if($hash->{'.debug'}) {
@@ -566,14 +568,15 @@ sub MQTT_GENERIC_BRIDGE_Initialize {
     #}
 
     $hash->{'.debug'} = '0';
-    return;       
+    $hash->{NotifyOrderPrefix} = "70-";
+    return;
 }
 
 ###############################################################################
 # prueft, ob debug Attribute auf 1 gesetzt ist (Debugmode)
 sub isDebug {
   my $hash = shift // return;
-  return AttrVal($hash->{NAME},'debug',0);  
+  return AttrVal($hash->{NAME},'debug',0);
 }
 
 # Entfernt Leerzeichen vom string vorne und hinten
@@ -677,22 +680,22 @@ sub refreshUserAttr {
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
 sub retrieveIODevName {
   my $hash = shift // return;
-  my $iodn = AttrVal($hash->{NAME}, "IODev", undef);
+  my $iodn = defined InternalVal($hash->{NAME}, 'IODev',undef) ? InternalVal($hash->{NAME}, 'IODev',undef)->{NAME} : AttrVal($hash->{NAME}, 'IODev',ReadingsVal($hash->{NAME}, 'IODev', undef));
   return $iodn;
 }
 
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
 sub retrieveIODevType {
   my $hash = shift // return;
-  
+
   return $hash->{+HELPER}->{+IO_DEV_TYPE} if defined $hash->{+HELPER}->{+IO_DEV_TYPE};
 
-  my $iodn = AttrVal($hash->{NAME}, "IODev", undef);
+  my $iodn = retrieveIODevName($hash);
   my $iodt = undef;
   if(defined($iodn) and defined($defs{$iodn})) {
     $iodt = $defs{$iodn}{TYPE};
   }
-  $hash->{+HELPER}->{+IO_DEV_TYPE} =  $iodt;
+  $hash->{+HELPER}->{+IO_DEV_TYPE} = $iodt if defined $iodt;
   return $iodt;
 }
 
@@ -767,7 +770,7 @@ sub firstInit {
   my $hash = shift // return;
   
   # IO    
-  AssignIoPort($hash);
+  AssignIoPort($hash,retrieveIODevName($hash));
 
   if(isIODevMQTT($hash)) {
     require Net::MQTT::Constants;
@@ -778,7 +781,7 @@ sub firstInit {
   if ($init_done) {
     $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 0;
 
-    return if !defined(AttrVal($hash->{NAME},'IODev',undef));
+    return if !retrieveIODevName($hash);
 
     # Default-Excludes
     defineDefaultGlobalExclude($hash);
@@ -2514,7 +2517,8 @@ sub doPublish { #($$$$$$$$) {
     #readingsSingleUpdate($hash,"outgoing-count",$hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT},1);
     readingsEndUpdate($hash,1);
     return;
-  } elsif (isIODevMQTT($hash)) { #elsif ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT') {
+  } 
+  if (isIODevMQTT($hash)) { #elsif ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT') {
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] doPublish for $device, $reading, topic: $topic, message: $message");
     my $msgid;
     if(defined($topic) and defined($message)) {
@@ -2534,12 +2538,11 @@ sub doPublish { #($$$$$$$$) {
     }
     $hash->{message_ids}->{$msgid}++ if defined $msgid;
     return 'empty topic or message';
-  } else {
-    my $iodt = retrieveIODevType($hash);
-    $iodt = 'undef' if !defined $iodt;
-    Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] unknown IODev: ".$iodt);
-    return 'unknown IODev';
   }
+  my $iodt = retrieveIODevType($hash);
+  $iodt = 'undef' if !defined $iodt;
+  Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] unknown IODev: ".$iodt);
+  return 'unknown IODev';
 }
 
 # MQTT-Nachrichten entsprechend Geraete-Infos senden
@@ -2721,22 +2724,24 @@ sub Attr {
   if ($attribute eq "IODev") {
       my $ioDevType = undef;
       $ioDevType = $defs{$value}{TYPE} if defined ($value) and defined ($defs{$value});
-      $hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
+      #$hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
       
       if ($command eq "set") {
-      my $oldValue = $attr{$name}{IODev};
-      if ($init_done) {
-          unless (defined ($oldValue) and ($oldValue eq $value) ) {
+        $hash->{+HELPER}->{+IO_DEV_TYPE} = $ioDevType;
+        my $oldValue = retrieveIODevName($hash); #$attr{$name}{IODev};
+        if ($init_done) {
+          #unless (defined ($oldValue) and ($oldValue eq $value) ) {
             #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] attr: change IODev");
-          MQTT::client_stop($hash) if defined($attr{$name}{IODev}) and ($attr{$name}{IODev} eq 'MQTT');
-          $attr{$name}{IODev} = $value;
-            firstInit($hash);
+          #MQTT::client_stop($hash) if defined($attr{$name}{IODev}) and ($attr{$name}{IODev} eq 'MQTT');
+          #$attr{$name}{IODev} = $value;
+          if ( !defined $oldValue || $oldValue ne $value ) {
+              MQTT::client_stop($hash) if defined $oldValue &&  $ioDevType eq 'MQTT';
+              firstInit($hash);
           }
         }
       } else {
-      if ($init_done) {
-          MQTT::client_stop($hash) if defined ($ioDevType) and ($ioDevType eq 'MQTT');
-        }
+        MQTT::client_stop($hash) if $init_done && defined $ioDevType && $ioDevType eq 'MQTT';
+        delete $hash->{+HELPER}->{+IO_DEV_TYPE};
       }
     return;
   }
@@ -2881,7 +2886,7 @@ sub Parse {
     # Name mit IODev vegleichen
     my $iiodn = retrieveIODevName($hash);
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse: test IODev: $iiodn vs. $ioname");
-    next if $ioname ne $iiodn;
+    next if !defined $iiodn || $ioname ne $iiodn;
     my $iiodt = retrieveIODevType($hash);
     next if !checkIODevMQTT2($iiodt);
     #next unless isIODevMQTT2($hash);
