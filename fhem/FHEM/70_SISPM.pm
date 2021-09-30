@@ -434,6 +434,7 @@ SISPM_Read($)
 
     if($eof) {
 	close($FH);
+        delete $hash->{FH};
 	delete $hash->{FD};
 	delete $selectlist{"$name.pipe"};
 	InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
