@@ -6258,7 +6258,8 @@ IsWe(;$$)
   my ($when, $wday) = @_;
 
   my $dt = ($when && $when =~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/);
-  $when = "state" if(!$when || ($when !~ m/^(yesterday|tomorrow)$/ && !$dt));
+  $when = "state" if(!$when ||
+                ($when !~ m/^(yesterday|today|tomorrow)$/ && !$dt));
   if(!defined($wday)) {
     if($dt) {
       my ($y,$m,$d) = ($2 ? $2-1900 : (localtime())[5], $3-1, $4);
