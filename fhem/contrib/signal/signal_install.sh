@@ -47,18 +47,6 @@ if grep -q docker /proc/1/cgroup; then
 	SIGNALPATH=/opt/fhem
 fi
 
-if [ -z "$OPERATION" ] || [ "$OPERATION" = "system" ] || [ "$OPERATION" = "install" ] || [ "$OPERATION" = "all" ]; then
-echo "This script will help you to install signal-cli as system dbus service"
-echo "and prepare the use of the FHEM Signalbot module"
-echo
-echo "Please verify that these settings are correct:"
-echo "Signal-cli User:              $SIGNALUSER"
-echo "Signal-cli Install directory: $SIGNALPATH"
-echo "Signal config storage:        $SIGNALVAR"
-echo "Signal version:               $SIGNALVERSION"
-echo "System library path:          $LIBPATH"
-fi
-
 #
 install_and_check() {
 #Check availability of tools and install via apt if missing
@@ -151,34 +139,47 @@ check_and_compare_file() {
 
 ARCH=`arch`
 OSNAME=`uname`
-RASPI=""
+APT=`which apt`
+if [ $ARCH = "armv7l" ]; then 
+	ARCH="armhf"
+elif [ $ARCH = "x86_64" ]; then
+	ARCH="amd64"
+fi
+GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
+
+IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
+KNOWN=("amd64-glibc2.27-0.9.0" "amd64-glibc2.28-0.9.0" "amd64-glibc2.31-0.9.0" "armhf-glibc2.28-0.9.0")
+
+GETLIBS=1
+if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
+    echo "$IDENTSTR is an unsupported combination - signal-cli binary libraries might not work"
+	GETLIBS=0
+fi
 
 if [ $OSNAME != "Linux" ]; then
 	echo "Only Linux systems are supported (you: $OSNAME), quitting"
 	exit
 fi
+if [ -z "$APT" ]; then
+	echo "Your system does not have apt installed, quitting"
+	exit
+fi
 
-if [ "$ID" = "raspbian" ] || [ "$ID" = "Raspian" ] || [ "$ARCH" = "armv7l" ]; then
-	echo "You seem to be on a Raspberry pi with $ARCH"
-	RASPI=1
-else 
-	if [ "$ID" = "ubuntu" ] || [ "$ID" = "Ubuntu" ]; then
-		echo "You seem to run Ubuntu on $ARCH"
-	else
-		echo "Your configuration"
-		uname -a
-		echo "has not been tested, continue at own risk"
-	fi
+if [ -z "$OPERATION" ] || [ "$OPERATION" = "system" ] || [ "$OPERATION" = "install" ] || [ "$OPERATION" = "all" ]; then
+echo "This script will help you to install signal-cli as system dbus service"
+echo "and prepare the use of the FHEM Signalbot module"
+echo
+echo "Please verify that these settings are correct:"
+echo "Signal-cli User:              $SIGNALUSER"
+echo "Signal-cli Install directory: $SIGNALPATH"
+echo "Signal config storage:        $SIGNALVAR"
+echo "Signal version:               $SIGNALVERSION"
+echo "System library path:          $LIBPATH"
+echo "System architecture:          $ARCH"
+echo "System GLIBC version:         $GLIBC"
 fi
 
 check_and_update() {
-
-APT=`which apt`
-
-if [ -z "$APT" ]; then
-	echo "Can't find apt command - are you on a supported system?"
-	exit
-fi
 
 check_and_create_path $LIBPATH
 check_and_create_path /etc/dbus-1
@@ -292,20 +293,19 @@ if [ $NEEDINSTALL = 1 ]; then
 		tar xf /tmp/signal-cli-$SIGNALVERSION.tar.gz
 		rm -rf signal
 		mv "signal-cli-$SIGNALVERSION" signal
-		if [ -n "$RASPI" ]; then
-			echo "Downloading native armv7l libraries..."
+		if [ "$GETLIBS" = 1 ]; then
+			echo -n "Downloading native libraries..."
 			cd /tmp
 			rm -rf libsignal_jni.so libzkgroup.so
-			wget -qN https://svn.fhem.de/fhem/trunk/fhem/thirdparty/signallibs_armv7l/v$SIGNALVERSION/libzkgroup.so
-			wget -qN https://svn.fhem.de/fhem/trunk/fhem/thirdparty/signallibs_armv7l/v$SIGNALVERSION/libsignal_jni.so
+			wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libzkgroup.so
+			wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libsignal_jni.so
 			echo "done"
-			echo -n "Updating native x86 since you're on Raspberry..."
+			echo "Updating native libs for $IDENTSTR"
 			zip -u $SIGNALPATH/signal/lib/zkgroup-java-*.jar libzkgroup.so
 			zip -u $SIGNALPATH/signal/lib/signal-client-java-*.jar libsignal_jni.so
 			#Use updated libs in jar instead of /usr/lib
 			#mv libsignal_jni.so libzkgroup.so $LIBPATH
-			rm -f $LIBDIR/libzkgroup.so $LIBDIR/libsignal_jni.so
-			echo "done"
+			#rm -f $LIBDIR/libzkgroup.so $LIBDIR/libsignal_jni.so
 		fi
 		echo "done"
 		rm -f /tmp/signal-cli-$SIGNALVERSION.tar.gz
