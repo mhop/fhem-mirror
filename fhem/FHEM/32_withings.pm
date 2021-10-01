@@ -191,6 +191,19 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      143 => { name => "unknown 143", reading => "unknown143", },#
                      144 => { name => "unknown 144", reading => "unknown144", },#
                      145 => { name => "unknown 145", reading => "unknown145", },#
+                     146 => { name => "unknown 146", reading => "unknown146", },#
+                     147 => { name => "unknown 147", reading => "unknown147", },#
+                     148 => { name => "unknown 148", reading => "unknown148", },#
+                     149 => { name => "unknown 149", reading => "unknown149", },#
+                     150 => { name => "unknown 150", reading => "unknown150", },#
+                     151 => { name => "unknown 151", reading => "unknown151", },#
+                     152 => { name => "unknown 152", reading => "unknown152", },#
+                     153 => { name => "unknown 153", reading => "unknown153", },#
+                     154 => { name => "unknown 154", reading => "unknown154", },#
+                     155 => { name => "Vascular Age", reading => "vascularAge", },#
+                     156 => { name => "unknown 156", reading => "unknown156", },#
+                     157 => { name => "unknown 157", reading => "unknown157", },#
+                     158 => { name => "unknown 158", reading => "unknown158", },#
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
@@ -334,7 +347,6 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
                         'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
-
                         #'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
                         #'steps' => { name => "Steps", reading => "steps", unit => 0, },
                         #'calories' => { name => "Calories", reading => "calories", unit => 0, },
@@ -1310,6 +1322,16 @@ sub withings_getDeviceDetail($) {
     $hash->{typeID} = $device->{type};
     $hash->{lastsessiondate} = $device->{lastsessiondate} if( defined($device->{lastsessiondate}) );
     $hash->{lastweighindate} = $device->{lastweighindate} if( defined($device->{lastweighindate}) );
+
+    readingsBeginUpdate($hash);
+    if( defined($device->{batterylvl}) and $device->{batterylvl} > 0 and $device->{type} ne '32' and $device->{model} ne '22') {
+      readingsBulkUpdate( $hash, "batteryPercent", $device->{batterylvl}, 1 );
+      readingsBulkUpdate( $hash, "batteryState", ($device->{batterylvl}>20?"ok":"low"), 1 );
+    }
+    readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime(int($device->{lastweighindate})), 1 ) if( defined($device->{lastweighindate}) and int($device->{lastweighindate}) > 0  and $device->{model} ne '60' );
+    readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime(int($device->{lastsessiondate})), 1 ) if( defined($device->{lastsessiondate}) );
+    readingsBulkUpdate( $hash, "firmware", $device->{fw}, 1 ) if( defined($device->{fw}) );
+    readingsEndUpdate($hash,1);
   }
 
   return $json->{body};
@@ -1970,20 +1992,20 @@ sub withings_parseProperties($$) {
   my ($hash,$json) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "$name: parsedevice\n".Dumper($json);
-
   #parse
   my $detail = $json->{body};
+  Log3 $name, 5, "$name: parsedevice\n".Dumper($json->{body});
 
   readingsBeginUpdate($hash);
 
-  if( defined($detail->{batterylvl}) and $detail->{batterylvl} > 0 and $detail->{type} ne '32' and $detail->{model} ne '22') {
-    readingsBulkUpdate( $hash, "batteryPercent", $detail->{batterylvl}, 1 );
-    readingsBulkUpdate( $hash, "batteryState", ($detail->{batterylvl}>20?"ok":"low"), 1 );
+  if( defined($json->{body}{batterylvl}) and $json->{body}{batterylvl} > 0 and $json->{body}{type} ne '32' and $json->{body}{model} ne '22') {
+    readingsBulkUpdate( $hash, "batteryPercent", $json->{body}{batterylvl}, 1 );
+    readingsBulkUpdate( $hash, "batteryState", ($json->{body}{batterylvl}>20?"ok":"low"), 1 );
   }
-  readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime($detail->{lastweighindate}), 1 ) if( defined($detail->{lastweighindate}) and $detail->{lastweighindate} > 0  and $detail->{model} ne '60' );
-  readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime($detail->{lastsessiondate}), 1 ) if( defined($detail->{lastsessiondate}) );
-  $hash->{lastsessiondate} = $detail->{lastsessiondate} if( defined($detail->{lastsessiondate}) );
+  readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime(int($json->{body}{lastweighindate})), 1 ) if( defined($json->{body}{lastweighindate}) and int($json->{body}{lastweighindate}) > 0  and $json->{body}{model} ne '60' );
+  readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime(int($json->{body}{lastsessiondate})), 1 ) if( defined($json->{body}{lastsessiondate}) );
+  readingsBulkUpdate( $hash, "firmware", $json->{body}{fw}, 1 ) if( defined($json->{body}{fw}) );
+  $hash->{lastsessiondate} = $json->{body}{lastsessiondate} if( defined($json->{body}{lastsessiondate}) );
 
   readingsEndUpdate($hash,1);
 
@@ -2525,7 +2547,7 @@ sub withings_parseVasistas($$;$) {
       $newlastupdate = $device->{lastweighindate} if($device->{lastweighindate} and $device->{lastweighindate} < $newlastupdate);
 
       #start in-bed detection
-      if($hash->{modelID} eq "61" && $datatype =~ /Sleep/ && $iscurrent == 0){
+      if($hash->{modelID} && $hash->{modelID} eq "61" && $datatype =~ /Sleep/ && $iscurrent == 0){
         if($device->{lastweighindate} > (time()-1800)){
           readingsSingleUpdate( $hash, "in_bed", 1, 1 );
         } else {
@@ -4071,7 +4093,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'dailySteps';
     $unit = 'steps';
   }
-  elsif($event =~ m/steps/)
+  elsif($event =~ m/^steps/)
   {
     $reading = 'steps';
     $unit = 'steps';
@@ -4106,7 +4128,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'diastolicBloodPressure';
     $unit = 'mmHg';
   }
-  elsif($event =~ m/spo2/)
+  elsif($event =~ m/^spo2/)
   {
     $reading = 'spo2';
     $unit = '%';
@@ -4131,7 +4153,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'fatMassWeight';
     $unit = 'kg';
   }
-  elsif($event =~ m/weight/)
+  elsif($event =~ m/^weight/)
   {
     $reading = 'weight';
     $unit = 'kg';
@@ -4171,22 +4193,22 @@ sub withings_DbLog_splitFn($) {
     $reading = 'dailyCaloriesActive';
     $unit = 'kcal';
   }
-  elsif($event =~ m/calories/)
+  elsif($event =~ m/^calories/)
   {
     $reading = 'calories';
     $unit = 'kcal';
   }
-  elsif($event =~ m/co2/)
+  elsif($event =~ m/^co2/)
   {
     $reading = 'co2';
     $unit = 'ppm';
   }
-  elsif($event =~ m/voc/)
+  elsif($event =~ m/^voc/)
   {
     $reading = 'voc';
     $unit = 'ppm';
   }
-  elsif($event =~ m/light/)
+  elsif($event =~ m/^light/)
   {
     $reading = 'light';
     $unit = 'lux';
@@ -4196,7 +4218,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'batteryPercent';
     $unit = '%';
   }
-  elsif($event =~ m/durationTo/)
+  elsif($event =~ m/^durationTo/)
   {
     $value = $parts[1];
     $unit = 's';
@@ -4211,7 +4233,7 @@ sub withings_DbLog_splitFn($) {
     $value = $parts[1];
     $unit = 'bpm';
   }
-  elsif($event =~ m/pressure/)
+  elsif($event =~ m/^pressure/)
   {
     $value = $parts[1];
     $unit = 'mmHg';
