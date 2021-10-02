@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  48_MieleAtHome: fix but in autocreate
  - feature: 32_withings: added vascularAge reading
  - feature: 49_SSCamSTRM: new setter snap
  - feature: 02_RSS: support for more than one directory for background 

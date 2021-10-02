@@ -35,7 +35,7 @@ use Encode qw(encode_utf8);
 use List::Util qw[min max];
 use JSON;
 
-my $version = "1.1.0";
+my $version = "1.1.1";
 
 my $MAH_hasMimeBase64 = 1;
 
@@ -387,7 +387,7 @@ sub MAH_SetFn($$@)
 		return undef;
 	}
 	elsif( $cmd eq 'autocreate' ) {
-		return "autocreate needs a valid ACCESS_TOKEN, please try again" if (MAH_getAccessToken($hash) == "");
+		return "autocreate needs a valid ACCESS_TOKEN, please try again" if (MAH_getAccessToken($hash) eq "");
 		return "use $cmd without arguments" if(@args != 0);
 		InternalTimer(gettimeofday()+0, "MAH_autocreate", $hash);
 		return undef;
