@@ -486,6 +486,7 @@ sub _getVersion {
 1;
 
 __END__
+
 =pod
 =item summary helper functions needed for ebus MQTT2_DEVICE
 =item summary_DE needed Hilfsfunktionen für ebus MQTT2_DEVICE
@@ -516,7 +517,7 @@ __END__
   </li>
   <li><b>FHEM::aTm2u_ebus::send_weekprofile</b><br>
   <code>FHEM::aTm2u_ebus::send_weekprofile($$$,$$)</code><br>
-  Helper function that may be capable to translate a (temperature) <i>weekly profile<i> provided by a <i>weekprofile<i> TYPE device to the ebus format (max. three pairs of on/off switching times).
+  Helper function that may be capable to translate a (temperature) <i>weekly profile</i> provided by a <i>weekprofile</i> TYPE device to the ebus format (max. three pairs of on/off switching times).
   </li>
   <li><b>FHEM::aTm2u_ebus::createBarView</b><br>
   <code>FHEM::aTm2u_ebus::createBarView($,$$)</code><br>
