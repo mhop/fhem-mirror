@@ -65,7 +65,7 @@ FHEM/10_FS20.pm              rudolfkoenig         SlowRF
 FHEM/10_HXBDevice.pm         neubert              Sonstige Systeme
 FHEM/10_IT.pm                dancer0705/bjoernh   InterTechno
 FHEM/10_Itach_IR             ulimaass             Sonstige Systeme
-FHEM/10_KNX.pm               erwin                KNX/EIB
+FHEM/10_KNX.pm               erwin                KNX/EIB (Forum #122582) https://forum.fhem.de/index.php/topic,122582.0.html
 FHEM/10_KOPP_FC.pm           raspii               Sonstige Systeme
 FHEM/10_MAX.pm               Wzut                 MAX
 FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
