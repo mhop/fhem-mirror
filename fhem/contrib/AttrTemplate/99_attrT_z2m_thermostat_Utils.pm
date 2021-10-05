@@ -8,6 +8,8 @@ use strict;
 use warnings;
 use JSON qw(decode_json);
 use Carp qw(carp);
+use Scalar::Util qw(looks_like_number);
+
 #use POSIX qw(strftime);
 #use List::Util qw( min max );
 #use Scalar::Util qw(looks_like_number);
@@ -32,6 +34,7 @@ BEGIN {
           json2nameValue
           defs
           Log3
+          IsWe
           )
     );
 }
@@ -102,6 +105,50 @@ sub z2t_send_weekprofile {
   }
   readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
   return;
+}
+
+
+sub z2t_send_Beca_weekprofile {
+  my $name       = shift // carp q[No device name provided!]              && return;
+  my $wp_name    = shift // carp q[No weekprofile device name provided!]  && return;
+  my $wp_profile = shift // carp q[No weekprofile profile name provided!] && return;
+  my $topic      = shift // carp q[No topic to send to provided!]         && return;
+
+  my $hash = $defs{$name};
+
+  my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
+  if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
+    Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
+    return;
+  }
+
+  my @D = qw(Sun Mon Tue Wed Thu Fri Sat); # eqals to my @D = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
+  my $payload;
+  my @days = (0,1,6);
+  my $decoded;
+  if ( !eval { $decoded  = decode_json($wp_profile_data) ; 1 } ) {
+    Log3($name, 1, "JSON decoding error in $wp_profile provided by $wp_name: $@");
+    return;
+  }
+
+  for my $i (@days) {
+      my $sd = $i == 0 ? 'u' : $i == 6 ? 'a' : 'w';
+
+      for my $j (0..5) {
+        my $time = $decoded->{$D[$i]}{'time'}[$j];
+        last if !defined $time;
+        my $tmp  = $decoded->{$D[$i]}{'temp'}[$j];
+        my $k = $j+1;
+        next if !looks_like_number($tmp);
+        $payload .= defined $payload ? ',' : '{';
+        $payload .= qq("${sd}${k}h":"$time","${sd}${k}t":$tmp);
+      }
+  }
+  Log3($hash,3,"$payload");
+  return if !defined $payload;
+  $payload .='}';
+  readingsSingleUpdate( $hash, 'weekprofile', "$wp_name $wp_profile",1);
+  return qq{$topic $payload};
 }
 
 1;

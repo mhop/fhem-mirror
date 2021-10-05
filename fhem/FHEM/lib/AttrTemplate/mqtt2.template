@@ -2355,6 +2355,48 @@ set DEVICE attrTemplate speechcontrol_type_thermostat
 option:global
 setreading DEVICE attrTemplateVersion 20210811
 
+# Thermostat Beca Wifi
+name:WThermostatBeca
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc: First version for <a href="https://github.com/fashberg/WThermostatBeca">WThermostat Beca</a>. <br>Not yet tested... <br> see <a href="https://forum.fhem.de/index.php/topic,123212.0.html">Forum Thread</a>. Might also be ok for original firmware from https://github.com/klausahrenberg/WThermostatBeca
+order:E_05a
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:ICON;ICON as set, defaults to hm-tc-it-wm-w-eu;{ AttrVal("DEVICE","icon","hm-tc-it-wm-w-eu") }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:WPNAME;weekprofile attr value, defaults to device name;{ AttrVal('DEVICE','weekprofile','DEVICE') }
+{ Svn_GetFile("contrib/AttrTemplate/99_attrT_z2m_thermostat_Utils.pm", "FHEM/99_attrT_z2m_thermostat_Utils.pm", sub(){ CommandReload(undef, "99_attrT_z2m_thermostat_Utils.pm") }) }
+attr DEVICE icon ICON
+attr DEVICE userattr weekprofile
+attr DEVICE weekprofile WPNAME
+attr DEVICE devStateIcon <a href="http://ip" target="_blank">\
+LWT\
+</a>\
+state
+attr DEVICE setStateList on off weekprofile
+attr DEVICE readingList TELETOPIC/LWT:.* LWT\
+  devices/network:.* { json2nameValue($EVENT,'d_network_',$JSONMAP) }\
+  devices/clock:.* { json2nameValue($EVENT,'d_clock_',$JSONMAP) }\
+  devices/thermostat:.* { json2nameValue($EVENT,'d_thermostat_',$JSONMAP) }\
+  devices/logging:.* { json2nameValue($EVENT,'d_log_',$JSONMAP) }\
+  STATTOPIC/things/network/properties:.* { json2nameValue($EVENT,'net_',$JSONMAP) }\
+  STATTOPIC/things/thermostat/properties:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/things/logging/properties:.* { json2nameValue($EVENT,'log_',$JSONMAP) }\
+  STATTOPIC/things/clock/properties:.* { json2nameValue($EVENT,'clock_',$JSONMAP) }
+attr DEVICE setList on CMNDTOPIC/things/thermostat/properties/deviceOn true\
+  off CMNDTOPIC/things/thermostat/properties/deviceOn false\
+  desired-temp:slider,5.0,0.5,35.0,1 CMNDTOPIC/things/thermostat/properties/targetTemperature $EVTPART1\
+  mode:heat,auto CMNDTOPIC/things/thermostat/properties/mode $EVTPART1\
+  weekprofile { FHEM::attrT_z2m_thermostat_Utils::z2t_send_Beca_weekprofile($NAME, $EVTPART1, $EVTPART2, 'CMNDTOPIC/things/thermostat/schedules') }\
+  x_send_mcucommand:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(CMNDTOPIC/things/thermostat/mcucommand $payload)}
+attr DEVICE getList desired-temp:noArg desired-temp CMNDTOPIC/things/thermostat/properties
+attr DEVICE jsonMap targetTemperature:desired-temp
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20211005
+
+
 ###########################################
 # SHELLY
 #
@@ -3536,20 +3578,20 @@ desc:To configure a boiler device for use with an <a href="https://github.com/pr
 order:E_02b
 par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
 attr DEVICE readingList DEV_ID/boiler_data { json2nameValue($EVENT) }\
-	DEV_ID/shower_data:.* { json2nameValue($EVENT) }\
-	DEV_ID/mixing_data:.* { json2nameValue($EVENT) }\
-	DEV_ID/tapwater_active:.* tapwater_active\
-	DEV_ID/heating_active:.* heating_active\
-	DEV_ID/boiler_data_ww:.* { json2nameValue($EVENT) }\
+  DEV_ID/shower_data:.* { json2nameValue($EVENT) }\
+  DEV_ID/mixing_data:.* { json2nameValue($EVENT) }\
+  DEV_ID/tapwater_active:.* tapwater_active\
+  DEV_ID/heating_active:.* heating_active\
+  DEV_ID/boiler_data_ww:.* { json2nameValue($EVENT) }\
 attr DEVICE stateFormat \
-	Vorlauf: curFlowTemp C\
-	Rücklauf: retTemp C \
-	Vorlauf Soll: selFlowTemp C\
-	SystemDruck: sysPress Bar \
-	Wasserspeicher: wwStorageTemp2 C \
-	Status: BoilerStatus \
-	Status-Code: serviceCode serviceCodeNumber\
-	Temp Außen: outdoorTemp C\
+  Vorlauf: curFlowTemp C\
+  Rücklauf: retTemp C \
+  Vorlauf Soll: selFlowTemp C\
+  SystemDruck: sysPress Bar \
+  Wasserspeicher: wwStorageTemp2 C \
+  Status: BoilerStatus \
+  Status-Code: serviceCode serviceCodeNumber\
+  Temp Außen: outdoorTemp C\
 attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red
 attr DEVICE userReadings BoilerStatus {BoilerStatus("serviceCode","serviceCodeNumber")}
 attr DEVICE model ems-esp_boiler
@@ -3609,106 +3651,6 @@ attr DEVICE model ems-esp_thermostat_RC35_type
 attr DEVICE stateFormat mode\
 seltemp °C
 setreading DEVICE attrTemplateVersion 20201110
-
-
-
-name:ems-esp_heater_device_outdated
-filter:TYPE=MQTT2_DEVICE
-desc:Compability version of template, for firmware versions prior to 2.1!<br>EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
-order:E_02a1
-par:BASE_ID;base topic set, default is "home";{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/, ? $1 : "home" }
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
-par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
-attr DEVICE icon ICON
-modify DEVICE DEV_ID
-attr DEVICE bridgeRegexp \
-  BASE_ID/DEV_ID/(sensors|sm_data|hp_data|thermostat_data).*:.* "ems_esp_$1"\
-  BASE_ID/DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* "ems_esp_boiler"
-attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
-attr DEVICE  readingList BASE_ID/DEV_ID/start:.* LWT\
-  BASE_ID/DEV_ID/heartbeat:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE stateFormat Interface: \
-LWT\
-Signal: \
-rssid %\
-<br>Uptime: formatedUptime\
-<br>IPAddress : <a href="http://IP" target="_blank">IP</a>
-attr DEVICE setList restart:noArg BASE_ID/DEV_ID/restart
-attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan_rs485@red
-attr DEVICE autocreate 1
-attr DEVICE webCmd restart
-attr DEVICE model ems-esp_heater_device_outdated
-setreading DEVICE attrTemplateVersion 20200522 or prior
-
-name:ems-esp_boiler_outdated
-filter:TYPE=MQTT2_DEVICE
-desc:To configure a boiler device for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a><br>.<a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
-order:E_02b1
-par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/boiler_data:, ? "$1" : undef }
-attr DEVICE readingList BASEPATH/boiler_data { json2nameValue($EVENT,'',$JSONMAP) }\
-  BASEPATH/shower_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  BASEPATH/mixing_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  BASEPATH/tapwater_active:.* tapwater_active\
-  BASEPATH/heating_active:.* heating_active
-attr DEVICE stateFormat { my $h=ReadingsNum($name,"heating_active",0); my $t=ReadingsNum($name,"tapwater_active",0); !$h && !$t ? "idle" : ($h && !$t ? "heating" : "tapwater")}
-attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red
-attr DEVICE setList wWComfort:select,hot,intelligent BASEPATH/boiler_cmd { "cmd":"comfort", "data": "$EVTPART1" }
-attr DEVICE webCmd wWComfort
-attr DEVICE eventMap hot:Hot intelligent:Eco
-attr DEVICE model ems-esp_boiler_outdated
-setreading DEVICE attrTemplateVersion 20200529
-
-#ems-esp thermostat device
-name:ems-esp_thermostat_read-only_outdated
-filter:TYPE=MQTT2_DEVICE
-desc:To configure a simple read-only thermostat (e.g. CT200) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a>.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
-order:E_02c1
-par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
-par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
-attr DEVICE icon ICON
-attr DEVICE devStateIcon auto:time_automatic manual:time_manual_mode
-attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
-attr DEVICE readingList BASEPATH/thermostat_data:.* { json2nameValue($EVENT, '', $JSONMAP) }
-attr DEVICE stateFormat mode\
-desired-temp °C
-attr DEVICE webCmd :
-attr DEVICE model ems-esp_thermostat_read-only_outdated
-setreading DEVICE attrTemplateVersion 20200522 or prior
-
-name:ems-esp_thermostat_simple_outdated
-filter:TYPE=MQTT2_DEVICE
-desc:To configure a simple thermostat (e.g. RC300) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a>.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
-order:E_02ca
-par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
-par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
-attr DEVICE icon ICON
-attr DEVICE devStateIcon set.auto:edit_settings:mode+manual set.manual:edit_settings:mode+auto auto:time_automatic:mode+manual manual:time_manual_mode:mode+auto  set.*°C:edit_settings
-attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
-attr DEVICE readingList BASEPATH/thermostat_data:.* { json2nameValue($EVENT, '', $JSONMAP) }
-attr DEVICE setList mode:uzsuSelectRadio,auto,manual BASEPATH/thermostat_cmd_mode1 $EVTPART1\
-  desired-temp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_temp1 $EVTPART1
-attr DEVICE setStateList on off
-attr DEVICE stateFormat mode\
-desired-temp °C
-attr DEVICE webCmd mode:desired-temp
-set DEVICE attrTemplate speechcontrol_type_thermostat
-attr DEVICE model ems-esp_thermostat_simple_outdated
-setreading DEVICE attrTemplateVersion 20200522 or prior
-
-name:ems-esp_thermostat_RC35_type_outdated
-filter:TYPE=MQTT2_DEVICE
-desc:To configure a thermostat comparable to RC35 for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a><br>.<a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
-order:E_02ca1
-par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
-set DEVICE attrTemplate ems-esp_thermostat_simple
-attr DEVICE setList mode:uzsuSelectRadio,auto,manual BASEPATH/thermostat_cmd_mode1 $EVTPART1\
-  desired-temp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_temp1 $EVTPART1\
-  daytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_daytemp1 $EVTPART1\
-  nighttemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_nighttemp1 $EVTPART1\
-  holidaytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_holidayttemp1 $EVTPART1
-set DEVICE attrTemplate speechcontrol_type_thermostat
-attr DEVICE model ems-esp_thermostat_RC35_type_outdated
-setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 ###############
