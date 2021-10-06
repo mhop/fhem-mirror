@@ -2353,6 +2353,7 @@ attr DEVICE jsonMap Battery:0 Device:0 BatteryPercentage:batteryPercent LocalTem
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_thermostat
 option:global
+attr DEVICE model tasmota_zigbee2tasmota_eurotronic_spirit
 setreading DEVICE attrTemplateVersion 20210811
 
 # Thermostat Beca Wifi
@@ -2376,25 +2377,26 @@ LWT\
 state
 attr DEVICE setStateList on off weekprofile
 attr DEVICE readingList TELETOPIC/LWT:.* LWT\
-  devices/network:.* { json2nameValue($EVENT,'d_network_',$JSONMAP) }\
-  devices/clock:.* { json2nameValue($EVENT,'d_clock_',$JSONMAP) }\
-  devices/thermostat:.* { json2nameValue($EVENT,'d_thermostat_',$JSONMAP) }\
-  devices/logging:.* { json2nameValue($EVENT,'d_log_',$JSONMAP) }\
+  devices/(network|clock|thermostat|logging):.* {}\
   STATTOPIC/things/network/properties:.* { json2nameValue($EVENT,'net_',$JSONMAP) }\
-  STATTOPIC/things/thermostat/properties:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/things/thermostat/properties:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/things/logging/properties:.* { json2nameValue($EVENT,'log_',$JSONMAP) }\
-  STATTOPIC/things/clock/properties:.* { json2nameValue($EVENT,'clock_',$JSONMAP) }
-attr DEVICE setList on CMNDTOPIC/things/thermostat/properties/deviceOn true\
-  off CMNDTOPIC/things/thermostat/properties/deviceOn false\
+  STATTOPIC/things/clock/properties:.* { json2nameValue($EVENT,'clock_',$JSONMAP) }\
+  STATTOPIC/things/thermostat/deviceOn:.* {{state => $EVENT eq 'false' ? 'off' : 'on'}}\
+  STATTOPIC/things/thermostat/targetTemperature:.* desired-temp
+attr DEVICE setList on:noArg CMNDTOPIC/things/thermostat/properties/deviceOn true\
+  off:noArg CMNDTOPIC/things/thermostat/properties/deviceOn false\
   desired-temp:slider,5.0,0.5,35.0,1 CMNDTOPIC/things/thermostat/properties/targetTemperature $EVTPART1\
-  mode:heat,auto CMNDTOPIC/things/thermostat/properties/mode $EVTPART1\
+  mode:heat,auto,cool CMNDTOPIC/things/thermostat/properties/mode $EVTPART1\
   weekprofile { FHEM::attrT_z2m_thermostat_Utils::z2t_send_Beca_weekprofile($NAME, $EVTPART1, $EVTPART2, 'CMNDTOPIC/things/thermostat/schedules') }\
   x_send_mcucommand:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(CMNDTOPIC/things/thermostat/mcucommand $payload)}
 attr DEVICE getList desired-temp:noArg desired-temp CMNDTOPIC/things/thermostat/properties
-attr DEVICE jsonMap targetTemperature:desired-temp
+attr DEVICE jsonMap targetTemperature:0 deviceOn:0
+attr DEVICE webCmd mode:desired-temp
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20211005
+attr DEVICE model WThermostatBeca
+setreading DEVICE attrTemplateVersion 20211006
 
 
 ###########################################
