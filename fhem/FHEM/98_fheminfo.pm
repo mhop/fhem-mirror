@@ -2,7 +2,7 @@
 
 # $Id$
 
-This script free software; you can redistribute it and/or modify
+This script is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
 any later version.
@@ -30,7 +30,7 @@ my $c_noModel = 'noModel';
 my %fhemInfo    = ();
 my @ignoreList  = qw(Global);
 my @noModelList = qw(readingsgroup lacrosse zwdongle wol weekdaytimer 
-   cul_rfr solarview lw12 tscul knx dummy at archetype pushover twilight 
+   cul_rfr solarview lw12 tscul dummy at archetype pushover twilight 
    notify cloneDummy structure FHEMWEB hminfo);
 
 sub fheminfo_Initialize {
@@ -96,10 +96,10 @@ sub _fi2_Count {
       my $model = $c_noModel;
 
 # 2. look for model information in internals
-      unless (lc($type) eq 'knx') {
+#      unless (lc($type) eq 'knx') {
          $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
          $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
-      }
+#      }
 
       if ($model eq $c_noModel) {
 # 3. look for model information in attributes
@@ -124,11 +124,15 @@ sub _fi2_Count {
       foreach my $i (@noModelList) {
          $model = $c_noModel if (lc($type) eq $i);
       }
+
+# 6. protect against very old KNX modules
+      $model = $c_noModel if ( lc($type) eq 'knx' && $model !~ /^dpt[\d]+/x);
       
-# 6. check if model is a scalar
+# 7. check if model is a scalar
       $model = $c_noModel if (ref($model) eq 'HASH');
 
-# 7. skip for some special cases found in database
+
+# 8. skip for some special cases found in database
       next if ( ($model =~ /^unkno.*/i) || 
                 ($model =~ /virtual.*/i) || 
                 ($model =~ m/\berror\b/i) ||
@@ -139,7 +143,7 @@ sub _fi2_Count {
                 (defined($defs{$key}{'chanNo'})) ||
                 ($name =~ m/^unknown_/) );
 
-# 8. finally count it :)
+# 9. finally count it :)
       $fhemInfo{$type}{$model}++ ;
    }
 
