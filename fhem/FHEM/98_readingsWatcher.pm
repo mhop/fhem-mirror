@@ -418,11 +418,11 @@ sub OnTimer {
     @skipDevs = ();
     @allDevs  = ();
 
-    ($hash->{helper}{readingActifity},$hash->{helper}{dead},$hash->{helper}{alive}) = split(':', AttrVal($name, 'readingActivity', 'none:dead:alive'));
+    ($hash->{helper}{readingActivity},$hash->{helper}{dead},$hash->{helper}{alive}) = split(':', AttrVal($name, 'readingActivity', 'none:dead:alive'));
 
     $hash->{helper}{dead}  //= 'dead';  # if (!defined($dead));
     $hash->{helper}{alive} //= 'alive'; # if (!defined($alive));
-    $hash->{helper}{readingActifity} = ''  if ($hash->{helper}{readingActifity} eq 'none');
+    $hash->{helper}{readingActivity} = ''  if ($hash->{helper}{readingActivity} eq 'none');
 
     $hash->{helper}{delimiter} = AttrVal($name,'delimiter','_'); # -, --, _, __
 
@@ -597,18 +597,18 @@ sub checkDevice {
         my $d_d = $hash->{helper}{d_d};
 
         if ((!$or_and && $d_d) || ($or_and && !$d_a)) { # tot bei OR und mindestens einem Toten ||  AND aber kein noch Lebender
-	    $error = CommandSetReading(undef, "$device $hash->{helper}{readingActifity} $hash->{helper}{dead}") if ($hash->{helper}{readingActifity});
+	    $error = CommandSetReading(undef, "$device $hash->{helper}{readingActivity} $hash->{helper}{dead}") if ($hash->{helper}{readingActivity});
 	    push @deadDevs, $device; # dead devices
 	}
 	else  { # wenn es nicht tot ist müsste es eigentlich noch leben ....
-	    $error = CommandSetReading(undef, "$device $hash->{helper}{readingActifity} $hash->{helper}{alive}") if ($hash->{helper}{readingActifity});
+	    $error = CommandSetReading(undef, "$device $hash->{helper}{readingActivity} $hash->{helper}{alive}") if ($hash->{helper}{readingActivity});
 	    $hash->{helper}{alive_count} ++; # alive devices
 	}
 	Log3($name, 2, "$name, $error") if ($error);
     }
     else {
         Log3($name, 2, "$name, insufficient parameters for device $device - skipped !");
-        CommandSetReading(undef, "$device $hash->{helper}{readingActifity} unknown") if ($hash->{helper}{readingActifity});
+        CommandSetReading(undef, "$device $hash->{helper}{readingActivity} unknown") if ($hash->{helper}{readingActivity});
         push @skipDevs, $device;
     }
 
@@ -683,11 +683,11 @@ __END__
        <a name="disable"></a><li><b>disable</b><br>deactivate/activate the device</li><br>
        <a name="interval"></a><li><b>interval &lt;seconds&gt;</b><br>Time interval for continuous check (default 60)</li><br>
        <a name="deleteUnusedReadings"></a><li><b>deleteUnusedReadings</b><br>delete unused readings (default 1)</li><br>
-       <a name="readingActifity"></a><li><b>readingActifity</b> (default none)<br>
+       <a name="readingActivity"></a><li><b>readingActivity</b> (default none)<br>
        Similar to the HomeMatic ActionDetector, the module can set its own reading in the monitored device and save the monitoring status.<br>
-       <code>attr &lt;name&gt; readingActifity actifity</code><br>
+       <code>attr &lt;name&gt; readingActivity actifity</code><br>
        Creates the additional reading actifity in the monitored devices and supplies it with the status dead or alive<br>     
-       <code>attr &lt;name&gt; readingActifity activ:0:1</code><br>
+       <code>attr &lt;name&gt; readingActivity activ:0:1</code><br>
        Creates the additional reading activ in the monitored devices and supplies it with the status 0 or 1
       </li><br>
      </ul>
@@ -756,12 +756,12 @@ __END__
        <a name="disable"></a><li><b>disable</b><br>Deaktiviert das Device</li><br>
        <a name="interval"></a><li><b>interval &lt;Sekunden&gt;</b> (default 60)<br>Zeitintervall zur kontinuierlichen Überprüfung</li><br>
        <a name="deleteUnusedReadings"></a><li><b>deleteUnusedReadings</b> (default 1)<br>Readings mit dem Wert unused werden automatisch gelöscht</li><br>
-       <a name="readingActifity"></a><li><b>readingActifity</b> (default none)<br>
+       <a name="readingActivity"></a><li><b>readingActivity</b> (default none)<br>
        Das Modul kann ähnlich dem HomeMatic ActionDetector im überwachten Gerät ein eigenes Reading setzen und den Überwachungsstatus<br>
        in diesem speichern. Beispiel :<br>
-       <code>attr &lt;name&gt; readingActifity actifity</code><br>
+       <code>attr &lt;name&gt; readingActivity actifity</code><br>
        Erzeugt in den überwachten Geräten das zusäzliche Reading actifity und versorgt es mit dem Status dead bzw alive<br>     
-       <code>attr &lt;name&gt; readingActifity aktiv:0:1</code><br>
+       <code>attr &lt;name&gt; readingActivity aktiv:0:1</code><br>
        Erzeugt in den überwachten Geräten das zusätzliche Reading aktiv und versorgt es mit dem Status 0 bzw 1
        </li><br>
      </ul>
