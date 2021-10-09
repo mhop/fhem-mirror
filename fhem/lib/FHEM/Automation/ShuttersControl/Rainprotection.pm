@@ -107,6 +107,13 @@ sub RainProcessing {
             $FHEM::Automation::ShuttersControl::shutters
                 ->setRainProtectionStatus('unprotected');
         }
+        else {
+            $FHEM::Automation::ShuttersControl::shutters
+                ->setRainProtectionStatus('unprotected')
+              if (  $FHEM::Automation::ShuttersControl::shutters->getStatus !=
+                      $rainClosedPos
+                && ($val == 0 || $val < $triggerMin) );
+        }
     }
 
     return;

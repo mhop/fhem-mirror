@@ -1360,18 +1360,23 @@ sub EventProcessingWind {
                           $FHEM::Automation::ShuttersControl::shutters->getIsDay
                         ? $FHEM::Automation::ShuttersControl::shutters
                           ->getLastPos
-                        : (
-                            $FHEM::Automation::ShuttersControl::shutters
-                              ->getPrivacyDownStatus == 2
+                        : ( $FHEM::Automation::ShuttersControl::shutters->getShuttersPlace
+                            eq 'awning'
                             ? $FHEM::Automation::ShuttersControl::shutters
-                              ->getPrivacyDownPos
+                              ->getOpenPos
                             : (
                                 $FHEM::Automation::ShuttersControl::shutters
-                                  ->getSleepPos > 0
+                                  ->getPrivacyDownStatus == 2
                                 ? $FHEM::Automation::ShuttersControl::shutters
-                                  ->getSleepPos
-                                : $FHEM::Automation::ShuttersControl::shutters
-                                  ->getClosedPos
+                                  ->getPrivacyDownPos
+                                : (
+                                    $FHEM::Automation::ShuttersControl::shutters
+                                      ->getSleepPos > 0
+                                    ? $FHEM::Automation::ShuttersControl::shutters
+                                      ->getSleepPos
+                                    : $FHEM::Automation::ShuttersControl::shutters
+                                      ->getClosedPos
+                                )
                             )
                         )
                     )

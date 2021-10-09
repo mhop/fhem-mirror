@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2018-2020 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
+#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -273,6 +273,8 @@ my %posSetCmds = (
     Siro        => 'pct',
     CUL_HM      => 'pct',
     ROLLO       => 'pct',
+    Shelly      => 'pct',
+    HMCCUDEV    => 'pct',
     SOMFY       => 'position',
     tahoma      => 'dim',
     KLF200Node  => 'pct',
@@ -365,7 +367,7 @@ sub Define {
         $name . ' devStateIcon { ShuttersControl_DevStateIcon($name) }' )
       if ( AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
 
-    addToAttrList('ASC:0,1,2');
+    addToAttrList('ASC:0,1,2','AutoShuttersControl');
 
     Log3( $name, 3, "AutoShuttersControl ($name) - defined" );
 
@@ -828,7 +830,7 @@ sub UserAttributs_Readings_ForShutters {
 
     while ( my ( $attrib, $attribValue ) = each %{userAttrList} ) {
         for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
-            addToDevAttrList( $shuttersDev, $attrib )
+            addToDevAttrList( $shuttersDev, $attrib, 'AutoShuttersControl' )
               ; ## fhem.pl bietet eine Funktion um ein userAttr Attribut zu befüllen. Wir schreiben also in den Attribut userAttr alle unsere Attribute rein. Pro Rolladen immer ein Attribut pro Durchlauf
             ## Danach werden die Attribute die im userAttr stehen gesetzt und mit default Werten befüllt
             ## CommandAttr hat nicht funktioniert. Führte zu Problemen
@@ -2046,3 +2048,5 @@ sub RemoveShuttersTimer {
 }
 
 1;
+
+__END__

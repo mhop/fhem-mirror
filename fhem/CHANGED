@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: multiple bugfixes, change version
  - change:  10_KNX: multiple fixes & cleanup - see Forum Thread #122582
  - bugfix:  48_MieleAtHome: fix but in autocreate
  - feature: 32_withings: added vascularAge reading
@@ -37,6 +38,7 @@
  - change:  57_SSCal: compatibility to DSM7 
  - bugfix:  10_WS980: v.1.5.0 fix fhem-crash when autodiscovery fails
  - change:  10_WS980: allow to ignore invalid values
+ - bugfix:  46_TeslaPowerwall2AC: fix ssl Check and change package name
  - feature: 49_SSCam: new value 8.2.8-xxxx for attr simu_SVSversion
  - bugfix:  76_SMAInverter:fix ETOTAL/LOADTOTAL bug
  - feature: 76_SMAInverter: hide unavailable data
