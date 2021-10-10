@@ -638,7 +638,7 @@ my $RequestList = {
       "Gasverbrauch_Heizung/Jahr_gelesen_am",
     "heating.gas.consumption.heating.unit" => "Gasverbrauch_Heizung/Einheit",
     "heating.gas.consumption.total.day"    => "Gasverbrauch_Total/Tag",
-    "heating.gas.consumption.total.month"  => "Gasverbrauch_Total/Woche",
+    "heating.gas.consumption.total.month"  => "Gasverbrauch_Total/Monat",
     "heating.gas.consumption.total.unit"   => "Gasverbrauch_Total/Einheit",
     "heating.gas.consumption.total.week"   => "Gasverbrauch_Total/Woche",
     "heating.gas.consumption.total.year"   => "Gasverbrauch_Total/Jahr",
