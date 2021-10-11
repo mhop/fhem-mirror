@@ -932,7 +932,7 @@ sub RSS_returnIMG($$) {
         # check if background directory is set
         my $reason = "?";    # remember reason for undefined image
         my $bgroot = AttrVal( $name, "bgroot", "");
-        my $bgdirs = AttrVal( $name, "bg", "undef" );  # comma-separated list of directories
+        my $bgdirs = AttrVal( $name, "bg", undef );  # comma-separated list of directories
         if ( defined($bgdirs) ) {
 
             my $bgnr;        # item number
