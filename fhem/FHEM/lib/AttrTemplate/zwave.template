@@ -44,6 +44,32 @@ par:CHANNEL01;First channel of the device - do not proceed if it can't be identi
 par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",2) }
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?room=%23devspec%3dMAINCHANNEL,CHANNEL01,CHANNEL02'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 
+
+name:----generic-devices-section--------
+filter:TYPE=ZWave
+order:00generic00000
+desc:Templates for non manufacturer specific devices
+
+
+name:zwave_dimmer
+filter:TYPE=ZWave
+order:00generic00000
+desc:May help for all type of dimmer devices, developed for Qubino (Goap) ZMNHHDx Mini Dimmer, see https://forum.fhem.de/index.php/topic,123254.0.html. 
+farewell:No Problem encountered, enjoy!
+par:CLASSESORDERED;Make sure, classes are in the right order;{ my $av = AttrVal('DEVICE','classes',''); $av =~ s{(SWITCH_BINARY )(SWITCH_MULTILEVEL )}{${2}$1}; $av }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
+attr DEVICE icon ICON
+attr DEVICE classes CLASSESORDERED
+attr DEVICE userReadings dim:(dim|reportedState).* {$1 =~ /reportedState/ ? ReadingsNum($name,'reportedState',0):ReadingsNum($name,'state',0)}
+attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
+attr DEVICE webCmd dim
+attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
+set DEVICE attrTemplate speechcontrol_type_light
+attr DEVICE model zigbee2mqtt_light_dimmer
+setreading DEVICE attrTemplateVersion zwave_dimmer_20211011
+
+
 name:----Fibaro-devices-section--------
 filter:TYPE=ZWave
 order:01Fibaro00000

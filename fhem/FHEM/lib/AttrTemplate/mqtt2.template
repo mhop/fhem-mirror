@@ -187,7 +187,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02a1
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","mqtt_device") }
+par:ICON;ICON as set, defaults to mqtt_device;{ AttrVal('DEVICE','icon','mqtt_device') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:rc_GREEN offline:rc_RED
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -3982,7 +3982,8 @@ attr OMG_BT_ID stateFormat Last IO: last_IO
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
-setreading OMG_BT_ID attrTemplateVersion 20201207
+set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20211011
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
@@ -4006,7 +4007,8 @@ attr OMG_BT_ID stateFormat T: temperature°C, M: moisture%, L: lux, F: fertility
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_mi_flora_sensor
-setreading OMG_BT_ID attrTemplateVersion 20200522 or prior
+set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20211011
 
 
 name:OpenMQTTGateway_simple_RF433_switch
@@ -4036,7 +4038,9 @@ attr OMG_DEVCID setList\
 farewell:template has been applied successfully.
 attr OMG_DEVCID room NEWDEVROOM
 attr OMG_DEVCID model OpenMQTTGateway_simple_RF433_switch
-setreading OMG_DEVCID attrTemplateVersion 20200522 or prior
+set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_DEVCID
+setreading OMG_DEVCID attrTemplateVersion 20211011
+
 
 name:OpenMQTTGateway_bme
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
@@ -4092,7 +4096,8 @@ attr OMG_BT_ID stateFormat T: temperature°C, H: humidity%rH
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
-setreading OMG_BT_ID attrTemplateVersion 20200913
+set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20211011
 
 
 ###############
