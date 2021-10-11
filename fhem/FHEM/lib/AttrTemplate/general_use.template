@@ -139,8 +139,6 @@ par:SUBCHANNELS;SUBCHANNELS: Regex for devices to copy value to, defaults to DEV
 par:IODEVATTR;IODEVATTR: attribute value if set, will be copied to other channel devices, defaults to 0;{ AttrVal('DEVICE','IODev',0) }
 par:IODEVREADING;IODEVREADING: reading value if set and no attribute is set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) ? 0 : ReadingsVal('DEVICE','IODev',0)}
 
-setreading SUBCHANNELS IODevattr IODEVATTR
-setreading SUBCHANNELS IODevreading IODEVREADING
 option:{ return 0 if "IODEVATTR" eq "0"; return 1 }
 attr SUBCHANNELS IODev IODEVATTR
 
