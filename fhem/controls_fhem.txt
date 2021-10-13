@@ -1,4 +1,4 @@
-REV 25065
+REV 25067
 DIR unused
 UPD 2021-10-09_07:45:03 366405 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -308,7 +308,7 @@ UPD 2020-11-25_07:45:03 26811 FHEM/59_LuftdatenInfo.pm
 UPD 2021-06-18_07:45:03 5449 FHEM/59_Netzfrequenz.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2021-01-02_07:45:03 40665 FHEM/59_PROPLANTA.pm
-UPD 2021-09-11_07:45:02 60822 FHEM/59_Twilight.pm
+UPD 2021-10-13_07:45:02 60855 FHEM/59_Twilight.pm
 UPD 2020-04-17_07:45:02 21167 FHEM/59_WUup.pm
 UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
 UPD 2020-10-18_07:45:03 51082 FHEM/59_Weather.pm
@@ -649,7 +649,7 @@ UPD 2021-10-12_07:45:03 328635 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-09-28_07:45:03 14799 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
-UPD 2021-10-12_07:45:03 25629 FHEM/lib/AttrTemplate/zwave.template
+UPD 2021-10-13_07:45:02 25586 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-23_07:45:02 9355 FHEM/lib/EnO_ReCom_Device_Descr.xml
 UPD 2015-07-28_14:05:30 11604 FHEM/lib/LiquidCrystal.pm
 UPD 2015-07-28_14:05:30 75542 FHEM/lib/MP3/Info.pm
@@ -741,8 +741,8 @@ UPD 2021-10-11_07:45:08 4566429 docs/commandref.html
 UPD 2021-10-11_07:45:10 2813832 docs/commandref_DE.html
 UPD 2021-09-17_07:45:02 82791 docs/commandref_frame.html
 UPD 2021-08-02_07:45:03 92754 docs/commandref_frame_DE.html
-UPD 2021-10-12_07:45:11 253565 docs/commandref_modular.html
-UPD 2021-10-12_07:45:12 264638 docs/commandref_modular_DE.html
+UPD 2021-10-13_07:45:10 253565 docs/commandref_modular.html
+UPD 2021-10-13_07:45:11 264638 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
