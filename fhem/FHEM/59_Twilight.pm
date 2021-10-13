@@ -116,12 +116,13 @@ sub Twilight_Define {
     my $href = shift;
     return if !defined $aref && !defined $href;
 
-    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    return $@ if !FHEM::Meta::SetInternals($hash);
 
     return 'syntax: define <name> Twilight [<latitude> <longitude>] [indoorHorizon=... ] [weatherDevice=<device:reading>]'
       if int(@$aref) < 2 || int(@$aref) > 6;
 
     my $DEFmayChange = int(@$aref) == 6 ? 1 : 0;
+    notifyRegexpChanged( $hash, q{} );
 
     my $weather = q{none};
     $weather = pop @$aref if int(@$aref) == 6 || int(@$aref) == 4 && !looks_like_number($$aref[3]);
@@ -177,7 +178,7 @@ sub Twilight_Undef {
 
     deleteAllRegIntTimer($hash);
 
-    notifyRegexpChanged( $hash, "" );
+    notifyRegexpChanged( $hash, q{} );
     for my $key ( keys %{ $hash->{helper}{extWeather} } ) {
         delete $hash->{helper}{extWeather}{$key};
     }
