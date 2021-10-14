@@ -241,7 +241,7 @@ LUXTRONIK2_Set($$@)
    }
 
   #Check Firmware and Set-Parameter-lock 
-  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater|opModeVentilation)$/i ) 
+  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater|opModeVentilation|opModeHeating)$/i ) 
    {
     my $firmware = ReadingsVal($name,"firmware","");
     my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
@@ -278,6 +278,7 @@ LUXTRONIK2_Set($$@)
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
             || $cmd eq 'opModeVentilation'
+            || $cmd eq 'opModeHeating'
             || $cmd eq 'returnTemperatureHyst'
             || $cmd eq 'returnTemperatureSetBack'
             || $cmd eq 'heatingCurveEndPoint'
@@ -328,6 +329,7 @@ LUXTRONIK2_Set($$@)
           ." returnTemperatureSetBack "
           ." opModeHotWater:Auto,Party,Off"
           ." opModeVentilation:Auto,Off"
+          ." opModeHeating:Auto,Party,Off"
           ." synchronizeClockHeatPump:noArg"
           ." INTERVAL ";
           
@@ -1484,6 +1486,14 @@ sub LUXTRONIK2_SetParameter ($$$)
      $setParameter = 894;
      $setValue = $opVentMode{$realValue};
   }
+
+  elsif ($parameterName eq "opModeHeating") {
+    if (! exists($opMode{$realValue})) {
+      return "$name Error: Wrong parameter given for opModeHeating, use Automatik,Off"
+     }
+     $setParameter = 3;
+     $setValue = $opMode{$realValue};
+  }
   
   elsif ($parameterName eq "returnTemperatureHyst") {
      #parameter number
@@ -2318,6 +2328,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
        <li><code>opModeVentilation &lt;Mode&gt;</code><br>
          Operating Mode of Ventilation (Auto | Off)
          </li><br>
+       <li><code>opModeHeating &lt;Mode&gt;</code><br>
+         Operating Mode of Heating (Auto | Off)
+         </li><br>
      <li><code>resetStatistics &lt;statReadings&gt;</code>
          <br>
          Deletes the selected statistic values <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
@@ -2488,6 +2501,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       <li><code>opModeVentilation &lt;Betriebsmodus&gt;</code>
          <br>
          Betriebsmodus der Lueftung ( Auto | Off )
+         </li><br>
+      <li><code>opModeHeating &lt;Betriebsmodus&gt;</code>
+         <br>
+         Betriebsmodus der Heizung ( Auto | Off )
          </li><br>
      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
