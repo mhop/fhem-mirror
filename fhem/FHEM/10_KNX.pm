@@ -55,6 +55,12 @@
 #              prevent deletion of Attr disable until a valid dpt is defined
 #              changed AnalyzePerlCommand to AnalyzeCommandChain to allow multiple fhem cmds in eval's
 #              code cleanup
+# MH 20211013  E04.72 fix dpt1.004, .011, .012, .018 encoding
+#              remove 'return undef' from initialize & defineFn 
+#              fix stateregex (KNX_replacebyregex)		
+#              fix off-for-timer
+#              add wiki links
+#              add blink cmd for dpt1, dpt1.001
 
 
 package FHEM::KNX; ## no critic 'package'
@@ -110,6 +116,7 @@ my $MODELERR    = "MODEL_NOT_DEFINED"; # for autocreate
 #my $OFFFORTIMER = "off-for-timer";
 #my $ONUNTIL     = "on-until";
 #my $OFFUNTIL    = "off-until";
+my $BLINK       = "blink";
 my $TOGGLE      = "toggle";
 my $RAW         = "raw";
 my $RGB         = "rgb";
@@ -151,26 +158,26 @@ my $PAT_DPT16_CLR = qr/>CLR</ix;
 #if setlist is not supplied and min/max are given, a slider is shown for numeric values. Otherwise min/max value are shown in a list
 my %dpttypes = (
 	#Binary value
-	"dpt1"          => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>"off", MAX=>"on"},
+	"dpt1"          => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>"off", MAX=>"on", SETLIST=>'on,off,toggle'},
 	"dpt1.000"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>"0", MAX=>"1"},
-	"dpt1.001"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>"off", MAX=>"on"},
+	'dpt1.001'      => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>'off', MAX=>'on', SETLIST=>'on,off,toggle'},
 	"dpt1.002"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(true)|(false))/ix, MIN=>"false", MAX=>"true"},
 	"dpt1.003"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(enable)|(disable))/ix, MIN=>"disable", MAX=>"enable"},
-	"dpt1.004"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(no_ramp)|(ramp))/ix, MIN=>"no_ramp", MAX=>"ramp"},
+	'dpt1.004'      => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|no_ramp|ramp)/ix, MIN=>'no_ramp', MAX=>'ramp'},
 	"dpt1.005"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(no_alarm)|(alarm))/ix, MIN=>"no_alarm", MAX=>"alarm"},
 	"dpt1.006"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(low)|(high))/ix, MIN=>"low", MAX=>"high"},
 	"dpt1.007"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(decrease)|(increase))/ix, MIN=>"decrease", MAX=>"increase"},
 	"dpt1.008"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(up)|(down))/ix, MIN=>"up", MAX=>"down"},
 	"dpt1.009"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(closed)|(open))/ix, MIN=>"open", MAX=>"closed"},
 	"dpt1.010"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(start)|(stop))/ix, MIN=>"stop", MAX=>"start"},
-	"dpt1.011"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(inactive)|(active))/ix, MIN=>"inactive", MAX=>"active"},
-	"dpt1.012"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(not_inverted)|(inverted))/ix, MIN=>"not_inverted", MAX=>"inverted"},
+	'dpt1.011'      => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|inactive|active)/ix, MIN=>'inactive', MAX=>'active'},
+	'dpt1.012'      => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|not_inverted|inverted)/ix, MIN=>'not_inverted', MAX=>'inverted'},
 	"dpt1.013"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(start_stop)|(cyclically))/ix, MIN=>"start_stop", MAX=>"cyclically"},
 	"dpt1.014"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(fixed)|(calculated))/ix, MIN=>"fixed", MAX=>"calculated"},
 	"dpt1.015"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(no_action)|(reset))/ix, MIN=>"no_action", MAX=>"reset"},
 	"dpt1.016"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(no_action)|(acknowledge))/ix, MIN=>"no_action", MAX=>"acknowledge"},
 	"dpt1.017"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(trigger)|(trigger))/ix, MIN=>"trigger", MAX=>"trigger"},
-	"dpt1.018"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(not_occupied)|(occupied))/ix, MIN=>"not_occupied", MAX=>"occupied"},
+	'dpt1.018'      => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|not_occupied|occupied)/ix, MIN=>'not_occupied', MAX=>'occupied'},
 	"dpt1.019"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(closed)|(open))/ix, MIN=>"closed", MAX=>"open"},
 	"dpt1.021"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(logical_or)|(logical_and))/ix, MIN=>"logical_or", MAX=>"logical_and"},
 	"dpt1.022"      => {CODE=>"dpt1", UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT|(scene_A)|(scene_B))/ix, MIN=>"scene_A", MAX=>"scene_B"},
@@ -314,7 +321,8 @@ sub Initialize {
             "$readingFnAttributes ";         #standard attributes
 	$hash->{noAutocreatedFilelog} = 1;   # autocreate devices create no FileLog
 	$hash->{AutoCreate} = {"KNX_.*"  => { ATTR => "disable:1"} };  # autocreate devices are disabled by default
-	return undef; # really necessary?
+
+	return;
 }
 
 #Define this device
@@ -413,7 +421,7 @@ sub KNX_Define {
 			$gadOption = $gadArgs[1] if(defined($gadArgs[1]) && $gadArgs[1] =~ m/($PAT_GAD_OPTIONS)/ix);
 			$gadNoSuffix = 'noSuffix' if (join(q{ },@gadArgs) =~ m/nosuffix/ix);
 
-			return "KNX_define ($name): -invalid option for group-number $gadNo. Use one of: $PAT_GAD_OPTIONS" if (defined($gadOption) && ($gadOption !~ m/^($PAT_GAD_OPTIONS)$/ix));
+			return "KNX_define ($name): -invalid option for group-number $gadNo. Use one of: $PAT_GAD_OPTIONS" if (defined($gadOption) && ($gadOption !~ m/^(?:$PAT_GAD_OPTIONS)$/ix)); #PBP
 			return "KNX_define ($name): -invalid suffix for group-number $gadNo. Use $PAT_GAD_SUFFIX" if (defined($gadNoSuffix) && ($gadNoSuffix !~ m/$PAT_GAD_SUFFIX/ix));
 		}
 
@@ -536,7 +544,7 @@ sub KNX_Define {
 
 	Log3 ($name, 5, "KNX_define ($name): -exit");
 
-	return undef; # really necessary?
+	return;
 }
 
 #Release this device
@@ -640,7 +648,7 @@ sub KNX_Set {
 		$cmd = shift(@arg);
 	}
 	else { #oldsyntax
-		(my $err, $targetGadName, $cmd) = KNX_Set_oldsyntax($hash,$targetGadName,@arg); ## process old syntax
+		(my $err, $targetGadName, $cmd) = KNX_Set_oldsyntax($hash,$targetGadName,@arg); ## process old syntax targetGadName contains command!
 		return $err if defined($err);
 	}
 
@@ -714,52 +722,61 @@ sub KNX_Set_oldsyntax {
 	#select another group, if the last arg starts with a g
 	if($na >= 1 && $a[$na - 1] =~ m/$PAT_GNO/ix) {
 		$groupnr = pop (@a);
-		Log3 $name, 3, q{KNX_Set_oldsyntax: you are still using "old syntax", pls. change to "set } . "$name $groupnr $cmd " . join(q{ },@a) . q{"};
+		Log3 $name, 3, q{KNX_Set_syntax2: you are still using "old syntax", pls. change to "set } . "$name $groupnr $cmd " . join(q{ },@a) . q{"};
 		$groupnr =~ s/^g//gix; #remove "g"
 	}
 
 	#unknown groupnr
-	return "KNX_Set_oldsyntax: group-no. not found" if((!defined($groupnr)) || ($groupnr eq q{}));
+#E04.72	return "KNX_Set_syntax2: group-no. not found" if((!defined($groupnr)) || ($groupnr eq q{}));
+
+	# if cmd contains g1: the check for valid gadnames failed !
+	# this is NOT oldsyntax, but a user-error!
+	if ($cmd =~ /^g[\d]/ix) { # E04.72 an invalid Gadname was specified
+		Log3 ($name,2,"KNX_Set_syntax2: an invalid gadName: $cmd was used in set-cmd");
+		return ("KNX_Set_syntax2: an invalid gadName: $cmd was used in set-cmd",q{},q{});
+	}
 
 	foreach my $key (keys %{$hash->{GADDETAILS}}) {
 		$targetGadName = $key if (int ($hash->{GADDETAILS}{$key}{NO}) == int ($groupnr));
 	}
-	return "KNX_Set_oldsyntax: gadName not found for $groupnr" if(!defined($targetGadName));
+	return "KNX_Set_syntax2: gadName not found for $groupnr" if(!defined($targetGadName));
 
 	# all of the following cmd's need at least 1 Argument (or more)
 	return (undef, $targetGadName, $cmd) if (scalar(@a) <= 0);
 
 	my $code = $hash->{GADDETAILS}{$targetGadName}{MODEL};
-	my $value = "$cmd " . join(q{ },@a); # default
-	if ($cmd =~ m/$RAW/ix) { # perlcritic (ControlStructures::ProhibitCascadingIfElse) ?
+	my $value = $cmd;
+#E04.72	my $value = "$cmd " . join(q{ },@a); # default
 
+	if ($cmd =~ m/$RAW/ix) {
 		#check for 1-16 hex-digits
-		return "KNX_Set_oldsyntax: $cmd $a[0] has wrong syntax. Use hex-format only." if ($a[0] !~ m/[0-9A-F]{1,16}/ix);
+		return "KNX_Set_syntax2: $cmd $a[0] has wrong syntax. Use hex-format only." if ($a[0] !~ m/[0-9A-F]{1,16}/ix);
 		$value = $a[0];
+
 	}
 	elsif ($cmd =~ m/$VALUE/ix) {
-		return 'KNX_Set_oldsyntax: "value" not allowed for dpt1, dpt16 and dpt232' if ($code =~ m/(dpt1$)|(dpt16$)|(dpt232$)/ix);
-
+		return 'KNX_Set_syntax2: "value" not allowed for dpt1, dpt16 and dpt232' if ($code =~ m/(dpt1$)|(dpt16$)|(dpt232$)/ix);
 		$value = $a[0];
 		$value =~ s/,/\./gx;
+
 	}
 	#set string <val1 val2 valn>
 	elsif ($cmd =~ m/$STRING/ix) {
-		return 'KNX_Set_oldsyntax: "string" only allowed for dpt16' if ($code !~ m/dpt16/ix);
+		return 'KNX_Set_syntax2: "string" only allowed for dpt16' if ($code !~ m/dpt16/ix);
 		$value = q{}; # will be joined in KNX_Set
 
 	}
 	#set RGB <RRGGBB>
 	elsif ($cmd =~ m/$RGB/ix) {
-		return 'KNX_Set_oldsyntax: "RGB" only allowed for dpt232' if ($code !~ m/dpt232$/ix);
-
+		return 'KNX_Set_syntax2: "RGB" only allowed for dpt232' if ($code !~ m/dpt232$/ix);
 		#check for 6 hex-digits
-		return "KNX_Set_oldsyntax: $cmd $a[0] has wrong syntax. Use 6 hex-digits only." if ($a[0] !~ m/[0-9A-F]{6}/ix);
+		return "KNX_Set_syntax2: $cmd $a[0] has wrong syntax. Use 6 hex-digits only." if ($a[0] !~ m/[0-9A-F]{6}/ix);
 		$value = lc($a[0]);
+
 	}
-	elsif ($code =~ m/^dpt16/ix) { # Forum #122779
-		$value = $cmd if ($cmd eq q{}); # rest will be joined in KNX_Set
-	}
+#E04.72	elsif ($code =~ m/^dpt16/ix) { # Forum #122779
+#		$value = $cmd if ($cmd eq q{}); # cmd contains first word - rest will be joined in KNX_Set
+#	}
 
 	return (undef, $targetGadName, $value);
 }
@@ -774,9 +791,9 @@ sub KNX_Set_dpt1 {
 	my $groupCode = $hash->{GADDETAILS}{$targetGadName}{CODE};
 
 	#delete any running timers
-	if ($hash->{"TIMER_$groupCode"}) {
+	if ($hash->{".TIMER_$groupCode"}) {
 		CommandDelete(undef, $name . "_TIMER_$groupCode");
-		delete $hash->{"TIMER_$groupCode"};
+		delete $hash->{".TIMER_$groupCode"};
 	}
 
 	my $value = 'off'; # default
@@ -786,13 +803,15 @@ sub KNX_Set_dpt1 {
 		$tvalue = 'off';
 	}
 
+	return (undef,$value) if ($cmd =~ m/(?:on|off)$/ix); # shortcut
+
 	#set on-for-timer / off-for-timer
 	if ($cmd =~ m/(?:(on|off)-for-timer)$/ix) {
 		#get duration
 		my $duration = sprintf("%02d:%02d:%02d", $arg[0]/3600, ($arg[0]%3600)/60, $arg[0]%60);
 		Log3 ($name, 5, "KNX_Set_dpt1 $name: \"on-for-timer\" for $duration");
 
-		$hash->{"TIMER_$groupCode"} = $duration; #create local marker
+		$hash->{".TIMER_$groupCode"} = $duration; #create local marker
 		#place at-command for switching on / off
 		CommandDefMod(undef, '-temporary ' .  $name . "_TIMER_$groupCode at +$duration set $name $targetGadName $tvalue");
 	}
@@ -807,7 +826,7 @@ sub KNX_Set_dpt1 {
 		my $hms_til = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
 		Log3 ($name, 5, "KNX_Set_dpt1 $name: \"$cmd $hms_til\" ");
 
-		$hash->{"TIMER_$groupCode"} = $hms_til; #create local marker
+		$hash->{".TIMER_$groupCode"} = $hms_til; #create local marker
 		#place at-command for switching on / off
 		CommandDefMod(undef, '-temporary ' . $name . "_TIMER_$groupCode at $hms_til set $name $targetGadName $tvalue");
 	}
@@ -833,6 +852,16 @@ sub KNX_Set_dpt1 {
 
 		Log3 ($name, 3, 'KNX_Set_dpt1: initial value for "set ' . "$name $targetGadName" . ' TOGGLE is not "on" or "off" - ' . "$targetGadName will be switched off") if ($toggleOldVal !~ /^(?:on|off)/ix);
 		$value = q{on} if ($toggleOldVal =~ m/^off/ix); # value off is default
+	}
+
+	#blink - implemented with timer & toggle
+	elsif ($cmd =~ m/$BLINK/ix) {
+		my $count = $arg[0] * 2 -1;
+		$count = 1 if ($count < 1);
+		my $duration = sprintf("%02d:%02d:%02d", $arg[0]/3600, ($arg[0]%3600)/60, $arg[0]%60);
+		$hash->{".TIMERBLINK_$groupCode"} = $duration; #create local marker
+		CommandDefMod(undef, '-temporary ' .  $name . "_TIMERBLINK_$groupCode at +*{" . $count ."}$duration set $name $targetGadName toggle");
+		$value = 'on';
 	}
 
 #04.68	### setextensions trial...
@@ -1263,7 +1292,7 @@ sub KNX_checkAndClean {
 
 # replace state-values Attribute: stateRegex
 sub KNX_replaceByRegex {
-	my ($regAttr, $prefix, $input) = @_;
+	my ($regAttr, $rdName, $input) = @_;
 
 	return $input if (! defined($regAttr));
 
@@ -1273,8 +1302,7 @@ sub KNX_replaceByRegex {
 	#get array of given attributes
 	my @reg = split(/\s\//x, $regAttr);
 
-	$prefix .= q{:};
-	my $tempVal = $prefix . $input;
+	my $tempVal = $rdName . q{:} . $input;
 
 	#loop over all regex
 	foreach my $regex (@reg) {
@@ -1284,19 +1312,24 @@ sub KNX_replaceByRegex {
 		my @regPair = split(/\//x, $regex);
 
 		#skip if first part of regex not match readingName
-		next if ((not defined($regPair[0])) || ($regPair[0] eq q{}) || ($regPair[0] !~ /$prefix/ix));
+		next if ((not defined($regPair[0])) || ($regPair[0] eq q{}) || ($regPair[0] !~ /^(?:$rdName)/ix));
 
 		if (not defined ($regPair[1])) {
 			#cut value
-			$tempVal = undef;
+			$retVal = undef;
+		}
+		elsif ($regPair[0] eq $tempVal) { # complete match
+			$retVal = $regPair[1];
+		}
+		elsif (($input !~ /$regPair[0]/x) && ($regPair[0] =~ /[:]/x)) {
+			$retVal = $input;
 		}
 		else {
 			#replace value
 			$tempVal =~ s/$regPair[0]/$regPair[1]/gix;
+			($retVal = $tempVal) =~ s/[:]/ /x;
 		}
 
-		#restore value
-		$retVal = $tempVal;
 		last;
 	}
 	return $retVal;
@@ -1390,7 +1423,8 @@ sub KNX_encodeByDpt {
 
 	#Binary value
 	if ($code eq "dpt1") {
-		$numval = 1 if ($value =~ m/(1$|on$|$dpttypes{$model}{MAX})/ix);
+		$numval = 1 if ($value =~ m/(1|on)$/ix);
+		$numval = 1 if ($value eq $dpttypes{$model}{MAX}); # dpt1.011 problem
 
 		$hexval = sprintf("%.2x",$numval);
 	}
@@ -1824,6 +1858,7 @@ This module provides a basic set of operations (on, off, toggle, on-until, on-fo
 <p>For each received telegram there will be a reading with containing the received value and the sender address.<br /> 
 For every set, there will be a reading containing the sent value.<br /> 
 The reading &lt;state&gt; will be updated with the last sent or received value.&nbsp;</p>
+<p>A (german) wiki page is available here: <a href="http://www.fhemwiki.de/wiki/KNX">FHEM Wiki</a>
 
 <a id="KNX-define"></a>
 <p><strong>Define</strong></p>
@@ -1870,7 +1905,7 @@ If you add the option "nosuffix", &lt;getName&gt;, &lt;setName&gt; and &lt;putNa
   set &lt;deviceName&gt; [gadName] &lt;value&gt;<br /></code></p>
 <p>Set sends the given value to the bus.<br /> If &lt;gadName&gt; is omitted, the first listed GAD of the device is used. 
  If the GAD is restricted in the definition with "get" or "listenonly", the set-command will be refused.<br /> 
- For dpt1 and dpt1.001 valid values are on, off and toggle. Also the timer-functions can be used. 
+ For dpt1 and dpt1.001 valid values are on, off, toggle and blink. Also the timer-functions can be used. 
  For all other binary DPT (dpt1.xxx) the min- and max-values can be used for en- and decoding alternatively to on/off.<br/> 
  After successful sending the value, it is stored in the readings &lt;setName&gt;.</p>
 <p>Examples:</p>
@@ -1881,7 +1916,9 @@ If you add the option "nosuffix", &lt;getName&gt;, &lt;setName&gt; and &lt;putNa
 <code>set lamp2 g1 off</code><br/>
 <code>set lamp2 g1 on-for-timer 10</code><br/>
 <code>set lamp2 g1 on-until 13:15:00</code><br/>
-<code>set lamp2 steuern on-until 13:15:00</code><br/>
+<code>set lamp3 steuern on-until 13:15:00</code><br/>
+<code>set lamp3 steuern toogle    # lamp3 change state</code><br/>
+<code>set lamp3 steuern blink 2 4 # lamp3 on for 4 seconds, off for 4 seconds, 2 repeats</code><br/>
 <br/>
 <code>set myThermoDev g1 23.44</code><br/>
 <br/>
@@ -1897,28 +1934,28 @@ The answer from the bus-device updates reading and state.</p>
 <a id="KNX-attr"></a>
 <p><strong>Common attributes</strong></p>
 <div>
-<a href="#DbLogInclude">DbLogInclude</a><br /> 
-<a href="#DbLogExclude">DbLogExclude</a><br />
-<a href="#DbLogValueFn">DbLogValueFn</a><br />
+<a href="#DbLogattr">DbLogInclude</a><br /> 
+<a href="#DbLogattr">DbLogExclude</a><br />
+<a href="#DbLogattr">DbLogValueFn</a><br />
 <a href="#alias">alias</a><br /> 
 <a href="#cmdIcon">cmdIcon</a><br />
 <a href="#comment">comment</a><br /> 
 <a href="#devStateIcon">devStateIcon</a><br /> 
 <a href="#devStateStyle">devStateStyle</a><br /> 
-<a href="#event-aggregator">event-aggregator</a><br /> 
-<a href="#event-min-interval">event-min-interval</a><br /> 
-<a href="#event-on-change-reading">event-on-change-reading</a><br /> 
-<a href="#event-on-update-reading">event-on-update-reading</a><br /> 
+<a href="#readingFnAttributes">event-aggregator</a><br /> 
+<a href="#readingFnAttributes">event-min-interval</a><br /> 
+<a href="#readingFnAttributes">event-on-change-reading</a><br /> 
+<a href="#readingFnAttributes">event-on-update-reading</a><br /> 
 <a href="#eventMap">eventMap</a><br />
 <a href="#group">group</a><br /> 
 <a href="#icon">icon</a><br /> 
-<a href="#oldreadings">oldreadings</a><br />
+<a href="#readingFnAttributes">oldreadings</a><br />
 <a href="#room">room</a><br /> 
 <a href="#showtime">showtime</a><br /> 
 <a href="#sortby">sortby</a><br /> 
-<a href="#stateFormat">stateFormat</a><br />
-<a href="#timestamp-on-change-reading">timestamp-on-change-reading</a><br /> 
-<a href="#userReadings">userReadings</a><br /> 
+<a href="#readingFnAttributes">stateFormat</a><br />
+<a href="#readingFnAttributes">timestamp-on-change-reading</a><br /> 
+<a href="#readingFnAttributes">userReadings</a><br /> 
 <a href="#userattr">userattr</a><br />
 <a href="#verbose">verbose</a><br /> 
 <a href="#webCmd">webCmd</a><br /> 
@@ -1984,21 +2021,22 @@ The answer from the bus-device updates reading and state.</p>
 </ul>
 
 <a id="KNX-dpt"></a>
-<p><strong>DPT - datapoint-types</strong></p>
-<p>The following dpt are implemented and have to be assigned within the device definition.</p>
+<p><strong>DPT - data-point-types</strong></p>
+<p>The following dpt are implemented and have to be assigned within the device definition. 
+   The values right to the dpt define the valid range of Set-command values and Get-command return values.</p>
 <ul>
-<li><b>dpt1     </b>     on, off</li>
-<li><b>dpt1.000 </b>  1, 0</li>
-<li><b>dpt1.001 </b>  on, off</li>
-<li><b>dpt1.002 </b>  true, false</li>
-<li><b>dpt1.003 </b>  enable, disable</li>
+<li><b>dpt1     </b>     off, on, toggle</li>
+<li><b>dpt1.000 </b>  0, 1</li>
+<li><b>dpt1.001 </b>  off, on, toggle</li>
+<li><b>dpt1.002 </b>  false, true</li>
+<li><b>dpt1.003 </b>  disable, enable</li>
 <li><b>dpt1.004 </b>  no ramp, ramp</li>
 <li><b>dpt1.005 </b>  no alarm, alarm</li>
 <li><b>dpt1.006 </b>  low, high</li>
 <li><b>dpt1.007 </b>  decrease, increase</li>
 <li><b>dpt1.008 </b>  up, down</li>
 <li><b>dpt1.009 </b>  open, closed</li>
-<li><b>dpt1.010 </b>  start, stop</li>
+<li><b>dpt1.010 </b>  stop, start</li>
 <li><b>dpt1.011 </b>  inactive, active</li>
 <li><b>dpt1.012 </b>  not inverted, inverted</li>
 <li><b>dpt1.013 </b>  start/stop, ciclically</li>
@@ -2084,7 +2122,7 @@ The answer from the bus-device updates reading and state.</p>
 
 <p>&nbsp;</p>
 <p><strong>More complex examples:</strong><br/>
-Examples can also be found on the (german) <a href="http://www.fhemwiki.de/wiki/KNX_Device_Definition_-_Beispiele">Wiki</a> page.</p>
+Examples can also be found on the (german) <a href="http://www.fhemwiki.de/wiki/KNX_Device_Definition_-_Beispiele">Wiki</a></p>
 <p><em>Rollo:</em></p>
 <code>define rollo KNX 0/10/12:dpt1.008:wdw1 0/10/13:dpt1</code><br/>
 <code>set rollo wdw1 down </code>moves down rollo at window 1<br/>
@@ -2095,7 +2133,7 @@ Examples can also be found on the (german) <a href="http://www.fhemwiki.de/wiki/
 <code>define sps KNX 0/4/0:dpt1:steuern 0/4/1:dpt1:status</code><br/>
 <code>attr sps devStateIcon status-on:general_an:Aus status-off:general_aus:Ein steuern.*:hourglass:Aus</code><br/>
 <code>attr sps eventMap /steuern on:Ein/steuern off:Aus/</code><br/>
-<code>attr sps stateRegex /steuern-set:/steuern-/ /steuern-get:// /status-get:/status-/</code><br/>
+<code>attr sps stateRegex /steuern-set/steuern-/ /steuern-get// /status-get/status-/</code><br/>
 <code>attr sps webCmd Ein:Aus</code><br/>
 
 <p><em>Object with feedback, state is always showing status:</em></p>
@@ -2151,7 +2189,7 @@ have the same dpt-code (e.g dpt9 in this example), else garbage will be returned
   <code>fw=>{'^An'=&gt;'An', '^Aus'=&gt;'Aus'} \</code>
   </blockquote>
   <code>}</code><br/>
-  <code>attr testDev11 stateRegex /steuern-set:/steuern-/ /steuern-get:// /status-get:/status-/</code><br/>
+  <code>attr testDev11 stateRegex /steuern-set/steuern-/ /steuern-get// /status-get/status-/</code><br/>
   <code>attr testDev11 stateCmd {\</code>
   <blockquote>
   <code>if ($state =~ m/dimmwert:/i) {'status-' . ReadingsVal($name,"status-get","")}\</code><br/>
