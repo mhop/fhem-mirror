@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.1" => "15.10.2021  fix warnings 'my variable masks earlier' ",
   "2.15.0" => "27.09.2021  model lastsnap: add setter snap ",
   "2.14.5" => "12.08.2020  avoid loose of adoption after restart ",
   "2.14.4" => "03.08.2020  fix check of ARG in RemoveInternalTimer in _setadoptForTimer sub (sometimes no switch back done) ",             
@@ -355,8 +356,6 @@ sub _setsnap {                           ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $aref  = $paref->{aref};
-  
-  my ($num,$lag) = (1,2); 
   
   my $num     = @$aref[2] // 1;
   my $lag     = @$aref[3] // 2;

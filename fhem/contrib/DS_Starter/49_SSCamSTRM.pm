@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 22598 2020-08-14 14:09:14Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 25032 2021-09-29 13:23:58Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.1" => "15.10.2021  fix warnings 'my variable masks earlier' ",
   "2.15.0" => "27.09.2021  model lastsnap: add setter snap ",
   "2.14.5" => "12.08.2020  avoid loose of adoption after restart ",
   "2.14.4" => "03.08.2020  fix check of ARG in RemoveInternalTimer in _setadoptForTimer sub (sometimes no switch back done) ",             
@@ -355,8 +356,6 @@ sub _setsnap {                           ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $aref  = $paref->{aref};
-  
-  my ($num,$lag) = (1,2); 
   
   my $num     = @$aref[2] // 1;
   my $lag     = @$aref[3] // 2;
@@ -783,12 +782,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                                     # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCamSTRM}{META}}
-      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22598 2020-08-14 14:09:14Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 25032 2021-09-29 13:23:58Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22598 2020-08-14 14:09:14Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 25032 2021-09-29 13:23:58Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
