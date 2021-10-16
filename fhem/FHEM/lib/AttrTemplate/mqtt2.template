@@ -3578,8 +3578,8 @@ name:ems-esp_boiler
 filter:TYPE=MQTT2_DEVICE
 desc:To configure a boiler device for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a> with Firmware 2.1.0.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
 order:E_02b
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
-attr DEVICE readingList DEV_ID/boiler_data { json2nameValue($EVENT) }\
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal('DEVICE','readingList','') =~ m,[^/:]+/([^/]+), ? $1 : 'ems-esp' }
+attr DEVICE readingList DEV_ID/boiler_data:.* { json2nameValue($EVENT) }\
   DEV_ID/shower_data:.* { json2nameValue($EVENT) }\
   DEV_ID/mixing_data:.* { json2nameValue($EVENT) }\
   DEV_ID/tapwater_active:.* tapwater_active\
@@ -3595,9 +3595,9 @@ attr DEVICE stateFormat \
   Status-Code: serviceCode serviceCodeNumber\
   Temp Außen: outdoorTemp C\
 attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red
-attr DEVICE userReadings BoilerStatus {BoilerStatus("serviceCode","serviceCodeNumber")}
+attr DEVICE userReadings BoilerStatus {BoilerStatus('serviceCode','serviceCodeNumber')}
 attr DEVICE model ems-esp_boiler
-setreading DEVICE attrTemplateVersion 20201110
+setreading DEVICE attrTemplateVersion 20211016
 
 #ems-esp thermostat device
 name:ems-esp_thermostat_read-only
