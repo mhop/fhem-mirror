@@ -54,6 +54,7 @@ use strict;
 use warnings;
 use Time::Local;
 use FHEM::Meta;
+use Data::Dumper;
 my %ElectricityCalculator_gets;
 my %EolectricityCalculator_sets;
 
