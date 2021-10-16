@@ -263,13 +263,19 @@ sub HMinfo_Notify(@){##########################################################
   }
   return undef;
 }
-sub HMinfo_init($){#############################################################
-  my ($hash, $dev) = @_;
+sub HMinfo_init($){############################################################
+  #my ($hash, $dev) = @_;
+
   RemoveInternalTimer("HMinfo_init");# just to be sure...
   if ($init_done){
-    Log3($hash,5,"debug: HMinfo_init");
     if (!$modules{HMinfo}{helper}{initDone}){ 
       my ($hm) = devspec2array("TYPE=HMinfo");
+      Log3($hm,5,"debug: HMinfo_init");
+      foreach my $attrName (keys %{$attr{$hm}}){
+        #Log 1," update HM attributes  - will update CUL_HM settings ocationally";
+        HMinfo_Attr("set",$hm, $attrName,$attr{$hm}{$attrName});
+      }
+
       if (substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0){
         HMinfo_SetFn($defs{$hm},$hm,"loadConfig");
         InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
@@ -1251,7 +1257,7 @@ sub HMinfo_getCfgDefere($){####################################################
   HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".'\^('.join("|",@{$defs{$hm}{helper}{nbPend}}).')\$'.")\$");  
 }
 
-sub HMinfo_startBlocking(@){####################################################
+sub HMinfo_startBlocking(@){###################################################
   my ($name,$fkt,$param) = @_;
   my $hash = $defs{$name};
   Log3 $hash,5,"HMinfo $name start blocking:$fkt";
