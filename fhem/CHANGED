@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_ElectricityCalculator: use Data:Dumper inserted
+ - bugfix:  73_GasCalculator:         use Data:Dumper inserted
+ - bugfix:  73_WaterCalculator:       use Data:Dumper inserted
  - bugfix:  49_SSCamSTRM: fix warnings
  - bugfix:  10_KNX: multiple fixes & new cmd: blink - see Forum #122582
  - feature: 23_LUXTRONIK2: new set parameter opModeHeating
