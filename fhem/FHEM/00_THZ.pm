@@ -1530,27 +1530,38 @@ sub THZ_Get_Comunication($$) {
 #
 ########################################################################################
 sub THZ_ReadAnswer($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
     my $buf =undef;
     my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.8"));
     $rtimeout +=1 if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/);
     $rtimeout = minNum($rtimeout,1.8) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.8s if nonblocking disabled
     my $count = 0; my $countmax = 20;
     while ((!defined($buf)) and ($count <= $countmax)) {
-        select(undef, undef, undef, 0.01) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
-        $buf = DevIo_SimpleReadWithTimeout($hash, (minNum($count,1)*$rtimeout/$countmax + 0.001)); ##pay attention with DevIo_SimpleRead: it closes the connection if no answe given; DevIo_SimpleReadWithTimeout does not close
-        #$hash->{"total_count_$count"}+=1;
+        if ($^O =~ /Win/){
+            select(undef, undef, undef, 0.005);  ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
+            $buf =    DevIo_DoSimpleRead($hash);
+            $buf =  undef if (length($buf)==0);
+        }
+        else {
+            $buf = DevIo_SimpleReadWithTimeout($hash, (minNum($count,1)*$rtimeout/$countmax + 0.001)); ##pay attention with DevIo_SimpleRead: it closes the connection if no answe given; DevIo_SimpleReadWithTimeout does not close
+        }
         $count ++;
     }
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
-	my $data =  uc(unpack('H*', $buf));
-	$count =1; $countmax = 120;	#increased to 120 for LeJoke his raspi4 is very fast reading and reaches 60 evry time
-	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax)){ 
-        select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
-        my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
-        Log3($hash->{NAME}, 5, "double read $count activated $data");
+    my $data =  uc(unpack('H*', $buf));
+    $count =1; $countmax = 120;    #increased to 120 for LeJoke his raspi4 is very fast reading and reaches 60 evry time
+    while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax)){ 
+        my $buf1=undef;
+        if ($^O =~ /Win/){
+            select(undef, undef, undef, 0.005);  ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
+            $buf1 =DevIo_DoSimpleRead($hash);
+        }
+        else {
+            $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
+        }
+	Log3($hash->{NAME}, 5, "double read $count activated $data");
         if(defined($buf1)) {
             $buf .=  $buf1 ;
             $data =  uc(unpack('H*', $buf));
@@ -1559,9 +1570,9 @@ sub THZ_ReadAnswer($) {
 	    }
         else{ $count += 10; }	# increased to 10 because doubled the countmax
     }
-	return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
-	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
-	return (undef, $data);
+   return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
+   Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";
+   return (undef, $data);
 }
  
 #####################################
