@@ -181,7 +181,8 @@ sub CUL_HM_Initialize($) {
   CUL_HM_AttrInit($hash,"initAttrlist");
                          
   CUL_HM_initRegHash();
-
+  my $time = gettimeofday();
+  
   $hash->{prot}{rspPend} = 0;#count Pending responses
   my @statQArr     = ();
   my @statQWuArr   = ();
@@ -200,7 +201,7 @@ sub CUL_HM_Initialize($) {
   $hash->{stat}{s}{dummy}=0;
   $hash->{stat}{r}{dummy}=0;
   RemoveInternalTimer("StatCntRfresh");
-  InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
+  InternalTimer($time + 3600 * 20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
 
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
@@ -210,8 +211,9 @@ sub CUL_HM_Initialize($) {
                                           # fhem does not provide module notifcation - so we streamline here. 
   $hash->{helper}{initDone} = 0;
   $hash->{NotifyOrderPrefix} = "48-"; #Beta-User: make sure, CUL_HM is up and running prior to User code e.g. in notify, and also prior to HMinfo
-  InternalTimer(1,"CUL_HM_updateConfig","startUp",0);
-  #InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+  InternalTimer($time + 1,"CUL_HM_updateConfig","startUp",0);
+  #InternalTimer($time + 1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+
   return;
 }
 
@@ -223,7 +225,7 @@ sub CUL_HM_updateConfig($){##########################
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
+    InternalTimer(gettimeofday() + 1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
@@ -546,7 +548,13 @@ sub CUL_HM_updateConfig($){##########################
   }
   
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  Log 1,"CUL_HM finished initial cleanup" if(!$modules{CUL_HM}{helper}{initDone});
+  if(!$modules{CUL_HM}{helper}{initDone}){
+    Log 1,"CUL_HM finished initial cleanup";
+    if ($modules{HMinfo}){# force reread
+      $modules{HMinfo}{helper}{initDone} = 0;
+      InternalTimer(gettimeofday() + 5,"HMinfo_init", "HMinfo_init", 0);
+    }
+  }
   $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
   ## configCheck will be issues by HMInfo once
 }
@@ -1560,6 +1568,7 @@ sub CUL_HM_Notify(@){###############################
   return undef if(!$events); # Some previous notify deleted the array.
   #my $cws = join(";#",@{$dev->{CHANGED}});
   my $count;
+
   foreach my $evnt(@{$events}){
     if($evnt =~ m/^(DELETEATTR)/){
     }
@@ -9943,22 +9952,21 @@ sub CUL_HM_getChnPeerFriend($){ #which are my peerFriends
   return join(",",@chPopt);
 }
 
-sub CUL_HM_getPeerOption($){ #who are my friends
+sub CUL_HM_getPeerOption($){ #who are my friends? Whom can I peer to, who can I unpeer
   my ($name)  = @_; 
   CUL_HM_calcPeerOptions() if(!$modules{CUL_HM}{helper}{peerOpt});
 
   my %curPTmp;  
   if($defs{$name}{helper}{peerFriend}){
-      $curPTmp{$_} = $_              foreach(grep !/$name/,
-                                         split(",",
-                                         join(",",map{$modules{CUL_HM}{helper}{peerOpt}{$_}}
-                                                  grep!/^-$/,
-                                                  split(",",$defs{$name}{helper}{peerFriend}))));
+    $curPTmp{$_} = $_              foreach(grep !/$name/,
+                                       split(",",
+                                       join(",",map{$modules{CUL_HM}{helper}{peerOpt}{$_}}
+                                                grep!/^-$/,
+                                                split(",",$defs{$name}{helper}{peerFriend}))));
   }
-  else{
-      $curPTmp{$_} = "remove_".$_    foreach(grep !/(broadcast|self)/,values %{$defs{$name}{helper}{peerIDsH}});
+  if($defs{$name}{helper}{peerIDsH}){
+    $curPTmp{$_} = "remove_".$_    foreach(grep !/(broadcast|self)/,values %{$defs{$name}{helper}{peerIDsH}});
   }
-  
   my @peers = sort values %curPTmp;
   
   return join(",",(grep/remove/ ,@peers)   # offer remove first
@@ -11758,13 +11766,15 @@ __END__
           which specifies the index of the old key when the reading is divided by 2.
         </li>
         <li><a id="CUL_HM-set-clear"></a><B>clear &lt;[rssi|readings|register|msgEvents|attack|all]&gt;</B><br>
-          A set of variables can be removed.<br>
+          A set of variables or readings can be removed.<br>
           <ul>
-            readings: all readings will be deleted. Any new reading will be added usual. May be used to eliminate old data<br>
-            register: all captured register-readings in FHEM will be removed. This has NO impact to the values in the device.<br>
-            msgEvents:  all message event counter will be removed. Also commandstack will be cleared. <br>
-            rssi:  collected rssi values will be cleared. <br>
-            attack:  information regarding an attack will be removed. <br>
+            readings: all readings are removed. Any new reading will be added usual. Used to eliminate old data.<br>
+            register: all captured register-readings in FHEM are removed. NO impact to the device.<br>
+            msgEvents:  all message event counter are removed. Also commandstack is cleared. <br>
+            msgErrors:  message-error counter are removed.<br>
+            rssi:  collected rssi values are cleared. <br>
+            attack:  information regarding an attack are removed. <br>
+            trigger:  all trigger readings are removed. <br>
             all:  all of the above. <br>
           </ul>
         </li>
@@ -12091,12 +12101,11 @@ __END__
                used to stimulate the related actions as defined in the actor register.
           </li>
           <li><a id="CUL_HM-set-peerSmart"></a><B>peerSmart [&lt;peer&gt;]</B><br>
-               The command is similar to <B><a href="#CUL_HM-set-peerChan">peerChan</a></B>. 
-               peerChan uses only one parameter, the peer which the channel shall be peered to. <br>
-               Therefore peerSmart peers always in single mode (see peerChan). Funktionallity of the peered actor shall be applied 
-               manually by setting register. This is not a big difference to peerChan. <br>
-               Smart register setting could be done using hmTemplate. <br>
-               peerSmart is also available for actor-channel.
+               The command is similar to <B><a href="#CUL_HM-set-peerChan">peerChan</a></B> 
+               with reduced options for peer and unpeer.<br>
+               peerSmart peers in single mode (see peerChan) while funktionallity should be defined 
+               by setting register (not much difference to peerChan). <br>
+               Smart register setting could be done using hmTemplate.
           </li>
           <li><a id="CUL_HM-set-peerChan"></a><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B><br>
           
@@ -13560,12 +13569,10 @@ __END__
                Initiiert ein pressL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="#CUL_HM-set-pressL">pressL</a><br>
           </li>
           <li><B>peerSmart [&lt;peer&gt;] </B><a id="CUL_HM-set-peerSmart"></a><br>
-               Das Kommando ist aehnlich dem <B><a href="#CUL_HM-set-peerChan">peerChan</a></B>. 
-               peerChan braucht nur einen Parameter, den Peer zu welchem die Beziehung hergestellt werden soll.<br>
-               Daher peert peerSmart immer single mode (siehe peerChan). Die Funktionalitaet des gepeerten Aktors wird über das manuelle 
-               setzen der Register eingestellt. Am Ende ist das kein grosser Unterschied zu peerChan. <br>
-               Smartes Register Setzen kann man mit hmTemplate erreichen. <br>
-               peerSmart ist auch für Aktor Kanäle verfügbar.
+               Das Kommando ist aehnlich <B><a href="#CUL_HM-set-peerChan">peerChan</a></B> mit reduzierten Optionen.<br>
+               peerSmart peert immer single mode (siehe peerChan). Die Funktionalitaet über das  
+               setzen der Register erstellt (kein grosser Unterschied zu peerChan).<br>
+               Smartes Registersetzen unterstützt bspw hmTemplate.<br>
           </li>
           <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
               [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a id="CUL_HM-set-peerChan"></a><br>
