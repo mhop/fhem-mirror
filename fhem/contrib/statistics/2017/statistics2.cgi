@@ -39,6 +39,8 @@ use Geo::IP;
 
 sub insertDB();
 sub getLocation();
+sub revInfo($);
+sub makeOfficial();
 sub add2total();
 sub doAggregate();
 sub viewStatistics();
@@ -88,6 +90,7 @@ sub insertDB() {
 
   my $decoded  = decode_json($json);
   $json = revInfo($decoded) if (defined($decoded->{'system'}{'revision'}));
+  makeOfficial(); # delete inofficial modules from statistics data
 
   $dbh = DBI->connect($dsn,"","", { RaiseError => 1, ShowErrorStatement => 1 }) ||
           die "Cannot connect: $DBI::errstr";
@@ -135,6 +138,15 @@ sub revInfo($) {
      $decoded->{'system'}{'revdate'} = mktime(0,0,7,$mday,($mon-1),($year-1900),0,0,0);
      return encode_json $decoded;
    }
+}
+
+sub makeOfficial() {
+  my %official = ();
+  open (FH, "$fhemPathSvn/controls_fhem.txt") || die "Sorry!!";
+    while (<FH>) { $official{$1} = 1 if ($_ =~ /FHEM\/\d\d_(.*)\.pm/) }
+  close FH;
+  foreach my $key (keys %$decoded) { delete $decoded->{$key} unless $official{$key} }
+  return;
 }
 
 sub add2total() {
