@@ -96,10 +96,8 @@ sub _fi2_Count {
       my $model = $c_noModel;
 
 # 2. look for model information in internals
-#      unless (lc($type) eq 'knx') {
-         $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
-         $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
-#      }
+      $model = defined($defs{$key}{model}) ? $defs{$key}{model} : $model;
+      $model = defined($defs{$key}{MODEL}) ? $defs{$key}{MODEL} : $model;
 
       if ($model eq $c_noModel) {
 # 3. look for model information in attributes
@@ -130,7 +128,6 @@ sub _fi2_Count {
       
 # 7. check if model is a scalar
       $model = $c_noModel if (ref($model) eq 'HASH');
-
 
 # 8. skip for some special cases found in database
       next if ( ($model =~ /^unkno.*/i) || 
