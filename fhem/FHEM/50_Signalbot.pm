@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.0";
+my $Signalbot_VERSION="3.1";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -76,7 +76,7 @@ my %sets = (
 	"isGroupBlocked" 		=> "ay",
 	"version" 				=> "",
 	"isMember"				=> "ay",
-	"getAccount"			=> "",
+	"getSelfNumber"			=> "", #V0.9.1
 #	"isRegistered" 			=> "", Removing this will primarily use the register instance, so "true" means -U mode, "false" means multi
 	"sendEndSessionMessage" => "as",		#unused
 	"sendRemoteDeleteMessage" => "xas",		#unused
@@ -129,7 +129,7 @@ sub Signalbot_Initialize($) {
 												"registerMethod:SMS,Voice ".
 												"$readingFnAttributes";
 }
-################################### Todo: Set or Attribute for Mode? Other sets needed?
+################################### 
 sub Signalbot_Set($@) {					#
 
 	my ( $hash, $name, @args ) = @_;
@@ -681,9 +681,9 @@ sub Signalbot_MessageReceived ($@) {
 		
 		#Just pick one sender in den Priority: group, named contact, number, babblePeer
 		my $replyPeer=undef;
-		$replyPeer=$sourceRegex if defined $sourceRegex;
-		$replyPeer=$senderRegex if defined $senderRegex;
-		$replyPeer="#".$groupIdRegex if defined $groupIdRegex;
+		$replyPeer=$sourceRegex if (defined $sourceRegex and $sourceRegex ne "");
+		$replyPeer=$senderRegex if (defined $senderRegex and $senderRegex ne "");
+		$replyPeer="#".$groupIdRegex if (defined $groupIdRegex and $groupIdRegex ne "");
 		
 		#Activate Babble integration, only if sender or sender group is in babblePeer 
 		if (defined $bDevice && defined $bPeer && defined $replyPeer) {
@@ -836,8 +836,8 @@ sub Signalbot_setup2($@) {
 		if ($state) {
 			#if running daemon is running in -u mode set the signal path to default regardless of the registered number
 			$hash->{helper}{signalpath}='/org/asamk/Signal';
-			$account=Signalbot_CallS($hash,"getAccount");
-			#Workaround since signal-cli 0.9.0 did not include by getName() method - delete the reading, so its not confusing
+			$account=Signalbot_CallS($hash,"getSelfNumber"); #Available from signal-cli 0.9.1
+			#Workaround since signal-cli 0.9.0 did not include by getSelfNumber() method - delete the reading, so its not confusing
 			if (!defined $account) { readingsDelete($hash,"account"); }
 			#Remove all entries that are only available in registration or multi mode
 			delete($gets{accounts});
@@ -1049,8 +1049,10 @@ sub Signalbot_Call($@) {
 		#Handle Error here and mark Serial for mainloop to ignore
 		my $b=$msg->get_body()->[0];
 		readingsSingleUpdate($hash, 'lastError', "Error in $function:".$b,1);
+		return;
 		}
 	);
+	return undef;
 }
 
 sub Signalbot_Read($@){
@@ -1187,15 +1189,16 @@ sub Signalbot_invite($@) {
 	while (@contacts) {
 		my $contact=shift @contacts;
 		my $number=Signalbot_translateContact($hash,$contact);
-		return "Unknown Contact" unless defined $number;
+		return "Unknown Contact $contact" unless defined $number;
 		push @members,$number;
 	}
 	
 	my @group=Signalbot_getGroup($hash,$groupname);
 	return join(" ",@group) unless @group>1;
 	
-	Log3 $hash->{NAME}, 4, $hash->{NAME}.": Invited ".join(",",@contacts)." to $groupname";
+	Log3 $hash->{NAME}, 4, $hash->{NAME}.": Invited ".join(",",@members)." to $groupname";
 	Signalbot_Call($hash,"updateGroup",\@group,"",\@members,"");
+	return;
 }
 
 sub Signalbot_setBlocked($@) {
@@ -1372,6 +1375,7 @@ sub Signalbot_Attr(@) {					#
 	my ($command, $name, $attr, $val) = @_;
 	my $hash = $defs{$name};
 	my $msg = undef;
+	return if !defined $val; #nothing to do when deleting an attribute
 	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Attr $attr=$val"; 
 	if($attr eq "allowedPeer") {
 	#Take over as is
@@ -1636,6 +1640,9 @@ sub Signalbot_Detail {
 		$ret .= "<b>signal-cli v0.9.0+ required.</b><br>Please use installer to install or update<br>";
 		$ret .= "Note: The installer only supports Debian based Linux distributions like Ubuntu and Raspberry OS<br>";
 		$ret .= "      and X86 or armv7l CPUs<br>";
+	}
+	if($hash->{helper}{version}==901) {
+		$ret .= "<b>Warning: signal-cli v0.9.1 has issues affecting Signalbot.</b><br>Please use installer to downgrade to 0.9.0<br>";
 	}
 	if ($multi==0) {
 		$ret .= "Signal-cli is running in single-mode, please consider starting it without -u parameter (e.g. by re-running the installer)<br>";
@@ -1934,7 +1941,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		</li>
 		<li><b>set invite &ltgroupname&gt &ltcontact&gt</b><br>
 		<a id="Signalbot-set-invite"></a>
-		Invite new members to an existing group.<br>
+		Invite new members to an existing group. You can add multiple contacts separated by space.<br>
 		</li>		
 		<a id="Signalbot-set-joinGroup"></a>
 		<li><b>set joinGroup &ltgroup link&gt</b><br>
