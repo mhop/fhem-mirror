@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 03/2021
-my $thzversion = "0.196";
+# by immi 10/2021
+my $thzversion = "0.197";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -1570,9 +1570,9 @@ sub THZ_ReadAnswer($) {
 	    }
         else{ $count += 10; }	# increased to 10 because doubled the countmax
     }
-   return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
-   Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";
-   return (undef, $data);
+    return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
+    Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";
+    return (undef, $data);
 }
  
 #####################################
