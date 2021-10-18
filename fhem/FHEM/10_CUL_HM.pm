@@ -232,7 +232,7 @@ sub CUL_HM_updateConfig($){##########################
     # only once after startup - clean up definitions. During operation define function will take care
     Log 1,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
-    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......");   # devices only
+    my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only
     
     foreach my $name  (@hmdev){
       if ($attr{$name}{subType} && $attr{$name}{subType} eq "virtual"){
@@ -251,8 +251,8 @@ sub CUL_HM_updateConfig($){##########################
       my $IOgrp = AttrVal($name,"IOgrp","");
       if($IOgrp ne ""){
         delete $attr{$name}{IODev};
-        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp);
         CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+        CUL_HM_Attr("set",$name,"IOgrp",$IOgrp);
       }
       my $h = $defs{$name};
       delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
@@ -550,7 +550,7 @@ sub CUL_HM_updateConfig($){##########################
   delete $modules{CUL_HM}{helper}{updtCfgLst};
   if(!$modules{CUL_HM}{helper}{initDone}){
     Log 1,"CUL_HM finished initial cleanup";
-    if ($modules{HMinfo}){# force reread
+    if (defined &HMinfo_init){# force reread
       $modules{HMinfo}{helper}{initDone} = 0;
       InternalTimer(gettimeofday() + 5,"HMinfo_init", "HMinfo_init", 0);
     }
@@ -1014,11 +1014,20 @@ sub CUL_HM_Attr(@) {#################################
              if (AttrVal($name,"IOgrp",undef));
       if ($attrVal) {
         my @IOnames = devspec2array('Clients=.*:CUL_HM:.*');
+#        my @IOnames = grep {InternalVal($_,'Clients',
+#                                           defined $modules{InternalVal($_,'TYPE','')}{Clients}
+#                                           ? $modules{InternalVal($_,'TYPE','')}{Clients}
+#                                           : '') 
+#                            =~ m{:CUL_HM:}} 
+#                            keys %defs;
         return 'CUL_HM '.$name.': Non suitable IODev '.$attrVal.' specified. Options are: ',join(",",@IOnames)
             if (!grep /^$attrVal$/,@IOnames);
         $attr{$name}{$attrName} = $attrVal;
         CUL_HM_assignIO($hash);
       }
+    } 
+    else {
+        InternalTimer(gettimeofday(),'CUL_HM_assignIO',$hash,0); #Beta-User: as attribute is no longer mandatory, we should assign one after delete is done. Might collide with automatic deletion in initialisation
     }
   }
   elsif($attrName eq "IOList"){
@@ -5410,7 +5419,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $reply = CommandAttr(undef, "$name tempListTmpl $a[2]");
     
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
-    if ($modules{HMinfo}){
+    if (defined &HMinfo_tempListDefFn){
       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
@@ -7377,7 +7386,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "assignIO") { #################################################
     $state = "";
     my $io = $a[2];
-    return "use set of unset - $a[3] not allowed"   if ($a[3] && $a[3] != m/^(set|unset)$/);
+    return "use set of unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
     return "$io no suitable for CUL_HM" if(scalar(grep{$_ eq $io}
                                                   grep{$defs{$_}{Clients} =~ m/:CUL_HM:/}
                                                   keys %defs));
@@ -10824,22 +10833,16 @@ sub CUL_HM_UpdtCentralState($){
 }
 sub CUL_HM_operIObyIOHash($){ # noansi: in iohash, return iohash if IO is operational, else undef
   return if (!defined($_[0]));
-  my $ioname = $_[0]->{NAME};
-  return if (   !$ioname
-             || InternalVal($ioname,'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
-             || ReadingsVal($ioname,'state','disconnected') eq 'disconnected' # CUL
-             || IsDummy($ioname)
-            );
-  return $_[0];
+  return CUL_HM_operIObyIOName($_[0]->{NAME});
 }
 sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operational, else undef
   return if (!$_[0]);
   my $iohash = $defs{$_[0]};
   return if (   !defined($iohash)
-             || InternalVal($_[0],'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
-             || ReadingsVal($_[0],'state','disconnected') eq 'disconnected' # CUL
-             || IsDummy($_[0]
-             || IsDisabled($_[0]))                                                                                                
+             || defined InternalVal($_[0],'XmitOpen',undef) && InternalVal($_[0],'XmitOpen',0) == 0 # HMLAN/HMUSB/TSCUL
+             || ReadingsVal($_[0],'state','disconnected') eq 'disconnected'                         # CUL
+             || IsDummy($_[0])
+             || IsDisabled($_[0])                                                                                                
             );
   return $iohash;
 }
@@ -10874,7 +10877,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   
   if ($hh->{io}{vccu}){# second option - any IO from the
     my $iom;
-    ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}                  if(!$iom && @{$hh->{io}{prefIO}});
+    ($iom) = grep {$_ eq 'none'} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
+    return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
     if(!$iom){
       my @ioccu = grep{CUL_HM_operIObyIOName($_)} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}};
       ($iom) =    ((sort {@{$hh->{mRssi}{io}{$b}}[0] <=>     # This is the best choice
@@ -10884,6 +10888,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     } 
     ($iom) = grep{defined $defs{$_}} @{$hh->{io}{prefIO}}                           if(!$iom && @{$hh->{io}{prefIO}});
     ($iom) = grep{defined $defs{$_}} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}}  if(!$iom && @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}});
+    return 0 if ($iom && $iom eq 'none');
+    $newIODevH  = $defs{$iom} if($iom);
     $newIODevH  = $defs{$iom} if($iom);
   }
   
@@ -11779,13 +11785,9 @@ __END__
           </ul>
         </li>
         <li><a id="CUL_HM-set-getConfig"></a><B>getConfig</B><br>
-          Will read major configuration items stored in the HM device. Executed
-          on a channel it will read pair Inforamtion, List0, List1 and List3 of
-          the 1st internal peer. Furthermore the peerlist will be retrieved for
-          teh given channel. If executed on a device the command will get the
-          above info or all assotated channels. Not included will be the
-          configuration for additional peers.  <br> The command is a shortcut
-          for a selection of other commands.
+          Will read configuration of the physical HM device. Executed
+          on a channel it reads peerings and register information. <br>
+          Executed on a device the command will retrieve configuration for ALL associated channels. 
         </li>
         <li><a id="CUL_HM-set-getRegRaw"></a><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6|List7]&lt;peerChannel&gt; </B><br>
         
@@ -11976,6 +11978,10 @@ __END__
           "onlyEnterBootLoader" tells the device to enter the boot loader so it can be
           flashed using the eq3 firmware update tool. Mainly useful for flush-mounted devices
           in FHEM environments solely using HM-LAN adapters.
+        </li>
+        <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
+          Add or remove an IO device to the list of available IO's.
+          Changes attribute <i>IOlist</i> accordingly.
         </li>
       </ul>
   
