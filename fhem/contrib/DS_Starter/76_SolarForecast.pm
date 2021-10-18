@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.7" => "18.10.2021  new attr flowGraphicShowConsumerDummy ",
   "0.56.6" => "19.09.2021  bug fix ",
   "0.56.5" => "16.09.2021  fix sub ___csmSpecificEpieces (rows 2924-2927) ",
   "0.56.4" => "16.09.2021  new sub ___csmSpecificEpieces ",
@@ -518,19 +519,21 @@ my $defflowGSize = 300;                                                         
 my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
 
                                                                                   # Default CSS-Style
-my $cssdef       = qq{.flowg.text         { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
-                   qq{.flowg.sun_active   { stroke: orange; fill: orange; }                                                \n}.
-                   qq{.flowg.sun_inactive { stroke: gray; fill: gray; }                                                    \n}.
-                   qq{.flowg.bat25        { stroke: red; fill: red; }                                                      \n}.
-                   qq{.flowg.bat50        { stroke: yellow; fill: yellow; }                                                \n}.
-                   qq{.flowg.bat75        { stroke: green; fill: green; }                                                  \n}.
-                   qq{.flowg.grid_color1  { fill: green; }                                                                 \n}.
-                   qq{.flowg.grid_color2  { fill: red; }                                                                   \n}.
-                   qq{.flowg.grid_color3  { fill: gray; }                                                                  \n}.
-                   qq{.flowg.inactive_in  { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
-                   qq{.flowg.inactive_out { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
-                   qq{.flowg.active_in    { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_out   { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
+my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
+                   qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                \n}.
+                   qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                    \n}.
+                   qq{.flowg.bat25          { stroke: red; fill: red; }                                                      \n}.
+                   qq{.flowg.bat50          { stroke: yellow; fill: yellow; }                                                \n}.
+                   qq{.flowg.bat75          { stroke: green; fill: green; }                                                  \n}.
+                   qq{.flowg.grid_color1    { fill: green; }                                                                 \n}.
+                   qq{.flowg.grid_color2    { fill: red; }                                                                   \n}.
+                   qq{.flowg.grid_color3    { fill: gray; }                                                                  \n}.
+                   qq{.flowg.inactive_in    { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
+                   qq{.flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
+                   qq{.flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+				   qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+				   qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
                    ;
 
 my %hef = (                                                                                   # Energiedaktoren für Verbrauchertypen
@@ -593,6 +596,7 @@ sub Initialize {
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
                                 "flowGraphicShowConsumer:1,0 ".
+                                "flowGraphicShowConsumerDummy:1,0 ".      
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast,none ".                                     
@@ -1974,8 +1978,8 @@ sub centralTask {
       my $minute  = strftime "%M", localtime($t);                                                  # aktuelle Minute
       my $day     = strftime "%d", localtime($t);                                                  # aktueller Tag  (range 01 to 31)
       my $dayname = strftime "%a", localtime($t);                                                  # aktueller Wochentagsname
-            
-      my $params = {
+
+      my $centpars = {
           hash    => $hash,
           name    => $name,
           t       => $t,
@@ -1993,27 +1997,27 @@ sub centralTask {
       Log3 ($name, 4, "$name - ################################################################");
       Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
       
-      collectAllRegConsumers     ($params);                                                        # alle Verbraucher Infos laden
+      collectAllRegConsumers     ($centpars);                                                        # alle Verbraucher Infos laden
       
-      _specialActivities         ($params);                                                        # zusätzliche Events generieren + Sonderaufgaben
-      _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen
-      _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
-      _transferInverterValues    ($params);                                                        # WR Werte übertragen
-      _transferMeterValues       ($params);                                                        # Energy Meter auswerten    
-      _transferBatteryValues     ($params);                                                        # Batteriewerte einsammeln
-      _manageConsumerData        ($params);                                                        # Consumerdaten sammeln und planen  
-      _estConsumptionForecast    ($params);                                                        # erwarteten Verbrauch berechnen
-      _evaluateThresholds        ($params);                                                        # Schwellenwerte bewerten und signalisieren  
-      _calcSummaries             ($params);                                                        # Zusammenfassungen erstellen
+      _specialActivities         ($centpars);                                                        # zusätzliche Events generieren + Sonderaufgaben
+      _transferWeatherValues     ($centpars);                                                        # Wetterwerte übertragen
+      _transferDWDForecastValues ($centpars);                                                        # Forecast Werte übertragen  
+      _transferInverterValues    ($centpars);                                                        # WR Werte übertragen
+      _transferMeterValues       ($centpars);                                                        # Energy Meter auswerten    
+      _transferBatteryValues     ($centpars);                                                        # Batteriewerte einsammeln
+      _manageConsumerData        ($centpars);                                                        # Consumerdaten sammeln und planen  
+      _estConsumptionForecast    ($centpars);                                                        # erwarteten Verbrauch berechnen
+      _evaluateThresholds        ($centpars);                                                        # Schwellenwerte bewerten und signalisieren  
+      _calcSummaries             ($centpars);                                                        # Zusammenfassungen erstellen
 
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
       }
       
-      calcVariance           ($params);                                                            # Autokorrektur berechnen
-      saveEnergyConsumption  ($params);                                                            # Energie Hausverbrauch speichern
+      calcVariance           ($centpars);                                                            # Autokorrektur berechnen
+      saveEnergyConsumption  ($centpars);                                                            # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate($hash, "state", $params->{state}, 1);                                   # Abschluß state      
+      readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                                   # Abschluß state      
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -4055,6 +4059,7 @@ sub entryGraphic {
       flowgh     => AttrVal ($name,    'flowGraphicSize', $defflowGSize),                      # Größe Energieflußgrafik
       flowgani   => AttrVal ($name,    'flowGraphicAnimate',          0),                      # Animation Energieflußgrafik
       flowgcons  => AttrVal ($name,    'flowGraphicShowConsumer',     1),                      # Verbraucher in der Energieflußgrafik anzeigen
+      flowgconX  => AttrVal ($name,    'flowGraphicShowConsumerDummy',1),                      # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
       css        => AttrVal ($name,    'Css',                   $cssdef),                      # Css Styles
   };
   
@@ -5234,10 +5239,10 @@ sub _flowGraphic {
   my $flowgh     = $paref->{flowgh};
   my $flowgani   = $paref->{flowgani};
   my $flowgcons  = $paref->{flowgcons};
+  my $flowgconX  = $paref->{flowgconX};
   my $css        = $paref->{css};
     
   my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
-  # my $fs         = $flowgh < 300 ? '48px' : '32px';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
 
   my $cpv        = ReadingsNum($name, 'Current_PV', 0);
@@ -5253,7 +5258,8 @@ sub _flowGraphic {
   my $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
   
   my $cc         = ReadingsNum($name, 'Current_Consumption', 0);
-
+  my $cc_dummy	 = $cc;
+  
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
@@ -5276,9 +5282,9 @@ sub _flowGraphic {
       $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
   }
 
-  my $batin_style  = $batin  ? 'flowg active_out'  : 'flowg inactive_out';
-  my $batout_style = $batout ? 'flowg active_in'   : 'flowg inactive_in';
-  my $grid_color   = $cgfi   ? 'flowg grid_color1' : 'flowg grid_color2';
+  my $batin_style  = $batin  ? 'flowg active_in active_bat_in'   : 'flowg inactive_out';
+  my $batout_style = $batout ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
+  my $grid_color   = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
   $grid_color      = 'flowg grid_color3' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
   
   my $ret = << "END0";
@@ -5287,9 +5293,9 @@ sub _flowGraphic {
       $animation
       </style>
      
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 580 580" style="$style" id="SVGPLOT">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 780 780" style="$style" id="SVGPLOT">
       
-      <g transform="translate(300,50)">
+      <g transform="translate(400,50)">
         <g>
             <line class="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
         </g>
@@ -5317,11 +5323,11 @@ sub _flowGraphic {
         <circle cx="0" cy="0" class="$sun_color" r="16" stroke-width="2"/>
       </g>
 
-      <g id="home" fill="grey" transform="translate(250,310),scale(4)">
+      <g id="home" fill="grey" transform="translate(350,310),scale(4)">
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
       </g>    
 
-      <g id="grid" class="$grid_color" transform="translate(100,150),scale(3.5)">
+      <g id="grid" class="$grid_color" transform="translate(200,150),scale(3.5)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
 END0
@@ -5331,9 +5337,9 @@ END0
   my $pos_left          = 0;
   my $consumercount     = 0;
   my $consumer_start    = 0;
-  my $consumer_distance = 100;
-  my @consumers;
+  my $consumer_distance = 80;
   my $currentPower      = 0;
+  my @consumers;
   
   if ($flowgcons) {
       my $type       = $hash->{TYPE};
@@ -5341,10 +5347,10 @@ END0
       $consumercount = scalar @consumers; 
 
       if ($consumercount % 2) {
-          $consumer_start = 250 - ($consumer_distance  * (($consumercount -1) / 2)); 
+          $consumer_start = 350 - ($consumer_distance  * (($consumercount -1) / 2)); 
       } 
       else {
-          $consumer_start = 250 - ((($consumer_distance ) / 2) * ($consumercount-1));
+          $consumer_start = 350 - ((($consumer_distance ) / 2) * ($consumercount-1));
       }
       
       $consumer_start = 0 if $consumer_start < 0;
@@ -5354,7 +5360,8 @@ END0
           my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
           $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
           my $cicon       = substConsumerIcon ($hash, $c0);                                         # Icon des Consumerdevices
-
+          $cc_dummy 	 -= $currentPower;
+		  
           $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
           $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
           $ret .= '</g> ';
@@ -5365,7 +5372,7 @@ END0
 
   if ($hasbat) {
       $ret .= << "END1";
-      <g class="$bat_color" transform="translate(510,135),scale(.33) rotate (90)">
+      <g class="$bat_color" transform="translate(610,135),scale(.33) rotate (90)">
       <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
       <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
 END1
@@ -5376,20 +5383,36 @@ END1
       $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 88);
       $ret .= '</g>';
   }
-
+  
+  if ($flowgconX) {                                                                              # Dummy Consumer
+	  $ret .= '<g id="consumer_X" fill="grey" transform="translate(520,330),scale(0.1)">';
+	  $ret .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100', '');
+	  $ret .= '</g> ';
+   }
+   
     $ret .= << "END2";
     <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-    <path id="pv-home"   class="$csc_style"  d="M500,100 L500,510" />
-    <path id="pv-grid"   class="$cgfi_style" d="M470,100 L290,270" />
-    <path id="grid-home" class="$cgc_style"  d="M290,305 L470,510" />
+    <path id="pv-home"   class="$csc_style"  d="M700,100 L700,510" />
+    <path id="pv-grid"   class="$cgfi_style" d="M670,100 L490,270" />
+    <path id="grid-home" class="$cgc_style"  d="M490,305 L670,510" />
 END2
 
   if ($hasbat) {
       $ret .= << "END3";
-      <path id="bat-home" class="$batout_style" d="M702,305 L530,510" />
-      <path id="pv-bat"   class="$batin_style"  d="M530,100 L700,270" />
+      <path id="bat-home" class="$batout_style" d="M902,305 L730,510" />
+      <path id="pv-bat"   class="$batin_style"  d="M730,100 L900,270" />
 END3
   }
+  
+   if ($flowgconX) {                                                                            # Dummy Consumer 
+  	  my $consumer_style = 'flowg inactive_out';
+      $consumer_style    = 'flowg active_out' if($cc_dummy > 1);
+		  
+	  my $consumer_color = "";
+      $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($cc_dummy > 0.5);
+	  
+	  $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $consumer_color d="M780,620 L930,620" />};  
+   }
   
   ## get consumer list and display it in Graphics
   ################################################
@@ -5399,10 +5422,10 @@ END3
       my $distance       = 25;
       
       if ($consumercount % 2) {
-          $pos_left_start = 500 - ($distance  * (($consumercount -1) / 2)); 
+          $pos_left_start = 700 - ($distance  * (($consumercount -1) / 2)); 
       } 
       else {
-          $pos_left_start = 500 - ((($distance ) / 2) * ($consumercount-1));
+          $pos_left_start = 700 - ((($distance ) / 2) * ($consumercount-1));
       }
       
       for my $c1 (@consumers) {     
@@ -5430,16 +5453,19 @@ END3
           $pos_left_start   += $distance;
       } 
   }
+  
+  $cc_dummy = sprintf("%.0f",$cc_dummy);
 
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="600" y="15"  style="text-anchor: start;">$cpv</text>}     if ($cpv);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="795" y="370" style="text-anchor: middle;">$soc %</text>}  if ($hasbat);
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="530" y="300" style="text-anchor: start;">$csc</text>}     if ($csc && $cpv);
-  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="325" y="200" style="text-anchor: end;">$cgfi</text>}      if ($cgfi);
-  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="325" y="420" style="text-anchor: end;">$cgc</text>}       if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batout-txt"    x="665" y="420" style="text-anchor: start;">$batout</text>}  if ($batout && $hasbat);
-  $ret .= qq{<text class="flowg text" id="batin-txt"     x="665" y="200" style="text-anchor: start;">$batin</text>}   if ($batin && $hasbat);
-  $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: start;">$cc</text>};                                    # Current_Consumption Anlage
-
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800" y="15"  style="text-anchor: start;">$cpv</text>}     	 if ($cpv);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="995" y="370" style="text-anchor: middle;">$soc %</text>}  	 if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730" y="300" style="text-anchor: start;">$csc</text>}     	 if ($csc && $cpv);
+  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525" y="200" style="text-anchor: end;">$cgfi</text>}      	 if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="525" y="420" style="text-anchor: end;">$cgc</text>}       	 if ($cgc);
+  $ret .= qq{<text class="flowg text" id="batout-txt"    x="865" y="420" style="text-anchor: start;">$batout</text>}  	 if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="batin-txt"     x="865" y="200" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
+  $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: end;">$cc</text>};                                    # Current_Consumption Anlage
+  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1070" y="620" style="text-anchor: start;">$cc_dummy</text>}  if ($flowgconX);          # Current_Consumption Dummy
+  
   ## get consumer list and display it in Graphics
   ################################################
   if ($flowgcons) {
@@ -5454,7 +5480,7 @@ END3
               $currentPower = $swstate eq "on" ? 'on' : 'off';
           }
           
-          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1070" style="text-anchor: start;">$currentPower</text>};                          # Current_Consumption Consumer
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1090" style="text-anchor: start;">$currentPower</text>};                          # Current_Consumption Consumer
           $pos_left  += ($consumer_distance * 2);
       }
   }
@@ -7812,19 +7838,21 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Zum Ändern des Css-Attributes bitte den Default übernehmen und anpassen: <br><br>
          
          <ul>   
-           .flowg.text         { stroke: none; fill: gray; font-size: 32px; } <br>    
-           .flowg.sun_active   { stroke: orange; fill: orange; }              <br>                                          
-           .flowg.sun_inactive { stroke: gray; fill: gray; }                  <br>                                         
-           .flowg.bat25        { stroke: red; fill: red; }                    <br>                                        
-           .flowg.bat50        { stroke: yellow; fill: yellow; }              <br>                                       
-           .flowg.bat75        { stroke: green; fill: green; }                <br>                                    
-           .flowg.grid_color1  { fill: green; }                               <br>           
-           .flowg.grid_color2  { fill: red; }                                 <br>                                    
-           .flowg.grid_color3  { fill: gray; }                                <br>                                    
-           .flowg.inactive_in  { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
-           .flowg.inactive_out { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
-           .flowg.active_in    { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
-           .flowg.active_out   { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
+           .flowg.text           { stroke: none; fill: gray; font-size: 32px; } <br>    
+           .flowg.sun_active     { stroke: orange; fill: orange; }              <br>                                          
+           .flowg.sun_inactive   { stroke: gray; fill: gray; }                  <br>                                         
+           .flowg.bat25          { stroke: red; fill: red; }                    <br>                                        
+           .flowg.bat50          { stroke: yellow; fill: yellow; }              <br>                                       
+           .flowg.bat75          { stroke: green; fill: green; }                <br>                                    
+           .flowg.grid_color1    { fill: green; }                               <br>           
+           .flowg.grid_color2    { fill: red; }                                 <br>                                    
+           .flowg.grid_color3    { fill: gray; }                                <br>                                    
+           .flowg.inactive_in    { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
+           .flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
+           .flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
+           .flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
+		   .flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
+		   .flowg.active_bat_out { stroke: green; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>                                                                                                                                                                                                                             
          </ul>   
          
        </li>
@@ -7856,6 +7884,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          (default: 1)
        </li>
        <br>
+       
+	   <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
+       <li><b>flowGraphicShowConsumerDummy </b><br>
+         Zeigt bzw. unterdrückt den Dummy-Verbraucher in der Energieflußgrafik. <br> 
+         Dem Dummy-Verbraucher stellt den Energieverbrauch dar der anderen Verbrauchern nicht zugeordnet werden konnte. <br>
+         (default: 1)
+       </li>
+       <br>    
        
        <a id="SolarForecast-attr-flowGraphicSize"></a>
        <li><b>flowGraphicSize &lt;Pixel&gt; </b><br>
