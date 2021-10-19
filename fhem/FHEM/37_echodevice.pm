@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2021.10.19 v0.2.14
+# - BUG:     https://forum.fhem.de/index.php/topic,82631.msg1175268.html#msg1175268 (Danke Benutzer JudgeDredd)
+# - FEATURE: Unterstützung A31DTMEEVDDOIV FireTV Stick
+#
 # 2021.09.15 v0.2.13
 # - CHANGE:  Probleme set tunein (Danke Benutzer adn77)
 #
@@ -471,7 +475,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.13";
+my $ModulVersion     = "0.2.14";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4375,6 +4379,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A2LWARUGJLBYEW" || $ModelNumber eq "Fire TV Stick V2")		{return "Fire TV Stick V2";}
 	elsif($ModelNumber eq "AKPGW064GI9HE"  || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
 	elsif($ModelNumber eq "A265XOI9586NML" || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
+	elsif($ModelNumber eq "A31DTMEEVDDOIV" || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV";}
 	elsif($ModelNumber eq "A2JKHJ0PX4J3L3" || $ModelNumber eq "ECHO FireTv Cube 4K")	{return "ECHO FireTv Cube 4K";}
 	elsif($ModelNumber eq "A10L5JEZTKKCZ8" || $ModelNumber eq "VOBOT")           		{return "VOBOT";}
 	elsif($ModelNumber eq "A37SHHQ3NUL7B5" || $ModelNumber eq "Bose Home Speaker 500")	{return "Bose Home Speaker 500";}
@@ -5460,7 +5465,7 @@ sub echodevice_PlayOwnMP3($$) {
 	print FH $M3UContentWR;
 	close(FH);
 		
-	echodevice_SendCommand($hash,"tunein",ReadingsVal($hash->{IODev}->{NAME} , "POM_TuneIn", "s167655"));
+	echodevice_SendCommand($hash,"tunein",ReadingsVal($hash->{IODev}->{NAME} , lc("POM_TuneIn"), "s167655"));
 }
 
 sub echodevice_SaveOwnPlaylist($$) {
@@ -5577,7 +5582,7 @@ sub echodevice_StartTTSMessage($) {
 	my $name = $hash->{NAME};
 	
 	# TTS starten
-	echodevice_SendCommand($hash,"ttstunein",ReadingsVal($hash->{IODev}->{NAME} , "TTS_TuneIn", "s237481"));
+	echodevice_SendCommand($hash,"ttstunein",ReadingsVal($hash->{IODev}->{NAME} , lc("TTS_TuneIn"), "s237481"));
 }
 
 1;
