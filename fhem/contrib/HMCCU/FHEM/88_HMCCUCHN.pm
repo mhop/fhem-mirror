@@ -30,6 +30,8 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
+my $HMCCUCHN_VERSION = '5.0 212921914';
+
 ######################################################################
 # Initialize module
 ######################################################################
@@ -37,6 +39,8 @@ sub HMCCUCHN_Attr ($@);
 sub HMCCUCHN_Initialize ($)
 {
 	my ($hash) = @_;
+
+	$hash->{version} = $HMCCUCHN_VERSION;
 
 	$hash->{DefFn}    = 'HMCCUCHN_Define';
 	$hash->{UndefFn}  = 'HMCCUCHN_Undef';
@@ -177,33 +181,37 @@ sub HMCCUCHN_InitDevice ($$)
 	$devHash->{ccutype}     = $dt;
 	$devHash->{ccudevstate} = 'active';
 	
+	my $rc = 0;
+
 	if ($init_done) {
 		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 		
 		# Interactive device definition
-		HMCCU_SetSCAttributes ($ioHash, $devHash, $detect);
-		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
-		HMCCU_UpdateDevice ($ioHash, $devHash);
-		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
+		HMCCU_SetSCAttributes ($ioHash, $devHash, $detect);		# Set selection lists for attributes statedatapoint and controldatapoint
+		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});	# Add device to internal IO device hashes
+		HMCCU_UpdateDevice ($ioHash, $devHash);					# Set device information like firmware and links
+		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);			# Set CCU type, CCU subtype and roles
+		HMCCU_SetInitialAttributes ($ioHash, $name);			# Set global attributes as defined in IO device attribute ccudef-attributes
 		
-		return -2 if (!defined($detect) || $detect->{level} == 0);
+		if (defined($detect) && $detect->{level} > 0) {
+			my ($sc, $sd, $cc, $cd, $rsd, $rcd) = HMCCU_SetDefaultSCDatapoints ($ioHash, $devHash, $detect, 1);
+			HMCCU_Log ($devHash, 2, "Cannot set default state- and/or control datapoints. Maybe device type not known by HMCCU")
+				if ($rsd == 0 && $rcd == 0);
 
-		my ($sc, $sd, $cc, $cd, $rsd, $rcd) = HMCCU_SetDefaultSCDatapoints ($ioHash, $devHash, $detect, 1);
-		HMCCU_Log ($devHash, 2, "Cannot set default state- and/or control datapoints. Maybe device type not known by HMCCU")
-			if ($rsd == 0 && $rcd == 0);
-
-		HMCCU_SetInitialAttributes ($ioHash, $name);
-
-		if (!exists($devHash->{hmccu}{nodefaults}) || $devHash->{hmccu}{nodefaults} == 0) {
-			if (!HMCCU_SetDefaultAttributes ($devHash)) {
-				HMCCU_SetDefaults ($devHash);
+			if (!exists($devHash->{hmccu}{nodefaults}) || $devHash->{hmccu}{nodefaults} == 0) {
+				if (!HMCCU_SetDefaultAttributes ($devHash)) {
+					HMCCU_SetDefaults ($devHash);
+				}
 			}
+		}
+		else {
+			$rc = -2;
 		}
 
 		HMCCU_GetUpdate ($devHash, $da, 'Value');
 	}
 
-	return 0;
+	return $rc;
 }
 
 ######################################################################

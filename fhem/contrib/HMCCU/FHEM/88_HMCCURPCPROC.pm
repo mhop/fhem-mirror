@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0';
+my $HMCCURPCPROC_VERSION = '5.0 212921914';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -247,6 +247,8 @@ sub HMCCURPCPROC_Initialize ($)
 {
 	my ($hash) = @_;
 
+	$hash->{version} = $HMCCURPCPROC_VERSION;
+	
 	$hash->{DefFn}             = 'HMCCURPCPROC_Define';
 	$hash->{UndefFn}           = 'HMCCURPCPROC_Undef';
 	$hash->{RenameFn}          = 'HMCCURPCPROC_Rename';
@@ -1160,7 +1162,9 @@ sub HMCCURPCPROC_GetPeers ($;$)
 }
 
 ######################################################################
-# Get RPC device descriptions from CCU
+# Get RPC device descriptions from CCU recursively. Add devices to
+# IO device.
+# If address is not specified, fetch description of all devices.
 # Return number of devices and channels read from CCU.
 ######################################################################
 
@@ -1500,15 +1504,15 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	$hash->{hmccu}{sockparent} = $sockparent;
 	$hash->{hmccu}{sockchild} = $sockchild;
 
-	# Enable FHEM I/O
+	# Enable FHEM I/O, calculate RPC server port
 	my $pid = $$;
 	$hash->{FD} = fileno $sockchild;
 	$selectlist{"RPC.$name.$pid"} = $hash; 
+	my $callbackport = $rpcserverport+$rpcport+($ccunum*10);
 	
 	# Initialize RPC server
-	my $err = '';
-	my %srvprocpar;
-	my $callbackport = $rpcserverport+$rpcport+($ccunum*10);
+#	my $err = '';
+#	my %srvprocpar;
 
 	# Start RPC server process
 	my $rpcpid = fhemFork ();
@@ -1547,7 +1551,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	$hash->{RPCPID} = $rpcpid;
 
 	# Trigger Timer function for checking successful RPC start
-	# Timer will be removed before execution if event 'IN' is reveived
+	# Timer will be removed before first execution if event 'IN' is reveived
 	InternalTimer (gettimeofday()+$HMCCURPCPROC_INIT_INTERVAL3, "HMCCURPCPROC_IsRPCServerRunning",
 		$hash, 0);
 	
