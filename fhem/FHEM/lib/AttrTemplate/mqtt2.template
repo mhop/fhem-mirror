@@ -239,11 +239,11 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
-  ct_startup:coolest,cool,neutral,warmest,previous $DEVICETOPIC/set {"color_temp_startup":"$EVTPART1"}
+  ct_startup:coolest,cool,neutral,warmest,previous $\DEVICETOPIC/set {"color_temp_startup":"$EVTPART1"}
 attr DEVICE jsonMap color_temp:ct color_temp_startup:ct_startup
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_cct
-setreading DEVICE attrTemplateVersion 20211018
+setreading DEVICE attrTemplateVersion 20211019
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgb_hex
@@ -878,7 +878,7 @@ attr DEVICE setList \
   desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
   btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
   preset:schedule,manual,boost,complex,comfort,eco $\DEVICETOPIC/set {"preset": "$EVTPART1"}\
-  mode:heat,auto,off $DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
+  mode:heat,auto,off $\DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
   holidays $\DEVICETOPIC/set/schedule { "holidays":[$EVTPART1] }\
   workdays $\DEVICETOPIC/set/schedule { "workdays":[$EVTPART1] }\
   week:5+2,6+1,7 $\DEVICETOPIC/set $EVTPART1\
@@ -899,7 +899,7 @@ attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210211
+setreading DEVICE attrTemplateVersion 20211019
 
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1145005.html#msg1145005
 name:zigbee2mqtt_thermostat_without_weekprofile
@@ -2953,18 +2953,18 @@ attr DEVICE setList \
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE  readingList shellies/DEVICE/online:.* online\
-  shellies/DEVICE/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  shellies/DEVICE/sensor/temperature:.* temperature\
-  shellies/DEVICE/sensor/flood:.* flood\
-  shellies/DEVICE/sensor/battery:.* batteryPercent\
-  shellies/DEVICE/sensor/error:.* error\
-  shellies/DEVICE/sensor/act_reasons:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  shellies/DEVNAME/sensor/temperature:.* temperature\
+  shellies/DEVNAME/sensor/flood:.* flood\
+  shellies/DEVNAME/sensor/battery:.* batteryPercent\
+  shellies/DEVNAME/sensor/error:.* error\
+  shellies/DEVNAME/sensor/act_reasons:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap 1:report
 attr DEVICE stateFormat flood (bat batteryPercent%)
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shellyflood
-setreading DEVICE attrTemplateVersion 202010228
+setreading DEVICE attrTemplateVersion 20211019
 
 
 
