@@ -27,20 +27,20 @@
 
 #
 # Internals introduced in this module:
-#	MODEL	distinguish between different X10 device types
-#	BRIGHT	brightness level of dimmer devices in units of microdims (0..210)
+#   MODEL   distinguish between different X10 device types
+#   BRIGHT  brightness level of dimmer devices in units of microdims (0..210)
 #
 # Readings introduced in this module:
-#	state	function and argument of last command
-#	onoff	inherited from switch interface (0= on, 1= off)
-#	dimmer	inherited from dimmer interface (0= dark, 100= bright)
+#   state   function and argument of last command
+#   onoff   inherited from switch interface (0= on, 1= off)
+#   dimmer  inherited from dimmer interface (0= dark, 100= bright)
 #
 # Setters introduced in this module:
-#	on	inherited from switch interface
-#	off	inherited from switch interface
-#	dimmer  inherited from dimmer interface (0= dark, 100= bright)
-#	dimdown	inherited from dimmer interface
-#	dimup	inherited from dimmer interface
+#   on      inherited from switch interface
+#   off     inherited from switch interface
+#   dimmer  inherited from dimmer interface (0= dark, 100= bright)
+#   dimdown inherited from dimmer interface
+#   dimup   inherited from dimmer interface
 #
 
 package main;
@@ -93,9 +93,9 @@ my %functions_set = ( "on" => 0,
                       "off" => 0,
                       "dimup" => 1,
                       "dimdown" => 1,
-		                  "dimto" => 1,
+                      "dimto" => 1,
                       "on-till" => 1,
-            		      "on-for-timer" => 1,
+                      "on-for-timer" => 1,
                       "all_units_off" => 0,
                       "all_units_on" => 0,
                       "all_lights_off" => 0,
@@ -103,7 +103,7 @@ my %functions_set = ( "on" => 0,
                     );
 
 my %models = (
-    lm12	=> 'dimmer',
+    lm12        => 'dimmer',
     lm15        => 'switch',
     am12        => 'switch',
     tm13        => 'switch',
@@ -135,7 +135,8 @@ X10_Initialize($)
   $hash->{UndefFn}   = "X10_Undef";
   $hash->{ParseFn}   = "X10_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 " .
-                       "dummy:1,0 showtime:1,0 model:lm12,lm15,am12,tm13";
+                       "dummy:1,0 showtime:1,0 model:lm12,lm15,am12,tm13 " .
+                       $readingFnAttributes;
 
 }
 
@@ -208,10 +209,15 @@ X10_StateMachine($$$$)
 
   $hash->{ONOFF}= $onoff;
   $hash->{BRIGHT}= $bright;
-  $hash->{READINGS}{onoff}{TIME}= $time;
-  $hash->{READINGS}{onoff}{VAL}= $onoff;
-  $hash->{READINGS}{dimmer}{TIME}= $time;
-  $hash->{READINGS}{dimmer}{VAL}= int(1000.0*$bright/210.0+0.5)/10.0;
+  #$hash->{READINGS}{onoff}{TIME}= $time;
+  #$hash->{READINGS}{onoff}{VAL}= $onoff;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,'onoff',$onoff,1,$time);
+  #$hash->{READINGS}{dimmer}{TIME}= $time;
+  #$hash->{READINGS}{dimmer}{VAL}= int(1000.0*$bright/210.0+0.5)/10.0;
+  readingsBulkUpdate($hash,'dimmer',int(1000.0*$bright/210.0+0.5)/10.0,1,$time);
+  readingsEndUpdate($hash,1);
+  return;
 }
 
 #############################
@@ -353,11 +359,11 @@ X10_Set($@)
       if(defined($hash->{BRIGHT})) { $bright= $hash->{BRIGHT} };
       $arg= $arg-100.0*$bright/210.0;
       if($arg> 0) {
-	$function= "dimup";
-	$dim= X10_LevelToDims($arg);
+        $function= "dimup";
+        $dim= X10_LevelToDims($arg);
       } else {
-	$function= "dimdown";
-	$dim= X10_LevelToDims(-$arg);
+        $function= "dimdown";
+        $dim= X10_LevelToDims(-$arg);
       }
     } else {
       $dim= X10_LevelToDims($arg);
@@ -379,9 +385,10 @@ X10_Set($@)
   my $tn = TimeNow();
 
   $hash->{CHANGED}[0] = $v;
-  $hash->{STATE} = $v;
-  $hash->{READINGS}{state}{TIME} = $tn;
-  $hash->{READINGS}{state}{VAL} = $v;
+  #$hash->{STATE} = $v;
+  #$hash->{READINGS}{state}{TIME} = $tn;
+  #$hash->{READINGS}{state}{VAL} = $v;
+  readingsSingleUpdate($hash,'state',$v,1,$tn);
   X10_StateMachine($hash, $tn, $function, int(210.0*$dim/22.0+0.5));
 
   return undef;
@@ -405,12 +412,12 @@ X10_Define($$)
   my $housecode = $a[3];
   return "Define $a[0]: wrong housecode format: specify a value ".
          "from A to P"
-  		if($housecode !~ m/^[A-P]$/i);
+        if($housecode !~ m/^[A-P]$/i);
 
   my $unitcode = $a[4];
   return "Define $a[0]: wrong unitcode format: specify a value " .
          "from 1 to 16"
-  		if( ($unitcode<1) || ($unitcode>16) );
+        if( ($unitcode<1) || ($unitcode>16) );
 
 
   $hash->{MODEL}  = $model;
@@ -515,10 +522,11 @@ X10_Parse($$)
     if($h) {
         my $name= $h->{NAME};
         $h->{CHANGED}[0] = $value;
-        $h->{STATE} = $value;
-        $h->{READINGS}{state}{TIME} = $tn;
-        $h->{READINGS}{state}{VAL} = $value;
-	X10_StateMachine($h, $tn, $function, $arg);
+        #$h->{STATE} = $value;
+        #$h->{READINGS}{state}{TIME} = $tn;
+        #$h->{READINGS}{state}{VAL} = $value;
+        readingsSingleUpdate($h,'state',$value,1,$tn);
+        X10_StateMachine($h, $tn, $function, $arg);
         Log3 $hash, 2, "X10 $name $value";
         push(@list, $name);
     } else {
@@ -535,15 +543,17 @@ X10_Parse($$)
 
 1;
 
+__END__
+
 =pod
 =item summary    devices communicating via the X10 protocol
 =item summary_DE Anbindung von X10-Ger&auml;ten
 =begin html
 
-<a name="X10"></a>
+<a id="X10"></a>
 <h3>X10</h3>
 <ul>
-  <a name="X10define"></a>
+  <a id="X10-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; X10 &lt;model&gt; &lt;housecode&gt;
@@ -578,7 +588,7 @@ X10_Parse($$)
   </ul>
   <br>
 
-  <a name="X10set"></a>
+  <a id="X10-set"></a>
   <b>Set </b>
   <ul>
     <code>set &lt;name&gt; &lt;value&gt; [&lt;argument&gt]</code>
@@ -610,6 +620,7 @@ X10_Parse($$)
       <li>An X10 device has 210 discrete brightness levels. If you use a
           X10 sender, e.g. a remote control or a wall switch to dim, a
           brightness step is 100%/210.</li>
+      <a id="X10-set-dimup" data-pattern="dim(up|down)"></a>
       <li><code>dimdown</code> and <code>dimup</code> take a number in the
           range from 0 to 22 as argument. It is assumed that argument 1 is
           a 1% brightness change (microdim) and arguments 2 to 22 are
@@ -637,10 +648,10 @@ X10_Parse($$)
   </ul>
   <br>
 
-  <a name="X10get"></a>
+  <a id="X10-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="X10attr"></a>
+  <a id="X10-attr"></a>
   <b>Attributes</b>
   <ul>
   <li><a href="#do_not_notify">do_not_notify</a></li>
