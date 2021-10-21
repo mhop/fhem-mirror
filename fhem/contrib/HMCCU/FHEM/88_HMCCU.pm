@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 212921914';
+my $HMCCU_VERSION = '5.0 212941907';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -6860,10 +6860,16 @@ sub HMCCU_UpdateRoleCommands ($$;$)
 						}
 					}
 				}
+				else {
+					if (!HMCCU_IsValidParameter ($clHash, "$addr:$cmdChn", $psName, $dpt, $parAccess)) {
+						HMCCU_Log ($clHash, 4, "Invalid parameter $addr:$cmdChn $psName $dpt $parAccess");
+						next URCSUB;
+					}
+				}
 				
 				my $paramDef = HMCCU_GetParamDef ($ioHash, "$addr:$cmdChn", $psName, $dpt);
 				if (!defined($paramDef)) {
-					HMCCU_Log ($ioHash, 3, "INFO: Can't get definition of datapoint $addr:$cmdChn.$dpt. Ignoring command $cmd for device $clHash->{NAME}");
+					HMCCU_Log ($ioHash, 4, "INFO: Can't get definition of datapoint $addr:$cmdChn.$dpt. Ignoring command $cmd for device $clHash->{NAME}");
 					next URCCMD;
 				}
 				$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{scn}  = sprintf("%03d", $subCmdNo);
@@ -6986,6 +6992,14 @@ sub HMCCU_UpdateRoleCommands ($$;$)
 				$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{partype} = $pt;
 				$parTypes[$pt]++;
 				$cnt++;
+			}
+
+			if ($cnt == 0) {
+				if (!exists($clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcount})) {
+					HMCCU_Log ($clHash, 4, "No datapoints found. Deleting command $cmd");
+					delete $clHash->{hmccu}{roleCmds}{$cmdType}{$cmd};
+				}
+				next URCCMD;
 			}
 			
 			if ($parTypes[1] == 1 && $parTypes[2] == 0 && $cmdArgList ne '') {
