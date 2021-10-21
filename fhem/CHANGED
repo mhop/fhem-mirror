@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 48_MieleAtHome: support set targetTemperature and mode
  - bugfix:  50_Signalbot: Fixed issue with Babble and invite
  - bugfix:  73_ElectricityCalculator: use Data:Dumper inserted
  - bugfix:  73_GasCalculator:         use Data:Dumper inserted
