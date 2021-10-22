@@ -337,7 +337,7 @@ HttpUtils_Connect($)
 
   if($hash->{url} !~ /
       ^(http|https):\/\/                # $1: proto
-       (([^:\/]+):([^:\/]+)@)?          # $2: auth, $3:user, $4:password
+       (([^:\/]+):([^:\/]*)@)?          # $2: auth, $3:user, $4:password
        ([^:\/]+|\[[0-9a-f:]+\])         # $5: host or IPv6 address
        (:\d+)?                          # $6: port
        (\/.*)$                          # $7: path
