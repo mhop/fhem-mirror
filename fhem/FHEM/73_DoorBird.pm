@@ -1637,17 +1637,17 @@ sub DoorBird_Read($) {
 							
 							### Define Parameter for Non-BlockingGet
 							my $param = {
-								url               => $CommandURL,
-								timeout           => $PollingTimeout,
-								user              => $Username,
-								pwd               => $Password,
-								hash              => $hash,
-								method            => $Method,
-								header            => $Header,
-								timestamp         => $TIMESTAMP,
-								event             => "motionsensor",
-								incrementalTimout => 1,
-								callback          => \&DoorBird_LastEvent_Image
+								url                => $CommandURL,
+								timeout            => $PollingTimeout,
+								user               => $Username,
+								pwd                => $Password,
+								hash               => $hash,
+								method             => $Method,
+								header             => $Header,
+								timestamp          => $TIMESTAMP,
+								event              => "motionsensor",
+								incrementalTimeout => 1,
+								callback           => \&DoorBird_LastEvent_Image
 							};
 
 							### Initiate Bulk Update
@@ -1702,17 +1702,17 @@ sub DoorBird_Read($) {
 							
 							### Define Parameter for Non-BlockingGet
 							my $param = {
-								url               => $CommandURL,
-								timeout           => $PollingTimeout,
-								user              => $Username,
-								pwd               => $Password,
-								hash              => $hash,
-								method            => $Method,
-								header            => $Header,
-								timestamp         => $TIMESTAMP,
-								event             => "keypad",
-								incrementalTimout => 1,
-								callback          => \&DoorBird_LastEvent_Image
+								url                => $CommandURL,
+								timeout            => $PollingTimeout,
+								user               => $Username,
+								pwd                => $Password,
+								hash               => $hash,
+								method             => $Method,
+								header             => $Header,
+								timestamp          => $TIMESTAMP,
+								event              => "keypad",
+								incrementalTimeout => 1,
+								callback           => \&DoorBird_LastEvent_Image
 							};
 					
 							### Initiate Bulk Update
@@ -1767,18 +1767,18 @@ sub DoorBird_Read($) {
 							
 							### Define Parameter for Non-BlockingGet
 							my $param = {
-								url               => $CommandURL,
-								timeout           => $PollingTimeout,
-								user              => $Username,
-								pwd               => $Password,
-								hash              => $hash,
-								method            => $Method,
-								header            => $Header,
-								timestamp         => $TIMESTAMP,
-								event             => "doorbell",
-								doorbellNo        => $EVENT,
-								incrementalTimout => 1,
-								callback          => \&DoorBird_LastEvent_Image
+								url                => $CommandURL,
+								timeout            => $PollingTimeout,
+								user               => $Username,
+								pwd                => $Password,
+								hash               => $hash,
+								method             => $Method,
+								header             => $Header,
+								timestamp          => $TIMESTAMP,
+								event              => "doorbell",
+								doorbellNo         => $EVENT,
+								incrementalTimeout => 1,
+								callback           => \&DoorBird_LastEvent_Image
 							};
 					
 							### Initiate Bulk Update
@@ -3392,15 +3392,15 @@ sub DoorBird_History_Request($$) {
 	
 	### Define Parameter for Non-BlockingGet
 	my $param = {
-		url               => $CommandURL,
-		timeout           => $PollingTimeout,
-		user              => $Username,
-		pwd               => $Password,
-		hash              => $hash,
-		method            => $Method,
-		header            => $Header,
-		incrementalTimout => 1,
-		callback          => \&DoorBird_History_Request_Parse
+		url                => $CommandURL,
+		timeout            => $PollingTimeout,
+		user               => $Username,
+		pwd                => $Password,
+		hash               => $hash,
+		method             => $Method,
+		header             => $Header,
+		incrementalTimeout => 1,
+		callback           => \&DoorBird_History_Request_Parse
 	};
 	
 	### Initiate communication and close
