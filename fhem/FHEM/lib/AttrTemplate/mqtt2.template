@@ -142,13 +142,16 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/config/log_level:.* log_level\
   $\DEVICETOPIC/bridge/config/permit_join:.* permit_join\
   $\DEVICETOPIC/bridge/config/rename:.* { json2nameValue($EVENT, 'rename_') }\
+  $\DEVICETOPIC/bridge/config:.* { json2nameValue($EVENT) }\
   $\DEVICETOPIC/bridge/log:.*\"type\".\"devices\".\"message\".* devices\
   $\DEVICETOPIC/bridge/log:.* log\
   $\DEVICETOPIC/bridge/logging:.* { json2nameValue($EVENT,'log_') }\
   $\DEVICETOPIC/bridge/networkmap:.* {}\
   $\DEVICETOPIC/bridge/networkmap/graphviz:.* graphviz\
   $\DEVICETOPIC/bridge/networkmap/raw:.* raw\
-  $\DEVICETOPIC/bridge/config:.* { json2nameValue($EVENT) }
+  $\DEVICETOPIC/bridge/devices:.* devices\
+  $\DEVICETOPIC/bridge/groups:.* groups\
+  $\DEVICETOPIC/bridge/extensions:.* extensions
 attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false $\DEVICETOPIC/bridge/config/permit_join $EVTPART1\
@@ -174,7 +177,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20210515
+setreading DEVICE attrTemplateVersion 20211022
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -2845,29 +2848,29 @@ name:shellybulb
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellybulb using original firmware <br>Tested with 1.49
 order:A_15
-par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:DEVNAME;name of this shelly;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
   on:noArg shellies/DEVNAME/color/0/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"gain":"$EVTPART1","brightness":"$EVTPART1"}\
-  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
-  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
-  ct_on:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
-  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
-  rgb_on:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3){"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"gain":"$EVTPART1","brightness":$EVTPART1}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":$EVTPART1,"brightness":$EVTPART1}\
+  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if $EVTPART1<3000;qq(shellies/DEVNAME/color/0/set {"mode":"white","temp":$EVTPART1})}\
+  ct_on:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if $EVTPART1<3000;qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":$EVTPART1})}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;return if !defined $3;if($1 ne $2 || $2 ne $3){qq(shellies/DEVNAME/color/0/set {"mode":"color","gain":"100","red":).hex($1).qq(,"green":).hex($2).qq(,"blue":).hex($3).'}'}else{qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
+  rgb_on:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;return if !defined $3;if($1 ne $2 || $2 ne $3){qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"color","gain":"100","red":).hex($1).qq(,"green":).hex($2).qq(,"blue":).hex($3).'}'}else{qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}
-attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
+attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {if(ReadingsVal($name,'mode','') eq 'color'){sprintf("%02X%02X%02X", ReadingsVal($name,'red',99), ReadingsVal($name,'green',99), ReadingsVal($name,'blue',99))}else{my $a=sprintf("%02X",ReadingsVal($name,'brightness',0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:pct:ct:rgb
 attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellybulb
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20211022
 
 # contributed by KurtK https://forum.fhem.de/index.php/topic,94495.msg1055093.html#msg1055093
 # shellyduo using original firmware
@@ -2875,16 +2878,16 @@ name:shellyduo
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:Shelly Duo using original firmware <br>Tested with firmware 20200320-123338/v1.6.2@514044b4 <br> based on shellybulb and shelliergbw2 template
 order:A_15a
-par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:DEVNAME;name of this shelly;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/light/0/command off\
   on:noArg shellies/DEVNAME/light/0/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/light/0/set {"gain":"$EVTPART1","brightness":"$EVTPART1"}\
-  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/light/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
-  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/light/0/set {\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
-  ct_on:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/light/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/light/0/set {"gain":"$EVTPART1","brightness":$EVTPART1}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/light/0/set {"turn":"on","gain":$EVTPART1,"brightness":$EVTPART1}\
+  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if $EVTPART1<3000;qq(shellies/DEVNAME/color/0/set {"mode":"white","temp":$EVTPART1})}\
+  ct_on:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if $EVTPART1<3000;qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":$EVTPART1})}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
@@ -2897,22 +2900,22 @@ attr DEVICE readingList\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}
 attr DEVICE webCmd on:off:pct:ct
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off"); my $cons = ReadingsVal($name,"power","unknown"); "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; my $light = ReadingsVal($name,'state','off'); my $cons = ReadingsVal($name,'power','unknown'); '<a href="http://'.ReadingsVal($name,'ip','none').' "target="_blank">'.FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellyduo
-setreading DEVICE attrTemplateVersion 20200831
+setreading DEVICE attrTemplateVersion 20211022
 
 #contributed by MrTom, https://forum.fhem.de/index.php/topic,94060.msg1135513.html#msg1135513
 name:shellymotion
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellymotion using original firmware.
 order:A_16
-par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to motion_detector;{ AttrVal("DEVICE","icon","motion_detector") }
+par:DEVNAME;name of this shelly;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to motion_detector;{ AttrVal('DEVICE','icon','motion_detector') }
 attr DEVICE icon ICON
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; \
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; \
 my $moti = ReadingsVal($name,"motion","false") eq "true"?"people_sensor":"message_presence"; \
 "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($moti)."</a>"}
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
@@ -3046,20 +3049,20 @@ name:shelly2rgbw_color
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyrgbw2 color mode <br>Tested with 1.5.0-rgbw2-hotfix1
 order:A_17
-par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:DEVNAME;name of this shelly;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
   on:noArg shellies/DEVNAME/color/0/command on\
-  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
-  white:colorpicker,BRI,0,1,255 shellies/DEVNAME/color/0/set {"white":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/0/set {"mode":"white","brightness":$EVTPART1}\
+  white:colorpicker,BRI,0,1,255 shellies/DEVNAME/color/0/set {"white":$EVTPART1}\
   gain:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"gain":"$EVTPART1"}\
-  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set {\"mode\":\"color\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
-  white_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","white":"$EVTPART1"}\
-  gain_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1"}\
-  rgb_on:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
-  effect:selectnumbers,0,1,6,0,lin  shellies/DEVNAME/color/0/set {"effect":"$EVTPART1"}\
+  rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;return if !defined $3;if($1 ne $2 || $2 ne $3){qq(shellies/DEVNAME/color/0/set {"mode":"color","gain":"100","red":).hex($1).qq(,"green":).hex($2).qq(,"blue":).hex($3).'}'}else{qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
+  white_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","white":$EVTPART1}\
+  gain_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":$EVTPART1}\
+  rgb_on:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;return if !defined $3;if($1 ne $2 || $2 ne $3){qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"color","gain":"100","red":).hex($1).qq(,"green":).hex($2).qq(,"blue":).hex($3).'}'}else{qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
+  effect:selectnumbers,0,1,6,0,lin  shellies/DEVNAME/color/0/set {"effect":$EVTPART1}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
@@ -3071,11 +3074,11 @@ attr DEVICE readingList \
 attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off"); my $cons = ReadingsVal($name,"power","unknown"); "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'true'?'10px-kreis-gruen':'10px-kreis-rot'; my $light = ReadingsVal($name,'state','off'); my $cons = ReadingsVal($name,'power','unknown'); '<a href="http://'.ReadingsVal($name,'ip','none').' "target="_blank">'.FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model shelly2rgbw_color
-setreading DEVICE attrTemplateVersion 20201215
+setreading DEVICE attrTemplateVersion 20211022
 
 #contributed by user sledge
 name:shelly2rgbw_4w_split
