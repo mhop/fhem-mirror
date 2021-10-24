@@ -56,7 +56,6 @@ FHEM/09_USF1000.pm           neubert              SlowRF
 FHEM/10_CUL_HM.pm            martinp876           HomeMatic
 FHEM/10_CUL_IR.pm            odroegehorn          SlowRF
 FHEM/10_DUOFERNSTICK         telekatz             Sonstige Systeme
-FHEM/10_EIB.pm               andi291              KNX/EIB
 FHEM/10_EnOcean.pm           klaus-schauer        EnOcean
 FHEM/10_EQ3BT.pm             dominikkarall        Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         FRITZ!Box
