@@ -515,7 +515,7 @@ m{^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAs
             EventProcessingGeneral( $hash, undef, join( ' ', @{$events} ) );
         }
     }
-    elsif ( grep m{^($posReading):\s\d{1,3}$}xms, @{$events} ) {
+    elsif ( grep m{^($posReading):\s\d{1,3}(\.\d{1,3})?$}xms, @{$events} ) {
         ASC_Debug( 'Notify: '
               . ' ASC_Pos_Reading Event vom Rollo ' 
               . $devname
