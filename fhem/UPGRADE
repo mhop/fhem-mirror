@@ -46,3 +46,4 @@ enable the old feature.
   - Deprecated modules (consider replacing them by prior to upgrading):
     10_MQTT_BRIDGE (=> MQTT_GENERIC_BRIDGE)
     98_Heating_Control (=> WeekdayTimer)
+    10_EIB (=> 10_KNX)
