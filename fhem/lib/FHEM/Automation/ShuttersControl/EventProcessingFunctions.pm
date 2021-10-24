@@ -977,8 +977,10 @@ sub EventProcessingResidents {
                         || ( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                             && $FHEM::Automation::ShuttersControl::shutters
                             ->getSelfDefenseMode eq 'gone'
-                            && $FHEM::Automation::ShuttersControl::shutters
-                            ->getShuttersPlace eq 'terrace'
+                            && ( $FHEM::Automation::ShuttersControl::shutters
+                                ->getShuttersPlace eq 'terrace'
+                              || $FHEM::Automation::ShuttersControl::shutters
+                                ->getShuttersPlace eq 'EG_window' )
                             && $FHEM::Automation::ShuttersControl::shutters
                             ->getSelfDefenseMode ne 'off' )
                     )
@@ -2440,7 +2442,7 @@ sub EventProcessingExternalTriggerDevice {
             'external trigger device inactive');
         $FHEM::Automation::ShuttersControl::shutters->setNoDelay(1);
         $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerStatus(
-            1);
+            0);
         FHEM::Automation::ShuttersControl::ShuttersCommandSet(
             $hash,
             $shuttersDev,

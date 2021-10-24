@@ -161,9 +161,9 @@ sub setDriveCmd {
         $FHEM::Automation::ShuttersControl::shutters->setDelayCmd($posValue);
         $FHEM::Automation::ShuttersControl::ascDev->setDelayCmdReading;
         $FHEM::Automation::ShuttersControl::shutters->setNoDelay(0);
-        $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerStatus(0)
-          if ( $FHEM::Automation::ShuttersControl::shutters
-            ->getExternalTriggerStatus );
+#         $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerStatus(0)
+#           if ( $FHEM::Automation::ShuttersControl::shutters
+#             ->getExternalTriggerStatus );
 
         FHEM::Automation::ShuttersControl::ASC_Debug( 'setDriveCmd: '
               . $FHEM::Automation::ShuttersControl::shutters->getShuttersDev

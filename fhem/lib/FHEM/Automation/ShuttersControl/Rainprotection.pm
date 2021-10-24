@@ -108,11 +108,16 @@ sub RainProcessing {
                 ->setRainProtectionStatus('unprotected');
         }
         else {
-            $FHEM::Automation::ShuttersControl::shutters
-                ->setRainProtectionStatus('unprotected')
-              if (  $FHEM::Automation::ShuttersControl::shutters->getStatus !=
-                      $rainClosedPos
-                && ($val == 0 || $val < $triggerMin) );
+            if (  $FHEM::Automation::ShuttersControl::shutters->getStatus != $rainClosedPos
+              && ($val == 0 || $val < $triggerMin) )
+            {
+                $FHEM::Automation::ShuttersControl::shutters
+                  ->setRainProtectionStatus('unprotected');
+            }
+            elsif ($val > $triggerMax) {
+                $FHEM::Automation::ShuttersControl::shutters
+                  ->setRainProtectionStatus('protected');
+            }     
         }
     }
 

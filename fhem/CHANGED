@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix ExternalTrigger,
+                                    fix set rainstate by night
  - bugfix:  73_DoorBird: incrementalTim[e]out misspelling corrected
  - feature: 48_MieleAtHome: support set targetTemperature and mode
  - bugfix:  50_Signalbot: Fixed issue with Babble and invite
