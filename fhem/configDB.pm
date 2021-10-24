@@ -160,6 +160,8 @@
 #
 # 2021-08-17 - changed   adopt to Rudi's funny fakelog changes
 #
+# 2021-10-24 - added     delete old files for large readings
+#
 ##############################################################################
 =cut
 
@@ -219,6 +221,7 @@ sub _cfgDB_Uuid;
 sub _cfgDB_table_exists;
 sub _cfgDB_dump;
 sub _cfgDB_knownAttr;
+sub _cfgDB_deleteRF;
 
 ##################################################
 # Read configuration file for DB connection
@@ -518,6 +521,8 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 sub cfgDB_SaveState {
 	my ($out,$val,$r,$rd,$t,@rowList);
 
+    _cfgDB_deleteRF;
+
 	$t = localtime;
 	$out = "#$t";
 	push @rowList, $out;
@@ -559,6 +564,7 @@ sub cfgDB_SaveState {
                   my $uid = _cfgDB_Uuid();
 				  FileWrite($uid,$val);
 				  $out = "setstate $d $rd->{TIME} $c cfgDBkey:$uid";
+                  Log 5, "configDB: r:$c d:$d key:$uid";
 				}
                 push @rowList, $out; 
 			}
@@ -961,6 +967,29 @@ sub _cfgDB_Info {
 	return join("\n", @r);
 }
 
+sub _cfgDB_Info_Json {
+  my $cSVN = shift;
+  $cSVN //= 'unknown';
+  my %info = ();
+
+# add ./FHEM/98_configdb.pm svn id
+  $info{cSVN} = $cSVN;
+
+# add ./configDB.pm svn id
+  my $dSVN = cfgDB_svnId;
+  $dSVN =~ s/# //;
+  $info{dSVN} = $dSVN;
+
+# add configDB database info
+	$info{dbconn} = $cfgDB_dbconn;
+	$info{dbuser} = $configDB{attr}{private} ? 'private' : $cfgDB_dbuser;
+	$info{dbpass} = $configDB{attr}{private} ? 'private' : $cfgDB_dbpass;
+	$info{dbtype} = $cfgDB_dbtype;
+    $info{dbsize} = _cfgDB_filesize_str(-s $cfgDB_filename) if ($cfgDB_dbtype eq "SQLITE");
+    
+  return toJSON \%info;
+}
+
 # recover former config from database archive
 sub _cfgDB_Recover {
 	my ($version) = @_;
@@ -1215,6 +1244,22 @@ sub _cfgDB_knownAttr {
 #    "for internal use only";
 }
 
+sub _cfgDB_deleteRF {
+# Delete old files containing large readings
+  my $filename;
+   my $fhem_dbh2 = _cfgDB_Connect;
+   my $sth = $fhem_dbh2->prepare( "SELECT filename FROM fhemb64filesave" );  
+   $sth->execute();
+   while ($filename = $sth->fetchrow_array()) {
+     if ($filename =~ m/^[0-9A-F]+$/i) {
+       Log 5, "configDB delete file: $filename";
+       $fhem_dbh2->do("delete from fhemb64filesave where filename = '$filename'");
+     }
+   }
+   $fhem_dbh2->commit();
+   $fhem_dbh2->disconnect();
+}
+
 ##################################################
 # functions used for file handling
 # called by 98_configdb.pm
@@ -1224,10 +1269,10 @@ sub _cfgDB_knownAttr {
 sub _cfgDB_Filedelete {
 	my ($filename,$fhem_dbh) = @_;
 	my $internal_call = 1 if $fhem_dbh;
-	$fhem_dbh = _cfgDB_Connect unless $fhem_dbh;
+	$fhem_dbh = _cfgDB_Connect unless $internal_call;
 	my $ret = $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
 	$fhem_dbh->commit();
-	$fhem_dbh->disconnect() unless $fhem_dbh;
+	$fhem_dbh->disconnect() unless $internal_call;
 	$ret = ($ret > 0) ? 1 : undef;
 	return $ret;
 }
