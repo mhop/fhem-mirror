@@ -1446,7 +1446,7 @@ __END__
   <a id="weekdayTimer-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WeekdayTimer &lt;device&gt; [&lt;language&gt;] [<u>weekdays</u>] &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
+    <code>define &lt;name&gt; WeekdayTimer &lt;device&gt; [&lt;language&gt;] [<u>weekdays</u>] &lt;profile&gt; [&lt;command&gt;|&lt;condition&gt;]</code>
     <br><br>
 
     to set a weekly profile for &lt;device&gt;<br><br>
@@ -1456,8 +1456,9 @@ __END__
 
     <code>set &lt;device&gt; &lt;para&gt;</code><br><br>
 
-    If you have defined a &lt;condition&gt; and this condition is false if the switchingtime has reached, no command will executed.<br>
-    An other case is to define an own perl command with &lt;command&gt;.
+    If you have defined a &lt;condition&gt;, this condition will be evaluated in the daily evaluation of the switching times. If false, no switching times will be set for this day. To force a re-evaluation, you may e.g. use the "enable" or "WDT_Params" commands<br>
+    Alternatively you may define an own perl command with &lt;command&gt; that will be avaluated at each switchingtime.<br>
+    &lt;command&gt; or &lt;condition&gt; are optional, if no explicit &lt;command&gt; is set, the command will be taken from <i>commandTemplate</i> attribute.
     <p>
     The following parameter are defined:
     <ul><b>device</b><br>
