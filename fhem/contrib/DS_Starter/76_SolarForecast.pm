@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.8" => "25.10.2021  change func  ___csmSpecificEpieces as proposed from Max : https://forum.fhem.de/index.php/topic,117864.msg1180452.html#msg1180452 ",
   "0.56.7" => "18.10.2021  new attr flowGraphicShowConsumerDummy ",
   "0.56.6" => "19.09.2021  bug fix ",
   "0.56.5" => "16.09.2021  fix sub ___csmSpecificEpieces (rows 2924-2927) ",
@@ -532,8 +533,8 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
                    qq{.flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
                    qq{.flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
                    qq{.flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-				   qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-				   qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
+                   qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
                    ;
 
 my %hef = (                                                                                   # Energiedaktoren für Verbrauchertypen
@@ -2698,7 +2699,7 @@ sub _manageConsumerData {
           delete $paref->{histname};
       }
       
-	  ## Verbraucher - Laufzeit und Zyklen pro Tag ermitteln
+      ## Verbraucher - Laufzeit und Zyklen pro Tag ermitteln
       ## Laufzeit (in Minuten) wird pro Stunde erfasst
       ## bei Tageswechsel Rücksetzen in _specialActivities
       #######################################################
@@ -2712,11 +2713,11 @@ sub _manageConsumerData {
       
       my $currpowerpercent = $pcurr;    
       $currpowerpercent    = (($pcurr / $nompower) * 100) if($nompower > 0);
-	  
-	  $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
-	  
+      
+      $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
+      
       my $starthour;
-	  if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher soll aktiv sein
+      if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher soll aktiv sein
             if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
@@ -2738,16 +2739,16 @@ sub _manageConsumerData {
                     $data{$type}{$name}{consumers}{$c}{lastMinutesOn} = 0;
                 }
             }                                                                                     
-	  }
-	  else {                                                                                  # Verbraucher soll nicht aktiv sein
-	      $data{$type}{$name}{consumers}{$c}{onoff} = "off";
+      }
+      else {                                                                                  # Verbraucher soll nicht aktiv sein
+          $data{$type}{$name}{consumers}{$c}{onoff} = "off";
           $starthour                                = strftime "%H", localtime(ConsumerVal ($hash, $c, "startTime", $t)); 
           
           if($chour ne $starthour) {
               $data{$type}{$name}{consumers}{$c}{minutesOn} = 0;
               delete $data{$type}{$name}{consumers}{$c}{startTime};
           }
-	  }
+      }
       
       $paref->{val}      = ConsumerVal ($hash, $c, "numberDayStarts", 0);                     # Anzahl Tageszyklen des Verbrauchers speichern
       $paref->{histname} = "cyclescsm${c}";
@@ -2879,7 +2880,7 @@ return;
 }
 
 ###################################################################
-#    Verbraucherspezifische Energiestück Ermittlung
+#  Verbraucherspezifische Energiestück Ermittlung
 #
 #  epiecHistCounts = x gibt an wie viele Zyklen betrachtet werden
 #                      sollen
@@ -2900,61 +2901,80 @@ sub ___csmSpecificEpieces {
   my $name  = $paref->{name};
   my $c     = $paref->{consumer}; 
   my $etot  = $paref->{etot};
+  my $t     = $paref->{t}; 
   
   my $type  = $hash->{TYPE};
    
-  if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {
-      my $epiecHist       = "";
-      my $epiecHist_hours = "";
-        
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) < 0) {                                   #neue Aufzeichnung
-          $data{$type}{$name}{consumers}{$c}{epiecHist} += 1;  
-          $data{$type}{$name}{consumers}{$c}{epiecHist}  = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
+  if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {                                                 # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
+      $data{$type}{$name}{consumers}{$c}{lastOnTime} = $t;
+  }
+    
+  my $offTime = defined $data{$type}{$name}{consumers}{$c}{lastOnTime} ? 
+                $t - $data{$type}{$name}{consumers}{$c}{lastOnTime}    :
+                99;
+
+  if($offTime < 300) {																	                # erst nach 60s ist das Gerät aus
+      my $epiecHist        = "";
+      my $epiecHist_hours  = "";
+	   
+      if(ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {  	                                            # neue Aufzeichnung
+          $data{$type}{$name}{consumers}{$c}{epiecStartTime} = $t;
+		  $data{$type}{$name}{consumers}{$c}{epiecHist}     += 1;  
+          $data{$type}{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
             
           $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
-          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                          # Löschen, wird neu erfasst
+          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                                        # Löschen, wird neu erfasst
       }
         
-      $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);
-      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours";
-      my $epiecHour    = floor (ConsumerVal ($hash, $c, "minutesOn", 0) / 60) + 1;  
-        
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                         
+      $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Namen fürs Speichern
+      $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours"; 
+      my $epiecHour    = floor (($t - ConsumerVal ($hash, $c, "epiecStartTime", $t)) / 60 / 60) + 1;    # aktuelle Betriebsstunde ermitteln, ( / 60min) mögliche wäre auch durch 15min        /Minute /Stunde
+        	
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                       # Stundenwechsel? Differenz von etot noch auf die vorherige Stunde anrechnen                       
           my $epiecHour_last = $epiecHour - 1;
           
           $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
-          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
+          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;		  
       }
-
+      
       my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
       $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $ediff;
       $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
-      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $ediff ? $epiecHour : 0;
+      $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $ediff ? $epiecHour : $epiecHour - 1; # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
   } 
-  else {                                                                                  # Durchschnitt ermitteln
-      if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                   # Durchschnittliche Stunden ermitteln
+  else {                                                                                                 # Durchschnitt ermitteln
+      if(ConsumerVal ($hash, $c, "epiecHour", 0) > 0) {                                                  # Durchschnittliche Stunden ermitteln
           my $hours = 0;
           
-          for my $h (1..$epiecHCounts) {                
+          for my $h (1..$epiecHCounts) {                                                                 # durchschnittliche Stunden über alle epieces ermitteln und aufrunden
               $hours += ConsumerVal ($hash, $c, "epiecHist_".$h."_hours", 0);    
           }
             
           $hours                                             = ceil ($hours / $epiecHCounts);
           $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
-              
-      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                # Durchschnitt für epics ermitteln     
-          for my $hour (1..$hours) {
-              for my $h (1..$epiecHCounts) {
+       	       
+          delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                           # Durchschnitt für epics ermitteln     
+          
+          for my $hour (1..$hours) {												                     # jede Stunde durchlaufen
+			  my $hoursE = 1;
+		  
+              for my $h (1..$epiecHCounts) {											                 # jedes epiec durchlaufen
                   my $epiecHist = "epiecHist_".$h;
-                    
-                  $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour};
+				  
+                  if(defined $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour}) {
+				      if($data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour} > 5) {
+						  $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour}; 
+						  $hoursE += 1;
+					  }
+				  }
+				  
               }
-                
-              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $epiecHCounts;
+              
+              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = sprintf('%.2f',$data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $hoursE);    # Durchschnitt ermittelt und in epiecAVG schreiben
           }
       }
     
-      $data{$type}{$name}{consumers}{$c}{epiecHour} = -1;
+      $data{$type}{$name}{consumers}{$c}{epiecHour} = -1;                                                # epiecHour auf initialwert setzen für nächsten durchlauf
   }
   
 return;
@@ -5258,7 +5278,7 @@ sub _flowGraphic {
   my $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
   
   my $cc         = ReadingsNum($name, 'Current_Consumption', 0);
-  my $cc_dummy	 = $cc;
+  my $cc_dummy   = $cc;
   
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
@@ -5360,8 +5380,8 @@ END0
           my $calias      = ConsumerVal       ($hash, $c0, "alias", "");                            # Name des Consumerdevices
           $currentPower   = ReadingsNum       ($name, "consumer${c0}_currentPower", 0);
           my $cicon       = substConsumerIcon ($hash, $c0);                                         # Icon des Consumerdevices
-          $cc_dummy 	 -= $currentPower;
-		  
+          $cc_dummy      -= $currentPower;
+          
           $ret .= '<g id="consumer_'.$c0.'" fill="grey" transform="translate('.$pos_left.',485),scale(0.1)">';
           $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
           $ret .= '</g> ';
@@ -5385,9 +5405,9 @@ END1
   }
   
   if ($flowgconX) {                                                                              # Dummy Consumer
-	  $ret .= '<g id="consumer_X" fill="grey" transform="translate(520,330),scale(0.1)">';
-	  $ret .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100', '');
-	  $ret .= '</g> ';
+      $ret .= '<g id="consumer_X" fill="grey" transform="translate(520,330),scale(0.1)">';
+      $ret .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100', '');
+      $ret .= '</g> ';
    }
    
     $ret .= << "END2";
@@ -5405,13 +5425,13 @@ END3
   }
   
    if ($flowgconX) {                                                                            # Dummy Consumer 
-  	  my $consumer_style = 'flowg inactive_out';
+      my $consumer_style = 'flowg inactive_out';
       $consumer_style    = 'flowg active_out' if($cc_dummy > 1);
-		  
-	  my $consumer_color = "";
+          
+      my $consumer_color = "";
       $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($cc_dummy > 0.5);
-	  
-	  $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $consumer_color d="M780,620 L930,620" />};  
+      
+      $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $consumer_color d="M780,620 L930,620" />};  
    }
   
   ## get consumer list and display it in Graphics
@@ -5456,12 +5476,12 @@ END3
   
   $cc_dummy = sprintf("%.0f",$cc_dummy);
 
-  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800" y="15"  style="text-anchor: start;">$cpv</text>}     	 if ($cpv);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="995" y="370" style="text-anchor: middle;">$soc %</text>}  	 if ($hasbat);
-  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730" y="300" style="text-anchor: start;">$csc</text>}     	 if ($csc && $cpv);
-  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525" y="200" style="text-anchor: end;">$cgfi</text>}      	 if ($cgfi);
-  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="525" y="420" style="text-anchor: end;">$cgc</text>}       	 if ($cgc);
-  $ret .= qq{<text class="flowg text" id="batout-txt"    x="865" y="420" style="text-anchor: start;">$batout</text>}  	 if ($batout && $hasbat);
+  $ret .= qq{<text class="flowg text" id="pv-txt"        x="800" y="15"  style="text-anchor: start;">$cpv</text>}        if ($cpv);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="995" y="370" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730" y="300" style="text-anchor: start;">$csc</text>}        if ($csc && $cpv);
+  $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525" y="200" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
+  $ret .= qq{<text class="flowg text" id="grid-home-txt" x="525" y="420" style="text-anchor: end;">$cgc</text>}          if ($cgc);
+  $ret .= qq{<text class="flowg text" id="batout-txt"    x="865" y="420" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="865" y="200" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
   $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: end;">$cc</text>};                                    # Current_Consumption Anlage
   $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1070" y="620" style="text-anchor: start;">$cc_dummy</text>}  if ($flowgconX);          # Current_Consumption Dummy
@@ -7851,8 +7871,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
            .flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
            .flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
            .flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-		   .flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
-		   .flowg.active_bat_out { stroke: green; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>                                                                                                                                                                                                                             
+           .flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
+           .flowg.active_bat_out { stroke: green; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>                                                                                                                                                                                                                             
          </ul>   
          
        </li>
@@ -7885,7 +7905,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-	   <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
+       <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
        <li><b>flowGraphicShowConsumerDummy </b><br>
          Zeigt bzw. unterdrückt den Dummy-Verbraucher in der Energieflußgrafik. <br> 
          Dem Dummy-Verbraucher stellt den Energieverbrauch dar der anderen Verbrauchern nicht zugeordnet werden konnte. <br>
