@@ -30,6 +30,11 @@
 # 
 # CHANGE LOG
 #
+# 26.10.2021 1.4.4
+# fix/improvement : in _evalValue2 Regex Pattern angepasst (betrifft expressions)
+#                   Ineinander eingelegte {}-Blöcke werden jetzt komplett gefunden
+#                   (von der ersten '{' zu zu der letzten '}' Klammer)
+#
 # 30.09.2021 1.4.3
 # fix        : IODev fix be Beta-User
 #
@@ -424,7 +429,7 @@ use GPUtils qw(:all);
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.4.3 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.4.4 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1382,7 +1387,8 @@ sub _evalValue2 {
   # TODO : Maskierte Klammern unterstuetzen? $str =~ m/^(.*)(\\{.*\\})(.*)({.*})(.*)$/;; $1.$2.$3.$4.$5 - irgendwie so
   #if($str =~ m/^{.*}$/) {
   #if($str =~ m/^(.*)({.*})(.*)$/) {
-  if($str =~ m{\A(.*)(\{.*\})(.*)\z}x) { # forum https://forum.fhem.de/index.php/topic,117659.msg1121004.html#msg1121004
+  #if($str =~ m{\A(.*)(\{.*\})(.*)\z}x) { # forum https://forum.fhem.de/index.php/topic,117659.msg1121004.html#msg1121004
+  if($str =~ m{\A([^\{]*)(\{.*\})([^\}]*)\z}x) { # Ineinander eingelegte {}-Blöcke komplett finden
     my $s1 = $1 // q{}; #$s1='' unless defined $s1;
     my $s2 = $2 // q{}; #$s2='' unless defined $s2;
     my $s3 = $3 // q{}; #$s3='' unless defined $s3;
