@@ -389,6 +389,7 @@ FHEM/73_km200.pm             Sailor               Heizungssteuerung/Raumklima ht
 FHEM/73_MPD.pm               Wzut                 Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/73_PRESENCE.pm          markusbloch          Unterstützende Dienste
+FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
 FHEM/74_HOMBOT.pm            CoolTux              sonstige Systeme
