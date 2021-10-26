@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  88_HMCCU: Update to version 5.0
  - bugfix:  73_AutoShuttersControl: fix regex to detect position
                                     event with dot's
  - change:  10_EIB: Move to deprecated
