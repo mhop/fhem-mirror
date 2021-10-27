@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.9" => "27.10.2021  change sub _flowGraphic (Max) ",
   "0.56.8" => "25.10.2021  change func  ___csmSpecificEpieces as proposed from Max : https://forum.fhem.de/index.php/topic,117864.msg1180452.html#msg1180452 ",
   "0.56.7" => "18.10.2021  new attr flowGraphicShowConsumerDummy ",
   "0.56.6" => "19.09.2021  bug fix ",
@@ -5263,23 +5264,20 @@ sub _flowGraphic {
   my $css        = $paref->{css};
     
   my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
+
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
 
   my $cpv        = ReadingsNum($name, 'Current_PV', 0);
-  my $sun_color  = $cpv ? 'flowg sun_active' : 'flowg sun_inactive';
 
   my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
-  my $cgc_style  = $cgc ? 'flowg active_in'   : 'flowg inactive_in';
 
   my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn', 0);
-  my $cgfi_style = $cgfi ? 'flowg active_out' : 'flowg inactive_out';
 
   my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
-  my $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
   
   my $cc         = ReadingsNum($name, 'Current_Consumption', 0);
   my $cc_dummy   = $cc;
-  
+
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
@@ -5297,15 +5295,41 @@ sub _flowGraphic {
       $soc    = 0;
   }
   
-  if($batout) {
-      $csc       -= $batout;
-      $csc_style  = $csc ? 'flowg active_out' : 'flowg inactive_out';
-  }
+  my $grid_color    = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
+  $grid_color       = 'flowg grid_color3'                                                 if (!$cgfi && !$cgc && $batout);     # dritte Farbe
+  my $cgc_style     = $cgc    ? 'flowg active_in'                 : 'flowg inactive_in';
+  my $batout_style  = $batout ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
+  
+  my $cgc_direction = 'M490,305 L670,510';                             # Batterientladung ins Netz                 
+  
+  if($batout) {                                                        
+      my $cgfo = $cgfi - $cpv;
 
-  my $batin_style  = $batin  ? 'flowg active_in active_bat_in'   : 'flowg inactive_out';
-  my $batout_style = $batout ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
-  my $grid_color   = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
-  $grid_color      = 'flowg grid_color3' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
+      if($cgfo > 1) {
+        $cgc_style     = 'flowg active_out';
+        $cgc_direction = 'M670,510 L490,305';
+        $cgfi         -= $cgfo;
+        $cgc           = $cgfo; 
+      }
+  }
+  
+  my $batout_direction  =  'M902,305 L730,510';                        # Batterientladung aus Netz
+  
+  if($batin) {
+      my $gbi = $batin - $cpv;
+
+      if($gbi > 1) {
+        $batin            -= $gbi;
+        $batout_style      = 'flowg active_in';
+        $batout_direction  = 'M730,510 L902,305';
+        $batout            = $gbi; 
+      }
+  }
+  
+  my $sun_color    = $cpv         ? 'flowg sun_active'              : 'flowg sun_inactive';
+  my $batin_style  = $batin       ? 'flowg active_in active_bat_in' : 'flowg inactive_out';
+  my $csc_style    = $csc && $cpv ? 'flowg active_out'              : 'flowg inactive_out';
+  my $cgfi_style   = $cgfi        ? 'flowg active_out'              : 'flowg inactive_out';
   
   my $ret = << "END0";
       <style>
@@ -5358,8 +5382,8 @@ END0
   my $consumercount     = 0;
   my $consumer_start    = 0;
   my $consumer_distance = 80;
-  my $currentPower      = 0;
   my @consumers;
+  my $currentPower      = 0;
   
   if ($flowgcons) {
       my $type       = $hash->{TYPE};
@@ -5404,7 +5428,7 @@ END1
       $ret .= '</g>';
   }
   
-  if ($flowgconX) {                                                                              # Dummy Consumer
+  if ($flowgconX) {                                                                                # Dummy Consumer
       $ret .= '<g id="consumer_X" fill="grey" transform="translate(520,330),scale(0.1)">';
       $ret .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100', '');
       $ret .= '</g> ';
@@ -5414,17 +5438,17 @@ END1
     <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
     <path id="pv-home"   class="$csc_style"  d="M700,100 L700,510" />
     <path id="pv-grid"   class="$cgfi_style" d="M670,100 L490,270" />
-    <path id="grid-home" class="$cgc_style"  d="M490,305 L670,510" />
+    <path id="grid-home" class="$cgc_style"  d="$cgc_direction" />
 END2
 
   if ($hasbat) {
       $ret .= << "END3";
-      <path id="bat-home" class="$batout_style" d="M902,305 L730,510" />
+      <path id="bat-home" class="$batout_style" d="$batout_direction" />
       <path id="pv-bat"   class="$batin_style"  d="M730,100 L900,270" />
 END3
   }
   
-   if ($flowgconX) {                                                                            # Dummy Consumer 
+   if ($flowgconX) {                                                                              # Dummy Consumer 
       my $consumer_style = 'flowg inactive_out';
       $consumer_style    = 'flowg active_out' if($cc_dummy > 1);
           
