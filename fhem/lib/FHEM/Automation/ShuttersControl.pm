@@ -1826,9 +1826,9 @@ sub _SetCmdFn {
         # Nutzervariablen setzen
         my %specials = (
              '$name'        => $shuttersDev,
-             '$level'       => $posValue,
-             '$slatLevel'   => $slatPos,
-             '$reason'      => $shutters->getLastDrive
+             '$pos'       => $posValue,
+             '$slatPos'   => $slatPos,
+             '$cause'      => $shutters->getLastDrive
         );
         
         $commandTemplate  = ::EvalSpecials($commandTemplate, %specials);

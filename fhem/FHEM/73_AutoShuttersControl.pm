@@ -640,16 +640,17 @@ __END__
             <a id="AutoShuttersControl-attr-ASC_SlatPosCmd_SlatDevice"></a>
             <li><strong>ASC_SlatPosCmd_SlatDevice</strong> - If your shutter is "venetian blind" type (with turnable slats, lamellas or similar), this is the place to set additional command and/or device info to control the slat level. Examples: <i>attr ROLLO ASC_SlatPosCmd_SlatDevice slatPct</i> or <i>attr ROLLO ASC_SlatPosCmd_SlatDevice dim:ROLLOSLATDEVICE</i>. Providing a device name for the slat device is only needed in case it's different to the shutter itself. If attribute is set, additional positioning values for the respective slat levels can be set in attributes <i>ASC_Open_Pos</i>, <i>ASC_Closed_Pos</i>, <i>ASC_Ventilate_Pos</i>, <i>ASC_ComfortOpen_Pos</i>, <i>ASC_Shading_Pos</i> and <i>ASC_Sleep_Pos</i>.</li>
             <a id="AutoShuttersControl-attr-ASC_CommandTemplate"></a>
-            <li><strong>ASC_CommandTemplate</strong> - <strong>FHEM or Perl command</strong> (Perl in braces as usual needs escaping semicolons etc.). The parameters <i>$name</i> (name of the shutter device), <i>$level</i> (target position for the respective drive command) and <i>$slatLevel</i> (target position for the (rurnable) lammellas in venetion blinds) will be replaced by the appropirate values. You may have to take care to avoid unneeded driving commands.
-            Examples: 
+            <li><strong>ASC_CommandTemplate</strong> - <strong>FHEM or Perl command</strong> (Perl in braces as usual needs escaping semicolons etc.).<br>
+            This optional attribute will override the internally determined command to drive this shutter. Setting it, is only recommended in <strong>some rare and special cases,</strong>, in most cases there's <strong>no need</strong> to set this attribute!
+            The parameters <i>$name</i> (name of the shutter device), <i>$pos</i> (target position for the respective drive command), <i>$slatPos</i> (target position for the (turnable) lammellas in venetion blinds) and <i>$cause</i> (internal label for the cause of the driving command) will be replaced by the appropirate values. You may have to take care to avoid unneeded driving commands.
+            Examples:
             <ul>
-            <li><i>attr ROLLO ASC_CommandTemplate set $name $level</i> - Address the position command directly to the main switch of the device</li>
-            <li><i>attr ROLLO ASC_CommandTemplate set $name pct $level</i> - Address the position command directly to the main switch of the device</li>
-            <li><i>attr ROLLO ASC_CommandTemplate set $name datapoint 4.LEVEL_2 $slatLevel 4.LEVEL $level</i> - combined positioning command, e.g. appropriate for HM-IP-venetian blind type actors</li>
-            <li><i>attr ROLLO ASC_CommandTemplate { fhem("set $name ".($level+1024)).";set $name 0")}</i> - positioning command with Perl calculation and additional "execute" command, e.g. for an SPS type blind</li>
-            <li><i>attr ROLLO ASC_CommandTemplate myPerlCode("$name", $level, $slatLevel)</i> - positioning command from perlfunction</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name $pos</i> - Address the position command directly to the main switch of the device</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name pct $pos</i> - Address the setter <i>pct</i> for positioning commands</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name datapoint 4.LEVEL_2 $slatPos 4.LEVEL $pos</i> - combined positioning command, e.g. appropriate for HM-IP-venetian blind type actors</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { fhem("set $name ".($pos+1024)).";set $name 0")}</i> - positioning command with Perl calculation and additional "execute" command, e.g. for an SPS type blind</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { myPerlFn("$name",$pos,$slatPos,"$cause")}</i> - call own Perl function (e.g. from 99_myUtils.pm)</li>
             </ul>
-            <strong>Note: ASC_CommandTemplate</strong> is meant for some rare and special cases. In most cases there's <strong>no need</strong> to set this attribute!
             </li>
             <a id="AutoShuttersControl-attr-ASC_WindowRec_PosAfterDayClosed"></a>
             <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
@@ -1170,16 +1171,18 @@ __END__
             <a id="AutoShuttersControl-attr-ASC_SlatPosCmd_SlatDevice"></a>
             <li><strong>ASC_SlatPosCmd_SlatDevice</strong> - Angaben zu einem Slat (Lamellen) CMD und - sofern diese Lamellen &uuml;ber ein anderes Device gesteuert werden - zum Slat Device. Beispiele: <i>attr ROLLO ASC_SlatPosCmd_SlatDevice slatPct</i> oder <i>attr ROLLO ASC_SlatPosCmd_SlatDevice dim:ROLLOSLATDEVICE</i>. Die Angabe des Devices ist nur erforderlich, wenn zur Steuerung der Lamellen ein anderes Device verwendet wird. Damit das ganze dann auch greift, muss in den 6 Positionsangaben ASC_Open_Pos, ASC_Closed_Pos, ASC_Ventilate_Pos, ASC_ComfortOpen_Pos, ASC_Shading_Pos und ASC_Sleep_Pos ein weiterer Parameter f&uuml;r die Lamellenstellung mit angegeben werden.</li>
             <a id="AutoShuttersControl-attr-ASC_CommandTemplate"></a>
-            <li><strong>ASC_CommandTemplate</strong> - <strong>FHEM-Kommando(s) oder Perl-Anweisung</strong> (in geschweiften Klammern unter Beachtung der üblichen Regeln für das escapen von Semicolons etc.). Die Variablen <i>$name</i> (der Name des Rollladen-Devices), <i>$level</i> (die Zielposition des Fahrbefehls) und <i>$slatLevel</i> (die Zielposition des Fahrbefehls für eventuelle Lamellen) werden durch die ermittelten Werte ersetzt, es muss selbst dafür gesorgt werden, dass eventuell unnötige Fahrbefehle aussortiert werden.
-            Beispiele: 
+            <a id="AutoShuttersControl-attr-ASC_CommandTemplate"></a>
+            <li><strong>ASC_CommandTemplate</strong> - <strong>FHEM-Kommando(s) oder Perl-Anweisung</strong> (in geschweiften Klammern unter Beachtung der üblichen Regeln für das escapen von Semicolons etc.).<br>
+            Dieses Attribut übersteuert das sonst intern ermittelte Fahrkommando und ist <strong>für seltene und spezielle Fälle</strong> gedacht. In der Regel ist es nicht erforderlich, dieses Attribut zu setzen!<br>
+            Die Variablen <i>$name</i> (der Name des Rollladen-Devices), <i>$pos</i> (die Zielposition des Fahrbefehls), <i>$slatPos</i> (die Zielposition des Fahrbefehls für eventuelle Lamellen) und <i>$cause</i> (die interne Benennung des Fahranlasses) werden durch die ermittelten Werte ersetzt, es muss selbst dafür gesorgt werden, dass eventuell unnötige Fahrbefehle aussortiert werden.
+            Beispiele:
             <ul>
-            <li><i>attr ROLLO ASC_CommandTemplate set $name $level</i> - Positionsbefehl direkt an Gerät
+            <li><i>attr ROLLO ASC_CommandTemplate set $name $pos</i> - Positionsbefehl direkt an Gerät
             setzen</li>
-            <li><i>attr ROLLO ASC_CommandTemplate set $name pct $level</i> - Positionsbefehl direkt an Gerät
-            setzen</li>
-            <li><i>attr ROLLO ASC_CommandTemplate set $name datapoint 4.LEVEL_2 $slatLevel 4.LEVEL $level</i> - Positionsbefehl und Lamellen-Ansteuerung für HM-IP-Jalousieaktoren</li>
-            <li><i>attr ROLLO ASC_CommandTemplate { fhem("set $name ".($level+1024)).";set $name 0")}</i> - Positionsbefehl für eine SPS in Perl umrechnen</li>
-            <li><i>attr ROLLO ASC_CommandTemplate myPerlCode("$name", $level, $slatLevel)</i> - Positionsbefehl aus eigener Perlfunktion</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name pct $pos</i> - Positionsbefehl auf den setter <i>pct</i> absetzen</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name datapoint 4.LEVEL_2 $slatPos 4.LEVEL $pos</i> - Positionsbefehl und Lamellen-Ansteuerung für HM-IP-Jalousieaktoren</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { fhem("set $name ".($pos+1024)).";set $name 0")}</i> - Positionsbefehl für eine SPS in Perl umrechnen</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { myPerlFn("$name",$pos,$slatPos,"$cause")}</i> - eigene Perl-Funktion (z.B. in 99_myUtils.pm) aufrufen</li>
             </ul>
             <strong>Hinweis: ASC_CommandTemplate</strong> ist für seltene und spezielle Fälle gedacht. In der Regel ist es nicht erforderlich, dieses Attribut zu setzen!
             </li>
