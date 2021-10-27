@@ -26,6 +26,7 @@ FHEM/00_HMLAN.pm             martinp876           HomeMatic
 FHEM/00_HMUARTLGW.pm         mgernoth             HomeMatic
 FHEM/00_HXB.pm               neubert              Sonstige Systeme
 FHEM/00_KM271.pm             physikus             Sonstiges
+FHEM/00_KNXTUL               jewuma               KNX/EIB
 FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
 FHEM/00_MAXLAN.pm            Wzut		  MAX
 FHEM/00_MQTT.pm              hexenmeister         MQTT
@@ -61,6 +62,7 @@ FHEM/10_EQ3BT.pm             dominikkarall        Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         FRITZ!Box
 FHEM/10_FRM.pm               jensb                Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         SlowRF
+FHEM/10_GFPROBT.pm           dominik              Sonstige Systeme
 FHEM/10_HXBDevice.pm         neubert              Sonstige Systeme
 FHEM/10_IT.pm                dancer0705/bjoernh   InterTechno
 FHEM/10_Itach_IR             ulimaass             Sonstige Systeme
@@ -335,7 +337,6 @@ FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme
 FHEM/70_BRAVIA.pm            vuffiraa             Multimedia
 FHEM/70_CanOverEthernet.pm   delmar               Sonstige Systeme
 FHEM/70_DENON_AVR.pm         delmar               Multimedia
-FHEM/70_DENON_AVR_ZONE.pm    delmar               Multimedia
 FHEM/70_EGPM.pm              alexus               Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               Multimedia
 FHEM/70_HYDRAWISE.pm         xasher               Hydrawise irrigation
@@ -367,6 +368,7 @@ FHEM/70_WINCONNECT.pm        michael.winkler      Sonstige Systeme
 FHEM/70_WS3600.pm            Josch                Sonstiges
 FHEM/70_ZoneMinder.pm        delmar               Sonstige Systeme
 FHEM/71_COE_Node.pm          delmar               Sonstige Systeme
+FHEM/71_DENON_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_ONKYO_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             Multimedia
 FHEM/71_PIONEERAVRZONE.pm    50watt               Multimedia
