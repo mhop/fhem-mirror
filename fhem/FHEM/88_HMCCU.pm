@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 212981850';
+my $HMCCU_VERSION = '5.0 213001927';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -314,7 +314,7 @@ sub HMCCU_SetSCDatapoints ($$;$$);
 sub HMCCU_GetStateValues ($;$$);
 sub HMCCU_GetValidDatapoints ($$$$;$);
 sub HMCCU_IsValidDatapoint ($$$$$);
-sub HMCCU_SetInitialAttributes ($$);
+sub HMCCU_SetInitialAttributes ($$;$);
 sub HMCCU_SetDefaultAttributes ($;$);
 sub HMCCU_SetMultipleDatapoints ($$);
 sub HMCCU_SetMultipleParameters ($$$;$);
@@ -1848,6 +1848,7 @@ sub HMCCU_Get ($@)
 
 		# Setup attributes for new devices
 		my %ah = ();
+		HMCCU_SetInitialAttributes ($hash, undef, \%ah);
 		foreach my $da (keys %$h) { $ah{$da} = $h->{$da} if ($da !~ /^[psf]$/); }
 
 		my $cs = HMCCU_CreateFHEMDevices ($hash, $devSpec, $devPrefix, $devSuffix, $devFormat, $defOpts, \%ah);
@@ -6610,14 +6611,19 @@ sub HMCCU_GetAttribute ($$$$)
 # device attribute ccudef-attributes
 ######################################################################
 
-sub HMCCU_SetInitialAttributes ($$)
+sub HMCCU_SetInitialAttributes ($$;$)
 {
-	my ($ioHash, $clName) = @_;
+	my ($ioHash, $clName, $ah) = @_;
 
-	my $ccudefAttributes = AttrVal ($ioHash->{NAME}, 'ccudef-attributes', 'room=Homematic');
+	my $ccudefAttributes = AttrVal ($ioHash->{NAME}, 'ccudef-attributes', '');
 	foreach my $a (split(';', $ccudefAttributes)) {
 		my ($an, $av) = split('=', $a);
-		CommandAttr (undef, "$clName $an $av") if (defined($av));
+		if (defined($ah)) {
+			$ah->{$an} = $av;
+		}
+		else {
+			CommandAttr (undef, "$clName $an $av") if (defined($av));
+		}
 	}
 }
 
@@ -10590,11 +10596,10 @@ sub HMCCU_MaxHashEntries ($$)
       	Example: Find devices with low batteries. Generate reading in HTML format.<br/>
       	name=battery,filter:name=.*,read:(LOWBAT|LOW_BAT),if:any=yes,else:no,prefix:batt_,coll:NAME!All batteries OK,html:/home/battery.cfg<br/>
       </li><br/>
-		<li><b>ccudef-attributes {&lt;attrName&gt;=&lt;attrValue&gt;[;...] | none}</b><br/>
-			Define attributes which are assigned to newly defined HMCCUDEV or HMCCUCHN devices. By default the following
-			attributes will be assigned:<br/>
-			room=Homematic<br/>
-			If attribute is set to 'none', no attributes will be assigned to new devices.
+		<li><b>ccudef-attributes &lt;attrName&gt;=&lt;attrValue&gt;[;...]</b><br/>
+			Define attributes which are assigned to newly defined HMCCUDEV or HMCCUCHN devices. By default no
+			attributes will be assigned. To assign every new device to room Homematic, set this attribute
+			to 'room=Homematic'.
 		</li><br/>
       <li><b>ccudef-hmstatevals &lt;subst-rule[;...]&gt;</b><br/>
       	Set global rules for calculation of reading hmstate.
