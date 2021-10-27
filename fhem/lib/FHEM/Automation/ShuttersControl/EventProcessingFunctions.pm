@@ -324,6 +324,13 @@ sub EventProcessingWindowRec {
                              ->getShuttersPlace eq 'terrace'
                        )
                     && !$FHEM::Automation::ShuttersControl::shutters->getIsDay )
+                || ( $FHEM::Automation::ShuttersControl::shutters->getStatus ==
+                      $FHEM::Automation::ShuttersControl::shutters
+                         ->getOpenPos
+                    && $FHEM::Automation::ShuttersControl::shutters
+                         ->getDelayCmd ne 'none'
+                    && $FHEM::Automation::ShuttersControl::shutters
+                         ->getShuttersPlace eq 'terrace' )
             )
             && ( $FHEM::Automation::ShuttersControl::shutters->getVentilateOpen
                 eq 'on'
@@ -370,7 +377,12 @@ sub EventProcessingWindowRec {
                         || $FHEM::Automation::ShuttersControl::shutters
                         ->getStatus !=
                         $FHEM::Automation::ShuttersControl::shutters
-                        ->getLastManPos )
+                        ->getLastManPos
+                        || (   $FHEM::Automation::ShuttersControl::shutters
+                                 ->getDelayCmd ne 'none'
+                            && $FHEM::Automation::ShuttersControl::shutters
+                                 ->getShuttersPlace eq 'terrace' )
+                        )
                   )
                 {
                     if ( $FHEM::Automation::ShuttersControl::shutters
@@ -395,11 +407,17 @@ sub EventProcessingWindowRec {
                           ->setDriveCmd(
                             (
                                 $FHEM::Automation::ShuttersControl::shutters
-                                  ->getVentilatePosAfterDayClosed eq 'open'
+                                    ->getDelayCmd ne 'none'
+                                  && $FHEM::Automation::ShuttersControl::shutters
+                                    ->getShuttersPlace eq 'terrace'
                                 ? $FHEM::Automation::ShuttersControl::shutters
-                                  ->getOpenPos
+                                    ->getDelayCmd
+                                : ( $FHEM::Automation::ShuttersControl::shutters
+                                      ->getVentilatePosAfterDayClosed eq 'open'
+                                ? $FHEM::Automation::ShuttersControl::shutters
+                                    ->getOpenPos
                                 : $FHEM::Automation::ShuttersControl::shutters
-                                  ->getLastManPos
+                                    ->getLastManPos )
                             )
                           );
                     }

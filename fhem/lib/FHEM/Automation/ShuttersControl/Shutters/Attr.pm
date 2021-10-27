@@ -516,6 +516,12 @@ sub getSelfDefenseAbsentDelay {
     return AttrVal( $self->{shuttersDev}, 'ASC_Self_Defense_AbsentDelay', 300 );
 }
 
+sub getCommandTemplate {
+    my $self = shift;
+
+    return AttrVal( $self->{shuttersDev}, 'ASC_CommandTemplate', 'none' );
+}
+
 sub setWiggleValue {
     my $self    = shift;
     my $attrVal = shift;

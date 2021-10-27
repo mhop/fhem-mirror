@@ -184,9 +184,7 @@ BEGIN {
           delFromAttrList
           gettimeofday
           InternalTimer
-          RemoveInternalTimer
-          computeAlignTime
-          ReplaceEventMap)
+          RemoveInternalTimer)
     );
 
     #-- Export to main context with different name
@@ -229,8 +227,8 @@ our %userAttrList = (
     'ASC_LockOut:soft,hard,off'                  => '-',
     'ASC_LockOut_Cmd:inhibit,blocked,protection' => '-',
     'ASC_BlockingTime_afterManual'               => '-',
-    'ASC_BlockingTime_beforNightClose'           => '-',
-    'ASC_BlockingTime_beforDayOpen'              => '-',
+    'ASC_BlockingTime_beforeNightClose'           => '-',
+    'ASC_BlockingTime_beforeDayOpen'              => '-',
     'ASC_BrightnessSensor'                       => '-',
     'ASC_Shading_Pos:10,20,30,40,50,60,70,80,90,100'       => [ '', 80, 20 ],
     'ASC_Shading_Mode:absent,always,off,home'              => '-',
@@ -265,6 +263,7 @@ our %userAttrList = (
     'ASC_RainProtection:on,off'             => '-',
     'ASC_ExternalTrigger'                   => '-',
     'ASC_Adv:on,off'                        => '-',
+    'ASC_CommandTemplate'                   => '-',
     'ASC_SlatPosCmd_SlatDevice'             => '-',
 );
 
@@ -1227,15 +1226,15 @@ sub RenewSunRiseSetShuttersTimer {
                 1, 0 );
         }
 
-#         $attr{$shuttersDev}{ASC_Drive_Delay} =
-#           AttrVal( $shuttersDev, 'ASC_Drive_Offset', 'none' )
-#           if ( AttrVal( $shuttersDev, 'ASC_Drive_Offset', 'none' ) ne 'none' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Drive_Offset' );
-#
-#         $attr{$shuttersDev}{ASC_Drive_DelayStart} =
-#           AttrVal( $shuttersDev, 'ASC_Drive_OffsetStart', 'none' )
-#           if ( AttrVal( $shuttersDev, 'ASC_Drive_OffsetStart', 'none' ) ne 'none' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Drive_OffsetStart' );
+        $attr{$shuttersDev}{ASC_BlockingTime_beforeNightClose} =
+          AttrVal( $shuttersDev, 'ASC_BlockingTime_beforNightClose', 'none' )
+          if ( AttrVal( $shuttersDev, 'ASC_BlockingTime_beforNightClose', 'none' ) ne 'none' );
+        delFromDevAttrList( $shuttersDev, 'ASC_BlockingTime_beforNightClose' );
+
+        $attr{$shuttersDev}{ASC_BlockingTime_beforeDayOpen} =
+          AttrVal( $shuttersDev, 'ASC_BlockingTime_beforDayOpen', 'none' )
+          if ( AttrVal( $shuttersDev, 'ASC_BlockingTime_beforDayOpen', 'none' ) ne 'none' );
+        delFromDevAttrList( $shuttersDev, 'ASC_BlockingTime_beforDayOpen' );
 #
 #         $attr{$shuttersDev}{ASC_Shading_StateChange_SunnyCloudy} =
 #             AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Sunny', 'none' ) . ':'
@@ -1769,8 +1768,9 @@ sub _SetCmdFn {
           . '. Grund der Fahrt: '
           . $shutters->getLastDrive );
 
-    my $driveCommand = $shutters->getPosSetCmd . ' ' . $posValue;
-    my $slatPos      = -1;
+    my $driveCommand    = $shutters->getPosSetCmd . ' ' . $posValue;
+    my $commandTemplate = $shutters->getCommandTemplate;
+    my $slatPos         = -1;
 
     if (   $shutters->getShadingPositionAssignment ne 'none'
         || $shutters->getOpenPositionAssignment ne 'none'
@@ -1822,32 +1822,48 @@ sub _SetCmdFn {
         }
     }
 
-    CommandSet( undef,
-            $shuttersDev
-          . ':FILTER='
-          . $shutters->getPosCmd . '!='
-          . $posValue . ' '
-          . $driveCommand );
+    if ( $commandTemplate ne 'none' ) {     # Patch von Beta-User Forum https://forum.fhem.de/index.php/topic,123659.0.html
+        # Nutzervariablen setzen
+        my %specials = (
+             '$name'        => $shuttersDev,
+             '$level'       => $posValue,
+             '$slatLevel'   => $slatPos,
+             '$reason'      => $shutters->getLastDrive
+        );
+        
+        $commandTemplate  = ::EvalSpecials($commandTemplate, %specials);
+        # CMD ausführen
+        ::AnalyzeCommandChain( $h, $commandTemplate );
+    }
+    else {
+        CommandSet( undef,
+                $shuttersDev
+            . ':FILTER='
+            . $shutters->getPosCmd . '!='
+            . $posValue . ' '
+            . $driveCommand );
 
-    InternalTimer(
-        gettimeofday() + 3,
-        sub() {
-            CommandSet(
-                undef,
-                (
-                      $shutters->getSlatDevice ne 'none'
-                    ? $shutters->getSlatDevice
-                    : $shuttersDev
-                  )
-                  . ' '
-                  . $shutters->getSlatPosCmd . ' '
-                  . $slatPos
-            );
-        },
-        $shuttersDev
-      )
-      if ( $slatPos > -1
-        && $shutters->getSlatPosCmd ne 'none' );
+        InternalTimer(
+            gettimeofday() + 3,
+            sub() {
+                CommandSet(
+                    undef,
+                    (
+                        $shutters->getSlatDevice ne 'none'
+                        ? $shutters->getSlatDevice
+                        : $shuttersDev
+                    )
+                    . ' '
+                    . $shutters->getSlatPosCmd . ' '
+                    . $slatPos
+                );
+            },
+            $shuttersDev
+        )
+        if ( $slatPos > -1
+            && $shutters->getSlatPosCmd ne 'none' );
+    
+    }
 
     $shutters->setSelfDefenseAbsent( 0, 0 )
       if (!$shutters->getSelfDefenseAbsent
