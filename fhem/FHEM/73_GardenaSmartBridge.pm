@@ -63,6 +63,8 @@ use warnings;
 use POSIX;
 use FHEM::Meta;
 
+#use Data::Dumper;
+
 use HttpUtils;
 
 my $missingModul = '';
@@ -205,6 +207,7 @@ sub Initialize {
     $hash->{AttrFn} = \&Attr;
     $hash->{AttrList} =
         'debugJSON:0,1 '
+      . 'debugDEVICE:0,1 '
       . 'disable:1 '
       . 'interval '
       . 'disabledForIntervals '
@@ -239,7 +242,7 @@ sub Define {
       . '/v1';
     $hash->{VERSION}   = version->parse($VERSION)->normal;
     $hash->{INTERVAL}  = 60;
-    $hash->{NOTIFYDEV} = "global,$name";
+    $hash->{NOTIFYDEV} = "global,$name"; 
 
     CommandAttr( undef, $name . ' room GardenaSmart' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -258,7 +261,7 @@ sub Undef {
     my $hash = shift;
     my $name = shift;
 
-    RemoveInternalTimer($hash);
+    RemoveInternalTimer($hash, "FHEM::GardenaSmartBridge::getDevices");
     delete $modules{GardenaSmartBridge}{defptr}{BRIDGE}
       if ( defined( $modules{GardenaSmartBridge}{defptr}{BRIDGE} ) );
 
@@ -279,7 +282,7 @@ sub Attr {
 
     if ( $attrName eq 'disable' ) {
         if ( $cmd eq 'set' && $attrVal eq '1' ) {
-            RemoveInternalTimer($hash);
+            RemoveInternalTimer($hash, "FHEM::GardenaSmartBridge::getDevices");
             readingsSingleUpdate( $hash, 'state', 'inactive', 1 );
             Log3 $name, 3, "GardenaSmartBridge ($name) - disabled";
         }
@@ -304,13 +307,13 @@ sub Attr {
         if ( $cmd eq 'set' ) {
             return 'Interval must be greater than 0'
               if ( $attrVal == 0 );
-            RemoveInternalTimer($hash);
+            RemoveInternalTimer($hash, "FHEM::GardenaSmartBridge::getDevices");
             $hash->{INTERVAL} = $attrVal;
             Log3 $name, 3,
               "GardenaSmartBridge ($name) - set interval: $attrVal";
         }
         elsif ( $cmd eq 'del' ) {
-            RemoveInternalTimer($hash);
+            RemoveInternalTimer($hash, "FHEM::GardenaSmartBridge::getDevices");
             $hash->{INTERVAL} = 60;
             Log3 $name, 3,
 "GardenaSmartBridge ($name) - delete User interval and set default: 60";
@@ -352,6 +355,7 @@ sub Notify {
                 @{$events} or grep /^DEFINED.$name$/,
                 @{$events} or grep /^MODIFIED.$name$/,
                 @{$events} or grep /^ATTR.$name.gardenaAccountEmail.+/,
+                @{$events} or grep /^DELETEATTR.$name.disable$/,
                 @{$events}
             )
         )
@@ -363,14 +367,14 @@ sub Notify {
                 @{$events}
             )
         )
+      && $init_done
       );
 
     getDevices($hash)
       if (
         $devtype eq 'Global'
         && (
-            grep /^DELETEATTR.$name.disable$/,
-            @{$events} or grep /^ATTR.$name.disable.0$/,
+            grep /^ATTR.$name.disable.0$/,
             @{$events} or grep /^DELETEATTR.$name.interval$/,
             @{$events} or grep /^ATTR.$name.interval.[0-9]+/,
             @{$events}
@@ -383,11 +387,10 @@ sub Notify {
         && (
             grep /^state:.Connected$/,
             @{$events} or grep /^lastRequestState:.request_error$/,
-            @{$events}
+            @{$events} 
         )
       )
     {
-
         InternalTimer( gettimeofday() + $hash->{INTERVAL},
             "FHEM::GardenaSmartBridge::getDevices", $hash );
         Log3 $name, 4,
@@ -413,7 +416,7 @@ sub Get {
         my $list = "";
         $list .= " debug_devices_list:"
           .join( ',', @{ $hash->{helper}{deviceList} }) 
-          if ( AttrVal( $name, "debugJSON", "none") ne "none" 
+          if ( AttrVal( $name, "debugDEVICE", "none") ne "none" 
            && exists($hash->{helper}{deviceList}) );
       return "Unknown argument $cmd,choose one of $list";    
     }
@@ -481,6 +484,7 @@ sub Write {
         {
             url       => $hash->{URL} . $uri,
             timeout   => 15,
+            incrementalTimeout => 1,
             hash      => $hash,
             device_id => $deviceId,
             data      => $payload,
@@ -517,8 +521,8 @@ sub ErrorHandling {
     my $dname = $dhash->{NAME};
     
     Log3 $name, 4, "GardenaSmartBridge ($name) - Request: $data";
-   
-    my $decode_json = eval { decode_json($data) };
+
+    my $decode_json = eval { decode_json($data) } if ( length($data) > 0 );
     if ($@) {
         Log3 $name, 3, "GardenaSmartBridge ($name) - JSON error while request";
     }
@@ -708,10 +712,26 @@ sub ErrorHandling {
         delete $dhash->{helper}{deviceAction}
           if ( defined( $dhash->{helper}{deviceAction} ) );
 
+        readingsSingleUpdate( $hash, 'token', 'none', 1 )
+          if ( !defined( $hash->{helper}{session_id} ) );
+
+        getToken($hash) 
+          if ( !defined( $hash->{helper}{session_id} ) );
         return;
     }
- if (defined($hash->{helper}{debug_device})){
-      Log3 $name, 5, "GardenaSmartBridge DEBUG Device";
+    elsif (defined ($decode_json->{message}) 
+          && $decode_json->{message} eq 'Unauthorized') {
+      Log3 $name, 3,
+          "GardenaSmartBridge ($name) - Unauthorized -> fetch new token ";     
+      getToken($hash);
+      return;
+    }
+
+  if (defined($hash->{helper}{debug_device})
+    	&& $hash->{helper}{debug_device} ne 'none'
+    	){
+      Log3 $name, 4, "GardenaSmartBridge DEBUG Device";
+      delete $hash->{helper}{debug_device};
       my @device_spec = ("name", "id", "category");
       my $devJson=$decode_json->{devices};
       my $output = '.:{ DEBUG OUTPUT for '.$devJson->{name}.' }:. \n';
@@ -722,6 +742,18 @@ sub ErrorHandling {
       $output .= '\n=== Settings \n';
       my $i = 0;
       for my $dev_settings ( @ { $devJson->{settings} } ) {
+        $output .= "[".$i++."]id: $dev_settings->{id} \n";
+        $output .= "name: $dev_settings->{name} ";
+        if (ref ($dev_settings->{value}) eq 'ARRAY' 
+          || ref ($dev_settings->{value}) eq 'HASH'){
+          $output .= 'N/A \n';
+        } else {
+          $output .= "value: $dev_settings->{value} \n";
+        }
+      }
+      $output .= '\n=== Abilities \n';
+      $i = 0;
+      for my $dev_settings ( @ { $devJson->{abilities} } ) {
         $output .= "[".$i++."]id: $dev_settings->{id} \n";
         $output .= "name: $dev_settings->{name} ";
         if (ref ($dev_settings->{value}) eq 'ARRAY' 
@@ -771,6 +803,10 @@ sub ResponseProcessing {
         $hash->{helper}{session_id}     = $decode_json->{data}{id};
         $hash->{helper}{user_id}        = $decode_json->{data}{attributes}->{user_id};
         $hash->{helper}{refresh_token}  = $decode_json->{data}{attributes}->{refresh_token};
+        $hash->{helper}{token_expired}  = gettimeofday() + $decode_json->{data}{attributes}->{expires_in};
+
+        InternalTimer($hash->{helper}{token_expired},
+            "FHEM::GardenaSmartBridge::getToken", $hash );
 
         Write( $hash, undef, undef, undef );
         Log3 $name, 3, "GardenaSmartBridge ($name) - fetch locations id";
@@ -931,7 +967,6 @@ sub WriteReadings {
                         elsif ( $decode_json->{abilities}[0]{properties}
                             [$properties]{name} eq 'wifi_status' )
                         {
-                            #TODO: read valies if bridge connected to wifi
                             readingsBulkUpdateIfChanged( $hash,
                               'wifi_status-ssid', $v->{ssid} )
                               if (ref($v->{ssid}) ne 'HASH');
@@ -967,8 +1002,7 @@ sub getDevices {
     my $hash = shift;
 
     my $name = $hash->{NAME};
-
-    RemoveInternalTimer($hash);
+    RemoveInternalTimer($hash, "FHEM::GardenaSmartBridge::getDevices");
 
     if ( not IsDisabled($name) ) {
 
@@ -978,12 +1012,17 @@ sub getDevices {
         for my $gardenaDev (@list){
           push( @{ $hash->{helper}{deviceList} }, $gardenaDev );
         }
-        Write( $hash, undef, undef, undef );
-        Log3 $name, 4,
-          "GardenaSmartBridge ($name) - fetch device list and device states";
+        if ( AttrVal( $name, 'gardenaAccountEmail', 'none' ) ne 'none' 
+          && (
+            defined( ReadPassword( $hash, $name ) ) 
+          )) 
+        {
+          Write( $hash, undef, undef, undef );
+          Log3 $name, 4,
+            "GardenaSmartBridge ($name) - fetch device list and device states";
+        } # fi gardenaAccountEmail
     }
     else {
-
         readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
         Log3 $name, 3, "GardenaSmartBridge ($name) - device is disabled";
     }
@@ -1013,16 +1052,6 @@ sub getToken {
       if ( defined( $hash->{helper}{locations_id} )
         && $hash->{helper}{locations_id} );
 
-    # Write(
-    #     $hash,
-    #     '"sessions": {"email": "'
-    #       . AttrVal( $name, 'gardenaAccountEmail', 'none' )
-    #       . '","password": "'
-    #       . ReadPassword( $hash, $name ) . '"}',
-    #     undef,
-    #     undef
-    # );
-    
     Write(
          $hash,
          '"data": {"type":"token", "attributes":{"username": "' 
@@ -1033,8 +1062,9 @@ sub getToken {
          undef
      );
 
-Log3 $name, 4, '"data": {"type":"token", "attributes":{"username": "'      . AttrVal( $name, 'gardenaAccountEmail', 'none' )      . '","password": "'
-          . ReadPassword( $hash, $name ) . '", "client_id":"smartgarden-jwt-client"}}';
+    Log3 $name, 4, '"data": {"type":"token", "attributes":{"username": "'     
+               .AttrVal( $name, 'gardenaAccountEmail', 'none' ) . '","password": "'
+               .ReadPassword( $hash, $name ) . '", "client_id":"smartgarden-jwt-client"}}';
     Log3 $name, 3,
 "GardenaSmartBridge ($name) - send credentials to fetch Token and locationId";
 
@@ -1200,20 +1230,21 @@ sub createHttpValueStrings {
     $payload = '{}' if ( !defined($payload) );
 
     if ( $payload eq '{}' ) {
-        $method = 'GET';
+        $method = 'GET' if (defined( $hash->{helper}{session_id} ) );
         $payload = '';
         $uri .= '/locations?locatioId=null&user_id=' . $hash->{helper}{user_id}
           if ( exists( $hash->{helper}{user_id} )
             && !defined( $hash->{helper}{locations_id} ) );
         readingsSingleUpdate( $hash, 'state', 'fetch locationId', 1 )
-          if ( !defined( $hash->{helper}{locations_id} ) );
-        $uri .= '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
+          if ( exists( $hash->{helper}{user_id} )
+            && !defined( $hash->{helper}{locations_id} ) );
         $uri .= '/devices'
           if (!defined($abilities)
             && defined( $hash->{helper}{locations_id} ) );
     }
 
-    $uri = '/devices/'.InternalVal($hash->{helper}{debug_device}, 'DEVICEID', 0 ) if ( exists ($hash->{helper}{debug_device}));
+    $uri = '/devices/'.InternalVal($hash->{helper}{debug_device}, 'DEVICEID', 0 ) if ( defined ($hash->{helper}{debug_device})  
+                                                                                       && defined( $hash->{helper}{locations_id} ) );
     $uri = '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
 
     if ( defined( $hash->{helper}{locations_id} ) ) {
@@ -1278,6 +1309,19 @@ sub createHttpValueStrings {
               . '/abilities/'
               . $abilities
               . '/properties/manual_watering_timer';
+
+        }
+        elsif (defined($abilities)
+            && defined($payload)
+            && $abilities eq 'watering_button_config' )
+        {
+            $method = 'PUT';
+
+            $uri .=
+                '/devices/'
+              . $deviceId
+              . '/abilities/watering'
+              . '/properties/button_config_time';
 
         }
         elsif (defined($abilities)
@@ -1463,7 +1507,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.4.0",
+  "version": "v2.4.6",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
