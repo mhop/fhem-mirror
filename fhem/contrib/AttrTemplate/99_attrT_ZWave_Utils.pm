@@ -19,14 +19,14 @@ BEGIN {
         qw(
           InternalVal
           readingsSingleUpdate
-		  readingsBulkUpdate
+          readingsBulkUpdate
           ReadingsVal
           ReadingsNum
           ReadingsAge
           devspec2array
           FW_makeImage
           defs
-		  Log3
+          Log3
           )
     );
 }
@@ -43,7 +43,7 @@ sub identify_channel_devices {
   my $devname = shift;
   my $wanted = shift // return;
   
-  my $mainId = substr(InternalVal($devname,"nodeIdHex","00"),0,2);
+  my $mainId = substr(InternalVal($devname,'nodeIdHex','00'),0,2);
   my $wantedId = $mainId;
   $wantedId .= "0$wanted" if $wanted;
   my @names = devspec2array("TYPE=ZWave:FILTER=nodeIdHex=$wantedId");
@@ -53,48 +53,44 @@ sub identify_channel_devices {
 
 sub devStateIcon_shutter {
   my $levelname = shift // return;
-  my $model = shift // "FGR223";
-  my $mode = shift // "roller"; # or "venetian"
+  my $model = shift // 'FGR223';
+  my $mode = shift // 'roller'; # or "venetian"
   my $slatname = $levelname;
-  my $dimlevel= ReadingsNum($levelname,"dim",0);
-  my $ret ="";
+  my $dimlevel= ReadingsNum($levelname,'dim',0);
+  my $ret ='';
   my $slatlevel = 0;
-  my $slatcommand_string = "dim ";
+  my $slatcommand_string = 'dim ';
   my $moving = 0;
-  
-  if ($model eq "FGR223") {
-    if ($mode eq "venetian") {
-      #my ($def,$defnr) = split(" ", InternalVal($levelname,"DEF",$levelname));
-      #$defnr++;
-      #my @slatnames = devspec2array("DEF=$def".'.'.$defnr);
-      
-	  $slatname = identify_channel_devices($levelname,2);
-      $slatlevel= ReadingsNum($slatname,"state",0);
+
+  if ($model eq 'FGR223') {
+    if ($mode eq 'venetian') {
+      $slatname = identify_channel_devices($levelname,2);
+      $slatlevel= ReadingsNum($slatname,'state',0);
     }
-    $moving = 1 if ReadingsNum($levelname,"power",0) > 0;
-  } 
-  if ($model eq "FGRM222") {
-    if ($mode eq "venetian") {
-      $slatlevel= ReadingsNum($slatname,"positionSlat",0);
-      $slatcommand_string = "positionSlat ";
+    $moving = 1 if ReadingsNum($levelname,'power',0) > 0;
+  }
+  if ($model eq 'FGRM222') {
+    if ($mode eq 'venetian') {
+      $slatlevel= ReadingsNum($slatname,'positionSlat',0);
+      $slatcommand_string = 'positionSlat ';
     }
-    $moving = 1 if ReadingsNum($levelname,"power",0) > 0;
-  } 
+    $moving = 1 if ReadingsNum($levelname,'power',0) > 0;
+  }
 
   #levelicon
-  my $symbol_string = "fts_shutter_";
-  my $command_string = "dim 99";
-  $command_string = "dim 0" if $dimlevel > 50;
+  my $symbol_string = 'fts_shutter_';
+  my $command_string = 'dim 99';
+  $command_string = 'dim 0' if $dimlevel > 50;
   $symbol_string .= int ((109 - $dimlevel)/10)*10;
-  $ret .= $moving ? "<a href=\"/fhem?cmd.dummy=set $levelname stop&XHR=1\">" . FW_makeImage("edit_settings","edit_settings") . "</a> " 
-                  : "<a href=\"/fhem?cmd.dummy=set $levelname $command_string&XHR=1\">" . FW_makeImage($symbol_string,"fts_shutter_10") . "</a> "; 
+  $ret .= $moving ? "<a href=\"/fhem?cmd.dummy=set $levelname stop&XHR=1\">" . FW_makeImage('edit_settings','edit_settings') . "</a> " 
+                  : "<a href=\"/fhem?cmd.dummy=set $levelname $command_string&XHR=1\">" . FW_makeImage($symbol_string,'fts_shutter_10') . "</a> "; 
 
   #slat
-  if ($mode eq "venetian") {
-    $symbol_string = "fts_blade_arc_close_";
-    $slatlevel > 49 ? $symbol_string .= "00" : $slatlevel > 24 ? $symbol_string .= "50" : $slatlevel < 25 ? $symbol_string .= "100" : undef;
-    $slatlevel > 49 ? $slatcommand_string .= "0" : $slatlevel > 24 ? $slatcommand_string .= "50" : $slatlevel < 25 ? $slatcommand_string .= "25" : undef;
-    $symbol_string = FW_makeImage($symbol_string,"fts_blade_arc_close_100");
+  if ($mode eq 'venetian') {
+    $symbol_string = 'fts_blade_arc_close_';
+    $slatlevel > 49 ? $symbol_string .= '00' : $slatlevel > 24 ? $symbol_string .= '50' : $slatlevel < 25 ? $symbol_string .= '100' : undef;
+    $slatlevel > 49 ? $slatcommand_string .= '0' : $slatlevel > 24 ? $slatcommand_string .= '50' : $slatlevel < 25 ? $slatcommand_string .= '25' : undef;
+    $symbol_string = FW_makeImage($symbol_string,'fts_blade_arc_close_100');
     $ret .= qq(<a href="/fhem?cmd.dummy=set $slatname $slatcommand_string&XHR=1">$symbol_string $slatlevel %</a>); 
   }
 
@@ -105,14 +101,13 @@ sub devStateIcon_shutter {
 sub desiredTemp {
   my $name = shift // return;
   my $call = shift // 'OK';
-  
+
   my $hash = $defs{$name} // return;
   my $now = time;
   my $state = ReadingsVal($name,'state','unknown');
   my $stateNum = ReadingsNum($name,'state',20);
   Log3($hash, 3, "ZWave-utils desiredTemp called, state is $state");
-  #return if ReadingsAge($name,'state',10000000) > 3;
-  
+
   if ($state =~ m,desired-temp|thermostatSetpointSet,) {
     readingsBulkUpdate($hash, 'desired-temp',$stateNum,1);
     return;
@@ -125,7 +120,7 @@ sub desiredTemp {
     readingsBulkUpdate($hash, 'desired-temp',ReadingsVal($name,'energySaveHeating','unknown'),1);
     return;
   }
-  
+
   if ($state =~ m,off,) {
     readingsBulkUpdate($hash, 'desired-temp',6,'unknown',1);
     return;
@@ -138,10 +133,12 @@ sub desiredTemp {
 1;
 
 __END__
+
 =pod
 =item summary helper functions needed for attrTemplate for TYPE ZWave
 =item summary_DE needed Hilfsfunktionen für attrTemplate bei ZWave-TYPE Geräten
 =begin html
+
 There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,114109.0.html.
 <a id="attrT_ZWave_Utils"></a>
 <h3>attrT_ZWave_Utils</h3>

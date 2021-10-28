@@ -3499,6 +3499,86 @@ set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model 6channel_ethernet_board_6input_unified
 setreading DEVICE attrTemplateVersion 20200602
 
+###############
+#dingtian 8ch relay board
+#
+#specials: event-on-change-reading and timestamp-on-change-reading via Perl...
+#
+# input by rico5588, see forum https://forum.fhem.de/index.php/topic,123709.msg1182787.html#msg1182787
+name:8channel_relay_board_8di_split
+filter:TYPE=MQTT2_DEVICE
+desc:For use with dingtian 8-ch digital Input and 8-ch relay output ethernet board.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,123709.msg1182787.html#msg1182787">Forum Thread</a>. You have to configure MQTT first as described in product manual.<br>Split version - you'll get 8 independent devices.
+order:W_05
+par:DEVNAME;Device's name in the topic tree;{ AttrVal('DEVICE','readingList','') =~ m,dingtian/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to on;{ AttrVal('DEVICE','icon','on') }
+attr DEVICE icon ICON
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE readingList /dingtian/DEVNAME/out/lwt_availability:.* LWT\
+  /dingtian/DEVNAME/out/(relay|input)[1-8]:.* {}\
+  /dingtian/DEVNAME/out/r1:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }\
+  /dingtian/DEVNAME/out/i1:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di1','unknown') eq $state; {di1=>$state}}\
+  /dingtian/DEVNAME/out/i2:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di2','unknown') eq $state; {di2=>$state}}\
+  /dingtian/DEVNAME/out/i3:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di3','unknown') eq $state; {di3=>$state}}\
+  /dingtian/DEVNAME/out/i4:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di4','unknown') eq $state; {di4=>$state}}\
+  /dingtian/DEVNAME/out/i5:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di5','unknown') eq $state; {di5=>$state}}\
+  /dingtian/DEVNAME/out/i6:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di6','unknown') eq $state; {di6=>$state}}\
+  /dingtian/DEVNAME/out/i7:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di7','unknown') eq $state; {di7=>$state}}\
+  /dingtian/DEVNAME/out/i8:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di8','unknown') eq $state; {di8=>$state}}\
+  /dingtian/DEVNAME/out/ip:.* ip\
+  /dingtian/DEVNAME/out/sn:.* sn\
+  /dingtian/DEVNAME/out/mac:.* mac\
+  /dingtian/DEVNAME/out/dicnt:.* dicnt\
+  /dingtian/DEVNAME/out/relay_cnt:.* relay_cnt
+attr DEVICE setExtensionsEvent 1
+attr DEVICE setList on:noArg /dingtian/DEVNAME/in/r1 ON\
+  off:noArg /dingtian/DEVNAME/in/r1 OFF
+attr DEVICE webCmd : 
+copy DEVICE DEVICE_CH2
+deleteattr DEVICE_CH2 stateFormat
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH5
+copy DEVICE_CH2 DEVICE_CH6
+copy DEVICE_CH2 DEVICE_CH7
+copy DEVICE_CH2 DEVICE_CH8
+attr DEVICE_CH2 readingList /dingtian/DEVNAME/out/r2:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH3 readingList /dingtian/DEVNAME/out/r3:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH4 readingList /dingtian/DEVNAME/out/r4:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH5 readingList /dingtian/DEVNAME/out/r5:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH6 readingList /dingtian/DEVNAME/out/r6:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH6 readingList /dingtian/DEVNAME/out/r7:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH6 readingList /dingtian/DEVNAME/out/r8:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
+attr DEVICE_CH2 setList on:noArg /dingtian/DEVNAME/in/r2 ON\
+  off:noArg /dingtian/DEVNAME/in/r2 OFF
+attr DEVICE_CH3 setList on:noArg /dingtian/DEVNAME/in/r3 ON\
+  off:noArg /dingtian/DEVNAME/in/r3 OFF
+attr DEVICE_CH4 setList on:noArg /dingtian/DEVNAME/in/r4 ON\
+  off:noArg /dingtian/DEVNAME/in/r4 OFF
+attr DEVICE_CH5 setList on:noArg /dingtian/DEVNAME/in/r5 ON\
+  off:noArg /dingtian/DEVNAME/in/r5 OFF
+attr DEVICE_CH6 setList on:noArg /dingtian/DEVNAME/in/r6 ON\
+  off:noArg /dingtian/DEVNAME/in/r6 OFF
+attr DEVICE_CH7 setList on:noArg /dingtian/DEVNAME/in/r7 ON\
+  off:noArg /dingtian/DEVNAME/in/r7 OFF
+attr DEVICE_CH8 setList on:noArg /dingtian/DEVNAME/in/r8 ON\
+  off:noArg /dingtian/DEVNAME/in/r8 OFF
+set DEVICE attrTemplate set_associatedWith \CHANNELS=8
+attr DEVICE devStateIcon offline:rc_STOP@red online:rc_STOP@green
+attr DEVICE stateFormat LWT\
+state\
+<br>\
+DigiIn\
+di1\
+di2\
+di3\
+di4\
+di5\
+di6\
+di7\
+di8
+set DEVICE attrTemplate speechcontrol_type_switch
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20211028
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 model 8channel_relay_board_8di_split
 
 
 ###############
