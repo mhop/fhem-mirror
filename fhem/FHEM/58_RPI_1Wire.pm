@@ -4,7 +4,6 @@
 #and RoBue to access 1-Wire-Clones with ID: 28 53 44 54 xx xx xx 
 
 #Possible Extensions:
-#Check if bulk_read is writable, give hints and enable BUSMASTER to trigger this on a regular basis -> there is currently an issue when having non temperature w1 devices!!!!
 #Writing to the switches is not supported (but I also don't have the HW to test that)
 
 package main;
@@ -34,7 +33,8 @@ sub RPI_1Wire_Initialize {
 							"$readingFnAttributes";
 }
 
-my $w1_path="/sys/devices/w1_bus_master1";
+my $w1_path="/sys/bus/w1/devices";
+my $ms_path="/sys/devices/w1_bus_master";
 my $dht_path="/sys/devices/platform/dht11@";
 
 my %RPI_1Wire_Devices =
@@ -67,8 +67,8 @@ sub RPI_1Wire_Notify {
 		my $def=$own_hash->{DEF};
 		$def="" if (!defined $def); 
 		#GetDevices is triggering the autocreate calls, but this is not yet working (autocreate not ready?) so delay this by 10 seconds
-		InternalTimer(gettimeofday()+10, "RPI_1Wire_GetDevices", $own_hash, 0) if $own_hash->{DEF} eq "BUSMASTER";
-		RPI_1Wire_Init($own_hash,$ownName." ".$own_hash->{TYPE}." ".$def);
+		RPI_1Wire_Init($own_hash,$def,0);
+		InternalTimer(gettimeofday()+10, "RPI_1Wire_GetDevices", $own_hash, 0) if $own_hash->{DEF} =~ /BUSMASTER/;
 	}
 }
 
@@ -89,44 +89,50 @@ sub RPI_1Wire_Define {			#
 	$hash->{NOTIFYDEV} = "global";
 		if ($init_done) {
 			Log3 $hash->{NAME}, 2, "Define init_done: $def";
-			my $ret=RPI_1Wire_Init($hash,$hash->{NAME}." ".$hash->{TYPE}." ".$hash->{DEF});
+			$def =~ s/^\S+\s*\S+\s*//; #Remove devicename and type
+			my $ret=RPI_1Wire_Init($hash,$def,1);
 			return $ret if $ret;
 	}
 	return;
 }
 ################################### 
 sub RPI_1Wire_Init {				#
-	my ( $hash, $args ) = @_;
-	Log3 $hash->{NAME}, 2, $hash->{NAME}.": Init: $args";
+	my ( $hash, $args, $check ) = @_;
+	Log3 $hash->{NAME}, 2, $hash->{NAME}.": Init: $args $check";
 	if (! -e "$w1_path") {
 		$hash->{STATE} ="No 1-Wire Bus found";
 		Log3 $hash->{NAME}, 3, $hash->{NAME}.": Init: $hash->{STATE}";
 		return $hash->{STATE};
 	}
 
-	my @a = ();
-	@a = split("[ \t]+", $args) if defined $args;
-	shift @a;shift @a;
-	my $name = $hash->{NAME};
-	if (defined $args && @a!=1)	{
-		return "syntax: define <name> RPI_1Wire <id>|BUSMASTER";
+	my @a = split("[ \t]+", $args);
+	if (@a!=1)	{
+		return "syntax: define <name> RPI_1Wire <id>|BUSMASTER|DHT11-<gpio>|DHT22-<gpio>";
 	}
+	my $name = $hash->{NAME};
 	my $arg=$a[0];
 	$hash->{helper}{write}="";
+	$hash->{helper}{duration}=0;
 	my $device="";
 	my $family="";
 	my $id="";
 	my $dev=0;
-	if ($arg eq "BUSMASTER") {
-		$device=$arg;
-		$family=$arg;
+	if ($arg =~ /(BUSMASTER)(-\d)?$/) {
+		$device=$1;
+		$family=$1;
+		$id=1;
+		$id=abs($2) if defined $2; #abs to get rid of the "-"
+		if (! -e $ms_path.$id) {
+			readingsSingleUpdate($hash,"failreason","Device not found",0);
+			return "Device $device $id does not exist";
+		}
 	} elsif ($arg =~ /DHT(11|22)-(\d+)/) {
 		return "Module RPi::DHT missing (see https://github.com/bublath/rpi-dht)" if defined $DHT_missing;
 		$id=$2;
 		$family="DHT".$1;
 		$device=$family;
 	} else {
-		return "Device $arg does not exist" if (! -e "$w1_path/$arg");
+		return "Device $arg does not exist" if (! -e "$w1_path/$arg" and $check==1); #Only quit if coming from interactive define
 		($family, $id) = split('-',$arg);
 		return "Unknown device family $family" if !defined $RPI_1Wire_Devices{$family};
 		$device=$RPI_1Wire_Devices{$family}{name};
@@ -142,15 +148,11 @@ sub RPI_1Wire_Init {				#
 		delete($hash->{setList}{therm_bulk_read});
 		RPI_1Wire_DeviceUpdate($hash);
 	} else {
-		my $bulk=$hash->{bulk_read};
-		if (!defined $bulk) {
-			$hash->{bulk_read}="off";
-			$bulk="off";
-		}
-		if (! -w "$w1_path/therm_bulk_read") {
+		my $bulk=ReadingsVal($name,"therm_bulk_read","off");
+		if (! -w $ms_path.$id."/therm_bulk_read") {
 			delete($hash->{setList}{therm_bulk_read});
 			delete($hash->{setList}{update});
-			$hash->{bulk_read}="off";
+			readingsSingleUpdate($hash, 'therm_bulk_read', "off",0);
 		} elsif ($bulk eq "on") {
 			$hash->{setList}{update}="noArg"; #Restore set command in case it was deleted previously
 			RPI_1Wire_DeviceUpdate($hash);
@@ -189,10 +191,11 @@ sub RPI_1Wire_GetDevices {
 	my ($hash) = @_;
 	Log3 $hash->{NAME}, 3 , $hash->{NAME}.": GetDevices";
 	my @devices;
-	if (open(my $fh, "<", "$w1_path/w1_master_slaves")) {
+	if (open(my $fh, "<", $ms_path.$hash->{id}."/w1_master_slaves")) {
 		while (my $device = <$fh>) {
 			chomp $device; #remove \n
 			Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Found device $device";
+			push @devices,$device;
 			my $found=0;
 			foreach my $dev ( sort keys %main::defs ) {
 				if ($defs{$dev}->{TYPE} eq "RPI_1Wire" && $defs{$dev}->{DEF} eq $device) { $found=1; }
@@ -207,6 +210,7 @@ sub RPI_1Wire_GetDevices {
 		}
 		close($fh);
 	}
+	$hash->{devices}=join(" ",@devices);
 	return;
 }
 
@@ -216,15 +220,15 @@ sub RPI_1Wire_DeviceUpdate {
 	my $family=$hash->{family};
 	if (!defined $family) {
 		#For safety, if a device was not ready during startup it sometimes is not properly initialized when being reconnected
-		return RPI_1Wire_Init($hash,$name." ".$hash->{TYPE}." ".$hash->{DEF});
+		return RPI_1Wire_Init($hash,$hash->{DEF},0);
 	}
 	my $pollingInterval = AttrVal($name,"pollingInterval",60);
+	return if $pollingInterval<1;
 	Log3 $name, 4 , $name.": DeviceUpdate($hash->{NAME}), pollingInterval:$pollingInterval";
-#	RPI_1Wire_Poll($hash);
-	#Einfach "delete?" oder eventuell "kill" auf hängenden Prozess?
+
 	my $mode=AttrVal($name,"mode","nonblocking");
 	if ($family eq "BUSMASTER") {
-		if ($hash->{bulk_read} eq "on") {
+		if (ReadingsVal($name,"therm_bulk_read","off") eq "on") {
 			$mode="bulk_read";
 		} else {
 			return; #once set to "off" the timer won't be started again by exiting here
@@ -255,7 +259,8 @@ sub RPI_1Wire_DeviceUpdate {
 }
 
 sub RPI_1Wire_TriggerBulk {
-	my $path="$w1_path/therm_bulk_read";
+	my ($hash) = @_;
+	my $path=$ms_path.$hash->{id}."/therm_bulk_read";
 	if (open(my $fh, ">", $path)) {
 		print $fh "trigger\n";
 		close($fh);
@@ -344,10 +349,10 @@ sub RPI_1Wire_Set {
 		RPI_1Wire_GetConfig($hash);
 	} elsif ($cmd eq "therm_bulk_read" and @args==1) {
 		if ($args[0] eq "on") {
-			$hash->{bulk_read}="on";
+			readingsSingleUpdate($hash, 'therm_bulk_read', "on",1);
 			return RPI_1Wire_DeviceUpdate($hash);
 		} else {
-			$hash->{bulk_read}="off";
+			readingsSingleUpdate($hash, 'therm_bulk_read', "off",1);
 		}
 	}
 	return;
@@ -390,9 +395,9 @@ sub RPI_1Wire_Get {
 		
 		my $script= "SUBSYSTEM==\"w1*\", PROGRAM=\"/bin/sh -c \'\\\n";
 		$script .= "chown -R root:gpio /sys/devices/w1*;\\\n";
-		$script .= "chmod g+w /sys/devices/w1_bus_master1/therm_bulk_read;\\\n";
-		$script .= "chmod g+w /sys/devices/w1_bus_master1/*/resolution;\\\n";
-		$script .= "chmod g+w /sys/devices/w1_bus_master1/*/conv_time;\\ \'\"\n";
+		$script .= "chmod g+w /sys/devices/w1_bus_master*/therm_bulk_read;\\\n";
+		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/resolution;\\\n";
+		$script .= "chmod g+w /sys/devices/w1_bus_master*/*/conv_time;\\ \'\"\n";
 		
 		return $ret.$script;
 	}
@@ -404,6 +409,7 @@ sub RPI_1Wire_GetConfig {
 	readingsBeginUpdate($hash);
 	my $device=$hash->{DEF};
 	my $fh;
+	my $conv=0;
 	my $path="$w1_path/$device/resolution";
 	if (open($fh, "<", $path)) {
 		my $line = <$fh>;
@@ -415,8 +421,11 @@ sub RPI_1Wire_GetConfig {
 	if (open($fh, "<", $path)) {
 		my $line = <$fh>;
 		chomp $line;
+		$conv=$line;
 		readingsBulkUpdate($hash,"conv_time",$line);
 		close($fh);
+	}
+	if (ReadingsVal($hash->{NAME},"mode","nonblocking") eq "timer" && $conv>10) {
 	}
 	readingsEndUpdate($hash,1);			
 }
@@ -542,7 +551,7 @@ sub RPI_1Wire_Poll {
 	#################################################
 	my $elapsed = tv_interval ($start,[gettimeofday]);
 	Log3 $hash->{NAME}, 4, $hash->{NAME}.": Poll for $type took $elapsed s";
-	return $retval;
+	return $retval." duration=$elapsed";
 }
 
 #get attribute "faultvalues" and return values that are contained in this space seperated list
@@ -569,6 +578,9 @@ sub RPI_1Wire_FinishFn {
 	my $decimals = AttrVal($name,"decimals",3);
 	readingsBeginUpdate($hash);
 	my $state="";
+	if (ReadingsAge($name,"failreason",0)>300) {
+		readingsBulkUpdate($hash,"failreason","ok"); # Reset fail reason after 5 minutes to avoid confusion
+	}
 	foreach (@ret) {
 		my ($par,$val)=split("=",$_);
 		
@@ -578,6 +590,13 @@ sub RPI_1Wire_FinishFn {
 			$val=sprintf( '%.'.$decimals.'f',$val*AttrVal($name,"tempFactor",1.0)+AttrVal($name,"tempOffset",0));
 			readingsBulkUpdate($hash,"temperature",$val);
 			$state.="T: $val ";
+		} elsif ($par eq "duration") {
+			my $duration=ReadingsVal($name,"duration",0);
+			readingsBulkUpdate($hash,$par,sprintf("%.2f",$val));
+			my $mode=AttrVal($name,"mode","nonblocking");
+			if ($duration>0.5 and $val>0.5 and $mode ne "nonblocking") { #Only complain with 2 values in raw >0.5s
+				readingsBulkUpdate($hash,"failreason","Read>0.5s - nonblocking mode recommended");
+			}	
 		} elsif ($par eq "error") {
 			readingsBulkUpdate($hash,"failures",ReadingsVal($name,"failures",0)+1);
 			readingsBulkUpdate($hash,"failreason",$val);
@@ -604,6 +623,10 @@ sub RPI_1Wire_Attr {					#
 	} elsif ($attr eq "mode") {
 		if ($val ne "blocking" && $val ne "nonblocking" && $val ne "timer") {
 			return "Unknown mode $val";
+		}
+		RPI_1Wire_GetConfig($hash); #Make sure the test is done with updated HW values
+		if ($val eq "timer" && ReadingsVal($name,"conv_time",1000)>10) {
+			return "Using timer mode is only recommended with reduced conv_time\nTry to adjust conv_time to 2";
 		}
 		#Restart Timer
 		RPI_1Wire_DeviceUpdate($hash);
@@ -667,7 +690,10 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 	<ul>
 		<code>define &lt;name&gt; RPI_1Wire BUSMASTER|ff-xxxxxxxxxxxx|DHT11-&lt;gpio&gt|DHT22-&lt;gpio&gt</code><br><br>
 		<li>BUSMASTER device has the functionality to autocreate devices on startup or with the "scan" command<br>
-		Having a BUSMASTER is not required unless you like to use autocreate or the therm_bulk_read feature</li>
+		Having a BUSMASTER is not required unless you like to use autocreate or the therm_bulk_read feature.<br>
+		The internal reading "devices" will list all the device IDs associated with the BUSMASTER.<br>
+		In case you defined more than one w1_bus_master in your system, you can use "BUSMASTER-x", where "x" is the number of w1_bus_master<b>x</b> in the sysfs, to explicitly define it. Default is always to use "1".<br>
+		</li>
 		<li>ff-xxxxxxxxxxxx is the id of a 1-Wire device as shown in sysfs tree where ff is the family. To use 1-Wire sensors call "sudo raspi-config" and enable the "1-Wire Interface" under "Interface options".</li>
 		<li>DHT11|12-&lt;gpio&gt defines a DHT11 or DHT22 sensor where gpio is the number of the used GPIO. This requires an additional Perl module which can be aquired <a href="https://github.com/bublath/rpi-dht">here</a>. Make sure to define the right type, since DHT11 and DHT22 sensors are similar, but require different algorithms to read. Also note that these are not 1-Wire (GPIO4) sensors and should be attached to GPIOs different to 4 and require one GPIO each.</li>
 		<br>
@@ -742,6 +768,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		<a id="RPI_1Wire-attr-mode"></a>
 			Reading values from the devices is typically blocking the execution of FHEM. In my tests a typical precision 12 temperature reading blocks for about 1s, a counter read for 0.2s and reading voltages about 0.5s.<br>
 			While this sounds minimal there are devices that may depend on timing (e.g. CUL_HM) and can be impacted if FHEM is blocked for so long. As a result this module is by default fork()ing a seperate process that does the read operation in parallel to normal FHEM execution, which should be ok for most users, but can be optimized if desired (see more in "set conv_time" above).<br>
+			Setting to timer mode is blocked for safety reasons in case conv_time is more than 9ms.<br>
 			Default: nonblocking, valid values: blocking,nonblocking,timer<br>
 		</li>
 		<li><b>faultvalues</b><br>
@@ -766,6 +793,8 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		<li>crc: data could be read, but there was a checksum failure. If that happens too often, check you cabling quality</li>
 		<li>no_data: The device could be opened, but no data was received</li>
 		<li>open_device: The device could not be opened. Likely it was disconnected</li>
+		<li><b>duration</b></li>
+		Duration of the last read out. In modes blocking and timer a warning is put into failreason if this get more than 0.5s<br>
 		<li><b>conv_time</b></li>
 		Only for temperature: The actual used conversion time (queried from the OS)<br>
 		Requires Linux Kernel 5.10+ (Raspbian Buster)<br>
