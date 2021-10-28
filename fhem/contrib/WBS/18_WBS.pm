@@ -14,12 +14,20 @@
 # Type = READING-NAME f.e.
 # CODE = Unique-Code for WBS-Sensors max. 16 Chars
 #
-# Example
+# Example 1
 # define WBS001 WBS Temperature 1032D8ED01080011
 # $defs$defs{WBS001}{TYPE} = WBS
 # $defs$defs{WBS001}{CODE} = 1032D8ED01080011
 # $defs{WBS001}{READINGS}{Temperature}{VAL} = 0
 # $defs{WBS001}{READINGS}{Temperature}{TIME} = TimeNow()
+#
+# Example 2
+# define WBS002 WBS String 1032D8ED01080012
+# $defs$defs{WBS002}{TYPE} = WBS
+# $defs$defs{WBS002}{CODE} = 1032D8ED01080012
+# $defs{WBS002}{READINGS}{String}{VAL} = SignalOK
+# $defs{WBS002}{READINGS}{String}{TIME} = TimeNow()
+#
 # Only One READING for each WBS
 #
 # Updates via WEB:
@@ -32,8 +40,12 @@
 # max-Lenght MSG: 3:16:8 = 29 Chars
 # Example: Temperature form Dallas 1820-Temp-Sensors 24.32 °Celsius
 # WBS:1032D8ED01080011:23.32
+#
+# Value -> String-Data -> Format: STRING
+#
 # Update via http-get-request
 # http://[MY_FHEMWEB:xxxx]/fhem/rawmsg?WBS:1032D8ED01080011:23.32
+# http://[MY_FHEMWEB:xxxx]/fhem/rawmsg?WBS:1032D8ED01080012:SignalOK
 ################################################################################
 package main;
 use strict;
@@ -108,9 +120,6 @@ sub WBS_Parse($$)
   if(length($code) > 16 ) {
 	return "WBS|Parse|ERROR: Max. Length CODE > 16";
   }
-  if(length($value) > 8) {
-	return "WBS|Parse|ERROR: Max. Length VALUE > 8";
-  }
   # Find Device-Name
   my $mod = "WBS";
   if(!defined($modules{$mod}{defptr}{$code})){
@@ -118,18 +127,25 @@ sub WBS_Parse($$)
   }
   my $wbs_name = $modules{$mod}{defptr}{$code};
   my $wbs = $defs{$wbs_name};
+  # if not a string: check maximum length of value
+  if($wbs->{WBS_TYPE} ne "String") {
+	if(length($value) > 8) {
+		return "WBS|Parse|ERROR: Max. Length VALUE > 8";
+	}
+  }
   #LogLevel
   my $ll = 0;
   if(defined($attr{$wbs_name}{loglevel})) {$ll = $attr{$wbs_name}{loglevel};}
-  #Clean-Value
-  $value =~ s/[^0123456789.-]//g;
+  #if reading-type is not of type string: Clean-Value
+  if($wbs->{WBS_TYPE} ne "String") {$value =~ s/[^0123456789.-]//g;}
   # Get Reading
   my $reading = $wbs->{WBS_TYPE};
   $wbs->{READINGS}{$reading}{VAL} = $value;
   $wbs->{READINGS}{$reading}{TIME} = TimeNow();
   # State: [FirstChar READING]:VALUE
   my $fc = uc(substr($reading,0,1));
-  $wbs->{STATE} = "$fc: $value | " . TimeNow();
+#  $wbs->{STATE} = "$fc: $value | " . TimeNow();
+  $wbs->{STATE} = "$fc: $value";
   # Changed
   $wbs->{CHANGED}[0] = "$reading: $value";
   return $wbs_name;
