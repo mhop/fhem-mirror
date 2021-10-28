@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 213001927';
+my $HMCCU_VERSION = '5.0 213011850';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -6642,11 +6642,9 @@ sub HMCCU_SetDefaultAttributes ($;$)
 	$parRef //= { mode => 'update', role => undef, roleChn => undef };
 	my $role;
 
-#	HMCCU_Log ($clHash, 2, HMCCU_RefToString($parRef));
-
 	if ($parRef->{mode} eq 'reset') {
 		# List of attributes to be removed
-		my @removeAttr = ('ccureadingname', 'ccuscaleval', 'eventMap', 'cmdIcon',
+		my @removeAttr = ('ccureadingname', 'ccuscaleval', 'cmdIcon',
 			'substitute', 'webCmd', 'widgetOverride'
 		);
 

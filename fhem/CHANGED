@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: Keep eventMap when resetting attributes
  - bugfix:  88_HMCCU: Fixed attribute room bug
  - new:     58_RPI_1Wire: Raspberry Pi 1Wire interface replacing 58_GPIO4
  - change:  73_AutoShuttersControl: change names of CommandTemplate variables,

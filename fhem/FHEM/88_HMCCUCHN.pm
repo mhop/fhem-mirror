@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 213001927';
+my $HMCCUCHN_VERSION = '5.0 213011850';
 
 ######################################################################
 # Initialize module
@@ -360,12 +360,14 @@ sub HMCCUCHN_Set ($@)
 	elsif ($lcopt eq 'defaults') {
 		my $mode = shift @$a // 'update';
 		my $rc = 0;
+		my $retMsg = 'OK';
 		if ($mode ne 'old') {
 			$rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, roleChn => undef });
+			$retMsg = 'Please remove HMCCU 4.3 entries from attribute eventMap' if ($rc && $mode eq 'reset' && exists($attr{$name}{eventMap}));
 		}
 		$rc = HMCCU_SetDefaults ($hash) if (!$rc);
 		HMCCU_RefreshReadings ($hash) if ($rc);
-		return HMCCU_SetError ($hash, $rc == 0 ? "No default attributes found" : "OK");
+		return HMCCU_SetError ($hash, $rc == 0 ? 'No default attributes found' : $retMsg);
 	}
 	else {
 		return "Unknown argument $opt choose one of $syntax";
