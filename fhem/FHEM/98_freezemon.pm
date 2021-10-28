@@ -110,7 +110,7 @@ package main;
 use strict;
 use warnings;
 
-use Data::Dumper;
+#use Data::Dumper;
 
 use POSIX;
 use Time::HiRes qw(gettimeofday);
@@ -371,9 +371,6 @@ sub freezemon_ProcessTimer($) {
 
         #get the timers that were executed in last cycle
         my $first = $intAtA[0]->{TRIGGERTIME};
-		if (!defined $first) {
-			print Dumper(@intAtA);
-		}
         foreach my $c ( $hash->{helper}{inAt} ) {
             foreach my $d (@$c) {
                 last if ( $d->{TRIGGERTIME} >= $first );
