@@ -1,4 +1,4 @@
-ï»¿Files with a maintainer. If you wish to change a file, please contact the
+Files with a maintainer. If you wish to change a file, please contact the
 maintainer of the file to do the change.
 
 The third column specifies, where/how the maintainer should be contacted. If
@@ -81,7 +81,7 @@ FHEM/10_RESIDENTS.pm         loredo               Automatisierung
 FHEM/10_SD_GT.PM             sidey/elektron-bbs   SlowRF
 FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
 FHEM/10_UNIRoll.pm           C_Herrmann           SlowRF
-FHEM/10_WS980.pm             choenig              UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/10_WS980.pm             choenig              Unterstützende Dienste/Wettermodule
 FHEM/10_ZWave.pm             rudolfkoenig         ZWave
 FHEM/10_FS10.pm              sidey/elektron-bbs   SlowRF
 FHEM/11_FHT.pm               rudolfkoenig         SlowRF
@@ -155,6 +155,7 @@ FHEM/23_LUXTRONIK2.pm        TH9                  Heizungssteuerung/Raumklima (l
 FHEM/24_Iluminize.pm         VolkerKettenbach     Sonstige Systeme
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  Sonstiges
 FHEM/24_TPLinkHS110.pm       VolkerKettenbach     Sonstige Systeme
+FHEM/26_KM273.pm             mike3436             Heizungssteuerung/Raumklima
 FHEM/26_tahoma.pm            mike3436             Sonstige Systeme
 FHEM/30_DUOFERN              telekatz             Sonstige Systeme
 FHEM/30_ENECSYSGW.pm         akw                  Sonstige Systeme
@@ -176,12 +177,12 @@ FHEM/31_MilightDevice.pm     mattwire             Beleuchtung
 FHEM/31_Nello.pm             neumann              Sonstige Systeme
 FHEM/32_mailcheck.pm         justme1968           Automatisierung
 FHEM/32_speedtest.pm         justme1968           Sonstiges
-FHEM/32_SYSSTAT.pm           justme1968           UnterstÃ¼tzende Dienste
+FHEM/32_SYSSTAT.pm           justme1968           Unterstützende Dienste
 FHEM/32_TechemHKV.pm         herrmannj            Heizungssteuerung/Raumklima
 FHEM/32_TechemWZ.pm          herrmannj            Sonstiges
 FHEM/32_WifiLight.pm         herrmannj            Beleuchtung
 FHEM/32_withings.pm          markus-m             Sonstiges
-FHEM/32_yowsup.pm            justme1968           UnterstÃ¼tzende Dienste
+FHEM/32_yowsup.pm            justme1968           Unterstützende Dienste
 FHEM/33_readingsChange.pm    rudolfkoenig         Automatisierung
 FHEM/33_readingsGroup.pm     justme1968           Frontends/readingsGroup readingsHistory
 FHEM/33_readingsHistory.pm   justme1968           Frontends/readingsGroup readingsHistory
@@ -232,10 +233,10 @@ FHEM/42_AptToDate.pm         CoolTux              Sonstige Systeme
 FHEM/42_Nextion.pm           viegener             Bastelecke
 FHEM/42_npmjs.pm             loredo               Sonstige Systeme
 FHEM/42_RFXMETER.pm          wherzig              RFXTRX
-FHEM/42_SMARTMON.pm          hexenmeister         UnterstÃ¼tzende Dienste
-FHEM/42_SYSMON.pm            hexenmeister         UnterstÃ¼tzende Dienste
+FHEM/42_SMARTMON.pm          hexenmeister         Unterstützende Dienste
+FHEM/42_SYSMON.pm            hexenmeister         Unterstützende Dienste
 FHEM/43_RFXX10REC.pm         wherzig              RFXTRX
-FHEM/44_ROLLO.pm             KernSani             UnterstÃ¼tzende Dienste
+FHEM/44_ROLLO.pm             KernSani             Unterstützende Dienste
 FHEM/44_S7.pm                charlie71            Sonstige Systeme
 FHEM/44_S7_ARead.pm          charlie71            Sonstige Systeme
 FHEM/44_S7_AWrite.pm         charlie71            Sonstige Systeme
@@ -264,13 +265,13 @@ FHEM/49_Arlo.pm              maluk                Sonstige Systeme
 FHEM/49_IPCAM.pm             delmar               Sonstiges
 FHEM/49_SSCam.pm             DS_Starter           Sonstiges
 FHEM/49_SSCamSTRM.pm         DS_Starter           Sonstiges
-FHEM/49_TBot_List.pm         viegener             UnterstÃ¼tzende Dienste
-FHEM/50_HP1000.pm            loredo               UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/49_TBot_List.pm         viegener             Unterstützende Dienste
+FHEM/50_HP1000.pm            loredo               Unterstützende Dienste/Wettermodule
 FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
 FHEM/50_SSChatBot.pm         DS_Starter           Sonstiges
 FHEM/50_SSFile.pm            DS_Starter           Sonstiges
-FHEM/50_TelegramBot.pm       viegener             UnterstÃ¼tzende Dienste
-FHEM/50_Signalbot.pm         Adimarantis          UnterstÃ¼tzende Dienste https://forum.fhem.de/index.php/topic,118370.msg1176583.html#new
+FHEM/50_TelegramBot.pm       viegener             Unterstützende Dienste
+FHEM/50_Signalbot.pm         Adimarantis          Unterstützende Dienste https://forum.fhem.de/index.php/topic,118370.msg1176583.html#new
 FHEM/50_WS300.pm             Dirk                 SlowRF
 FHEM/51_I2C_BH1750.pm        arnoaugustin         Einplatinencomputer (bitte auch PM)
 FHEM/51_I2C_BMP180.pm        Dirk                 Einplatinencomputer
@@ -297,25 +298,25 @@ FHEM/52_I2C_PCF8574          klausw               Sonstige Systeme
 FHEM/52_I2C_SHT21            klausw               Sonstige Systeme
 FHEM/52_I2C_SHT3x            macs                 Sonstige Systeme
 FHEM/53_GHoma.pm             klausw               Sonstige Systeme
-FHEM/55_DWD_OpenData.pm      jensb                UnterstÃ¼tzende Dienste/Wettermodule
-FHEM/55_InfoPanel.pm         betateilchen         UnterstÃ¼tzende Dienste
+FHEM/55_DWD_OpenData.pm      jensb                Unterstützende Dienste/Wettermodule
+FHEM/55_InfoPanel.pm         betateilchen         Unterstützende Dienste
 FHEM/55_PIFACE.pm            klaus.schauer        Einplatinencomputer
 FHEM/56_POKEYS.pm            axelberner           Sonstiges
-FHEM/57_Calendar.pm          neubert              UnterstÃ¼tzende Dienste/Kalendermodule
-FHEM/57_CALVIEW.pm           chris1284            UnterstÃ¼tzende Dienste/Kalendermodule
-FHEM/57_SSCal.pm             DS_Starter           UnterstÃ¼tzende Dienste/Kalendermodule
+FHEM/57_Calendar.pm          neubert              Unterstützende Dienste/Kalendermodule
+FHEM/57_CALVIEW.pm           chris1284            Unterstützende Dienste/Kalendermodule
+FHEM/57_SSCal.pm             DS_Starter           Unterstützende Dienste/Kalendermodule
 FHEM/58_HVAC_DaikinAC.pm     roelb                Heizungssteuerung/Raumklima (preferably in English and a copy as PM)
 FHEM/58_RPI_1Wire.pm         Adimarantis          Einplatinencomputer  https://forum.fhem.de/index.php/topic,123499.0.html
 FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
-FHEM/59_OPENWEATHER.pm       tupol                UnterstÃ¼tzende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_PROPLANTA.pm         tupol                UnterstÃ¼tzende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          Beta-User/orphan     UnterstÃ¼tzende Dienste/Wettermodule (Forum Thread #114061)   https://forum.fhem.de/index.php/topic,114061.0.html
-FHEM/59_Weather.pm           neubert              UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/59_OPENWEATHER.pm       tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
+FHEM/59_PROPLANTA.pm         tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
+FHEM/59_Twilight.pm          Beta-User/orphan     Unterstützende Dienste/Wettermodule (Forum Thread #114061)   https://forum.fhem.de/index.php/topic,114061.0.html
+FHEM/59_Weather.pm           neubert              Unterstützende Dienste/Wettermodule
 FHEM/59_Wunderground.pm      loredo               (deprecated)
-FHEM/59_WUup.pm              mahowi               UnterstÃ¼tzende Dienste/Wettermodule
-FHEM/59_WWO.pm               baumrasen            UnterstÃ¼tzende Dienste/Wettermodule
-FHEM/60_allergy.pm           markus-m             UnterstÃ¼tzende Dienste
+FHEM/59_WUup.pm              mahowi               Unterstützende Dienste/Wettermodule
+FHEM/59_WWO.pm               baumrasen            Unterstützende Dienste/Wettermodule
+FHEM/60_allergy.pm           markus-m             Unterstützende Dienste
 FHEM/60_EM.pm                rudolfkoenig         SlowRF
 FHEM/60_Watches.pm           DS_Starter           Sonstiges
 FHEM/61_EMWZ.pm              rudolfkoenig         SlowRF
@@ -333,7 +334,7 @@ FHEM/66_EseraOneWire.pm      pizmus               1Wire
 FHEM/66_EseraShutter.pm      pizmus               1Wire
 FHEM/66_EseraTemp.pm         pizmus               1Wire
 FHEM/67_ECMDDevice.pm        neubert              Sonstige Systeme
-FHEM/69_SoftliqCloud.pm      KernSani             UnterstÃ¼tzende Dienste
+FHEM/69_SoftliqCloud.pm      KernSani             Unterstützende Dienste
 FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme
 FHEM/70_BRAVIA.pm            vuffiraa             Multimedia
 FHEM/70_CanOverEthernet.pm   delmar               Sonstige Systeme
@@ -341,7 +342,7 @@ FHEM/70_DENON_AVR.pm         delmar               Multimedia
 FHEM/70_EGPM.pm              alexus               Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               Multimedia
 FHEM/70_HYDRAWISE.pm         xasher               Hydrawise irrigation
-FHEM/70_Jabber.pm            BioS                 UnterstÃ¼tzende Dienste
+FHEM/70_Jabber.pm            BioS                 Unterstützende Dienste
 FHEM/70_JSONMETER.pm         tupol                Sonstiges (Link als PM an tupol)
 FHEM/70_KODI.pm              vbs                  Multimedia
 FHEM/70_LaMetric2.pm         loredo               Multimedia
@@ -351,11 +352,11 @@ FHEM/70_ONKYO_AVR.pm         delmar               Multimedia
 FHEM/70_OctoPrint.pm         michael.winkler      Multimedia
 FHEM/70_PHTV.pm              loredo               Multimedia
 FHEM/70_PIONEERAVR.pm        50watt               Multimedia
-FHEM/70_Pushbullet.pm        fhainz               UnterstÃ¼tzende Dienste
-FHEM/70_PushNotifier.pm      xusader              UnterstÃ¼tzende Dienste
-FHEM/70_Pushover.pm          loredo               UnterstÃ¼tzende Dienste
-FHEM/70_Pushsafer.pm         markusbloch          UnterstÃ¼tzende Dienste
-FHEM/70_SamsungAV.pm         KÃ¶lnSolar            Multimedia
+FHEM/70_Pushbullet.pm        fhainz               Unterstützende Dienste
+FHEM/70_PushNotifier.pm      xusader              Unterstützende Dienste
+FHEM/70_Pushover.pm          loredo               Unterstützende Dienste
+FHEM/70_Pushsafer.pm         markusbloch          Unterstützende Dienste
+FHEM/70_SamsungAV.pm         KölnSolar            Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  Sonstiges
 FHEM/70_SISPM.pm             real-wusel           Sonstiges
 FHEM/70_SML.pm               bentele              Sonstiges
@@ -379,28 +380,28 @@ FHEM/71_YAMAHA_MC.pm         Leugi                Multimedia
 FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia
 FHEM/71_ZM_Monitor.pm        delmar               Sonstige Systeme
 FHEM/72_FB_CALLLIST.pm       markusbloch          Frontends
-FHEM/72_FB_CALLMONITOR.pm    markusbloch          UnterstÃ¼tzende Dienste
+FHEM/72_FB_CALLMONITOR.pm    markusbloch          Unterstützende Dienste
 FHEM/72_FRITZBOX.pm          tupol                FRITZ!Box (link als PM an tupol)
 FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
 FHEM/72_XiaomiDevice.pm      markus-m             Sonstige Systeme
 FHEM/73_AMADCommBridge.pm    CoolTux              Sonstige Systeme
 FHEM/73_AutoShuttersControl.pm CoolTux            Automatisierung
 FHEM/73_DoorBird.pm          Sailor               Sonstige Systeme https://forum.fhem.de/index.php/topic,100758
-FHEM/73_ElectricityCalculator.pm Sailor           UnterstÃ¼tzende Dienste https://forum.fhem.de/index.php/topic,57106.0.html
+FHEM/73_ElectricityCalculator.pm Sailor           Unterstützende Dienste https://forum.fhem.de/index.php/topic,57106.0.html
 FHEM/73_GardenaSmartBridge.pm CoolTux             Sonstige Systeme
-FHEM/73_GasCalculator        Sailor               UnterstÃ¼tzende Dienste https://forum.fhem.de/index.php/topic,47909.0.html
+FHEM/73_GasCalculator        Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,47909.0.html
 FHEM/73_km200.pm             Sailor               Heizungssteuerung/Raumklima https://forum.fhem.de/index.php/topic,25540.0.html
 FHEM/73_MPD.pm               Wzut                 Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
-FHEM/73_PRESENCE.pm          markusbloch          UnterstÃ¼tzende Dienste
-FHEM/73_WaterCalculator      Sailor               UnterstÃ¼tzende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
+FHEM/73_PRESENCE.pm          markusbloch          Unterstützende Dienste
+FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
 FHEM/74_HOMBOT.pm            CoolTux              sonstige Systeme
 FHEM/74_HusqvarnaAutomower.pm krannich            Sonstige Systeme
-FHEM/74_Nmap.pm              igami                UnterstÃ¼tzende Dienste
+FHEM/74_Nmap.pm              igami                Unterstützende Dienste
 FHEM/74_NUKIDevice.pm        CoolTux              Sonstige Systeme
-FHEM/74_THINKINGCLEANER.pm   loredo               UnterstÃ¼tzende Dienste
+FHEM/74_THINKINGCLEANER.pm   loredo               Unterstützende Dienste
 FHEM/74_Unifi.pm             rapster/wuehler      Automatisierung
 FHEM/74_UnifiSwitch.pm       wuehler              Automatisierung
 FHEM/74_UnifiClient.pm       wuehler              Automatisierung
@@ -414,7 +415,7 @@ FHEM/76_MSGMail.pm           gandy                Automatisierung
 FHEM/76_SMAInverter.pm       MadMax/DS_Starter    Sonstige Systeme
 FHEM/77_SMAEM.pm             VolkerKettenbach     Sonstige Systeme
 FHEM/77_SMASTP.pm            VolkerKettenbach     Sonstige Systeme
-FHEM/77_UWZ.pm               CoolTux              UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/77_UWZ.pm               CoolTux              Unterstützende Dienste/Wettermodule
 FHEM/79_BDKM.pm              arnoaugustin         Heizungssteuerung/Raumklima (bitte auch PM)
 FHEM/80_M232.pm              neubert              Sonstige Systeme
 FHEM/81_M232Counter.pm       neubert              Sonstige Systeme
@@ -454,24 +455,24 @@ FHEM/93_DbLog.pm             DS_Starter           Automatisierung
 FHEM/93_DbRep.pm             DS_Starter           Sonstiges
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         Automatisierung
 FHEM/93_Log2Syslog.pm        DS_Starter           Automatisierung
-FHEM/93_InfluxDBLogger.pm    timmib               UnterstÃ¼tzende Dienste
+FHEM/93_InfluxDBLogger.pm    timmib               Unterstützende Dienste
 FHEM/93_PWMR.pm              jamesgo              Heizungssteuerung/Raumklima
 FHEM/94_PWM.pm               jamesgo              Heizungssteuerung/Raumklima
-FHEM/95_Alarm.pm             pahenning            UnterstÃ¼tzende Dienste
-FHEM/95_Astro.pm             pahenning,loredo,CoolTux            UnterstÃ¼tzende Dienste
-FHEM/95_Babble.pm            pahenning            UnterstÃ¼tzende Dienste
+FHEM/95_Alarm.pm             pahenning            Unterstützende Dienste
+FHEM/95_Astro.pm             pahenning,loredo,CoolTux            Unterstützende Dienste
+FHEM/95_Babble.pm            pahenning            Unterstützende Dienste
 FHEM/95_Dashboard.pm         DS_Starter           Frontends
 FHEM/95_FLOORPLAN.pm         ulimaass             Frontends/FLOORPLAN
 FHEM/95_holiday.pm           rudolfkoenig         Sonstiges
-FHEM/95_PostMe.pm            pahenning            UnterstÃ¼tzende Dienste
+FHEM/95_PostMe.pm            pahenning            Unterstützende Dienste
 FHEM/95_remotecontrol.pm     ulimaass             Frontends
-FHEM/95_YAAHM.pm             pahenning            UnterstÃ¼tzende Dienste
+FHEM/95_YAAHM.pm             pahenning            Unterstützende Dienste
 FHEM/96_allowed.pm           rudolfkoenig         Automatisierung
 FHEM/96_SIP.pm               Wzut,plin            Sonstiges
 FHEM/96_Snapcast.pm          rudolfkoenig/orphan  Multimedia
 FHEM/97_PiXtendV2            PiXtend              Sonstige Systeme https://forum.fhem.de/index.php/topic,116308.0.html
-FHEM/97_TrashCal.pm          Tobias               UnterstÃ¼tzende Dienste
-FHEM/98_alarmclock.pm        FlorianZ             UnterstÃ¼tzende Dienste
+FHEM/97_TrashCal.pm          Tobias               Unterstützende Dienste
+FHEM/98_alarmclock.pm        FlorianZ             Unterstützende Dienste
 FHEM/98_apptime.pm           martinp876           Sonstiges
 FHEM/98_archetype.pm         igami                Automatisierung
 FHEM/98_ArduCounter.pm       StefanStrobel        Sonstiges
@@ -486,7 +487,7 @@ FHEM/98_configdb.pm          betateilchen         Sonstiges
 FHEM/98_copy.pm              justme1968           Sonstiges
 FHEM/98_count.pm             betateilchen         Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         Sonstiges
-FHEM/98_CustomReadings.pm    HCS                  UnterstÃ¼tzende Dienste
+FHEM/98_CustomReadings.pm    HCS                  Unterstützende Dienste
 FHEM/98_dewpoint.pm          hotbso               Automatisierung
 FHEM/98_DLNARenderer.pm      dominikkarall        Multimedia
 FHEM/98_DOIF.pm              damian-s             Automatisierung/DOIF
@@ -494,16 +495,16 @@ FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        Sonstige Systeme
 FHEM/98_dummy.pm             rudolfkoenig         Automatisierung
 FHEM/98_DSBMobile 			 KernSani 			  Codeschnipsel https://forum.fhem.de/index.php/topic,107104.0.html
-FHEM/98_expandJSON.pm        dev0                 UnterstÃ¼tzende Dienste
+FHEM/98_expandJSON.pm        dev0                 Unterstützende Dienste
 FHEM/98_feels_like.pm        hotbso               Wettermodule
 FHEM/98_fhemdebug.pm         rudolfkoenig         Sonstiges
 FHEM/98_FhemTestUtils.pm     rudolfkoenig         Development
 FHEM/98_fheminfo.pm          betateilchen         Sonstiges
-FHEM/98_freezemon            KernSani             UnterstÃ¼tzende Dienste
+FHEM/98_freezemon            KernSani             Unterstützende Dienste
 FHEM/98_FReplacer.pm         StefanStrobel        Sonstiges
 FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
-FHEM/98_GEOFANCY.pm          loredo               UnterstÃ¼tzende Dienste
-FHEM/98_GoogleAuth.pm        betateilchen         UnterstÃ¼tzende Dienste
+FHEM/98_GEOFANCY.pm          loredo               Unterstützende Dienste
+FHEM/98_GoogleAuth.pm        betateilchen         Unterstützende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
@@ -512,12 +513,12 @@ FHEM/98_HTTPMOD.pm           StefanStrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
 FHEM/98_IF.pm                damian-s             Automatisierung
 FHEM/98_inotify.pm           marvin78             Automatisierung
-FHEM/98_Installer.pm         loredo               UnterstÃ¼tzende Dienste
+FHEM/98_Installer.pm         loredo               Unterstützende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_JsonMod.pm           herrmannj            Automatisierung
-FHEM/98_livetracking.pm      markus-m             UnterstÃ¼tzende Dienste
+FHEM/98_livetracking.pm      markus-m             Unterstützende Dienste
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
-FHEM/98_search.pm            loredo               UnterstÃ¼tzende Dienste
+FHEM/98_search.pm            loredo               Unterstützende Dienste
 FHEM/98_MAX_Temperature.pm   Wzut/Bismosa         MAX
 FHEM/98_MaxScanner.pm        john                 MAX
 FHEM/98_MediaList.pm         Tobias               Multimedia
@@ -530,35 +531,35 @@ FHEM/98_monitoring.pm        igami                Automatisierung
 FHEM/98_notice.pm            mfr69bs              Sonstiges
 FHEM/98_PHC.pm               StefanStrobel        Sonstiges
 FHEM/98_PID20.pm             John                 Automatisierung
-FHEM/98_pilight.pm           andreas-fey          UnterstÃ¼tzende Dienste
+FHEM/98_pilight.pm           andreas-fey          Unterstützende Dienste
 FHEM/98_ping                 mattwire             Sonstiges
-FHEM/98_powerMap             igami                UnterstÃ¼tzende Dienste
-FHEM/98_QRCode.pm            Benni                UnterstÃ¼tzende Dienste
+FHEM/98_powerMap             igami                Unterstützende Dienste
+FHEM/98_QRCode.pm            Benni                Unterstützende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
-FHEM/98_RandomTimer.pm       Beta-User            UnterstÃ¼tzende Dienste/Kalendermodule
+FHEM/98_RandomTimer.pm       Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_readingsWatcher	     Wzut                 Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
-FHEM/98_rssFeed.pm           Benni                UnterstÃ¼tzende Dienste
-FHEM/98_serviced.pm          DeeSPe               UnterstÃ¼tzende Dienste
-FHEM/98_statistics.pm        tupol                UnterstÃ¼tzende Dienste (Link als PM an tupol)
+FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
+FHEM/98_serviced.pm          DeeSPe               Unterstützende Dienste
+FHEM/98_statistics.pm        tupol                Unterstützende Dienste (Link als PM an tupol)
 FHEM/98_structure.pm         rudolfkoenig         Automatisierung
 FHEM/98_SVG.pm               rudolfkoenig         Frontends/SVG/Plots/logProxy
-FHEM/98_systemd_watchdog.pm  hexenmeister         UnterstÃ¼tzende Dienste
+FHEM/98_systemd_watchdog.pm  hexenmeister         Unterstützende Dienste
 FHEM/98_telnet.pm            rudolfkoenig         Automatisierung
-FHEM/98_Text2Speech.pm       Tobias               UnterstÃ¼tzende Dienste
+FHEM/98_Text2Speech.pm       Tobias               Unterstützende Dienste
 FHEM/98_THRESHOLD.pm         damian-s             Automatisierung
-FHEM/98_todoist.pm           marvin78             UnterstÃ¼tzende Dienste
-FHEM/98_TRAFFIC.pm           jmike                UnterstÃ¼tzende Dienste
+FHEM/98_todoist.pm           marvin78             Unterstützende Dienste
+FHEM/98_TRAFFIC.pm           jmike                Unterstützende Dienste
 FHEM/98_UbiquitiMP.pm        Wzut                 Sonstige Systeme
 FHEM/98_UbiquitiOut.pm       Wzut                 Sonstige Systeme
 FHEM/98_update.pm            rudolfkoenig         Sonstiges
-FHEM/98_Verkehrsinfo.pm      martins              UnterstÃ¼tzende Dienste
+FHEM/98_Verkehrsinfo.pm      martins              Unterstützende Dienste
 FHEM/98_version.pm           markusbloch          Sonstiges
 FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
-FHEM/98_WeekdayTimer.pm      Beta-User            UnterstÃ¼tzende Dienste/Kalendermodule
+FHEM/98_WeekdayTimer.pm      Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_weekprofile.pm       risiko               Frontends
-FHEM/98_WOL.pm               KernSani             UnterstÃ¼tzende Dienste
+FHEM/98_WOL.pm               KernSani             Unterstützende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         Automatisierung
@@ -566,7 +567,7 @@ FHEM/AttrTemplate.pm         rudolfkoenig         Automatisierung
 FHEM/Blocking.pm             rudolfkoenig         Automatisierung
 FHEM/Color.pm                justme1968           Sonstiges
 FHEM/CoProcess.pm            justme1968           Sonstiges
-FHEM/DarkSkyAPI.pm           CoolTux              UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/DarkSkyAPI.pm           CoolTux              Unterstützende Dienste/Wettermodule
 FHEM/DevIo.pm                rudolfkoenig         Sonstiges
 FHEM/FritzBoxUtils.pm        rudolfkoenig         FRITZ!Box
 FHEM/GPUtils.pm              CoolTux              FHEM Development
@@ -578,7 +579,7 @@ FHEM/MaxCommon.pm            Wzut                 MAX
 FHEM/Meta.pm                 loredo               FHEM Development
 FHEM/msgSchema.pm            loredo               Automatisierung
 FHEM/ONKYOdb.pm              delmar               Multimedia
-FHEM/OpenWeatherMapAPI.pm    CoolTux              UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/OpenWeatherMapAPI.pm    CoolTux              Unterstützende Dienste/Wettermodule
 FHEM/OWX_DS2480.pm           ntruchsess           1Wire
 FHEM/OWX_DS9097.pm           ntruchsess           1Wire
 FHEM/OWX_FRM.pm              ntruchsess           1Wire
@@ -594,7 +595,7 @@ FHEM/TR064Utils.pm           rudolfkoenig         Automatisierung
 FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/WMBus.pm                kaihs                Sonstige Systeme
-FHEM/wundergroundAPI.pm      loredo               UnterstÃ¼tzende Dienste/Wettermodule
+FHEM/wundergroundAPI.pm      loredo               Unterstützende Dienste/Wettermodule
 FHEM/YahooWeatherAPI.pm      neubert              (deprecated)
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
 FHEM/holiday/*               betateilchen         Sonstiges
@@ -622,8 +623,8 @@ contrib/DS_Starter/*         DS_Starter           Sonstiges
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
 contrib/98_exportdevice.pm   loredo               (deprecated)
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
-contrib/97_SprinkleControl.pm Tobias              UnterstÃ¼tzende Dienste
-contrib/98_Sprinkle.pm       Tobias               UnterstÃ¼tzende Dienste
+contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
+contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
 contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
 contrib/AttrTemplate/99_sonos2mqttUtils.pm Otto123 MQTT
@@ -637,8 +638,8 @@ contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung
 contrib/Infratec/*           Wzut                 Bastelecke
 contrib/META.json.full.txt   loredo               FHEM Development
 contrib/META.json.txt        loredo               FHEM Development
-contrib/PRESENCE             markusbloch          UnterstÃ¼tzende Dienste
-contrib/PRESENCE/lepresenced PatrickR             UnterstÃ¼tzende Dienste
+contrib/PRESENCE             markusbloch          Unterstützende Dienste
+contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
 contrib/SIP/*                Wzut                 Sonstiges
 contrib/WebViewControl/*     Dirk                 Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          Frontends
