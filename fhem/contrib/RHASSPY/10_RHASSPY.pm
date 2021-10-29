@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24786 2021-09-21 + Beta-User$
+# $Id: 10_RHASSPY.pm 24786 2021-10-17 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -246,8 +246,9 @@ my $de_mappings = {
 
 BEGIN {
 
-  GP_Import(qw(
+  GP_Import( qw(
     addToAttrList
+    addToDevAttrList
     delFromDevAttrList
     delFromAttrList
     readingsSingleUpdate
@@ -295,9 +296,7 @@ BEGIN {
     FileRead
     getAllSets
     trim
-  ))
-    #round
-
+  ) )
 };
 
 # MQTT Topics die das Modul automatisch abonniert
@@ -348,7 +347,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.40';
+    $hash->{MODULE_VERSION} = '0.4.41a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -376,16 +375,23 @@ sub firstInit {
 
     # IO
     AssignIoPort($hash);
-    my $IODev = AttrVal( $name, 'IODev', ReadingsVal( $name, 'IODev', InternalVal($name, 'IODev', undef )->{NAME}));
+    my $IODev = AttrVal( $name, 'IODev', ReadingsVal( $name, 'IODev', defined InternalVal($name, 'IODev', undef ) ? InternalVal($name, 'IODev', undef )->{NAME} : undef ));
 
-    return if !$init_done || !defined $IODev;
+    return if !$init_done; # || !defined $IODev;
     RemoveInternalTimer($hash);
     deleteAllRegIntTimer($hash);
 
     fetchSiteIds($hash) if !ReadingsVal( $name, 'siteIds', 0 );
     initialize_rhasspyTweaks($hash, AttrVal($name,'rhasspyTweaks', undef ));
     fetchIntents($hash);
-    IOWrite($hash, 'subscriptions', join q{ }, @topics) if InternalVal($IODev,'TYPE',undef) eq 'MQTT2_CLIENT';
+    delete $hash->{ERRORS};
+    if ( !defined InternalVal($name, 'IODev',undef) ) {
+        Log3( $hash, 1, "[$name] no suitable IO found, please define one and/or also add :RHASSPY: to clientOrder");
+        $hash->{ERRORS} = 'no suitable IO found, please define one and/or also add :RHASSPY: to clientOrder!';
+    }
+    IOWrite($hash, 'subscriptions', join q{ }, @topics) 
+        if defined InternalVal($name, 'IODev',undef) 
+        && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
 
     return;
@@ -436,20 +442,25 @@ sub initialize_prefix {
     addToAttrList("${prefix}Name",'RHASSPY');
     addToAttrList("${prefix}Room",'RHASSPY');
     addToAttrList("${prefix}Mapping:textField-long",'RHASSPY');
-    #addToAttrList("${prefix}Channels:textField-long");
-    #addToAttrList("${prefix}Colors:textField-long");
     addToAttrList("${prefix}Group:textField",'RHASSPY');
     addToAttrList("${prefix}Specials:textField-long",'RHASSPY');
+    for (devspec2array("${prefix}Colors=.+")) {
+        addToDevAttrList($_, "${prefix}Colors:textField-long",'RHASSPY');
+    }
+    for (devspec2array("${prefix}Channels=.+")) {
+        addToDevAttrList($_, "${prefix}Channels:textField-long",'RHASSPY');
+    }
 
     return if !$init_done || !defined $old_prefix;
     my @devs = devspec2array("$hash->{devspec}");
     my @rhasspys = devspec2array("TYPE=RHASSPY:FILTER=prefix=$old_prefix");
 
-    for my $detail (qw( Name Room Mapping Group Specials)) { 
+    for my $detail ( qw( Name Room Mapping Group Specials Channels Colors ) ) { 
         for my $device (@devs) {
-            my $aval = AttrVal($device, "${old_prefix}$detail", undef);
+            my $aval = AttrVal($device, "${old_prefix}$detail", undef); 
             CommandAttr($hash, "$device ${prefix}$detail $aval") if $aval;
             CommandDeleteAttr($hash, "$device ${old_prefix}$detail") if @rhasspys < 2;
+            delFromDevAttrList($device,"${old_prefix}$detail") if @rhasspys < 2 && ($detail eq "Channels" || $detail eq "Colors");
         }
         delFromAttrList("${old_prefix}$detail") if @rhasspys < 2;
     }
@@ -4805,12 +4816,13 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confirmIntents"></a>
       <li><b>confirmIntents</b>
-        <p>This key may contain <i>&lt;Intent&gt;=&lt;regex&gt;</i> pairs beeing 
+        <p>This key may contain <i>&lt;Intent&gt;=&lt;regex&gt;</i> pairs beeing </p>
         <ul>
         <li><i>Intent</i> one of the intents supporting confirmation feature (all set type intents)  and </li>
         <li><i>regex</i> containing a regular expression matching to either the group name (for group intents) or the device name(s) - using a full match lookup. If intent and regex match, a confirmation will be requested.
-        </ul>
         Example: <p><code>confirmIntents=SetOnOffGroup=light|blinds SetOnOff=blind.*</code></p>
+        </li>
+        </ul>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confirmIntentResponses"></a>
       <li><b>confirmIntentResponses</b>
@@ -4820,10 +4832,11 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-intentFilter"></a>
       <li><b>intentFilter</b>
-        <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.
+        <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
       </li>
     </ul>
   </li>
+  
 
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
