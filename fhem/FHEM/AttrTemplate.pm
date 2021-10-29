@@ -26,6 +26,9 @@ package main;
 # - order:<val> sort the templates for help purposes.
 # - option:<perl> if perl code return false, skip all commands until next
 #   option (or name:)
+# - loop:<variable>:1:2:3:...  replicate the commands between this line and
+#   loop:END, and replace <variable> in each iteration with the values in the
+#   colon separated list
 
 
 my %templates;
@@ -332,7 +335,34 @@ AttrTemplate_Set($$@)
     }
   }
 
-  my $cmdlist = join("\n",@{$h->{cmds}});
+  # Loop unrolling
+  my @cmds;
+  for(my $i1 = 0; $i1 < @{$h->{cmds}}; $i1++) {
+    my $cmd = $h->{cmds}[$i1];
+
+    if($cmd =~ m/^loop:([^:]*):/) {
+      my @loop = split(":", $cmd);
+      my $var = $1;
+      my $i2;
+      for($i2=$i1+1; $i2<@{$h->{cmds}}; $i2++) {
+        last if($h->{cmds}[$i2] =~ m/^loop:END/)
+      }
+      for(my $i3=2; $i3<@loop; $i3++) {
+        for(my $i4=$i1+1; $i4<$i2; $i4++) {
+          $cmd = $h->{cmds}[$i4];
+          $cmd =~ s/$var/$loop[$i3]/g;
+          push @cmds, $cmd;
+        }
+      }
+      $i1=$i2;
+
+    } else {
+      push @cmds, $cmd;
+    }
+
+  }
+  my $cmdlist = join("\n",@cmds);
+
   $repl{DEVICE} = $name;
   Log3 $name, 5, "AttrTemplate replace ".
                         join(",", map { "$_=>$repl{$_}" } sort keys %repl);
