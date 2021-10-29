@@ -59,7 +59,6 @@ sub RPI_1Wire_Notify {
 	my ($own_hash, $dev_hash) = @_;
 	my $ownName = $own_hash->{NAME}; # own name / hash
 	return "" if(IsDisabled($ownName)); # Return without any further action if the module is disabled
-
 	my $devName = $dev_hash->{NAME}; # Device that created the events
 #	Log3 $ownName, 1, $ownName." Notify from $devName";
 	my $events = deviceEvents($dev_hash,1);
@@ -142,22 +141,6 @@ sub RPI_1Wire_Init {				#
 	$hash->{family}=$family;
 	my $type=$RPI_1Wire_Devices{$family}{type};
 	
-	#remove set commands that make no sense
-	if ($device ne "BUSMASTER") {
-		delete($hash->{setList}{scan});
-		delete($hash->{setList}{therm_bulk_read});
-		RPI_1Wire_DeviceUpdate($hash);
-	} else {
-		my $bulk=ReadingsVal($name,"therm_bulk_read","off");
-		if (! -w $ms_path.$id."/therm_bulk_read") {
-			delete($hash->{setList}{therm_bulk_read});
-			delete($hash->{setList}{update});
-			readingsSingleUpdate($hash, 'therm_bulk_read', "off",0);
-		} elsif ($bulk eq "on") {
-			$hash->{setList}{update}="noArg"; #Restore set command in case it was deleted previously
-			RPI_1Wire_DeviceUpdate($hash);
-		}
-	}
 	if ($type ne "temperature") {
 		delete($hash->{setList}{precision});
 		delete($hash->{setList}{conv_time});
@@ -171,9 +154,23 @@ sub RPI_1Wire_Init {				#
 			$hash->{helper}{write}.="resolution ";
 		}
 	}
+	#remove set commands that make no sense
+	if ($device ne "BUSMASTER") {
+		delete($hash->{setList}{scan});
+		delete($hash->{setList}{therm_bulk_read});
+	} else {
+		my $bulk=ReadingsVal($name,"therm_bulk_read","off");
+		if (! -w $ms_path.$id."/therm_bulk_read") {
+			delete($hash->{setList}{therm_bulk_read});
+			delete($hash->{setList}{update});
+			readingsSingleUpdate($hash, 'therm_bulk_read', "off",0);
+		} elsif ($bulk eq "on") {
+			$hash->{setList}{update}="noArg"; #Restore set command in case it was deleted previously
+		}
+	}
 	RPI_1Wire_Set($hash, $name, "setfromreading");
 	#Restore previous settings
-	my $precision=ReadingsVal($name,"temperature",undef);
+	my $precision=ReadingsVal($name,"precision",undef);
 	my $conv_time=ReadingsVal($name,"conv_time",undef);
 	if (defined $precision) {
 		RPI_1Wire_SetPrecision($hash,$precision);
@@ -184,6 +181,7 @@ sub RPI_1Wire_Init {				#
 	RPI_1Wire_GetConfig($hash);
 	$hash->{STATE} = "Initialized";
 	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Init done for $device $family $id $type";
+	RPI_1Wire_DeviceUpdate($hash);
 	return;
 }
 
@@ -217,6 +215,7 @@ sub RPI_1Wire_GetDevices {
 sub RPI_1Wire_DeviceUpdate {
 	my ($hash) = @_;
 	my $name=$hash->{NAME};
+	return if (!$init_done); #
 	my $family=$hash->{family};
 	if (!defined $family) {
 		#For safety, if a device was not ready during startup it sometimes is not properly initialized when being reconnected
