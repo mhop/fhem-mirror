@@ -175,9 +175,10 @@ sub OBIS_Define($$)
     "VSM102"	=> 	["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
-    "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)]
+    "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "MT382"	=> 	["/?!".chr(13).chr(10),    20,    chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)] #this line added by alkazaa
     );
-  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
+  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110, E350USB, AS1440, MT382'};
   $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
   $hash->{helper}{DEVICES} =$devs{$type};
   $hash->{helper}{RULECACHE} = {};
@@ -952,6 +953,7 @@ sub OBIS_CRC16($$) {
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
       <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
+      <li>MT382 -&gt; ISKRA MT382</li>
       <li>Standard -&gt; Data comes as plainText</li>
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
@@ -1039,6 +1041,7 @@ sub OBIS_CRC16($$) {
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
       <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
+      <li>MT382 -&gt; ISKRA MT382</li>
       <li>Standard -&gt; Daten kommen als plainText</li>
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
