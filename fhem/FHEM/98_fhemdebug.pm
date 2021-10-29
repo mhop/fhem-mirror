@@ -8,11 +8,13 @@ use B qw(svref_2object);
 
 my $fhemdebug_enabled;
 my $main_callfn;
+my $main_readingsEndUpdate;
+my $main_setReadingsVal;
 
 sub
 fhemdebug_Initialize($){
   $cmds{"fhemdebug"}{Fn} = "fhemdebug_Fn";
-  $cmds{"fhemdebug"}{Hlp} = "{start|stop|status}";
+  $cmds{"fhemdebug"}{Hlp} = "{enable|disable|status|timerList}";
 }
 
 sub
@@ -46,10 +48,29 @@ fhemdebug_Fn($$)
     $addTimerStacktrace = $param;
     return;
 
+  } elsif($param =~ m/^forceEvents ([0|1])/) { #123655
+    local $SIG{__WARN__} = sub { };
+    if($1) {
+      $main_readingsEndUpdate = \&readingsEndUpdate;
+      $main_setReadingsVal = \&setReadingsVal;
+      *readingsEndUpdate = sub($$){ 
+        $_[1]=1;
+        &{$main_readingsEndUpdate}(@_);
+      };
+      *setReadingsVal = sub($$$$) {
+        DoTrigger($_[0]->{NAME}, "$_[1] $_[2]") if($_[1] && $_[1] eq "IODev");
+        &{$main_setReadingsVal}(@_);
+      };
+    } else {
+      *readingsEndUpdate = $main_readingsEndUpdate;
+      *setReadingsVal = $main_setReadingsVal;
+    }
+
   } else {
     return "Usage: fhemdebug {enable | disable | status | ".
-                        "timerList | addTimerStacktrace {0|1} }";
+              "timerList | addTimerStacktrace {0|1} | forceEvents {0|1} }";
   }
+  return;
 }
 
 sub
