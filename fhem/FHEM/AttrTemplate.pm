@@ -292,12 +292,12 @@ AttrTemplate_Set($$@)
       return
       "<html>".
          "<input type='hidden' value='set $name attrTemplate $entry'>".
-         "<p>Specify the unknown parameters for $entry:</p>".
+         "<p>Specify the unknown parameters for $name/$entry:</p>".
          "<table class='block wide'><tr>".
          join("</tr><tr>", map { 
            my @t=split("= with ",$_,2);
            "<td>$t[1]</td><td>" .($t[0] =~ m/^RADIO_/ ?
-             "<input type='radio' name='s' value='$t[0]'>":
+             "<input type='radio' name='$name.s' value='$t[0]'>":
              "<input type='text' name='$t[0]' size='20'></td>")
          } @mComm)."</tr></table>".
         '<script>
@@ -306,10 +306,10 @@ AttrTemplate_Set($$@)
             $("#FW_okDialog").parent().find("button").css("display","block");
             $("#FW_okDialog").parent().find(".ui-dialog-buttonpane button")
             .unbind("click").click(function(){
-              var cmd;
+              var cmd = "";
               $("#FW_okDialog input").each(function(){
                 var t=$(this).attr("type");
-                if(t=="hidden") cmd = $(this).val();
+                if(t=="hidden")cmd +=";"+$(this).val();
                 if(t=="text")  cmd +=" "+$(this).attr("name")+"="+$(this).val();
                 if(t=="radio") cmd +=" "+$(this).val()+"="+
                                           ($(this).prop("checked") ? 1:0);
