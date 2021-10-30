@@ -521,25 +521,25 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0 
 attr DEVICE setList \
-  on:noArg $\DEVICETOPIC/1/set {"state":"ON"}\
-  off:noArg $\DEVICETOPIC/1/set {"state":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/1/set {"state":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/1/set {"state_l1":"ON"}\
+  off:noArg $\DEVICETOPIC/1/set {"state_l1":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/1/set {"state_l1":"TOGGLE"}
 attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
 attr DEVICE_CH2 setList \
-  on:noArg $\DEVICETOPIC/2/set {"state":"ON"}\
-  off:noArg $\DEVICETOPIC/2/set {"state":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/2/set {"state":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/2/set {"state_l2":"ON"}\
+  off:noArg $\DEVICETOPIC/2/set {"state_l2":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/2/set {"state_l2":"TOGGLE"}
 attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE_CH3 setList \
-  on:noArg $\DEVICETOPIC/3/set {"state":"ON"}\
-  off:noArg $\DEVICETOPIC/3/set {"state":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/3/set {"state":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/3/set {"state_l3":"ON"}\
+  off:noArg $\DEVICETOPIC/3/set {"state_l3":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/3/set {"state_l3":"TOGGLE"}
 attr DEVICE_CH2 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
-set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20201213
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20211030
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
@@ -3345,8 +3345,9 @@ attr DEVICE icon ICON
 attr DEVICE model 8channel_ethernet_board_split
 attr DEVICE setStateList on off
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20200529
+setreading DEVICE attrTemplateVersion 20211029
 set DEVICE attrTemplate set_associatedWith \CHANNELS=8 \MAKECOPIES=1
+defmod DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 MQTT2_\DEVICE DEVICE_channels
 attr DEVICE readingList STATETOPIC.* { $EVENT =~ /output...([01])[01]{7}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
@@ -3432,6 +3433,7 @@ di5\
 di6
 attr DEVICE webCmd : 
 copy DEVICE DEVICE_CH2
+defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_channels
 deleteattr DEVICE_CH2 stateFormat
 copy DEVICE_CH2 DEVICE_CH3
 copy DEVICE_CH2 DEVICE_CH4
@@ -3454,7 +3456,7 @@ attr DEVICE_CH6 setList on:noArg Advantech/DEVNAME/ctl/do6:r {"v":true}\
   off:noArg Advantech/DEVNAME/ctl/do6:r {"v":false}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=6
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplateVersion 20200602
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplateVersion 20211029
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 model 6channel_ethernet_board_6input_split
 
 
@@ -3508,22 +3510,14 @@ setreading DEVICE attrTemplateVersion 20200602
 name:8channel_relay_board_8di_split
 filter:TYPE=MQTT2_DEVICE
 desc:For use with dingtian 8-ch digital Input and 8-ch relay output ethernet board.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,123709.msg1182787.html#msg1182787">Forum Thread</a>. You have to configure MQTT first as described in product manual.<br>Split version - you'll get 8 independent devices.
-order:W_05
-par:DEVNAME;Device's name in the topic tree;{ AttrVal('DEVICE','readingList','') =~ m,dingtian/([^/]+)/, ? $1 : undef }
+order:W_05par:DEVNAME;Device's name in the topic tree;{ AttrVal('DEVICE','readingList','') =~ m,dingtian/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal('DEVICE','icon','on') }
 attr DEVICE icon ICON
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE readingList /dingtian/DEVNAME/out/lwt_availability:.* LWT\
   /dingtian/DEVNAME/out/(relay|input)[1-8]:.* {}\
   /dingtian/DEVNAME/out/r1:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }\
-  /dingtian/DEVNAME/out/i1:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di1','unknown') eq $state; {di1=>$state}}\
-  /dingtian/DEVNAME/out/i2:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di2','unknown') eq $state; {di2=>$state}}\
-  /dingtian/DEVNAME/out/i3:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di3','unknown') eq $state; {di3=>$state}}\
-  /dingtian/DEVNAME/out/i4:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di4','unknown') eq $state; {di4=>$state}}\
-  /dingtian/DEVNAME/out/i5:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di5','unknown') eq $state; {di5=>$state}}\
-  /dingtian/DEVNAME/out/i6:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di6','unknown') eq $state; {di6=>$state}}\
-  /dingtian/DEVNAME/out/i7:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di7','unknown') eq $state; {di7=>$state}}\
-  /dingtian/DEVNAME/out/i8:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'di8','unknown') eq $state; {di8=>$state}}\
+  /dingtian/DEVNAME/out/i1:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'input','unknown') eq $state; {input=>$state}}\
   /dingtian/DEVNAME/out/ip:.* ip\
   /dingtian/DEVNAME/out/sn:.* sn\
   /dingtian/DEVNAME/out/mac:.* mac\
@@ -3532,52 +3526,22 @@ attr DEVICE readingList /dingtian/DEVNAME/out/lwt_availability:.* LWT\
 attr DEVICE setExtensionsEvent 1
 attr DEVICE setList on:noArg /dingtian/DEVNAME/in/r1 ON\
   off:noArg /dingtian/DEVNAME/in/r1 OFF
-attr DEVICE webCmd : 
+attr DEVICE webCmd :
 copy DEVICE DEVICE_CH2
-deleteattr DEVICE_CH2 stateFormat
-copy DEVICE_CH2 DEVICE_CH3
-copy DEVICE_CH2 DEVICE_CH4
-copy DEVICE_CH2 DEVICE_CH5
-copy DEVICE_CH2 DEVICE_CH6
-copy DEVICE_CH2 DEVICE_CH7
-copy DEVICE_CH2 DEVICE_CH8
-attr DEVICE_CH2 readingList /dingtian/DEVNAME/out/r2:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH3 readingList /dingtian/DEVNAME/out/r3:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH4 readingList /dingtian/DEVNAME/out/r4:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH5 readingList /dingtian/DEVNAME/out/r5:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH6 readingList /dingtian/DEVNAME/out/r6:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH6 readingList /dingtian/DEVNAME/out/r7:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH6 readingList /dingtian/DEVNAME/out/r8:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }
-attr DEVICE_CH2 setList on:noArg /dingtian/DEVNAME/in/r2 ON\
-  off:noArg /dingtian/DEVNAME/in/r2 OFF
-attr DEVICE_CH3 setList on:noArg /dingtian/DEVNAME/in/r3 ON\
-  off:noArg /dingtian/DEVNAME/in/r3 OFF
-attr DEVICE_CH4 setList on:noArg /dingtian/DEVNAME/in/r4 ON\
-  off:noArg /dingtian/DEVNAME/in/r4 OFF
-attr DEVICE_CH5 setList on:noArg /dingtian/DEVNAME/in/r5 ON\
-  off:noArg /dingtian/DEVNAME/in/r5 OFF
-attr DEVICE_CH6 setList on:noArg /dingtian/DEVNAME/in/r6 ON\
-  off:noArg /dingtian/DEVNAME/in/r6 OFF
-attr DEVICE_CH7 setList on:noArg /dingtian/DEVNAME/in/r7 ON\
-  off:noArg /dingtian/DEVNAME/in/r7 OFF
-attr DEVICE_CH8 setList on:noArg /dingtian/DEVNAME/in/r8 ON\
-  off:noArg /dingtian/DEVNAME/in/r8 OFF
+defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_channels
+loop:#:3:4:5:6:7:8
+copy DEVICE_CH2 DEVICE_CH#
+loop:END
+loop:chNo:2:3:4:5:6:7:8
+attr DEVICE_CHchNo readingList /dingtian/DEVNAME/out/rchNo:.* { my $state = lc $EVENT; return if ReadingsVal($NAME,'state','unknown') eq $state; {state=>$state} }\
+  /dingtian/DEVNAME/out/ichNo:.* {my $state = lc $EVENT; return if ReadingsVal($NAME,'input','unknown') eq $state; {input=>$state}}
+attr DEVICE_CHchNo setList on:noArg /dingtian/DEVNAME/in/rchNo ON\
+  off:noArg /dingtian/DEVNAME/in/rchNo OFF
+loop:END
 set DEVICE attrTemplate set_associatedWith \CHANNELS=8
-attr DEVICE devStateIcon offline:rc_STOP@red online:rc_STOP@green
-attr DEVICE stateFormat LWT\
-state\
-<br>\
-DigiIn\
-di1\
-di2\
-di3\
-di4\
-di5\
-di6\
-di7\
-di8
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','offline') eq 'online'?'10px-kreis-gruen':'10px-kreis-rot'; my $light = ReadingsVal($name,'state','off'); '<a href="http://'.ReadingsVal($name,'ip','none').' "target="_blank">'.FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a>"}
 set DEVICE attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20211028
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20211029
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 model 8channel_relay_board_8di_split
 
 
