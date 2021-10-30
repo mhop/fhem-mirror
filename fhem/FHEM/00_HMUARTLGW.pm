@@ -14,6 +14,7 @@ package main;
 use strict;
 use warnings;
 
+use DevIo;
 use Digest::MD5;
 use Time::HiRes qw(gettimeofday time);
 use Time::Local;
@@ -135,8 +136,6 @@ my %gets = (
 sub HMUARTLGW_Initialize($)
 {
 	my ($hash) = @_;
-
-	require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 	$hash->{ReadyFn}   = "HMUARTLGW_Ready";
 	$hash->{ReadFn}    = "HMUARTLGW_Read";
