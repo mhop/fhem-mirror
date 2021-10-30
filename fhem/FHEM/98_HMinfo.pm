@@ -4,6 +4,7 @@
 package main;
 use strict;
 use warnings;
+use B qw(svref_2object);
 
 sub HMinfo_Initialize($$);
 sub HMinfo_Define($$);
@@ -387,6 +388,7 @@ sub HMinfo_status($){##########################################################
       foreach (grep {$ehash->{"prot".$_}} keys %protW){ $protW{$_}++; push @protNamesW,$eName;}#protocol events reported
       $rssiMin{$eName} = 0;
       foreach (keys %{$ehash->{helper}{rssi}}){
+        last if !defined $ehash->{IODev};
         next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
         $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
           if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
@@ -1776,19 +1778,34 @@ sub HMinfo_GetFn($@) {#########################################################
     }
     my $fltr = "(".join("|",keys %show).')' ;
     my @ak;
-    foreach my $ats (keys %intAt){
-      push @ak,  substr(localtime($intAt{$_}{TRIGGERTIME}),0,19)
-               .sprintf("%8d: %-30s\t :",int($intAt{$ats}{TRIGGERTIME}-gettimeofday())
-                                        ,$intAt{$ats}{FN})
-               .(ref($intAt{$ats}{ARG}) eq 'HASH' 
-                     ? join("\t ",map{"$_ : ".$intAt{$ats}{ARG}{$_}} 
+    my ($tfnm, $cv);
+    my $timerarray =  \@intAtA;
+    my $now = gettimeofday();
+    foreach my $ats (@{$timerarray}){
+      $tfnm = $ats->{FN};
+      if (ref($tfnm) ne "") {
+        $cv = svref_2object($tfnm);
+        $tfnm = $cv->GV->NAME if ($cv);
+      }
+       if (!defined($ats->{TRIGGERTIME})) { #noansi: just for debugging
+        Log3 $hash,0,'HMinfo '.$name.' showTimer undefined TRIGGERTIME:'
+                     .(defined($ats->{atNr})?' atNr:'.$ats->{atNr}:'')
+                     .' FN:'.$tfnm
+                     .' ARG:'.$ats->{ARG};
+ #       next;
+      }
+      push @ak,  substr(localtime($ats->{TRIGGERTIME}),0,19)
+               .sprintf("%8d: %-30s\t :",int($ats->{TRIGGERTIME}-$now)
+                                        ,$tfnm)
+               .(ref($ats->{ARG}) eq 'HASH'
+                     ? join("\t ",map{"$_ : ".$ats->{ARG}{$_}}
                                   map{$_=~m/^\d/?substr($_,1,99):$_}
-                                  sort 
+                                  sort
                                   map{(my $foo = $_) =~ s/$fltr/$show{$1}$1/g; $foo;}
                                   grep /^$fltr/,
-                                  keys %{$intAt{$ats}{ARG}})
-                      :"$intAt{$ats}{ARG}")};
-    $ret = join("\n",sort @ak);
+                                  keys %{$ats->{ARG}})
+                      :"$ats->{ARG}")};
+    $ret = join("\n", @ak);
   }
   elsif($cmd eq "showChilds"){
     my ($type) = @a;
@@ -1879,13 +1896,13 @@ sub HMinfo_SetFn($@) {#########################################################
         delete $modules{CUL_HM}{stat}{s}{$_};
       }
     }
-    if ($type eq "msgErrors"){#clear message events for all devices which has problems
+    if ($type eq "msgErrors"){#clear message errors for all devices which has problems
       my @devL = split(",",InternalVal($hash->{NAME},"iW__protoNames"  ,""));
-      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protoNames",""));
+      push @devL,split(",",InternalVal($hash->{NAME},"iCRI__protocol"  ,""));
       push @devL,split(",",InternalVal($hash->{NAME},"iERR__protocol"  ,""));
     
       foreach my $dName (HMinfo_noDup(@devL)){
-        CUL_HM_Set($defs{$dName},$dName,"clear","msgEvents");
+        CUL_HM_Set($defs{$dName},$dName,"clear","msgErrors");
       }
     }
     elsif ($type ne "msgStat"){
