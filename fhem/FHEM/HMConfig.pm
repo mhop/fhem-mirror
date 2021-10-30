@@ -1705,7 +1705,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,getRegRaw     => "(List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]"
                       ,getConfig     => ""
                       ,regSet        => "[(prep|{exec})] -regName- -value- [-peerChn-]"
-                      ,clear         => "[(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]"
+                      ,clear         => "[({msgErrors}|msgEvents|rssi|attack|trigger|register|oldRegs|readings|all)]"
                       ,tplDel        => "-tplDel-"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -1862,7 +1862,7 @@ $culHmModelSets{"HM-ES-TX-WM"}           = $culHmModelSets{"HM-PB-4DIS-WM-2"};
                                          
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
-$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
+#$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### reference subtype sets
 
 
