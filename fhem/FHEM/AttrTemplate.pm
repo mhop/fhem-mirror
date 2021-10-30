@@ -372,6 +372,7 @@ AttrTemplate_Set($$@)
   my $cmd = "";
   my @ret;
   my $option = 1;
+  my $withHtml;
   map {
 
     if($_ =~ m/^(.*)\\$/) {
@@ -393,7 +394,13 @@ AttrTemplate_Set($$@)
         $cmd =~ s/##.*//; #114109
         Log3 $name, 5, "AttrTemplate exec $cmd";
         my $r = AnalyzeCommand($cl, $cmd);
-        push(@ret, $r) if($r);
+        if($r) {
+          if($r =~ m,^<html>(.*)</html>$,s) {
+            $r = $1;
+            $withHtml = 1;
+          }
+          push(@ret, $r);
+        }
 
       } else {
         Log3 $name, 5, "AttrTemplate skip $cmd";
@@ -403,7 +410,11 @@ AttrTemplate_Set($$@)
     }
   } split("\n", $cmdlist);
 
-  return join("\n", @ret) if(@ret);
+  if(@ret) {
+    my $r = join("\n", @ret);
+    $r = "<html>$r</html>" if($withHtml);
+    return $r;
+  }
 
   if($h->{farewell}) {
     my $fw = $h->{farewell};
