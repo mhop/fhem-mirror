@@ -101,7 +101,7 @@ sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
 sub Value($);
-sub WriteStatefile(;$);
+sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$;$);
 sub addToDevAttrList($$;$);
@@ -1593,14 +1593,13 @@ GetAllReadings($)
 
 #####################################
 sub
-WriteStatefile(;$)
+WriteStatefile()
 {
   if(configDBUsed()) {
     return cfgDB_SaveState();
   }
 
   my $stateFile = AttrVal('global','statefile',undef);
-  $stateFile = $_[0] if($_[0]); #123764
   return "No statefile specified" if(!defined($stateFile));
 
   my $now = gettimeofday();
