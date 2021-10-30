@@ -508,6 +508,7 @@ FHEM/98_GoogleAuth.pm        betateilchen         Unterstützende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
+FHEM/98_HMtemplate.pm        martinp876           HomeMatic
 FHEM/98_HourCounter.pm       john                 MAX
 FHEM/98_HTTPMOD.pm           StefanStrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
