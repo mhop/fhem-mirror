@@ -259,7 +259,7 @@ sub CUL_HM_updateConfig($){##########################
                                               && defined($h->{helper}{io}{restoredIO})
                                               && !defined($defs{$h->{helper}{io}{restoredIO}})); # cleanup undefined restored IO
       if (!CUL_HM_operIObyIOHash($h->{IODev})) { # noansi: assign IO, if no currently operational  IO assigned
-        CUL_HM_assignIO($h);
+        CUL_HM_assignIO($h) if !IsDummy($name) && !IsIgnored($name);
         delete($h->{IODev}{'.clientArray'}) if ($h->{IODev}); # Force a recompute
       }
     }
@@ -673,7 +673,7 @@ sub CUL_HM_Define($$) {##############################
       }
       # fhem.pl will set an IO from reading/attr IODev or AssignIoPort at end of init, we can not avoid and can not assign correctly
       #         but with reading IOdev fhem.pl will restore the IO unsed before normal restart
-      CUL_HM_assignIO($hash) if (!$hash->{IODev}); 
+      CUL_HM_assignIO($hash) if (!$hash->{IODev} && $init_done);
       delete($hash->{IODev}{'.clientArray'}) if ($hash->{IODev}); # Force a recompute
     }
   }
@@ -934,11 +934,12 @@ sub CUL_HM_Attr(@) {#################################
     return "change not allowed for channels" if(!$hash->{helper}{role}{dev});
     if (  $attrVal eq "CCU-FHEM" 
       and $cmd eq "set"
-      and AttrVal($name,"model","VIRTUAL") eq "VIRTUAL"){
+      and AttrVal($name,"model","VIRTUAL") =~ m/^(VIRTUAL|)$/){
         delete $hash->{helper}{rxType}; # needs new calculation
         delete $hash->{helper}{mId};
         $attr{$name}{subType} = "virtual";
         $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
+        CUL_HM_updtDeviceModel($name,$attrVal);
         $updtReq = 1;
         CUL_HM_AttrAssign($name);
         CUL_HM_UpdtCentral($name);
@@ -1037,11 +1038,12 @@ sub CUL_HM_Attr(@) {#################################
       $attrVal =~ s/ //g; 
       my @newIO = CUL_HM_noDup(split(",",$attrVal));
       foreach my $nIO (@newIO){
-        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients",
-                                                             defined $modules{InternalVal($nIO,"TYPE","")}{Clients}
-                                                                   ? $modules{InternalVal($nIO,"TYPE","")}{Clients}
-                                                                   :"")
-                                                   !~ m /:CUL_HM:/);
+        return "$nIO does not support CUL_HM" if(InternalVal($nIO,"Clients","") !~ m /:CUL_HM:/);
+        my $owner_ccu = InternalVal($nIO,'owner_CCU',undef);
+        return "device $nIO already owned by $owner_ccu" if $owner_ccu && $owner_ccu ne $name;
+        if (InternalVal($nIO,'TYPE','') eq 'HMLAN' ) {
+            HMLAN_assignIDs($defs{$nIO}) if AttrVal($nIO,'hmId','') ne $hash->{DEF} && defined &HMLAN_assignIDs;
+        }
       }
       if($attr{$name}{$attrName}){# see who we lost
         foreach my $oldIOs (split(",",$attr{$name}{$attrName})){
@@ -1119,13 +1121,13 @@ sub CUL_HM_Attr(@) {#################################
       $hash->{helper}{io}{vccu}   = $ioCCU;
       $attr{$name}{$attrName}     = $attrVal;
       delete $attr{$name}{IODev};# just in case
-      CUL_HM_assignIO($hash); 
     }
     else{ # this is a delete
       my @a = ();
       $hash->{helper}{io}{vccu}   = "";
       $hash->{helper}{io}{prefIO} = \@a;
     }
+    CUL_HM_assignIO($hash);
   }
   elsif($attrName eq "autoReadReg"){
     if ($cmd eq "set"){
@@ -1243,10 +1245,18 @@ sub CUL_HM_Attr(@) {#################################
         next if (   $modules{$defs{$IOname}{TYPE}}{AttrList} !~  m/logIDs/);
         my $r = CommandAttr(undef, "$IOname logIDs $newVal");
       }
+    } else {
+      CommandDeleteAttr(undef, AttrVal($name,'IOList','').' logIDs');
     }
   }
-  elsif($attrName eq "ignore"){
+  elsif($attrName eq "ignore" || $attrName eq "dummy"){
     if ($cmd eq "set"){
+      if ($attrVal) {
+        return "Setting $attrName for CCU-FHEM model requires to delete IOList first!" if defined AttrVal($hash->{NAME},'IOList',undef);
+        IOWrite($hash, '', 'remove:'.$hash->{DEF}) if defined $hash->{IODev}->{TYPE} && $hash->{IODev}->{TYPE} =~ m/^HM(?:LAN|UARTLGW)$/s && defined $hash->{DEF};
+        #delete $hash->{IODev};
+        delete $hash->{READINGS}{IODev};
+      }
       $attr{$name}{".ignoreSet"} = $attrVal; # remember user desire
       foreach my $chNm(CUL_HM_getAssChnNames($name)){
         if( $attrVal == 1){
@@ -1255,13 +1265,17 @@ sub CUL_HM_Attr(@) {#################################
             CUL_HM_primaryDev();
           }
         }
-        elsif( defined $attr{$chNm}{".ignoreSet"}){
+        elsif( defined $attr{$chNm}{".ignoreSet"} && $attrName eq 'ignore'){
           $attr{$chNm}{$attrName} = $attr{$chNm}{".ignoreSet"};
         }
         else{
           delete $attr{$chNm}{$attrName};
         }
       }
+      if (!$attrVal) {
+        CUL_HM_assignIO($hash) ;
+      }
+      delete $attr{$name}{".ignoreSet"}; #Beta-User: seems not to be used outside of this code part
     }
     else {
       delete $attr{$name}{".ignoreSet"};
@@ -1273,6 +1287,7 @@ sub CUL_HM_Attr(@) {#################################
           delete $attr{$chNm}{$attrName};
         }
       }
+      CUL_HM_assignIO($hash) if $attrName eq 'ignore' && !IsDummy($hash) || $attrName eq 'dummy' && !IsIgnored($hash);
     }
   }
   elsif($attrName eq "commStInCh"){
@@ -1390,7 +1405,7 @@ sub CUL_HM_AttrInit($;$) {#############################
                            param             => 'showTimed'
                           };
     $hash->{AttrX}{'switch'} = {                       # subType
-                           param             => 'showTimed'
+                           param             => 'showTimed,levelInverse'
                           };
     $hash->{AttrX}{'dimmer'} = {                       # subType
                            param             => 'showTimed'
@@ -1630,6 +1645,7 @@ sub CUL_HM_Notify(@){###############################
           }
         }
         foreach my $HMdef (grep{AttrVal($_,"IODev","") eq $ent} @culHmDevs){# for each IODev
+          next if IsDummy($HMdef) || IsIgnored($HMdef);
           CommandAttr (undef,"$HMdef IODev $new");
           $count++;
         }
@@ -1648,13 +1664,13 @@ sub CUL_HM_Notify(@){###############################
 #    elsif($evnt =~ m/(MODIFIED)/ ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 #    else                          { Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 
-  }    
+  }
 
   return undef;
 }
 
 sub CUL_HM_setupHMLAN(@){#################################
-  foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
+  foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual:FILTER=dummy!=1:FILTER=ignore!=1")){
     $defs{$_}{helper}{io}{newChn} = "";
     CUL_HM_hmInitMsg($defs{$_}); #update device init msg for HMLAN
   }
@@ -1726,7 +1742,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my @mI = unpack '(A2)*',$mh{p}; # split message info to bytes
   $mh{mStp} = $mI[0] ? $mI[0] : ""; #message subtype
   $mh{mTyp} = $mh{mTp}.$mh{mStp};           #message type/subtype
-  
+
   # $shash will be replaced for multichannel commands
   $mh{devH}   = CUL_HM_id2Hash($mh{src}); #sourcehash - will be modified to channel entity
   $mh{dstH}   = CUL_HM_id2Hash($mh{dst}); # destination device hash
@@ -1738,7 +1754,6 @@ sub CUL_HM_Parse($$) {#########################################################
                          ($mh{dstH} ? $mh{dstH}->{NAME} :
                     ($mh{dst} eq $mh{id} ? $mh{ioName} :
                                    $mh{dst}));
-  
   if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
     my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
@@ -4995,7 +5010,6 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list++++++++++++++
         @arr1 = grep !/(trg|)(press|event|Press|Event)[SL]\S*?/,@arr1;
       }
     }
-    delete $hash->{helper}{cmds}{cmdLst} ;
     foreach(@arr1){
       my ($cmdS,$val) = split(":",$_,2);
       $val =~ s/\{self\}/\{self$chn\}/;
@@ -7386,10 +7400,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "assignIO") { #################################################
     $state = "";
     my $io = $a[2];
-    return "use set of unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
-    return "$io no suitable for CUL_HM" if(scalar(grep{$_ eq $io}
-                                                  grep{$defs{$_}{Clients} =~ m/:CUL_HM:/}
-                                                  keys %defs));
+    return "use set or unset - $a[3] not allowed"   if ($a[3] && $a[3] !~ m/^(set|unset)$/);
+    return "$io not suitable for CUL_HM" if(!defined $defs{$io} || InternalVal("$io",'Clients','') !~ m/:CUL_HM:/);
 
     my $rmIO  = $a[3]  && $a[3] eq "unset" ? $io : "";
     my $addIO = !$a[3] || $a[3] ne "unset" ? $io : "";
@@ -8164,7 +8176,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"reSent:=$rss","brstWu:=1");
     }
     elsif($mTp !~ m/C./)              {#
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"reSent:=$rss");
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=".hex($mNo),"fromSrc:=$src","reSent:=$rss");
     }
 
     CUL_HM_protState($hash,"CMDs_processing...");#if($mTp ne '03');
@@ -10822,7 +10834,7 @@ sub CUL_HM_UpdtCentralState($){
 
     if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){ # update HMid of io devices
       Log 1,"CUL_HM correct hmId for assigned IO $ioN";
-      $attr{$ioN}{hmId} = $defs{$name}{DEF};
+      CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}");
     }
   };
   $state .= join(",",@ioState);
@@ -10863,7 +10875,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   # no option - 
   
   my $hash = shift;
-  
+  return 0 if IsIgnored($hash->{NAME}) || IsDummy($hash->{NAME});
   my $oldIODevH = $hash->{IODev};
   my $hh = $hash->{helper};
 
@@ -10877,7 +10889,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   
   if ($hh->{io}{vccu}){# second option - any IO from the
     my $iom;
-    ($iom) = grep {$_ eq 'none'} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
+    ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
+    ($iom) = grep {$_ eq 'none'}              @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
     return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
     if(!$iom){
       my @ioccu = grep{CUL_HM_operIObyIOName($_)} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}};
@@ -10889,7 +10902,6 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     ($iom) = grep{defined $defs{$_}} @{$hh->{io}{prefIO}}                           if(!$iom && @{$hh->{io}{prefIO}});
     ($iom) = grep{defined $defs{$_}} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}}  if(!$iom && @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}});
     return 0 if ($iom && $iom eq 'none');
-    $newIODevH  = $defs{$iom} if($iom);
     $newIODevH  = $defs{$iom} if($iom);
   }
   
@@ -10915,7 +10927,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     IOWrite($hash, "", "remove:".$ID) if(   defined($oldIODevH) && defined $oldIODevH->{NAME} 
                                          && $oldIODevH->{TYPE}  && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old
     AssignIoPort($hash,$newIODevH->{NAME}); #  send preferred
-    $hash->{IODev} = $newIODevH;
+    Log3($hash, 2, "fhem.pl does not assign desired IODev $newIODevH->{NAME}!") if defined $newIODevH->{NAME} && $newIODevH->{NAME} ne $hash->{IODev}->{NAME};
+    $newIODevH = $hash->{IODev};
     if (   ($newIODevH->{TYPE} && $newIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
         || (   $newIODevH->{helper}{VTS_AES})){
       IOWrite($hash, "", "init:".$ID); # assign to new IO
@@ -12712,7 +12725,7 @@ __END__
            if set IO is forced to request AES signature before sending ACK to the device.<br>
            Defautls to 0<br>
           </li>
-      <li><a id="CUL_HM-attr-aesKey"></a>aesKey<br>
+      <li><a id="CUL_HM-attr-aesKey" data-pattern="aesKey.*"></a>aesKey<br>
           specifies which aes key is to be used if aesCommReq is active<br>
           </li>
       <li><a id="CUL_HM-attr-autoReadReg"></a>autoReadReg<br>
@@ -12761,13 +12774,7 @@ __END__
       <li><a id="CUL_HM-attr-firmware"></a>firmware &lt;FWversion&gt;<br>
           Firmware version of the device. Should not be overwritten.
           </li>
-      <li><a id="CUL_HM-attr-hmKey"></a>hmKey &lt;key&gt;<br>
-          AES key to be used
-          </li>
-      <li><a id="CUL_HM-attr-hmKey2"></a>hmKey2 &lt;key&gt;<br>
-          AES key to be used
-          </li>
-      <li><a id="CUL_HM-attr-hmKey3"></a>hmKey3 &lt;key&gt;<br>
+      <li><a id="CUL_HM-attr-hmKey" data-pattern="hmKey.*"></a>hmKey &lt;key&gt;<br>
           AES key to be used
           </li>
       <li><a id="CUL_HM-attr-hmProtocolEvents"></a>hmProtocolEvents<br>
@@ -12862,8 +12869,6 @@ __END__
           For devices with wakeup mode the device will wait for next wakeup. Lonng delay might be 
           considered in this case. <br>
           Repeat for burst devices will impact HMLAN transmission capacity.</li>
-      <li><a id="CUL_HM-attr-param"></a>param<br>
-          param defines model specific behavior or functions. See <a href="#CUL_HM-attr-params"><b>available parameter</b></a> for details</li>
       <li><a id="CUL_HM-attr-peerIDs"></a>peerIDs<br>
           will be filled automatically by getConfig and shows the direct peerings of the channel. Should not be changed by user.</li>
       <li><a id="CUL_HM-attr-rawToReadable"></a>rawToReadable<br>
@@ -12894,7 +12899,8 @@ __END__
           in milliseconds is added to the result. So adjusting this might fix problems for example when weather messages of virtual devices are not received reliably
           </li>
     </ul>  <br>
-    <a id="CUL_HM-attr-params"></a><b>available parameter for attribut "param"</b>
+    <li>
+    <a id="CUL_HM-attr-param"></a><b>param defines model specific behavior or functions. Available parameters are (model dependand):</b>
     <ul>
       <li><B>HM-SEN-RD-O</B><br>
         <B>offAtPon</B> heat channel only: force heating off after powerOn<br>
@@ -12914,6 +12920,10 @@ __END__
         <B>ponRestoreSmart</B> upon powerup of the device the Blind will drive to expected closest endposition followed by driving to the pre-PON level<br>
         <B>ponRestoreForce</B> upon powerup of the device the Blind will drive to level 0, then to level 100 followed by driving to the pre-PON level<br>
       </li>
+      <li><B>switch</B><br>
+        <B>levelInverse</B> siehe <i>blind</i> above.
+      </li>
+      
       <li><B>sensRain</B><br>
           <B>siren</B><br>
           <B>powerMeter</B><br>
@@ -12923,7 +12933,8 @@ __END__
         <B>showTimed</B> if timmed is running -till will be added to state. 
                          This results eventually in state on-till which allowes better icon handling.<br>
       </li>
-    </ul><br>
+    </ul>
+    </li><br>
     <a id="CUL_HM-events"></a><h4>Generated events:</h4>
     <ul>
       <li><B>general</B><br>
@@ -13385,7 +13396,8 @@ __END__
             set myChannel peerBulk 12345601 unset # entferne Peer 123456 Kanal 01<br>
           </code></ul>
         </li>
-        <li><B>regBulk &lt;reg List&gt;.&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><a id="CUL_HM-set-regBulk"></a><br>
+        <a id="CUL_HM-set-regBulk"></a>
+        <li><B>regBulk &lt;reg List&gt;.&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...</B><br>
           Dieser Befehl ersetzt das bisherige regRaw. Er erlaubt Register mit Rohdaten zu
           beschreiben. Hauptzweck ist das komplette Wiederherstellen eines zuvor gesicherten
           Registers. <br>
@@ -13464,6 +13476,10 @@ __END__
           "onlyEnterBootLoader" schickt das Device in den Booloader so dass es vom eq3 Firmware Update 
           Tool geflashed werden kann. Haupts&auml;chlich f&uuml;r Unterputz-Aktoren in Verbindung mit 
           FHEM Installationen die ausschliesslich HM-LANs nutzen interessant.
+        </li>
+        <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
+          IO-Gerät zur Liste der IO's hinzufügen oder aus dieser Löschen.
+          Ändert das Attribut <i>IOlist</i> entsprechend.
         </li>
 
       </ul>
@@ -14037,7 +14053,7 @@ __END__
       </ul>
     </ul>
     <br>
-    <a id="CUL_HM-get"></a><b>Get</b><br>
+    <a id="CUL_HM-get"></a><h4>Get</h4><br>
     <ul>
       <li><B>configSave &lt;filename&gt;</B><a id="CUL_HM-get-configSave"></a><br>
         Sichert die Einstellungen eines Eintrags in einer Datei. Die Daten werden in
@@ -14172,7 +14188,7 @@ __END__
         Die gesamte Funktion kann &uuml;ber den "ActionDetector"-Eintrag &uuml;berpr&uuml;ft werden. Der Status aller Instanzen liegt im READING-Bereich.<br>
         Hinweis: Diese Funktion kann ebenfalls f&uuml;r Ger&auml;te ohne zyklische &Uuml;bertragung aktiviert werden. Es obliegt dem Nutzer eine vern&uuml;nftige Zeitspanne festzulegen.
       </li>
-      <li><a id="CUL_HM-attr-aesKey"></a>aesKey<br>
+      <li><a id="CUL_HM-attr-aesKey" data-pattern="aesKey.*"></a>aesKey<br>
           Spezifiziert, welcher aes key verwendet wird, falls <i>aesCommReq</i> aktiviert wird.<br>
           </li>
       <li><a id="CUL_HM-attr-autoReadReg"></a>autoReadReg<br>
@@ -14272,8 +14288,6 @@ __END__
         wird automatisch gesetzt. </li>
       <li><a id="CUL_HM-attr-subType"></a>subType<br>
         wird automatisch gesetzt. </li>
-      <li><a id="CUL_HM-attr-param"></a>param<br>
-        'param' definiert modelspezifische Verhalten oder Funktionen. Siehe "models" f&uuml;r Details.</li>
       <li><a id="CUL_HM-attr-msgRepeat"></a>msgRepeat<br>
         Definiert die Nummer an Wiederholungen falls ein Ger&auml;t nicht rechtzeitig antwortet. <br>
         F&uuml;r Ger&auml;te die nur den "Config"-Modus unterst&uuml;tzen sind Wiederholungen nicht erlaubt. <br>
@@ -14319,7 +14333,8 @@ __END__
         </ul>
       </li>
       </ul> <br>
-    <a id="CUL_HM-attr-params"></a><b>verfügbare Parameter für "param"</b>
+    <li>
+    <a id="CUL_HM-attr-param"></a><b>'param'</b> definiert modelspezifische Verhalten oder Funktionen. Verfügbare Parameter für "param" (Modell-abhängig):
     <ul>
       <li><B>HM-SEN-RD-O</B><br>
         offAtPon: nur Heizkan&auml;le: erzwingt Ausschalten der Heizung nach einem powerOn<br>
@@ -14332,22 +14347,25 @@ __END__
         außer die der Ventilstellung verworfen um die Nachrichtenmenge zu reduzieren<br>
       </li>
       <li><B>blind</B><br>
-        <B>levelInverse</B> w&auml;hrend HM 100% als offen und 0% als geschlossen behandelt ist dies evtl. nicht 
+        levelInverse: w&auml;hrend HM 100% als offen und 0% als geschlossen behandelt ist dies evtl. nicht 
         intuitiv f&uuml;r den Nutzer. Defaut f&uuml;r 100% ist offen und wird als 'on'angezeigt. 
         Das Setzen des Parameters invertiert die Anzeige - 0% wird also offen und 100% ist geschlossen.<br>
         ACHTUNG: Die Anpassung betrifft nur Readings und Kommandos. <B>Register sind nicht betroffen.</B><br>
-        <B>ponRestoreSmart</B> bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
-        <B>ponRestoreForce</B> bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
+        ponRestoreSmart: bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
+        ponRestoreForce: bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
+      </li>
+      <li><B>switch</B><br>
+        levelInverse: siehe oben bei <i>blind</i>
       </li>
       <li><B>sensRain</B><br>
           <B>siren</B><br>
           <B>powerMeter</B><br>
-          <B>switch</B><br>
           <B>dimmer</B><br>
           <B>rgb</B><br>
         <B>showTimed</B> wenn timedOn running ist wird -till an state gehängt. Dies führt dazu, dass ggf. on-till im State steht was das stateIcon handling verbessert.<br>
       </li>
-    </ul><br>
+    </ul>
+    </li><br>
     <a id="CUL_HM-events"></a><b>Erzeugte Events:</b>
     <ul>
       <li><B>Allgemein</B><br>
