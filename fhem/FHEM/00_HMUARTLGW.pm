@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+# noansi: modified for better timing compatibility with CUL
 #
 # HMUARTLGW provides support for the eQ-3 HomeMatic Wireless LAN Gateway
 # (HM-LGW-O-TW-W-EU) and the eQ-3 HomeMatic UART module (HM-MOD-UART), which
@@ -1447,17 +1448,24 @@ sub HMUARTLGW_Parse($$$$)
 
 			Log3($hash, 5, "HMUARTLGW ${name} Dispatch: ${dmsg}");
 
-			my $wait = 0;
-			if (!(hex($flags) & (1 << 5))) {
-				#!BIDI
-				$wait = 0.100;
-			} else {
-				$wait = 0.300;
-			}
-			$wait -= $hash->{Helper}{RoundTrip}{Delay} if (defined($hash->{Helper}{RoundTrip}{Delay}));
+			if ($modules{CUL_HM}{defptr}{$src}) {
+				my $flgh = hex($flags);
+				my $wait = 0.100;
+				$wait += 0.200 if ($flgh & (1 << 5) && # BIDI
+								   $modules{CUL_HM}{defptr}{$src}->{IODev}->{TYPE} =~ m/^(?:TSCUL|HMUARTLGW)$/s);
+				$wait -= 0.044 if ($flgh & (1 << 6)); # received from Repeater
 
-			$modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = $recvtime + $wait
-				if ($modules{CUL_HM}{defptr}{$src} && $wait > 0);
+				$wait -= $hash->{Helper}{RoundTrip}{Delay}
+					if (defined($hash->{Helper}{RoundTrip}{Delay}));
+
+				if ($wait > 0) {
+					my $nextSend = $recvtime + $wait;
+					$modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = $nextSend
+						if (!defined($modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend})   ||
+							$nextSend < $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} ||
+							($recvtime - $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend}) > 0.09); # not allready set by previous IO
+				}
+			}
 
 			Dispatch($hash, $dmsg, \%addvals);
 		}
