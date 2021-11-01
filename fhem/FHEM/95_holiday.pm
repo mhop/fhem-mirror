@@ -307,8 +307,17 @@ holiday_Get($@)
 
   } elsif($a[1] =~ m/^(yesterday|today|tomorrow)$/) {
     my $t = time();
-    $t += 86400 if($a[1] eq "tomorrow");
-    $t -= 86400 if($a[1] eq "yesterday");
+
+    if($a[1] =~ m/^(yesterday|tomorrow)$/) { # clock change issues, #123808
+      my $inc = ($a[1] eq "tomorrow" ? 3600 : -3600);
+      my @now = localtime($t);
+      for(;;) {
+        $t += $inc;
+        my @then = localtime($t);
+        last if($then[3] != $now[3]);
+      }
+    }
+
     my @a = localtime($t);
     $arg = sprintf("%04d-%02d-%02d", $a[5]+1900, $a[4]+1, $a[3]);
 
