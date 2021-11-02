@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.43.1"  => "02.11.2021  fix SQL statement if devspec can't be resolved, Forum:https://forum.fhem.de/index.php/topic,53584.msg1184155.html#msg1184155 ",
+  "8.43.0"  => "22.09.2021  consider attr device, reading in sqlCmd, remove length limit of attr device, reading ",
   "8.42.9"  => "05.09.2021  minor fixes, change SQL for SQLite in deldoublets_DoParse ",
   "8.42.8"  => "17.07.2021  more log data verbose 5, delete whitespaces in sub getInitData ",
   "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
@@ -1443,14 +1445,6 @@ sub DbRep_Attr {
             unless ($success) {return "The credentials of a database admin user couldn't be read. ".
                                       "Make shure you have set them with command \"set $name adminCredentials <user> <password>\" before. ";}
         }
-        
-        if ($aName eq "reading" || $aName eq "device") {
-            if ($aVal !~ m/,/ && $dbmodel && $dbmodel ne 'SQLITE') {
-                my $attrname = uc($aName);
-                my $mlen = $hash->{HELPER}{DBREPCOL}{$attrname}?$hash->{HELPER}{DBREPCOL}{$attrname}:$dbrep_col{$attrname}; 
-                return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $mlen" if(length($aVal) > $mlen);
-            }
-        }
     } 
     
 return;
@@ -2155,6 +2149,7 @@ sub DbRep_Main {
             $prop   = join(" ", @cmd);
         }
     }
+    
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
  } 
  elsif ($opt =~ /syncStandby/ ) {
@@ -6381,6 +6376,8 @@ sub sqlCmd_DoParse {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my $device     = AttrVal($name, "device",  undef);
+  my $reading    = AttrVal($name, "reading", undef);
   my ($err,$dbh,@pms);
 
   # Background-Startzeit
@@ -6504,9 +6501,11 @@ sub sqlCmd_DoParse {
       }
   }
   
-  # Allow inplace replacement of keywords for timings (use time attribute syntax)
+  # Allow inplace replacement of keywords for timings (use time attribute syntax), device, reading
   $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
   $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
+  $sql =~ s/§device§/'$device'/xg   if ($device);
+  $sql =~ s/§reading§/'$reading'/xg if ($reading);
   
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
   
@@ -9836,8 +9835,11 @@ return $sql;
 #               Ableiten von Device, Reading-Spezifikationen 
 ####################################################################################################
 sub DbRep_specsForSql {
- my ($hash,$device,$reading) = @_;
+ my $hash    = shift;
+ my $device  = shift;
+ my $reading = shift;
  my $name    = $hash->{NAME};
+ 
  my (@idvspcs,@edvspcs,@idvs,@edvs,@idvswc,@edvswc,@residevs,@residevswc);
  my ($nl,$nlwc) = ("","");
  
@@ -9845,46 +9847,27 @@ sub DbRep_specsForSql {
  my ($idevice,$edevice)               = ('','');
  my ($idevs,$idevswc,$edevs,$edevswc) = ('','','','');
  my ($idanz,$edanz)                   = (0,0);
+ 
  if($device =~ /EXCLUDE=/i) {
      ($idevice,$edevice) = split(/EXCLUDE=/i,$device);
-     $idevice = $idevice?DbRep_trim($idevice):"%";
- } else {
+     $idevice            = $idevice ? DbRep_trim($idevice) : "%";
+ } 
+ else {
      $idevice = $device;
  }
  
  # Devices exkludiert
  if($edevice) {
-     @edvs  = split(",",$edevice); 
-     foreach my $e (@edvs) {
-         $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen 
-         @edvspcs = devspec2array($e);
-         @edvspcs = map {s/\.\*/%/g; $_; } @edvspcs;
-         if((map {$_ =~ /%/;} @edvspcs) && $edevice !~ /^%$/) {      # Devices mit Wildcard (%) erfassen, die nicht aufgelöst werden konnten
-             $edevswc .= "," if($edevswc);
-             $edevswc .= join(",",@edvspcs);
-         } else {
-             $edevs .= "," if($edevs);
-             $edevs .= join(",",@edvspcs);   
-         }
-     }                                           
+     @edvs             = split(",",$edevice); 
+     ($edevs,$edevswc) = DbRep_resolveDevspecs($name,$edevice,\@edvs);                                           
  }
+ 
  $edanz = split(",",$edevs);                                         # Anzahl der exkludierten Elemente (Lauf1)
  
  # Devices inkludiert
- @idvs  = split(",",$idevice);
- foreach my $d (@idvs) {
-     $d       =~ s/%/\.*/g if($d !~ /^%$/);                          # SQL Wildcard % auflösen  
-     @idvspcs = devspec2array($d);
-     @idvspcs = map {s/\.\*/%/g; $_; } @idvspcs;
-     if((map {$_ =~ /%/;} @idvspcs) && $idevice !~ /^%$/) {          # Devices mit Wildcard (%) erfassen, die nicht aufgelöst werden konnten
-         $idevswc .= "," if($idevswc);
-         $idevswc .= join(",",@idvspcs);
-     } else {
-         $idevs .= "," if($idevs);
-         $idevs .= join(",",@idvspcs);   
-     }   
- }
- $idanz = split(",",$idevs);                                         # Anzahl der inkludierten Elemente (Lauf1)
+ @idvs             = split(",",$idevice);
+ ($idevs,$idevswc) = DbRep_resolveDevspecs($name,$idevice,\@idvs);
+ $idanz            = split(",",$idevs);                              # Anzahl der inkludierten Elemente (Lauf1)
  
  Log3 $name, 5, "DbRep $name - Devices for operation - \n"
                 ."included ($idanz): $idevs \n"
@@ -9895,14 +9878,17 @@ sub DbRep_specsForSql {
  # exkludierte Devices aus inkludierten entfernen (aufgelöste)
  @idvs = split(",",$idevs);
  @edvs = split(",",$edevs);
- foreach my $in (@idvs) {
+ 
+ for my $in (@idvs) {
      my $inc = 1;
-     foreach(@edvs) {
-         next if($in ne $_);
+     
+     for my $v (@edvs) {
+         next if($in ne $v);
          $inc = 0;
          $nl .= "|" if($nl);
-         $nl .= $_;                                                  # Liste der entfernten devices füllen
+         $nl .= $v;                                                  # Liste der entfernten devices füllen
      }
+     
      push(@residevs, $in) if($inc);
  }
  $edevs = join(",", map {($_ !~ /$nl/)?$_:();} @edvs) if($nl);
@@ -9910,18 +9896,20 @@ sub DbRep_specsForSql {
  # exkludierte Devices aus inkludierten entfernen (wildcard konnte nicht aufgelöst werden)
  @idvswc = split(",",$idevswc);
  @edvswc = split(",",$edevswc);
- foreach my $inwc (@idvswc) {
+ 
+ for my $inwc (@idvswc) {
      my $inc = 1;
-     foreach(@edvswc) {
-         next if($inwc ne $_);
-         $inc = 0;
+     
+     for my $w (@edvswc) {
+         next if($inwc ne $w);
+         $inc   = 0;
          $nlwc .= "|" if($nlwc);
-         $nlwc .= $_;                                                # Liste der entfernten devices füllen
+         $nlwc .= $w;                                                # Liste der entfernten devices füllen
      }
+     
      push(@residevswc, $inwc) if($inc);
  }
  $edevswc = join(",", map {($_ !~ /$nlwc/)?$_:();} @edvswc) if($nlwc);
- # Log3($name, 1, "DbRep $name - nlwc: $nlwc, mwc: @mwc");
  
  # Ergebnis zusammenfassen
  $idevs   = join(",",@residevs);
@@ -9930,17 +9918,18 @@ sub DbRep_specsForSql {
  $idevswc =~ s/'/''/g;                                               # escape ' with ''
  
  $idanz = split(",",$idevs);                                         # Anzahl der inkludierten Elemente (Lauf2)
+
  if($idanz > 1) {
      $idevs =~ s/,/','/g;
      $idevs = "'".$idevs."'";
  }
  
  $edanz = split(",",$edevs);                                         # Anzahl der exkludierten Elemente (Lauf2)
+
  if($edanz > 1) {
      $edevs =~ s/,/','/g;
      $edevs = "'".$edevs."'";
  }
- 
  
  ##### inkludierte / excludierte Readings und deren Anzahl ermitteln #####
  my ($ireading,$ereading)           = ('','');
@@ -9948,49 +9937,52 @@ sub DbRep_specsForSql {
  my ($erdswc,$erdgs,$irdswc,$irdgs) = ('','','','');
  my (@erds,@irds);
  
- $reading =~ s/'/''/g;            # escape ' with ''
+ $reading =~ s/'/''/g;                                               # escape ' with ''
  
  if($reading =~ /EXCLUDE=/i) {
      ($ireading,$ereading) = split(/EXCLUDE=/i,$reading);
-     $ireading = $ireading?DbRep_trim($ireading):"%";
- } else {
+     $ireading = $ireading ? DbRep_trim($ireading) : "%";
+ } 
+ else {
      $ireading = $reading;
  }
 
  if($ereading) {
-     @erds  = split(",",$ereading); 
-     foreach my $e (@erds) {
-         if($e =~ /%/ && $e !~ /^%$/) {       # Readings mit Wildcard (%) erfassen
+     @erds = split(",",$ereading); 
+     
+     for my $e (@erds) {
+         if($e =~ /%/ && $e !~ /^%$/) {                              # Readings mit Wildcard (%) erfassen
              $erdswc .= "," if($erdswc);
              $erdswc .= $e;
-         } else {
+         } 
+         else {
              $erdgs .= "," if($erdgs);
              $erdgs .= $e;   
          }
      }                                           
  }
  
- # Readings inkludiert
- @irds  = split(",",$ireading); 
- foreach my $i (@irds) {
-     if($i =~ /%/ && $i !~ /^%$/) {           # Readings mit Wildcard (%) erfassen
+ @irds  = split(",",$ireading);                                      # Readings inkludiert
+ 
+ for my $i (@irds) {
+     if($i =~ /%/ && $i !~ /^%$/) {                                  # Readings mit Wildcard (%) erfassen
          $irdswc .= "," if($irdswc);
          $irdswc .= $i;
-     } else {
+     } 
+     else {
          $irdgs .= "," if($irdgs);
          $irdgs .= $i;   
      }
- } 
- 
+ }
  
  $iranz = split(",",$irdgs);
+ 
  if($iranz > 1) {
      $irdgs =~ s/,/','/g;
      $irdgs = "'".$irdgs."'";
  }
  
- if($ereading) {
-     # Readings exkludiert
+ if($ereading) {                                                     # Readings exkludiert
      $eranz = split(",",$erdgs);
      if($eranz > 1) {
          $erdgs =~ s/,/','/g;
@@ -10005,6 +9997,35 @@ sub DbRep_specsForSql {
                 ."excluded with wildcard: $erdswc";
 
 return ($idevs,$idevswc,$idanz,$irdgs,$iranz,$irdswc,$edevs,$edevswc,$edanz,$erdgs,$eranz,$erdswc);
+}
+
+####################################################################################################
+#               devspecs für SQL auflösen
+####################################################################################################
+sub DbRep_resolveDevspecs {
+  my $name   = shift;
+  my $dlist  = shift;                                                # Komma getrennte Deviceliste
+  my $devref = shift;                                                # Referenz der Deviceliste
+  
+  my ($devs,$devswc) = ('','');
+      
+  for my $d (@$devref) {
+      $d          =~ s/%/\.*/g if($d !~ /^%$/);                      # SQL Wildcard % auflösen 
+      my @devspcs = devspec2array($d);
+      @devspcs    = qw(^^) if(!@devspcs);                            # ein nie existierendes Device (^^) setzen wenn Liste leer 
+      @devspcs    = map {s/\.\*/%/g; $_; } @devspcs;
+         
+      if((map {$_ =~ /%/;} @devspcs) && $dlist !~ /^%$/) {           # Devices mit Wildcard (%) erfassen, die nicht aufgelöst werden konnten
+          $devswc .= "," if($devswc);
+          $devswc .= join(",",@devspcs);
+      } 
+      else {
+          $devs .= "," if($devs);
+          $devs .= join(",",@devspcs);   
+      }
+  }
+ 
+return ($devs,$devswc);
 }
 
 ####################################################################################################
@@ -13464,10 +13485,12 @@ return;
                                  This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
                                  @closed:=NULL;" or the usage of SQLite PRAGMA before execution the SQL-Statement.
                                  If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
-                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                 
-                                 If the attribute <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
-                                 is assumed in the statement, it is possible to use placeholder <b>§timestamp_begin§</b> respectively
-                                 <b>§timestamp_end§</b> on suitable place. <br><br>
+                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                
+                                 If the attributes <a href="#device">device</a>, <a href="#reading">reading</a>, 
+                                 <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
+                                 set in the module are to be taken into account in the statement, 
+                                 the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
+                                 <b>§timestamp_end§</b> can be used for this purpose. <br><br>
                                  
                                  If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
                                  original timestamp. <br><br>
@@ -16110,9 +16133,11 @@ sub bdump {
                                  Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements 
                                  gesetzt werden, kann dafür das Attribut <a href="#sqlCmdVars">sqlCmdVars</a> 
                                  verwendet werden. <br>
-                                 Sollen die im Modul gesetzten Attribute <a href="#timestamp_begin">timestamp_begin</a> bzw. 
+                                 Sollen die im Modul gesetzten Attribute <a href="#device">device</a>, <a href="#reading">reading</a>,
+                                 <a href="#timestamp_begin">timestamp_begin</a> bzw. 
                                  <a href="#timestamp_end">timestamp_end</a> im Statement berücksichtigt werden, können die Platzhalter 
-                                 <b>§timestamp_begin§</b> bzw. <b>§timestamp_end§</b> dafür verwendet werden. <br><br>
+                                 <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> bzw. 
+                                 <b>§timestamp_end§</b> dafür verwendet werden. <br><br>
                                  
                                  Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
                                  originalen Timestamps zu verhindern. <br><br>
