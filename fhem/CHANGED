@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  10_KNX: rework de- en-code, removed examples from cmdref->WIKI
  - change:  47_OBIS: Added patch from alkazaa
  - change:  58_RPI_1Wire: Support for multiple Busmasters, enhancements, fixes
  - bugfix:  88_HMCCU: Keep eventMap when resetting attributes
