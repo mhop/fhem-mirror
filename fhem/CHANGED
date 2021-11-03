@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_RFHEM: Moved to deprecated (use FHEM2FHEM)
  - bugfix:  93_DbRep: fix SQL statement if devspec can't be resolved, 
                       Forum:#/topic,53584.msg1184155.html#msg1184155
  - bugfix:  10_KNX: rework de- en-code, removed examples from cmdref->WIKI

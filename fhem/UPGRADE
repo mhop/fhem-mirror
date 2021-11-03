@@ -47,3 +47,6 @@ enable the old feature.
     10_MQTT_BRIDGE (=> MQTT_GENERIC_BRIDGE)
     98_Heating_Control (=> WeekdayTimer)
     10_EIB (=> 10_KNX)
+    93_RFHEM (=> FHEM2FHEM)
+    58_GPIO4 (=> RPI_1Wire)
+
