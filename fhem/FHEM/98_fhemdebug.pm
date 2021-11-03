@@ -59,7 +59,7 @@ fhemdebug_Fn($$)
         &{$main_readingsEndUpdate}($_[0], $dt);
       };
       *setReadingsVal = sub($$$$) {
-        DoTrigger($_[0]->{NAME}, "$_[1] $_[2]")
+        DoTrigger($_[0]->{NAME}, "$_[1]: $_[2]")
           if($_[1] && $_[1] eq "IODev" &&
              AttrVal($_[0]->{NAME}, "forceEvents", 0));
         &{$main_setReadingsVal}(@_);
