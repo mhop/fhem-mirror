@@ -12,7 +12,6 @@ use warnings;
 #use Data::Dumper;
 use Time::HiRes qw ( gettimeofday tv_interval );
 use Scalar::Util qw(looks_like_number);
-#use vars qw{%attr %defs};
 eval "use RPi::DHT;1" or my $DHT_missing = "yes";
 
 sub RPI_1Wire_Initialize {
@@ -56,18 +55,20 @@ my %RPI_1Wire_Devices =
 );
 
 sub RPI_1Wire_Notify {
-	my ($own_hash, $dev_hash) = @_;
-	my $ownName = $own_hash->{NAME}; # own name / hash
+	my ($hash, $dev_hash) = @_;
+	my $ownName = $hash->{NAME}; # own name / hash
 	return "" if(IsDisabled($ownName)); # Return without any further action if the module is disabled
 	my $devName = $dev_hash->{NAME}; # Device that created the events
-#	Log3 $ownName, 1, $ownName." Notify from $devName";
 	my $events = deviceEvents($dev_hash,1);
 	if ($devName eq "global" and grep(m/^INITIALIZED|REREADCFG$/, @{$events})) {
-		my $def=$own_hash->{DEF};
+		my $def=$hash->{DEF};
 		$def="" if (!defined $def); 
 		#GetDevices is triggering the autocreate calls, but this is not yet working (autocreate not ready?) so delay this by 10 seconds
-		RPI_1Wire_Init($own_hash,$def,0);
-		InternalTimer(gettimeofday()+10, "RPI_1Wire_GetDevices", $own_hash, 0) if $own_hash->{DEF} =~ /BUSMASTER/;
+		RPI_1Wire_Init($hash,$def,0);
+		InternalTimer(gettimeofday()+10, "RPI_1Wire_GetDevices", $hash, 0) if $hash->{DEF} =~ /BUSMASTER/;
+	} elsif ($devName eq "global" and grep(/^(DELETEATTR|ATTR).$ownName.pollingInterval/, @{$events})) {
+		#Restart timer with new pollingInterval
+		RPI_1Wire_DeviceUpdate($hash);
 	}
 }
 
@@ -147,11 +148,11 @@ sub RPI_1Wire_Init {				#
 	} else {
 		if (!(-w "$w1_path/$arg/conv_time")) {
 			delete($hash->{setList}{conv_time});
-			$hash->{helper}{write}.="conv_time ";
+			$hash->{helper}{write}.="conv_time " if (-e "$w1_path/$arg/conv_time"); 
 		}
 		if (!(-w "$w1_path/$arg/resolution")) {
 			delete($hash->{setList}{precision});
-			$hash->{helper}{write}.="resolution ";
+			$hash->{helper}{write}.="resolution " if (-e "$w1_path/$arg/resolution") ;
 		}
 	}
 	#remove set commands that make no sense
@@ -222,7 +223,6 @@ sub RPI_1Wire_DeviceUpdate {
 		return RPI_1Wire_Init($hash,$hash->{DEF},0);
 	}
 	my $pollingInterval = AttrVal($name,"pollingInterval",60);
-	return if $pollingInterval<1;
 	Log3 $name, 4 , $name.": DeviceUpdate($hash->{NAME}), pollingInterval:$pollingInterval";
 
 	my $mode=AttrVal($name,"mode","nonblocking");
@@ -246,14 +246,14 @@ sub RPI_1Wire_DeviceUpdate {
 		#RPI_1Wire_FinishFn($ret); First result can be ignored
 		RemoveInternalTimer($hash);
 		#Table of reasonable conv_times?
-		InternalTimer(gettimeofday()+1.5, "RPI_1Wire_FromTimer", $hash, 0);
+		InternalTimer(gettimeofday()+1.5, "RPI_1Wire_FromTimer", $hash, 0) if $pollingInterval>0;
 		return;
 	} elsif ($mode eq "bulk_read") {
 		$hash->{helper}{RUNNING_PID} = BlockingCall("RPI_1Wire_TriggerBulk", $hash,undef);
 		Log3 $hash->{NAME}, 3, $hash->{NAME}.": Triggered bulk read";
 	}
 	RemoveInternalTimer($hash);
-	InternalTimer(gettimeofday()+$pollingInterval, "RPI_1Wire_DeviceUpdate", $hash, 0);
+	InternalTimer(gettimeofday()+$pollingInterval, "RPI_1Wire_DeviceUpdate", $hash, 0) if $pollingInterval>0;
 	return;
 }
 
@@ -274,7 +274,7 @@ sub RPI_1Wire_FromTimer {
 	RPI_1Wire_FinishFn($ret);
 	RemoveInternalTimer($hash);
 	my $pollingInterval = AttrVal($name,"pollingInterval",60);
-	InternalTimer(gettimeofday()+$pollingInterval, "RPI_1Wire_DeviceUpdate", $hash, 0);
+	InternalTimer(gettimeofday()+$pollingInterval, "RPI_1Wire_DeviceUpdate", $hash, 0) if $pollingInterval>0;
 }
 
 sub RPI_1Wire_SetPrecision {
@@ -617,8 +617,7 @@ sub RPI_1Wire_Attr {					#
 		if (!looks_like_number($val) || $val < 0) {
 			return "pollingInterval has to be a positive number or zero";
 		}
-		#Restart Timer
-		RPI_1Wire_DeviceUpdate($hash);
+		#RPI_1Wire_DeviceUpdate($hash); moved to NOTIFY, after the change has been done
 	} elsif ($attr eq "mode") {
 		if ($val ne "blocking" && $val ne "nonblocking" && $val ne "timer") {
 			return "Unknown mode $val";
@@ -749,6 +748,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/RPI_1Wire">Wiki<
 		<li><b>pollingInterval</b><br>
 		<a id="RPI_1Wire-attr-pollingInterval"></a>
 			Defines how often the device is updated in seconds.<br>
+			Setting the pollingInterval to 0 disables the automatic updates.<br>
 			Default: 60, valid values: integers<br>
 		</li>
 		<li><b>tempOffset</b><br>
