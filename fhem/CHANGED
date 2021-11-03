@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCam: set compability to SVS 8.2.10
  - bugfix:  58_RPI_1Wire: Improved behaviour when changing pollingInterval
  - change:  93_RFHEM: Moved to deprecated (use FHEM2FHEM)
  - bugfix:  93_DbRep: fix SQL statement if devspec can't be resolved, 

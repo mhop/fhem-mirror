@@ -184,6 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.2" => "03.11.2021  set SVS compatibility to 8.2.10 ",
   "9.10.1" => "18.07.2021  set SVS compatibility to 8.2.9 ",
   "9.10.0" => "03.07.2021  change getApiSites_Parse for better simu_SVSversion, new value 8.2.8-xxxx for attr simu_SVSversion ",
   "9.9.0"  => "21.05.2021  new get command saveLastSnap ",
@@ -662,7 +663,7 @@ my %hsimu = (                                                              # Fun
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $compstat          = "8.2.9";                           # getestete SVS-Version
+my $compstat          = "8.2.10";                          # getestete SVS-Version
 my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
