@@ -57,10 +57,6 @@ watchdog_reset($)
   my ($watchdog) = @_;
   $watchdog->{STATE} = "defined";
   setReadingsVal($watchdog, "Reset", "reset", TimeNow());
-  if($watchdog->{READINGS}) {
-    delete($watchdog->{READINGS}{triggeredByDev}) ;
-    delete($watchdog->{READINGS}{triggeredByEvent}) ;
-  }
 }
 
 #####################################
