@@ -602,6 +602,7 @@ FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/WMBus.pm                kaihs                Sonstige Systeme
 FHEM/Winservice.pm           rudolfkoenig         Sonstige Systeme
 FHEM/ZWLib.pm                rudolfkoenig         ZWave
+FHEM/myUtilsTemplate.pm      rudolfkoenig         Sonstige Systeme
 FHEM/wundergroundAPI.pm      loredo               Unterstützende Dienste/Wettermodule
 FHEM/YahooWeatherAPI.pm      neubert              (deprecated)
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
