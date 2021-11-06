@@ -2717,6 +2717,11 @@ sub _manageConsumerData {
       
       $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
       
+      #################################################
+      # onoff funktioniert nur züverlässig wenn powerthreshold hier nochmal abgefragt wird ?!?
+      $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 1); 
+      #################################################
+      
       my $starthour;
       if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher soll aktiv sein
             if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
