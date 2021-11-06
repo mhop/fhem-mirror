@@ -246,6 +246,7 @@ holiday_refresh($;$$)
 
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, 'state', $found);
+    readingsBulkUpdate($hash, 'today', $found);
     readingsBulkUpdate($hash, 'yesterday', CommandGet(undef,"$name yesterday"));
     readingsBulkUpdate($hash, 'tomorrow',  CommandGet(undef,"$name tomorrow"));
     readingsEndUpdate($hash,1);
