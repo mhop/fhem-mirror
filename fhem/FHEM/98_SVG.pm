@@ -13,6 +13,7 @@ sub FW_pO(@);
 use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
 use vars qw($FW_RET);     # Returned data (html)
 use vars qw($FW_RETTYPE); # image/png or the like
+use vars qw($FW_chash);   # client fhem hash
 use vars qw($FW_cssdir);  # css directory
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_dir);     # base directory for web server
@@ -2445,7 +2446,8 @@ plotAsPng(@)
   @webs=devspec2array("TYPE=FHEMWEB");
   foreach(@webs) {
     if(!InternalVal($_,'TEMPORARY',undef)) {
-      $FW_wname=InternalVal($_,'NAME','');
+      $FW_wname = InternalVal($_,'NAME','');
+      $FW_chash = $defs{$FW_wname};
       last;
     }
   }

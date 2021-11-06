@@ -76,6 +76,7 @@ use vars qw($FW_wname);   # Web instance
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw(%FW_pos);     # scroll position
 use vars qw($FW_cname);   # Current connection name
+use vars qw($FW_chash);   # client fhem hash
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
@@ -120,7 +121,6 @@ my $FW_XHR;        # Data only answer, no HTML
 my $FW_id="";      # id of current page
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
 my $FW_headerlines; #
-my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
 my $FW_styleStamp=time();
 my %FW_svgData;
