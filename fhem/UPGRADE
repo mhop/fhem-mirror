@@ -43,10 +43,12 @@ enable the old feature.
     NOTE: In 6.0 version this can be forced by new attribute offState
   - 96_allowed: the default for allowedIfAuthenticatedByMe is now 1 (relevant
     if there are multiple allowed devices valid for the same target).
-  - Deprecated modules (consider replacing them by prior to upgrading):
+  - Deprecated modules (consider replacing them by named alternative(s) 
+    prior to upgrading):
     10_MQTT_BRIDGE (=> MQTT_GENERIC_BRIDGE)
     98_Heating_Control (=> WeekdayTimer)
     10_EIB (=> 10_KNX)
     93_RFHEM (=> FHEM2FHEM)
     58_GPIO4 (=> RPI_1Wire)
-
+    20_OWFS (=> OWServer, or OWX)
+    21_OWTEMP (=> OWDevice)

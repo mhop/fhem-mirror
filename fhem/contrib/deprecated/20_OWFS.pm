@@ -21,7 +21,7 @@
 #  GNU General Public License for more details.
 #
 ################################################################
-# $Id$
+# $Id: 20_OWFS.pm 2516 2013-01-14 10:41:48Z mfr69bs $
 package main;
 
 use strict;

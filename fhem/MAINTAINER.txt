@@ -132,7 +132,6 @@ FHEM/20_FRM_SERVO.pm         jensb                Sonstige Systeme
 FHEM/20_FRM_STEPPER.pm       jensb                Sonstige Systeme
 FHEM/20_GUEST.pm             loredo               Automatisierung
 FHEM/20_N4HBUS.pm            okoerber             Sonstige Systeme
-FHEM/20_OWFS.pm              mfr69bs              1Wire (deprecated)
 FHEM/20_PET.pm               loredo               Automatisierung
 FHEM/20_ROOMMATE.pm          loredo               Automatisierung
 FHEM/20_X10.pm               neubert              SlowRF
@@ -146,7 +145,6 @@ FHEM/21_OWID.pm              pahenning            1Wire
 FHEM/21_OWLCD.pm             pahenning            1Wire
 FHEM/21_OWMULTI.pm           pahenning            1Wire
 FHEM/21_OWSWITCH.pm          pahenning            1Wire
-FHEM/21_OWTEMP.pm            mfr69bs              1Wire (deprecated)
 FHEM/21_OWTHERM.pm           pahenning            1Wire
 FHEM/21_OWVAR.pm             pahenning            1Wire
 FHEM/21_SONOSPLAYER          Reinerlein           Multimedia

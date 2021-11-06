@@ -21,7 +21,7 @@
 #  GNU General Public License for more details.
 #
 ################################################################
-# $Id$
+# $Id: 21_OWTEMP.pm 6164 2014-06-25 13:40:30Z ntruchsess $
 package main;
 
 use strict;
