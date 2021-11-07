@@ -5,6 +5,7 @@ package main;
 
 use strict;
 use warnings;
+use DevIo;
 use Time::HiRes qw(gettimeofday time);
 use Digest::MD5 qw(md5);
 
@@ -51,8 +52,8 @@ my $HMmlSlice = 12; # number of messageload slices per hour (10 = 6min)
 
 sub HMLAN_Initialize($) {
   my ($hash) = @_;
+  use DevIo;
 
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "HMLAN_Read";
@@ -82,6 +83,8 @@ sub HMLAN_Initialize($) {
                      "wdTimer:5,10,15,20,25 ".
                      "logIDs:multiple,sys,all,broadcast ".
                      $readingFnAttributes;
+  $hash->{NotifyOrderPrefix} = "47-"; #make sure, HMLAN_DoInit is called once prior to CUL_HM initialisation
+  return;
 }
 sub HMLAN_Define($$) {#########################################################
   my ($hash, $def) = @_;
@@ -89,7 +92,7 @@ sub HMLAN_Define($$) {#########################################################
 
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> HMLAN ip[:port]";
-    Log3 $hash, 2, $msg;
+    Log3 $a[0], 2, $msg;
     return $msg;
   }
   DevIo_CloseDev($hash);
@@ -99,7 +102,7 @@ sub HMLAN_Define($$) {#########################################################
   $dev .= ":1000" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
   if($dev eq "none") {
-    Log3 $hash, 1, "$name device is none, commands will be echoed only";
+    Log3 $name, 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -118,6 +121,7 @@ sub HMLAN_Define($$) {#########################################################
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
   $hash->{helper}{q}{scnt}        = 0;
+  $hash->{helper}{q}{sending}     = 0;
   $hash->{helper}{q}{loadNo}      = 0;
   $hash->{helper}{q}{loadLastMax} = 0;   # max load in last slice
   my @ald = ("0") x $HMmlSlice;
@@ -136,9 +140,10 @@ sub HMLAN_Define($$) {#########################################################
   readingsSingleUpdate($hash,"state","disconnected",1);
   $hash->{owner} = "";
   HMLAN_Attr("delete",$name,"loadLevel");
+  $hash->{Clients} = ":CUL_HM:";
 
-  my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
-  return $ret;
+  return DevIo_OpenDev($hash, 0, "HMLAN_DoInit") if $init_done;
+  return;
 }
 sub HMLAN_Undef($$) {##########################################################
   my ($hash, $arg) = @_;
@@ -165,12 +170,13 @@ sub HMLAN_RemoveHMPair($) {####################################################
 }
 sub HMLAN_Notify(@) {##########################################################
   my ($hash,$dev) = @_;
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
+  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
     if ($hash->{helper}{attrPend}){
       my $aVal = AttrVal($hash->{NAME},"logIDs","");
       HMLAN_Attr("set",$hash->{NAME},"logIDs",$aVal) if($aVal);
       delete $hash->{helper}{attrPend};
     }
+    DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
     HMLAN_writeAesKey($hash->{NAME});
   }
   elsif ($dev->{NAME} eq $hash->{NAME}){
@@ -641,6 +647,7 @@ sub HMLAN_Parse($$) {##########################################################
   my @mFld = split(',', $rmsg);
   my $letter = substr($mFld[0],0,1); # get leading char
 
+  $hash->{helper}{q}{sending} = 0 if ($letter eq "R");
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
     # max speed for devices is 100ms after receive - example:TC
     my ($mNo,$flg,$type,$src,$dst,$p) = unpack('A2A2A2A6A6A*',$mFld[5]);
@@ -936,6 +943,7 @@ sub HMLAN_DoInit($) {##########################################################
 
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
+  $hash->{helper}{q}{sending} = 0;
 
   my $tn = gettimeofday();
   my $wdTimer = AttrVal($name,"wdTimer",25);
@@ -986,11 +994,16 @@ sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
+  my $tn = gettimeofday();
+  if ($hash->{helper}{q}{sending}) { #Currently sending, reschedule KeepAlive
+    RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+    InternalTimer($tn+0.1,"HMLAN_KeepAlive", "keepAlive:".$name, 1);
+    return;
+  }
   $hash->{helper}{q}{keepAliveRec} = 0; # reset indicator
 
   return if(!$hash->{FD});
   
-  my $tn = gettimeofday();
   my $wdTimer = AttrVal($name,"wdTimer",25);
   my $rht = int($tn)>>15 ;
   if( $rht != $hash->{helper}{setTime}){# reset HMLAN watch about each 10h
@@ -1156,13 +1169,15 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
 
 1;
 
+__END__
+
 =pod
 =item device
 =item summary    IO device for wireless homematic
 =item summary_DE IO device für funkgesteuerte Homematic Devices
 =begin html
 
-<a name="HMLAN"></a>
+<a id="HMLAN"></a>
 <h3>HMLAN</h3>
 <ul>
     The HMLAN is the fhem module for the eQ-3 HomeMatic LAN Configurator.<br>
@@ -1182,7 +1197,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     </ul>
     <br/><br/>
 
-    <a name="HMLANdefine"><b>Define</b></a>
+    <a id="HMLAN-define"></a><h4>Define</h4>
     <ul>
         <code>define &lt;name&gt; HMLAN &lt;ip-address&gt;[:port]</code><br>
         <br>
@@ -1191,36 +1206,38 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     </ul>
     <br><br>
 
-    <a name="HMLANset"><b>Set</b></a>
+    <a id="HMLAN-set"></a><h4>Set</h4>
     <ul>
         <li><a href="#hmPairForSec">hmPairForSec</a></li>
         <li><a href="#hmPairSerial">hmPairSerial</a></li>
         <li><a href="#hmreopen">reopen</a>
            reconnect the device
-           </li>
+        </li>
         <li><a href="#hmrestart">restart</a>
           Restart the device
           </li>
-        <li><a href="#HMLANset_reassignIDs">reassignIDs</a>
+        <li><a id="HMLAN-set-reassignIDs"></a>reassignIDs<br>
           Syncs the IDs between HMLAN and the FHEM list. 
           Usually this is done automatically and only is recomended if there is a difference in counts.
           </li>
     <br><br>
     </ul>
-    <a name="HMLANget"><b>Get</b></a>
+    <a id="HMLAN-get"></a><h4>Get</h4>
     <ul>
-        <li><a href="#HMLANgetassignIDs">assignIDs</a>
+        <a id="HMLAN-get-assignIDs"><b>Get</b></a>
+        <li>assignIDs<br>
           Gibt eine Liste aller diesem IO zugewiesenen IOs aus.
-          </li>
+        </li>
     </ul>
     <br><br>
 
-    <a name="HMLANattr"><b>Attributes</b></a>
+    <a id="HMLAN-attr"></a><h4>Attributes</h4>
     <ul>
         <li><a href="#addvaltrigger">addvaltrigger</a></li>
         <li><a href="#do_not_notify">do_not_notify</a></li>
         <li><a href="#attrdummy">dummy</a></li>
-        <li><a href="#HMLANlogIDs">logIDs</a><br>
+        <a id="HMLAN-attr-logIDs"></a>
+        <li><a id="HMLAN-attr-logIDs">logIDs</a><br>
            enables selective logging of HMLAN messages. A list of HMIds or names can be
            entered, comma separated, which shall be logged.<br>
            The attribute only allows device-IDs, not channel IDs.
@@ -1229,31 +1246,27 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
            <b>sys</b> will log system related messages like keep-alive<br>
            in order to enable all messages set "<b>all,sys</b>"<br>
         </li>
-        <li><a name="HMLANloadLevel">loadLevel</a><br>
+        <li><a id="HMLAN-attr-loadLevel"></a>loadLevel<br>
             loadlevel will be mapped to reading vaues. <br>
             0:low,30:mid,40:batchLevel,90:high,99:suspended<br>
             the batchLevel value will be set to 40 if not entered. This is the level at which
             background message generation e.g. for autoReadReg will be stopped<br>
             </li>
         <li><a href="#hmId">hmId</a></li>
-        <li><a name="HMLANhmKey">hmKey</a></li>
-        <li><a name="HMLANhmKey2">hmKey2</a></li>
-        <li><a name="HMLANhmKey3">hmKey3</a></li>
-        <li><a name="HMLANhmKey4">hmKey4</a></li>
-        <li><a name="HMLANhmKey5">hmKey5</a><br>
+        <li><a id="HMLAN-attr-hmKey" data-pattern="hmKey.*"></a>hmKey / hmKey2-5<br>
             AES keys for the HMLAN adapter. <br>
             The key is converted to a hash. If a hash is given directly it is not converted but taken directly.
             Therefore the original key cannot be converted back<br>
         </li>
         <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
-        <li><a name="HMLANrespTime">respTime</a><br>
+        <li><a id="HMLAN-attr-respTime"></a>respTime<br>
             Define max response time of the HMLAN adapter in seconds. Default is 1 sec.<br/>
             Longer times may be used as workaround in slow/instable systems or LAN configurations.</li>
-        <li><a name="HMLAN#wdTimer">wdTimer</a><br>
+        <li><a id="HMLAN-attr-wdTimer">wdTimer</a><br>
             Time in sec to trigger HMLAN. Values between 5 and 25 are allowed, 25 is default.<br>
             It is <B>not recommended</B> to change this timer. If problems are detected with <br>
             HLMLAN disconnection it is advisable to resolve the root-cause of the problem and not symptoms.</li>
-        <li><a name="HMLANhmLanQlen">hmLanQlen</a><br>
+        <li><a id="HMLAN-attr-hmLanQlen">hmLanQlen</a><br>
             defines queuelength of HMLAN interface. This is therefore the number of
             simultanously send messages. increasing values may cause higher transmission speed.
             It may also cause retransmissions up to data loss.<br>
@@ -1261,7 +1274,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
             1 - is a conservatibe value, and is default<br>
             5 - is critical length, likely cause message loss</li>
     </ul><br>
-    <a name="HMLANparameter"><b>parameter</b></a>
+    <a id="HMLAN-parameter"></a><h4>parameter</h4>
     <ul>
       <li><B>assignedIDsCnt</B><br>
           number of IDs that are assigned to HMLAN by FHEM.
@@ -1280,7 +1293,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
       <li><B>msgLoadCurrent</B><br>
           Current transmit load of HMLAN. When capacity reaches 100% HMLAN stops sending and waits for 
           reduction. See also:
-          <a href="#HMLANloadLevel">loadLevel</a><br></li>
+          <a href="#HMLAN-attr-loadLevel">loadLevel</a><br></li>
       <li><B>msgLoadHistoryAbs</B><br>
           Historical transmition load of IO.</li>
       <li><B>msgParseDly</B><br>
@@ -1288,7 +1301,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           It therefore gives an indication about FHEM system performance.
           </li>
     </ul><br>
-    <a name="HMLANreadings"><b>parameter and readings</b></a>
+    <a id="HMLAN-readings"></a><h4>parameter and readings</h4>
     <ul>
       <li><B>prot_disconnect</B>       <br>recent HMLAN disconnect</li>
       <li><B>prot_init</B>             <br>recent HMLAN init</li>
@@ -1305,7 +1318,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
 =end html
 =begin html_DE
 
-<a name="HMLAN"></a>
+<a id="HMLAN"></a>
 <h3>HMLAN</h3>
 <ul>
     Das HMLAN ist das fhem-Modul f&uuml;r den eQ-3 HomeMatic LAN Configurator welcher als IO 
@@ -1324,45 +1337,46 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     </ul>
     <br><br>
 
-    <a name="HMLANdefine"><b>Define</b></a>
+    <a id="HMLAN-define"><b>Define</b></a>
     <ul>
         <code>define &lt;name&gt; HMLAN &lt;ip-address&gt;[:port]</code><br>
         <br>
         Der Standard-Port lautet: 1000.<br/>
         Wenn keine IP-Adresse angegeben wird, wird auch kein Ger&auml;t ge&ouml;ffnet; man kann 
-	also auch ohne angeschlossene Hardware experimentieren.
+        also auch ohne angeschlossene Hardware experimentieren.
     </ul>
     <br><br>
 
-    <a name="HMLANset"><b>Set</b></a>
+    <a id="HMLAN-set"><h4>Set</h4></a>
     <ul>
         <li><a href="#hmPairForSec">hmPairForSec</a></li>
         <li><a href="#hmPairSerial">hmPairSerial</a></li>
+        <a id="HMLAN-set-hmreopen"><b>Set</b></a>
         <li><a href="#hmreopen">reopen</a>
            Connection zum IO device neu starten</li>
         <li><a href="#hmrestart">restart</a>
            Neustart des IOdevice
-           </li>
-        <li><a href="#HMLANset_reassignIDs">reassignIDs</a>
+        </li>
+        <li><a id="HMLAN-set-reassignIDs">reassignIDs</a>
           Synchronisiert die im HMLAN eingetragenen IDs mit der von FHEM verwalteten Liste. 
           I.a. findet dies automatisch statt, koennte aber in reset Fällen abweichen.
-          </li>
+        </li>
     </ul>
     <br><br>
-    <a name="HMLANget"><b>Get</b></a>
+    <a id="HMLAN-get"></a><h4>Get</h4>
     <ul>
-        <li><a href="#HMLANgetassignIDs">assignIDs</a>
+        <li><a id="HMLAN-get-assignIDs">assignIDs</a>
           Gibt eine Liste aller diesem IO zugewiesenen IOs aus.
-          </li>
+        </li>
     </ul>
     <br><br>
 
-    <a name="HMLANattr"><b>Attributes</b></a>
+    <a id="HMLAN-attr"><h4>Attributes</h4></a>
     <ul>
         <li><a href="#do_not_notify">do_not_notify</a></li><br>
         <li><a href="#attrdummy">dummy</a></li><br>
         <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
-        <li><a href="#HMLANlogIDs">logIDs</a><br>
+        <li><a id="HMLAN-attr-logIDs">logIDs</a><br>
            Schaltet selektives Aufzeichnen der HMLAN Meldungen ein. Eine Liste der 
            HMIds oder Namen, die aufgezeichnet werden sollen, k&ouml;nnen - getrennt durch 
            Kommata - eingegeben werden.<br>
@@ -1372,35 +1386,31 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
            <b>sys</b> zeichnet alle systemrelevanten Meldungen wie keep-alive auf.<br>
            <b>all,sys</b> damit wird die Aufzeichnung aller Meldungen eingeschaltet<br>
         </li>
-        <li><a name="HMLANloadLevel">loadLevel</a><br>
+        <li><a id="HMLAN-attr-loadLevel">loadLevel</a><br>
             loadlevel mapped den Auslastungslevel auf die Namen in ein Reading. <br>
             0:low,30:mid,40:batchLevel,90:high,99:suspended<br>
             Der batchLevel Wert wird auf 40 gesetzt., sollte er fehlen. 
             Das ist der Levelbei dem die Hintergrundnachrichten z.B. durch autoReadReg gestoppt werden<br>
         </li><br>
         <li><a href="#hmId">hmId</a></li><br>
-        <li><a name="HMLANhmKey">hmKey</a></li><br>
-        <li><a name="HMLANhmKey2">hmKey2</a></li><br>
-        <li><a name="HMLANhmKey3">hmKey3</a></li><br>
-        <li><a name="HMLANhmKey4">hmKey4</a></li><br>
-        <li><a name="HMLANhmKey5">hmKey5</a><br>
+        <li><a id="HMLAN-attr-hmKey" data-pattern="hmKey.*"></a>hmKey / hmKey2-5<br>
           AES Schl&uuml;ssel f&uuml;r den HMLAN Adapter. <br>
           Der Schl&uuml;ssel wird in eine hash-Zeichenfolge umgewandelt. Wenn eine Hash-Folge unmittelbar 
           eingegeben wird, erfolgt keine Umwandlung, sondern eine eine direkte Benutzung der Hash-Folge. 
           Deshalb kann der Originalschl&uuml;ssel auch nicht entschl&uuml;sselt werden.<br>
         </li>
         <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
-        <li><a name="HMLANrespTime">respTime</a><br>
+        <li><a id="HMLAN-attr-respTime">respTime</a><br>
           Definiert die maximale Antwortzeit des HMLAN-Adapters in Sekunden. Standardwert ist 1 Sekunde.<br/>
           L&auml;ngere Zeiten k&ouml;nnen &uuml;bergangsweise in langsamen und instabilen Systemen oder in
           LAN-Konfigurationen verwendet werden.</li>
-        <li><a name="HMLAN#wdTimer">wdTimer</a><br>
+        <li><a id="HMLAN-attr-wdTimer">wdTimer</a><br>
           Zeit in Sekunden, um den HMLAN zu triggern. Werte zwischen 5 und 25 sind zul&auml;ssig. 
           Standardwert ist 25 Sekunden.<br>
           Es wird <B>davon abgeraten</B> diesen Timer zu ver&auml;ndern. Wenn Probleme mit 
           HMLAN-Abbr&uuml;chen bestehen wird empfohlen die Ursache des Problems zu finden 
           und zu beheben und nicht die Symptom.</li>
-        <li><a name="HMLANhmLanQlen">hmLanQlen</a><br>
+        <li><a id="HMLAN-attr-hmLanQlen">hmLanQlen</a><br>
           Definiert die L&auml;nge der Warteschlange des HMLAN Interfaces. Es ist deshalb die Anzahl 
           der gleichzeitig zu sendenden Meldungen. Erh&ouml;hung des Wertes kann eine Steigerung der
           &Uuml;bertragungsgeschwindigkeit verursachen, ebenso k&ouml;nnen wiederholte Aussendungen 
@@ -1409,7 +1419,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           1 - ist ein Wert auf der sicheren Seite und deshalb der Standardwert<br>
           5 - ist eine kritische L&auml;nge und verursacht wahrscheinlich Meldungsverluste</li>
     </ul>
-    <a name="HMLANparameter"><b>parameter</b></a>
+    <a id="HMLAN-parameter"><h4>parameter</h4></a>
     <ul>
       <li><B>assignedIDsCnt</B><br>
           Anzahl der IDs, die von FHEM einem HMLAN zugeordnet sind. 
@@ -1430,7 +1440,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
       <li><B>msgLoadCurrent</B><br>
           Aktuelle Funklast des HMLAN. Da HMLAN nur eine begrenzte Kapzit&auml;t je Stunde hat 
           Telegramme abzusetzen stellt es bei 100% das Senden ein. Siehe auch
-          <a href="#loadLevel">loadLevel</a><br></li>
+          <a href="#HMLAN-attr-loadLevel">loadLevel</a><br></li>
       <li><B>msgLoadHistoryAbs</B><br>
           IO Funkbelastung vergangener Zeitabschnitte.</li>
       <li><B>msgParseDly</B><br>
@@ -1439,7 +1449,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           des Systems  von FHEM.
           </li>
     </ul>
-    <a name="HMLANreadings"><b>Parameter und Readings</b></a>
+    <a id="HMLAN-readings"><h4>Parameter und Readings</h4></a>
     <ul>
       <li><B>prot_disconnect</B>       <br>letzter HMLAN disconnect</li>
       <li><B>prot_init</B>             <br>letzter HMLAN init</li>
