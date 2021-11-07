@@ -2864,7 +2864,7 @@ GlobalAttr($$$$)
   if($type eq "del") {
     my %noDel = ( modpath=>1, verbose=>1, logfile=>1, configfile=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
-    $featurelevel = 6.0 if($name eq "featurelevel");
+    $featurelevel = 6.1 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
     delete($defs{global}{ignoreRegexpObj}) if($name eq "ignoreRegexp");
     return undef;
