@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 6.1 released
+
+- 2021-11-07 (6.1)
  - change:  20_OWFS: Move to deprecated
  - change:  21_OWTEMP: Move to deprecated
  - change:  49_SSCam: set compability to SVS 8.2.10

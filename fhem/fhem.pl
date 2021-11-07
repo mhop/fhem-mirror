@@ -305,7 +305,7 @@ my $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 $init_done = 0;
 $lastDefChange = 0;
-$featurelevel = 6.0; # see also GlobalAttr
+$featurelevel = 6.1; # see also GlobalAttr
 $numCPUs = `grep -c ^processor /proc/cpuinfo 2>&1` if($^O eq "linux");
 $numCPUs = ($numCPUs && $numCPUs =~ m/(\d+)/ ? $1 : 1);
 
