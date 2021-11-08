@@ -149,6 +149,7 @@ sub HMUARTLGW_Initialize($)
 	$hash->{RenameFn}  = "HMUARTLGW_Rename";
 	$hash->{ShutdownFn}= "HMUARTLGW_Shutdown";
 	$hash->{NotifyFn}  = "HMUARTLGW_Notify";
+	$hash->{NotifyOrderPrefix} = "47-"; #make sure, HMUARTLGW_InitConnection is called once prior to CUL_HM initialisation
 
 	$hash->{AttrList}= "hmId " .
 	                   "lgwPw " .
