@@ -142,6 +142,7 @@ sub HMLAN_Define($$) {#########################################################
   HMLAN_Attr("delete",$name,"loadLevel");
   $hash->{Clients} = ":CUL_HM:";
 
+  $hash->{nextOpenDelay} = 10;
   return DevIo_OpenDev($hash, 0, "HMLAN_DoInit") if $init_done;
   return;
 }
@@ -835,7 +836,7 @@ sub HMLAN_Parse($$) {##########################################################
 }
 sub HMLAN_Ready($) {###########################################################
   my ($hash) = @_;
-  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit");
+  return DevIo_OpenDev($hash, 1, "HMLAN_DoInit",  sub(){});
 }
 sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
@@ -909,6 +910,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
+    $hash->{helper}{q}{sending} = 1;
     $hash->{helper}{q}{scnt}++;  
   }
   else{
