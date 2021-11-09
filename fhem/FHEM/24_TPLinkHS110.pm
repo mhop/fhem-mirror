@@ -194,6 +194,18 @@ sub TPLinkHS110_Get($$) {
 	Log3 $hash, 3, "TPLinkHS110: $name Get called. Relay state: $json->{'system'}->{'get_sysinfo'}->{'relay_state'}, RSSI: $json->{'system'}->{'get_sysinfo'}->{'rssi'}";
 
 	my $hw_ver = $json->{'system'}->{'get_sysinfo'}->{'hw_ver'};
+
+
+	if ($json->{'system'}->{'get_sysinfo'}->{'model'} eq "KP115(EU)")
+	{
+		$hw_ver = '2.0';	
+	}
+	else
+	{
+		$hw_ver = $hw_ver;
+	}
+
+
 	my %hwMap = hwMapping();
 
 	foreach my $key (sort keys %{$json->{'system'}->{'get_sysinfo'}}) {
@@ -238,7 +250,13 @@ sub TPLinkHS110_Get($$) {
 
 	# If the device is a HS110, get realtime data:
 	#  if ( 1 == 0 ) {
-	if ($json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(EU)" or $json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(UK)") {
+	if (
+		$json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(EU)"
+		or
+		$json->{'system'}->{'get_sysinfo'}->{'model'} eq "HS110(UK)"
+		or
+		$json->{'system'}->{'get_sysinfo'}->{'model'} eq "KP115(EU)"
+	) {
 		my $realtimejcommand = '{"emeter":{"get_realtime":{}}}';
 		my $rdata;
 		($errmsg, $rdata) = TPLinkHS110_SendCommand($hash, $realtimejcommand);
