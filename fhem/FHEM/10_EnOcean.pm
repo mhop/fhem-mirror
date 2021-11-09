@@ -443,6 +443,7 @@ my %EnO_eepConfig = (
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
  # special profiles
   "G5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", manufID => "00D", model => 'tracker'}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
+  "H5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", devMode => 'master', devUpdate => 'auto', motionMode => 'fully'}},
   "G5.10.12" => {attr => {subType => "roomSensorControl.01", eep => "A5-10-12", manufID => "00D", scaleMax => 40, scaleMin => 0, scaleDecimals => 1}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
@@ -785,7 +786,7 @@ sub EnOcean_Initialize($) {
                       "showtime:select,0,1 " .
                       "actualTemp angleMax:slider,-180,20,180 alarmAction alwaysUpdateReadings:select,0,1 " .
                       "angleMin:slider,-180,20,180 " .
-                      "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
+                      "angleTime blockUnknownMSC:no,yes blockMotion:no,yes " .
                       "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
                       "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
                       "blockFanSpeed:no,yes blockKey:no,yes " .
@@ -804,7 +805,7 @@ sub EnOcean_Initialize($) {
                       "demandRespAction:textField-long demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
                       "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
                       "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
-                      "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
+                      "devChannel devMode:master,slave devUpdate:select,auto,off " .
                       "dimMax dimMin dimValueOn disable:0,1 disabledForIntervals " .
                       "displayContent:default,humidity,off,setpointTemp,tempertureExtern,temperatureIntern,time,no_change " .
                       "displayOrientation:0,90,180,270 " .
@@ -812,6 +813,7 @@ sub EnOcean_Initialize($) {
                       "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable measurementTypeSelect:feed,room " .
                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
                       "model:" . join(",", sort keys %EnO_models) . " " .
+                      "motionMode:select,fully,semi motionRefDev " .
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction:textField-long observeInterval observeLogic:and,or " .
                       #observeCmds observeExeptions
                       "observeRefDev openLoopCtrlScale pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
@@ -823,7 +825,7 @@ sub EnOcean_Initialize($) {
                       "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sendTimePeriodic sensorMode:switch,pushbutton " .
-                      "serviceOn:no,yes settingAccuracy:high,low setpointRefDev setpointSummerMode:slider,0,5,100 " .
+                      "serviceOn:no,yes setCmdTrigger:man,refDev setpointRefDev setpointSummerMode:slider,0,5,100 settingAccuracy:high,low " .
                       "signal:off,on signOfLife:off,on signOfLifeInterval setpointTempRefDev shutTime shutTimeCloses subDef " .
                       "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
@@ -861,12 +863,13 @@ sub EnOcean_Define($$) {
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   my $ioDev = $hash->{IODev}{NAME} if (exists $hash->{IODev});
+  #Log3 $name, 2, "EnOcean $name IODev: $ioDev" if (defined $ioDev);
   # proposed IODev set by TCM attr assignIODev
   $ioDev = $modules{$ioModulesType}{assignIODev}{NAME} if (exists $modules{$ioModulesType}{assignIODev});
   #Log3 $name, 2, "EnOcean $name assignIODev IODev: $ioDev" if (defined $ioDev);
   # proposed IODev set by TCM Teach flag
   $ioDev = $modules{$ioModulesType}{Teach}{NAME} if (exists $modules{$ioModulesType}{Teach});
-  #Log3 $name, 2, "EnOcean $name Teach IODev: $ioDev" if (defined $ioDev);
+  #Log3 $name, 2, "EnOcean $name teach IODev: $ioDev" if (defined $ioDev);
 
   my ($autocreateFilelog, $autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
      ('./log/' . $name . '-%Y.log', undef, undef, 'EnOcean', 'Plots');
@@ -2457,6 +2460,79 @@ sub EnOcean_Set($@) {
       }
       Log3 $name, 3, "EnOcean set $name $switchCmd";
 
+    } elsif ($st eq "occupSensor.01") {
+      # Occupancy Sensor (EEP A5-07-01)
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2] is solar panel current where =0 uA ... 0xFF = 127 uA
+      # $db[1] is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
+      $rorg = "A5";
+      my $signOfLifeCmd;
+      if ($cmd eq "status") {
+        $data = "FAFF0008";
+        $hash->{helper}{lastCmd} = $cmd;
+        $cmd = 'off';
+        $signOfLifeCmd = 'status';
+      } elsif ($cmd eq "teach") {
+        # teach-in EEP A5-07-01
+        $data = "1C0FFF80";
+        $attr{$name}{eep} = "A5-07-01";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = 'status';
+        CommandDeleteReading(undef, "$name .*");
+        readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
+        #($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+      } elsif ($cmd eq "fullyOn") {
+        $data = "FAFFFF08";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'fullyOn');
+        readingsBulkUpdate($hash, "state", 'fullyOn');
+        readingsEndUpdate($hash, 1);
+      } elsif ($cmd eq "off") {
+        $data = "FAFF0008";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = 'status';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'off');
+        readingsBulkUpdate($hash, "state", 'off');
+        readingsEndUpdate($hash, 1);
+      } elsif ($cmd eq "on") {
+        $data = AttrVal($name, 'motionMode', 'fully') eq 'semi' ? 'FAFFC808' : 'FAFFFF08';
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'on');
+        readingsBulkUpdate($hash, "state", 'on');
+        readingsEndUpdate($hash, 1);
+      } elsif ($cmd eq "semiOn") {
+        $data = "FAFFC808";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'semiOn');
+        readingsBulkUpdate($hash, "state", 'semiOn');
+        readingsEndUpdate($hash, 1);
+      } else {
+        if (AttrVal($name, 'devMode', 'master') eq 'master') {
+          if ($manufID eq "00D") {
+          # Eltako FBH55SB [TF-Modus]
+            return "Unknown argument " . $cmd . ", choose one of fullyOn:noArg off:noArg on:noArg semiOn:noArg teach:noArg"
+          } else {
+            return "Unknown argument " . $cmd . ", choose one of off:noArg on:noArg teach:noArg"
+          }
+        } else {
+          return undef;
+        }
+      }
+      $updateState = 0;
+      my %signOfLifePeriod = ('off' => 120, 'on' => 60, 'fullyOn' => 60, 'semiOn' => 60, 'status' => 1020, 'teach' => 1020);
+      RemoveInternalTimer($hash->{helper}{timer}{signOfLife}) if(exists $hash->{helper}{timer}{signOfLife});
+      $hash->{helper}{timer}{signOfLife} = {hash => $hash, function => $signOfLifeCmd, period => $signOfLifePeriod{$signOfLifeCmd}};
+      InternalTimer(gettimeofday() + $signOfLifePeriod{$signOfLifeCmd}, 'EnOcean_SignOfLife', $hash->{helper}{timer}{signOfLife}, 0);
+      Log3 $name, 3, "EnOcean set $name $cmd";
+
     } elsif ($st eq "roomSensorControl.01") {
       # Room Sensor and Control Unit (EEP A5-04-01, A5-10-10 ... A5-10-14)
       # [Thermokon SR04 * rH, Thanus SR *, untested]
@@ -2594,8 +2670,7 @@ sub EnOcean_Set($@) {
       } else {
         if (AttrVal($name, 'devMode', 'master') eq 'master') {
           return "Unknown argument " . $cmd . ", choose one of " . $cmdList . " setpoint:slider,0,1,255 setpointScaled switch:on,off teach:noArg"
-        }
-        else {
+        } else {
           return undef;
         }
       }
@@ -14000,7 +14075,7 @@ sub EnOcean_Attr(@) {
   } elsif ($attrName eq "devUpdate") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^(off|auto|demand|polling|interrupt)$/) {
+    } elsif ($attrVal !~ m/^(off|auto)$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -14829,12 +14904,16 @@ sub EnOcean_Notify(@) {
           } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
             @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
             EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+          } elsif ($attr{$name}{subType} eq 'occupSensor.01' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+            my @setCmd = ($name, ReadingsVal($name, 'motion', 'status'));
+            EnOcean_Set($hash, @setCmd);
           }
         }
       }
       # teach-in response actions
       # delete temporary teach-in response device, see V9333_02
       #Log3($name, 2, "EnOcean $name <notify> DEFINED $definedName");
+      #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
 
     } elsif ($devName eq "global" && $s =~ m/^INITIALIZED$/) {
       # assign remote management defptr
@@ -14855,6 +14934,9 @@ sub EnOcean_Notify(@) {
         } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
           @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
           EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+        } elsif ($attr{$name}{subType} eq 'occupSensor.01' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+          my @setCmd = ($name, ReadingsVal($name, 'motion', 'status'));
+          EnOcean_Set($hash, @setCmd);
         } elsif ($attr{$name}{subType} eq "switch.05") {
           my @getCmd = ($name, 'state');
           EnOcean_Get($hash, @getCmd);
@@ -14883,6 +14965,9 @@ sub EnOcean_Notify(@) {
         } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
           @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
           EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+        } elsif ($attr{$name}{subType} eq 'occupSensor.01' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+          my @setCmd = ($name, ReadingsVal($name, 'motion', 'status'));
+          EnOcean_Set($hash, @setCmd);
         }
       }
 
@@ -15045,6 +15130,16 @@ sub EnOcean_Notify(@) {
           }
         }
       #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+      }
+
+      if (defined(AttrVal($name, "motionRefDev", undef)) &&
+          $devName eq AttrVal($name, "motionRefDev", "") &&
+          $parts[0] eq "motion") {
+        if (AttrVal($name, "subType", '') eq 'occupSensor.01') {
+          my @setCmd = ($name, $parts[1]);
+          EnOcean_Set($hash, @setCmd);
+          #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+        }
       }
 
       if (defined(AttrVal($name, "temperatureRefDev", undef)) && AttrVal($name, "setCmdTrigger", "man") eq "refDev") {
@@ -16361,7 +16456,6 @@ sub EnOcean_CheckSenderID($$$) {
     $IDCntr1 = $unusedID + 1;
     $IDCntr2 = $unusedID + 127;
   }
-
   if ($ctrl eq "getBaseID") {
     # get TCM BaseID of the EnOcean device
     if ($defs{$ioDev}{BaseID}) {
@@ -17289,6 +17383,17 @@ sub EnOcean_sndUTE($$$$$$$) {
   $attr{$name}{manufID} = "7FF";
   $data = sprintf "%02X%02X%s%s%s%s%s", $db[6], $db[5], $db[4], $db[3], $db[2], $db[1], $db[0];
   return ($err, "D4", $data);
+}
+
+#
+sub EnOcean_SignOfLife($) {
+  my ($functionHash) = @_;
+  my $function = $functionHash->{function};
+  my $hash = $functionHash->{hash};
+  my $period = $functionHash->{period};
+  my @setCmd = ($hash->{NAME}, $function);
+  EnOcean_Set($hash, @setCmd);
+  return;
 }
 
 #
@@ -18729,9 +18834,10 @@ sub EnOcean_Delete($$) {
       <code>define sensor1 EnOcean A5-02-05</code><br>
     </ul><br>
 
-   Inofficial EEP for special devices
+   <a id="EnOcean-Inofficial-EEP">Inofficial EEP</a> for special devices
    <ul>
      <li>G5-07-01 PioTek-Tracker<br></li>
+     <li>H5-07-01 Presence Sensor (Master)<br></li>
      <li>G5-10-12 Room Sensor and Control Unit [Eltako FUTH65D]<br></li>
      <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
      <li>H5-38-08 Gateway, Dimming [Eltako TF61D, TF100D]<br></li>
@@ -19059,6 +19165,35 @@ sub EnOcean_Delete($$) {
        Default is "off" and an interval of 1980 sec.<br>
        Set the manufID to 00D for Eltako devices that send a periodic voltage telegram. (For example TF-FKB)
     </li><br><br>
+
+    <li>Occupancy Sensor (EEP A5-07-01)<br>
+        [Eltako FBH55SB]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+          initiate teach-in</li>
+      <li>on<br>
+          Motion detection is sent. With the attribute <a href="#EnOcean-attr-motionMode">motionMode</a> you
+          can choose between the fully automatic and semi-automatic mode. Fully automatic is default. Semi-automatic
+          motion detection is available in TF mode on the Eltako actuator.</li>
+      <li>fullyOn<br>
+          Fully automatic motion detection is sent.</li>
+      <li>semiOn<br>
+          Semi-automatic motion detection is sent. Switch-on takes place by the light sensor.</li>
+      <li>off<br>
+          No motion is sent.</li>
+    </ul><br>
+      The current motion status can be set manually or will be taken from the motion reported by
+      a motion reference device <a href="#EnOcean-attr-motionRefDev">motionRefDev</a>.<br>
+      If the attribute <a href="#EnOcean-attr-devUpdate">devUpdate</a> is set to "auto", data telegrams with the current
+      motion status are sent periodically.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
+      The attr subType must be occupSensor.01. The attribute must be set manually. The device can be fully defined
+      via the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> H5-07-01.
+    </li>
+    <br><br>
 
     <li>Room Sensor and Control Unit (EEP A5-10-02)<br>
         [Thermokon SR04 PTS]<br>
@@ -20728,6 +20863,9 @@ sub EnOcean_Delete($$) {
     <li><a id="EnOcean-attr-devMode">devMode</a> master|slave, [devMode] = master is default.<br>
       device operation mode.
     </li>
+    <li><a id="EnOcean-attr-devUpdate">devUpdate</a> auto|off, [devUpdate] = auto is default.<br>
+      device status update mode.
+    </li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
     <li><a id="EnOcean-attr-dimMax">dimMax</a> dim/%|off, [dimMax] = 255 is default.<br>
       maximum brightness value<br>
@@ -20819,6 +20957,13 @@ sub EnOcean_Delete($$) {
       temperature sensor must be exists, see attribute <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>.
     </li>
     <li><a href="#EnOcean-attr-model">model</a></li>
+    <li><a id="EnOcean-attr-motionMode">motionMode</a> fully|semi, [motionMode] = fully is default.<br>
+      Fully automatic or semi automatic motion detection
+    </li>
+    <li><a id="EnOcean-attr-motionRefDev">motionRefDev</a> &lt;name&gt;<br>
+      Name of the device whose reference value is read. The reference values is
+      the reading motion.
+    </li>
     <li><a id="EnOcean-attr-observe">observe</a> off|on, [observe] = off is default.<br>
       Observing and repeating the execution of set commands
     </li>
