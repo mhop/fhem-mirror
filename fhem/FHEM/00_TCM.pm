@@ -1546,11 +1546,13 @@ sub TCM_Undef($$) {
     }
   }
   DevIo_CloseDev($hash);
-  for (my $i = 0; $i <= @{$modules{"$hash->{TYPE}"}{BaseID}}; $i++) {
-    if (${$modules{"$hash->{TYPE}"}{BaseID}}[$i] eq $hash->{BaseID}) {
-      Log3 $name, 4, "TCM $name remove module BaseID: " . ${$modules{"$hash->{TYPE}"}{BaseID}}[$i];
-      splice(@{$modules{"$hash->{TYPE}"}{BaseID}}, $i, 1);
-      last;
+  if (exists $modules{"$hash->{TYPE}"}{BaseID}) {
+    for (my $i = 0; $i <= @{$modules{"$hash->{TYPE}"}{BaseID}}; $i++) {
+      if (${$modules{"$hash->{TYPE}"}{BaseID}}[$i] eq $hash->{BaseID}) {
+        Log3 $name, 4, "TCM $name remove module BaseID: " . ${$modules{"$hash->{TYPE}"}{BaseID}}[$i];
+        splice(@{$modules{"$hash->{TYPE}"}{BaseID}}, $i, 1);
+        last;
+      }
     }
   }
   if (exists $modules{"$hash->{TYPE}"}{ChipID}) {
