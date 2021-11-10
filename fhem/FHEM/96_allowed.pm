@@ -109,7 +109,7 @@ allowed_Authorize($$$$;$)
     # Return 0: allow stacking with other instances, see Forum#46380
     return 0 if($me->{".allowedCommands"} =~ m/\b\Q$arg\E\b/);
     Log3 $me, 3, "Forbidden command $arg for $cl->{NAME}";
-    stacktrace() if(AttrVal($me, "verbose", 5));
+    stacktrace() if(AttrVal($me->{NAME}, "verbose", 0) == 5);
     return 2;
   }
 
@@ -122,7 +122,7 @@ allowed_Authorize($$$$;$)
                 $arg =~ m/^$me->{".allowedDevicesRegexp"}$/);
     if(!$silent) {
       Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
-      stacktrace() if(AttrVal($me, "verbose", 5));
+      stacktrace() if(AttrVal($me->{NAME}, "verbose", 0) == 5);
     }
     return 2;
   }
