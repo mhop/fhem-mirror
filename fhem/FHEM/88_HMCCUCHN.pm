@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 213011850';
+my $HMCCUCHN_VERSION = '5.0 213141800';
 
 ######################################################################
 # Initialize module
@@ -97,8 +97,8 @@ sub HMCCUCHN_Define ($@)
 	$hash->{readonly} = 'no';
 	$hash->{hmccu}{channels} = 1;
 	$hash->{hmccu}{nodefaults} = $init_done ? 0 : 1;
-	$hash->{hmccu}{semDefaults} = 0;
 	$hash->{hmccu}{detect} = 0;
+	$hash->{hmccu}{setDefaults} = 0;
 	
 	# Parse optional command line parameters
 	my $n = 0;
@@ -184,6 +184,7 @@ sub HMCCUCHN_InitDevice ($$)
 	my $rc = 0;
 
 	if ($init_done) {
+		HMCCU_Log ($devHash, 2, "InitDevice called when init done");
 		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 		
 		# Interactive device definition
@@ -199,8 +200,12 @@ sub HMCCUCHN_InitDevice ($$)
 				if ($rsd == 0 && $rcd == 0);
 
 			if (!exists($devHash->{hmccu}{nodefaults}) || $devHash->{hmccu}{nodefaults} == 0) {
-				if (!HMCCU_SetDefaultAttributes ($devHash)) {
-					HMCCU_SetDefaults ($devHash);
+				# Don't let device definition fail if default attributes cannot be set
+				my ($rc, $retMsg) = HMCCU_SetDefaultAttributes ($devHash);
+				if (!$rc) {
+					HMCCU_Log ($devHash, 2, $retMsg);
+					HMCCU_Log ($devHash, 2, 'No HMCCU 4.3 default attributes found during device definition')
+						if (!HMCCU_SetDefaults ($devHash));
 				}
 			}
 		}
@@ -252,6 +257,7 @@ sub HMCCUCHN_Attr ($@)
 	my ($cmd, $name, $attrname, $attrval) = @_;
 	my $clHash = $defs{$name};
 	my $ioHash = HMCCU_GetHash ($clHash);
+	my $clType = $clHash->{TYPE};
 
 	if ($cmd eq 'set') {
 		return 'Missing attribute value' if (!defined($attrval));
@@ -259,15 +265,16 @@ sub HMCCUCHN_Attr ($@)
 			$clHash->{IODev} = $defs{$attrval};
 		}
 		elsif ($attrname eq 'statevals') {
-			return 'Attribute statevals ignored. Device is read only' if ($clHash->{readonly} eq 'yes');
-			return 'Attribute statevals ignored. Device type is known by HMCCU' if ($clHash->{hmccu}{detect} > 0);
+			return "$clType [$name] Attribute statevals ignored. Device is read only" if ($clHash->{readonly} eq 'yes');
+			return "$clType [$name] Attribute statevals ignored. Device type is known by HMCCU" if ($clHash->{hmccu}{detect} > 0);
 			if ($init_done && !HMCCU_IsValidControlDatapoint ($clHash)) {
 				HMCCU_LogDisplay ($clHash, 2, 'Warning: Attribute controldatapoint not set or set to invalid datapoint');
 			}
 		}
 		elsif ($attrname =~ /^(state|control)datapoint$/) {
 			my $role = HMCCU_GetChannelRole ($clHash);
-			return "Invalid value $attrval" if (!HMCCU_SetSCDatapoints ($clHash, $attrname, $attrval, $role));
+			return "$clType [$name] Invalid value $attrval for attribute $attrname"
+				if (!HMCCU_SetSCDatapoints ($clHash, $attrname, $attrval, $role, 1));
 		}
 	}
 	elsif ($cmd eq 'del') {
@@ -277,11 +284,11 @@ sub HMCCUCHN_Attr ($@)
 			delete $clHash->{hmccu}{roleCmds}
 				if (exists($clHash->{hmccu}{roleCmds}) &&
 					(!exists($clHash->{hmccu}{control}{chn}) || $clHash->{hmccu}{control}{chn} eq ''));
-			if ($init_done) {
+			if ($init_done && $clHash->{hmccu}{setDefaults} == 0) {
 				my ($sc, $sd, $cc, $cd, $rsd, $rcd) = HMCCU_SetDefaultSCDatapoints ($ioHash, $clHash, undef, 1);
 				HMCCU_Log ($clHash, 2, "Cannot set default state- and/or control datapoints")
 					if ($rsd == 0 && $rcd == 0);
-			}		
+			}
 		}
 	}
 
@@ -312,7 +319,7 @@ sub HMCCUCHN_Set ($@)
 		if (HMCCU_IsRPCStateBlocking ($ioHash));
 
 	# Build set command syntax
-	my $syntax = 'clear defaults:reset,update,old';
+	my $syntax = 'clear defaults:reset,update,old,forceReset';
 	
 	# Command readingFilter depends on readable datapoints
 	my ($add, $chn) = split(":", $hash->{ccuaddr});
@@ -359,15 +366,18 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif ($lcopt eq 'defaults') {
 		my $mode = shift @$a // 'update';
+		return HMCCU_SetError ($hash, "Usage: get $name defaults [forceReset|old|reset|update]")
+			if ($mode !~ /^(forceReset|reset|old|update)$/);
 		my $rc = 0;
-		my $retMsg = 'OK';
-		if ($mode ne 'old') {
-			$rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, roleChn => undef });
-			$retMsg = 'Please remove HMCCU 4.3 entries from attribute eventMap' if ($rc && $mode eq 'reset' && exists($attr{$name}{eventMap}));
+		my $retMsg = '';
+		($rc, $retMsg) = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, roleChn => undef }) if ($mode ne 'old');
+		if (!$rc) {
+			$rc = HMCCU_SetDefaults ($hash);
+			$retMsg .= $rc ? "\nSet version 4.3 attributes" : "\nNo version 4.3 default attributes found";
 		}
-		$rc = HMCCU_SetDefaults ($hash) if (!$rc);
+		$retMsg = 'OK' if ($retMsg eq '');
 		HMCCU_RefreshReadings ($hash) if ($rc);
-		return HMCCU_SetError ($hash, $rc == 0 ? 'No default attributes found' : $retMsg);
+		return HMCCU_SetError ($hash, $retMsg);
 	}
 	else {
 		return "Unknown argument $opt choose one of $syntax";
@@ -419,9 +429,9 @@ sub HMCCUCHN_Get ($@)
 	if ($lcopt eq 'datapoint') {
 		my $objname = shift @$a // return HMCCU_SetError ($hash, "Usage: get $name datapoint {datapoint}");		
 		return HMCCU_SetError ($hash, -8, $objname)
-			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 1));
+			if (!HMCCU_IsValidParameter ($hash, $ccuaddr, 'VALUES', $objname, 1));
 
-		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
+		$objname = "$ccuif.$ccuaddr.$objname";
 		my ($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 		return $rc < 0 ? HMCCU_SetError ($hash, $rc, $result) : $result;
 	}
@@ -544,12 +554,16 @@ sub HMCCUCHN_Get ($@)
         <code>set temp_control datapoint SET_TEMPERATURE 21</code><br/>
         <code>set temp_control datapoint AUTO_MODE 1 SET_TEMPERATURE=21</code>
       </li><br/>
-      <li><b>set &lt;name&gt; defaults ['reset'|'old'|'<u>update</u>']</b><br/>
+      <li><b>set &lt;name&gt; defaults ['reset'|'forceReset'|'old'|'<u>update</u>']</b><br/>
    		Set default attributes for CCU device type. Default attributes are only available for
-   		some device types and for some channels of a device type. If option 'reset' is specified,
-   		the following attributes are deleted before the new attributes are set: 
-   		'ccureadingname', 'ccuscaleval', 'eventMap', 'substexcl', 'webCmd', 'widgetOverride'.
-   		During update to version 4.4 it's recommended to use option 'reset'. With option 'old'
+   		some device types and for some channels of a device type. With option 'reset' obsolete attributes
+		are deleted if they are matching the default attributes of HMCCU 4.3. Attributes modified
+		by the user will be kept.<br/>
+		With option 'forceReset' all obsolete attributes will be deleted. The following attributes are
+		obsolete in HMCCU 5.x:  'ccureadingname', 'ccuscaleval', 'eventMap', 'substexcl', 'webCmd', 'widgetOverride'.
+		In addition 'statedatapoint', 'statechannel', 'controldatapoint' and 'controlchannel' are removed if HMCCU
+		is able to detect these values automatically.<br/>
+   		During update to version 5.x it's recommended to use option 'reset' or 'forceReset'. With option 'old'
 		the attributes are set according to HMCCU 4.3 defaults mechanism.
       </li><br/>
       <li><b>set &lt;name&gt; down [&lt;value&gt;]</b><br/>

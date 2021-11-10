@@ -239,6 +239,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'(C#\.)?SET_TEMPERATURE$:+desired-temp',
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' =>
 		'(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?HUMIDITY$:+humidity;'.
 		'(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
 		'(C#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
 	'CLIMATECONTROL_REGULATOR' =>
