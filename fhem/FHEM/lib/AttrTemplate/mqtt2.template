@@ -528,14 +528,14 @@ attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
 attr DEVICE_CH2 setList \
-  on:noArg $\DEVICETOPIC/2/set {"state_l2":"ON"}\
-  off:noArg $\DEVICETOPIC/2/set {"state_l2":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/2/set {"state_l2":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/l2/set {"state_l2":"ON"}\
+  off:noArg $\DEVICETOPIC/l2/set {"state_l2":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/l2/set {"state_l2":"TOGGLE"}
 attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE_CH3 setList \
-  on:noArg $\DEVICETOPIC/3/set {"state_l3":"ON"}\
-  off:noArg $\DEVICETOPIC/3/set {"state_l3":"OFF"}\
-  toggle:noArg $\DEVICETOPIC/3/set {"state_l3":"TOGGLE"}
+  on:noArg $\DEVICETOPIC/l3/set {"state_l3":"ON"}\
+  off:noArg $\DEVICETOPIC/l3/set {"state_l3":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/l3/set {"state_l3":"TOGGLE"}
 attr DEVICE_CH2 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
