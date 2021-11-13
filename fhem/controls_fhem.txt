@@ -1,4 +1,4 @@
-REV 25214
+REV 25219
 DIR unused
 UPD 2021-11-11_07:45:02 368857 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -642,7 +642,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2021-10-17_07:45:03 5009 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-11-11_07:45:02 338957 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-11-13_07:45:02 338957 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-09-28_07:45:03 14799 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -738,8 +738,8 @@ UPD 2021-11-11_07:45:06 4559930 docs/commandref.html
 UPD 2021-11-08_07:45:16 2815067 docs/commandref_DE.html
 UPD 2021-11-07_07:45:03 82810 docs/commandref_frame.html
 UPD 2021-11-07_07:45:03 92764 docs/commandref_frame_DE.html
-UPD 2021-11-12_07:45:10 253795 docs/commandref_modular.html
-UPD 2021-11-12_07:45:11 264858 docs/commandref_modular_DE.html
+UPD 2021-11-13_07:45:10 253795 docs/commandref_modular.html
+UPD 2021-11-13_07:45:11 264858 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1286,8 +1286,11 @@ UPD 2015-07-28_14:05:34 9539 www/images/default/ws_WNW_kl.png
 UPD 2015-07-28_14:05:34 9522 www/images/default/ws_WSW_kl.png
 UPD 2015-07-28_14:05:34 9478 www/images/default/ws_W_kl.png
 UPD 2019-08-09_07:45:02 21769 www/images/fhemSVG/3d_printer.svg
+UPD 2021-11-13_07:45:02 24275 www/images/fhemSVG/Abfalltonne-Recycling-Logo.svg
+UPD 2021-11-13_07:45:02 19686 www/images/fhemSVG/Abfalltonne.svg
 UPD 2019-02-09_07:45:03 59586 www/images/fhemSVG/Botvac_VR200.svg
 UPD 2017-11-26_07:45:02 58372 www/images/fhemSVG/DIN_rail_housing.svg
+UPD 2021-11-13_07:45:02 54547 www/images/fhemSVG/Gartenabfall.svg
 UPD 2020-11-24_07:45:03 9685 www/images/fhemSVG/HomeMatic.svg
 UPD 2020-11-24_07:45:03 16258 www/images/fhemSVG/HomeMatic_Schrift.svg
 UPD 2017-11-14_07:45:02 14088 www/images/fhemSVG/HutschIcon3.svg
