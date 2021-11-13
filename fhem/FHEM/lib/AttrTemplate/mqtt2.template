@@ -565,7 +565,7 @@ attr DEVICE setList \
 attr DEVICE stateFormat pct
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
-setreading DEVICE attrTemplateVersion 20210902
+setreading DEVICE attrTemplateVersion 20211113
 
 
 name:zigbee2mqtt_ContactSensor
