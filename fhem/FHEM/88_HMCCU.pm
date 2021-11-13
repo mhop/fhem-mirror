@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 213141800';
+my $HMCCU_VERSION = '5.0 213171649';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -194,7 +194,7 @@ sub HMCCU_SubstVariables ($$$);
 # Update client device readings
 sub HMCCU_BulkUpdate ($$$;$);
 sub HMCCU_GetUpdate ($$;$$);
-sub HMCCU_RefreshReadings ($);
+sub HMCCU_RefreshReadings ($;$);
 sub HMCCU_UpdateCB ($$$);
 sub HMCCU_UpdateClients ($$$$;$$);
 sub HMCCU_UpdateInternalValues ($$$$$);
@@ -4686,12 +4686,17 @@ sub HMCCU_UpdateParamsetReadings ($$$;$)
 # Refresh readings of a client device
 ######################################################################
 
-sub HMCCU_RefreshReadings ($)
+sub HMCCU_RefreshReadings ($;$)
 {
-	my ($clHash) = @_;
-		
-	my $ioHash = HMCCU_GetHash ($clHash) // return;
+	my ($clHash, $attribute) = @_;
 	
+	my $ioHash = HMCCU_GetHash ($clHash) // return;
+	my $refreshAttrList = 'ccucalculate|ccuflags|ccureadingfilter|ccureadingformat|'.
+		'ccureadingname|ccuReadingPrefix|ccuscaleval|controldatapoint|hmstatevals|'.
+		'statedatapoint|statevals|substitute|substexcl|stripnumber';
+
+	return if (defined($attribute) && $attribute !~ /^($refreshAttrList)$/i);
+
 	HMCCU_DeleteReadings ($clHash, '.*');
 	
 	my %objects;
@@ -6870,7 +6875,8 @@ sub HMCCU_UpdateRoleCommands ($$;$)
 		next URCROL if (!defined($role) || !exists($HMCCU_ROLECMDS->{$role}));
 		
 		URCCMD: foreach my $cmdKey (keys %{$HMCCU_ROLECMDS->{$role}}) {
-			next URCCMD if ($clHash->{TYPE} eq 'HMCCUCHN' && $chnNo ne '' && $chnNo != $channel && $chnNo ne 'd');
+#			next URCCMD if ($clHash->{TYPE} eq 'HMCCUCHN' && $chnNo ne '' && $chnNo != $channel && $chnNo ne 'd');
+			next URCCMD if ($chnNo ne '' && $chnNo != $channel && $chnNo ne 'd');
 			my ($cmd, $cmdIf) = split (':', $cmdKey);
 			next URCCMD if (defined($cmdIf) && $clHash->{ccuif} !~ /$cmdIf/);
 			my $cmdSyntax = $HMCCU_ROLECMDS->{$role}{$cmdKey};
@@ -8479,9 +8485,27 @@ sub HMCCU_DetectDevice ($$$)
 		}
 	}
 
- 	$di{defSDP} = $di{defSCh}.'.'.$di{stateRole}{$di{defSCh}}{datapoint} if ($di{defSCh} != -1);
-  	$di{defCDP} = $di{defCCh}.'.'.$di{controlRole}{$di{defCCh}}{datapoint} if ($di{defCCh} != -1);
-
+	if ($di{defSCh} != -1) {
+		my $dpn = $di{stateRole}{$di{defSCh}}{datapoint} // '';
+		my $dpr = $di{stateRole}{$di{defSCh}}{role} // '';
+		if ($dpn eq '') {
+			HMCCU_Log ($ioHash, 2, "State datapoint not defined for channel $di{defSCh}, role $dpr");
+		}
+		else {
+			$di{defSDP} = $di{defSCh}.'.'.$dpn;
+		}
+	}
+	if ($di{defCCh} != -1) {
+		my $dpn = $di{controlRole}{$di{defCCh}}{datapoint} // '';
+		my $dpr = $di{controlRole}{$di{defCCh}}{role} // '';
+		if ($dpn eq '') {
+			HMCCU_Log ($ioHash, 2, "Control datapoint not defined for channel $di{defCCh}, role $dpr");
+		}
+		else {
+			$di{defCDP} = $di{defCCh}.'.'.$dpn;
+		}
+	}
+ 
 	return \%di;
 }
 
@@ -10112,9 +10136,9 @@ sub HMCCU_EncodeEPDisplay ($)
 	my @text = ('', '', '');
 	my @icon = ('', '', '');
 	foreach my $tok (split (',', $msg)) {
-		my ($par, $val) = split (':', $tok);
+		my ($par, $val) = split (':', $tok, 2);
 		next if (!defined($val));
-		if    ($par =~ /^text([1-3])$/)                 { $text[$1-1] = substr ($val, 0, 12); }
+		if    ($par =~ /^text([1-3])$/)                 { $text[$1-1] = substr($val, 0, 12); }
 		elsif ($par =~ /^icon([1-3])$/)                 { $icon[$1-1] = $val; }
 		elsif ($par =~ /^(sound|pause|repeat|signal)$/) { $conf{$1} = $val; }
 	}

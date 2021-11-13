@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 213141800';
+my $HMCCUDEV_VERSION = '5.0 213171649';
 
 ######################################################################
 # Initialize module
@@ -209,7 +209,6 @@ sub HMCCUDEV_InitDevice ($$)
 	my $rc = 0;
 
 	if ($init_done) {
-		HMCCU_Log ($devHash, 2, "InitDevice called when init done");
 		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 		return "Specify option 'forceDev' for HMCCUDEV or use HMCCUCHN instead (recommended). Command: define $name HMCCUCHN $detect->{defAdd}"
 			if (defined($detect) && $detect->{defMod} eq 'HMCCUCHN' && $devHash->{hmccu}{forcedev} == 0);
@@ -699,17 +698,18 @@ sub HMCCUDEV_Get ($@)
       </li><br/>
       <li><b>ePaper Display</b><br/><br/>
       This display has 5 text lines. The lines 1,2 and 4,5 are accessible via config parameters
-      TEXTLINE_1 and TEXTLINE_2 in channels 1 and 2. Example:<br/><br/>
+      TEXTLINE_1 and TEXTLINE_2 in channels 1 and 2.<br/>
+	  Example:<br/><br/>
       <code>
       define HM_EPDISP HMCCUDEV CCU_EPDISP<br/>
-      set HM_EPDISP config 2 TEXTLINE_1=Line1<br/>
-		set HM_EPDISP config 2 TEXTLINE_2=Line2<br/>
-		set HM_EPDISP config 1 TEXTLINE_1=Line4<br/>
-		set HM_EPDISP config 1 TEXTLINE_2=Line5<br/>
+      set HM_EPDISP config 2 TEXTLINE_1=Line1 # Set line 1 to "Line1"<br/>
+	  set HM_EPDISP config 2 TEXTLINE_2=Line2 # Set line 2 to "Line2"<br/>
+	  set HM_EPDISP config 1 TEXTLINE_1=Line4 # Set line 4 to "Line4"<br/>
+	  set HM_EPDISP config 1 TEXTLINE_2=Line5 # Set line 5 to "Line5"<br/>
       </code>
       <br/>
-      The lines 2,3 and 4 of the display can be accessed by setting the datapoint SUBMIT of the
-      display to a string containing command tokens in format 'parameter=value'. The following
+      The lines 2,3 and 4 of the display can be modified by setting the datapoint SUBMIT of the
+      display to a string containing command tokens in format 'parameter:value'. The following
       commands are allowed:
       <br/><br/>
       <ul>
@@ -728,8 +728,7 @@ sub HMCCUDEV_Get ($@)
       snd_long<br/><br/>
       Example:<br/>
       <code>
-      set HM_EPDISP datapoint 3.SUBMIT text1=Line2,text2=Line3,text3=Line4,sound=snd_short,
-      signal=sig_red
+      set HM_EPDISP datapoint 3.SUBMIT "text1:Line2,text2:Has Blank,text3:10:05:21,sound:snd_short,signal:sig_red
       </code>
       </li>
    </ul>

@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 213141800';
+my $HMCCUCHN_VERSION = '5.0 213171649';
 
 ######################################################################
 # Initialize module
@@ -184,7 +184,6 @@ sub HMCCUCHN_InitDevice ($$)
 	my $rc = 0;
 
 	if ($init_done) {
-		HMCCU_Log ($devHash, 2, "InitDevice called when init done");
 		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 		
 		# Interactive device definition
@@ -757,7 +756,9 @@ sub HMCCUCHN_Get ($@)
          channel-name.datapoint. If set to 'datapoint' format is channel-number.datapoint.
          For HMCCUCHN devices the channel part is ignored. With suffix 'lc' reading names are converted
          to lowercase. The reading format can also contain format specifiers %a (address), 
-         %n (name) and %c (channel). Use %A, %N, %C for conversion to upper case.<br/><br/>
+         %n (name) and %c (channel). Use %A, %N, %C for conversion to upper case. The readings will
+		 be refreshed automatically if this attribute is changed. The default value for this
+		 attribute can be defined by setting attribute ccudef-readingformat in the I/O device.<br/><br/>
          Example:<br/>
          <code>
          attr mydev ccureadingformat HM_%c_%N
