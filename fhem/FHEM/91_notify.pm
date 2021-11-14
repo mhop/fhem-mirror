@@ -24,10 +24,11 @@ notify_Initialize($)
     forwardReturnValue:1,0
     ignoreRegexp
     readLog:1,0
+    setList
     showtime:1,0
   );
   use warnings 'qw';
-  $hash->{AttrList} = join(" ", @attrList);
+  $hash->{AttrList} = join(" ", @attrList)." $readingFnAttributes";
 
   $hash->{SetFn}    = "notify_Set";
   $hash->{StateFn}  = "notify_State";
@@ -124,7 +125,8 @@ notify_Exec($$)
       $ntfy->{TRIGGERTIME} = $now;
       setReadingsVal($ntfy, "triggeredByDev",   $n, $dev->{NTFY_TRIGGERTIME});
       setReadingsVal($ntfy, "triggeredByEvent", $s, $dev->{NTFY_TRIGGERTIME});
-      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME} if(AttrVal($ln,'showtime',1));
+      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME}
+        if(AttrVal($ln, 'showtime', !AttrVal($ln, "stateFormat", 0)));
       last if($dat);
     }
   }
@@ -181,13 +183,21 @@ notify_Set($@)
 
   return "no set argument specified" if(int(@a) < 2);
   my %sets = (addRegexpPart=>2, removeRegexpPart=>1, inactive=>0, active=>0);
+  my $setList = AttrVal($me, "setList", "");
+  my %usrSets = map { $_ =~ s/:.*//; $_ => 1 } split(" ", $setList);
   
   my $cmd = $a[1];
-  if(!defined($sets{$cmd})) {
-    my $ret ="Unknown argument $cmd, choose one of ".join(" ", sort keys %sets);
+  if(!defined($sets{$cmd}) && !defined($usrSets{$cmd})) {
+    my $ret ="Unknown argument $cmd, choose one of ".
+        join(" ", sort keys %sets)." $setList";
     $ret =~ s/active/active:noArg/g;
     return $ret;
   }
+  if($usrSets{$cmd}) {
+    readingsSingleUpdate($hash, $cmd, join(" ",@a[2..$#a]), 1);
+    return;
+  }
+
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
 
   if($cmd eq "addRegexpPart") {
@@ -576,6 +586,18 @@ END
         </code></ul>
         </li>
 
+    <a id="notify-attr-setList"></a>
+    <li>setList<br>
+        space separated list of user-defined commands. When executing such a
+        command, a reading with the same name is set to the arguments of the
+        command.<br>
+        Can be used in scenarios like:
+        <ul><code>
+          define Leuchtdauer notify schalter:on
+                set Licht on-for-timer [$SELF:dauer]<br>
+          attr Leuchtdauer setList dauer:60,120,180
+        </code></ul>
+        </li>
 
   </ul>
   <br>
@@ -805,6 +827,18 @@ END
         <ul><code>
           define n notify n:.*Server.started.* { Log 1, "Wirklich" }<br>
           attr n readLog
+        </code></ul>
+        </li>
+
+    <a id="notify-attr-setList"></a>
+    <li>setList<br>
+        Leerzeichen getrennte Liste von benutzerdefinierten Befehlen. Beim
+        ausf&uuml;ren solcher Befehle wird ein gleichnamiges Reading auf dem
+        Wert des Befehls gesetzt. Kann z.Bsp. wie folgt verwendet werden:
+        <ul><code>
+          define Leuchtdauer notify schalter:on
+                set Licht on-for-timer [$SELF:dauer]<br>
+          attr Leuchtdauer setList dauer:60,120,180
         </code></ul>
         </li>
 
