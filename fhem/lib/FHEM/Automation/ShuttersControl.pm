@@ -775,11 +775,11 @@ sub WriteReadingsShuttersList {
         readingsBulkUpdate(
             $hash,
             'room_'
-              . makeReadingName( AttrVal( $shuttersDev, 'room', 'unsorted' ) ),
+              . ::makeReadingName( AttrVal( $shuttersDev, 'room', 'unsorted' ) ),
             ReadingsVal(
                 $name,
                 'room_'
-                  . makeReadingName(
+                  . ::makeReadingName(
                     AttrVal( $shuttersDev, 'room', 'unsorted' )
                   ),
                 ''
@@ -791,7 +791,7 @@ sub WriteReadingsShuttersList {
             ReadingsVal(
                 $name,
                 'room_'
-                  . makeReadingName(
+                  . ::makeReadingName(
                     AttrVal( $shuttersDev, 'room', 'unsorted' )
                   ),
                 'none'
@@ -801,14 +801,14 @@ sub WriteReadingsShuttersList {
         readingsBulkUpdate(
             $hash,
             'room_'
-              . makeReadingName( AttrVal( $shuttersDev, 'room', 'unsorted' ) ),
+              . ::makeReadingName( AttrVal( $shuttersDev, 'room', 'unsorted' ) ),
             $shuttersDev
           )
           if (
             ReadingsVal(
                 $name,
                 'room_'
-                  . makeReadingName(
+                  . ::makeReadingName(
                     AttrVal( $shuttersDev, 'room', 'unsorted' )
                   ),
                 'none'

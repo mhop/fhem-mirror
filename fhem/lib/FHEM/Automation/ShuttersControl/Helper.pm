@@ -994,25 +994,6 @@ sub IsAfterShuttersManualBlocking {
     else { return 1 }
 }
 
-sub makeReadingName {
-    my ($rname) = shift;
-    my %charHash = (
-        chr(0xe4) => "ae",    # ä
-        chr(0xc4) => "Ae",    # Ä
-        chr(0xfc) => "ue",    # ü
-        chr(0xdc) => "Ue",    # Ü
-        chr(0xf6) => "oe",    # ö
-        chr(0xd6) => "Oe",    # Ö
-        chr(0xdf) => "ss"     # ß
-    );
-    my $charHashkeys = join( "", keys(%charHash) );
-
-    return $rname if ( $rname =~ m{^\./}xms );
-    $rname =~ s/([$charHashkeys])/$charHash{$1}/xgi;
-    $rname =~ s/[^a-z0-9._\-\/]/_/xgi;
-    return $rname;
-}
-
 sub IsWe {
     return main::IsWe( shift, shift );
 }
