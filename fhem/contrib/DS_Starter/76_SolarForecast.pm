@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.10"=> "14.11.2021  change sub _flowGraphic (Max), https://forum.fhem.de/index.php/topic,117864.msg1186970.html#msg1186970 ",
   "0.56.9" => "27.10.2021  change sub _flowGraphic (Max) ",
   "0.56.8" => "25.10.2021  change func  ___csmSpecificEpieces as proposed from Max : https://forum.fhem.de/index.php/topic,117864.msg1180452.html#msg1180452 ",
   "0.56.7" => "18.10.2021  new attr flowGraphicShowConsumerDummy ",
@@ -2719,7 +2720,7 @@ sub _manageConsumerData {
       
       #################################################
       # onoff funktioniert nur züverlässig wenn powerthreshold hier nochmal abgefragt wird ?!?
-      $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 1); 
+      # $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 1); 
       #################################################
       
       my $starthour;
@@ -5298,6 +5299,9 @@ sub _flowGraphic {
       $batin  = 0;
       $batout = 0;
       $soc    = 0;
+  }
+  else {
+      $csc -= $batout;
   }
   
   my $grid_color    = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
