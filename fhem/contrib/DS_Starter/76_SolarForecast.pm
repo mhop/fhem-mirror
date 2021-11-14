@@ -2681,15 +2681,15 @@ sub _manageConsumerData {
             
               push @$daref, "consumer${c}_currentPower<>". $pcurr." W";
           }
-          else {
-              deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$enread);
-          }
+          #else {
+          #    deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$enread);
+          #}
           
           if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $pthreshold) {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
  
-              $paref->{consumerco} = $consumerco;                                              # Verbrauch des Consumers aktuelle Stunde
+              $paref->{consumerco} = $consumerco;                                                 # Verbrauch des Consumers aktuelle Stunde
               $paref->{histname}   = "csme${c}";
               setPVhistory ($paref);
               delete $paref->{histname};   
@@ -2700,6 +2700,8 @@ sub _manageConsumerData {
           setPVhistory ($paref);
           delete $paref->{histname};
       }
+      
+      deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$enread && !$paread);
       
       ## Verbraucher - Laufzeit und Zyklen pro Tag ermitteln
       ## Laufzeit (in Minuten) wird pro Stunde erfasst
