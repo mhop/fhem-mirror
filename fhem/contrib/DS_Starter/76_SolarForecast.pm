@@ -120,7 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.56.10"=> "14.11.2021  change sub _flowGraphic (Max), https://forum.fhem.de/index.php/topic,117864.msg1186970.html#msg1186970 ",
+  "0.56.10"=> "14.11.2021  change sub _flowGraphic (Max), https://forum.fhem.de/index.php/topic,117864.msg1186970.html#msg1186970, new reset consumerMaster ",
   "0.56.9" => "27.10.2021  change sub _flowGraphic (Max) ",
   "0.56.8" => "25.10.2021  change func  ___csmSpecificEpieces as proposed from Max : https://forum.fhem.de/index.php/topic,117864.msg1180452.html#msg1180452 ",
   "0.56.7" => "18.10.2021  new attr flowGraphicShowConsumerDummy ",
@@ -732,7 +732,8 @@ sub Set {
   my ($setlist,@fcdevs,@cfs);
   my ($fcd,$ind,$med,$cf) = ("","","","");
   
-  my @re = qw( consumerPlanning
+  my @re = qw( ConsumerMaster
+               consumerPlanning
                currentBatteryDev 
                currentForecastDev
                currentInverterDev
@@ -1343,7 +1344,26 @@ sub _setreset {                          ## no critic "not used"
       }
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
-  }  
+  }
+
+  if($prop eq "consumerMaster") {                                                    # Verbraucherhash löschen
+      my $c = $paref->{prop1} // "";                                                 # bestimmten Verbraucher setzen falls angegeben
+      
+      if ($c) {
+          my $calias = ConsumerVal ($hash, $c, "alias", "");
+          delete $data{$type}{$name}{consumers}{$c};
+          Log3($name, 3, qq{$name - Consumer "$calias" deleted from memory});
+      }
+      else {
+          for my $cs (keys %{$data{$type}{$name}{consumers}}) {
+              my $calias = ConsumerVal ($hash, $cs, "alias", "");
+              delete $data{$type}{$name}{consumers}{$cs};
+              Log3($name, 3, qq{$name - Consumer "$calias" deleted from memory});
+          }           
+      }
+      
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
+  }   
   
   createNotifyDev ($hash);
 
@@ -7543,6 +7563,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                             </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                          </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>löscht die Daten aller registrierten Verbraucher aus dem Speicher                                                            </td></tr>
+            <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>   
             <tr><td> <b>currentBatteryDev</b>  </td><td>löscht das eingestellte Batteriedevice und korrespondierende Daten                                                   </td></tr>
             <tr><td> <b>currentForecastDev</b> </td><td>löscht das eingestellte Device für Wetterdaten                                                                       </td></tr>
             <tr><td> <b>currentInverterDev</b> </td><td>löscht das eingestellte Inverterdevice und korrespondierende Daten                                                   </td></tr>
