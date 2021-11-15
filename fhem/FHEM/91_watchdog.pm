@@ -193,9 +193,13 @@ watchdog_Trigger($)
   }
 
   Log3 $name, 3, "Watchdog $name triggered";
+  my $dname = ReadingsVal($name, "triggeredByDev", "");
   my %specials= (
-    "%DEV" => ReadingsVal($name, "triggeredByDev", ""),
-    "%EVENT" => ReadingsVal($name, "triggeredByEvent", "")
+    "%DEV" => $dname,
+    "%EVENT" => ReadingsVal($name, "triggeredByEvent", ""),
+    "%NAME" => $dname,
+    "%TYPE" => InternalVal($dname, "TYPE", ""),
+    "%SELF" => $name,
   );
   my $exec = EvalSpecials($watchdog->{CMD}, %specials);
   $watchdog->{STATE} = "triggered";
@@ -355,8 +359,9 @@ watchdog_Set($@)
           currently not possible.</li>
       <li>with modify all parameters are optional, and will not be changed if
           not specified.</li>
-      <li>the device and the event triggering the watchdog is available as $DEV
-          and $EVENT in the executable.</li>
+      <li>The variables $DEV, $NAME, $EVENT, $EVTPART*, $TYPE and $SELF are
+          available in the executed code, see the notify documentation for
+          details.</li>
     </ul>
 
     <br>
@@ -498,9 +503,9 @@ watchdog_Set($@)
       <li>Bei modify sind alle Parameter optional, und werden nicht geaendert,
       falls nicht spezifiziert.</li>
 
-      <li>Das aktivierende Ger&auml;t und Event sind al $DEV und $EVENT im
-      ausf&uuml;hrenden Teil verf&uuml;gbar.</li>
-
+      <li>Die Variablen $DEV, $NAME, $EVENT, $EVTPART*, $TYPE und $SELF stehen
+      im ausgef&uuml;rten Code zur Verf&uuml;gung, sie sind in der notify
+      Dokumentation genauer beschreiben.</li>
     </ul>
 
     <br>
