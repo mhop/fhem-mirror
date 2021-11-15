@@ -448,6 +448,7 @@ END
           be textually replaced for FHEM commands.</li>
         <li>$NAME and $TYPE contain the name and type of the device triggering
           the event, e.g. myFht and FHT</li>
+        <li>$SELF contains the name of the notify itself</li>
        </ul></li>
 
       <li>Note: the following is deprecated and will be removed in a future
@@ -674,6 +675,8 @@ END
 
           <li>$NAME und $TYPE enthalten den Namen bzw. Typ des Ereignis
             ausl&ouml;senden Ger&auml;tes, z.B. myFht und FHT</li>
+
+        <li>$SELF enthaelt den Namen dieser notify</li>
        </ul></li>
 
       <li>Achtung: Folgende Vorgehensweise ist abgek&uuml;ndigt, funktioniert
