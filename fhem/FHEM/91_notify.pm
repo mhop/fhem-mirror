@@ -245,6 +245,8 @@ notify_State($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
+  $hash->{STATE} = $val if($vt eq "STATE" && !$init_done);
+
   return undef if($vt ne "state" || $val ne "inactive");
   readingsSingleUpdate($hash, "state", "inactive", 1);
   return undef;
