@@ -443,7 +443,7 @@ my %EnO_eepConfig = (
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
  # special profiles
   "G5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", manufID => "00D", model => 'tracker'}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
-  "H5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", devMode => 'master', devUpdate => 'auto', motionMode => 'fully'}},
+  "H5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", devMode => 'master', devUpdate => 'auto', manufID => '00D', motionMode => 'fully'}},
   "G5.10.12" => {attr => {subType => "roomSensorControl.01", eep => "A5-10-12", manufID => "00D", scaleMax => 40, scaleMin => 0, scaleDecimals => 1}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
@@ -2473,9 +2473,9 @@ sub EnOcean_Set($@) {
         $hash->{helper}{lastCmd} = $cmd;
         $cmd = 'off';
         $signOfLifeCmd = 'status';
-      } elsif ($cmd eq "teach") {
+      } elsif ($cmd eq 'teach') {
         # teach-in EEP A5-07-01
-        $data = "1C0FFF80";
+        $data = $manufID eq '00D' ? '1C080D80' : '1C0FFF80';
         $attr{$name}{eep} = "A5-07-01";
         $hash->{helper}{lastCmd} = $cmd;
         $signOfLifeCmd = 'status';
@@ -2488,7 +2488,7 @@ sub EnOcean_Set($@) {
         $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "motion", 'fullyOn');
-        readingsBulkUpdate($hash, "state", 'fullyOn');
+        readingsBulkUpdate($hash, "state", 'on');
         readingsEndUpdate($hash, 1);
       } elsif ($cmd eq "off") {
         $data = "FAFF0008";
@@ -2512,7 +2512,7 @@ sub EnOcean_Set($@) {
         $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "motion", 'semiOn');
-        readingsBulkUpdate($hash, "state", 'semiOn');
+        readingsBulkUpdate($hash, "state", 'on');
         readingsEndUpdate($hash, 1);
       } else {
         if (AttrVal($name, 'devMode', 'master') eq 'master') {
@@ -14075,7 +14075,7 @@ sub EnOcean_Attr(@) {
   } elsif ($attrName eq "devUpdate") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^(off|auto)$/) {
+    } elsif ($attrVal !~ m/^off|auto$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -17388,8 +17388,9 @@ sub EnOcean_sndUTE($$$$$$$) {
 #
 sub EnOcean_SignOfLife($) {
   my ($functionHash) = @_;
-  my $function = $functionHash->{function};
   my $hash = $functionHash->{hash};
+  return if (AttrVal($hash->{NAME}, 'devUpdate', 'off') ne 'auto');
+  my $function = $functionHash->{function};
   my $period = $functionHash->{period};
   my @setCmd = ($hash->{NAME}, $function);
   EnOcean_Set($hash, @setCmd);
@@ -19191,7 +19192,8 @@ sub EnOcean_Delete($$) {
       motion status are sent periodically.<br>
       The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
       The attr subType must be occupSensor.01. The attribute must be set manually. The device can be fully defined
-      via the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> H5-07-01.
+      via the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> H5-07-01.<br>
+      Set the attribute manufID to 00D for Eltako device function fullyOn and semiOn.
     </li>
     <br><br>
 
