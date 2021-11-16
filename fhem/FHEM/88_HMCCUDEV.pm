@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 213171649';
+my $HMCCUDEV_VERSION = '5.0 213201747';
 
 ######################################################################
 # Initialize module
@@ -380,7 +380,7 @@ sub HMCCUDEV_Attr ($@)
 			}
 		}
 	}
-	
+
 	return;
 }
 
@@ -456,12 +456,14 @@ sub HMCCUDEV_Set ($@)
 			if ($mode !~ /^(forceReset|reset|old|update)$/);
 		my $rc = 0;
 		my $retMsg = '';
+		$hash->{hmccu}{setDefaults} = 1; # Make sure that readings are not refreshed after each set attribute command
 		($rc, $retMsg) = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, roleChn => undef }) if ($mode ne 'old');
 		if (!$rc) {
 			$rc = HMCCU_SetDefaults ($hash);
 			$retMsg .= $rc ? "\nSet version 4.3 attributes" : "\nNo version 4.3 default attributes found";
 		}
 		$retMsg = 'OK' if ($retMsg eq '');
+		$hash->{hmccu}{setDefaults} = 0;
 		HMCCU_RefreshReadings ($hash) if ($rc);
 		return HMCCU_SetError ($hash, $retMsg);
 	}

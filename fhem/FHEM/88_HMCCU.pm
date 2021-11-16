@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 213171649';
+my $HMCCU_VERSION = '5.0 213201747';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -162,7 +162,7 @@ sub HMCCU_Detail ($$$$);
 sub HMCCU_PostInit ($);
 
 # Aggregation
-sub HMCCU_AggregateReadings ($$);
+sub HMCCU_AggregateReadingsRule ($$);
 sub HMCCU_AggregationRules ($$);
 
 # Handling of default attributes
@@ -192,7 +192,7 @@ sub HMCCU_SubstRule ($$$);
 sub HMCCU_SubstVariables ($$$);
 
 # Update client device readings
-sub HMCCU_BulkUpdate ($$$;$);
+sub HMCCU_BulkUpdate ($$$;$$);
 sub HMCCU_GetUpdate ($$;$$);
 sub HMCCU_RefreshReadings ($;$);
 sub HMCCU_UpdateCB ($$$);
@@ -336,7 +336,7 @@ sub HMCCU_CorrectName ($);
 sub HMCCU_Encrypt ($);
 sub HMCCU_Decrypt ($);
 sub HMCCU_DefStr ($;$$);
-sub HMCCU_DeleteReadings ($$);
+sub HMCCU_DeleteReadings ($;$);
 sub HMCCU_EncodeEPDisplay ($);
 sub HMCCU_ExprMatch ($$$);
 sub HMCCU_ExprNotMatch ($$$);
@@ -479,7 +479,7 @@ sub HMCCU_Define ($$$)
 	$hash->{config}          = $HMCCU_CONFIG_VERSION;
 	$hash->{ccutype}         = 'CCU2/3';
 	$hash->{RPCState}        = 'inactive';
-	$hash->{NOTIFYDEV}       = 'global,TYPE=(HMCCU|HMCCUDEV|HMCCUCHN)';
+	$hash->{NOTIFYDEV}       = 'global,TYPE=HMCCU';
 	$hash->{hmccu}{rpcports} = undef;
 
 	HMCCU_Log ($hash, 1, "Initialized version $HMCCU_VERSION");
@@ -610,17 +610,17 @@ sub HMCCU_Attr ($@)
 			return HMCCU_SetError ($hash, 'Syntax error in attribute ccuaggregate') if ($rc == 0);
 		}
 		elsif ($attrname eq 'ccuackstate') {
-			return "HMCCU: Attribute ccuackstate is depricated. Use ccuflags with 'ackState' instead";
+			return "HMCCU: [$name] Attribute ccuackstate is depricated. Use ccuflags with 'ackState' instead";
 		}
 		elsif ($attrname eq 'ccureadings') {
-			return "HMCCU: Attribute ccureadings is depricated. Use ccuflags with 'noReadings' instead";
+			return "HMCCU: [$name] Attribute ccureadings is depricated. Use ccuflags with 'noReadings' instead";
 		}
 		elsif ($attrname eq 'ccuflags') {
 			my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 			my @flags = ($attrval =~ /(intrpc|extrpc|procrpc)/g);
-			return "Flags extrpc, procrpc and intrpc cannot be combined" if (scalar (@flags) > 1);
+			return "HMCCU: [$name] Flags extrpc, procrpc and intrpc cannot be combined" if (scalar (@flags) > 1);
 			if ($attrval =~ /(intrpc|extrpc)/) {
-				HMCCU_Log ($hash, 1, "RPC server mode $1 no longer supported. Using procrpc instead");
+				HMCCU_Log ($hash, 1, "HMCCU: [$name] RPC server mode $1 no longer supported. Using procrpc instead");
 				$attrval =~ s/(extrpc|intrpc)/procrpc/;
 				$_[3] = $attrval;
 			}
@@ -632,20 +632,32 @@ sub HMCCU_Attr ($@)
 			$hash->{hmccu}{ccuvarsint} = $interval;
 			RemoveInternalTimer ($hash, "HMCCU_UpdateVariables");
 			if ($interval > 0) {
-				HMCCU_Log ($hash, 2, "Updating CCU system variables every $interval seconds");
+				HMCCU_Log ($hash, 2, "HMCCU: [$name] Updating CCU system variables every $interval seconds");
 				InternalTimer (gettimeofday()+$interval, "HMCCU_UpdateVariables", $hash);
 			}
 		}
+		elsif ($attrname eq 'eventMap') {
+			my @av = map { $_ =~ /^rpcserver (on|off):(on|off)$/ || $_ eq '' ? () : $_ } split (/\//, $attrval);
+			if (scalar(@av) > 0) {
+				$_[3] = '/'.join('/',@av).'/';
+				HMCCU_Log ($hash, 2, "HMCCU: [$name] Removed rpcserver entries from attribute eventMap");
+			}
+			else {
+				# Workaround because FHEM is ignoring error values for attribute eventMap
+				delete $attr{$name}{eventMap} if (exists($attr{$name}{eventMap}));
+				return "HMCCU: [$name] Ignored attribute eventMap because it contains only obsolet rpcserver entries";
+			}
+		}
 		elsif ($attrname eq 'rpcdevice') {
-			return "HMCCU: Attribute rpcdevice is depricated. Please remove it";
+			return "HMCCU: [$name] Attribute rpcdevice is depricated. Please remove it";
 		}
 		elsif ($attrname eq 'rpcport') {
-			return 'HMCCU: Attribute rpcport is no longer supported. Use rpcinterfaces instead';
+			return "HMCCU: [$name] Attribute rpcport is no longer supported. Use rpcinterfaces instead";
 		}
 	}
 	elsif ($cmd eq 'del') {
 		if ($attrname eq 'ccuaggregate') {
-			HMCCU_AggregationRules ($hash, '');			
+			HMCCU_AggregationRules ($hash, '');
 		}
 		elsif ($attrname eq 'ccuGetVars') {
 			RemoveInternalTimer ($hash, "HMCCU_UpdateVariables");
@@ -675,10 +687,9 @@ sub HMCCU_AggregationRules ($$)
 	my ($hash, $rulestr) = @_;
 	my $name = $hash->{NAME};
 
-	return 0 if ($rulestr eq '');
-
 	# Delete existing aggregation rules
 	if (exists($hash->{hmccu}{agg})) { delete $hash->{hmccu}{agg}; }
+	return if ($rulestr eq '');
 	
 	my @pars = ('name', 'filter', 'if', 'else');
 
@@ -1042,42 +1053,16 @@ sub HMCCU_Notify ($$)
 				InternalTimer (gettimeofday()+$delay, "HMCCU_PostInit", $hash, 0);
 			}
 			elsif ($event =~ /^(ATTR|DELETEATTR)/ && $init_done) {
-				# Attribute of client device set or deleted
-				my $refreshAttrList = 'ccucalculate|ccuflags|ccureadingfilter|ccureadingformat|'.
-					'ccureadingname|ccuReadingPrefix|ccuscaleval|controldatapoint|hmstatevals|'.
-					'statedatapoint|statevals|substitute|substexcl|stripnumber';
-
 				my ($aCmd, $aDev, $aAtt, $aVal) = split (/\s+/, $event);
 				$aAtt = $aVal if ($aCmd eq 'DELETEATTR');
 				if (defined($aAtt)) {
 					my $clHash = $defs{$aDev};
 					# Consider attr event only for HMCCUCHN or HMCCUDEV devices assigned to current IO device
-					HMCCU_RefreshReadings ($clHash)
+					my $setDefaults = $clHash->{hmccu}{setDefaults} // 0;
+					HMCCU_RefreshReadings ($clHash, $aAtt)
 						if (defined($clHash->{TYPE}) && ($clHash->{TYPE} eq 'HMCCUCHN' || $clHash->{TYPE} eq 'HMCCUDEV') &&
-							defined($clHash->{IODev}) && $clHash->{IODev} == $hash && $aAtt =~ /^($refreshAttrList)$/i);
+							defined($clHash->{IODev}) && $clHash->{IODev} == $hash && $setDefaults == 0);
 				}
-			}
-		}
-		else {
-			# Device must be assigned to IO device
-			return if (($devtype ne 'HMCCUDEV' && $devtype ne 'HMCCUCHN') || $devhash->{IODev} != $hash);
-
-			# Update aggregated readings
-			my ($r, $v) = split (": ", $event);
-			return if (!defined($v) || HMCCU_IsFlag ($name, 'noagg'));
-
-			foreach my $rule (keys %{$hash->{hmccu}{agg}}) {
-				my $ftype = $hash->{hmccu}{agg}{$rule}{ftype};
-				my $fexpr = $hash->{hmccu}{agg}{$rule}{fexpr};
-				my $fread = $hash->{hmccu}{agg}{$rule}{fread};
-				next if ($r !~ $fread ||
-					($ftype eq 'name' && $devname !~ /$fexpr/) ||
-					($ftype eq 'type' && $devhash->{ccutype} !~ /$fexpr/) ||
-					($ftype eq 'group' && AttrVal ($devname, 'group', 'null') !~ /$fexpr/) ||
-					($ftype eq 'room' && AttrVal ($devname, 'room', 'null') !~ /$fexpr/) ||
-					($ftype eq 'alias' && AttrVal ($devname, 'alias', 'null') !~ /$fexpr/));
-			
-				HMCCU_AggregateReadings ($hash, $rule);
 			}
 		}
 	}
@@ -1121,12 +1106,50 @@ sub HMCCU_Detail ($$$$)
 	return $links;
 }
 
+sub HMCCU_IsAggregation ($)
+{
+	my ($ioHash) = @_;
+
+	return (HMCCU_IsFlag ($ioHash->{NAME}, 'noagg') || AttrVal ($ioHash->{NAME}, 'ccuaggregate', '') eq '') ? 0 : 1;
+}
+
 ######################################################################
-# Calculate reading aggregations.
-# Called by Notify or via command get aggregation.
+# Calculate reading aggregations
 ######################################################################
 
-sub HMCCU_AggregateReadings ($$)
+sub HMCCU_AggregateReadings ($)
+{
+	my ($clHash) = @_;
+
+	my $ioHash = HMCCU_GetHash ($clHash);
+	return if (!defined($ioHash) || !exists($clHash->{hmccu}{updateReadings}) || !HMCCU_IsAggregation ($ioHash));
+
+	my $name = $clHash->{NAME};
+
+	foreach my $r (keys %{$clHash->{hmccu}{updateReadings}}) {
+		foreach my $rule (keys %{$ioHash->{hmccu}{agg}}) {
+			my $ftype = $ioHash->{hmccu}{agg}{$rule}{ftype};
+			my $fexpr = $ioHash->{hmccu}{agg}{$rule}{fexpr};
+			my $fread = $ioHash->{hmccu}{agg}{$rule}{fread};
+			next if ($r !~ $fread ||
+				($ftype eq 'name' && $name !~ /$fexpr/) ||
+				($ftype eq 'type' && $clHash->{ccutype} !~ /$fexpr/) ||
+				($ftype eq 'group' && AttrVal ($name, 'group', 'null') !~ /$fexpr/) ||
+				($ftype eq 'room' && AttrVal ($name, 'room', 'null') !~ /$fexpr/) ||
+				($ftype eq 'alias' && AttrVal ($name, 'alias', 'null') !~ /$fexpr/));
+		
+			HMCCU_AggregateReadingsRule ($ioHash, $rule);
+		}
+	}
+
+	delete $clHash->{hmccu}{updateReadings};
+}
+
+######################################################################
+# Calculate reading aggregations by rule.
+######################################################################
+
+sub HMCCU_AggregateReadingsRule ($$)
 {
 	my ($hash, $rule) = @_;
 	
@@ -1335,7 +1358,7 @@ sub HMCCU_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a // return 'No set command specified';
 	my $options = "var clear delete execute hmscript cleardefaults:noArg datapoint ".
-		"importdefaults rpcregister:all rpcserver:on,off ackmessages:noArg authentication ".
+		"importdefaults rpcregister:all ackmessages:noArg authentication ".
 		"prgActivate prgDeactivate on:noArg off:noArg";
 	$opt = lc($opt);
 	
@@ -1930,14 +1953,14 @@ sub HMCCU_Get ($@)
 			
 		if ($rule eq 'all') {
 			foreach my $r (keys %{$hash->{hmccu}{agg}}) {
-				my $rc = HMCCU_AggregateReadings ($hash, $r);
+				my $rc = HMCCU_AggregateReadingsRule ($hash, $r);
 				$result .= "$r = $rc\n";
 			}
 		}
 		else {
 			return HMCCU_SetError ($hash, "HMCCU: Aggregation rule $rule does not exist")
 				if (!exists($hash->{hmccu}{agg}{$rule}));
-			$result = HMCCU_AggregateReadings ($hash, $rule);
+			$result = HMCCU_AggregateReadingsRule ($hash, $rule);
 			$result = "$rule = $result";			
 		}
 
@@ -2166,6 +2189,7 @@ sub HMCCU_ParseObject ($$$)
 # or
 #   [N:][Channel-No[,Channel-No].]Datapoint-Expr
 # Multiple filter rules must be separated by ;
+# Return: 0=Do not update reading, 1=Update reading
 ######################################################################
  
 sub HMCCU_FilterReading ($$$;$)
@@ -4582,7 +4606,7 @@ sub HMCCU_UpdateParamsetReadings ($$$;$)
  	my $clInt = $clHash->{ccuif};
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($clHash);
 
-	readingsBeginUpdate ($clHash);
+	HMCCU_BeginBulkUpdate ($clHash);
 	
 	# Loop over all addresses
 	foreach my $a (@addList) {
@@ -4650,10 +4674,10 @@ sub HMCCU_UpdateParamsetReadings ($$$;$)
 					$results{$devAddr}{$c}{$ps}{$p} = $cv if ($devAddr eq $a);
 					
 					my @rnList = HMCCU_GetReadingName ($clHash, $clInt, $a, $c, $p, '', $clRF, $ps);
-					my $dispFlag = HMCCU_FilterReading ($clHash, $chnAddr, $p, $ps) ? '' : '.';
+					my $hide = HMCCU_FilterReading ($clHash, $chnAddr, $p, $ps) ? 0 : 1;
 					foreach my $rn (@rnList) {
-						HMCCU_Trace ($clHash, 2, "rn=$rn, dispFlag=$dispFlag, fv=$fv, cv=$cv");
-						HMCCU_BulkUpdate ($clHash, $dispFlag.$rn, $fv, $cv);
+						HMCCU_Trace ($clHash, 2, "rn=$rn, hide=$hide, fv=$fv, cv=$cv");
+						HMCCU_BulkUpdate ($clHash, $rn, $fv, $cv, $hide);
 					}
 				}
 			}
@@ -4677,7 +4701,7 @@ sub HMCCU_UpdateParamsetReadings ($$$;$)
 		HMCCU_BulkUpdate ($clHash, $hms_read, $hms_val, $hms_val) if (defined($hms_val));
 	}
 
-	readingsEndUpdate ($clHash, 1);
+	HMCCU_EndBulkUpdate ($clHash);
 	
 	return \%results;
 }
@@ -4697,7 +4721,7 @@ sub HMCCU_RefreshReadings ($;$)
 
 	return if (defined($attribute) && $attribute !~ /^($refreshAttrList)$/i);
 
-	HMCCU_DeleteReadings ($clHash, '.*');
+	HMCCU_DeleteReadings ($clHash);
 	
 	my %objects;
 	my ($devAddr, undef) = HMCCU_SplitChnAddr ($clHash->{ccuaddr});
@@ -4815,14 +4839,14 @@ sub HMCCU_GetAffectedAddresses ($)
 	my @addlist = ();
 	
 	if ($clHash->{TYPE} eq 'HMCCUDEV' || $clHash->{TYPE} eq 'HMCCUCHN') {
-		my $ioHash = HMCCU_GetHash ($clHash);
-		my $ccuFlags = defined($ioHash) ? HMCCU_GetFlags ($ioHash) : 'null';
-		if (exists($clHash->{ccuaddr})) {
+		if (HMCCU_IsDeviceActive ($clHash)) {
+			my $ioHash = HMCCU_GetHash ($clHash);
+			my $ccuFlags = defined($ioHash) ? HMCCU_GetFlags ($ioHash) : 'null';
 			my ($devaddr, $cnum) = HMCCU_SplitChnAddr ($clHash->{ccuaddr});
 			push @addlist, $devaddr;
-		}
-		if ($clHash->{ccuif} eq 'VirtualDevices' && $ccuFlags =~ /updGroupMembers/ && exists($clHash->{ccugroup}) && $clHash->{ccugroup} ne '') {
-			push @addlist, split (',', $clHash->{ccugroup});
+			if ($clHash->{ccuif} eq 'VirtualDevices' && $ccuFlags =~ /updGroupMembers/ && exists($clHash->{ccugroup}) && $clHash->{ccugroup} ne '') {
+				push @addlist, split (',', $clHash->{ccugroup});
+			}
 		}
 	}
 	
@@ -5756,9 +5780,10 @@ sub HMCCU_IsDeviceActive ($)
 	if (defined($clHash)) {
 		my $disabled = AttrVal ($clHash->{NAME}, 'disable', 0);
 		my $devstate = $clHash->{ccudevstate} // 'pending';
-		return $disabled == 0 && exists($clHash->{ccuaddr}) && $devstate ne 'inactive' ? 1 : 0;
+		return 1 if ($disabled == 0 && exists($clHash->{ccuaddr}) && exists($clHash->{ccuif}) && $devstate ne 'inactive');
 	}
 
+	HMCCU_Log ($clHash, 2, "Device disabled or inactive and/or address or interface is missing");
 	return 0;
 }
 
@@ -6774,11 +6799,9 @@ sub HMCCU_DeleteAttributes ($$;$)
 	$sem //= 0;
 	my $clName = $clHash->{NAME};
 
-	$clHash->{hmccu}{setDefaults} = $sem;
 	foreach my $a (@$attrList) {
 		CommandDeleteAttr (undef, "$clName $a") if (exists($attr{$clName}{$a}));
 	}
-	$clHash->{hmccu}{setDefaults} = 0;
 }
 
 ######################################################################
@@ -8489,7 +8512,7 @@ sub HMCCU_DetectDevice ($$$)
 		my $dpn = $di{stateRole}{$di{defSCh}}{datapoint} // '';
 		my $dpr = $di{stateRole}{$di{defSCh}}{role} // '';
 		if ($dpn eq '') {
-			HMCCU_Log ($ioHash, 2, "State datapoint not defined for channel $di{defSCh}, role $dpr");
+			HMCCU_Log ($ioHash, 5, "State datapoint not defined for channel $di{defSCh}, role $dpr");
 		}
 		else {
 			$di{defSDP} = $di{defSCh}.'.'.$dpn;
@@ -8914,14 +8937,35 @@ sub HMCCU_HMScriptExt ($$;$$$)
 # Bulk update of reading considering attribute substexcl.
 ######################################################################
 
-sub HMCCU_BulkUpdate ($$$;$)
+sub HMCCU_BeginBulkUpdate ($)
 {
-	my ($hash, $reading, $orgval, $subval) = @_;
+	my ($hash) = @_;
+
+	readingsBeginUpdate ($hash);
+}
+
+sub HMCCU_BulkUpdate ($$$;$$)
+{
+	my ($hash, $reading, $orgval, $subval, $hide) = @_;
 	$subval //= $orgval;
+	$hide //= 0;
+	my $ioHash = HMCCU_GetHash ($hash);
 	
 	my $excl = AttrVal ($hash->{NAME}, 'substexcl', '');
+	my $rv = $excl ne '' && $reading =~ /$excl/ ? $orgval : $subval;
+	$hash->{hmccu}{updateReadings}{$reading} = $rv if (HMCCU_IsAggregation ($ioHash));
 
-	readingsBulkUpdate ($hash, $reading, ($excl ne '' && $reading =~ /$excl/ ? $orgval : $subval));
+	my $disp = $hide ? '.' : '';
+	readingsBulkUpdate ($hash, $disp.$reading, $rv);
+}
+
+sub HMCCU_EndBulkUpdate ($)
+{
+	my ($hash) = @_;
+
+	HMCCU_AggregateReadings ($hash);
+
+	readingsEndUpdate ($hash, 1);
 }
 
 ######################################################################
@@ -9666,6 +9710,7 @@ sub HMCCU_UpdateDeviceStates ($)
 		'0.DEVICE_IN_BOOTLOADER' => 'boot',
 		'0.STICKY_UNREACH'       => 'stickyUnreach',
 		'0.UPDATE_PENDING'       => 'updPending',
+		'0.SABOTAGE'             => 'sabotage'
 	);
 	
 	# Datapoints to be converted to readings
@@ -9675,7 +9720,8 @@ sub HMCCU_UpdateDeviceStates ($)
 		'0.RSSI_PEER'   => 'rssipeer',
 		'0.LOW_BAT'     => 'battery',
 		'0.LOWBAT'      => 'battery',
-		'0.UNREACH'     => 'activity'
+		'0.UNREACH'     => 'activity',
+		'0.SABOTAGE'    => 'sabotage'
 	);
 	
 	# The new readings
@@ -10055,7 +10101,7 @@ sub HMCCU_Decrypt ($)
 # Readings 'state' and 'control' are ignored.
 ######################################################################
 
-sub HMCCU_DeleteReadings ($$)
+sub HMCCU_DeleteReadings ($;$)
 {
 	my ($hash, $rnexp) = @_;
 	$rnexp //= '.*';
@@ -10533,7 +10579,14 @@ sub HMCCU_MaxHashEntries ($$)
       <li><b>set &lt;name&gt; initialize</b><br/>
       	Initialize I/O device if state of CCU is unreachable.
       </li><br/>
-      <li><b>set &lt;name&gt; prgActivate &lt;program&gt;</b><br/>
+      <li><b>set &lt;name&gt; off</b><br/>
+	  	 Stop RPC server(s). See also 'set on' command.
+      </li><br/>
+      <li><b>set &lt;name&gt; on</b><br/>
+	     Start RPC server(s). This command will fork a RPC server process for each RPC interface defined in attribute 'rpcinterfaces'.
+         Until operation is completed only a few set/get commands are available and you may get the error message 'CCU busy'.
+      </li><br/>
+	  <li><b>set &lt;name&gt; prgActivate &lt;program&gt;</b><br/>
          Activate a CCU program.
       </li><br/>
       <li><b>set &lt;name&gt; prgDeactivate &lt;program&gt;</b><br/>
@@ -10541,12 +10594,6 @@ sub HMCCU_MaxHashEntries ($$)
       </li><br/>
       <li><b>set &lt;name&gt; rpcregister [{all | &lt;interface&gt;}]</b><br/>
       	Register RPC servers at CCU.
-      </li><br/>
-      <li><b>set &lt;name&gt; rpcserver {on | off | restart}</b><br/>
-         Start, stop or restart RPC server(s). This command executed with option 'on'
-         will fork a RPC server process for each RPC interface defined in attribute 'rpcinterfaces'.
-         Until operation is completed only a few set/get commands are available and you
-         may get the error message 'CCU busy'.
       </li><br/>
       <li><b>set &lt;name&gt; var &lt;variable&gt; &lt;Value&gt;</b><br/>
         Set CCU system variable value. Special characters \_ in <i>value</i> are
