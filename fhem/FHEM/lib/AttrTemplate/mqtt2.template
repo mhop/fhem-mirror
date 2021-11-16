@@ -1466,38 +1466,31 @@ attr DEVICE setList \
    half:noArg CMNDTOPIC/ShutterPosition1 50\
    pct:slider,0,1,100 CMNDTOPIC/ShutterPosition1 $EVTPART1\
    stop:noArg CMNDTOPIC/ShutterStop1\
-   closeSlat:noArg CMNDTOPIC/ShutterClose2\
-   openSlat:noArg CMNDTOPIC/ShutterOpen2\
-   halfSlat:noArg CMNDTOPIC/ShutterPosition2 50\
-   pctSlat:slider,0,1,100 CMNDTOPIC/ShutterPosition2 $EVTPART1\
-   stopSlat:noArg CMNDTOPIC/ShutterStop2\
+   closeSlat:noArg CMNDTOPIC/ShutterTilt1 CLOSE\
+   openSlat:noArg CMNDTOPIC/ShutterTilt1 OPEN\
+   halfSlat:noArg CMNDTOPIC/ShutterTilt1 0\
+   tiltSlat:slider,-90,5,90 CMNDTOPIC/ShutterTilt1 $EVTPART1\
    resetClose:noArg CMNDTOPIC/ShutterSetClose1\
-   resetCloseSlat:noArg CMNDTOPIC/ShutterSetClose2
    x_configuration CMNDTOPIC/$EVTPART1 $EVTPART2
 attr DEVICE readingList \
    TELETOPIC/LWT:.* LWT\
-   STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
-   STATTOPIC/POWER1:.* POWER1\
-   STATTOPIC/POWER1:on {{'state' => 'opening'}}\
-   STATTOPIC/POWER2:.* POWER2\
-   STATTOPIC/POWER2:on {{'state' => 'closing'}}\
-   STATTOPIC/SHUTTER1:.* state\
-   STATTOPIC/SHUTTER1:.* pct\
-   STATTOPIC/SHUTTER2:.* stateSlat\
-   STATTOPIC/SHUTTER2:.* pctSlat\
-   TELETOPIC/RESULT:.* { json2nameValue($EVENT) }\
-   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-   TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
+   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
    TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
-   TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }
+   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+   STATTOPIC/POWER1:.* {{'state' => 'opening'} if $EVENT eq 'on'}\
+   STATTOPIC/POWER2:.* {{'state' => 'closing'} if $EVENT eq 'on'}
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d.*:fts_shutter_90 8\d.*:fts_shutter_80 7\d.*:fts_shutter_70 6\d.*:fts_shutter_60 5\d.*:fts_shutter_50 4\d.*:fts_shutter_40 3\d.*:fts_shutter_30 2\d.*:fts_shutter_20 1\d.*:fts_shutter_10 \b\d\b.*:fts_shutter_10 set_.*:fts_shutter_updown
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 attr DEVICE eventMap open:opens close:closes
+attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:tiltSlat Shutter1_Target:pct  ANALOG_Temperature:temperature
+attr DEVICE userReadings state:pct:.* {ReadingsNum($name,"pct",0)}
 attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
 LWT\
 </a>\
-state
+state\
+tiltSlat
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE setStateList open close half stop pct
 attr DEVICE comment After applying the template set "ShutterOpenDuration1", "ShutterCloseDuration1" and "shuttertiltconfig1" first.\
@@ -1507,7 +1500,7 @@ commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20211110
+setreading DEVICE attrTemplateVersion 20211116
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 
@@ -2927,7 +2920,7 @@ attr DEVICE setList\
   effect:selectnumbers,0,1,3,0,lin  shellies/DEVNAME/color/0/set {"turn": "on","mode":"color","effect":$EVTPART1}\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":$EVTPART1,"brightness":$EVTPART1}\
   ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if $EVTPART1<3000;qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":$EVTPART1})}\
-  rgb:colorpicker,RGB {return 'shellies/DEVNAME/color/0/command off' if $EVTPART1 eq '000000';  return 'shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":4000}' if $EVTPART1 eq 'FFFFFF'; $EVTPART1=~/(..)(..)(..)/; return if !defined $3; if($1 ne $2 || $2 ne $3){qq(shellies/DEVNAME/color/0/set {"mode":"color","gain":"100","red":).hex($1).qq(,"green":).hex($2).qq(,"blue":).hex($3).'}'}else{qq(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
+  rgb:colorpicker,RGB {return 'shellies/DEVNAME/color/0/command off' if $EVTPART1 eq '000000';  return 'shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","temp":4000}' if $EVTPART1 eq 'FFFFFF'; $EVTPART1=~/(..)(..)(..)/; return if !defined $3; if($1 ne $2 || $2 ne $3){q(shellies/DEVNAME/color/0/set {"mode":"color","gain":"100","turn":"on","red":).hex($1).q(,"green":).hex($2).q(,"blue":).hex($3).'}'}else{q(shellies/DEVNAME/color/0/set {"turn":"on","mode":"white","brightness":).int(hex($1)/2.55).'}'}}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
@@ -2938,7 +2931,7 @@ attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellybulb
-setreading DEVICE attrTemplateVersion 20211110
+setreading DEVICE attrTemplateVersion 20211116
 
 # contributed by KurtK https://forum.fhem.de/index.php/topic,94495.msg1055093.html#msg1055093
 # shellyduo using original firmware
