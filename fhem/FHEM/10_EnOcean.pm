@@ -2515,7 +2515,7 @@ sub EnOcean_Set($@) {
         readingsBulkUpdate($hash, "state", 'on');
         readingsEndUpdate($hash, 1);
       } else {
-        if (AttrVal($name, 'devMode', 'master') eq 'master') {
+        if (AttrVal($name, 'devMode', 'slave') eq 'master') {
           if ($manufID eq "00D") {
           # Eltako FBH55SB [TF-Modus]
             return "Unknown argument " . $cmd . ", choose one of fullyOn:noArg off:noArg on:noArg semiOn:noArg teach:noArg"
