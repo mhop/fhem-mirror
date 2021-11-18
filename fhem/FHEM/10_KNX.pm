@@ -64,6 +64,8 @@
 # MH 20211017  E04.80 rework decode- encode- ByDpt (cascading if/else != performance)
 #              fix stateregex once more
 #              removed examples from cmdref -> wiki
+# MH 20211118  E04.90 fix dpt10 now, fix dpt19 workingdays
+#              fix dpt3 encode
 
 
 package FHEM::KNX; ## no critic 'package'
@@ -149,7 +151,8 @@ my $PAT_DPT1_PAT = '(on)|(off)|(0?1)|(0?0)';
 my $PAT_DTSEP = qr/(?:_)/ix; # date/time separator
 my $PAT_DATE = qr/(3[01]|[0-2]?[0-9])\.(1[0-2]|0?[0-9])\.((?:19|20)[0-9][0-9])/ix;
 #pattern for time
-my $PAT_TIME = qr/(2[0-4]|[0?1][0-9]):([0?1-5][0-9]):([0?1-5][0-9])/ix;
+my $PAT_TIME = qr/(2[0-4]|[01]{0,1}[0-9]):([0-5]{0,1}[0-9]):([0-5]{0,1}[0-9])/ix; #E04.90
+#my $PAT_TIME = qr/(2[0-4]|[0?1][0-9]):([0?1-5][0-9]):([0?1-5][0-9])/ix;
 my $PAT_DPT16_CLR = qr/>CLR</ix;
 
 #CODE is the identifier for the en- and decode algos. See encode and decode functions
@@ -161,7 +164,6 @@ my $PAT_DPT16_CLR = qr/>CLR</ix;
 #if setlist is not supplied and min/max are given, a slider is shown for numeric values. Otherwise min/max value are shown in a list
 my %dpttypes = (
 	#Binary value
-#	'dpt1'          => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>'off', MAX=>'on', SETLIST=>'on,off,toggle'},
 	'dpt1'          => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>'off', MAX=>'on', SETLIST=>'on,off,toggle',
                             DEC=>\&dec_dpt1,ENC=>\&enc_dpt1,},
 	'dpt1.000'      => {CODE=>'dpt1', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_DPT1_PAT)/ix, MIN=>0, MAX=>1},
@@ -431,7 +433,6 @@ sub KNX_Define {
 
 		if ($gadModel ne $MODELERR && $gadNo == 1) { # for fheminfo statistic only
 			($hash->{model} = lc($gadModel)) =~ s/^(dpt[\d]+)\..*/$1/x; # use first gad as mdl reference for fheminfo
-			# $hash->{model} = lc($gadModel) # this is too much!
 		}
 
 		if (@gadArgs) {
@@ -547,6 +548,7 @@ sub KNX_Define {
 					$getString .= q{ } . $key . ':noArg';
 				}
 				elsif ($option eq 'set') {
+#					$setString .= ' on:noArg off:noArg toggle:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x));
 					$setString .= ' on:noArg off:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x)); 
 					$setString .= q{ } . $key . $hash->{GADDETAILS}{$key}{SETLIST};
 				}
@@ -554,6 +556,7 @@ sub KNX_Define {
 			}
 			else {  # no option def, select all
 				$getString .= q{ } . $key . ':noArg';
+#				$setString .= ' on:noArg off:noArg toggle:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x));
 				$setString .= ' on:noArg off:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x));
 				$setString .= q{ } . $key . $hash->{GADDETAILS}{$key}{SETLIST};
 			}
@@ -582,7 +585,7 @@ sub KNX_Undef {
 	my $name = shift;
 
 	Log3 ($name, 5, "KNX_undef -enter: $name");
-	
+
 	#delete all defptr entries for this device. this bug is still in SVN version! 09-02-2021
 	KNX_delete_defptr($hash); # verify with: {PrintHash($modules{KNX}{defptr},3) } on FHEM-cmdline
 
@@ -615,11 +618,9 @@ sub KNX_Get {
 		$gadName = $hash->{FIRSTGADNAME};
 	}
 
-	#get groupCode
+	#get groupCode, groupAddress, option
 	my $groupc = $hash->{GADDETAILS}{$gadName}{CODE};
-	#get groupAddress
 	my $group = $hash->{GADDETAILS}{$gadName}{GROUP};
-	#get option		
 	my $option = $hash->{GADDETAILS}{$gadName}{OPTION};
 
 	#return, if unknown group
@@ -715,7 +716,7 @@ sub KNX_Set {
 	#process set command
 	my $transvale = KNX_encodeByDpt($hash, $transval, $targetGadName);
 	IOWrite($hash, $TULid, 'w' . $groupCode . $transvale);
-	
+
 	Log3 ($name, 4, "$thisSub: $name, cmd= $cmd, value= $value, translated= $transvale");
 
 	# decode again for values that have been changed in encode process
@@ -775,19 +776,16 @@ sub KNX_Set_oldsyntax {
 		#check for 1-16 hex-digits
 		return "KNX_Set_syntax2: $cmd $a[0] has wrong syntax. Use hex-format only." if ($a[0] !~ m/[0-9A-F]{1,16}/ix);
 		$value = $a[0];
-
 	}
 	elsif ($cmd =~ m/$VALUE/ix) {
 		return 'KNX_Set_syntax2: "value" not allowed for dpt1, dpt16 and dpt232' if ($code =~ m/(dpt1$)|(dpt16$)|(dpt232$)/ix);
 		$value = $a[0];
 		$value =~ s/,/\./gx;
-
 	}
 	#set string <val1 val2 valn>
 	elsif ($cmd =~ m/$STRING/ix) {
 		return 'KNX_Set_syntax2: "string" only allowed for dpt16' if ($code !~ m/dpt16/ix);
 		$value = q{}; # will be joined in KNX_Set
-
 	}
 	#set RGB <RRGGBB>
 	elsif ($cmd =~ m/$RGB/ix) {
@@ -795,7 +793,6 @@ sub KNX_Set_oldsyntax {
 		#check for 6 hex-digits
 		return "KNX_Set_syntax2: $cmd $a[0] has wrong syntax. Use 6 hex-digits only." if ($a[0] !~ m/[0-9A-F]{6}/ix);
 		$value = lc($a[0]);
-
 	}
 
 	return (undef, $targetGadName, $value);
@@ -807,7 +804,6 @@ sub KNX_Set_oldsyntax {
 sub KNX_Set_dpt1 {
 	my ($hash, $targetGadName, $cmd, @arg) = @_;
 	my $name = $hash->{NAME};
-
 	my $groupCode = $hash->{GADDETAILS}{$targetGadName}{CODE};
 
 	#delete any running timers
@@ -835,7 +831,6 @@ sub KNX_Set_dpt1 {
 		#place at-command for switching on / off
 		CommandDefMod(undef, '-temporary ' .  $name . "_TIMER_$groupCode at +$duration set $name $targetGadName $tvalue");
 	}
-
 	#set on-until / off-until
 	elsif ($cmd =~ m/(?:(on|off)-until)$/ix) {
 		#get off-time
@@ -850,7 +845,6 @@ sub KNX_Set_dpt1 {
 		#place at-command for switching on / off
 		CommandDefMod(undef, '-temporary ' . $name . "_TIMER_$groupCode at $hms_til set $name $targetGadName $tvalue");
 	}
-
 	#toggle
 	elsif ($cmd =~ m/$TOGGLE/ix) {
 		my $togglereading = 'dummy';
@@ -873,7 +867,6 @@ sub KNX_Set_dpt1 {
 		Log3 ($name, 3, 'KNX_Set_dpt1: initial value for "set ' . "$name $targetGadName" . ' TOGGLE is not "on" or "off" - ' . "$targetGadName will be switched off") if ($toggleOldVal !~ /^(?:on|off)/ix);
 		$value = q{on} if ($toggleOldVal =~ m/^off/ix); # value off is default
 	}
-
 	#blink - implemented with timer & toggle
 	elsif ($cmd =~ m/$BLINK/ix) {
 		my $count = $arg[0] * 2 -1;
@@ -884,15 +877,6 @@ sub KNX_Set_dpt1 {
 		$value = 'on';
 	}
 
-#04.68	### setextensions trial...
-#	else {
-#		my ($ecmd,@earg) = split(/[\s]/ix,$cmd,2);
-#		my $cmdlist = $hash->{SETSTRING} . ' blink intervals';
-##		my @earg =  join(' ', @a[1 .. $na-1])) if (defined ($a[1]));
-#		Log3($name, 1, "Setext cmd=$ecmd, arg=" . join(',',@earg));
-#		my $extret = SetExtensions($hash, $cmdlist , $name, $ecmd, @earg); # use SetExtensions
-#		Log3($name, 1, 'Setext returned: ' . $extret) if (defined($extret));
-#	}
 	return (undef,$value);
 }
 
@@ -959,7 +943,6 @@ sub KNX_Attr {
 	if ($cmd eq 'del') {
 		if ($aName eq 'KNX_toggle') {
 			delete $hash->{'.TOGGLESRC'};
-#			CommandModify(undef, "$name $hash->{DEF}");
 		}
 		elsif ($aName eq 'disable') {
 			my @defentries = split(/\s/ix,$hash->{DEF});
@@ -970,7 +953,6 @@ sub KNX_Attr {
 				Log3 ($name, 2, 'Attribut "disable" cannot be deleted for device ' . $name . ' until you specify a valid dpt!');
 				return 'Attribut "disable" cannot be deleted for device ' . $name . ' until you specify a valid dpt!';
 			}
-#			CommandDefMod(undef, "-temporary $name KNX $hash->{DEF}"); # do a defmod ...
 			CommandModify(undef, "$name $hash->{DEF}"); # do a defmod ...
 		}
 	}
@@ -1303,9 +1285,7 @@ sub KNX_checkAndClean {
 
 	return if ($found == 0);
 
-#E04.80	$value = KNX_limit ($hash, $value, $gadName, undef);
-
-	Log3 ($name, 3, "KNX_checkAndClean: name= $name, gadName= $gadName, value= $orgValue was casted to $value") if ($orgValue ne $value); #E04.80 add dev-name
+	Log3 ($name, 3, "KNX_checkAndClean: name= $name, gadName= $gadName, value= $orgValue was casted to $value") if ($orgValue ne $value);
 	Log3 ($name, 5, "KNX_checkAndClean -exit: value= $value, gadName= $gadName, model= $model, pattern= $pattern");
 
 	return $value;
@@ -1343,7 +1323,7 @@ sub KNX_replaceByRegex {
 			$retVal = $regPair[1];
 		}
 		elsif (($input !~ /$regPair[0]/x) && ($regPair[0] =~ /[:]/x)) { # value dont match!
-			next; #E04.80
+			next;
 		}
 		else {
 			#replace value
@@ -1359,14 +1339,12 @@ sub KNX_replaceByRegex {
 # limit numeric values. Valid directions: encode, decode
 sub KNX_limit {
 	my ($hash, $value, $model, $direction) = @_;
-#E04.80	my ($hash, $value, $gadName, $direction) = @_;
 
 	#continue only if numeric value
 	return $value if (! looks_like_number ($value));
 	return $value if (! defined($direction));
 
 	my $name = $hash->{NAME};
-#E04.80	my $model = $hash->{GADDETAILS}{$gadName}{MODEL};
 	my $retVal = $value;
 
 	#get correction details
@@ -1399,10 +1377,7 @@ sub KNX_limit {
 	$logString   .= " OFFSET: $offset" if (defined ($offset));
 	$logString   .= " MIN: $min" if (defined ($min));
 	$logString   .= " MAX: $max" if (defined ($max));
-#E04.80	Log3 ($name, 5, "KNX_limit: $gadName $logString");
-#	Log3 ($name, 4, "KNX_limit: $gadName modified... Output: $retVal, Input: $value, Model: $model") if ($retVal != $value);
 	Log3 ($name, 5, "KNX_limit: $logString");
-#	Log3 ($name, 4, "KNX_limit: modified... Input: $value, Output: $retVal, Model: $model") if ($retVal != $value);
 
 	return $retVal;
 }
@@ -1435,19 +1410,15 @@ sub KNX_encodeByDpt {
 	#return unchecked, if this is a autocreate-device
 	return if ($model eq $MODELERR);
 
-#	#this one stores the translated value (readble)
-#	my $numval = 0; # default
 	#this one stores the translated hex-value
 	my $hexval = undef;
 
 	Log3 ($name, 5, "KNX_encodeByDpt -enter: $gadName model: $model, code: $code, value: $value");
 
-	my $ivalue = $value; #E04.80 save for compare
-	$value = KNX_limit ($hash, $value, $model, 'ENCODE'); #E04.80
-#E04.80	$value = KNX_limit ($hash, $value, $gadName, 'ENCODE');
-	Log3 ($name, 4, "KNX_limit: $gadName modified... Input: $ivalue, Output: $value, Model: $model") if ($ivalue ne $value); #E04.80
+	my $ivalue = $value; # save for compare
+	$value = KNX_limit ($hash, $value, $model, 'ENCODE');
+	Log3 ($name, 4, "KNX_limit: $gadName modified... Input: $ivalue, Output: $value, Model: $model") if ($ivalue ne $value);
 
-###rework begin
 	if (ref($dpttypes{$code}->{ENC}) eq 'CODE') {
 		$hexval = $dpttypes{$code}->{ENC}->($value, $model);
 		Log3 ($name, 5, "KNX_encodeByDpt -exit: $gadName, model: $model, code: $code, value: $value, hexval: $hexval");
@@ -1458,7 +1429,6 @@ sub KNX_encodeByDpt {
 	}
 	return;
 }
-###rework end 
 
 # decode KNX-Message according DPT
 sub KNX_decodeByDpt {
@@ -1477,7 +1447,6 @@ sub KNX_decodeByDpt {
 
 	Log3 ($name, 5, "KNX_decodeByDpt -enter: model: $model, code: $code, value: $value, length-value: " . length($value));
 
-###rework begin 
 	if (ref($dpttypes{$code}->{DEC}) eq 'CODE') {
 		$state = $dpttypes{$code}->{DEC}->($value, $model);
 		my $unit = $dpttypes{$model}{UNIT};
@@ -1491,8 +1460,6 @@ sub KNX_decodeByDpt {
 	}
 	return;
 }
-###rework end
-
 
 ############################
 ### encode sub functions ###
@@ -1518,13 +1485,11 @@ sub enc_dpt3 { #Step value (four-bit)
 	my $numval = 0;
 	my $sign = ($value >=0 )?1:0;
 	$value = abs($value);
-	my @values = qw( 75 50 25 12 6 3 1 );
-#	my $i = 0;
+#	my @values = qw( 75 50 25 12 6 3 1 );
+	my @values = qw( 75 50 25 12 6 3 1 0); #E04.90
 	foreach my $key (@values) {
-#		$i++;
 		$numval++;
 		if ($value >= $key) {
-#			$numval = $i;
 			last;
 		}
 	}
@@ -1568,6 +1533,7 @@ sub enc_dpt9 { #2-Octet Float value
 sub enc_dpt10 { #Time of Day
 	my $value = shift;
 	my $numval = 0;
+=pod 
 	if ($value =~ m/now/ix) {
 		#get actual time
 		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
@@ -1582,6 +1548,22 @@ sub enc_dpt10 { #Time of Day
 		my ($hh, $mm, $ss) = split(/:/x, $value);
 		$numval = $ss + ($mm << 8) + ($hh << 16);
 	}
+=cut
+#E04.90 new code
+	my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time); # default now
+	if ($value =~ /$PAT_TIME/ix) {
+		($hours,$mins,$secs) = split(/[:]/ix,$value);
+		my $ts = fhemTimeLocal($secs, $mins, $hours, $mday, $mon, $year);
+		($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($ts);
+	}
+	#add offsets
+	$year += 1900;
+	$mon++;
+	# calculate offset for weekday
+	$wday = 7 if ($wday == 0);
+	$hours += 32 * $wday;
+	$numval = $secs + ($mins << 8) + ($hours << 16);
+
 	return sprintf("00%.6x",$numval);
 }
 
@@ -1645,12 +1627,14 @@ sub enc_dpt19 { #DateTime
 	my $ts = time; # default or when "now" is given
 	# if no match we assume now and use current date/time
 	if ($value =~ m/^$PAT_DATE$PAT_DTSEP$PAT_TIME/x) {
-		$ts = fhemTimeLocal($6, $5, $4, $1, $2-1, $3 - 1900); # if ($value =~ m/^$PAT_DATE$PAT_DTSEP$PAT_TIME/x);
+		$ts = fhemTimeLocal($6, $5, $4, $1, $2-1, $3 - 1900);
 	}
 	my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($ts);
 	$wday = 7 if ($wday eq "0"); # calculate offset for weekday
 	$hours += ($wday << 5); # add day of week
-	my $status1 = 0x20;  # Fault=0, WD = 0, NWD = 1 (WD Field valid), NY = 0, ND = 0, NDOW= 0,NT=0, SUTI = 0
+	my $status1 = 0x40;  #E04.90  Fault=0, WD = 1, NWD = 0 (WD Field valid), NY = 0, ND = 0, NDOW= 0,NT=0, SUTI = 0
+#	my $status1 = 0x20;  # Fault=0, WD = 0, NWD = 1 (WD Field valid), NY = 0, ND = 0, NDOW= 0,NT=0, SUTI = 0
+	$status1 = $status1 & 0xBF if ($wday >= 6); #E04.90 Saturday & Sunday is non working day
 	$status1 += 1 if ($isdst == 1);
 	my $status0 = 0x00;  # CLQ=0
 	$mon++;
@@ -1693,7 +1677,6 @@ sub dec_dpt2 { #Step value (two-bit)
 
 sub dec_dpt3 { #Step value (four-bit)
 	my $numval = hex (shift);
-#	$numval = $numval & 0x0F;
 	my $dir = ($numval & 0x08) >> 3;
 	my $step = ($numval & 0x07);
 	my $stepcode = 0;
@@ -1803,7 +1786,6 @@ sub dec_dpt16 { #14-Octet String
 	my $value = shift;
 	my $model = shift;
 	my $numval = 0;
-#	my $state  = q{};
 	$value =~ s/\s*$//gx; # strip trailing blanks
 	my $state = pack("H*",$value);
 	#convert to latin-1
