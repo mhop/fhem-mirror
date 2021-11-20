@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 10/2021
-my $thzversion = "0.197";
+# by immi 11/2021
+my $thzversion = "0.198";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -353,7 +353,7 @@ my %parsinghash = (
 	      ],
   "0clean"    => [["", 8, 2, "hex", 1]             
               ],
-  "1clean"    => [["", 8, 4, "hex", 1]             
+  "1clean"    => [["", 8, 4, "hex2int", 1]             		#fix for celle; handl neg values 20NoV2021
               ],
   "2opmode"   => [["", 8, 2, "opmode", 1]             
               ],
@@ -779,6 +779,10 @@ my %getsonly539 = (  #info from belu and godmorgon
   "sFlowRate"		=> {cmd2=>"0A033B", type =>"1clean", unit =>" cl/min"},
   "sHumMaskingTime"	=> {cmd2=>"0A064F", type =>"1clean", unit =>" min"},
   "sHumThreshold"	=> {cmd2=>"0A0650", type =>"1clean", unit =>" %"},
+  "sHeatingRelPower"	=> {cmd2=>"0A069A", type =>"1clean", unit =>" %"},
+  "sComprRelPower"	=> {cmd2=>"0A069B", type =>"1clean", unit =>" %"},
+  "sComprRotUnlimit"	=> {cmd2=>"0A069C", type =>"1clean", unit =>" Hz"},
+  "sComprRotLimit"	=> {cmd2=>"0A069D", type =>"1clean", unit =>" Hz"},
   "sOutputReduction"	=> {cmd2=>"0A06A4", type =>"1clean", unit =>" %"},
   "sOutputIncrease"	=> {cmd2=>"0A06A5", type =>"1clean", unit =>" %"},
   "sHumProtection"	=> {cmd2=>"0A09D1", type =>"1clean", unit =>""},
