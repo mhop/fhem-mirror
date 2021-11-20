@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_WeekdayTimer: CONDITION now is checked at each switching time
  - bugfix:  10_KNX: fix for dpt3, dpt10 and dpt19 (working days) 
  - bugfix:  88_HMCCU: Fixed some bugs
  - bugfix:  73_AutoShuttersControl: Fix uninitialized value within %charHash
