@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: new attr numDecimalPlaces, 
+                      Forum:#/topic,53584.msg1178063.html#msg1178063
  - change:  98_WeekdayTimer: CONDITION now is checked at each switching time
  - bugfix:  10_KNX: fix for dpt3, dpt10 and dpt19 (working days) 
  - bugfix:  88_HMCCU: Fixed some bugs
