@@ -312,8 +312,8 @@ my %DbRep_vHintsExt_de = (
 
 
 # Variablendefinitionen
-my %dbrep_col     = ("DEVICE"  => 64, "READING" => 64, );                       # Standard Feldbreiten falls noch nicht getInitData ausgeführt
-my $defdecplaces  = 4;                                                          # Nachkommastellen Standard      
+my %dbrep_col          = ("DEVICE"  => 64, "READING" => 64, );                       # Standard Feldbreiten falls noch nicht getInitData ausgeführt
+my $dbrep_defdecplaces = 4;                                                          # Nachkommastellen Standard      
 
 
        
@@ -3214,7 +3214,7 @@ sub averval_ParseDone {
   my $irowdone   = $a[6];
   my $gtsstr     = $a[7] ? decode_base64($a[7]) : undef;
   my $gtsreached = $a[8];
-  my $ndp        = AttrVal($name, "numDecimalPlaces", $defdecplaces);
+  my $ndp        = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   
   my $reading_runtime_string;
   my $erread;
@@ -3680,7 +3680,7 @@ sub maxval_ParseDone {
   my ($rt,$brt) = split(",", $bt);
   my $err       = $a[5] ? decode_base64($a[5]) : undef;
   my $irowdone  = $a[6];
-  my $ndp       = AttrVal($name, "numDecimalPlaces", $defdecplaces);
+  my $ndp       = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   
   my $reading_runtime_string;
   my $erread;
@@ -3935,7 +3935,7 @@ sub minval_ParseDone {
   my ($rt,$brt) = split(",", $bt);
   my $err       = $a[5] ? decode_base64($a[5]) : undef;
   my $irowdone  = $a[6];
-  my $ndp       = AttrVal($name, "numDecimalPlaces", $defdecplaces);
+  my $ndp       = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   
   my $reading_runtime_string;
   my $erread;
@@ -4282,7 +4282,7 @@ sub diffval_ParseDone {
   my $ncpslist   = decode_base64($a[6]);                     # Hash von Perioden die nicht kalkuliert werden konnten "no calc in period" 
   my $err        = $a[7] ? decode_base64($a[7]) : undef;
   my $irowdone   = $a[8];
-  my $ndp        = AttrVal($name, "numDecimalPlaces", $defdecplaces);
+  my $ndp        = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   my $difflimit  = AttrVal($name, "diffAccept", "20");       # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
   
   my $erread;
@@ -4495,7 +4495,7 @@ sub sumval_ParseDone {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[5] ? decode_base64($a[5]) : undef;
   my $irowdone   = $a[6];
-  my $ndp        = AttrVal($name, "numDecimalPlaces", $defdecplaces);
+  my $ndp        = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   
   my ($reading_runtime_string,$erread);
   
@@ -11248,7 +11248,7 @@ sub DbRep_OutputWriteToDB {
   my $unit       = "";
   my $wrt        = 0;
   my $irowdone   = 0;
-  my $ndp        = AttrVal($name, "numDecimalPlaces", $defdecplaces);
+  my $ndp        = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   
   my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$value,$date,$time,$hour,$minute,$ndate,$ntime,$rsf,$rsn,@row_array);
   my ($timestamp,$year,$mon,$mday,$t1,$corr);
