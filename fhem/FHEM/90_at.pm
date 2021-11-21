@@ -84,6 +84,7 @@ at_Define($$)
         $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900, 0,0,-1);
 
       } else {
+        $hash->{STATE} = $err;
         return $err;
       }
 
