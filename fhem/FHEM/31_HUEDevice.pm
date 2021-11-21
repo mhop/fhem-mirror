@@ -1425,8 +1425,8 @@ HUEDevice_Parse($$)
       $hash->{helper}{lights} = {map {$_=>1} @{$result->{lights}}};
       $hash->{lights} = join( ",", sort { $a <=> $b } @{$result->{lights}} );
     } else {
-      $hash->{helper}{lights} = {};
-      $hash->{lights} = '';
+      #$hash->{helper}{lights} = {};
+      #$hash->{lights} = '';
     }
 
     if( ref($result->{state}) eq 'HASH' ) {
@@ -1632,6 +1632,7 @@ HUEDevice_Parse($$)
       $readings{battery} = $state->{battery} if( defined($state->{battery}) );
       $readings{batteryPercent} = $state->{battery} if( defined($state->{battery}) );
       $readings{batteryState} = $state->{lowbattery}?'low':'ok' if( defined($state->{lowbattery}) );
+      $readings{alarm} = $state->{alarm}?'1':'0' if( defined($state->{alarm}) );
 
       #Xiaomi Aqara Vibrationsensor (lumi.vibration.aq1)
       $readings{tiltangle} = $state->{tiltangle} if( defined ($state->{tiltangle}) );
@@ -1966,7 +1967,7 @@ HUEDevice_Attr($$$;$)
     The default and minimum is 60 if the IODev has not set pollDevices to 1.
     The default ist 0 if the IODev has set pollDevices to 1.
     Groups are updated only on definition and statusRequest, but see createGroupReadings<br>
-    Sensor devices will not be autocreated. Use <code>get &lt;bridge&gt; sensors</code> will provide the sensor id vor manual definition.<br><br>
+    Sensor devices will only be autocreated with deconz bridge devices. Use <code>get &lt;bridge&gt; sensors</code> will provide the sensor id vor manual definition.<br><br>
 
     Examples:
     <ul>
