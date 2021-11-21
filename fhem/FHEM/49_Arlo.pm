@@ -1364,7 +1364,7 @@ sub Arlo_ProcessResponse($$) {
             Log3 $hash->{NAME}, 3, "Arlo event queue error: subscription declined (Header $line). $val Retry event subscription.";
             $hash->{SSE_STATUS} = 298;
           }
-      } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'Server' && $check ne 'Acces'
+      } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'serve' && $check ne 'Acces'
           && substr($check, 0, 2) ne 'X-' && $check ne 'trans' && $check ne 'Serve' && $check ne 'Expir' && $check ne 'Stric' && $check ne 'Trans'
           && $check ne 'Expec' && $check ne 'CF-RA' && $check ne 'CF-Ca' && $check ne 'reque' && $check ne 'x-tra' && $check ne 'cf-re') {
         Log3 $hash->{NAME}, 2, "Invalid Arlo event response: $line";
