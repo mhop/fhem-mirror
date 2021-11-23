@@ -67,7 +67,7 @@ my %ttsSpeed        = ("Google"     => "",
 my %ttsQuality       = ("Google"     => "",
                        "VoiceRSS"   => "f="
                        );
-my %ttsMaxChar      = ("Google"     => 100,
+my %ttsMaxChar      = ("Google"     => 200,
                        "VoiceRSS"   => 300,
                        "SVOX-pico"  => 1000,
                        "Amazon-Polly" => 3000
@@ -165,6 +165,7 @@ sub Text2Speech_Initialize($)
                        " TTS_Language_Custom".
                        " TTS_SpeakAsFastAsPossible:1,0".
                        " TTS_OutputFile".
+                       " TTS_AWS_HomeDir".
                        " ".$readingFnAttributes;
 }
 
@@ -276,7 +277,7 @@ sub Text2Speech_loadmodules($$) {
       require Paws::Polly;
       Paws::Polly->import;
       1;
-    } or return "Paws Module not installed. Please install.";
+    } or return "Paws Module not installed. Please install via 'sudo cpan Paws'.";
 
     eval {
       require File::HomeDir;
@@ -309,6 +310,7 @@ sub Text2Speech_Attr(@) {
   my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
   my $TTS_CacheFileDir = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache");
   my $TTS_FileMapping  = AttrVal($hash->{NAME}, "TTS_FileMapping", ""); # zb, silence:silence.mp3 ring:myringtone.mp3;
+  my $TTS_AWS_HomeDir = AttrVal($hash->{NAME}, "TTS_AWS_HomeDir", "/home/fhem");
 
   if($a[2] eq "TTS_Delimiter" && $a[0] ne "del") {
     return "wrong Delimiter syntax: [+-]a[lfn]. Please see CommandRef for Notation. \n".
@@ -316,37 +318,37 @@ sub Text2Speech_Attr(@) {
            "  Example 2: +al." if($value !~ m/^([+-]a[lfn]){0,1}(.){1}$/i);
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
 
-  } elsif ($a[2] eq "TTS_Ressource" && $value eq "Amazon-Polly") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_Ressource" && $value eq "Amazon-Polly") {
     Log3 $hash->{NAME}, 4, $hash->{NAME}. ": Wechsele auf Amazon Polly, Lade Librarys nach.";
     my $ret = Text2Speech_loadmodules($hash, $a[2]);
     if ($ret) {return $ret;} # breche ab wenn Module fehlen
 
-    if (! -e File::HomeDir->my_home."/.aws/credentials"){
-      return "No AWS credentials in FHEM Homedir found, please check ".File::HomeDir->my_home."/.aws/credentials <br> please refer https://metacpan.org/pod/Paws#AUTHENTICATION";
+    if (! -e $TTS_AWS_HomeDir."/.aws/credentials"){
+      return "No AWS credentials in FHEM Homedir found, please check ".$TTS_AWS_HomeDir."/.aws/credentials \n please refer https://metacpan.org/pod/Paws#AUTHENTICATION \n\n Please check Attribute 'TTS_AWS_HomeDir' too";
     }
 
-  } elsif ($a[2] eq "TTS_Ressource") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_Ressource") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
 
-  } elsif ($a[2] eq "TTS_CacheFileDir") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_CacheFileDir") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
 
-  } elsif ($a[2] eq "TTS_SpeakAsFastAsPossible") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_SpeakAsFastAsPossible") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
 
-  } elsif ($a[2] eq "TTS_UseMP3Wrap") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_UseMP3Wrap") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
     return "Attribute TTS_UseMP3Wrap is required by Attribute TTS_SentenceAppendix! Please delete it first."
       if(($a[0] eq "del") && (AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef)));
 
-  } elsif ($a[2] eq "TTS_SentenceAppendix") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_SentenceAppendix") {
     return "This Attribute is only available in direct or server mode" if($hash->{MODE} !~ m/(DIRECT|SERVER)/ );
     return "Attribute TTS_UseMP3Wrap is required!" unless(AttrVal($hash->{NAME}, "TTS_UseMP3Wrap", undef));
 
     my $file = $TTS_CacheFileDir ."/". $value;
     return "File <".$file."> does not exists in CacheFileDir" if(! -e $file);
 
-  } elsif ($a[2] eq "TTS_FileTemplateDir") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_FileTemplateDir") {
     # Verzeichnis beginnt mit /, dann absoluter Pfad, sonst Unterpfad von $TTS_CacheFileDir
     my $newDir;
     if($value =~ m/^\/.*/) { $newDir = $value; } else { $newDir = $TTS_CacheFileDir ."/". $value;}
@@ -358,7 +360,10 @@ sub Text2Speech_Attr(@) {
   } elsif ($a[0] eq "set" && $a[2] eq "TTS_TimeOut") {
     return "Only Numbers allowed" if ($value !~ m/[0-9]+/);
 
-  } elsif ($a[2] eq "TTS_FileMapping") {
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_AWS_HomeDir") {
+  	return "Your HomeDir cannot be found." if (! -e $value)
+
+  } elsif ($a[0] eq "set" && $a[2] eq "TTS_FileMapping") {
     #Bsp: silence:silence.mp3 pling:mypling,mp3
     #ueberpruefen, ob mp3 Template existiert
     my @FileTpl = split(" ", $TTS_FileMapping);
@@ -864,7 +869,7 @@ sub Text2Speech_Download($$$) {
     my $HttpResponseErr;
     my $fh;
 
-    my $url  = "http://" . $ttsHost{$TTS_Ressource} . $ttsPath{$TTS_Ressource};
+    my $url  = "https://" . $ttsHost{$TTS_Ressource} . $ttsPath{$TTS_Ressource};
        $url .= $ttsLang{$TTS_Ressource} . $TTS_Language;
        $url .= "&" . $ttsAddon{$TTS_Ressource}              if(length($ttsAddon{$TTS_Ressource})>0);
        $url .= "&" . $ttsUser{$TTS_Ressource} . $TTS_User     if(length($ttsUser{$TTS_Ressource})>0);
