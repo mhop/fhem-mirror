@@ -431,7 +431,8 @@ my %zwave_class = (
   WINDOW_COVERING          => { id => '6a' },
   IRRIGATION               => { id => '6b' },
   SUPERVISION              => { id => '6c' },
-  ENTRY_CONTROL            => { id => '6f' },
+  ENTRY_CONTROL            => { id => '6f',
+    parse => { "^..6f01(.*)" => 'ZWave_entryControlParse($hash,$1)'} },
   CONFIGURATION            => { id => '70',
     set   => { configDefault=>"04%02x80",
                configByte  => "04%02x01%02x",
@@ -6167,6 +6168,33 @@ ZWave_firmwareUpdateParse($$$)
     return 1; #Veto
   }
 }
+
+
+sub
+ZWave_entryControlParse($$)
+{
+  my ($hash, $msg) = @_;
+  $msg =~ m/^(..)(..)(..)(..)(.*)$/;
+  my ($seq, $dt, $et, $l, $data) = ($1, $2, $3, $4, $5);
+  return "UNPARSED_ENTRY_CONTROL: $msg" if(!defined($et));
+
+  my %dataType = ("00"=>"NA", "01"=>"RAW", "02"=>"ASCII", "03"=>"MD5");
+  $dt = $dataType{$dt} ? $dataType{$dt} : "unknown_$et";
+
+  my %eventType = (
+    "00"=>"CACHING", "01"=>"CACHED_KEYS", "02"=>"ENTER", "03"=>"DISARM_ALL",
+    "04"=>"ARM_ALL", "05"=>"ARM_AWAY", "06"=>"ARM_HOME", "07"=>"EXIT_DELAY",
+    "08"=>"ARM_1", "09"=>"ARM_2", "0A"=>"ARM_3", "0B"=>"ARM_4", "0C"=>"ARM_5",
+    "0D"=>"ARM_6", "0E"=>"RFID", "0F"=>"BELL", "10"=>"FIRE", "11"=>"POLICE",
+    "12"=>"ALERT_PANIC", "13"=>"ALERT_MEDICAL", "14"=>"GATE_OPEN",
+    "15"=>"GATE_CLOSE", "16"=>"LOCK", "17"=>"UNLOCK", "18"=>"TEST" );
+  $et = $eventType{$et} ? $eventType{$et} : "unknown_$et";
+
+  $data = "" if(!defined($data));
+  $data = pack("H*", $data) if($dt eq "ASCII");
+
+  return "entry_control:sequence $seq dataType $dt eventType $et data $data"
+}
 1;
 
 =pod
@@ -7529,6 +7557,16 @@ ZWave_firmwareUpdateParse($$$)
     $mode = [unsecured|unsecured_withTimeout|unsecured_inside|
       unsecured_inside_withTimeout|unsecured_outside|
       unsecured_outside_withTimeout|secured</li>
+
+  <br><br><b>Class ENTRY_CONTROL</b>
+  <li>entry_control:sequence $seq dataType $dt eventType $et data $data<br>
+  where:<ul>
+  <li>$dt is one of NA RAW ASCII MD5</li>
+  <li>$et is one of CACHING CACHED_KEYS ENTER DISARM_ALL ARM_ALL ARM_AWAY
+      ARM_HOME EXIT_DELAY ARM_1 ARM_2 ARM_3 ARM_4 ARM_5 ARM_6 RFID BELL FIRE
+      POLICE ALERT_PANIC ALERT_MEDICAL GATE_OPEN GATE_CLOSE LOCK UNLOCK TEST</li>
+  </ul>
+  </li>
 
   <br><br><b>Class HAIL</b>
   <li>hail:01<br></li>
