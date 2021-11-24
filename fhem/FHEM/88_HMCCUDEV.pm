@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 213201747';
+my $HMCCUDEV_VERSION = '5.0 213281908';
 
 ######################################################################
 # Initialize module
@@ -208,7 +208,7 @@ sub HMCCUDEV_InitDevice ($$)
 	
 	my $rc = 0;
 
-	if ($init_done) {
+	if ($init_done && !HMCCU_IsDelayedInit ($ioHash)) {
 		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 		return "Specify option 'forceDev' for HMCCUDEV or use HMCCUCHN instead (recommended). Command: define $name HMCCUCHN $detect->{defAdd}"
 			if (defined($detect) && $detect->{defMod} eq 'HMCCUCHN' && $devHash->{hmccu}{forcedev} == 0);
