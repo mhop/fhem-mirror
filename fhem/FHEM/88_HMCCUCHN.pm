@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 213201747';
+my $HMCCUCHN_VERSION = '5.0 213261849';
 
 ######################################################################
 # Initialize module
@@ -183,7 +183,7 @@ sub HMCCUCHN_InitDevice ($$)
 	
 	my $rc = 0;
 
-	if ($init_done) {
+	if ($init_done && !HMCCU_IsDelayedInit ($ioHash)) {
 		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 		
 		# Interactive device definition
@@ -524,7 +524,13 @@ sub HMCCUCHN_Get ($@)
          Readings 'state' and 'control' are not deleted. With option 'reset' all readings
          and all internally stored device parameter values are deleted.
       </li><br/>
-      <li><b>set &lt;name&gt; config [device|&lt;receiver&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;] [...]</b><br/>
+	  <li><b>set &lt;name&gt; close</b><br/>
+		[blind] Set level of a shutter or blind to 0%.
+	  </li><br/>
+	  <li><b>set &lt;name&gt; color &lt;color-name&gt;</b><br/>
+	    [light] Set color of LED light.
+      </li><br/>
+	  <li><b>set &lt;name&gt; config [device|&lt;receiver&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;] [...]</b><br/>
          Set multiple config (parameter set MASTER) or link (parameter set LINKS) parameters.
          If neither 'device' nor <i>receiver</i> is specified, configuration parameters of
          current channel are set. With option 'device' configuration parameters of the device
@@ -583,8 +589,11 @@ sub HMCCUCHN_Get ($@)
          format HH:MM or HH:MM:SS. This command is only available if channel contains a datapoint
          ON_TIME. 
       </li><br/>
+	  <li><b>set &lt;name&gt; open</b><br/>
+		[blind] Set level of a shutter or blind to 100%.
+	  </li><br/>
       <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
-         [dimmer] Set datapoint LEVEL of a channel to the specified <i>value</i>. Optionally a <i>ontime</i>
+         [dimmer,blind] Set datapoint LEVEL of a channel to the specified <i>value</i>. Optionally a <i>ontime</i>
          and a <i>ramptime</i> (both in seconds) can be specified. This command is only available
          if channel contains at least a datapoint LEVEL and optionally datapoints ON_TIME and
          RAMP_TIME. The parameter <i>ontime</i> can be specified in seconds or as timestamp in
@@ -593,6 +602,9 @@ sub HMCCUCHN_Get ($@)
          Example: Turn dimmer on for 600 second. Increase light to 100% over 10 seconds<br>
          <code>set myswitch pct 100 600 10</code>
       </li><br/>
+	  <li><b>set &lt;name&gt; pctSlats &lt;value&gt;</b><br/>
+	  	[blind] Like command 'set pct', but changes the level of slats (if available).
+	  </li><br/>
 		<li><b>set &lt;name&gt; readingFilter &lt;datapoint-list&gt;</b><br/>
 			Set attribute ccureadingfilter by selecting a list of datapoints. Parameter <i>datapoint-list</i>
 			is a comma seperated list of datapoints.
