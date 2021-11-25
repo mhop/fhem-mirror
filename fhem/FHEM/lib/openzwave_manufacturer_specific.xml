@@ -1117,7 +1117,6 @@
   <Manufacturer id="015f" name="McoHome Technology Co Ltd">
     <Product id="0001" name="Mini Energy Dimmer" type="0001"/>
     <Product id="0001" name="Mini Energy Switch" type="0002"/>
-	<Product id="5102" name="MH7 Water/Electrical Heating Thermostat" type="0702" forumNr="no-statistics"/>
     <Product config="mcohome/mhp210.xml" id="1302" name="MH-P210 Mini Energy Dimmer" type="210a"/>
     <Product config="mcohome/mhp220.xml" id="1352" name="MH-P220 Micro Dimmer" type="220a"/>
     <Product config="mcohome/mhp220.xml" id="5101" name="MH-P220 Micro Dimmer" type="220a"/>
