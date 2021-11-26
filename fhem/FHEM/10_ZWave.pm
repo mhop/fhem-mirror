@@ -1615,7 +1615,8 @@ ZWave_thermostatSetpointParse ($$)
   # output temperature with variable decimals as reported (according to $prec)
   my $rt = sprintf("setpointTemp:%0.*f %s %s", $prec, $sp, $scale, $type);
 
-  return ($rt);
+  return $rt if($type !~ m/heating|cooling/);
+  return ($rt, sprintf("desired-temp:%0.*f", $prec, $sp) );
 }
 
 sub
