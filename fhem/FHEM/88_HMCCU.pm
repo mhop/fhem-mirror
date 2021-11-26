@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 213281908';
+my $HMCCU_VERSION = '5.0 213301607';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -7307,8 +7307,8 @@ sub HMCCU_ExecuteRoleCommand ($@)
 		if (exists($cmd->{min}) && exists($cmd->{max})) {
 			# Use mode = 0 in HMCCU_ScaleValue to get the min and max value allowed
 			HMCCU_Trace ($clHash, 2, "MinMax: value=$value, min=$cmd->{min}, max=$cmd->{max}");
-			my $scMin = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{min}, 0);
-			my $scMax = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{max}, 0);
+			my $scMin = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{min}, 2);
+			my $scMax = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{max}, 2);
 			$value = HMCCU_MinMax ($value, $scMin, $scMax);
 			HMCCU_Trace ($clHash, 2, "scMin=$scMin, scMax=$scMax, scVal=$value");
 		}
@@ -8392,9 +8392,9 @@ sub HMCCU_DetectDevice ($$$)
 	# Identify known roles
 	if ($devDesc->{_addtype} eq 'dev') {
 		foreach my $child (split(',', $devDesc->{CHILDREN})) {
-			$devDesc = HMCCU_GetDeviceDesc ($ioHash, $child, $devDesc->{_interface}) // next;
-			push @allRoles, $devDesc->{TYPE};
-			HMCCU_IdentifyRole ($ioHash, $devDesc, $iface, \@stateRoles, \@controlRoles);
+			my $chnDesc = HMCCU_GetDeviceDesc ($ioHash, $child, $devDesc->{_interface}) // next;
+			push @allRoles, $chnDesc->{TYPE};
+			HMCCU_IdentifyRole ($ioHash, $chnDesc, $iface, \@stateRoles, \@controlRoles);
 		}
 	}
 	elsif ($devDesc->{_addtype} eq 'chn') {
@@ -8499,7 +8499,6 @@ sub HMCCU_DetectDevice ($$$)
 				'^(?!([A-Z]+_VIRTUAL))([A-Z]+)[A-Z_]+(,\g2_VIRTUAL_[A-Z_]+){3}$', 4, 4);
 			if (defined($rolePatterns)) {
 				ROLEPATTERN: foreach my $rp (keys %$rolePatterns) {
-					$di{rolePatternCount} += $rolePatterns->{$rp}{c};
 
 					# A role pattern is a comma separated list of channel roles
 					my @patternRoles = split(',', $rp);
@@ -8513,7 +8512,11 @@ sub HMCCU_DetectDevice ($$$)
 						# state/control channel is the first channel with a state/control datapoint
 						my $i = 0;
 						foreach my $pr (@patternRoles) {
-							if (HMCCU_IsValidParameter ($ioHash, $devDesc, 'VALUES', $HMCCU_STATECONTROL->{$pr}{S}, 5)) {
+							my $chnNo = $firstChannel+$i;
+							my $chnAdd = "$devAdd:$chnNo";
+							if ($HMCCU_STATECONTROL->{$pr}{S} ne '' &&
+								HMCCU_IsValidParameter ($ioHash, $chnAdd, 'VALUES', $HMCCU_STATECONTROL->{$pr}{S}, 5)
+							) {
 								$di{rolePattern}{$firstChannel}{stateRole} = $pr;
 								$di{rolePattern}{$firstChannel}{stateChannel} = $firstChannel+$i; 
 								$di{rolePattern}{$firstChannel}{stateDatapoint} = $HMCCU_STATECONTROL->{$pr}{S}; 
@@ -8524,7 +8527,11 @@ sub HMCCU_DetectDevice ($$$)
 						}
 						$i = 0;
 						foreach my $pr (@patternRoles) {
-							if (HMCCU_IsValidParameter ($ioHash, $devDesc, 'VALUES', $HMCCU_STATECONTROL->{$pr}{C}, 2)) {
+							my $chnNo = $firstChannel+$i;
+							my $chnAdd = "$devAdd:$chnNo";
+							if ($HMCCU_STATECONTROL->{$pr}{C} ne '' &&
+								HMCCU_IsValidParameter ($ioHash, $chnAdd, 'VALUES', $HMCCU_STATECONTROL->{$pr}{C}, 2)
+							) {
 								$di{rolePattern}{$firstChannel}{controlRole} = $pr;
 								$di{rolePattern}{$firstChannel}{controlChannel} = $firstChannel+$i;
 								$di{rolePattern}{$firstChannel}{controlDatapoint} = $HMCCU_STATECONTROL->{$pr}{C}; 
@@ -8534,6 +8541,8 @@ sub HMCCU_DetectDevice ($$$)
 							$i++;
 						}
 					}
+
+					$di{rolePatternCount} += $rolePatterns->{$rp}{c};
 				}
 
 				$di{level} = 5 if (exists($di{rolePattern}) && scalar(keys %{$di{rolePattern}}) > 0);
@@ -9171,7 +9180,7 @@ sub HMCCU_SetMultipleDatapoints ($$) {
 
 ######################################################################
 # Scale, spread and/or shift datapoint value.
-# Mode: 0 = Get/Multiply, 1 = Set/Divide
+# Mode: 0 = Get/Multiply, 1 = Set/Divide, 2 = Scale min/max value
 # Supports reversing of value if value range is specified. Syntax for
 # Rule is:
 #   [ChannelNo.]Datapoint:Factor
@@ -9213,7 +9222,7 @@ sub HMCCU_ScaleValue ($$$$$;$)
 
 	HMCCU_Trace ($hash, 2, "chnno=$chnno, dpt=$dpt, value=$value, mode=$mode");
 	
-	if ($ccuscaleval ne '') {
+	if ($ccuscaleval ne '' && $mode != 2) {
 		HMCCU_Trace ($hash, 2, "ccuscaleval");
 		my @sl = split (',', $ccuscaleval);
 		foreach my $sr (@sl) {
@@ -9242,8 +9251,8 @@ sub HMCCU_ScaleValue ($$$$$;$)
 				$value = ($mode == 0) ? $value/$f : $value*$f;
 			}
 			elsif ($a[1] <= $a[2] && $a[3] <= $a[4] && (
-					($mode == 0 && $value >= $a[1] && $value <= $a[2]) ||
-					($mode == 1 && $value >= $a[3] && $value <= $a[4])
+				($mode == 0 && $value >= $a[1] && $value <= $a[2]) ||
+				($mode == 1 && $value >= $a[3] && $value <= $a[4])
 			)) {	
 				# Reverse value 
 				if ($rev) {
@@ -9290,7 +9299,7 @@ sub HMCCU_ScaleValue ($$$$$;$)
 		my $f = $1;
 		$min //= 0;
 		$max //= 1.0;
-		$value = ($mode == 0) ? HMCCU_MinMax ($value, $min, $max)*$f :
+		$value = ($mode == 0 || $mode == 2) ? HMCCU_MinMax ($value, $min, $max)*$f :
 			HMCCU_MinMax($value, $min*$f, $max*$f)/$f;
 	}
 	
@@ -9733,18 +9742,20 @@ sub HMCCU_UpdateDeviceStates ($)
 		'0.DEVICE_IN_BOOTLOADER' => 'boot',
 		'0.STICKY_UNREACH'       => 'stickyUnreach',
 		'0.UPDATE_PENDING'       => 'updPending',
-		'0.SABOTAGE'             => 'sabotage'
+		'0.SABOTAGE'             => 'sabotage',
+		'0.ERROR_SABOTAGE'       => 'sabotage'
 	);
 	
 	# Datapoints to be converted to readings
 	my %newReadings = (
-		'0.AES_KEY'     => 'sign',
-		'0.RSSI_DEVICE' => 'rssidevice',
-		'0.RSSI_PEER'   => 'rssipeer',
-		'0.LOW_BAT'     => 'battery',
-		'0.LOWBAT'      => 'battery',
-		'0.UNREACH'     => 'activity',
-		'0.SABOTAGE'    => 'sabotage'
+		'0.AES_KEY'        => 'sign',
+		'0.RSSI_DEVICE'    => 'rssidevice',
+		'0.RSSI_PEER'      => 'rssipeer',
+		'0.LOW_BAT'        => 'battery',
+		'0.LOWBAT'         => 'battery',
+		'0.UNREACH'        => 'activity',
+		'0.SABOTAGE'       => 'sabotage',
+		'0.ERROR_SABOTAGE' => 'sabotage'
 	);
 	
 	# The new readings

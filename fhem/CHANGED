@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: Fixed device detection bug
  - feature: 73_NUKIBridge 74_NUKIDevice: add support for
                                          new SmartLock Generation 3
  - bugfix:  88_HMCCU: Fixed delayed init and readingname bugs
