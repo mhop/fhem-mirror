@@ -1,4 +1,4 @@
-# $Id: 10_RHASSPY.pm 24786 2021-10-17 + Beta-User$
+# $Id: 10_RHASSPY.pm 24786 2021-11-26 + Beta-User$
 ###########################################################################
 #
 # FHEM RHASSPY module (https://github.com/rhasspy)
@@ -59,7 +59,8 @@ my %sets = (
     trainRhasspy => [qw(noArg)],
     fetchSiteIds => [qw(noArg)],
     update       => [qw(devicemap devicemap_only slots slots_no_training language intent_filter all)],
-    volume       => []
+    volume       => [],
+    text2intent  => []
 );
 
 my $languagevars = {
@@ -305,6 +306,7 @@ my @topics = qw(
     hermes/dialogueManager/sessionStarted
     hermes/dialogueManager/sessionEnded
     hermes/nlu/intentNotRecognized
+    hermes/hotword/+/detected
 );
 
 sub Initialize {
@@ -317,7 +319,7 @@ sub Initialize {
     #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{AttrFn}      = \&Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&Parse;
     $hash->{parseParams} = 1;
@@ -339,7 +341,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|encoding|useGenericAttrs)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|encoding|useGenericAttrs|handleHotword|experimental)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -347,16 +349,22 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.41a';
+    $hash->{MODULE_VERSION} = '0.5.03';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
-    $hash->{devspec} = $h->{devspec} // q{room=Rhasspy};
+    my $defaultdevspec = defined $h->{useGenericAttrs} && $h->{useGenericAttrs} == 0 ? q{room=Rhasspy} : q{genericDeviceType=.+};
+    $hash->{devspec} = $h->{devspec} // $defaultdevspec;
     $hash->{fhemId} = $h->{fhemId} // q{fhem};
     initialize_prefix($hash, $h->{prefix}) if !defined $hash->{prefix} || defined $h->{prefix} && $hash->{prefix} ne $h->{prefix};
     $hash->{prefix} = $h->{prefix} // q{rhasspy};
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
+
+    for my $key (qw( experimental handleHotword )) {
+        delete $hash->{$key};
+        $hash->{$key} = $h->{$key} if defined $h->{$key};
+    }
     $hash->{'.asyncQueue'} = [];
     #Beta-User: Für's Ändern von defaultRoom oder prefix vielleicht (!?!) hilfreich: https://forum.fhem.de/index.php/topic,119150.msg1135838.html#msg1135838 (Rudi zu resolveAttrRename) 
 
@@ -383,6 +391,7 @@ sub firstInit {
 
     fetchSiteIds($hash) if !ReadingsVal( $name, 'siteIds', 0 );
     initialize_rhasspyTweaks($hash, AttrVal($name,'rhasspyTweaks', undef ));
+    initialize_rhasspyHotwords($hash, AttrVal($name,'rhasspyHotwords', undef ));
     fetchIntents($hash);
     delete $hash->{ERRORS};
     if ( !defined InternalVal($name, 'IODev',undef) ) {
@@ -557,7 +566,8 @@ sub Set {
         speak       => \&sendSpeakCommand,
         textCommand => \&sendTextCommand,
         play        => \&setPlayWav,
-        volume      => \&setVolume
+        volume      => \&setVolume,
+        text2intent => \&text2intentRecognition
     };
 
     return Log3($name, 3, "set $name $command requires at least one argument!") if !@values;
@@ -648,6 +658,16 @@ sub Attr {
         } 
     }
 
+    if ( $attribute eq 'rhasspyHotwords' ) {
+        for ( keys %{ $hash->{helper}{hotwords} } ) {
+            delete $hash->{helper}{hotwords}{$_};
+        }
+        delete $hash->{helper}{hotwords};
+        if ($command eq 'set') {
+            return initialize_rhasspyHotwords($hash, $value);
+        } 
+    }
+
     if ( $attribute eq 'languageFile' ) {
         if ($command ne 'set') {
             delete $hash->{CONFIGFILE};
@@ -721,7 +741,7 @@ sub initialize_rhasspyTweaks {
             next;
         }
 
-        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses)[\s]*=}x) {
+        if ($line =~ m{\A[\s]*(timeouts|useGenericAttrs|timerSounds|confirmIntents|confirmIntentResponses|ignoreKeywords)[\s]*=}x) {
             ($tweak, $values) = split m{=}x, $line, 2;
             $tweak = trim($tweak);
             return "Error in $line! No content provided!" if !length $values && $init_done;
@@ -985,6 +1005,7 @@ sub _analyze_rhassypAttr {
             $specials->{setter} = $vencmd if defined $vencmd;
             $specials->{device} = $vendev if defined $vendev;
             $specials->{CustomCommand} = $named->{CustomCommand} if defined $named->{CustomCommand};
+            $specials->{stopCommand}   = $named->{stopCommand}   if defined $named->{stopCommand};
 
             $hash->{helper}{devicemap}{devices}{$device}{venetian_specials} = $specials if defined $vencmd || defined $vendev;
         }
@@ -1050,10 +1071,10 @@ sub _analyze_genDevType {
 
     my @rooms;
     if (!defined AttrVal($device,"${prefix}Room", undef)) {
-        $attrv = AttrVal($device,'alexaRoom', undef);
-        push @rooms, split m{,}x, lc $attrv if $attrv;
+        $attrv = _clean_ignored_keywords( $hash,'rooms', AttrVal($device,'alexaRoom', undef));
+        push @rooms, split m{,}x, $attrv if $attrv;
 
-        $attrv = AttrVal($device,'room',undef);
+        $attrv = _clean_ignored_keywords( $hash,'rooms', AttrVal($device,'room',undef));
         push @rooms, split m{,}x, lc $attrv if $attrv;
         $rooms[0] = $hash->{defaultRoom} if !@rooms;
     }
@@ -1067,8 +1088,8 @@ sub _analyze_genDevType {
     }
     $hash->{helper}{devicemap}{devices}{$device}->{rooms} = join q{,}, @rooms;
 
-    $attrv = AttrVal($device,'group', undef);
-    $hash->{helper}{devicemap}{devices}{$device}{groups} = lc $attrv if $attrv;
+    $attrv = _clean_ignored_keywords( $hash,'group', AttrVal($device,'group', undef));
+    $hash->{helper}{devicemap}{devices}{$device}{groups} = $attrv if $attrv;
 
     my $hbmap  = AttrVal($device, 'homeBridgeMapping', q{});
     my $allset = getAllSets($device);
@@ -1111,7 +1132,7 @@ sub _analyze_genDevType {
         return;
     }
 
-    if ( $gdt eq 'thermometer' ) {
+    if ( $gdt eq 'thermometer' || $gdt eq 'HumiditySensor' ) {
         my $r = $defs{$device}{READINGS};
         if($r) {
             for (sort keys %{$r}) {
@@ -1124,7 +1145,7 @@ sub _analyze_genDevType {
         return;
     }
 
-    if ( $gdt eq 'blind' ) {
+    if ( $gdt eq 'blind' || $gdt eq 'blinds' || $gdt eq 'shutter' ) {
         if ( $allset =~ m{\bdim([\b:\s]|\Z)}xms ) {
             my $maxval = InternalVal($device, 'TYPE', 'unknown') eq 'ZWave' ? 99 : 100;
             $currentMapping = 
@@ -1143,6 +1164,9 @@ sub _analyze_genDevType {
             SetNumeric => { setTarget => { cmd => 'pct', currentVal => 'pct', maxVal => '100', minVal => '0', step => '13', type => 'setTarget'} }
             };
         }
+        if ( $allset =~ m{\b(stop)([\b:\s]|\Z)}xmsi ) {
+            $currentMapping->{SetNumeric}->{setTarget}->{cmdStop} = $1;
+        }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
         return;
     }
@@ -1158,7 +1182,34 @@ sub _analyze_genDevType {
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
+    if ( $gdt eq 'motion' || $gdt eq 'contact' || $gdt eq 'ContactSensor' || $gdt eq 'lock' || $gdt eq 'presence') {
+        my $r = $defs{$device}{READINGS};
+        $gdt = 'contact' if $gdt eq 'ContactSensor';
+        if($r) {
+            for (sort reverse keys %{$r}) {
+                if ( $_ =~ m{\A(?<id>state|$gdt)\z}x ) {
+                    $currentMapping->{GetState}->{$gdt} = {currentVal => $+{id}, type => '$gdt' };
+                }
+            }
+        }
+        if ( $gdt eq 'lock') {
+            $currentMapping->{SetOnOff} = {cmdOff => 'unlock', type => 'SetOnOff', cmdOn => 'lock'};
+        }
+        $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
+        return;
+    }
     return;
+}
+
+sub _clean_ignored_keywords {
+    my $hash    = shift // return;
+    my $keyword = shift // return;
+    my $toclean = shift // return;
+    return lc $toclean if !defined $hash->{helper}->{tweaks}
+                        ||!defined $hash->{helper}->{tweaks}->{ignoreKeywords}
+                        ||!defined $hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword};
+    $toclean =~ s{\A$hash->{helper}->{tweaks}->{ignoreKeywords}->{$keyword}\z}{}gi;
+    return lc $toclean;
 }
 
 sub _analyze_genDevType_setter {
@@ -1226,6 +1277,30 @@ sub _analyze_genDevType_setter {
     return $mapping;
 }
 
+sub initialize_rhasspyHotwords {
+    my $hash    = shift // return;
+    my $attrVal = shift // return;
+
+    for my $line (split m{\n}x, $attrVal) {
+        next if !length $line;
+        my ($hotword, $values) = split m{=}x, $line, 2;
+        my($unnamed, $named) = parseParams($values);
+        for my $site ( keys %{$named} ) {
+            if ( $named->{$site} =~ m{\A\{.*\}\z}x) {
+                my $err = perlSyntaxCheck( $named->{$site}, ("%DEVICE"=>"$hash->{NAME}", "%VALUE"=>"test", "%ROOM"=>"room") );
+                return "$err in $line, $named->{$site}" if $err && $init_done;
+            }
+        }
+        $hotword = trim($hotword);
+        next if !$hotword;
+        if ( keys %{$named} ) {
+            $hash->{helper}{hotwords}->{$hotword} = $named;
+        } elsif (@{$unnamed}) {
+            $hash->{helper}{hotwords}->{$hotword}->{default} = join q{ }, @{$unnamed};
+        }
+    }
+    return;
+}
 
 sub perlExecute {
     my $hash   = shift // return;
@@ -2151,7 +2226,7 @@ sub Parse {
         # Name mit IODev vergleichen
         next if $ioname ne AttrVal($hash->{NAME}, 'IODev', ReadingsVal($hash->{NAME}, 'IODev', InternalVal($hash->{NAME}, 'IODev', 'none')));
         next if IsDisabled( $hash->{NAME} );
-        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized};
+        my $topicpart = qq{/$hash->{LANGUAGE}\.$hash->{fhemId}\[._]|hermes/dialogueManager|hermes/nlu/intentNotRecognized|hermes/hotword/[^/]+/detected};
         next if $topic !~ m{$topicpart}x;
 
         Log3($hash,5,"RHASSPY: [$hash->{NAME}] Parse (IO: ${ioname}): Msg: $topic => $value");
@@ -2278,6 +2353,15 @@ sub analyzeMQTTmessage {
         return \@updatedList;
     }
 
+    if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
+        return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
+        my $hotword = $1;
+        my $ret = handleHotwordDetection($hash, $hotword, $data);
+        push @updatedList, $ret if $defs{$ret};
+        push @updatedList, $hash->{NAME};
+        return \@updatedList;
+    }
+
     if ($mute) {
         $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
         respond( $hash, $data, q{ } );
@@ -2286,7 +2370,7 @@ sub analyzeMQTTmessage {
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
-        handleIntentNotRecognized($hash, $data);
+        handleIntentNotRecognized($hash, $data) if $hash->{experimental};
         return;
     }
 
@@ -2400,26 +2484,6 @@ sub sendTextCommand {
     return IOWrite($hash, 'publish', qq{$topic $message});
 }
 
-=pod
-sendSpeakCommand might need review; seems using https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager (for details see also https://rhasspy-hermes.readthedocs.io/en/latest/api.html#rhasspyhermes.dialogue.DialogueAction and https://community.rhasspy.org/t/start-conversation-with-tts-and-start-listening/2099/2) with "init" => "type": "notification" is the more generic approach
-
-hermes/dialogueManager/startSession (JSON)
-
-    Starts a new dialogue session (done automatically on hotword detected)
-    init: object - JSON object with one of two forms:
-        Action
-            type: string = "action" - required
-            canBeEnqueued: bool - true if session can be queued if there is already one (required)
-            text: string? = null - sentence to speak using text to speech
-            intentFilter: [string]? = null - valid intent names (null means all)
-            sendIntentNotRecognized: bool = false - send hermes/dialogueManager/intentNotRecognized if intent recognition fails
-        Notification
-            type: string = "notification" - required
-            text: string - sentence to speak using text to speech (required)
-    siteId: string = "default" - Hermes site ID
-    customData: string? = null - user-defined data passed to subsequent session messages
-=cut 
-
 # Sprachausgabe / TTS über RHASSPY
 sub sendSpeakCommand {
     my $hash = shift;
@@ -2450,37 +2514,36 @@ sub sendSpeakCommand {
     return IOWrite($hash, 'publish', qq{hermes/dialogueManager/startSession $json});
 }
 
-=pod 
-#old version
-sub sendSpeakCommand {
+# start intent recognition by Rhasspy service, see https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
+sub text2intentRecognition {
     my $hash = shift;
     my $cmd  = shift;
 
-    my $sendData =  {
-        id => '0',
-        sessionId => '0'#,
-        #canBeEnqueued => 'true'
+    my $id        = "$hash->{LANGUAGE}.$hash->{fhemId}" . time;
+    my $sendData =  { 
+        intentFilter => 'null',
+        id           => $id,
+        sessionId    => $id
     };
     if (ref $cmd eq 'HASH') {
-        return 'speak with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
-        $sendData->{siteId} =  $cmd->{siteId};
-        $sendData->{text} =  $cmd->{text};
+        return 'text2intent with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
+        $sendData->{siteId}    = $cmd->{siteId};
+        $sendData->{input}     = $cmd->{text};
+        $sendData->{id}        = $cmd->{id} // $id;
+        $sendData->{sessionId} = $cmd->{sessionId} // $id
     } else {    #Beta-User: might need review, as parseParams is used by default...!
-        my $siteId = 'default';
-        my $text = $cmd;
         my($unnamedParams, $namedParams) = parseParams($cmd);
-
-        if (defined $namedParams->{siteId} && defined $namedParams->{text}) {
-            $sendData->{siteId} = $namedParams->{siteId};
-            $sendData->{text} = $namedParams->{text};
+        if (defined $namedParams->{siteId} || defined $namedParams->{text}) {
+            $sendData->{siteId} = $namedParams->{siteId} // shift @{$unnamedParams};
+            $sendData->{input} = lc $namedParams->{text} // lc join q{ }, @{$unnamedParams};
         } else {
-            return 'speak needs siteId and text as arguments!';
+            $sendData->{siteId} = shift @{$unnamedParams};
+            $sendData->{input} = lc join q{ }, @{$unnamedParams};
         }
     }
     my $json = _toCleanJSON($sendData);
-    return IOWrite($hash, 'publish', qq{hermes/tts/say $json});
+    return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
 }
-=cut
 
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
 sub updateSlots {
@@ -2537,7 +2600,7 @@ sub updateSlots {
     my $overwrite = defined $tweaks && defined $tweaks->{overwrite_all} ? $tweaks->{useGenericAttrs}->{overwrite_all} : 'true';
     $url = qq{/api/slots?overwrite_all=$overwrite};
 
-    my @gdts = (qw(switch light media blind thermostat thermometer));
+    my @gdts = (qw(switch light media blind thermostat thermometer lock contact motion presence));
     my @aliases = ();
     my @mainrooms = ();
 
@@ -2546,8 +2609,11 @@ sub updateSlots {
             my @names = ();
             my @groupnames = ();
             my @devs = devspec2array("$hash->{devspec}");
+            
             for my $device (@devs) {
-                if (AttrVal($device, 'genericDeviceType', '') eq $gdt) {
+                my $attrVal = AttrVal($device, 'genericDeviceType', '');
+                my $gdtmap = { blind => 'blinds|shutter' , thermometer => 'HumiditySensor' , contact  => 'ContactSensor'};
+                if ($attrVal eq $gdt || defined $gdtmap->{$gdt} && $attrVal =~ m{\A$gdtmap->{$gdt}\z} ) {
                     push @names, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{names};
                     push @aliases, $hash->{helper}{devicemap}{devices}{$device}->{alias};
                     push @groupnames, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{groups} if defined $hash->{helper}{devicemap}{devices}{$device}->{groups};
@@ -2556,10 +2622,10 @@ sub updateSlots {
             }
             @names = get_unique(\@names);
             @names = ('') if !@names && $noEmpty;
-            $deviceData->{qq(${language}.${fhemId}.Device-${gdt})} = \@names if @names;
+            $deviceData->{qq(${language}.${fhemId}.Device-$gdt)} = \@names if @names;
             @groupnames = get_unique(\@groupnames);
             @groupnames = ('') if !@groupnames && $noEmpty;
-            $deviceData->{qq(${language}.${fhemId}.Group-${gdt})} = \@groupnames if @groupnames;
+            $deviceData->{qq(${language}.${fhemId}.Group-$gdt)} = \@groupnames if @groupnames;
         }
         @mainrooms = get_unique(\@mainrooms);
         @mainrooms = ('') if !@mainrooms && $noEmpty;
@@ -2736,9 +2802,17 @@ sub RHASSPY_ParseHttpResponse {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
-        #my $ref = decode_json($data);
-        my $siteIds = encode($cp,$ref->{dialogue}{satellite_site_ids});
-        readingsBulkUpdate($hash, 'siteIds', $siteIds);
+        my $siteIds;
+        for (keys %{$ref}) {
+            next if !defined $ref->{$_}{satellite_site_ids};
+            if ($siteIds) {
+                $siteIds .= ',' . encode($cp,$ref->{$_}{satellite_site_ids});
+            } else {
+                $siteIds = encode($cp,$ref->{$_}{satellite_site_ids});
+            }
+        }
+        my @ids = uniq(split q{,},$siteIds);
+        readingsBulkUpdate($hash, 'siteIds', join q{,}, @ids);
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 
@@ -2758,6 +2832,19 @@ sub RHASSPY_ParseHttpResponse {
     return;
 }
 
+sub handleHotwordDetection {
+    my $hash       = shift // return;
+    my $hotword    = shift // return;
+    my $data       = shift;
+
+    my $siteId    = $data->{siteId} // return;
+
+    readingsSingleUpdate($hash, 'hotword', "$hotword $siteId", 1);
+
+    return if !defined $hash->{helper}{hotwords} || !defined $hash->{helper}{hotwords}->{$hotword};
+    my $command = $hash->{helper}{hotwords}->{$hotword}->{$siteId} // $hash->{helper}{hotwords}->{$hotword}->{default} // return;
+    return analyzeAndRunCmd($hash, $hash->{NAME}, $command, $hotword, $siteId);
+}
 
 # Eingehender Custom-Intent
 sub handleCustomIntent {
@@ -3387,7 +3474,9 @@ sub handleIntentSetNumeric {
     } else { # defined $change
         # Stellwert um Wert x ändern ("Mache Lampe um 20 heller" oder "Mache Lampe heller")
         #elsif ((!defined $unit || $unit ne 'Prozent') && defined $change && !$forcePercent) {
-        if ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
+        if ( $change eq 'cmdStop' ) {
+            $newVal = $oldVal;
+        } elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
             $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
         }
         # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
@@ -3413,14 +3502,21 @@ sub handleIntentSetNumeric {
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric' );
 
     # execute Cmd
-    analyzeAndRunCmd($hash, $device, $cmd, $newVal);
+    $change ne 'cmdStop'
+            || !defined $mapping->{cmdStop}
+            ? analyzeAndRunCmd($hash, $device, $cmd, $newVal)
+            : analyzeAndRunCmd($hash, $device, $mapping->{cmdStop});
 
     #venetian blind special
     my $specials = $hash->{helper}{devicemap}{devices}{$device}{venetian_specials};
     if ( defined $specials ) {
         my $vencmd = $specials->{setter} // $cmd;
         my $vendev = $specials->{device} // $device;
-        analyzeAndRunCmd($hash, $vendev, defined $specials->{CustomCommand} ? $specials->{CustomCommand} :$vencmd , $newVal) if $device ne $vendev || $cmd ne $vencmd;
+        if ( $change ne 'cmdStop' ) {
+            analyzeAndRunCmd($hash, $vendev, defined $specials->{CustomCommand} ? $specials->{CustomCommand} :$vencmd , $newVal) if $device ne $vendev || $cmd ne $vencmd;
+        } elsif ( defined $specials->{stopCommand} ) {
+            analyzeAndRunCmd($hash, $vendev, $specials->{stopCommand});
+        }
     }
 
     # get response 
@@ -4147,7 +4243,7 @@ sub handleIntentNotRecognized {
     $response =~ s{(\$\w+)}{$1}eegx;
     $data_old->{customData} = 'intentNotRecognized';
 
-    return setDialogTimeout( $hash, $data_old, undef, $response ); # , $data_old->{intentNotRecognized} );
+    return setDialogTimeout( $hash, $data_old, undef, $response );
 }
 
 sub handleIntentCancelAction {
@@ -4181,7 +4277,7 @@ sub handleIntentConfirmAction {
     my $mode = $data->{Mode};
 
     #cancellation case
-    return handleIntentCancelAction($hash, $data) if $mode ne 'OK' && $mode ne 'Back' && $mode ne 'Next' ;
+    return handleIntentCancelAction($hash, $data) if !$mode || $mode ne 'OK' && $mode ne 'Back' && $mode ne 'Next';
 
     #confirmed case
     my $identiy = qq($data->{sessionId});
@@ -4566,7 +4662,7 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
 <p><b>Parameters:</b><br>
 <ul>
   <li><b>baseUrl</b>: http-address of the Rhasspy service web-interface. Optional, but needed as soon as default (<code>baseUrl=http://127.0.0.1:12101</code>) is not appropriate.<br>Make sure, this is set to correct values (ip and port) if Rhasspy is not running on the same machine or not uses default port!</li>
-  <li><b>devspec</b>: A description of devices that should be controlled by Rhasspy. Optional, but recommended, as (for compability reasons) default is <code>devspec=room=Rhasspy</code>. See <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
+  <li><b>devspec</b>: All the devices you want to control by Rhasspy <b>must meet devspec</b>. If <i>genericDeviceType</i> support is enabled, it defaults to <code>genericDeviceType=.+</code>, otherwise the former default  <code>devspec=room=Rhasspy</code> will be used. See <a href="#devspec"> as a reference</a>, how to e.g. use a comma-separated list of devices or combinations like <code>devspec=room=livingroom,room=bathroom,bedroomlamp</code>.</li>
   <li><b>defaultRoom</b>: Default room name. Used to speak commands without a room name (e.g. &quot;turn lights on&quot; to turn on the lights in the &quot;default room&quot;). Optional, but also recommended. Default is <code>defaultRoom=default</code>.</li>
   <li><b>language</b>: Makes part of the topic tree, RHASSPY is listening to. Should (but needs not to) point to the language voice commands shall be spoken with. Default is derived from global, which defaults to <code>language=en</code>. Preferably language should be set appropriate in global, if possible.</li>
   <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
@@ -4576,15 +4672,27 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   Might be usefull, if you have several instances of RHASSPY in one FHEM running and want e.g. to use different identifier for groups and rooms (e.g. a different language). Not recommended to be set if just one RHASSPY device is defined.</li>
   <a id="RHASSPY-genericDeviceType"></a>
   <li><b>useGenericAttrs</b>: Formerly, RHASSPY only used it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Today, it is capable to deal with a couple of commonly used <code>genericDeviceType</code> (<i>switch</i>, <i>light</i>, <i>thermostat</i>, <i>thermometer</i>, <i>blind</i> and <i>media</i>), so it will add <code>genericDeviceType</code> to the global attribute list and activate RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. <code>useGenericAttrs=0</code> will deactivate this. (do not set this unless you know what you are doing!). Note: <code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
+  <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
+  
 </ul>
 
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
-<p><b>Example for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b></p>
-<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:12183<br>
+<p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
+<ul>
+<li><b>Minimalistic version</b> - Rhasspy running on the same machine using it's internal MQTT server, MQTT2_CLIENT is only used by RHASSPY, language setting from <i>global</i> is used:
+</p>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT localhost:12183<br>
+attr rhasspyMQTT2 clientOrder RHASSPY<br>
+attr rhasspyMQTT2 subscriptions setByTheProgram</code></p>
+<p><code>define Rhasspy RHASSPY defaultRoom=Livingroom</code></p>
+</li>
+<li><b>Extended version</b> - Rhasspy running on remote machine using an external MQTT server on a third machine with non-default port, MQTT2_CLIENT is also used by MQTT_GENERIC_BRIDGE and MQTT2_DEVICE, hotword events shall be generated:
+</p>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:1884<br>
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
-attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized</code></p>
-<p><code>define Rhasspy RHASSPY devspec=room=Rhasspy defaultRoom=Livingroom language=en</code></p>
-
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized hermes/hotword/+/detected &lt;additional subscriptions for other MQTT-Modules&gt;<p>define Rhasspy RHASSPY baseUrl=http://192.168.1.210:12101 defaultRoom="Büro Lisa" language=de devspec=genericDeviceType=.+,device_a1,device_xy handleHotword=1</code></p>
+</li>
+</ul>
 <p><b>Additionals remarks on MQTT2-IOs:</b></p>
 <p>Using a separate MQTT server (and not the internal MQTT2_SERVER) is highly recommended, as the Rhasspy scripts also use the MQTT protocol for internal (sound!) data transfers. Best way is to either use MQTT2_CLIENT (see above) or bridge only the relevant topics from mosquitto to MQTT2_SERVER (see e.g. <a href="http://www.steves-internet-guide.com/mosquitto-bridge-configuration/">http://www.steves-internet-guide.com/mosquitto-bridge-configuration</a> for the principles). When using MQTT2_CLIENT, it's necessary to set <code>clientOrder</code> to include RHASSPY (as most likely it's the only module listening to the CLIENT it could be just set to <code>attr &lt;m2client&gt; clientOrder RHASSPY</code>)</p>
 <p>Furthermore, you are highly encouraged to restrict subscriptions only to the relevant topics:</p>
@@ -4593,7 +4701,8 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 <p><code>hermes/intent/+<br>
 hermes/dialogueManager/sessionStarted<br>
 hermes/dialogueManager/sessionEnded<br>
-hermes/nlu/intentNotRecognized</code></p>
+hermes/nlu/intentNotRecognized<br>
+hermes/hotword/+/detected</code></p>
 
 <p><b>Important</b>: After defining the RHASSPY module, you are supposed to manually set the attribute <i>IODev</i> to force a non-dynamic IO assignement. Use e.g. <code>attr &lt;deviceName&gt; IODev &lt;m2client&gt;</code>.</p>
 
@@ -4780,6 +4889,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       <ul>
         <li><b>c</b> => either numeric or text. If numeric: Timeout to wait for automatic cancellation. If text: response to send to ask for confirmation.</li>
         <li><b>ct</b> => numeric value for timeout in seconds, default: 15.</li>
+        See <a href="#RHASSPY-confirmation"><i>here</i></a> for more info about confirmations.
       </ul></li>
     </ul>
   </li>
@@ -4823,10 +4933,19 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         Example: <p><code>confirmIntents=SetOnOffGroup=light|blinds SetOnOff=blind.*</code></p>
         </li>
         </ul>
+        <a id="RHASSPY-confirmation"></a>
+        <p>To execute any action requiring confirmation, you have to send an <i>Mode:OK</i> value by the <i>ConfirmAction</i> intent. Any other <i>Mode</i> key sent to <i>ConfirmAction</i> intent will be interpretad as cancellation request. For cancellation, you may alternatively use the <i>CancelAction</i> intent. Example:<br>
+            <code>[de.fhem:ConfirmAction]<br>
+            ( yes, please do it | go on | that's ok | yes, please ){Mode:OK}<br>
+            ( don't do it after all ){Mode}<br>
+            [de.fhem:CancelAction]<br>
+            ( let it be | oh no | cancel | cancellation ){Mode:Cancel}
+            </code><br>
+        </p>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confirmIntentResponses"></a>
       <li><b>confirmIntentResponses</b>
-        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.
+        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.<br>
         Example: <p><code>confirmIntentResponses=SetOnOffGroup="really switch group $target $Value" SetOnOff="confirm setting $target $Value" </code></p>
         <i>$Value</i> may be translated with defaults from a <i>words</i> key in languageFile, for more options on <i>$Value</i> and/or more specific settings in single devices see also <i>confirmValueMap</i> key in <a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a>.</p>
       </li>
@@ -4834,10 +4953,25 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       <li><b>intentFilter</b>
         <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
       </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-ignoreKeywords"></a>
+      <li><b>ignoreKeywords</b>
+        <p>You may have also some technically motivated settings in the attributes RHASSPY uses to generate slots, e.g. <i>MQTT, alexa, homebridge</i> or <i>googleassistant</i> in <i>room</i> attribute. The key-value pairs will sort the given <i>value</i> out while generating the content for the respective <i>slot</i> for <i>key</i> (atm. only <i>rooms</i> and <i>group</i> are supported). <i>value</i> will be treated as (case-insensitive) regex with need to exact match.<br>
+        Example: <p><code>ignoreKeywords=room=MQTT|alexa|homebridge|googleassistant|logics-.*</code><br>
+        Note: requires restart to take full effect, will only affect content from general room, group or alexaRoom attributes.</p>
+      </li>
     </ul>
   </li>
-  
-
+    <li>
+    <a id="RHASSPY-attr-rhasspyHotwords"></a><b>rhasspyHotwords</b>
+    <p>Define custom reactions as soon as a specific hotword is detected. This does not require any specific configuration on any other FHEM device.<br>
+    One hotword per line, syntax is either a simple and an extended version.</p>
+    Examples:<br>
+    <p><code>bumblebee_linux = set amplifier2 mute on<br>
+        porcupine_linux = livingroom="set amplifier mute on" default={Log3($DEVICE,3,"device $DEVICE - room $ROOM - value $VALUE")}</code></p>
+    <p>First example will execute the command for all incoming messages for the respective hotword, second will decide based on the given <i>siteId</i> keyword; $DEVICE is evaluated to RHASSPY name, $ROOM to siteId and $VALUE to the hotword.<br>
+    <i>default</i> is optional. If set, this action will be executed for all <i>siteIds</i> without match to other keywords.<br>
+    Additionally, if either <i>rhasspyHotwords</i> ia set or key <i>handleHotword</i> in DEF is activated, the reading <i>hotword</i> will be filled with <i>hotword</i> plus <i>siteId</i> to also allow arbitrary event handling.<br>NOTE: As all hotword messages are sent to a common topic structure, you may need additional measures to distinguish between several <i>RHASSPY</i> instances, e.g. by restricting subscriptions and/or using different entries in this attribute.</p>
+  </li>
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
     <p>If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
@@ -4930,6 +5064,8 @@ yellow=rgb FFFF00</code></p>
         <ul>
           <li><b>setter</b> is the set command to control slat angle, e.g. <i>positionSlat</i> for CUL_HM or older ZWave type devices</li>
           <li><b>device</b> is needed if the slat command has to be issued towards a different device (applies e.g. to newer ZWave type devices)</li>
+          <li><b>CustomCommand</b> arbitrary command defined by the user. Note: no variables will be evaluated. Will be executed if a regular nummeric command is detected.</li>
+          <li><b>stopCommand</b> arbitrary command defined by the user. Note: no variables will be evaluated. Will be executed if a stop command is detected.</li>
         </ul>
         <p>If set, the slat target position will be set to the same level than the main device.</p>
       </li>
@@ -4971,29 +5107,46 @@ yellow=rgb FFFF00</code></p>
 
 <a id="RHASSPY-intents"></a>
 <h4>Intents</h4>
-<p>The following intents are directly implemented in RHASSPY code:
+<p>The following intents are directly implemented in RHASSPY code and the keywords used by them in sentences.ini are as follows:
 <ul>
-  <li>Shortcuts</li>
+  <li>Shortcuts</li> (keywords as required by user code)
   <li>SetOnOff</li>
+  {Device} and {Value} (on/off) are mandatory, {Room} is optional.
   <li>SetOnOffGroup</li>
-  <li>SetTimedOnOff</li>
-  <li>SetTimedOnOffGroup</li>
-  <li>GetOnOff</li>
+  {Group} and {Value} (on/off) are mandatory, {Room} is optional, <i>global</i> in {Room} will be interpreted as "everywhere".
+  <li>SetTimedOnOff</li>Basic keywords see SetOnOff, plus timer info in at least one of the fields {Hour} (for relative additions starting now), {Hourabs} (absolute time of day), {Min} (minutes) and {Sec} (seconds). If {Hourabs} is provided, {Min} and {Sec} will also be interpreted as absolute values.
+ uhr [(1..60){Min!int}] $OnOffValue{Value}
+  <li>SetTimedOnOffGroup</li> (for keywords see SetOnOffGroup)
+  <li>GetOnOff</li>(for keywords see SetOnOff)
   <li>SetNumeric</li>
+  {Device} and {Value} (nummeric value) are mandatory, {Room} is optional. Additional optional fields are {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored) and {Change} with one of 
+  <ul>
+    <li>lightUp, lightDown (brightness)</li>
+    <li>volUp, volDown (volume)</li>
+    <li>tempUp, tempDown (temperature)</li>
+    <li>setUp, setDown (setTarget)</li>
+    <li>cmdStop (blinds)</li>
+  </ul>
+  allowing to decide on calculation scheme and to guess for the proper device and/or answer.
   <li>SetNumericGroup</li>
-  <li>GetNumeric</li>
-  <li>GetState</li>
+    (as SetNumeric, except for {Group} instead of {Device}).
+  <li>GetNumeric</li> (as SetNumeric)
+  <li>GetState</li> {State} and {Device} are mandatory, {Room} is optional.
   <li>MediaControls</li>
-  <li>MediaChannels</li>
-  <li>SetColor</li>
-  <li>SetColorGroup</li>
+  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of cmdStop, cmdPlay, cmdPause, cmdFwd or cmdBack
+  <li>MediaChannels</li> (as configured by the user)
+  <li>SetColor</li> 
+  {Device} and one Color option are mandatory, {Room} is optional. Color options are {Hue} (0-360), {Colortemp} (0-100), {Saturation} (as understood by your device) or {Rgb} (hex value from 000000 to FFFFFF)
+  <li>SetColorGroup</li> (as SetColor, except for {Group} instead of {Device}).
+  <li>SetScene</li> {Device} and {Scene} (it's recommended to use the $lng.fhemId.Scenes slot to get that generated automatically!).
   <li>GetTime</li>
   <li>GetDate</li>
-  <li>SetTimer</li>
+  <li>SetTimer</li> Timer info as described in SetTimedOnOff is mandatory, {Room} and/or {Label} are optional to distinguish between different timers.
   <li>ConfirmAction</li>
-  <li>CancelAction</li>
-  <li>ChoiceRoom</li>
-  <li>ChoiceDevice</li>
+  {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
+  <li>CancelAction</li>{Mode} is recommended.
+  <li>ChoiceRoom</li>{Room}
+  <li>ChoiceDevice</li>{Device}
   <li>ReSpeak</li>
 </ul>
 
