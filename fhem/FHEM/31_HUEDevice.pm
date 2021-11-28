@@ -113,6 +113,9 @@ my %hueModels = (
 
   LCX002    => {name => 'Hue play gradient lightstrip'     ,type => 'Extended color light'    ,subType => 'extcolordimmer',
                                                                                     icon => 'hue_filled_lightstrip', },
+  LCX004    => {name => 'Hue gradient lightstrip'          ,type => 'Extended color light', subType => 'extcolordimmer',
+                                                                                    icon => 'hue_filled_lightstrip', },
+
   440400982841 => {name => 'Hue Play'           ,type => 'Extended color light'    ,subType => 'extcolordimmer',
                                                                                     icon => 'hue_filled_play', },
 
