@@ -9230,7 +9230,7 @@ sub EnOcean_Parse($$) {
       push @event, "3:state:" . ($db[0] & 1 ? "error" : "ok");
 
     } elsif ($st =~ m/^tempSensor/) {
-      # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-1B)
+      # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-30)
       # $db[1] is the temperature where 0x00 = max °C ... 0xFF = min °C
       my $temp;
       $temp = sprintf "%0.1f",   0 - $db[1] / 6.375 if ($st eq "tempSensor.01");
@@ -9260,6 +9260,12 @@ sub EnOcean_Parse($$) {
       $temp = sprintf "%0.1f", 62.3 - (($db[2] << 8) | $db[1]) / 10 if ($st eq "tempSensor.30");
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
+      readingsDelete($hash, "alarm");
+      if (AttrVal($name, "signOfLife", 'off') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1320), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "COSensor.01") {
       # Gas Sensor, CO Sensor (EEP A5-09-01)
@@ -21658,6 +21664,9 @@ sub EnOcean_Delete($$) {
        <li>temperature: t/&#176C (Sensor Range: t = &lt;t min&gt; &#176C ... &lt;t max&gt; &#176C)</li>
        <li>state: t/&#176C</li>
      </ul><br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
+        Default is "off" and an interval of 1230 sec.<br>
         The attr subType must be tempSensor.01 ... tempSensor.30. This is done if the device was
         created by autocreate.
      </li>
