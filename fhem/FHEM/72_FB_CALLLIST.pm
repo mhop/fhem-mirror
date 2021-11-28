@@ -1006,7 +1006,7 @@ sub FB_CALLLIST_createReadings($)
         $counters{"all"}++;
         $counters{"incoming"}++ if($item->{direction} eq "incoming");
         $counters{"outgoing"}++ if($item->{direction} eq "outgoing");
-        $counters{"missed-calls"}++ if($item->{"missed_call"});
+        $counters{"missed-calls"}++ if(($item->{direction} eq "incoming") and ($item->{"missed_call"} or (AttrVal($name, "answMachine-is-missed-call", "0") eq "1" and $item->{"internal_connection"} =~ /^Answering_Machine/)));
         $counters{"active"}++ if($item->{running_call});
         $counters{"completed"}++ unless($item->{running_call});
     }
@@ -1593,9 +1593,9 @@ sub FB_CALLLIST_strftime(@)
     <br>
 
     <li><a name="FB_CALLLIST_answMachine-is-missed-call">answMachine-is-missed-call</a> 0,1</li>
-    If activated, a incoming call, which is answered by an answering machine, will be treated as a missed call. This is only relevant if <a href="#FB_CALLLIST_list-type">list-type</a> is set to "missed-call".
+    If activated, a incoming call, which is answered by an answering machine, will be treated as a missed call. This is only relevant if <a href="#FB_CALLLIST_list-type">list-type</a> is set to "missed-call" or <a href="#FB_CALLLIST_create-readings">create-readings</a> is set.
     <br><br>
-    Possible values: 0 =&gt; disabled, 1 =&gt; enabled (answering machine calls will be treated as "missed call").<br>
+    Possible values: 0 =&gt; disabled, 1 =&gt; enabled (successful answering machine calls will be treated as "missed call").<br>
     Default Value is 0 (disabled)<br><br>
 
     <li><a name="FB_CALLLIST_connection-mapping">connection-mapping</a> &lt;hash&gt;</li>
@@ -1816,7 +1816,7 @@ sub FB_CALLLIST_strftime(@)
     <li><b>count-outgoing</b> - The number of all displayed <i>outgoing</i> calls</li>
     <li><b>count-active</b> - The number of running (not yet completed) calls</li>
     <li><b>count-completed</b> - The number of already completed calls.</li>
-    <li><b>count-missed-calls</b> - The number of missed calls.</li>
+    <li><b>count-missed-calls</b> - The number of missed calls (incoming).</li>
     </ul>
   </ul>
 </ul>
@@ -1888,7 +1888,7 @@ sub FB_CALLLIST_strftime(@)
     <br>
 
     <li><a name="FB_CALLLIST_answMachine-is-missed-call">answMachine-is-missed-call</a> 0,1</li>
-    Sofern aktiviert, werden Anrufe, welche durch einen internen Anrufbeantworter beantwortet werden, als "verpasster Anruf" gewertet. Diese Funktionalit&auml;t ist nur relevant, wenn <a href="#FB_CALLLIST_list-type">list-type</a> auf "missed-call" gesetzt ist.
+    Sofern aktiviert, werden Anrufe, welche durch einen internen Anrufbeantworter beantwortet werden, als "verpasster Anruf" gewertet. Diese Funktionalit&auml;t ist nur relevant, wenn <a href="#FB_CALLLIST_list-type">list-type</a> auf "missed-call" gesetzt oder <a href="#FB_CALLLIST_create-readings">create-readings</a> aktiviert ist.
     <br><br>
     M&ouml;gliche Werte: 0 =&gt; deaktiviert, 1 =&gt; aktiviert (Anrufbeantworter gilt als "verpasster Anruf").<br>
     Standardwert ist 0 (deaktiviert)<br><br>
@@ -2119,7 +2119,7 @@ sub FB_CALLLIST_strftime(@)
     <li><b>count-outgoing</b> - Die Anzahl aller angezeigten <i>ausgehenden</i> Anrufe</li>
     <li><b>count-active</b> - Die Anzahl aller laufenden (noch nicht beendeten) Anrufe</li>
     <li><b>count-completed</b> - Die Anzahl aller bereits abgeschlossenen Anrufe</li>
-    <li><b>count-missed-calls</b> - Die Anzahl aller verpassten Anrufe</li>
+    <li><b>count-missed-calls</b> - Die Anzahl aller verpassten Anrufe (eingehend)</li>
     </ul>
   </ul>
 </ul>
