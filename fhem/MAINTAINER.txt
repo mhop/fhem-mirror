@@ -646,6 +646,7 @@ contrib/META.json.full.txt   loredo               FHEM Development
 contrib/META.json.txt        loredo               FHEM Development
 contrib/PRESENCE             markusbloch          Unterstützende Dienste
 contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
+contrib/RHASSPY/*            drhirn/Beta-User     Frontends/Sprachsteuerung
 contrib/SIP/*                Wzut                 Sonstiges
 contrib/WebViewControl/*     Dirk                 Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          Frontends
