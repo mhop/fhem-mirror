@@ -251,7 +251,7 @@ sub CUL_HM_updateConfig($){##########################
       my $IOgrp = AttrVal($name,"IOgrp","");
       if($IOgrp ne ""){
         delete $attr{$name}{IODev};
-        CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if AttrVal($name,'IOList',undef); #Beta-User: Fix missing io->ioList in VCCU at startup, https://forum.fhem.de/index.php/topic,122848.msg1174047.html#msg1174047
+        CUL_HM_Attr('set',$name,'IOList',AttrVal($name,'IOList','')) if (AttrVal($name,'IOList',undef));
         CUL_HM_Attr("set",$name,"IOgrp",$IOgrp);
       }
       my $h = $defs{$name};
@@ -372,6 +372,12 @@ sub CUL_HM_updateConfig($){##########################
 
         $hash->{helper}{io}{vccu} = $name if (!$hash->{helper}{io}{vccu}
                                                && AttrVal($name,"IOList","")); # noansi: help, if IOgrp is missing for VCCU
+      }
+    }
+    elsif ($md =~ m/^HM-SEN-RD-O/ && $chn eq "02"){
+      for my $params (split q{,},AttrVal($name,'param','')){
+        if    ($params eq "offAtPon"){$hash->{helper}{param}{offAtPon} = 1}
+        elsif ($params eq "onAtRain"){$hash->{helper}{param}{onAtRain} = 1}
       }
     }
     elsif ($st =~ m/^(motionDetector|motionAndBtn)$/ ){
@@ -582,7 +588,7 @@ sub CUL_HM_initializeVirtuals {
     return;
 }
 
-sub CUL_HM_primaryDev() {###########################
+sub CUL_HM_primaryDev() {############################
   # one - and only one  - CUL_HM entity will be primary device
   # primary device is a) CUL_HM and b) not ignored
   
@@ -707,9 +713,10 @@ sub CUL_HM_Undef($$) {###############################
     delete $hash->{helper}{mId};
   }
   else{# delete a device
-     CommandDelete(undef,$hash->{$_}) foreach (grep(/^channel_/,keys %{$hash}));
+    CommandDelete(undef,$hash->{$_}) foreach (grep(/^channel_/,keys %{$hash}));
   }
   delete($modules{CUL_HM}{defptr}{$HMid});
+  delete $modules{CUL_HM}{helper}{primary} if (devspec2array('TYPE=CUL_HM') == 1);
   return undef;
 }
 sub CUL_HM_Rename($$) {##############################
@@ -1075,11 +1082,13 @@ sub CUL_HM_Attr(@) {#################################
       }
       my @devUpdate = ();
       foreach my $ent (grep{AttrVal($_,"IOgrp","") =~ m/^$name:/}keys %defs){
+        next if IsIgnored($ent);
         if(scalar @{$defs{$name}{helper}{io}{ioList}}){
           my $ea = AttrVal($ent,"IOgrp","");
           my $eaOrg = $ea;
           $ea =~ s/,?$_//  foreach (@rmIO);
           $ea =~ s/:,/:/; 
+          $ea = $name if ($ea eq "$name:" || $ea eq "$name:none");
           if($eaOrg ne $ea){
             push @devUpdate,"IOgrp $eaOrg changed to $ea for $ent";
             CommandAttr (undef,"$ent IOgrp $ea");
@@ -1328,7 +1337,7 @@ sub CUL_HM_AttrCheck(@) {############################
   return undef if(grep/^$attrVal$/,split(",",$attrOpt));   # attrval is valid option
   return "value $attrVal not allowed. Choose one of:$attrOpt";
 }
-sub CUL_HM_AttrInit($;$) {#############################
+sub CUL_HM_AttrInit($;$) {###########################
   # define attributes and their options that are relevant/defined/controlled by CUL_HM
   # for performance improvement the action with an update is restricted. 
   # dynamic Updates are expected and navigated for tempListTmpl and logIDs only. 
@@ -1614,6 +1623,9 @@ sub CUL_HM_Notify(@){###############################
         ||($evnt eq "RENAMED" && $defs{$new}{TYPE} eq "CUL_HM")){
         CUL_HM_Rename($new,$ent) if($evnt eq "RENAMED");
         CUL_HM_primaryDev() if ($ent eq $modules{CUL_HM}{helper}{primary});
+        if ($evnt eq 'DELETED' && $defs{$ent}{DEF} =~ m{\A[.]{6}\z} && defined $defs{$ent}->{IODev} && defined $defs{$ent}->{IODev}->{TYPE} && $defs{$ent}->{IODev}->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/) { 
+          IOWrite($defs{$ent}, '', "remove:".CUL_HM_hash2Id($defs{$ent}));
+        }
         $count++;
       }
       else{##------- update dependancies to IO devices used
@@ -1631,7 +1643,7 @@ sub CUL_HM_Notify(@){###############################
                      map{my $foo = $_;$foo =~ s/$ent/$new/;$foo} 
                      split(",",$ios)
                      );
-              $attr{$HMdef}{IOgrp} = "$vccu:$ios";
+              $attr{$HMdef}{IOgrp} = "$vccu".($ios ? ":$ios" : "");
               $count++;
             }
             else {# the vccu has no IO anymore - delete clients
@@ -1653,9 +1665,15 @@ sub CUL_HM_Notify(@){###############################
       return ($count ? "CUL_HM: $count device(s) renamed or attributes changed due to DELETED or RENAMED event"
                      : undef);
     }
-    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/(INITIALIZED|REREADCFG)/){# grep the first initialize
+    elsif (!$modules{CUL_HM}{helper}{initDone} && $evnt =~ m/INITIALIZED/){# grep the first initialize
       CUL_HM_updateConfig("startUp");
       InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+    }
+    elsif ($evnt =~ m/REREADCFG/){
+      Log3($ntfy,0,"[FAILURE] CUL_HM doesn't reliably support rereadcfg any longer! Restart FHEM instead.");
+      delete $modules{CUL_HM}{helper}{initDone};
+      InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);
+      CUL_HM_updateConfig("startUp");
     }
 #    elsif($evnt =~ m/(DEFINED)/  ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}
 #    elsif($evnt =~ m/(SHUTDOWN)/ ){ Log 1,"Info --- $dev->{NAME} -->$ntfy->{NAME} :  $evnt";}#SHUTDOWN|DELAYEDSHUTDOWN
@@ -1756,31 +1774,46 @@ sub CUL_HM_Parse($$) {#########################################################
                                    $mh{dst}));
   if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
-    my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
-    Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
-    
-    $mh{devN} = $sname ;
-    $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
-    $mh{devH}->{IODev} = $iohash;
-    if (!$modules{CUL_HM}{helper}{hmManualOper}){
-      my $ioOwn = InternalVal($mh{ioName},'owner_CCU','');
-      $defs{$sname}{IODev} = $defs{$mh{ioName}}; 
-      if ($ioOwn) {
-        $attr{$sname}{IOgrp} = $ioOwn;
-        $mh{devH}->{helper}{io}{vccu} = $ioOwn;
-        if (   defined($mh{myRSSI})
-            && $mh{myRSSI} ne ''
-            && $mh{myRSSI} >= -50) { #noansi: on good rssi set prefered, too
-          $attr{$sname}{IOgrp} .= ':'.$mh{ioName};
-          my @a = ();
-          $mh{devH}->{helper}{io}{prefIO} = \@a;
+    my $acdone;
+    if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created
+      if (IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { 
+        my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
+        Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+      } 
+      else { 
+        DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
+        CommandAttr(undef,"$sname room CUL_HM");
+      }
+      $acdone = 1;
+    } 
+    elsif (!IsDisabled((devspec2array('TYPE=autocreate'))[0]) && !defined InternalVal($mh{ioName},'owner_CCU',undef)) {
+      #Beta-User: no vccu, write Log
+      Log3($mh{ioName},2,"CUL_HM received learning message from unknown id $mh{src} outside of pairing mode. Please enable pairing mode first or define a virtual device w. model: CCU-FHEM.");
+    }
+    if ($acdone) {
+      $mh{devN} = $sname ;
+      $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
+      $mh{devH}->{IODev} = $iohash;
+      if (!$modules{CUL_HM}{helper}{hmManualOper}){
+        my $ioOwn = InternalVal($mh{ioName},'owner_CCU','');
+        $defs{$sname}{IODev} = $defs{$mh{ioName}}; 
+        if ($ioOwn) {
+          $attr{$sname}{IOgrp} = $ioOwn;
+          $mh{devH}->{helper}{io}{vccu} = $ioOwn;
+          if (   defined($mh{myRSSI})
+              && $mh{myRSSI} ne ''
+              && $mh{myRSSI} >= -50) { #noansi: on good rssi set prefered, too
+            $attr{$sname}{IOgrp} .= ':'.$mh{ioName};
+            my @a = ();
+            $mh{devH}->{helper}{io}{prefIO} = \@a;
+          }
         }
       }
       else{
         $attr{$sname}{IODev} = $mh{ioName}; 
       }
+      $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
     }
-    $mh{devH}->{helper}{io}{nextSend} = $mh{rectm}+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
@@ -4919,7 +4952,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
     return $ret;
   }
-  elsif($cmd eq "list"){  ###############################################
+  elsif($cmd eq "list"){  #####################################################
     my $globAttr = AttrVal("global","showInternalValues","undef");
     $attr{global}{showInternalValues} = $a[2] eq "full" ? 1 : 0;
     my $ret = CommandList(undef,$name);
@@ -5104,7 +5137,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     splice @a, 1, 0,"pct";#insert the actual command
     $cmd = "pct";
   }
-
   if(!defined $hash->{helper}{cmds}{cmdLst}{$cmd}) { ### unknown - return the commandlist
     my @cmdPrep = ();
     foreach my $cmdS (keys%{$hash->{helper}{cmds}{cmdLst}}){
@@ -9501,7 +9533,7 @@ sub CUL_HM_setTmplDisp($){ # remove register if outdated
 }
 sub CUL_HM_updtRegDisp($$$) {
   my($hash,$list,$peerId)=@_;
-  my $listNo = $list + 0;
+  my $listNo += $list;
   my $name = $hash->{NAME};
   my $devId = substr(CUL_HM_name2Id($name),0,6);
   my $ioId = CUL_HM_IoId(CUL_HM_id2Hash($devId));
@@ -9613,17 +9645,18 @@ sub CUL_HM_rmOldRegs($$){ # remove register i outdated
 }
 sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
   my $name = shift;
+  return if !defined $defs{$name};
   foreach(grep /\.?R-/,keys %{$defs{$name}{READINGS}}){
     delete $defs{$name}{READINGS}{$_};
   }
   my $peers = ReadingsVal($name,"peerList","");
-  my $dH = CUL_HM_getDeviceHash($defs{$name});
+  my $dH = CUL_HM_getDeviceHash($defs{$name}) // return;
   foreach(grep /\.?RegL_/,keys %{$defs{$name}{READINGS}}){
     my ($l,$p);
     ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..)\.(.*)/);
     my $ps = $p;
-    $ps =~ s/_chn-\d\d$//;
-    if (!$p || $peers =~ m/$ps/){
+    $ps =~ s/_chn-\d\d$// if (defined $ps);
+    if (!$p || defined $ps && $peers =~ m/$ps/){
       CUL_HM_updtRegDisp($defs{$name},$l,CUL_HM_name2Id($p,$dH));
     }
     else{
@@ -9797,8 +9830,8 @@ sub CUL_HM_time2min($) { # minutes -> time
 
 sub CUL_HM_getRegInfo($) { # 
   my ($name) = @_;
-  my $hash = $defs{$name};
-  my $devHash = CUL_HM_getDeviceHash($hash);
+  my $hash = $defs{$name} // return;
+  my $devHash = CUL_HM_getDeviceHash($hash) // return;
   my $st  = AttrVal    ($devHash->{NAME},"subType", "" );
   my $md  = CUL_HM_getAliasModel($hash);#AttrVal    ($devHash->{NAME},"model"  , "" );
   my $roleD  = $hash->{helper}{role}{dev} ? 1 : 0;
@@ -10891,7 +10924,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     my $iom;
     ($iom) = grep {CUL_HM_operIObyIOName($_)} @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
     ($iom) = grep {$_ eq 'none'}              @{$hh->{io}{prefIO}}  if(!$iom && @{$hh->{io}{prefIO}});
-    return 0 if $iom && $iom eq 'none'; #Beta-User: frank in https://forum.fhem.de/index.php/topic,123238.msg1179447.html#msg1179447
+    return 0 if $iom && $iom eq 'none';
     if(!$iom){
       my @ioccu = grep{CUL_HM_operIObyIOName($_)} @{$defs{$hh->{io}{vccu}}{helper}{io}{ioList}};
       ($iom) =    ((sort {@{$hh->{mRssi}{io}{$b}}[0] <=>     # This is the best choice
@@ -10927,7 +10960,10 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
     IOWrite($hash, "", "remove:".$ID) if(   defined($oldIODevH) && defined $oldIODevH->{NAME} 
                                          && $oldIODevH->{TYPE}  && $oldIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/); #IODev still old
     AssignIoPort($hash,$newIODevH->{NAME}); #  send preferred
-    Log3($hash, 2, "fhem.pl does not assign desired IODev $newIODevH->{NAME}!") if defined $newIODevH->{NAME} && $newIODevH->{NAME} ne $hash->{IODev}->{NAME};
+    if (defined $newIODevH->{NAME} && $newIODevH->{NAME} ne $hash->{IODev}->{NAME}) {
+      Log3($hash, 2, "fhem.pl does not assign desired IODev $newIODevH->{NAME} to $hash->{NAME}!") if (!defined $hash->{IOAssignmentErrCnt});
+      $hash->{IOAssignmentErrCnt}++;
+    }
     $newIODevH = $hash->{IODev};
     if (   ($newIODevH->{TYPE} && $newIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/)
         || (   $newIODevH->{helper}{VTS_AES})){
@@ -11994,7 +12030,7 @@ __END__
         </li>
         <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
           Add or remove an IO device to the list of available IO's.
-          Changes attribute <i>IOlist</i> accordingly.
+          Changes attribute <i>IOList</i> accordingly.
         </li>
       </ul>
   
@@ -12826,7 +12862,7 @@ __END__
           check which IO is operational and has the best RSSI performance for this device.<br>
           Optional a prefered IO - perfIO can be given. In case this IO is operational it will be selected regardless
           of rssi values. <br>
-          If none is detected in the VCCU's IOlist the mechanism is stopped.<br>
+          If none is detected in the VCCU's IOList the mechanism is stopped.<br>
           Example:<br>
           <ul><code>
             attr myDevice1 IOgrp vccu<br>
@@ -13479,7 +13515,7 @@ __END__
         </li>
         <li><B>assignIO &lt;IOname&gt; &lt;set|unset&gt;</B><a id="CUL_HM-set-assignIO"></a><br>
           IO-Gerät zur Liste der IO's hinzufügen oder aus dieser Löschen.
-          Ändert das Attribut <i>IOlist</i> entsprechend.
+          Ändert das Attribut <i>IOList</i> entsprechend.
         </li>
 
       </ul>
