@@ -326,6 +326,8 @@ MQTT2_SERVER_Read($@)
     # V3:MQIsdb V4:MQTT
     if(ord($fb) & 0xf) { # lower nibble must be zero
       Log3 $sname, 3, "$cname with bogus CONNECT (".ord($fb)."), disconnecting";
+      Log3 $sname, 3, "TLS activated on the client but not on the server?"
+        if(!AttrVal($sname,"TLS",0) && ord($fb) == 22);
       return CommandDelete(undef, $cname);
     }
     ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
