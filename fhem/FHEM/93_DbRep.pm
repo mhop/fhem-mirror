@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.44.1"  => "27.11.2021  change diffValue: recognize if diff is 0 or no value available ",
   "8.44.0"  => "21.11.2021  new attr numDecimalPlaces ",
   "8.43.1"  => "02.11.2021  fix SQL statement if devspec can't be resolved, Forum:https://forum.fhem.de/index.php/topic,53584.msg1184155.html#msg1184155 ",
   "8.43.0"  => "22.09.2021  consider attr device, reading in sqlCmd, remove length limit of attr device, reading ",
@@ -3997,7 +3998,7 @@ return;
 # nichtblockierende DB-Abfrage diffValue
 ####################################################################################################
 sub diffval_DoParse {
- my ($string) = @_;
+ my $string     = shift;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -4006,18 +4007,22 @@ sub diffval_DoParse {
  my $dblogname  = $dbloghash->{NAME};
  my $dbmodel    = $dbloghash->{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ 
  my ($dbh,$sql,$sth,$err,$selspec);
 
  # Background-Startzeit
  my $bst = [gettimeofday];
-  
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
- 
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$device|$reading|''|''|''|$err|''";
- }
+            
+ eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
+                                                                   RaiseError => 1, 
+                                                                   AutoInactiveDestroy => 1 
+                                                                 }
+                           ); 1;
+      } 
+      or do { $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - $@");
+              return "$name|''|$device|$reading|''|''|''|$err|''";
+            };
      
  # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
@@ -4033,7 +4038,8 @@ sub diffval_DoParse {
  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if($dbmodel eq "MYSQL") {
      $selspec = "TIMESTAMP,VALUE, if(VALUE-\@V < 0 OR \@RB = 1 , \@diff:= 0, \@diff:= VALUE-\@V ) as DIFF, \@V:= VALUE as VALUEBEFORE, \@RB:= '0' as RBIT ";
- } else {
+ } 
+ else {
      $selspec = "TIMESTAMP,VALUE";
  }
  
@@ -4063,9 +4069,11 @@ sub diffval_DoParse {
      
      if ($IsTimeSet || $IsAggrSet) {
          $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'ORDER BY TIMESTAMP');
-     } else {
+     } 
+     else {
          $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'ORDER BY TIMESTAMP'); 
      }
+     
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
      eval{ $sth = $dbh->prepare($sql);
@@ -4076,49 +4084,55 @@ sub diffval_DoParse {
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
          return "$name|''|$device|$reading|''|''|''|$err|''";
-     
-     } else {
-         if($dbmodel eq "MYSQL") {
-             @array = map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]." ".$_ -> [2]."\n" } @{ $sth->fetchall_arrayref() };
-         } else {
-             @array = map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };  
+     } 
+
+     if($dbmodel eq "MYSQL") {
+         @array = map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]." ".$_ -> [2]."\n" } @{ $sth->fetchall_arrayref() };
+     } 
+     else {
+         @array = map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };  
    
-             if (@array) {
-                 my @sp;
-                 my $dse = 0;
-                 my $vold;
-                 my @sqlite_array;
-                 foreach my $row (@array) {
-                     @sp = split("[ \t][ \t]*", $row, 4);
-                     my $runtime_string = $sp[0]; 
-                     my $timestamp      = $sp[2]?$sp[1]." ".$sp[2]:$sp[1];               
-                     my $vnew           = $sp[3];
-                     $vnew              =~ tr/\n//d;                 
+         if (@array) {
+             my @sp;
+             my $dse = 0;
+             my $vold;
+             my @sqlite_array;
+               
+             for my $row (@array) {
+                 @sp                = split("[ \t][ \t]*", $row, 4);
+                 my $runtime_string = $sp[0]; 
+                 my $timestamp      = $sp[2] ? $sp[1]." ".$sp[2] : $sp[1];               
+                 my $vnew           = $sp[3];
+                 $vnew              =~ tr/\n//d;                 
                      
-                     $dse = ($vold && (($vnew-$vold) > 0))?($vnew-$vold):0;
-                     @sp = $runtime_string." ".$timestamp." ".$vnew." ".$dse."\n";
-                     $vold = $vnew;
-                     push(@sqlite_array, @sp);
-                 }
-                 @array = @sqlite_array;
+                 $dse  = $vold && (($vnew-$vold) > 0) ? ($vnew-$vold) : 0;
+                 @sp   = $runtime_string." ".$timestamp." ".$vnew." ".$dse."\n";
+                 $vold = $vnew;
+                     
+                 push(@sqlite_array, @sp);
              }
+                 
+             @array = @sqlite_array;
          }
+     }
          
-         if(!@array) {
-             my $aval = AttrVal($name, "aggregation", "");
-             if($aval eq "hour") {
-                 my @rsf = split(/[ :]/,$runtime_string_first);
-                 @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
-             } elsif($aval eq "minute") {
-                 my @rsf = split(/[ :]/,$runtime_string_first);
-                 @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."\n");
-             } else {
-                 my @rsf = split(" ",$runtime_string_first);
-                 @array  = ($runtime_string." ".$rsf[0]."\n");
-             }
+     if(!@array) {
+         my $aval = AttrVal($name, "aggregation", "");
+         if($aval eq "hour") {
+             my @rsf = split(/[ :]/,$runtime_string_first);
+             @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
+         } 
+         elsif($aval eq "minute") {
+             my @rsf = split(/[ :]/,$runtime_string_first);
+             @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."\n");
+         } 
+         else {
+             my @rsf = split(" ",$runtime_string_first);
+             @array  = ($runtime_string." ".$rsf[0]."\n");
          }
-         push(@row_array, @array);
-     }  
+     }
+         
+     push(@row_array, @array);
  }
  
  # SQL-Laufzeit ermitteln
@@ -4131,10 +4145,11 @@ sub diffval_DoParse {
  my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
  
   # Berechnung diffValue aus Selektionshash
-  my %rh = ();                    # Ergebnishash, wird alle Ergebniszeilen enthalten
-  my %ch = ();                    # counthash, enthält die Anzahl der verarbeiteten Datasets pro runtime_string
+  my %rh  = ();                   # Ergebnishash, wird alle Ergebniszeilen enthalten
+  my %ch  = ();                   # counthash, enthält die Anzahl der verarbeiteten Datasets pro runtime_string
+  my $i   = 1;
+  my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
   my $lastruntimestring;
-  my $i = 1;
   my $lval;                       # immer der letzte Wert von $value
   my $rslval;                     # runtimestring von lval
   my $uediff;                     # Übertragsdifferenz (Differenz zwischen letzten Wert einer Aggregationsperiode und dem ersten Wert der Folgeperiode)
@@ -4142,7 +4157,6 @@ sub diffval_DoParse {
   my $diff_before;                # Differenzwert vorheriger Datensatz
   my $rejectstr;                  # String der ignorierten Differenzsätze
   my $diff_total;                 # Summenwert aller berücksichtigten Teildifferenzen
-  my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
 
   Log3 ($name, 5, "DbRep $name - data of row_array result assigned to fields:\n");
     
@@ -4177,11 +4191,11 @@ sub diffval_DoParse {
       # Ergebnishash erzeugen
       if ($runtime_string eq $lastruntimestring) {
           if ($i == 1) {
-              $diff_total = $diff?$diff:0 if($diff <= $difflimit);
+              $diff_total          = $diff ? $diff : 0 if($diff <= $difflimit);
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;    
               $ch{$runtime_string} = 1 if($value);
-              $lval = $value;
-              $rslval = $runtime_string;              
+              $lval                = $value;
+              $rslval              = $runtime_string;              
           }
           
           if ($diff) {
@@ -4190,28 +4204,28 @@ sub diffval_DoParse {
               }
               $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
               $ch{$runtime_string}++ if($value && $i > 1);
-              $lval = $value;
-              $rslval = $runtime_string;              
+              $lval                = $value;
+              $rslval              = $runtime_string;              
           }
       } 
       else {
           # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen und Übertragsdifferenz bilden
           $lastruntimestring = $runtime_string;
-          $i  = 1;
+          $i                 = 1;
+          $uediff            = $value - $lval if($value > $lval);
+          $diff              = $uediff;
+          $lval              = $value if($value);    # Übetrag über Perioden mit value = 0 hinweg !
+          $rslval            = $runtime_string;
           
-          $uediff = $value - $lval if($value > $lval);
-          $diff = $uediff;
-          $lval = $value if($value);    # Übetrag über Perioden mit value = 0 hinweg !
-          $rslval = $runtime_string;
           Log3 ($name, 4, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
-          
-          
-          $diff_total = $diff?$diff:0 if($diff <= $difflimit);
+                    
+          $diff_total          = $diff ? $diff : 0 if($diff <= $difflimit);
           $rh{$runtime_string} = $runtime_string."|".$diff_total."|".$timestamp;
           $ch{$runtime_string} = 1 if($value);  
 
-          $uediff = 0;        
+          $uediff              = 0;        
       } 
+      
       $i++;
   }
   
@@ -4242,13 +4256,16 @@ sub diffval_DoParse {
 
  # Ergebnisse in Datenbank schreiben
  my ($wrt,$irowdone);
+ 
  if($prop =~ /writeToDB/) {
      ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$rows,"diff");
+     
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
          return "$name|''|$device|$reading|''|''|''|$err|''";
      }
+     
      $rt = $rt+$wrt;
  }
  
@@ -4267,10 +4284,10 @@ sub diffval_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
 ####################################################################################################
 sub diffval_ParseDone {
-  my ($string) = @_;
-  my @a = split("\\|",$string);
-  my $hash = $defs{$a[0]};
-  my $name = $hash->{NAME};
+  my $string     = shift;
+  my @a          = split("\\|",$string);
+  my $hash       = $defs{$a[0]};
+  my $name       = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
   my $device     = decode_base64($a[2]);
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -4297,7 +4314,7 @@ sub diffval_ParseDone {
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "state", "error",  1);
       return;
   }
 
@@ -4310,10 +4327,11 @@ sub diffval_ParseDone {
           if($rowsrej);
  $rowsrej =~ s/\n/ \|\| /g;
  
- my %ncp    = split("§", $ncpslist);
+ my %ncp  = split("§", $ncpslist);
  my $ncpstr;
+ 
  if(%ncp) {
-     foreach my $ncpkey (sort(keys(%ncp))) {
+     for my $ncpkey (sort(keys(%ncp))) {
          $ncpstr .= $ncpkey." || ";    
      }
  }
@@ -4322,18 +4340,20 @@ sub diffval_ParseDone {
  my %rh = split("§", $rowlist);
  
  Log3 ($name, 4, "DbRep $name - result of diffValue calculation after decoding:");
- foreach my $key (sort(keys(%rh))) {
+ for my $key (sort(keys(%rh))) {
      Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
  }
   
  my $state = $erread?$erread:"done";
  readingsBeginUpdate($hash);
  
-  foreach my $key (sort(keys(%rh))) {
-      my @k    = split("\\|",$rh{$key});
-      my $rts  = $k[2]."__";
-      $rts     =~ s/:/-/g;      # substituieren unsupported characters -> siehe fhem.pl
-  
+  for my $key (sort(keys(%rh))) {
+      my $valid = 0;                                                                   # Datensatz hat kein Ergebnis als default
+      my @k     = split("\\|",$rh{$key});
+      $valid    = 1 if($k[2] =~ /(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2}):(\d{2})/x);   # Datensatz hat einen Wert wenn kompletter Timestamp ist enthalten
+      my $rts   = $k[2]."__";
+      $rts      =~ s/:/-/g;                                                            # substituieren unsupported characters -> siehe fhem.pl
+
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rts.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
       } 
@@ -4345,16 +4365,15 @@ sub diffval_ParseDone {
       }
       my $rv = $k[1];
 
-      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $rv ? sprintf("%.${ndp}f", $rv) : "-");
-    
+      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, (!$valid ? "-" : defined $rv ? sprintf "%.${ndp}f", $rv : "-"));
   }
 
-  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateValue ($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
-  ReadingsBulkUpdateValue ($hash, "less_data_in_period", $ncpstr) if($ncpstr);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":$state);
+  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
+  ReadingsBulkUpdateValue     ($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
+  ReadingsBulkUpdateValue     ($hash, "less_data_in_period", $ncpstr) if($ncpstr);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":$state);
   
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate           ($hash, 1);
   
 return;
 }

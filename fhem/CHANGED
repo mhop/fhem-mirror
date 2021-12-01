@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: diffValue - recognize if diff is 0 or no value available
  - change:  72_FB_CALLLIST: reading "count-missed-calls" only counts incoming
                             missed calls
  - bugfix:  88_HMCCU: Fixed device detection bug
