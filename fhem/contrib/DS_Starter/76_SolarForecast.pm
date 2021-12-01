@@ -120,6 +120,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.56.11"=> "01.12.2021  comment: 'next if(\$surplus <= 0);' to resolve consumer planning problem if 'mode = must' and the ".
+                           "current doesn't have suplus ",
   "0.56.10"=> "14.11.2021  change sub _flowGraphic (Max), https://forum.fhem.de/index.php/topic,117864.msg1186970.html#msg1186970, new reset consumerMaster ",
   "0.56.9" => "27.10.2021  change sub _flowGraphic (Max) ",
   "0.56.8" => "25.10.2021  change func  ___csmSpecificEpieces as proposed from Max : https://forum.fhem.de/index.php/topic,117864.msg1180452.html#msg1180452 ",
@@ -3033,8 +3035,8 @@ sub __planSwitchTimes {
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", 0 );
       my $confc   = NexthoursVal ($hash, $idx, "confc",      0 );
-      my $surplus = $pvfc-$confc;                                                          # Energieüberschuß
-      next if($surplus <= 0);
+      my $surplus = $pvfc-$confc;                                                          # Energieüberschuß (kann negativ sein)
+      # next if($surplus <= 0);
       
       my ($hour) = $idx =~ /NextHour(\d+)/xs;
       $max{$surplus}{starttime} = NexthoursVal ($hash, $idx, "starttime", "");
