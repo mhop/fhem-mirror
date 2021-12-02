@@ -506,7 +506,8 @@ MQTT2_SERVER_doPublish($$$$;$)
     $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
 
     $cid = AttrVal($serverName, "clientId", $cid);
-    Dispatch($server, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no"); 
+    my %addvals = (CONN => $src->{NAME});
+    Dispatch($server, "autocreate=$ac\0$cid\0$tp\0$val",\%addvals, $ac eq "no"); 
     my $re = AttrVal($serverName, "rawEvents", undef);
     DoTrigger($server->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
   }
