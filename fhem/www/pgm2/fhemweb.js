@@ -1583,7 +1583,12 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).attr('name', elName);
   if(cmd)
     $(newEl).change(function(arg) { cmd($(newEl).val()) });
-  newEl.setValueFn = function(arg) { if(vHash[arg]) $(newEl).val(arg); };
+  newEl.setValueFn = function(arg) { 
+    if(!vHash[arg])
+      arg = arg.replaceAll(" ",".");    // Forum #124505
+    if(vHash[arg])
+      $(newEl).val(arg);
+  };
   return newEl;
 }
 
