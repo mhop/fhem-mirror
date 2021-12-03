@@ -94,6 +94,9 @@ SetExtensions($$@)
     $fixedIt = 1;
   }
 
+  # Forum #124505
+  $list =~ s/:\{([^ ]+)\}/$cmdFromAnalyze=$1; ":".(eval $1)/e if($cmd eq "?");
+
   if(!$onCmd || !$offCmd) { # No extension
     return AttrTemplate_Set($hash, $list, $name, $cmd, @a);
   }
