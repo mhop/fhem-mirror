@@ -2905,6 +2905,8 @@ sub HMinfo_bpPost($) {#bp finished ############################################
 
   my @entityChk;
   my ($test,$testId,$ent,$issue) = ("","","","");
+  return if(!$ret);# nothing to post
+  
   foreach my $eLine (split("-ret-",$ret)){
     next if($eLine eq "");
     if($eLine =~m/^ (id....)$/){
