@@ -724,7 +724,8 @@ MQTT2_SERVER_ReadDebug($$)
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
     <li>SSL<br>
-      Enable SSL (i.e. TLS).
+      Enable SSL (i.e. TLS). Note: after deleting this attribute FHEM must be
+      restarted.
       </li><br>
 
     <li>sslVersion<br>
