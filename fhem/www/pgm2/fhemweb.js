@@ -1577,18 +1577,19 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
     vHash[o.value] = 1;
     newEl.options[j-1] = o;
   }
-  if(typeof(currVal) != "undefined")
-    $(newEl).val(currVal);
+
   if(elName)
     $(newEl).attr('name', elName);
   if(cmd)
     $(newEl).change(function(arg) { cmd($(newEl).val()) });
   newEl.setValueFn = function(arg) { 
-    if(!vHash[arg])
+    if(!vHash[arg] && typeof(arg) != "undefined")
       arg = arg.replaceAll(" ",".");    // Forum #124505
     if(vHash[arg])
       $(newEl).val(arg);
   };
+  newEl.setValueFn(currVal);
+
   return newEl;
 }
 
