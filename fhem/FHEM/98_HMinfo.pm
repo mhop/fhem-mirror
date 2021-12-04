@@ -432,10 +432,14 @@ sub HMinfo_status($){##########################################################
 
   my %tmp; # remove duplicates
   $hash->{iI_HM_IOdevices} = "";
-  $tmp{ReadingsVal($_,"cond",
-       InternalVal($_,"STATE","unknown"))}{$_} = 1 foreach( @IOdev);
-  foreach my $IOstat (sort keys %tmp){
-    $hash->{iI_HM_IOdevices} .= "$IOstat: ".join(",",sort keys %{$tmp{$IOstat}}).";";
+  
+  
+  $tmp{InternalVal($_,"owner_CCU","noVccu")}{ReadingsVal($_,"cond",InternalVal($_,"STATE","unknown"))}{$_} = 1 foreach(@IOdev);
+  foreach my $vccu (sort keys %tmp){
+    $hash->{iI_HM_IOdevices} .= $hash->{iI_HM_IOdevices} eq "" ? "$vccu>": " $vccu>";
+    foreach my $IOstat (sort keys %{$tmp{$vccu}}){
+      $hash->{iI_HM_IOdevices} .= "$IOstat:".join(",",sort keys %{$tmp{$vccu}{$IOstat}}).";";
+    }
   }
 
   # ------- what about protocol events ------
