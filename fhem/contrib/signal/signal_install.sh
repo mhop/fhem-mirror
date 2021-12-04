@@ -1,13 +1,13 @@
 #!/bin/bash
-#$Id:3.0beta$
-SCRIPTVERSION="3.0"
+#$Id:$
+SCRIPTVERSION="3.1"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.9.0"
+SIGNALVERSION="0.9.2"
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
@@ -148,7 +148,7 @@ fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
 IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
-KNOWN=("amd64-glibc2.27-0.9.0" "amd64-glibc2.28-0.9.0" "amd64-glibc2.31-0.9.0" "armhf-glibc2.28-0.9.0")
+KNOWN=("amd64-glibc2.27-0.9.0" "amd64-glibc2.28-0.9.0" "amd64-glibc2.31-0.9.0" "armhf-glibc2.28-0.9.0","amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
