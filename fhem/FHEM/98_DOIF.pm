@@ -1294,6 +1294,7 @@ sub ReadingValDoIf
         }
 #       $hash->{collect}{"$name $reading"}{$hours}{value}=$r;
 #       $hash->{collect}{"$name $reading"}{$hours}{time}=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
+        setValue_collect(\%{$hash->{collect}{"$name $reading"}{$hours}});
         return (\%{$hash->{collect}{"$name $reading"}{$hours}});
       } elsif ($regExp =~ /^d(\d)?/) {
         my $round=$1;
@@ -1353,13 +1354,24 @@ sub DOIF_collect_save_values {
   }
 } 
 
-sub collect_setValue
-{
-  my ($hash,$name,$reading,$hours)=@_;
 
-  my $collect=\%{$hash->{collect}{"$name $reading"}{$hours}};
+##sub collect_setValue
+##{
+##  my ($hash,$name,$reading,$hours)=@_;
+##  my $collect=\%{$hash->{collect}{"$name $reading"}{$hours}};
+##  setValue_collect ($collect);
+##}
+
+sub setValue_collect
+{
+  my ($collect)=@_;
+  my $name=${$collect}{name};
+  my $reading=${$collect}{reading};
+  my $hours=${$collect}{hours};
+
   my $r=ReadingsVal($name,$reading,0);
-  my $seconds=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
+  my ($seconds, $microseconds) = gettimeofday();
+  ##my $seconds=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
   $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : "N/A");
   ${$collect}{value}=$r;
   ${$collect}{time}=$seconds;
@@ -1692,7 +1704,10 @@ sub ReplaceReadingDoIf
              $hash->{collect}{"$name $reading"}{$hours}{values}=$va;
              $hash->{collect}{"$name $reading"}{$hours}{times}=$ta;
              $hash->{collect}{"$name $reading"}{$hours}{dim}=$dim;
-             collect_setValue($hash,$name,$reading,$hours);
+             $hash->{collect}{"$name $reading"}{$hours}{name}=$name;
+             $hash->{collect}{"$name $reading"}{$hours}{reading}=$reading;
+             setValue_collect(\%{$hash->{collect}{"$name $reading"}{$hours}});
+             ##collect_setValue($hash,$name,$reading,$hours);
            }
         } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
           $regExp =$1;
@@ -2910,8 +2925,9 @@ DOIF_Notify($$)
     foreach my $reading (keys %{$hash->{Regex}{"collect"}{$device}{"collect"}}) {
       my $readingregex=CheckRegexpDoIf($hash,"collect",$dev->{NAME},"collect",$eventa,$eventas,$reading);
       if (defined $readingregex) {
-        foreach my $hours (keys %{$hash->{collect}{"$device $readingregex"}}) {
-          collect_setValue($hash,$device,$readingregex,$hours);
+        foreach my $hours (keys %{$hash->{collect}{"$device $readingregex"}}){
+          setValue_collect(\%{$hash->{collect}{"$device $readingregex"}{$hours}});
+          ## collect_setValue($hash,$device,$readingregex,$hours);
         }
       }
     }
@@ -4699,10 +4715,10 @@ sub plot {
   }
   $out.= '</defs>';
   if ($noColor ne "-1") {
-    for (my $i=0;$i<=4;$i++) {
-      my $v=($maxPlot-$minPlot)*(1-$i*0.25)+$minPlot;
+    for (my $i=0;$i<=5;$i++) {
+      my $v=($maxPlot-$minPlot)*(1-$i*0.2)+$minPlot;
       my ($color)= get_color($v,$min,$max,$minColor,$maxColor,$func); 
-      $out.= sprintf('<text text-anchor="%s" x="%s" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$anchor,$pos,$i*12.5+2,$noColor eq "1" ? "#CCCCCC":color($color,$lmm),"",sprintf($format,$v)); 
+      $out.= sprintf('<text text-anchor="%s" x="%s" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$anchor,$pos,$i*10+2,$noColor eq "1" ? "#CCCCCC":color($color,$lmm),"",sprintf($format,$v)); 
     } 
   }
   
@@ -4762,17 +4778,17 @@ sub plot {
       if ($hours > 168) {
         $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:8px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($maxValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:9px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a %H:%M",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:9px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="35" y="%s" style="fill:#CCCCCC;font-size:9px">%s</text>',$footerPos,::strftime("%H:%M",localtime($maxValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:9px;%s">%s</text>',$bwidth/2+7,$footerPos,color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
     }
     if (defined $minValTime) {
       if ($hours > 168) {
         $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
-        ##$footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',$bwidth/2+9,$footerPos,::strftime("%d.%m %H:%M",localtime($minValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a %H:%M",localtime($minValTime)));
-       ## $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',$bwidth/2+9,$footerPos,::strftime("%a %H:%M",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">%s</text>',$bwidth/2+35,$footerPos,::strftime("%H:%M",localtime($minValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:9px;%s">%s</text>', $bwidth+7,$footerPos,color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
     }
@@ -4789,7 +4805,6 @@ sub card
   if (!defined $col) {
     return("");
   }
-
   
   my $collect;
   if (ref($col) eq "ARRAY") {
@@ -4964,9 +4979,10 @@ sub card
 
   $out.= '<rect x="-2" y="-2" width="'.($chart_dim+4).'" height="54" rx="1" ry="1" fill="url(#gradcardback)"/>';
 
-  for (my $i=1;$i<4;$i++) {
-    my $y=$i*12.5;
-    $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1"/>',$y,$chart_dim,$y);
+  for (my $i=1;$i<5;$i++) {
+    my $y=$i*10;
+    ##$out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1"/>',$y,$chart_dim,$y);
+    $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1"/>',$y,$chart_dim,$y);
   }
   
   my $timebeginn=$time-$hours*3600;
@@ -5000,7 +5016,8 @@ sub card
       my $h=$beginhour+($i+1)*$scale;
       $hour=($h >= 24 ? $h % 24:$h);
       my $x=int((($i*($chart_dim/$strokes)+$pos))*10)/10;
-      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
+      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
+      ##$out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
       if ($hour == 0) {
         if ($hours <= 168) {
           $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,substr(::strftime("%a",localtime($timebeginn+$h*3600)),0,2));
@@ -5728,8 +5745,8 @@ sub ring
   my ($div,$yNum,$yUnit,$high);
   if ($half eq "1") {
     $div=2;
-    $yNum=27;
-    $yUnit=14;
+    $yNum=28;
+    $yUnit=15;
     $high=29;
   } else {
     $div=1;
