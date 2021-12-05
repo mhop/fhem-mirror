@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.45.0"  => "05.12.2021  revised userExitFn, edit reduceLog ",
+  "8.45.0"  => "05.12.2021  revised userExitFn, fix average=day problem in reduceLog (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799) ",
   "8.44.1"  => "27.11.2021  change diffValue: recognize if diff is 0 or no value available ",
   "8.44.0"  => "21.11.2021  new attr numDecimalPlaces ",
   "8.43.1"  => "02.11.2021  fix SQL statement if devspec can't be resolved, Forum:https://forum.fhem.de/index.php/topic,53584.msg1184155.html#msg1184155 ",
@@ -2045,12 +2045,12 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt =~ /delDoublets/) {
-     my $cmd = $prop?$prop:"adviceDelete"; 
+     my $cmd = $prop ? $prop : "adviceDelete"; 
      # delseqdoubl_ParseDone ist Auswertefunktion auch für delDoublets
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt =~ /delSeqDoublets/) {
-     my $cmd = $prop?$prop:"adviceRemain"; 
+     my $cmd = $prop ? $prop : "adviceRemain"; 
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);   
  } 
  elsif ($opt eq "exportToFile") {
@@ -2076,6 +2076,7 @@ sub DbRep_Main {
          my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
          my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
          my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+         
          if($nthants > $othants) {
              ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
              return;
@@ -9014,6 +9015,8 @@ sub DbRep_reduceLog {
         $err = encode_base64($err,"");
         return "$name|''|$err|''";    
     }
+    
+    Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 
     my ($dbh,$brt,$ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour);
     my ($average,$processingDay,$lastUpdH);
@@ -9023,7 +9026,7 @@ sub DbRep_reduceLog {
     BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
     
     shift @a;                                            # Devicenamen aus @a entfernen
-    
+        
     my @b;
     for my $w (@a) {                                     # ausfiltern von optionalen Zeitangaben, z.B. 700:750
         next if($w =~ /\b(\d+(:\d+)?)\b/);
@@ -9031,13 +9034,37 @@ sub DbRep_reduceLog {
     }
     @a = @b;
     
-    #Log3 ($name, 1, "DbRep $name -> Start DbLog_reduceLog: ".join ' ', @a);
-    Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
-        
-    eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
-                                                                      RaiseError => 1, 
+    my ($pa,$ph) = parseParams(join ' ', @a);            # für späteren Einsatz !
+    #Log3 ($name, 1, "DbRep $name -> parseParams pa: ".Dumper (bless $pa));
+    #Log3 ($name, 1, "DbRep $name -> parseParams ph: ".Dumper (bless $ph));
+    
+    my $avgstring = q{};
+    if (defined($a[1])) {
+        $avgstring = ($a[1] =~ /average=day/i) ? 'AVERAGE=DAY'  : 
+                     ($a[1] =~ /average/i)     ? 'AVERAGE=HOUR' : 
+                     q{};
+    }
+    
+    # Korrektur des Select-Zeitraums + eine Stunde 
+    # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
+    my ($yyyy, $mm, $dd, $hh, $min, $sec) = $ots =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
+    my $epoche                            = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
+    my $splus                             = $avgstring =~ /AVERAGE/ ? 3600 : 0;
+    $ots                                  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoche+$splus);
+    
+            
+    if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
+        ($filter)     = $a[-1] =~ /^EXCLUDE=(.+)/i;
+        @excludeRegex = split(',',$filter);
+    }                  
+    elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
+        $filter = 1;
+    }
+   
+    eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
+                                                                      RaiseError          => 1, 
                                                                       AutoInactiveDestroy => 1, 
-                                                                      mysql_enable_utf8 => $utf8
+                                                                      mysql_enable_utf8   => $utf8
                                                                     }
                               ); 1;
          } 
@@ -9045,15 +9072,7 @@ sub DbRep_reduceLog {
                  Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
                  return "$name|''|$err|''";
                };
-    
-    if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
-        ($filter)     = $a[-1] =~ /^EXCLUDE=(.+)/i;
-        @excludeRegex = split(',',$filter);
-    } 
-    elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
-        $filter = 1;
-    }
-   
+               
     my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$d,$r);
     
     my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);              # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
@@ -9078,16 +9097,9 @@ sub DbRep_reduceLog {
         $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,undef,undef,$addon); 
     }
     
+    Log3 ($name, 3, "DbRep $name - reduce data older than: $ots (logical corrected), newer than: $nts");
+    
     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
-    
-    my $avgstring = q{};
-    if (defined($a[1])) {
-        $avgstring = ($a[1] =~ /average=day/i) ? 'AVERAGE=DAY'  : 
-                     ($a[1] =~ /average/i)     ? 'AVERAGE=HOUR' : 
-                     q{};
-    }
-    
-    Log3 ($name, 3, "DbRep $name - reduce data older than: $ots, newer than: $nts");
     
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
         .$avgstring
@@ -9119,6 +9131,13 @@ sub DbRep_reduceLog {
     }
     
     #########################################   Start
+    
+    # Ergebnsis von $sth_get->fetchrow_arrayref
+    # $row->[0] = Datum (YYYY-MM-DD hh:mm:ss)
+    # $row->[1] = Device
+    # $row->[2] = leer
+    # $row->[3] = Reading
+    # $row->[4] = Value
     
     do {
         $row         = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];        # || execute last-day dummy
@@ -10485,8 +10504,8 @@ sub DbRep_normRelTime {
  for my $ey (@a) {     
      if($ey =~ /\b(\d+(:\d+)?)\b/) {
          my ($od,$nd) = split(":", $1);                               # $od - Tage älter als , $nd - Tage neuer als, 
-         $toth        = "d:$od FullDay" if($od);                      # FullDay Option damit der ganze Tag berücksichtigt wird
-         $tdtn        = "d:$nd FullDay" if($nd);
+         $toth        = "d:$od" if($od);                      
+         $tdtn        = "d:$nd" if($nd);
      }
  }
   
@@ -10524,7 +10543,7 @@ sub DbRep_normRelTime {
 
      $tdtn  = $y + $d + $h + $m + $s + 1;                             # one security second for correct create TimeArray
      $tdtn  = DbRep_corrRelTime($name,$tdtn,1);
-     $fdopt = ($aval =~ /.*FullDay.*$/ && $tdtn >= 86400)?1:0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
+     $fdopt = ($aval =~ /.*FullDay.*$/ && $tdtn >= 86400) ? 1 : 0;    # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
  
  if($toth && $toth =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
@@ -10561,8 +10580,11 @@ sub DbRep_normRelTime {
 
      $toth  = $y + $d + $h + $m + $s + 1;                             # one security second for correct create TimeArray
      $toth  = DbRep_corrRelTime($name,$toth,0);
-     $fdopt = ($aval =~ /.*FullDay.*$/ && $toth >= 86400)?1:0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
+     $fdopt = ($aval =~ /.*FullDay.*$/ && $toth >= 86400) ? 1 : 0;    # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
+ 
+ $fdopt = 1 if($hash->{LASTCMD} =~ /reduceLog/x);                     # reduceLog -> FullDay Option damit der ganze Tag berücksichtigt wird
+ 
  Log3($name, 4, "DbRep $name - FullDay option: $fdopt");
  
 return ($toth,$tdtn,$fdopt);
