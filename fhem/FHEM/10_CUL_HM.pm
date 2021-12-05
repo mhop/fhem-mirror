@@ -2446,7 +2446,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       elsif(defined $mI[5]){
         $ctrlMode   = hex($mI[5]);
-        $bTime      = (($ctrlMode       ) & 0x3f)." min" if($ctrlMode == 3);#message with boost
+        $bTime      = (($ctrlMode       ) & 0x3f)." min" if(($ctrlMode &0xc0) == 0xc0);#message with boost
 #        $uk0        = ($ctrlMode       ) & 0x3f ;#unknown
         $ctrlMode   =  ($ctrlMode   >> 6) & 0x3  ;
       }
