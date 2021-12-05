@@ -2071,16 +2071,8 @@ sub DbRep_Main {
  } 
  elsif ($opt eq "delEntries") {
      delete $hash->{HELPER}{DELENTRIES};
-     if($IsTimeSet || $IsAggrSet) {                                                                                         # Forum:#113202
-         my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
-         my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
-         my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
-         my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
-         
-         if($nthants > $othants) {
-             ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
-             return;
-         }  
+     if($IsTimeSet || $IsAggrSet) {                                                                         # Forum:#113202
+         DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return; 
      }
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
@@ -2173,15 +2165,7 @@ sub DbRep_Main {
  }
  
  if ($opt =~ /reduceLog/) {
-     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
-     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
-     my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
-     my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
-     
-     if($nthants > $othants) {
-         ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
-         return;
-     } 
+     DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return;
      
      $params = {
          hash    => $hash,
@@ -11962,6 +11946,30 @@ sub DbRep_numval {
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   
 return $val;
+}
+
+################################################################
+# prüft die logische Gültigkeit der Zeitgrenzen 
+# $runtime_string_first und $runtime_string_next 
+################################################################
+sub DbRep_checkValidTimeSequence {
+  my $hash                 = shift;
+  my $runtime_string_first = shift;
+  my $runtime_string_next  = shift;
+  
+  my $valid = 1;
+  
+  my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
+  my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
+  my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+  my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+ 
+  if($nthants > $othants) {
+      ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
+      $valid = 0;
+  } 
+  
+return $valid;
 }
 
 ################################################################
