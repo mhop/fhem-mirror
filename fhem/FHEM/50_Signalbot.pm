@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.1";
+my $Signalbot_VERSION="3.2";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -644,7 +644,7 @@ sub Signalbot_MessageReceived ($@) {
 	my $sourceRegex = quotemeta($source);
 	my $groupIdRegex = quotemeta($group);
 	my $allowedPeer = AttrVal($hash->{NAME},"allowedPeer",undef);
-	
+	my $babble=1;
 	if(!defined $allowedPeer || $allowedPeer =~ /^.*$senderRegex.*$/ || $allowedPeer =~ /^.*$sourceRegex.*$/ || ($groupIdRegex ne "" && $allowedPeer =~ /^.*$groupIdRegex.*$/)) {
 		#Copy previous redings to keep history of on message
 		readingsBeginUpdate($hash);
@@ -656,7 +656,11 @@ sub Signalbot_MessageReceived ($@) {
 		readingsBulkUpdate($hash, "prevMsgAttachment", ReadingsVal($hash->{NAME}, "msgAttachment", undef)) if defined ReadingsVal($hash->{NAME}, "msgAttachment", undef);
 		readingsEndUpdate($hash, 0);
 
-		$message=Signalbot_command($hash,$source,$message);
+		my $cmd=AttrVal($hash->{NAME},"cmdKeyword",undef);
+		if ($message =~ /^$cmd(.*)/) { 
+			$babble=0; #Skip Babble execution in command mode
+			$message=Signalbot_command($hash,$source,$message);
+		}
 		$message=encode_utf8($message);
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "msgAttachment", trim($atr));
@@ -686,7 +690,7 @@ sub Signalbot_MessageReceived ($@) {
 		$replyPeer="#".$groupIdRegex if (defined $groupIdRegex and $groupIdRegex ne "");
 		
 		#Activate Babble integration, only if sender or sender group is in babblePeer 
-		if (defined $bDevice && defined $bPeer && defined $replyPeer) {
+		if (defined $bDevice && defined $bPeer && defined $replyPeer && $babble==1) {
 			if ($bPeer =~ /^.*$senderRegex.*$/ || $bPeer =~ /^.*$sourceRegex.*$/ || ($groupIdRegex ne "" && $bPeer =~ /^.*$groupIdRegex.*$/)) {
 				Log3 $hash->{NAME}, 4, $hash->{NAME}.": Calling Babble for $message ($replyPeer)";
 				if ($defs{$bDevice} && $defs{$bDevice}->{TYPE} eq "Babble") {
@@ -829,6 +833,7 @@ sub Signalbot_setup2($@) {
 	#to be on the safe side allow 2 digits for lowest version number, so 0.8.0 results to 800
 	$hash->{helper}{version}=$ver[0]*1000+$ver[1]*100+$ver[2];
 	$hash->{VERSION}="Signalbot:".$Signalbot_VERSION." signal-cli:".$version." Protocol::DBus:".$Protocol::DBus::VERSION;
+	$hash->{model}=SignalBot_OSRel();
 	if($hash->{helper}{version}>800) {
 		my $state=Signalbot_CallS($hash,"isRegistered");
 		#Signal-cli 0.9.0 : isRegistered not existing and will return undef when in multi-mode (or false with my PR)
@@ -1783,7 +1788,7 @@ sub SignalBot_replaceCommands(@) {
 				return ($msg, @processed); 
 			}
 			
-			my ( $isMediaStream, $type ) = SignalBot_IdentifyStream( $hash, $msg ) if ( defined( $msg ) );
+			my ( $isMediaStream, $type ) = SignalBot_IdentifyStream( $hash, $msg );
 			if ($isMediaStream<0) {
 				Log3 $hash->{NAME}, 5, $hash->{NAME}.": Media stream found $isMediaStream $type";
 				my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
@@ -1816,6 +1821,23 @@ sub SignalBot_replaceCommands(@) {
 	return (undef,@processed);
 }
 
+#Get OSRelease Version
+sub SignalBot_OSRel() {
+	my $fh;
+
+	if (!open($fh, "<", "/etc/os-release")) {
+		return "Unknown";
+	}
+	while (my $line = <$fh>) {
+		chomp($line);
+		if ($line =~ /PRETTY_NAME="(.*)"/) {
+			close ($fh);
+			return $1;
+		}
+	}
+	close ($fh);
+	return "Unknown";
+}
 
 ######################################
 #  Get a string and identify possible media streams
@@ -2038,13 +2060,17 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		</li>
 		<li><b>babblePeer</b><br>
 		<a id="Signalbot-attr-babblePeer"></a>
-			Comma separated list of recipient(s) and/or groupId(s) that will trigger that messages are forwarded to a Babble module defined by "BabbleDev". This can be used to interpret real language interpretation of messages as a chatbot or to trigger FHEM events.<br>
+			Comma separated list of recipient(s) and/or groupId(s) that will trigger that messages are forwarded to a Babble module defined by "babbleDev". This can be used to interpret real language interpretation of messages as a chatbot or to trigger FHEM events.<br>
 			<b>If the attribute is not defined, nothing is sent to Babble</b>
 		</li>
 		<li><b>babbleDev</b><br>
 		<a id="Signalbot-attr-babbleDev"></a>
 			Name of Babble Device to be used. This will typically be automatically filled when bubblePeer is set.<br>
 			<b>If the attribute is not defined, nothing is sent to Babble</b>
+		</li>
+		<li><b>babbleExclude</b><br>
+		<a id="Signalbot-attr-babbleExclude"></a>
+			RegExp pattern that, when matched, will exclude messages to be processed by the Babble connection<br>
 		</li>
 		<li><b>commandKeyword</b><br>
 		<a id="Signalbot-attr-commandKeyword"></a>
