@@ -13554,10 +13554,12 @@ return;
                                  
                                  <b>Method without option specification</b> <br><br>
                                  
-                                 If no options are specified, the data will be stored within the time specified by the <b>time.*</b> attributes. 
-                                 Time limits reduced to one entry (the first) per hour per Device & Reading.
-                                 At least one of the <b>time.*</b> attributes must be set (see table below). 
-                                 In this case, the missing time limit is calculated by the module.
+                                 If no options are specified, the data will be reduced to one entry (the first) per hour per 
+                                 device & reading within the time limits specified by the <b>time.*</b> attributes.
+                                 At least one of the <b>time.*</b> attributes must be set (see table below).
+                                 The FullDay option (full days are always selected) is used implicitly.                               
+                                 The respective missing time delimitation is calculated by the module in this case.
+
                                  <br><br>
                                  
                                  With the attributes <b>device</b> and <b>reading</b> the data records to be considered can be included
@@ -16243,7 +16245,8 @@ return;
                                  
                                  Sind keine Optionen angegeben, werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten 
                                  Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading reduziert.
-                                 Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten). 
+                                 Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten).
+                                 Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                               
                                  Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
                                  <br><br>
                                  
