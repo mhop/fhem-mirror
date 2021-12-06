@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.0"  => "06.12.2021  reduceLog options INCLUDE / EXCLUCE parse by parseParams ",
   "8.45.0"  => "05.12.2021  revised userExitFn, fix average=day problem in reduceLog (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799) ",
   "8.44.1"  => "27.11.2021  change diffValue: recognize if diff is 0 or no value available ",
   "8.44.0"  => "21.11.2021  new attr numDecimalPlaces ",
@@ -9018,16 +9019,13 @@ sub DbRep_reduceLog {
     }
     @a = @b;
     
-    my ($pa,$ph) = parseParams(join ' ', @a);            # für späteren Einsatz !
-    #Log3 ($name, 1, "DbRep $name -> parseParams pa: ".Dumper (bless $pa));
-    #Log3 ($name, 1, "DbRep $name -> parseParams ph: ".Dumper (bless $ph));
+    my ($pa,$ph) = parseParams(join ' ', @a);
     
-    my $avgstring = q{};
-    if (defined($a[1])) {
-        $avgstring = ($a[1] =~ /average=day/i) ? 'AVERAGE=DAY'  : 
-                     ($a[1] =~ /average/i)     ? 'AVERAGE=HOUR' : 
-                     q{};
-    }
+    my $avgstring = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'AVERAGE=HOUR' : 
+                    ($ph->{average} && $ph->{average} eq "day") ? 'AVERAGE=DAY'  : 
+                    q{};
+                    
+    Log3 ($name, 2, "DbRep $name - DbRep_reduceLog Arraystr - $avgstring");
     
     # Korrektur des Select-Zeitraums + eine Stunde 
     # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
@@ -9036,13 +9034,11 @@ sub DbRep_reduceLog {
     my $splus                             = $avgstring =~ /AVERAGE/ ? 3600 : 0;
     $ots                                  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoche+$splus);
     
-            
-    if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
-        ($filter)     = $a[-1] =~ /^EXCLUDE=(.+)/i;
-        @excludeRegex = split(',',$filter);
-    }                  
-    elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
-        $filter = 1;
+    my $excludes = $ph->{EXCLUDE} // q{};
+    my $includes = $ph->{INCLUDE} // q{};
+    
+    if ($excludes) {
+        @excludeRegex = split(',',$excludes);
     }
    
     eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
@@ -9067,9 +9063,9 @@ sub DbRep_reduceLog {
     my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
     
-    if($filter) {                                                                      # Option EX/INCLUDE wurde angegeben
+    if($includes) {                                                                      # Option EX/INCLUDE wurde angegeben
         $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
-               .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
+               .($includes =~ /^(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
                ."TIMESTAMP <= '$ots'"
                .($nts ? " AND TIMESTAMP >= '$nts' " : " ")
                ."ORDER BY TIMESTAMP ASC";
@@ -9086,12 +9082,18 @@ sub DbRep_reduceLog {
     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
     
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
-        .$avgstring
-        .($filter ? ((($avgstring && $filter) ? ", " : '').(uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1])) :
-        ((($idanz || $idevswc || $iranz || $irdswc) ? " INCLUDE -> " : '').
-        (($idanz || $idevswc) ? "Devs: ".($idevs ? $idevs:'').($idevswc ? $idevswc : '') : '').(($iranz || $irdswc) ? " Readings: ".($ireading ? $ireading : '').($irdswc ? $irdswc : '') : '').
-        (($edanz || $edevswc || $eranz || $erdswc) ? " EXCLUDE -> " : '').
-        (($edanz || $edevswc) ? "Devs: ".($edevs ? $edevs : '').($edevswc ? $edevswc : '') : '').(($eranz || $erdswc) ? " Readings: ".($ereading ? $ereading:'').($erdswc ? $erdswc : '') : '')) ));
+          .$avgstring
+          ."\n"
+          .($includes ? "INCLUDE -> $includes " : 
+           ((($idanz || $idevswc || $iranz || $irdswc) ? "INCLUDE -> " : '')
+          . (($idanz || $idevswc)                      ? "Devs: ".($idevs ? $idevs : '').($idevswc ? $idevswc : '').' ' : '').(($iranz || $irdswc) ? "Readings: ".($ireading ? $ireading : '').($irdswc ? $irdswc : '') : '')
+           ))
+          ."\n"
+          .($excludes ? "EXCLUDE -> $excludes " : 
+           ((($edanz || $edevswc || $eranz || $erdswc) ? "EXCLUDE -> " : '')
+          . (($edanz || $edevswc)                      ? "Devs: ".($edevs ? $edevs : '').($edevswc ? $edevswc : '').' ' : '').(($eranz || $erdswc) ? "Readings: ".($ereading ? $ereading : '').($erdswc ? $erdswc : '') : '')
+           ))
+         );
         
     my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
     
@@ -13562,12 +13564,17 @@ return;
                                  
                                  <b>Method without option specification</b> <br><br>
                                  
-                                 If no options are specified, the data will be reduced to one entry (the first) per hour per 
-                                 device & reading within the time limits specified by the <b>time.*</b> attributes.
+                                 The data within the time limits defined by the <b>time.*</b> attributes will be 
+                                 reduced to one entry (the first) per hour per device & reading.
                                  At least one of the <b>time.*</b> attributes must be set (see table below).
                                  The FullDay option (full days are always selected) is used implicitly.                               
                                  The respective missing time delimitation is calculated by the module in this case.
-
+                                 <br><br>
+                                 
+                                 By optionally specifying <b>average</b>, not only the database will be cleaned up, but 
+                                 all numeric values of an hour are reduced to a single average value.
+                                 With the option <b>average=day</b>, all numeric values of a day are reduced to a single 
+                                 average value (implies 'average'). 
                                  <br><br>
                                  
                                  With the attributes <b>device</b> and <b>reading</b> the data records to be considered can be included
@@ -13595,28 +13602,28 @@ return;
                                  
                                  <b>Examples: </b><br><br>
                                  <ul>
-                                 attr &lt;name&gt; timeOlderThan = d:200  <br>
+                                 attr &lt;name&gt; timeOlderThan d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
                                  # Records older than 200 days are written to the first entry per hour per Device & Reading.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeDiffToNow = d:200  <br>
+                                 attr &lt;name&gt; timeDiffToNow d:200  <br>
                                  set &lt;name&gt; reduceLog average=day <br>
                                  # Records newer than 200 days are limited to one entry per day per Device & Reading.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeDiffToNow = d:30  <br>
-                                 attr &lt;name&gt; device = TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
-                                 attr &lt;name&gt; reading = room% EXCLUDE=roomNameAlias  <br>
+                                 attr &lt;name&gt; timeDiffToNow d:30  <br>
+                                 attr &lt;name&gt; device TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
+                                 attr &lt;name&gt; reading room% EXCLUDE=roomNameAlias  <br>
                                  set &lt;name&gt; reduceLog <br>
                                  # Records newer than 30 days that are devices of type SONOSPLAYER 
                                  (except Device "Sonos_Kitchen") and the readings start with "room" (except "roomNameAlias")                       
                                  are reduced to the first entry per hour per Device & Reading.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeDiffToNow = d:10 <br>
-                                 attr &lt;name&gt; timeOlderThan = d:5  <br>
-                                 attr &lt;name&gt; device = Luftdaten_remote  <br>
+                                 attr &lt;name&gt; timeDiffToNow d:10 <br>
+                                 attr &lt;name&gt; timeOlderThan d:5  <br>
+                                 attr &lt;name&gt; device Luftdaten_remote  <br>
                                  set &lt;name&gt; reduceLog average <br>
                                  # Records older than 5 and newer than 10 days and containing DEVICE "Luftdaten_remote 
                                  are adjusted. Numerical values of an hour are reduced to an average value <br>                                  
@@ -13635,7 +13642,15 @@ return;
 
                                  The additions "EXCLUDE" and "INCLUDE" can be added to exclude device/reading combinations of reduceLog 
                                  or to include them. This specification is evaluated as regex and overwrites the setting of the attributes "device". 
-                                 and "reading", which are not considered in this case. <br><br>                 
+                                 and "reading", which are not considered in this case. <br><br>  
+
+                                 <b>Examples: </b><br><br>
+                                 <ul>
+                                 set &lt;name&gt; reduceLog 174:180 average EXCLUDE=SMA_Energymeter:Bezug_Wirkleistung INCLUDE=SMA_Energymeter:% <br>
+                                 # Records older than 174 and newer than 180 days are reduced to average per hour. <br>
+                                 # All readings from the device "SMA_Energymeter" except "Bezug_Wirkleistung" are taken reduced.  <br> 
+                                 </ul>
+                                 <br>                                
                                         
                                  <b>Note:</b> <br>
                                  Although the function itself is designed non-blocking, the assigned DbLog device should
@@ -16249,14 +16264,19 @@ return;
     <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
                                  Reduziert historische Datensätze. <br><br>
                                  
-                                 <b>Arbeitsweise ohne Optionsangabe</b> <br><br>
+                                 <b>Arbeitsweise ohne Optionsangabe </b> <br><br>
                                  
-                                 Sind keine Optionen angegeben, werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten 
+                                 Es werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten 
                                  Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading reduziert.
                                  Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten).
                                  Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                               
                                  Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
                                  <br><br>
+                                 
+                                 Durch die optionale Angabe von <b>average</b> wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
+                                 Mit der Option <b>average=day</b> werden alle numerischen Werte eines Tages auf einen einzigen 
+                                 Mittelwert reduziert (impliziert 'average'). <br><br>
                                  
                                  Mit den Attributen <b>device</b> und <b>reading</b> können die zu berücksichtigenden Datensätze eingeschlossen
                                  bzw. ausgeschlossen werden. Beide Eingrenzungen reduzieren die selektierten Daten und verringern den
@@ -16283,30 +16303,30 @@ return;
                                  
                                  <b>Beispiele: </b><br><br>
                                  <ul>
-                                 attr &lt;name&gt; timeOlderThan = d:200  <br>
+                                 attr &lt;name&gt; timeOlderThan d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
                                  # Datensätze die älter als 200 Tage sind, werden auf den ersten Eintrag pro Stunde je Device & Reading
                                  reduziert.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeDiffToNow = d:200  <br>
+                                 attr &lt;name&gt; timeDiffToNow d:200  <br>
                                  set &lt;name&gt; reduceLog average=day <br>
                                  # Datensätze die neuer als 200 Tage sind, werden auf einen Eintrag pro Tag je Device & Reading
                                  reduziert.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeDiffToNow = d:30  <br>
-                                 attr &lt;name&gt; device = TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
-                                 attr &lt;name&gt; reading = room% EXCLUDE=roomNameAlias  <br>
+                                 attr &lt;name&gt; timeDiffToNow d:30  <br>
+                                 attr &lt;name&gt; device TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
+                                 attr &lt;name&gt; reading room% EXCLUDE=roomNameAlias  <br>
                                  set &lt;name&gt; reduceLog <br>
                                  # Datensätze die neuer als 30 Tage sind, die Devices vom Typ SONOSPLAYER sind 
                                  (außer Device "Sonos_Kueche"), die Readings mit "room" beginnen (außer "roomNameAlias"),                       
                                  werden auf den ersten Eintrag pro Stunde je Device & Reading reduziert.  <br> 
                                  <br>
                                  
-                                 attr &lt;name&gt; timeDiffToNow = d:10 <br>
-                                 attr &lt;name&gt; timeOlderThan = d:5  <br>
-                                 attr &lt;name&gt; device = Luftdaten_remote  <br>
+                                 attr &lt;name&gt; timeDiffToNow d:10 <br>
+                                 attr &lt;name&gt; timeOlderThan d:5  <br>
+                                 attr &lt;name&gt; device Luftdaten_remote  <br>
                                  set &lt;name&gt; reduceLog average <br>
                                  # Datensätze die älter als 5 und neuer als 10 Tage sind und DEVICE "Luftdaten_remote" enthalten, 
                                  werden bereinigt. Numerische Werte einer Stunde werden auf einen Mittelwert reduziert <br>                                  
@@ -16314,7 +16334,7 @@ return;
                                  </ul>
                                  <br>
                                  
-                                 <b>Arbeitsweise mit Optionsangabe</b> <br><br>
+                                 <b>Arbeitsweise mit Optionsangabe </b> <br><br>
                                  
                                  Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als 
                                  <b>&lt;nn&gt;</b> Tage.
@@ -16325,7 +16345,17 @@ return;
 
                                  Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen 
                                  bzw. einzuschließen. Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" 
-                                 und "reading", die in diesem Fall nicht beachtet werden. <br><br>                  
+                                 und "reading", die in diesem Fall nicht beachtet werden. 
+                                 <br><br>      
+
+                                 <b>Beispiele: </b><br><br>
+                                 <ul>
+                                 set &lt;name&gt; reduceLog 174:180 average EXCLUDE=SMA_Energymeter:Bezug_Wirkleistung INCLUDE=SMA_Energymeter:% <br>
+                                 # Datensätze älter als 174 und neuer als 180 Tage werden auf den Durchschnitt pro Stunde reduziert. <br>
+                                 # Es werden alle Readings vom Device "SMA_Energymeter" außer "Bezug_Wirkleistung" berücksichtigt.
+                                 reduziert.  <br> 
+                                 </ul>
+                                 <br>                                 
                                         
                                  <b>Hinweis:</b> <br>
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
@@ -16334,6 +16364,7 @@ return;
                                  Weiterhin wird dringend empfohlen den standard INDEX 'Search_Idx' in der Tabelle 'history' 
                                  anzulegen ! <br>
                                  Die Abarbeitung dieses Befehls dauert unter Umständen (ohne INDEX) extrem lange. <br><br>
+                                 
                                  </li> <br>                                 
 
     <li><b> repairSQLite </b>  - repariert eine korrupte SQLite-Datenbank. <br>
