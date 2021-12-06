@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  77_UWZ: support for https connection
  - feature: 73_NUKIBridge 74_NUKIDevice: new modul structure and rewrite code,
                                 add support for new smartlock 3.0 and 3.0 pro,
                                 version 2.0 pre-release

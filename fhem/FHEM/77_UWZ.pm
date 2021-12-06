@@ -3,10 +3,10 @@
 #  77_UWZ.pm
 #
 #  (c) 2015-2016 Tobias D. Oestreicher
-#  (c) 2017-2019 Marko Oldenburg
+#  (c) 2017-2021 Marko Oldenburg
 #
 #  Special thanks goes to comitters:
-#       - Marko Oldenburg (leongaultier at gmail dot com)
+#       - Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #       - Hanjo (Forum) patch for sort by creation
 #       - cb1 <kontakt@it-buchinger.de> patch Replace Iconv with native perl encode()
 #       - KölnSolar (Markus) new write UWZAsHtml with smaler Code
@@ -209,7 +209,7 @@ my @ENmonths   = (
 
 # my $countrycode = 'DE';
 # my $plz = '77777';
-# my $uwz_alert_url = 'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=de&areaID=UWZ' . $countrycode . $plz;
+# my $uwz_alert_url = 'https://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=de&areaID=UWZ' . $countrycode . $plz;
 
 ########################################
 sub Log {
@@ -234,7 +234,7 @@ sub Log {
 sub Map2Movie {
     my $smap = shift;
 
-    my $uwz_movie_url = "http://www.meteocentrale.ch/uploads/media/";
+    my $uwz_movie_url = "https://www.meteocentrale.ch/uploads/media/";
     my $lmap;
 
     $smap = lc($smap);
@@ -294,22 +294,22 @@ sub Map2Movie {
 sub Map2Image {
     my $smap = shift;
 
-    my $uwz_de_url = 'http://www.unwetterzentrale.de/images/map/';
-    my $uwz_at_url = 'http://unwetter.wetteralarm.at/images/map/';
-    my $uwz_ch_url = 'http://alarm.meteocentrale.ch/images/map/';
-    my $uwz_en_url = 'http://warnings.severe-weather-centre.co.uk/images/map/';
-    my $uwz_li_url = 'http://alarm.meteocentrale.li/images/map/';
-    my $uwz_be_url = 'http://alarm.meteo-info.be/images/map/';
-    my $uwz_dk_url = 'http://alarm.vejrcentral.dk/images/map/';
-    my $uwz_fi_url = 'http://vaaratasot.saa-varoitukset.fi/images/map/';
-    my $uwz_fr_url = 'http://alerte.vigilance-meteo.fr/images/map/';
-    my $uwz_lu_url = 'http://alarm.meteozentral.lu/images/map/';
-    my $uwz_nl_url = 'http://alarm.noodweercentrale.nl/images/map/';
-    my $uwz_no_url = 'http://advarsler.vaer-sentral.no/images/map/';
-    my $uwz_pt_url = 'http://avisos.centrometeo.pt/images/map/';
-    my $uwz_se_url = 'http://varningar.vader-alarm.se/images/map/';
-    my $uwz_es_url = 'http://avisos.alertas-tiempo.es/images/map/';
-    my $uwz_it_url = 'http://allarmi.meteo-allerta.it/images/map/';
+    my $uwz_de_url = 'https://www.unwetterzentrale.de/images/map/';
+    my $uwz_at_url = 'https://unwetter.wetteralarm.at/images/map/';
+    my $uwz_ch_url = 'https://alarm.meteocentrale.ch/images/map/';
+    my $uwz_en_url = 'https://warnings.severe-weather-centre.co.uk/images/map/';
+    my $uwz_li_url = 'https://alarm.meteocentrale.li/images/map/';
+    my $uwz_be_url = 'https://alarm.meteo-info.be/images/map/';
+    my $uwz_dk_url = 'https://alarm.vejrcentral.dk/images/map/';
+    my $uwz_fi_url = 'https://vaaratasot.saa-varoitukset.fi/images/map/';
+    my $uwz_fr_url = 'https://alerte.vigilance-meteo.fr/images/map/';
+    my $uwz_lu_url = 'https://alarm.meteozentral.lu/images/map/';
+    my $uwz_nl_url = 'https://alarm.noodweercentrale.nl/images/map/';
+    my $uwz_no_url = 'https://advarsler.vaer-sentral.no/images/map/';
+    my $uwz_pt_url = 'https://avisos.centrometeo.pt/images/map/';
+    my $uwz_se_url = 'https://varningar.vader-alarm.se/images/map/';
+    my $uwz_es_url = 'https://avisos.alertas-tiempo.es/images/map/';
+    my $uwz_it_url = 'https://allarmi.meteo-allerta.it/images/map/';
 
     my $lmap;
 
@@ -491,11 +491,11 @@ sub Map2Image {
 
     ## Isobaren
     $lmap->{'isobaren1'} =
-      'http://www.unwetterzentrale.de/images/icons/UWZ_ISO_00.jpg';
+      'https://www.unwetterzentrale.de/images/icons/UWZ_ISO_00.jpg';
     $lmap->{'isobaren2'} =
-      'http://www.wetteralarm.at/uploads/pics/UWZ_EURO_ISO_GER_00.jpg';
+      'https://www.wetteralarm.at/uploads/pics/UWZ_EURO_ISO_GER_00.jpg';
     $lmap->{'isobaren3'} =
-'http://www.severe-weather-centre.co.uk/uploads/pics/UWZ_EURO_ISO_ENG_00.jpg';
+'https://www.severe-weather-centre.co.uk/uploads/pics/UWZ_EURO_ISO_ENG_00.jpg';
 
     return $lmap->{$smap};
 }
@@ -569,7 +569,7 @@ sub Define {
         }
 
         $hash->{URL} =
-'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
+'https://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
           . $URL_language
           . '&areaID=UWZ'
           . $aArg->[2]
@@ -944,7 +944,7 @@ sub Start {
     }
 
     $hash->{URL} =
-'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
+'https://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
       . $URL_language
       . '&areaID=UWZ'
       . $hash->{CountryCode}
@@ -1125,7 +1125,7 @@ sub Run {
         if ( !defined($maps2fetch) ) { $maps2fetch = 'deutschland'; }
         Log $hash, 4, 'Maps2Fetch : ' . $maps2fetch;
         my @maps = split( ' ', $maps2fetch );
-        my $uwz_de_url = 'http://www.unwetterzentrale.de/images/map/';
+        my $uwz_de_url = 'https://www.unwetterzentrale.de/images/map/';
 
         foreach my $smap (@maps) {
             Log $hash, 4, 'Download map : ' . $smap;
@@ -1669,12 +1669,12 @@ sub Run {
                 Log $hash, 4,
                     'Warn_'
                   . $i
-                  . '_IconURL: http://www.unwetterzentrale.de/images/icons/'
+                  . '_IconURL: https://www.unwetterzentrale.de/images/icons/'
                   . $typenames{ $single_warning->{'type'} } . '-'
                   . $single_warning->{'severity'} . '.gif';
                 $message .= 'Warn_'
                   . $i
-                  . '_IconURL|http://www.unwetterzentrale.de/images/icons/'
+                  . '_IconURL|https://www.unwetterzentrale.de/images/icons/'
                   . $typenames{ $single_warning->{'type'} } . '-'
                   . GetSeverityColor(
                     $hash,
@@ -2322,7 +2322,7 @@ sub UWZSearchLatLon {
 
     my $err_log = '';
     my $url =
-'http://alertspro.geoservice.meteogroup.de/weatherpro/SearchFeed.php?search='
+'https://alertspro.geoservice.meteogroup.de/weatherpro/SearchFeed.php?search='
       . $loc;
     my $agent = LWP::UserAgent->new(
         env_proxy         => 1,
@@ -2403,7 +2403,7 @@ sub UWZSearchAreaID {
 
     my $err_log = '';
     my $url =
-'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=lookupCoord&lat='
+'https://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=lookupCoord&lat='
       . $lat . '&lon='
       . $lon;
     my $agent = LWP::UserAgent->new(
@@ -2478,9 +2478,9 @@ sub UWZSearchAreaID {
 <h3>UWZ</h3>
 <ul>
    <a name="UWZdefine"></a>
-   This modul extracts thunderstorm warnings from <a href="http://www.unwetterzentrale.de">www.unwetterzentrale.de</a>.
+   This modul extracts thunderstorm warnings from <a href="https://www.unwetterzentrale.de">www.unwetterzentrale.de</a>.
    <br/>
-   Therefore the same interface is used as the Android App <a href="http://www.alertspro.com">Alerts Pro</a> does.
+   Therefore the same interface is used as the Android App <a href="https://www.alertspro.com">Alerts Pro</a> does.
    A maximum of 10 thunderstorm warnings will be served.
    Additional the module provides a few functions to create HTML-Templates which can be used with weblink.
    <br>
@@ -2732,7 +2732,7 @@ sub UWZSearchAreaID {
       <li><b>Warn_</b><i>0</i><b>_levelName</b> - Level Warn Name</li>
       <li><b>Warn_</b><i>0</i><b>_ShortText</b> - short warn text</li>
       <li><b>Warn_</b><i>0</i><b>_LongText</b> - detailed warn text</li>
-      <li><b>Warn_</b><i>0</i><b>_IconURL</b> - cumulated URL to display warn-icons from <a href="http://www.unwetterzentrale.de">www.unwetterzentrale.de</a></li>
+      <li><b>Warn_</b><i>0</i><b>_IconURL</b> - cumulated URL to display warn-icons from <a href="https://www.unwetterzentrale.de">www.unwetterzentrale.de</a></li>
    </ul>
    <br>
 
@@ -2936,9 +2936,9 @@ sub UWZSearchAreaID {
 <h3>UWZ</h3> 
 <ul>
    <a name="UWZdefine"></a>
-   Das Modul extrahiert Unwetterwarnungen von <a href="http://www.unwetterzentrale.de">www.unwetterzentrale.de</a>.
+   Das Modul extrahiert Unwetterwarnungen von <a href="https://www.unwetterzentrale.de">www.unwetterzentrale.de</a>.
    <br/>
-   Hierfür wird die selbe Schnittstelle verwendet die auch die Android App <a href="http://www.alertspro.com">Alerts Pro</a> nutzt.
+   Hierfür wird die selbe Schnittstelle verwendet die auch die Android App <a href="https://www.alertspro.com">Alerts Pro</a> nutzt.
    Es werden maximal 10 Standortbezogene Unwetterwarnungen zur Verfügung gestellt.
    Weiterhin verfügt das Modul über HTML-Templates welche als weblink verwendet werden können.
    <br>
@@ -3161,7 +3161,7 @@ sub UWZSearchAreaID {
       <li><b>Warn_</b><i>0</i><b>_levelName</b> - Level Warn Name</li>
       <li><b>Warn_</b><i>0</i><b>_ShortText</b> - Kurzbeschreibung der Warnung</li>
       <li><b>Warn_</b><i>0</i><b>_LongText</b> - Ausführliche Unwetterbeschreibung</li>
-      <li><b>Warn_</b><i>0</i><b>_IconURL</b> - Kumulierte URL um Warnungs-Icon von <a href="http://www.unwetterzentrale.de">www.unwetterzentrale.de</a> anzuzeigen</li>
+      <li><b>Warn_</b><i>0</i><b>_IconURL</b> - Kumulierte URL um Warnungs-Icon von <a href="https://www.unwetterzentrale.de">www.unwetterzentrale.de</a> anzuzeigen</li>
    </ul>
    <br>
 
@@ -3375,9 +3375,9 @@ sub UWZSearchAreaID {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.0.1",
+  "version": "v3.1.0",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
     "CoolTux"
