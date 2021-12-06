@@ -9024,8 +9024,6 @@ sub DbRep_reduceLog {
     my $avgstring = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'AVERAGE=HOUR' : 
                     ($ph->{average} && $ph->{average} eq "day") ? 'AVERAGE=DAY'  : 
                     q{};
-                    
-    Log3 ($name, 2, "DbRep $name - DbRep_reduceLog Arraystr - $avgstring");
     
     # Korrektur des Select-Zeitraums + eine Stunde 
     # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
