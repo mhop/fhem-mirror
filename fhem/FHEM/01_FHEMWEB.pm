@@ -2304,6 +2304,7 @@ FW_select($$$$$@)
     next if($processed{$v});
     if($typeHash) {
       my $newType = $typeHash->{$v};
+      $newType =~ s/^#//; #124538, see also getAllAttr
       if($newType ne $oldType) {
         $s .= "</optgroup>" if($oldType);
         $s .= "<optgroup label='$newType'>" if($newType);

@@ -2806,9 +2806,9 @@ getAllAttr($;$$)
 
   &$add($AttrList, "framework");
   if($defs{$d}{".AttrList"}) {
-    &$add($defs{$d}{".AttrList"}, $defs{$d}{TYPE});
+    &$add($defs{$d}{".AttrList"}, "#".$defs{$d}{TYPE}); #124538
   } else {
-    &$add($modules{$defs{$d}{TYPE}}{AttrList}, $defs{$d}{TYPE});
+    &$add($modules{$defs{$d}{TYPE}}{AttrList}, "#".$defs{$d}{TYPE});
   }
 
   my $nl2space = sub($$)
