@@ -452,7 +452,7 @@ sub DbRep_Define {
   $hash->{NOTIFYDEV}             = "global,".$name;                              # nur Events dieser Devices an DbRep_Notify weiterleiten 
   my $dbconn                     = $defs{$a[2]}{dbconn};
   $hash->{DATABASE}              = (split(/;|=/, $dbconn))[1];
-  $hash->{UTF8}                  = defined($defs{$a[2]}{UTF8})?$defs{$a[2]}{UTF8}:0;
+  $hash->{UTF8}                  = defined($defs{$a[2]}{UTF8}) ? $defs{$a[2]}{UTF8} : 0;
   
   # Versionsinformationen setzen
   DbRep_setVersionInfo($hash);
@@ -562,7 +562,7 @@ sub DbRep_Set {
   }
   
   if ($opt eq "dumpMySQL" && $hash->{ROLE} ne "Agent") {
-       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
        if ($prop eq "serverSide") {
            Log3 ($name, 3, "DbRep $name - ################################################################");
            Log3 ($name, 3, "DbRep $name - ###             New database serverSide dump                 ###");
@@ -611,28 +611,30 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###             New database Restore/Recovery                ###");
        Log3 ($name, 3, "DbRep $name - ################################################################");
-       DbRep_beforeproc($hash, "restore");
-       DbRep_Main($hash,$opt,$prop);
+       DbRep_beforeproc ($hash, "restore");
+       DbRep_Main       ($hash,$opt,$prop);
        return;
   }
   
   if ($opt =~ /optimizeTables|vacuum/ && $hash->{ROLE} ne "Agent") {
-       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###          New optimize table / vacuum execution           ###");
        Log3 ($name, 3, "DbRep $name - ################################################################");
-       DbRep_beforeproc($hash, "optimize");    
-       DbRep_Main($hash,$opt);
+       DbRep_beforeproc ($hash, "optimize");    
+       DbRep_Main       ($hash,$opt);
        return;
   }
   
   if ($opt =~ m/delSeqDoublets|delDoublets/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
+      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";  
+      
       if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       } 
-      DbRep_beforeproc($hash, "delDoublets");     
-      DbRep_Main($hash,$opt,$prop); 
+      
+      DbRep_beforeproc ($hash, "delDoublets");     
+      DbRep_Main       ($hash,$opt,$prop); 
       return;      
   }
   
@@ -1861,7 +1863,7 @@ sub DbRep_dbConnect {
   my $dblogname  = $dbloghash->{NAME};
   my $dbmodel    = $dbloghash->{MODEL};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
+  my $utf8       = $hash->{UTF8} // 0;
   
   my ($dbh,$err);
   
@@ -1879,7 +1881,7 @@ sub DbRep_dbConnect {
       }
   }
   
-  Log3 ($name, 4, "DbRep $name - database user for operation: $dbuser") if($dbuser); 
+  Log3 ($name, 4, "DbRep $name - Database connect - user: ".($dbuser ? $dbuser : 'no').", UTF8 option set: ".($utf8 ? 'yes' : 'no')); 
   
   eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
                                                                     RaiseError          => 1, 
@@ -2020,7 +2022,6 @@ sub DbRep_Main {
  
  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
  
- # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
  
  # Ausgaben und Zeitmanipulationen
@@ -2093,12 +2094,28 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", $params, "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt =~ /delDoublets/) {
-     my $cmd = $prop ? $prop : "adviceDelete";
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);  
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         device  => $device,
+         reading => $reading,
+         prop    => $prop // "adviceDelete",
+         ts      => $ts,
+     };
+     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", $params, "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt =~ /delSeqDoublets/) {
-     my $cmd = $prop ? $prop : "adviceRemain"; 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);   
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         device  => $device,
+         reading => $reading,
+         prop    => $prop // "adviceRemain",
+         ts      => $ts,
+     };
+     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", $params, "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);   
  } 
  elsif ($opt eq "exportToFile") {
      my $file = $prop;
@@ -4750,7 +4767,8 @@ sub insert_Push {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $utf8       = $hash->{UTF8} // 0;
+ 
  my ($err,$sth);
  
  # Background-Startzeit
@@ -4889,7 +4907,8 @@ sub currentfillup_Push {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $utf8       = $hash->{UTF8} // 0;
+ 
  my ($err,$sth,$sql,$selspec,$addon,@dwc,@rwc);
  
  # Background-Startzeit
@@ -5396,7 +5415,7 @@ sub fetchrows_DoParse {
   my $runtime_string_first = $paref->{rsf};
   my $runtime_string_next  = $paref->{rsn};
  
-  my $utf8                 = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
+  my $utf8                 = $hash->{UTF8} // 0;
   my $limit                = AttrVal($name, "limit", 1000);
   my $fetchroute           = AttrVal($name, "fetchRoute", "descent");
   $fetchroute              = $fetchroute eq "descent" ? "DESC" : "ASC";
@@ -5588,31 +5607,29 @@ return;
 #                                 Doubletten finden und löschen
 ####################################################################################################
 sub deldoublets_DoParse {
- my $string     = shift;
- my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $model      = $dbloghash->{MODEL};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my $limit      = AttrVal($name, "limit", 1000);
- my ($err,$dbh,$sth,$sql,$rowlist,$selspec,$st,$table,$addon,$dsql);
- 
- # Background-Startzeit
- my $bst = [gettimeofday];
+ my $paref   = shift;    
+ my $hash    = $paref->{hash};
+ my $name    = $paref->{name};
+ my $device  = $paref->{device};
+ my $reading = $paref->{reading};
+ my $prop    = $paref->{prop};
+ my $ts      = $paref->{ts};
 
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- if ($@) {
+ my $utf8    = $hash->{UTF8} // 0;
+ my $limit   = AttrVal($name, "limit", 1000);
+ 
+ my ($sth,$sql,$rowlist,$selspec,$st,$table,$addon,$dsql);
+ 
+ my $bst = [gettimeofday];                                                         # Background-Startzeit
+ 
+ my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ if ($err) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err|''|$opt";
+     return "$name|''|''|$err|''|$prop";
  }
 
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
+ my @ts = split("\\|", $ts);                                                       # Timestampstring to Array
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
  # mehrfache Datensätze finden
@@ -5621,14 +5638,13 @@ sub deldoublets_DoParse {
  # $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";                        # 18.10.2019 / V 8.28.2
  $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE HAVING count(*) > 1 ORDER BY TIMESTAMP ASC";       # Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489
                                                                                                            # und Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007
- # SQL zusammenstellen für DB-Abfrage
- $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?",$addon);
+ $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?",$addon);                      # SQL zusammenstellen für DB-Abfrage
  eval{$sth = $dbh->prepare_cached($sql);};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      $dbh->disconnect;
-     return "$name|''|''|$err|''|$opt";
+     return "$name|''|''|$err|''|$prop";
  }
  
  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
@@ -5658,7 +5674,7 @@ sub deldoublets_DoParse {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         return "$name|''|''|$err|''|$opt";
+         return "$name|''|''|$err|''|$prop";
      } 
  
      # SQL-Laufzeit ermitteln
@@ -5670,7 +5686,7 @@ sub deldoublets_DoParse {
      my $i = 0;
      for my $nr (map { $_->[1]."_ESC_".$_->[2]."_ESC_".($_->[0] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_|_".($_->[4]-1) } @{$sth->fetchall_arrayref()}) {     
          # Reihenfolge geändert in: DEVICE,READING,DATE,TIME,VALUE,count(*)
-         if($opt =~ /adviceDelete/) {
+         if($prop =~ /adviceDelete/x) {
              push(@warp,$i."_".$nr) if($#todel+1 < $limit);                   # die zu löschenden Datensätze (nur zur Anzeige) 
          } 
          else {        
@@ -5681,23 +5697,23 @@ sub deldoublets_DoParse {
          Log3 ($name, 4, "DbRep $name - WARP: $nr, ntodel: $ntodel, c: $c");
          $ntodel = $ntodel + $c;
          
-         if ($opt =~ /delete/) {                                       # delete Datensätze
+         if ($prop =~ /delete/x) {                                       # delete Datensätze
              my ($dev,$read,$date,$time,$val,$limit) = split(/_ESC_|_\|_/, $nr);
              my $dt = $date." ".$time;
              chomp($val);
-             $dev  =~ s/'/''/g;                                 # escape ' with ''
-             $read =~ s/'/''/g;                                 # escape ' with ''
-             $val  =~ s/'/''/g;                                 # escape ' with ''
-             $val  =~ s/\\/\\\\/g if($model eq "MYSQL");        # escape \ with \\ für MySQL
+             $dev  =~ s/'/''/g;                                        # escape ' with ''
+             $read =~ s/'/''/g;                                        # escape ' with ''
+             $val  =~ s/'/''/g;                                        # escape ' with ''
+             $val  =~ s/\\/\\\\/g if($dbmodel eq "MYSQL");             # escape \ with \\ für MySQL
              $st = [gettimeofday];
              
-             if($model =~ /MYSQL/) {
+             if($dbmodel =~ /MYSQL/x) {
                  $dsql = "delete FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' limit $limit;";
              }
-             elsif ($model eq "SQLITE") {                       # Forum: https://forum.fhem.de/index.php/topic,122791.0.html
+             elsif ($dbmodel eq "SQLITE") {                            # Forum: https://forum.fhem.de/index.php/topic,122791.0.html
                  $dsql = "delete FROM $table where rowid in (select rowid from $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' LIMIT $limit);";
              }             
-             elsif ($model eq "POSTGRESQL") {
+             elsif ($dbmodel eq "POSTGRESQL") {
                  $dsql = "DELETE FROM $table WHERE ctid = any (array(SELECT ctid FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' ORDER BY timestamp LIMIT $limit));";
              }
              
@@ -5710,7 +5726,7 @@ sub deldoublets_DoParse {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
                  $dbh->disconnect;
-                 return "$name|''|''|$err|''|$opt";
+                 return "$name|''|''|$err|''|$prop";
              } 
              $ndel = $ndel+$sthd->rows;
              $dbh->commit() if(!$dbh->{AutoCommit});
@@ -5721,23 +5737,25 @@ sub deldoublets_DoParse {
          $i++;
      }
      
-     if(@warp && $opt =~ /adviceDelete/) {
+     if(@warp && $prop =~ /adviceDelete/x) {
          push(@todel,@warp);    
      }
  }
  
- Log3 ($name, 3, "DbRep $name - number records identified to delete by \"$hash->{LASTCMD}\": $ntodel") if($ntodel && $opt =~ /advice/); 
+ Log3 ($name, 3, "DbRep $name - number records identified to delete by \"$hash->{LASTCMD}\": $ntodel") if($ntodel && $prop =~ /advice/); 
  Log3 ($name, 3, "DbRep $name - rows deleted by \"$hash->{LASTCMD}\": $ndel") if($ndel);
   
- my $retn     = ($opt =~ /adviceDelete/)?$ntodel:$ndel; 
- my @retarray = ($opt =~ /adviceDelete/)?@todel:" ";
+ my $retn     = $prop =~ /adviceDelete/x ? $ntodel : $ndel; 
+ my @retarray = $prop =~ /adviceDelete/x ? @todel : " ";
  
- s/\|/_E#S#C_/g for @retarray;         # escape Pipe "|" 
+ s/\|/_E#S#C_/g for @retarray;                                                # escape Pipe "|" 
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
- } elsif(@retarray) {
+ } 
+ elsif(@retarray) {
      $rowlist = join('|', @retarray);
- } else {
+ } 
+ else {
      $rowlist = 0;
  }
  
@@ -5754,32 +5772,42 @@ sub deldoublets_DoParse {
 
  $rt = $rt.",".$brt;
  
-return "$name|$rowlist|$rt|0|$retn|$opt";
+return "$name|$rowlist|$rt|0|$retn|$prop";
 }
 
 ####################################################################################################
 #                              sequentielle Doubletten löschen
 ####################################################################################################
 sub delseqdoubl_DoParse {
- my $string     = shift;
- my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my $limit      = AttrVal($name, "limit", 1000);
- my $var        = AttrVal($name, "seqDoubletsVariance", undef);                  # allgemeine Varianz
- my $table      = "history";
- my ($err,$dbh,$sth,$sql,$rowlist,$nrows,$selspec,$st,$varo,$varu);
+ my $paref   = shift;    
+ my $hash    = $paref->{hash};
+ my $name    = $paref->{name};
+ my $device  = $paref->{device};
+ my $reading = $paref->{reading};
+ my $prop    = $paref->{prop};
+ my $ts      = $paref->{ts};
+
+ my $utf8    = $hash->{UTF8} // 0;
+ my $limit   = AttrVal($name, "limit", 1000);
+ my $var     = AttrVal($name, "seqDoubletsVariance", undef);                     # allgemeine Varianz
+ my $table   = "history";
  
- # positive und negative Flankenvarianz spezifizieren
- my $edge = "balanced";
+ my ($sth,$sql,$rowlist,$nrows,$selspec,$st,$varo,$varu);
+ 
+ my $bst = [gettimeofday];                                                       # Background-Startzeit
+ 
+ my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ if ($err) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err|''|$prop";
+ }
+ 
+ my $edge = "balanced";                                                          # positive und negative Flankenvarianz spezifizieren
  if($var && $var =~ /EDGE=/) {
      ($var,$edge) = split("EDGE=", $var);
  }
+ 
  my ($varpos,$varneg);
  if (defined $var) {
      ($varpos,$varneg) = split(" ",$var);
@@ -5787,21 +5815,11 @@ sub delseqdoubl_DoParse {
      $varneg = $varpos if(!$varneg);
      $varneg = DbRep_trim($varneg);
  }
- Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: ".(defined $varpos?$varpos:"").", negative variance: ".(defined $varneg?$varneg:"").", EDGE: $edge");
-
  
- # Background-Startzeit
- my $bst = [gettimeofday];
+ Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: ".(defined $varpos ? $varpos : "")
+       .", negative variance: ".(defined $varneg ? $varneg : "").", EDGE: $edge");
 
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err|''|$opt";
- }
-
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
+ my @ts = split("\\|", $ts);                                                     # Timestampstring to Array
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
  $selspec = "DEVICE,READING,TIMESTAMP,VALUE";
@@ -5820,15 +5838,14 @@ sub delseqdoubl_DoParse {
  
  no warnings 'uninitialized'; 
  
- foreach my $row (@ts) {
+ for my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
      my $runtime_string_next   = $a[2];  
      $runtime_string           = encode_base64($runtime_string,""); 
       
-     # SQL-Startzeit
-     $st = [gettimeofday];
+     $st = [gettimeofday];                                               # SQL-Startzeit
      
      # SQL zusammenstellen für Logausgabe
      my $sql1 = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');  
@@ -5839,35 +5856,37 @@ sub delseqdoubl_DoParse {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         return "$name|''|''|$err|''|$opt";
+         return "$name|''|''|$err|''|$prop";
      } 
  
-     # SQL-Laufzeit ermitteln
-     $rt = $rt+tv_interval($st);
+     $rt = $rt+tv_interval($st);                                                     # SQL-Laufzeit ermitteln
         
      # Beginn Löschlogik, Zusammenstellen der löschenden DS (warping)
      # Array @sel -> die VERBLEIBENDEN Datensätze, @warp -> die zu löschenden Datensätze
      my (@sel,@warp);
      my ($or,$oor,$odev,$oread,$oval,$ooval,$ndev,$nread,$nval);
      my $i = 0;
-     foreach my $nr (map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3] } @{$sth->fetchall_arrayref()}) {               
+     
+     for my $nr (map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3] } @{$sth->fetchall_arrayref()}) {               
          ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);                     # Werte des aktuellen Elements
-         $or = pop @sel;                                                             # das letzte Element der Liste                         
+         $or                              = pop @sel;                                # das letzte Element der Liste                         
          ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);                     # Value des letzten Elements      
          
          if (looks_like_number($oval) && defined $varpos && defined $varneg) {       # unterschiedliche Varianz +/- für numerische Werte
              $varo = $oval + $varpos;
              $varu = $oval - $varneg;
-         } elsif (looks_like_number($oval) && defined $varpos && !defined $varneg) { # identische Varianz +/- für numerische Werte
+         } 
+         elsif (looks_like_number($oval) && defined $varpos && !defined $varneg) {   # identische Varianz +/- für numerische Werte
              $varo = $oval + $varpos;
              $varu = $oval - $varpos;
-         } else {
+         } 
+         else {
              undef $varo;
              undef $varu;
          }
-         $oor = pop @sel;                                           # das vorletzte Element der Liste
+         
+         $oor   = pop @sel;                                         # das vorletzte Element der Liste
          $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
-         # Log3 ($name, 1, "DbRep $name - OOVAL: $ooval, OVAL: $oval, VARO: $varo, VARU: $varu"); 
          
          if ($ndev.$nread ne $odev.$oread) {
              $i = 0;                                                # neues Device/Reading in einer Periode -> ooor soll erhalten bleiben
@@ -5876,7 +5895,9 @@ sub delseqdoubl_DoParse {
              push (@sel,$nr);
          } 
          elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || 
-                 ($i>=2 && $varo && $varu && ($ooval <= $varo) && ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) ) {
+               ($i>=2 && $varo   && $varu && ($ooval <= $varo) && 
+               ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) ) {
+             
              if ($edge =~ /negative/i && ($ooval > $oval)) {              
                  push (@sel,$oor);                                  # negative Flanke -> der fallende DS und desssen Vorgänger 
                  push (@sel,$or);                                   # werden behalten obwohl im Löschkorridor
@@ -5893,16 +5914,17 @@ sub delseqdoubl_DoParse {
                  push (@warp,$or);                                  # Array der zu löschenden Datensätze                         
              }
              
-             if ($opt =~ /delete/ && $or) {                         # delete Datensätze
+             if ($prop =~ /delete/ && $or) {                         # delete Datensätze
                  my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
-                 my $dt = $date." ".$time;
+                 my $dt                           = $date." ".$time;
                  chomp($val);
                  $dev  =~ s/'/''/g;                                 # escape ' with ''
                  $read =~ s/'/''/g;                                 # escape ' with ''
                  $val  =~ s/'/''/g;                                 # escape ' with ''
-                 $st = [gettimeofday];
+                 $st   = [gettimeofday];
                  my $dsql = "delete FROM $table where TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val';";
                  my $sthd = $dbh->prepare($dsql); 
+                 
                  Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
                      
                  eval {$sthd->execute();};
@@ -5910,8 +5932,9 @@ sub delseqdoubl_DoParse {
                      $err = encode_base64($@,"");
                      Log3 ($name, 2, "DbRep $name - $@");
                      $dbh->disconnect;
-                     return "$name|''|''|$err|''|$opt";
+                     return "$name|''|''|$err|''|$prop";
                  } 
+                 
                  $ndel = $ndel+$sthd->rows;
                  $dbh->commit() if(!$dbh->{AutoCommit});
                      
@@ -5923,29 +5946,38 @@ sub delseqdoubl_DoParse {
              push (@sel,$or) if($or);
              push (@sel,$nr);
          }
+         
          $i++;
      }
-     if(@sel && $opt =~ /adviceRemain/) {
+     
+     if(@sel && $prop =~ /adviceRemain/) {
          # die verbleibenden Datensätze nach Ausführung (nur zur Anzeige) 
          push(@remain,@sel) if($#remain+1 < $limit);      
      }
-     if(@warp && $opt =~ /adviceDelete/) {
+     
+     if(@warp && $prop =~ /adviceDelete/) {
          # die zu löschenden Datensätze (nur zur Anzeige)
          push(@todel,@warp) if($#todel+1 < $limit);    
      }
 
-     $nremain = $nremain + $#sel+1 if(@sel);
-     $ntodel = $ntodel + $#warp+1 if(@warp);
-     my $sum = $nremain+$ntodel;
-     Log3 ($name, 3, "DbRep $name - rows analyzed by \"$hash->{LASTCMD}\": $sum") if($sum && $opt =~ /advice/); 
+     $nremain = $nremain + $#sel+1  if(@sel);
+     $ntodel  = $ntodel  + $#warp+1 if(@warp);
+     my $sum  = $nremain + $ntodel;
+     
+     Log3 ($name, 3, "DbRep $name - rows analyzed by \"$hash->{LASTCMD}\": $sum") if($sum && $prop =~ /advice/); 
  }
  
  Log3 ($name, 3, "DbRep $name - rows deleted by \"$hash->{LASTCMD}\": $ndel") if($ndel);
   
- my $retn = ($opt =~ /adviceRemain/)?$nremain:($opt =~ /adviceDelete/)?$ntodel:$ndel; 
+ my $retn = $prop =~ /adviceRemain/ ? $nremain : 
+            $prop =~ /adviceDelete/ ? $ntodel  :
+            $ndel; 
 
- my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" ";
- s/\|/_E#S#C_/g for @retarray;         # escape Pipe "|" 
+ my @retarray = $prop =~ /adviceRemain/ ? @remain : 
+                $prop =~ /adviceDelete/ ? @todel  : 
+                " ";
+                
+ s/\|/_E#S#C_/g for @retarray;                                             # escape Pipe "|" 
  
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
@@ -5962,15 +5994,13 @@ sub delseqdoubl_DoParse {
 
  $dbh->disconnect;
  
- # Daten müssen als Einzeiler zurückgegeben werden
- $rowlist = encode_base64($rowlist,"");
+ $rowlist = encode_base64($rowlist,"");                                    # Daten müssen als Einzeiler zurückgegeben werden
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+ my $brt = tv_interval($bst);                                              # Background-Laufzeit ermitteln
 
  $rt = $rt.",".$brt;
  
-return "$name|$rowlist|$rt|0|$retn|$opt";
+return "$name|$rowlist|$rt|0|$retn|$prop";
 }
 
 ####################################################################################################
@@ -6059,7 +6089,8 @@ sub expfile_DoParse {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $utf8       = $hash->{UTF8} // 0;
+ 
  my ($dbh,$sth,$sql);
  my $err=0;
 
@@ -6252,8 +6283,9 @@ sub impfile_Push {
  my $dblogname  = $dbloghash->{NAME};
  my $dbmodel    = $dbloghash->{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my $err=0;
+ my $utf8       = $hash->{UTF8} // 0;
+ 
+ my $err = 0;
  my $sth;
 
  # Background-Startzeit
@@ -6453,10 +6485,12 @@ sub sqlCmd_DoParse {
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $utf8       = $hash->{UTF8} // 0;
+  
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   my $device     = AttrVal($name, "device",  undef);
   my $reading    = AttrVal($name, "reading", undef);
+  
   my ($err,$dbh,@pms);
 
   # Background-Startzeit
@@ -6799,7 +6833,8 @@ sub dbmeta_DoParse {
  my $dblogname   = $dbloghash->{NAME};
  my $dbpassword  = $attr{"sec$dblogname"}{secret};
  my $dbmodel     = $dbloghash->{MODEL};
- my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $utf8        = $hash->{UTF8} // 0;
+ 
  my ($dbh,$sth,$sql);
  my $err;
 
@@ -8852,7 +8887,7 @@ sub DbRep_syncStandby {
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts,$stbyname) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $table      = "history";
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+ my $utf8       = $hash->{UTF8} // 0;
  my ($dbh,$dbhstby,$err,$sql,$irows,$irowdone);
  # Quell-DB
  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -11447,7 +11482,7 @@ sub DbRep_OutputWriteToDB {
   my $DbLogType  = AttrVal($dblogname, "DbLogType", "History");
   my $supk       = AttrVal($dblogname, "noSupportPK", 0);
   my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $utf8       = $hash->{UTF8} // 0;
   $device        =~ s/[^A-Za-z\/\d_\.-]/\//g;
   $reading       =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $type       = "calculated";
