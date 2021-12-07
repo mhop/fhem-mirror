@@ -13655,9 +13655,11 @@ return;
                                  With the option <b>average=day</b> all numerical values of a day are reduced to a single 
                                  Average value reduced (implies 'average'). <br><br>
 
-                                 The additions "EXCLUDE" and "INCLUDE" can be added to exclude device/reading combinations of reduceLog 
-                                 or to include them. This specification is evaluated as regex and overwrites the setting of the attributes "device". 
-                                 and "reading", which are not considered in this case. <br><br>  
+                                 The additions "EXCLUDE" or "INCLUDE" can be added to exclude or include device/reading combinations in reduceLog
+                                 and override the "device" and "reading" attributes, which are ignored in this case. <br>
+                                 This specification in "EXCLUDE" is evaluated as a <b>regex</b>. Inside "INCLUDE", <b>SQL wildcards</b>
+                                 can be used. (for more information on SQL wildcards, see with <b>get &lt;name&gt; versionNotes 6</b>)
+                                 <br><br>
 
                                  <b>Examples: </b><br><br>
                                  <ul>
