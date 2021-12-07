@@ -262,6 +262,9 @@ my %DbRep_vNotesExtern = (
 
 # Hint Hash en
 my %DbRep_vHintsExt_en = (
+  "6" => "In some places in DbRep SQL wildcard characters can be used. It is explicitly pointed out. <br> ".
+         "A wildcard character can be used to replace any other character(s) in a string.<br> ".
+         "SQL wildcards are <a href=\"http://www.w3bai.com/en-US/sql/sql_wildcards.html\">described in more detail here</a>. ",
   "5" => "The grassland temperature sum (GTS) is a special form of the growth degree days, which is used in agricultural meteorology. ".
          "It is used to determine the date for the beginning of field work after winter in Central Europe.<br> ".
          "All positive daily averages are recorded from the beginning of the year. In January is multiplied by the factor 0.5, in February ".
@@ -289,6 +292,9 @@ my %DbRep_vHintsExt_en = (
 
 # Hint Hash de
 my %DbRep_vHintsExt_de = (
+  "6" => "An einigen Stellen in DbRep können SQL Wildcard-Zeichen verwendet werden. Es wird explizit darauf hingewiesen. <br> ".
+         "Ein Wildcard-Zeichen kann verwendet werden um jedes andere Zeichen in einer Zeichenfolge zu ersetzen.<br> ".
+         "Die SQL-Wildcards sind <a href=\"http://www.w3bai.com/de/sql/sql_wildcards.html\">hier</a> näher beschrieben. ",
   "5" => "Die Grünlandtemperatursumme (GTS) ist eine Spezialform der Wachstumsgradtage, die in der Agrarmeteorologie verwendet wird. ".
          "Sie wird herangezogen, um in Mitteleuropa den Termin für das Einsetzen der Feldarbeit nach dem Winter zu bestimmen.<br> ".
          "Es werden ab Jahresbeginn alle positiven Tagesmittel erfasst. Im Januar wird mit dem Faktor 0,5 multipliziert, im Februar ".
@@ -2042,8 +2048,15 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt =~ m/countEntries/) {
-     my $table = $prop;
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         table   => $prop,
+         device  => $device,
+         reading => $reading,
+         ts      => $ts,
+     };
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", $params, "count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt eq "averageValue") { 
      Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".AttrVal($name,"averageCalcForm","avgArithmeticMean"));
@@ -3328,115 +3341,115 @@ return;
 # nichtblockierende DB-Abfrage count
 ####################################################################################################
 sub count_DoParse {
- my ($string) = @_;
- my ($name,$table,$device,$reading,$ts) = split("\\§", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $ced        = AttrVal($name,"countEntriesDetail",0);
- my $vf         = AttrVal($name,"valueFilter","");
- my ($dbh,$sql,$sth,$err);
+  my $paref   = shift;    
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $table   = $paref->{table};
+  my $device  = $paref->{device};
+  my $reading = $paref->{reading};
+  my $ts      = $paref->{ts};
 
- # Background-Startzeit
- my $bst = [gettimeofday];
- 
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$device|''|$err|$table";
- }
+  my $ced     = AttrVal($name, "countEntriesDetail", 0);
+  my $vf      = AttrVal($name, "valueFilter",       "");
+  
+  my ($dbh,$sql,$sth,$err);
+
+  my $bst = [gettimeofday];                                        # Background-Startzeit
+  
+  ($err,$dbh) = DbRep_dbConnect($name, 0);
+  if ($err) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      return "$name|''|$device|''|$err|$table";
+  }
      
- # only for this block because of warnings if details of readings are not set
- no warnings 'uninitialized'; 
+  no warnings 'uninitialized'; 
  
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
- Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+  my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
+  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
   
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
+  # Timestampstring to Array
+  my @ts = split("\\|", $ts);
+  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
   
- # SQL-Startzeit
- my $st = [gettimeofday];
+  # SQL-Startzeit
+  my $st = [gettimeofday];
     
- # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
- my ($arrstr,@rsf,$ttail);
- my $addon   = '';
- my $selspec = "COUNT(*)";
- if($ced) {
-     $addon   = "group by READING";
-     $selspec = "READING, COUNT(*)";
- }
+  my ($arrstr,@rsf,$ttail);
+  my $addon   = '';
+  my $selspec = "COUNT(*)";
  
- foreach my $row (@ts) {
-     my @a                     = split("#", $row);
-     my $runtime_string        = $a[0];
-     my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];
-     my $tc = 0;
+  if($ced) {
+      $addon   = "group by READING";
+      $selspec = "READING, COUNT(*)";
+  }
+ 
+  for my $row (@ts) {                                                  # DB-Abfrage zeilenweise für jeden Timearray-Eintrag
+      my @a                    = split("#", $row);
+      my $runtime_string       = $a[0];
+      my $runtime_string_first = $a[1];
+      my $runtime_string_next  = $a[2];
+      my $tc = 0;
      
-     if($aggregation eq "hour") {
-         @rsf   = split(/[" "\|":"]/,$runtime_string_first);
-         $ttail = $rsf[0]."_".$rsf[1]."|";         
-     } else {
-         @rsf   = split(" ",$runtime_string_first);
-         $ttail = $rsf[0]."|";         
-     }     
+      if($aggregation eq "hour") {
+          @rsf   = split(/[" "\|":"]/,$runtime_string_first);
+          $ttail = $rsf[0]."_".$rsf[1]."|";         
+      } 
+      else {
+          @rsf   = split(" ",$runtime_string_first);
+          $ttail = $rsf[0]."|";         
+      }     
 
-     if ($IsTimeSet || $IsAggrSet) {
+      if ($IsTimeSet || $IsAggrSet) {
          $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
-     } else {
-         $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon); 
-     }
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+      } 
+      else {
+          $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon); 
+      }
+      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
-     eval{ $sth = $dbh->prepare($sql);
-           $sth->execute();
-         }; 
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - $@");
-         $dbh->disconnect;
-         return "$name|''|$device|''|$err|$table";
-     }
+      eval{ $sth = $dbh->prepare($sql);
+            $sth->execute();
+          }; 
+      if ($@) {
+          $err = encode_base64($@,"");
+          Log3 ($name, 2, "DbRep $name - $@");
+          $dbh->disconnect;
+          return "$name|''|$device|''|$err|$table";
+      }
      
-     if($ced) {
-         # detaillierter Readings-Count
-         while (my @line = $sth->fetchrow_array()) {    
-             Log3 ($name, 5, "DbRep $name - SQL result: @line");  
-             $tc += $line[1] if($line[1]);                                              # total count für Reading
-             $arrstr .= $runtime_string."#".$line[0]."#".$line[1]."#".$ttail;  
-         }
-         # total count (über alle selected Readings) für Zeitabschnitt einfügen
-         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$tc."#".$ttail;
-     } else {
-         my @line = $sth->fetchrow_array();
-         Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
-         $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$line[0]."#".$ttail;
-     }     
- }
+      if($ced) {                                                                         # detaillierter Readings-Count
+          while (my @line = $sth->fetchrow_array()) {    
+              Log3 ($name, 5, "DbRep $name - SQL result: @line");  
+              $tc += $line[1] if($line[1]);                                              # total count für Reading
+              $arrstr .= $runtime_string."#".$line[0]."#".$line[1]."#".$ttail;  
+          }
+         
+          $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$tc."#".$ttail;               # total count (über alle selected Readings) für Zeitabschnitt einfügen
+      } 
+      else {
+          my @line = $sth->fetchrow_array();
+          Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
+          $arrstr .= $runtime_string."#"."ALLREADINGS"."#".$line[0]."#".$ttail;
+      }     
+  }
  
- $sth->finish;
- $dbh->disconnect;
+  $sth->finish;
+  $dbh->disconnect;
  
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
+  my $rt = tv_interval($st);                                # SQL-Laufzeit ermitteln
  
- # Daten müssen als Einzeiler zurückgegeben werden
- $arrstr = encode_base64($arrstr,"");
- $device = encode_base64($device,"");
+  # Daten müssen als Einzeiler zurückgegeben werden
+  $arrstr = encode_base64($arrstr,"");
+  $device = encode_base64($device,"");
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+  # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);
 
- $rt = $rt.",".$brt;
+  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$rt|0|$table";
+return "$name|$arrstr|$device|$rt|0|$table";
 }
 
 ####################################################################################################
@@ -9790,6 +9803,7 @@ sub DbRep_createSelectSql {
  my $dbmodel   = $dbloghash->{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
  my $tnfull    = 0;
+ 
  my ($sql,$vf,@dwc,@rwc);
  
  my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
@@ -9807,6 +9821,7 @@ sub DbRep_createSelectSql {
  }
  
  $sql = "SELECT $selspec FROM $table where ";
+ 
  # included devices
  $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
  if($idevswc && $idevs !~ m(^%$)) {
@@ -9828,6 +9843,7 @@ sub DbRep_createSelectSql {
  $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
  $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
  $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ 
  # excluded devices
  if($edevswc) {
      @dwc = split(",",$edevswc);
@@ -9838,6 +9854,7 @@ sub DbRep_createSelectSql {
  $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
  $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
  $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
+ 
  # included readings
  $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
  if($irdswc && $ireading !~ m(^%$)) {
@@ -9859,6 +9876,7 @@ sub DbRep_createSelectSql {
  $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
  $sql .= "READING IN ($ireading) "            if($iranz > 1);
  $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ 
  # excluded readings
  if($erdswc) {
      @dwc = split(",",$erdswc);
@@ -9869,8 +9887,10 @@ sub DbRep_createSelectSql {
  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
  $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
  $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
+ 
  # add valueFilter
  $sql .= $vf if(defined $vf);
+ 
  # Timestamp Filter
  if (($tf && $tn)) {
      $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
@@ -16338,9 +16358,11 @@ return;
                                  Mit der Option <b>average=day</b> werden alle numerischen Werte eines Tages auf einen einzigen 
                                  Mittelwert reduziert (impliziert 'average'). <br><br>
 
-                                 Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen 
-                                 bzw. einzuschließen. Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" 
-                                 und "reading", die in diesem Fall nicht beachtet werden. 
+                                 Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen in reduceLog auszuschließen 
+                                 bzw. einzuschließen und überschreiben die Einstellung der Attribute "device" und "reading", die in diesem Fall 
+                                 nicht beachtet werden.  <br>
+                                 Diese Angabe in "EXCLUDE" wird als <b>Regex</b> ausgewertet. Innerhalb von "INCLUDE" können <b>SQL-Wildcards</b> 
+                                 verwendet werden (weitere Informationen zu SQL-Wildcards siehe mit <b>get &lt;name&gt; versionNotes 6</b>).
                                  <br><br>      
 
                                  <b>Beispiele: </b><br><br>
