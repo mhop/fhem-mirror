@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.1"  => "07.12.2021  some code improvements ",
   "8.46.0"  => "06.12.2021  reduceLog options INCLUDE / EXCLUCE parse by parseParams ",
   "8.45.0"  => "05.12.2021  revised userExitFn, fix average=day problem in reduceLog (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799) ",
   "8.44.1"  => "27.11.2021  change diffValue: recognize if diff is 0 or no value available ",
@@ -1663,7 +1664,7 @@ sub DbRep_getInitData {
   # Background-Startzeit
   my $bst = [gettimeofday];
   
-  ($err,$dbh) = DbRep_dbConnect($name,0);
+  ($err,$dbh) = DbRep_dbConnect($name, 0);
   if ($err) {
       $err = encode_base64($err,"");
       return "$name|''|''|$err";
@@ -1837,47 +1838,54 @@ return;
 }
 
 ######################################################################################
-#                       Connect zur Datenbank herstellen
+#    Connect zur Datenbank herstellen
+#
+#    $uac:  undef - Verwendung adminCredentials abhängig von Attr useAdminCredentials
+#              0  - adminCredentials werden nicht verwendet
+#              1  - adminCredentials werden immer verwendet
 ######################################################################################
 sub DbRep_dbConnect {
-  my ($name,$uac) = @_;
-  my $hash        = $defs{$name};
-  my $dbconn      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbconn};
-  my $dbuser      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
-  my $dblogname   = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
-  my $dbmodel     = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{MODEL};
-  my $dbpassword  = $attr{"sec$dblogname"}{secret};
-  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  $uac            = $uac?$uac:AttrVal($name, "useAdminCredentials", 0);
+  my $name       = shift;
+  my $uac        = shift // AttrVal($name, "useAdminCredentials", 0); 
+
+  my $hash       = $defs{$name};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbmodel    = $dbloghash->{MODEL};
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
+  
   my ($dbh,$err);
   
   if($uac) {
-      my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+      my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash, "adminCredentials");
+      
       if($success) {
           $dbuser     = $admusername;
           $dbpassword = $admpassword;
-      } else {
+      } 
+      else {
           $err = "Can't use admin credentials for database access, see logfile !";
           Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database operation, but are not set or can't read it");
           return $err;
       }
   }
   
+  Log3 ($name, 4, "DbRep $name - database user for operation: $dbuser") if($dbuser); 
+  
   eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
                                                                     RaiseError          => 1, 
-                                                                    AutoCommit          => 1, 
-                                                                    AutoInactiveDestroy => 1,
+                                                                    AutoCommit          => 1,
+                                                                    AutoInactiveDestroy => 1, 
                                                                     mysql_enable_utf8   => $utf8
-                                                                  } 
-                            ); 
-  };
-  
-  if ($@) {
-      $err = $@;
-      Log3 ($name, 2, "DbRep $name - ERROR: $@");
-  }
-  
-  Log3 ($name, 4, "DbRep $name - database user for operation: $dbuser") if($dbuser); 
+                                                                  }
+                            ); 1;
+       } 
+       or do { $err = $@;
+               Log3 ($name, 2, "DbRep $name - ERROR: $@");
+             };
 
 return ($err,$dbh);
 }
@@ -2042,8 +2050,17 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
  } 
  elsif ($opt eq "fetchrows") {
-     my $table = $prop;             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         table   => $prop,
+         device  => $device,
+         reading => $reading,
+         rsf     => $runtime_string_first,
+         rsn     => $runtime_string_next
+     };
+            
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", $params, "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt =~ /delDoublets/) {
      my $cmd = $prop ? $prop : "adviceDelete"; 
@@ -3485,7 +3502,7 @@ sub count_ParseDone {
   }
   
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate          ($hash, 1);
   
 return;
 }
@@ -5347,86 +5364,84 @@ return;
 # nichtblockierende DB-Abfrage fetchrows
 ####################################################################################################
 sub fetchrows_DoParse {
- my $string     = shift;
- my ($name,$table,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $limit      = AttrVal($name, "limit", 1000);
- my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my $fetchroute = AttrVal($name, "fetchRoute", "descent");
- $fetchroute    = ($fetchroute eq "descent")?"DESC":"ASC";
- my ($err,$dbh,$sth,$sql,$rowlist,$nrows);
+  my $paref                = shift;    
+  my $hash                 = $paref->{hash};
+  my $name                 = $paref->{name};
+  my $table                = $paref->{table};
+  my $device               = $paref->{device};
+  my $reading              = $paref->{reading};
+  my $runtime_string_first = $paref->{rsf};
+  my $runtime_string_next  = $paref->{rsn};
  
- # Background-Startzeit
- my $bst = [gettimeofday];
+  my $utf8                 = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
+  my $limit                = AttrVal($name, "limit", 1000);
+  my $fetchroute           = AttrVal($name, "fetchRoute", "descent");
+  $fetchroute              = $fetchroute eq "descent" ? "DESC" : "ASC";
+ 
+  my ($err,$dbh,$sth,$sql,$rowlist,$nrows);
+ 
+  my $bst = [gettimeofday];                                                           # Background-Startzeit
+            
+  ($err,$dbh) = DbRep_dbConnect($name, 0);
+  if ($err) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      return "$name|''|''|$err|''";
+  }
 
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err|''";
- }
+  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                            # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+ 
+  if ($IsTimeSet) {                                                                   # SQL zusammenstellen für DB-Abfrage
+      $sql = DbRep_createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
+  } 
+  else {
+      $sql = DbRep_createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
+  }
+ 
+  $sth = $dbh->prepare($sql);
+ 
+  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");    
 
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
- Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
+  my $st = [gettimeofday];                                                           # SQL-Startzeit
  
- # SQL zusammenstellen für DB-Abfrage
- if ($IsTimeSet) {
-     $sql = DbRep_createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'","ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
- } 
- else {
-     $sql = DbRep_createSelectSql($hash,$table,"DEVICE,READING,TIMESTAMP,VALUE,UNIT",$device,$reading,undef,undef,"ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
- }
+  eval{$sth->execute();};
+  if ($@) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      $dbh->disconnect;
+      return "$name|''|''|$err|''";
+  } 
  
- $sth = $dbh->prepare($sql);
+  no warnings 'uninitialized'; 
+  my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
  
- Log3 ($name, 4, "DbRep $name - SQL execute: $sql");    
+  use warnings;
+  $nrows = $#row_array+1;                                                            # Anzahl der Ergebniselemente  
+  pop @row_array if($nrows>$limit);                                                  # das zuviel selektierte Element wegpoppen wenn Limit überschritten
+ 
+  s/\|/_E#S#C_/g for @row_array;                                                     # escape Pipe "|"
+ 
+  if ($utf8) {
+      $rowlist = Encode::encode_utf8(join('|', @row_array));
+  } 
+  else {
+      $rowlist = join('|', @row_array);
+  }
+ 
+  Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
+ 
+  my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
 
- # SQL-Startzeit
- my $st = [gettimeofday];
+  $dbh->disconnect;
  
- eval{$sth->execute();};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     return "$name|''|''|$err|''";
- } 
+  $rowlist = encode_base64($rowlist,"");                                             # Daten müssen als Einzeiler zurückgegeben werden
  
- no warnings 'uninitialized'; 
- my @row_array = map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_ESC_".$_->[4]."\n" } @{$sth->fetchall_arrayref()}; 
- 
- use warnings;
- $nrows = $#row_array+1;                # Anzahl der Ergebniselemente  
- pop @row_array if($nrows>$limit);      # das zuviel selektierte Element wegpoppen wenn Limit überschritten
- 
- s/\|/_E#S#C_/g for @row_array;         # escape Pipe "|"
- if ($utf8) {
-     $rowlist = Encode::encode_utf8(join('|', @row_array));
- } else {
-     $rowlist = join('|', @row_array);
- }
- Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
- 
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
+  my $brt = tv_interval($bst);                                                       # Background-Laufzeit ermitteln
 
- $dbh->disconnect;
+  $rt = $rt.",".$brt;
  
- # Daten müssen als Einzeiler zurückgegeben werden
- $rowlist = encode_base64($rowlist,"");
- 
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
-
- $rt = $rt.",".$brt;
- 
- return "$name|$rowlist|$rt|0|$nrows";
+return "$name|$rowlist|$rt|0|$nrows";
 }
 
 ####################################################################################################
@@ -6424,7 +6439,7 @@ sub sqlCmd_DoParse {
   # Background-Startzeit
   my $bst = [gettimeofday];
 
-  ($err,$dbh) = DbRep_dbConnect($name,0);
+  ($err,$dbh) = DbRep_dbConnect($name, 0);
   if ($err) {
       $err = encode_base64($err,"");
       return "$name|''|$opt|$cmd|''|''|$err";
@@ -6619,7 +6634,7 @@ sub sqlCmd_DoParse {
 
   $rt = $rt.",".$brt;
  
-  return "$name|$rowstring|$opt|$cmd|$nrows|$rt|$err";
+return "$name|$rowstring|$opt|$cmd|$nrows|$rt|$err";
 }
 
 ####################################################################################################
@@ -7020,32 +7035,28 @@ sub DbRep_Index {
   my $hash       = $defs{$name};
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $database   = $hash->{DATABASE};
-  my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
-  my $dblogname  = $dbloghash->{NAME};
   my $dbmodel    = $dbloghash->{MODEL};
   my $grants     = $hash->{HELPER}{GRANTS};
-  my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+
   my ($dbh,$err,$sth,$rows,@six);
   my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
   my $p          = 0;
     
   Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
     
-  # Background-Startzeit
-  my $bst = [gettimeofday];
+  my $bst = [gettimeofday];                                         # Background-Startzeit
   
-  # Rechte Check MYSQL
-  if($cmdidx ne "list_all" && $dbmodel =~ /MYSQL/) {
-      if($grants && $grants ne "ALL PRIVILEGES") {
-          # Rechte INDEX und ALTER benötigt
+  if($cmdidx ne "list_all" && $dbmodel =~ /MYSQL/) {                # Rechte Check MYSQL
+      if($grants && $grants ne "ALL PRIVILEGES") {                  # Rechte INDEX und ALTER benötigt
           my $i = index($grants,"INDEX");
           my $a = index($grants,"ALTER");
-          if($i==-1 || $a==-1) {
+          
+          if($i == -1 || $a == -1) {
               $p = 1;
           }
-      } elsif (!$grants) {
+      } 
+      elsif (!$grants) {
           $p = 1;
       }
   }
@@ -7053,7 +7064,7 @@ sub DbRep_Index {
   Log3 ($name, 2, "DbRep $name - user \"$dbuser\" doesn't have rights \"INDEX\" and \"ALTER\" as needed - try use adminCredentials automatically !") 
      if($p);
   
-  ($err,$dbh) = DbRep_dbConnect($name,$p);
+  ($err,$dbh) = DbRep_dbConnect($name, $p);
   if ($err) {
       $err = encode_base64($err,"");
       return "$name|''|''|$err";
@@ -8981,16 +8992,9 @@ sub DbRep_reduceLog {
     my $r          = $paref->{reading};
     my $nts        = $paref->{rsf};
     my $ots        = $paref->{rsn} // "";
-    
-    my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-    my $dbconn     = $dbloghash->{dbconn};
-    my $dbuser     = $dbloghash->{dbuser};
-    my $dblogname  = $dbloghash->{NAME};
-    my $dbmodel    = $dbloghash->{MODEL};
-    my $dbpassword = $attr{"sec$dblogname"}{secret};
+
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
     my $rlpar      = join " ", @a;
-    my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
     
     my $err;
     
@@ -9038,18 +9042,13 @@ sub DbRep_reduceLog {
     if ($excludes) {
         @excludeRegex = split(',',$excludes);
     }
-   
-    eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
-                                                                      RaiseError          => 1, 
-                                                                      AutoInactiveDestroy => 1, 
-                                                                      mysql_enable_utf8   => $utf8
-                                                                    }
-                              ); 1;
-         } 
-         or do { $err = encode_base64($@,"");
-                 Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                 return "$name|''|$err|''";
-               };
+               
+    ($err,$dbh) = DbRep_dbConnect($name, 0);
+    if ($err) {
+        $err = encode_base64($@,"");
+        Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
+        return "$name|''|$err|''";
+    }
                
     my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$d,$r);
     
@@ -9080,15 +9079,13 @@ sub DbRep_reduceLog {
     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
     
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
-          .$avgstring
-          ."\n"
-          .($includes ? "INCLUDE -> $includes " : 
-           ((($idanz || $idevswc || $iranz || $irdswc) ? "INCLUDE -> " : '')
+          .($avgstring ? "\n".$avgstring : '')
+          .($includes  ? "\nINCLUDE -> $includes " : 
+           ((($idanz || $idevswc || $iranz || $irdswc) ? "\nINCLUDE -> " : '')
           . (($idanz || $idevswc)                      ? "Devs: ".($idevs ? $idevs : '').($idevswc ? $idevswc : '').' ' : '').(($iranz || $irdswc) ? "Readings: ".($ireading ? $ireading : '').($irdswc ? $irdswc : '') : '')
            ))
-          ."\n"
-          .($excludes ? "EXCLUDE -> $excludes " : 
-           ((($edanz || $edevswc || $eranz || $erdswc) ? "EXCLUDE -> " : '')
+          .($excludes ? "\nEXCLUDE -> $excludes " : 
+           ((($edanz || $edevswc || $eranz || $erdswc) ? "\nEXCLUDE -> " : '')
           . (($edanz || $edevswc)                      ? "Devs: ".($edevs ? $edevs : '').($edevswc ? $edevswc : '').' ' : '').(($eranz || $erdswc) ? "Readings: ".($ereading ? $ereading : '').($erdswc ? $erdswc : '') : '')
            ))
          );
@@ -10488,8 +10485,8 @@ sub DbRep_normRelTime {
  for my $ey (@a) {     
      if($ey =~ /\b(\d+(:\d+)?)\b/) {
          my ($od,$nd) = split(":", $1);                               # $od - Tage älter als , $nd - Tage neuer als, 
-         $toth        = "d:$od" if($od);                      
-         $tdtn        = "d:$nd" if($nd);
+         $toth        = "d:$od FullDay" if($od);                      # FullDay Option damit der ganze Tag berücksichtigt wird
+         $tdtn        = "d:$nd FullDay" if($nd);
      }
  }
   
@@ -10527,7 +10524,7 @@ sub DbRep_normRelTime {
 
      $tdtn  = $y + $d + $h + $m + $s + 1;                             # one security second for correct create TimeArray
      $tdtn  = DbRep_corrRelTime($name,$tdtn,1);
-     $fdopt = ($aval =~ /.*FullDay.*$/ && $tdtn >= 86400) ? 1 : 0;    # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
+     $fdopt = ($aval =~ /FullDay/x && $tdtn >= 86400) ? 1 : 0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
  
  if($toth && $toth =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
@@ -10564,7 +10561,7 @@ sub DbRep_normRelTime {
 
      $toth  = $y + $d + $h + $m + $s + 1;                             # one security second for correct create TimeArray
      $toth  = DbRep_corrRelTime($name,$toth,0);
-     $fdopt = ($aval =~ /.*FullDay.*$/ && $toth >= 86400) ? 1 : 0;    # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
+     $fdopt = ($aval =~ /FullDay/x && $toth >= 86400) ? 1 : 0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
  
  $fdopt = 1 if($hash->{LASTCMD} =~ /reduceLog/x);                     # reduceLog -> FullDay Option damit der ganze Tag berücksichtigt wird
@@ -10980,7 +10977,7 @@ sub DbRep_getcredentials {
         Log3($name, 2, "DbRep $name - ERROR - $cre not set. Use \"set $name adminCredentials\" first.");
     }
 
-    $success = (defined($passwd))?1:0;
+    $success = (defined($passwd)) ? 1 : 0;
 
 return ($success, $username, $passwd);        
 }
@@ -11936,19 +11933,6 @@ return ($upkh,$upkc,$pkh,$pkc);
 }
 
 ################################################################
-# extrahiert aus dem übergebenen Wert nur die Zahl
-################################################################
-sub DbRep_numval {
-  my $val = shift;
-  
-  return undef if(!defined($val));
-  
-  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
-  
-return $val;
-}
-
-################################################################
 # prüft die logische Gültigkeit der Zeitgrenzen 
 # $runtime_string_first und $runtime_string_next 
 ################################################################
@@ -11970,6 +11954,19 @@ sub DbRep_checkValidTimeSequence {
   } 
   
 return $valid;
+}
+
+################################################################
+# extrahiert aus dem übergebenen Wert nur die Zahl
+################################################################
+sub DbRep_numval {
+  my $val = shift;
+  
+  return undef if(!defined($val));
+  
+  $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
+  
+return $val;
 }
 
 ################################################################
