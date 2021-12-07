@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: fix some problems with reduceLog 
+                     (Forum: #/topic,53584.msg1177799.html#msg1177799
  - feature: 98_weekprofile: support HMCCUCHN with CCU
  - change:  22_HOMEMODE: adapt new help anchors
  - change:  77_UWZ: support for https connection
