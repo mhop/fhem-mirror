@@ -1637,7 +1637,17 @@ sub DbRep_firstconnect {
       # DB Strukturelemente abrufen      
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
       
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", "$name|$opt|$prop|$fret", "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
+      ReadingsSingleUpdateValue ($hash, "state", "read database properties", 1);
+      
+      my $params = {
+          hash => $hash,
+          name => $name,
+          opt  => $opt,
+          prop => $prop,
+          fret => $fret,
+      };
+       
+      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", $params, "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
 
       if($hash->{HELPER}{RUNNING_PID}) {                                                           
           $hash->{HELPER}{RUNNING_PID}{loglevel} = 5;                             # Forum #77057
@@ -1655,31 +1665,26 @@ return;
 #                             DatenDatenbankeigenschaften ermitteln  
 ####################################################################################################
 sub DbRep_getInitData {
-  my $string     = shift;
-  my ($name,$opt,$prop,$fret) = split("\\|", $string);
-  my $hash       = $defs{$name};
-  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
-  my $dblogname  = $dbloghash->{NAME};
-  my $dbmodel    = $dbloghash->{MODEL};
-  my $database   = $hash->{DATABASE};
-  my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $mintsdef   = "1970-01-01 01:00:00";
-  my $idxstate   = "";
-  my ($dbh,$sth,$sql,$err);
+  my $paref    = shift;    
+  my $hash     = $paref->{hash};
+  my $name     = $paref->{name};
+  my $opt      = $paref->{opt};
+  my $prop     = $paref->{prop};
+  my $fret     = $paref->{fret};
 
-  # Background-Startzeit
-  my $bst = [gettimeofday];
+  my $database = $hash->{DATABASE};
+  my $mintsdef = "1970-01-01 01:00:00";
+  my $idxstate = "";
+
+  my $bst = [gettimeofday];                                     # Background-Startzeit
   
-  ($err,$dbh) = DbRep_dbConnect($name, 0);
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   if ($err) {
       $err = encode_base64($err,"");
       return "$name|''|''|$err";
   }
  
-  # SQL-Startzeit
-  my $st = [gettimeofday];
+  my $st = [gettimeofday];                                      # SQL-Startzeit
  
   # ältesten Datensatz der DB ermitteln
   my $mints     = qq{};
@@ -1688,11 +1693,14 @@ sub DbRep_getInitData {
   # Report_Idx Status ermitteln
   my ($ava,$sqlava);
   my $idx = "Report_Idx";
+  
   if($dbmodel =~ /MYSQL/) {
       $sqlava = "SHOW INDEX FROM history where Key_name='$idx';";
-  } elsif($dbmodel =~ /SQLITE/) {
+  } 
+  elsif($dbmodel =~ /SQLITE/) {
       $sqlava = "SELECT name FROM sqlite_master WHERE type='index' AND name='$idx';";
-  } elsif($dbmodel =~ /POSTGRESQL/) {
+  } 
+  elsif($dbmodel =~ /POSTGRESQL/) {
       $sqlava = "SELECT indexname FROM pg_indexes WHERE tablename='history' and indexname ='$idx';";
   } 
   
@@ -1715,7 +1723,8 @@ sub DbRep_getInitData {
   }
   
   # effektive Userrechte in MYSQL ermitteln
-  my ($grants,@uniq);  
+  my ($grants,$sth,@uniq);  
+  
   if($dbmodel =~ /MYSQL/) {
       eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();"); $sth->execute();};
       if($@) {
@@ -1730,23 +1739,26 @@ sub DbRep_getInitData {
                   $row .= (split(" ON ",(split("GRANT ", $l, 2))[1], 2))[0];                 
               }
           }
+          
           $sth->finish;
           my %seen = ();
           my @g    = split(/,(\s?)/, $row);
+          
           for my $e (@g) {
               next if(!$e || $e =~ /^\s+$/);
               $seen{$e}++;
           }
+          
           @uniq   = keys %seen;
           $grants = join(",",@uniq);
+          
           Log3 ($name, 4, "DbRep $name - all grants: $grants");
       }
   }
  
   $dbh->disconnect;
  
-  # SQL-Laufzeit ermitteln
-  my $rt = tv_interval($st);
+  my $rt = tv_interval($st);                                  # SQL-Laufzeit ermitteln
   
   Log3 ($name, 5, "DbRep $name - minimum timestamp found in database: $mints");
  
@@ -1754,19 +1766,14 @@ sub DbRep_getInitData {
   $idxstate = encode_base64($idxstate, "");
   $grants   = encode_base64($grants,   "") if($grants);
  
-  # Background-Laufzeit ermitteln
-  my $brt = tv_interval($bst);
+  my $brt = tv_interval($bst);                                # Background-Laufzeit ermitteln
 
-  $rt = $rt.",".$brt;
+  $rt   = $rt.",".$brt;
   
   $opt  = DbRep_trim ($opt)  if($opt);
   $prop = DbRep_trim ($prop) if($prop);
-  
-  my $ret = "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
-  
-  # Log3 ($name, 5, "DbRep $name - return summary string: $ret");
  
-return $ret;
+return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
 }
 
 ####################################################################################################
@@ -12046,16 +12053,52 @@ sub DbRep_removeLeadingZero {
 return $val;
 }
 
-####################################################################################################
-#       löscht einen Wert vom $hash  des Hauptprozesses aus einem BlockingCall heraus     
-####################################################################################################
+################################################################
+#        Werte aus BlockingCall heraus setzen
+#   Erwartete Liste:
+#   @setl = $name,$setread,$helper
+################################################################
+sub DbRep_setFromBlocking {
+  my $name    = shift;
+  my $setread = shift // "NULL";
+  my $helper  = shift // "NULL";
+  
+  my $hash    = $defs{$name};
+  
+  if($setread ne "NULL") {
+      my @cparts = split ":", $setread, 2;
+      ReadingsSingleUpdateValue ($hash, $cparts[0], $cparts[1], 1);
+  }
+  
+  if($helper ne "NULL") {
+      my ($hnam,$k1,$k2,$k3) = split ":", $helper, 4;
+      
+      if(defined $k3) {
+          $hash->{HELPER}{"$hnam"}{"$k1"}{"$k2"} = $k3;
+      } 
+      elsif (defined $k2) {
+          $hash->{HELPER}{"$hnam"}{"$k1"} = $k2;
+      } 
+      else {
+          $hash->{HELPER}{"$hnam"} = $k1;
+      }
+  }
+
+return 1;
+}
+
+################################################################
+#  löscht einen Wert vom $hash  des Hauptprozesses aus 
+#  einem BlockingCall heraus     
+################################################################
 sub DbRep_delHashValFromBlocking {
   my ($name,$v1,$v2) = @_;
   my $hash        = $defs{$name};
 
   if($v2) {
       delete $hash->{$v1}{$v2};
-  } elsif ($v1) {
+  } 
+  elsif ($v1) {
       delete $hash->{$v1};
   }
 
