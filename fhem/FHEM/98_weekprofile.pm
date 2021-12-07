@@ -29,7 +29,7 @@ my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
 my %LAST_SEND;
 
-my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","weekprofile","dummyWT","WeekdayTimer","MQTT2_DEVICE");
+my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","HMCCUCHN","weekprofile","dummyWT","WeekdayTimer","MQTT2_DEVICE");
 
 my $CONFIG_VERSION = "1.1";
 
@@ -52,7 +52,8 @@ $DEV_READINGS{"Fri"}{"CUL_HM"} = "6_tempListFri";
 $DEV_READINGS{"Sat"}{"CUL_HM"} = "0_tempListSat";
 $DEV_READINGS{"Sun"}{"CUL_HM"} = "1_tempListSun";
 
-# HMCCUDEV HMIP
+# TYPE=HMCCUDEV or HMCCUCHN
+# ccutype=HmIP.*
 $DEV_READINGS{"Mon"}{"HMCCU_IP"} = "MONDAY";
 $DEV_READINGS{"Tue"}{"HMCCU_IP"} = "TUESDAY";
 $DEV_READINGS{"Wed"}{"HMCCU_IP"} = "WEDNESDAY";
@@ -61,7 +62,8 @@ $DEV_READINGS{"Fri"}{"HMCCU_IP"} = "FRIDAY";
 $DEV_READINGS{"Sat"}{"HMCCU_IP"} = "SATURDAY";
 $DEV_READINGS{"Sun"}{"HMCCU_IP"} = "SUNDAY";
 
-# HMCCUDEV HM
+# TYPE=HMCCUDEV or HMCCUCHN
+# ccutype = HM-.*
 $DEV_READINGS{"Mon"}{"HMCCU_HM"} = "MONDAY";
 $DEV_READINGS{"Tue"}{"HMCCU_HM"} = "TUESDAY";
 $DEV_READINGS{"Wed"}{"HMCCU_HM"} = "WEDNESDAY";
@@ -169,7 +171,7 @@ sub weekprofile_getDeviceType($$;$)
   elsif ( ($devType =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
-  elsif ( $devType =~ /HMCCUDEV/){
+  elsif ( $devType =~ /HMCCUDEV/ or $devType =~/HMCCUCHN/){
     my $readonly = AttrVal($device,"readOnly",0);
     if ($readonly) {
       Log3($me, 4, "$me(getDeviceType): $devHash->{NAME} is readonly - ignored");
@@ -182,9 +184,9 @@ sub weekprofile_getDeviceType($$;$)
       return undef if (!defined($model));
     }
     Log3($me, 5, "$me(getDeviceType): $devHash->{NAME}, $model");
-	$type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
+	  $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
     $type = "HMCCU_HM" if ( $model =~ m/HM-.*/ );
-  }
+  }  
 
   return $type if ($sndrcv eq "RCV");
   
@@ -457,7 +459,7 @@ sub weekprofile_sendDevProfile(@)
     eval { $prfData = $json->decode($json_text) };
   }
   
-  my $cmd;
+  my $cmd="";
   if($type eq "MAX") {
     $cmd = "set $device weekProfile ";
     foreach my $day (@dayToTransfer){
@@ -488,13 +490,12 @@ sub weekprofile_sendDevProfile(@)
       $k++;
     }
   } elsif ($type =~ /HMCCU.*/){ 
-    $cmd .= "set $device config" if ($type eq "HMCCU_HM");
+    $cmd .= "set $device config device" if ($type eq "HMCCU_HM");
     $cmd .= "set $device config 1" if ($type eq "HMCCU_IP");
     my $k=0;
     my $dayCnt = scalar(@dayToTransfer);
     my $prefix = weekprofile_get_prefix_HM($device,"ENDTIME_SUNDAY_1",$me);
-    $prefix = "" if ($type eq "HMCCU_HM"); # no prefix by set see topic,46117.msg1104569.html#msg1104569
-    $prefix = ""; # TEST always no prefix by set #msg1113658 
+    $prefix = ""; # always no prefix by set #msg1113658 
     if (!defined($prefix)) {
       Log3($me, 3, "$me(sendDevProfile): no prefix found"); 
       $prefix = ""; 
@@ -508,6 +509,7 @@ sub weekprofile_sendDevProfile(@)
       for (my $i = 0; $i < $tmpCnt; $i++) {
         $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prfData->{$day}->{"temp"}[$i];
         $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prfData->{$day}->{"time"}[$i]);
+        $cmd .= ":" if ($type eq "HMCCU_HM"); # ':' after time see #msg1191311
       }
       $k++;
     }
@@ -1778,8 +1780,8 @@ __END__
   Currently the following devices will by supported:<br>
   <li>MAX</li>
   <li>other weekprofile modules</li>
-  <li>Homematic channel _Clima or _Climate</li>
-  <li>Homematic via HMCCU and HM-IP)</li>
+  <li>Homematic via HM_CUL and channel _Clima or _Climate</li>
+  <li>Homematic via HMCCUDEV, HMCCUCHN)</li>
   <br>
   Additionally, also the following module types can be used as logical intermediates<br> 
   <li>WeekdayTimer</li>
@@ -2020,8 +2022,8 @@ __END__
   übertragen werden. Aktuell wird folgende Hardware unterstützt:
   <li>alle MAX Thermostate</li>
   <li>andere weekprofile Module</li>
-  <li>Homematic (Kanal _Clima bzw. _Climate)</li>
-  <li>Homematic via HMCCU und HM-IP</li>
+  <li>Homematic via CUL_HM (Kanal _Clima bzw. _Climate)</li>
+  <li>Homematic via HMCCUDEV und HMCCUCHN</li>
   <br>
   Weiter können die folgenden Modul-Typen als logische Zwischenschicht eingesetzt werden:<br> 
   <li>WeekdayTimer</li>
