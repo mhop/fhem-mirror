@@ -396,6 +396,88 @@ set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
 setreading DEVICE attrTemplateVersion 20211018
 
+# zigbee2mqtt 2 channel dimmer device
+name:zigbee2mqtt_2channel_dimmer_split
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:For zigbee2mqtt 2 channel dimmer device. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested updated version, should work with MOES MS-105B, see https://forum.fhem.de/index.php/topic,124612.0.html
+order:L_02g1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
+attr DEVICE icon ICON
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0 brightness_l1:brightness brightness_l2:0
+attr DEVICE setList \
+  on:noArg $\DEVICETOPIC/l1/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/l1/set {"state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/l1/set {"state":"TOGGLE"}\
+  brightness:colorpicker,BRI,0,1,254 $\DEVICETOPIC/l1/set {"state":"ON","$EVTPART0":"$EVTPART1"}
+attr DEVICE setStateList on off toggle
+attr DEVICE webCmd brightness
+deletereading -q DEVICE (?!associatedWith|IODev).*
+set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
+attr DEVICE_CH2 setList \
+  on:noArg $\DEVICETOPIC/l2/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/l2/set {"state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/l2/set {"state":"TOGGLE"}\
+  brightness:colorpicker,BRI,0,1,254 $\DEVICETOPIC/l2/set {"state":"ON","$EVTPART0":"$EVTPART1"}
+attr DEVICE_CH2 setStateList on off toggle
+deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
+attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0 brightness_l1:0 brightness_l2:brightness
+set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_light_255
+attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_dimmer_split
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20211207
+
+# zigbee2mqtt air purifier
+name:zigbee2mqtt_air_purifier
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:For zigbee2mqtt air purifier. <br>NOTE: Untested updated version, should work with tradfri STARKVIND, see https://forum.fhem.de/index.php/topic,124515.0.html
+order:L_02i
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to Ventilator_wind;{ AttrVal('DEVICE','icon','Ventilator_wind') }
+attr DEVICE icon ICON
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE getList state:noArg state $\DEVICETOPIC/get {"fan_state": ""}\
+  fan_speed:noArg fan_speed $\DEVICETOPIC/get {"fan_speed": ""}\
+  pm25:noArg pm25 $\DEVICETOPIC/get {"pm25": ""}\
+  air_quality:noArg air_quality $\DEVICETOPIC/get {"air_quality": ""}\
+  child_lock:noArg child_lock $\DEVICETOPIC/get {"child_lock": ""}\
+  replace_filter:noArg replace_filter $\DEVICETOPIC/get {"replace_filter": ""}
+attr DEVICE jsonMap fan_state:state state_l2:0 brightness_l1:brightness brightness_l2:0
+attr DEVICE setList \
+  on:noArg $\DEVICETOPIC/set {"fan_state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"fan_state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"fan_state":"TOGGLE"}\
+  fan_mode:off,auto,1,2,3,4,5,6,7,8,9 $\DEVICETOPIC/set {"fan_mode": "$EVTPART1"}
+attr DEVICE setStateList on off toggle
+attr DEVICE webCmd fan_mode
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model zigbee2mqtt_air_purifier
+setreading DEVICE attrTemplateVersion 20211207
+
+# zigbee2mqtt air quality sensor
+name:zigbee2mqtt_air_quality
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:For zigbee2mqtt air quality sensor. <br>NOTE: Untested updated version, should work with tradfri frient A/S, see https://forum.fhem.de/index.php/topic,124515.0.html
+order:L_02i
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to feinstaub_pm25;{ AttrVal('DEVICE','icon','feinstaub_pm25') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC/availability:.* availability\
+  $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap battery:batteryPercent voltage:batterymV
+attr DEVICE stateFormat air quality: air_quality, VOC: voc, Hum: humidity
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE model zigbee2mqtt_air_quality
+setreading DEVICE attrTemplateVersion 20211207
+
 name:zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_03
@@ -408,6 +490,8 @@ attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE stateFormat smoke
 attr DEVICE model zigbee2mqtt_smokeDetector
 setreading DEVICE attrTemplateVersion 20200904
+
+
 
 name:zigbee2mqtt_hueMotionSensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
@@ -4076,7 +4160,7 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/LWT:.* LWT\
   BASE_ID/DEVNAME/version:.* version\
   BASE_ID/DEVNAME/SYStoMQTT[:/].* { json2nameValue($EVENT,'Sys_')}\
-  BASE_ID/home_presence/.* {}/
+  BASE_ID/home_presence/.* {}\
   homeassistant/.+?/config:.* { }
 attr DEVICE setList\
   restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
@@ -4086,7 +4170,7 @@ LWT\
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20210607
+setreading DEVICE attrTemplateVersion 20211207
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
