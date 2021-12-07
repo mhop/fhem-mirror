@@ -1893,7 +1893,7 @@ sub DbRep_dbConnect {
                Log3 ($name, 2, "DbRep $name - ERROR: $@");
              };
 
-return ($err,$dbh);
+return ($err,$dbh,$dbmodel);
 }
 
 ################################################################################################################
@@ -2045,7 +2045,16 @@ sub DbRep_Main {
  #####  Funktionsaufrufe #####
  ############################# 
  if ($opt eq "sumValue") {
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         device  => $device,
+         reading => $reading,
+         prop    => $prop,
+         ts      => $ts,
+     };
+     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", $params, "sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt =~ m/countEntries/) {
      $params = {
@@ -2059,8 +2068,16 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", $params, "count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt eq "averageValue") { 
-     Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".AttrVal($name,"averageCalcForm","avgArithmeticMean"));
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         device  => $device,
+         reading => $reading,
+         prop    => $prop,
+         ts      => $ts,
+     };
+     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", $params, "averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
  } 
  elsif ($opt eq "fetchrows") {
      $params = {
@@ -2076,8 +2093,7 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", $params, "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt =~ /delDoublets/) {
-     my $cmd = $prop ? $prop : "adviceDelete"; 
-     # delseqdoubl_ParseDone ist Auswertefunktion auch für delDoublets
+     my $cmd = $prop ? $prop : "adviceDelete";
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt =~ /delSeqDoublets/) {
@@ -2880,34 +2896,32 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 # nichtblockierende DB-Abfrage averageValue
 ####################################################################################################
 sub averval_DoParse {
- my $string = shift;
- my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $paref   = shift;    
+ my $hash    = $paref->{hash};
+ my $name    = $paref->{name};
+ my $device  = $paref->{device};
+ my $reading = $paref->{reading};
+ my $prop    = $paref->{prop};
+ my $ts      = $paref->{ts};
+  
  my $acf        = AttrVal($name, "averageCalcForm", "avgArithmeticMean");         # Festlegung Berechnungsschema f. Mittelwert
  my $qlf        = "avg";
  
  my ($gts,$gtsstr) = (0,q{});                                                     # Variablen für Grünlandtemperatursumme GTS
  my $gtsreached;
  
- my ($dbh,$sql,$sth,$err,$selspec,$addon);
+ my ($sql,$sth,$selspec,$addon);
 
  my $bst = [gettimeofday];                                                        # Background-Startzeit
-
- eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
-                                                                   RaiseError => 1, 
-                                                                   AutoInactiveDestroy => 1 
-                                                                 }
-                           ); 1;
-      } 
-      or do { $err = encode_base64($@,"");
-              Log3 ($name, 2, "DbRep $name - $@");
-              return "$name|''|$device|$reading|''|$err|''";
- };
+ 
+ my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ if ($err) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|$device|$reading|''|$err|''";
+ }
+ 
+ Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".$acf);
      
  no warnings 'uninitialized'; 
   
@@ -2920,13 +2934,13 @@ sub averval_DoParse {
  if($acf eq "avgArithmeticMean") {                                                # arithmetischer Mittelwert
                                                                                   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
      $addon = '';
-     if ($dbloghash->{MODEL} eq "POSTGRESQL") {
+     if ($dbmodel eq "POSTGRESQL") {
          $selspec = "AVG(VALUE::numeric)";
      } 
-     elsif ($dbloghash->{MODEL} eq "MYSQL") {
+     elsif ($dbmodel eq "MYSQL") {
          $selspec = "AVG(VALUE)";
      } 
-     elsif ($dbloghash->{MODEL} eq "SQLITE") {
+     elsif ($dbmodel eq "SQLITE") {
          $selspec = "AVG(VALUE)";
      } 
      else {
@@ -3218,18 +3232,16 @@ sub averval_DoParse {
      }
      $rt = $rt+$wrt;
  }
-  
- # Daten müssen als Einzeiler zurückgegeben werden
- $arrstr = encode_base64($arrstr,"");
+
+ $arrstr = encode_base64($arrstr,"");                                                              # Daten müssen als Einzeiler zurückgegeben werden
  $device = encode_base64($device,"");
  $gtsstr = encode_base64($gtsstr,"");
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+ my $brt = tv_interval($bst);                                                                      # Background-Laufzeit ermitteln
 
  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$reading|$rt|0|$irowdone|$gtsstr|$gtsreached";
+return "$name|$arrstr|$device|$reading|$rt|0|$irowdone|$gtsstr|$gtsreached";
 }
 
 ####################################################################################################
@@ -4418,22 +4430,20 @@ return;
 #                             nichtblockierende DB-Abfrage sumValue
 ####################################################################################################
 sub sumval_DoParse {
- my $string = shift;
- my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
+ my $paref   = shift;    
+ my $hash    = $paref->{hash};
+ my $name    = $paref->{name};
+ my $device  = $paref->{device};
+ my $reading = $paref->{reading};
+ my $prop    = $paref->{prop};
+ my $ts      = $paref->{ts};
  
- my ($dbh,$sql,$sth,$err,$selspec);
+ my ($sql,$sth,$selspec);
 
- # Background-Startzeit
- my $bst = [gettimeofday];
+ my $bst = [gettimeofday];                                                           # Background-Startzeit
  
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
- if ($@) {
+ my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ if ($err) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      return "$name|''|$device|$reading|''|$err|''";
@@ -4447,13 +4457,13 @@ sub sumval_DoParse {
  my @ts = split("\\|", $ts);                                                         # Timestampstring to Array
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
- if ($dbloghash->{MODEL} eq "POSTGRESQL") {                                          #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
+ if ($dbmodel eq "POSTGRESQL") {                                                     #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
      $selspec = "SUM(VALUE::numeric)";
  } 
- elsif ($dbloghash->{MODEL} eq "MYSQL") {
+ elsif ($dbmodel eq "MYSQL") {
      $selspec = "SUM(VALUE)";
  } 
- elsif ($dbloghash->{MODEL} eq "SQLITE") {
+ elsif ($dbmodel eq "SQLITE") {
      $selspec = "SUM(VALUE)";
  } 
  else {
@@ -4530,7 +4540,7 @@ sub sumval_DoParse {
 
  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$reading|$rt|0|$irowdone";
+return "$name|$arrstr|$device|$reading|$rt|0|$irowdone";
 }
 
 ####################################################################################################
@@ -11556,8 +11566,7 @@ sub DbRep_OutputWriteToDB {
       }
   }   
   
-  if (@row_array) {
-      # Schreibzyklus aktivieren
+  if (@row_array) {                                                  # Schreibzyklus aktivieren
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
       if ($@) {
           $err = $@;
@@ -13657,7 +13666,7 @@ return;
 
                                  The additions "EXCLUDE" or "INCLUDE" can be added to exclude or include device/reading combinations in reduceLog
                                  and override the "device" and "reading" attributes, which are ignored in this case. <br>
-                                 This specification in "EXCLUDE" is evaluated as a <b>regex</b>. Inside "INCLUDE", <b>SQL wildcards</b>
+                                 The specification in "EXCLUDE" is evaluated as a <b>regex</b>. Inside "INCLUDE", <b>SQL wildcards</b>
                                  can be used. (for more information on SQL wildcards, see with <b>get &lt;name&gt; versionNotes 6</b>)
                                  <br><br>
 
@@ -16363,7 +16372,7 @@ return;
                                  Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen in reduceLog auszuschließen 
                                  bzw. einzuschließen und überschreiben die Einstellung der Attribute "device" und "reading", die in diesem Fall 
                                  nicht beachtet werden.  <br>
-                                 Diese Angabe in "EXCLUDE" wird als <b>Regex</b> ausgewertet. Innerhalb von "INCLUDE" können <b>SQL-Wildcards</b> 
+                                 Die Angabe in "EXCLUDE" wird als <b>Regex</b> ausgewertet. Innerhalb von "INCLUDE" können <b>SQL-Wildcards</b> 
                                  verwendet werden (weitere Informationen zu SQL-Wildcards siehe mit <b>get &lt;name&gt; versionNotes 6</b>).
                                  <br><br>      
 
