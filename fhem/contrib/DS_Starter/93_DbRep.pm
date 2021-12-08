@@ -4792,21 +4792,14 @@ sub insert_Push {
  my ($name)     = @_;
  my $hash       = $defs{$name};
  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
- my $utf8       = $hash->{UTF8} // 0;
  
- my ($err,$sth);
+ my $sth;
  
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- my $dbh;
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- 
- if ($@) {
+ my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ if ($err) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      return "$name|''|''|$err";
