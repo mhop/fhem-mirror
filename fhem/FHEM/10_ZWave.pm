@@ -1023,7 +1023,7 @@ ZWave_Cmd($$@)
   my ($type, $hash, @a) = @_;
   return "no $type argument specified" if(int(@a) < 2);
   my $name = shift(@a);
-  my $fullCmd = "$name $type ".join(" ",@a);
+  my $fullCmd = $type." ".join(" ",@a);
   my $cmd  = shift(@a);
 
   # Collect the commands from the distinct classes
@@ -3973,7 +3973,7 @@ ZWave_secAddToSendStack($$;$)
   my $id = $hash->{nodeIdHex};
   my $len = sprintf("%02x", (length($cmd)-2)/2+1);
   my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
-  my $data = "13$id$len$cmd$cmdEf" . ZWave_callbackId($hash, "$name $cmdTxt");
+  my $data = "13$id$len$cmd$cmdEf" . ZWave_callbackId($hash, $cmdTxt);
   ZWave_addToSendStack($hash, "set", $data);
 }
 
@@ -4672,7 +4672,7 @@ ZWave_callbackId($;$)
     my $hx = sprintf("%02x", $zwave_cbid);
     $zwave_cbid2dev{$hx} = $p;
     #Log 1, "CB: $cmd => $hx" if($cmd);
-    $zwave_cbid2cmd{$hx} = $cmd if(defined($cmd));
+    $zwave_cbid2cmd{$p->{NAME}." ".$hx} = $cmd if(defined($cmd)); #124576
     return $hx;
   }
   return $zwave_cbid2dev{$p};
@@ -5232,12 +5232,13 @@ ZWave_Parse($$@)
           }
 
           if($iodev->{setReadingOnAck}) {
-            my $ackCmd = $zwave_cbid2cmd{$callbackid};
+            my $ackCmd = $zwave_cbid2cmd{"$lname $callbackid"};
             if($ackCmd) {
               #Log 1, "ACK: $callbackid => $ackCmd";
-              my ($ackName, $type, $reading, $val) = split(" ", $ackCmd, 3);
-              readingsBulkUpdate($lhash, $reading, $val, 1)      #124576
-                  if($ackName eq $lname && $type eq "set" && defined($val));
+              my ($type, $reading, $val) = split(" ", $ackCmd, 3);
+              readingsBulkUpdate($lhash, $reading, $val, 1)
+                  if($type eq "set" && defined($val));
+              delete($zwave_cbid2cmd{"$lname $callbackid"});
               $name = $lname;
             }
           }
