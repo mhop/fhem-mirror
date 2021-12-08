@@ -886,7 +886,7 @@ HttpUtils_ParseAnswer($)
 
   }
   
-  if(($code==301 || $code==302 || $code==303) 
+  if(($code==301 || $code==302 || $code==303 || $code==308)
 	&& !$hash->{ignoreredirects}) { # redirect
     if(++$hash->{redirects} > 5) {
       return ("$hash->{displayurl}: Too many redirects", "");
