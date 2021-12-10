@@ -5234,7 +5234,7 @@ ZWave_Parse($$@)
           if($iodev->{setReadingOnAck}) {
             my $ackCmd = $zwave_cbid2cmd{"$lname $callbackid"};
             if($ackCmd) {
-              #Log 1, "ACK: $callbackid => $ackCmd";
+              #Log 1, "ACK: $lname $msg $callbackid => $ackCmd";
               my ($type, $reading, $val) = split(" ", $ackCmd, 3);
               readingsBulkUpdate($lhash, $reading, $val, 1)
                   if($type eq "set" && defined($val));

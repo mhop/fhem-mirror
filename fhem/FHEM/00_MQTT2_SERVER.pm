@@ -244,7 +244,7 @@ MQTT2_SERVER_out($$$;$)
   if($dump) {
     my $cpt = $cptype{ord(substr($msg,0,1)) >> 4};
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $dump, 5, "out: $cpt: $msg";
+    Log3 $dump, 5, "out\@$hash->{FD} $cpt: $msg";
   }
 }
 
@@ -311,7 +311,7 @@ MQTT2_SERVER_Read($@)
   if($dump) {
     my $msg = substr($hash->{BUF}, 0, $off+$tlen);
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $sname, 5, "in:  $cpt: $msg";
+    Log3 $sname, 5, "in\@$hash->{FD} $cpt: $msg";
   }
 
   $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
@@ -334,7 +334,8 @@ MQTT2_SERVER_Read($@)
     $hash->{protoNum}  = unpack('C*', substr($pl,$off++,1)); # 3 or 4
     $hash->{cflags}    = unpack('C*', substr($pl,$off++,1));
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
-    ($hash->{cid}, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
+    my $cid;
+    ($cid, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
     if($hash->{protoNum} > 4) {
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump,
@@ -370,6 +371,7 @@ MQTT2_SERVER_Read($@)
 
     $hash->{subscriptions} = {};
     $defs{$sname}{clients}{$cname} = 1;
+    $hash->{cid} = $cid; #124699
 
     Log3 $sname, 4, "  $cname cid:$hash->{cid} $cpt V:$hash->{protoNum} $desc";
     MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 0), $dump); # CONNACK+OK
