@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: Pragma query possible in sqlCmd, new getter initData
+                      minor fixes
  - bugfix:  88_HMCCU: Several improvements and bug fixes
  - bugfix:  93_DbRep: fix some problems with reduceLog 
                      (Forum: #/topic,53584.msg1177799.html#msg1177799
