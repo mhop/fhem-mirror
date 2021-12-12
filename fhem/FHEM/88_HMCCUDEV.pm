@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 213281908';
+my $HMCCUDEV_VERSION = '5.0 213461309';
 
 ######################################################################
 # Initialize module
@@ -52,7 +52,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccuaggregate:textField-long ccucalculate:textField-long '. 
-		'ccuflags:multiple-strict,ackState,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
+		'ccuflags:multiple-strict,ackState,noBoundsChecking,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
 		'ccureadingfilter:textField-long '.
 		'ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc '.
 		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix '.
@@ -259,7 +259,7 @@ sub HMCCUDEV_InitDevice ($$)
 		}
 
 		# Update readings
-		HMCCU_GetUpdate ($devHash, $da, 'Value');
+		HMCCU_GetUpdate ($devHash, $da);
 	}
 
 	# Parse group options
@@ -445,7 +445,7 @@ sub HMCCUDEV_Set ($@)
 	elsif ($lcopt =~ /^(config|values)$/) {
 		return HMCCU_ExecuteSetParameterCommand ($ioHash, $hash, $opt, $a, $h);
 	}
-	elsif ($lcopt =~ 'readingfilter') {
+	elsif ($lcopt eq 'readingfilter') {
 		my $filter = shift @$a // return HMCCU_SetError ($hash, "Usage: set $name readingFilter {datapointList}");
 		$filter = join(';', map { (my $f = $_) =~ s/\.(.+)/\.\^$1\$/; $f } split(',', $filter));
 		return CommandAttr (undef, "$name ccureadingfilter $filter");
