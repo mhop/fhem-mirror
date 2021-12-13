@@ -4671,8 +4671,11 @@ ZWave_callbackId($;$)
     $zwave_cbid = ($zwave_cbid+1) % 256;
     my $hx = sprintf("%02x", $zwave_cbid);
     $zwave_cbid2dev{$hx} = $p;
-    #Log 1, "CB: $cmd => $hx" if($cmd);
-    $zwave_cbid2cmd{$p->{NAME}." ".$hx} = $cmd if(defined($cmd)); #124576
+    my $iodev = $p->{IODev};
+    if($cmd && ref($iodev) eq "HASH" && $iodev->{setReadingOnAck}) {
+      Log3 $iodev, 5, "ReadingOnAck $p->{NAME} '$cmd' => $hx";
+      $zwave_cbid2cmd{"$p->{NAME} $hx"} = $cmd;
+    }
     return $hx;
   }
   return $zwave_cbid2dev{$p};
@@ -5234,7 +5237,7 @@ ZWave_Parse($$@)
           if($iodev->{setReadingOnAck}) {
             my $ackCmd = $zwave_cbid2cmd{"$lname $callbackid"};
             if($ackCmd) {
-              #Log 1, "ACK: $lname $msg $callbackid => $ackCmd";
+              Log3 $iodev, 5, "ReadingOnAck $lname $callbackid => '$ackCmd'";
               my ($type, $reading, $val) = split(" ", $ackCmd, 3);
               readingsBulkUpdate($lhash, $reading, $val, 1)
                   if($type eq "set" && defined($val));
