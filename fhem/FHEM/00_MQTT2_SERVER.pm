@@ -240,11 +240,12 @@ sub
 MQTT2_SERVER_out($$$;$)
 {
   my ($hash, $msg, $dump, $callback) = @_;
-  addToWritebuffer($hash, $msg, $callback);
+  addToWritebuffer($hash, $msg, $callback) if(defined($hash->{FD}));
   if($dump) {
     my $cpt = $cptype{ord(substr($msg,0,1)) >> 4};
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $dump, 5, "out\@$hash->{FD} $cpt: $msg";
+    my $fd = defined($hash->{FD}) ? $hash->{FD} : "NoFd";
+    Log3 $dump, 5, "out\@$fd $cpt: $msg";
   }
 }
 
@@ -311,7 +312,8 @@ MQTT2_SERVER_Read($@)
   if($dump) {
     my $msg = substr($hash->{BUF}, 0, $off+$tlen);
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $sname, 5, "in\@$hash->{FD} $cpt: $msg";
+    my $fd = defined($hash->{FD}) ? $hash->{FD} : "NoFd";
+    Log3 $sname, 5, "in\@$fd $cpt: $msg";
   }
 
   $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
