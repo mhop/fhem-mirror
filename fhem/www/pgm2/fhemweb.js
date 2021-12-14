@@ -1582,9 +1582,9 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).attr('name', elName);
   if(cmd)
     $(newEl).change(function(arg) { cmd($(newEl).val()) });
-  newEl.setValueFn = function(arg) { 
+  newEl.setValueFn = function(arg) {
     if(!vHash[arg] && typeof(arg) != "undefined")
-      arg = arg.replaceAll(" ",".");    // Forum #124505
+      arg = (arg+"").replaceAll(" ",".");    // Forum #124505
     if(vHash[arg])
       $(newEl).val(arg);
   };
