@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.4"  => "14.12.2021  fix tableCurrentPurge ",
   "8.46.3"  => "12.12.2021  edit/fix minor faults in exportToFile/importFromFile, new getter initData ",
   "8.46.2"  => "08.12.2021  Pragma query possible in sqlCmd. So far only 'set', get encoding info from database ",
   "8.46.1"  => "07.12.2021  some code improvements ",
@@ -2266,9 +2267,15 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", $params, "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "tableCurrentPurge") {
-     undef $runtime_string_first;
-     undef $runtime_string_next;      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         table   => "current",
+         device  => $device,
+         reading => $reading,
+     };
+     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", $params, "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "tableCurrentFillup") {         
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "DbRep_ParseAborted", $hash);
@@ -10345,7 +10352,7 @@ return ("$hh:$mm:$ss");
 }
 
 ####################################################################################################
-#    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. überseuern (je nach Funktion)
+#    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. übersteuern (je nach Funktion)
 #    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
 sub DbRep_checktimeaggr {
@@ -10369,7 +10376,7 @@ sub DbRep_checktimeaggr {
       AttrVal($name,"timeDiffToNow",   undef) || 
       AttrVal($name,"timeOlderThan",   undef) || 
       AttrVal($name,"timeYearPeriod",  undef) || $timeoption ) {
-    $IsTimeSet = 1;
+     $IsTimeSet = 1;
  }
  
  if ($aggregation ne "no") {
