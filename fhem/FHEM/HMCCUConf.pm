@@ -76,6 +76,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'BRIGHTNESS_TRANSMITTER' => {
 		F => 3, S => 'CURRENT_ILLUMINATION', C => '', V => '', P => 2
 	},
+	'CAPACITIVE_FILLING_LEVEL_SENSOR' => {
+		F => 3, S => 'FILLING_LEVEL', C => '', V => '', P => 2
+	},
 	'CLIMATE_TRANSCEIVER' => {
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => '', V => '', P => 1
 	},
@@ -151,6 +154,12 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		F => 3, S => 'PRESENCE_DETECTION_STATE', C => 'PRESENCE_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
 	},
+	'RAINDETECTOR' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 1
+	},
+	'RAINDETECTOR_HEAT' => {
+		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
+	},
 	'ROTARY_HANDLE_SENSOR' => {
 		F => 3, S => 'STATE', C => '', V => '', P => 2
 	},
@@ -215,6 +224,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 ######################################################################
 
 %HMCCU_READINGS = (
+	'ACCELERATION_TRANSCEIVER' =>
+		'^(C#\.)?MOTION:motion',
 	'ARMING' =>
 		'^(C#\.)?ARMSTATE$:+armState',
 	'BLIND' =>
@@ -223,14 +234,17 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?LEVEL$:+pct,+level;^(C#\.)?LEVEL_2$:+pctSlats',
 	'BLIND_VIRTUAL_RECEIVER' =>
 		'^(C#\.)?LEVEL$:+pct,+level',
-	'SHUTTER_TRANSMITTER' =>
-		'^(C#\.)?LEVEL$:+pct,+level',
-	'SHUTTER_VIRTUAL_RECEIVER' =>
-		'^(C#\.)?LEVEL$:+pct,+level',
-	'SWITCH_PANIC' =>
-		'^(C#\.)?STATE$:+panic',
-	'SWITCH_SENSOR' =>
-		'^(C#\.)?STATE$:+sensor',
+	'CAPACITIVE_FILLING_LEVEL_SENSOR' =>
+		'^(C#\.)?FILLING_LEVEL$:+level',
+	'CLIMATECONTROL_REGULATOR' =>
+		'^(C#\.)?SETPOINT$:+desired-temp',
+	'CLIMATECONTROL_RT_TRANSCEIVER' =>
+		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'^(C#\.)?SET_TEMPERATURE$:+desired-temp',
+	'CLIMATE_TRANSCEIVER' =>
+		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity',
 	'DIMMER' =>
 		'^(C#\.)?LEVEL$:+pct,+level',
 	'DIMMER_TRANSMITTER' =>
@@ -239,46 +253,43 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?LEVEL$:+pct,+level;(C#\.)?COLOR$:+color',
 	'DIMMER_WEEK_PROFILE' =>
 		'^(C#\.)?WEEK_PROGRAM_CHANNEL_LOCKS$:+progMode',
+	'HEATING_CLIMATECONTROL_TRANSCEIVER' =>
+		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'^(C#\.)?HUMIDITY$:+humidity;'.
+		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'^(C#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
 	'JALOUSIE' =>
 		'^(C#\.)?LEVEL$:+pct,+level;(C#\.)?LEVEL_SLATS$:+pctSlats',
 	'KEY' =>
 		'^(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
 	'KEY_TRANSCEIVER' =>
 		'^(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
-	'VIRTUAL_KEY' =>
-		'^(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
-	'ACCELERATION_TRANSCEIVER' =>
-		'^(C#\.)?MOTION:motion',
 	'MOTION_DETECTOR' =>
 		'^(C#\.)?BRIGHTNESS$:brightness;(C#\.)?MOTION:motion',
 	'MOTIONDETECTOR_TRANSCEIVER' =>
 		'^(C#\.)?ILLUMINATION$:brightness;^(C#\.)?MOTION$:motion;(C#\.)?MOTION_DETECTION_ACTIVE$:detection',
 	'PRESENCEDETECTOR_TRANSCEIVER' =>
 		'^(C#\.)?ILLUMINATION$:brightness;(C#\.)?PRESENCE_DETECTION_STATE:presence;(C#\.)?PRESENCE_DETECTION_ACTIVE:detection',
+	'SHUTTER_TRANSMITTER' =>
+		'^(C#\.)?LEVEL$:+pct,+level',
+	'SHUTTER_VIRTUAL_RECEIVER' =>
+		'^(C#\.)?LEVEL$:+pct,+level',
+	'SWITCH_PANIC' =>
+		'^(C#\.)?STATE$:+panic',
+	'SWITCH_SENSOR' =>
+		'^(C#\.)?STATE$:+sensor',
+	'THERMALCONTROL_TRANSMIT' =>
+		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'^(C#\.)?SET_TEMPERATURE$:+desired-temp',
+	'VIRTUAL_KEY' =>
+		'^(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
 	'WEATHER' =>
 		'^(C#\.)?TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?HUMIDITY$:+humidity',
 	'WEATHER_TRANSMIT' =>
 		'^(C#\.)?TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?HUMIDITY$:+humidity',
-	'CLIMATE_TRANSCEIVER' =>
-		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity',
-	'THERMALCONTROL_TRANSMIT' =>
-		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'^(C#\.)?SET_TEMPERATURE$:+desired-temp',
-	'CLIMATECONTROL_RT_TRANSCEIVER' =>
-		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'^(C#\.)?SET_TEMPERATURE$:+desired-temp',
-	'HEATING_CLIMATECONTROL_TRANSCEIVER' =>
-		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'^(C#\.)?HUMIDITY$:+humidity;'.
-		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'^(C#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
-	'CLIMATECONTROL_REGULATOR' =>
-		'^(C#\.)?SETPOINT$:+desired-temp',
 	'DEFAULT' =>
 		'^([0-9]{1,2}\.)?LEVEL$:+pct,+level;'.
 		'^([0-9]{1,2}\.)?SET_TEMPERATURE$:+desired-temp;'.
@@ -351,9 +362,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'up' => 'V:LEVEL:?delta=+20',
 		'down' => 'V:LEVEL:?delta=-20',
 		'stop' => 'V:STOP:1',
-		'pctSlats' => 'V:LEVEL_2:?level V:LEVEL:101',
-		'openSlats' => 'V:LEVEL_2:100 V:LEVEL:101',
-		'closeSlats' => 'V:LEVEL_2:0 V:LEVEL:101',
+		'pctSlats' => 'V:LEVEL_2:?level V:LEVEL:100.5',
+		'openSlats' => 'V:LEVEL_2:100 V:LEVEL:100.5',
+		'closeSlats' => 'V:LEVEL_2:0 V:LEVEL:100.5',
 	},
 	'CLIMATECONTROL_REGULATOR' => {
 		'desired-temp' => 'V:SETPOINT:?temperature',
@@ -441,6 +452,12 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		'detection' => 'V:PRESENCE_DETECTION_ACTIVE:#detection=inactive,active',
 		'reset' => 'V:RESET_PRESENCE:true'
+	},
+	'RAINDETECTOR_HEAT' => {
+		'on' => 'V:STATE:1',
+		'off' => 'V:STATE:0',
+		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
+		'on-till' => 'V:ON_TIME:?time V:STATE:1'
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'pct' => 'V:LEVEL:?level',
@@ -578,6 +595,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'cmdIcon' => 'reset:rc_BACK',
 		'webCmd' => 'detection:reset'
 	},
+	'RAINDETECTOR_HEAT' => {
+		'cmdIcon' => 'on:general_an off:general_aus'
+	},
 	'SHUTTER_CONTACT'  => {
 		'_none_' => ''
 	},
@@ -682,6 +702,12 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'VIRTUAL_KEY' => {
 		'PRESS_SHORT' => { '1' => 'pressed', 'true' => 'pressed' },
 		'PRESS_LONG' =>  { '1' => 'pressed', 'true' => 'pressed' }
+	},
+	'RAINDETECTOR' => {
+		'STATE' => { '0' => 'dry', 1 => 'rain' }
+	},
+	'RAINDETECTOR_HEAT' => {
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' }
 	},
 	'SHUTTER_CONTACT' => {
 		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }

@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 213461309';
+my $HMCCU_VERSION = '5.0 213491649';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -286,7 +286,6 @@ sub HMCCU_GetFirmwareVersions ($$);
 sub HMCCU_GetGroupMembers ($$);
 sub HMCCU_GetMatchingDevices ($$$$);
 sub HMCCU_GetParamDef ($$$;$);
-sub HMCCU_GetParamValueConversion ($$$$$);
 sub HMCCU_GetReceivers ($$$);
 sub HMCCU_IsValidChannel ($$$);
 sub HMCCU_IsValidDevice ($$$);
@@ -2877,20 +2876,30 @@ sub HMCCU_Substitute ($$$$$;$$)
 		return $HMCCU_CONVERSIONS->{DEFAULT}{$dpt}{$value};
 	}
 	
-	# Substitute enumerations
+	# Substitute enumerations and default parameter type conversions
 	if (defined($devDesc) && defined($ioHash)) {
 		my $paramDef = HMCCU_GetParamDef ($ioHash, $devDesc, 'VALUES', $dpt);
-		if (!defined($paramDef) && defined($paramDef->{TYPE}) &&
-			$paramDef->{TYPE} eq 'ENUM' && defined($paramDef->{VALUE_LIST})) {
-			my $i = defined($paramDef->{MIN}) ? $paramDef->{MIN} : 0;
-			if ($mode) {
-				my %enumVals = map { $_ => $i++ } split(',', $paramDef->{VALUE_LIST});
-				return $enumVals{$value} if (exists($enumVals{$value}));
+		if (defined($paramDef) && defined($paramDef->{TYPE})) {
+			my %ct = (
+				'BOOL' => { '0' => 'false', '1' => 'true' }
+			);
+			my $parType = $paramDef->{TYPE};
+			if ($parType eq 'ENUM' && defined($paramDef->{VALUE_LIST})) {
+				my $i = defined($paramDef->{MIN}) ? $paramDef->{MIN} : 0;
+				if ($mode == 1) {
+					my %enumVals = map { $_ => $i++ } split(',', $paramDef->{VALUE_LIST});
+					return $enumVals{$value} if (exists($enumVals{$value}));
+				}
+				else {
+					my @enumList = split(',', $paramDef->{VALUE_LIST});
+					if (HMCCU_IsIntNum ($value)) {
+						my $idx = $value-$i;
+						return $enumList[$idx] if ($idx >= 0 && $idx < scalar(@enumList));
+					}
+				}
 			}
-			else {
-				my @enumList = split(',', $paramDef->{VALUE_LIST});
-				my $idx = $value-$i;
-				return $enumList[$idx] if ($idx >= 0 && $idx < scalar(@enumList));
+			elsif (exists($ct{$parType}) && exists($ct{$parType}{$value})) {
+				return $ct{$parType}{$value};
 			}
 		}
 	}
@@ -4465,42 +4474,6 @@ sub HMCCU_IsValidParameter ($$$$;$)
 }
 
 ######################################################################
-# Convert parameter value
-# Parameters:
-#  $hash - Hash reference of IO device.
-#  $object - Device/channel address or device description reference.
-#  $paramset - Parameter set.
-#  $parameter - Parameter name.
-#  $value - Parameter value.
-# Return converted or original value.
-######################################################################
-
-sub HMCCU_GetParamValueConversion ($$$$$)
-{
-	my ($hash, $object, $paramset, $parameter, $value) = @_;
-	
-	# Conversion table
-	my %ct = (
-		'BOOL' => { 0 => 'false', 1 => 'true' }
-	);
-	
-	return $value if (!defined($object));
-	
-	$paramset = 'LINK' if ($paramset =~ /^LINK\..+$/);
-	my $paramDef = HMCCU_GetParamDef ($hash, $object, $paramset, $parameter) // return $value;
-	my $type = $paramDef->{TYPE} // return $value;
-
-	return $ct{$type}{$value} if (exists($ct{$type}) && exists($ct{$type}{$value}));
-
-	if ($type eq 'ENUM' && exists($paramDef->{VALUE_LIST})) {
-		my @vl = split(',', $paramDef->{VALUE_LIST});
-		return $vl[$value] if ($value =~ /^[0-9]+$/ && $value < scalar(@vl));
-	}
-	
-	return $value;
-}
-
-######################################################################
 # Update client devices with peering information
 # In addition peering information is stored in hash of IO device.
 ######################################################################
@@ -4729,8 +4702,6 @@ sub HMCCU_UpdateParamsetReadings ($$$;$)
 					HMCCU_Trace ($clHash, 2, "$p: sv = $sv");
 					$fv = HMCCU_FormatReadingValue ($clHash, $sv, $p);
 					$cv = HMCCU_Substitute ($fv, $clHash, 0, $c, $p, $chnType, $devDesc);
-					$cv = HMCCU_GetParamValueConversion ($ioHash, $devDesc, $ps, $p, $fv)
-						if (defined($devDesc) && "$fv" eq "$cv");
 
 					HMCCU_UpdateInternalValues ($clHash, $chKey, $ps, 'SVAL', $cv);
 					push @chKeys, $chKey;
@@ -9325,7 +9296,7 @@ sub HMCCU_ScaleValue ($$$$$;$)
 		$min = $paramDef->{MIN} if (defined($paramDef->{MIN}) && $paramDef->{MIN} ne '');
 		$max = $paramDef->{MAX} if (defined($paramDef->{MAX}) && $paramDef->{MAX} ne '');
 		$unit = $paramDef->{UNIT};
-		$unit = '100%' if ($dpt eq 'LEVEL' && !defined($unit));
+		$unit = '100%' if (!defined($unit) && ($dpt eq 'LEVEL' || $dpt eq 'LEVEL_2' || $dpt eq 'LEVEL_SLATS'));
 	}
 	else {
 		HMCCU_Trace ($hash, 2, "Can't get parameter definion for addr=$ccuaddr chn=$chnno dpt=$dpt");
@@ -9865,14 +9836,15 @@ sub HMCCU_UpdateDeviceStates ($)
 	
 	# Datapoints to be converted to readings
 	my %newReadings = (
-		'0.AES_KEY'        => 'sign',
-		'0.RSSI_DEVICE'    => 'rssidevice',
-		'0.RSSI_PEER'      => 'rssipeer',
-		'0.LOW_BAT'        => 'battery',
-		'0.LOWBAT'         => 'battery',
-		'0.UNREACH'        => 'activity',
-		'0.SABOTAGE'       => 'sabotage',
-		'0.ERROR_SABOTAGE' => 'sabotage'
+		'0.AES_KEY'           => 'sign',
+		'0.RSSI_DEVICE'       => 'rssidevice',
+		'0.RSSI_PEER'         => 'rssipeer',
+		'0.LOW_BAT'           => 'battery',
+		'0.LOWBAT'            => 'battery',
+		'0.OPERATING_VOLTAGE' => 'voltage',
+		'0.UNREACH'           => 'activity',
+		'0.SABOTAGE'          => 'sabotage',
+		'0.ERROR_SABOTAGE'    => 'sabotage'
 	);
 	
 	# The new readings
