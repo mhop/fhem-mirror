@@ -5,7 +5,7 @@ package main;
 
 use strict;
 use warnings;
-use POSIX;
+#use POSIX;
 #use JSON;
 #use Data::Dumper;
 
@@ -56,14 +56,15 @@ sub LightScene_Define($$)
 
   $hash->{HAS_JSON} = $LightScene_hasJSON;
   $hash->{HAS_DataDumper} = $LightScene_hasDataDumper;
+  $hash->{CONFIGFILE} = myStatefileName();
 
   my %list;
   foreach my $a (@args) {
     foreach my $d (devspec2array($a)) {
       $list{$d} = 1;
 
-      addToDevAttrList( $d, "lightSceneParamsToSave" );
-      addToDevAttrList( $d, "lightSceneRestoreOnlyIfChanged:1,0" );
+      addToDevAttrList( $d, "lightSceneParamsToSave", 'LightScene' );
+      addToDevAttrList( $d, "lightSceneRestoreOnlyIfChanged:1,0", 'LightScene' );
     }
   }
   $hash->{CONTENT} = \%list;
@@ -1012,20 +1013,22 @@ LightScene_editTable($) {
 }
 1;
 
+__END__
+
 =pod
 =item helper
 =item summary   create scenes from multiple fhem devices
 =item summary_DE verwaltet Szenen aus mehreren FHEM Ger&auml;ten
 =begin html
 
-<a name="LightScene"></a>
+<a id="LightScene"></a>
 <h3>LightScene</h3>
 <ul>
   Allows to store the state of a group of lights and other devices and recall it later.
   Multiple states for one group can be stored.
 
   <br><br>
-  <a name="LightScene_Define"></a>
+  <a id="LightScene-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; LightScene [&lt;dev1&gt;] [&lt;dev2&gt;] [&lt;dev3&gt;] ... </code><br>
@@ -1049,7 +1052,7 @@ LightScene_editTable($) {
   A weblink with a scene overview that can be included in any room or a floorplan can be created with:
    <ul><code>define wlScene weblink htmlCode {LightScene_2html("LightSceneName")}</code></ul>
 
-  <a name="LightScene_Set"></a>
+  <a id="LightScene-set"></a>
     <b>Set</b>
     <ul>
       <li>all &lt;command&gt;<br>
@@ -1079,17 +1082,17 @@ LightScene_editTable($) {
         rename &lt;scene_old_name&gt; to &lt;scene_new_name&gt;</li>
     </ul><br>
 
-  <a name="LightScene_Get"></a>
+  <a id="LightScene-get"></a>
     <b>Get</b>
     <ul>
       <li>scenes</li>
       <li>scene &lt;scene_name&gt;</li>
     </ul><br>
 
-  <a name="LightScene_Attr"></a>
+  <a id="LightScene-attr"></a>
     <b>Attributes</b>
     <ul>
-    <a name="async_delay"></a>
+    <a id="LightScene-attr-async_delay"></a>
     <li>async_delay<br>
         If this attribute is defined, unfiltered set commands will not be
         executed in the clients immediately. Instead, they are added to a queue
@@ -1098,6 +1101,7 @@ LightScene_editTable($) {
         timercalls is given by the value of async_delay (in seconds) and may be
         0 for fastest possible execution.
         </li>
+      <a id="LightScene-attr-lightSceneParamsToSave" data-pattern="lightSceneParamsToSave"></a>
       <li>lightSceneParamsToSave<br>
         this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
         that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
@@ -1110,18 +1114,22 @@ LightScene_editTable($) {
         <code>attr myReceiver lightSceneParamsToSave volume,channel</code><br>
         <code>attr myHueDevice lightSceneParamsToSave {(Value($DEVICE) eq "off")?"state":"bri : xy"}</code></li>
         <code>attr myDimmer lightSceneParamsToSave state@{if($value=~m/(\d+)/){$1}else{$value}}</code><br>
+      <a id="LightScene-attr-lightSceneRestoreOnlyIfChanged" data-pattern="lightSceneRestoreOnlyIfChanged"></a>
       <li>lightSceneRestoreOnlyIfChanged<br>
         this attribute can be set on the lightscene and/or on the individual devices included in a scene.
         the device settings have precedence over the scene setting.<br>
         1 -> for each device do nothing if current device state is the same as the saved state<br>
         0 -> always set the state even if the current state is the same as the saved state. this is the default</li>
+      <a id="LightScene-attr-followDevices"></a>
       <li>followDevices<br>
         the LightScene tries to follow the switching state of the devices set its state to the name of the scene that matches.<br>
         1 -> if no match is found state will be unchanged and a nomatch event will be triggered.<br>
         2 -> if no match is found state will be set to unknown. depending on the scene and devices state can toggle multiple
              times. use a watchdog if you want to handle this.</li>
+      <a id="LightScene-attr-showDeviceCurrentState"></a>
       <li>showDeviceCurrentState<br>
         show the current state of member devices in weblink</li>
+      <a id="LightScene-attr-switchingOrder"></a>
       <li>switchingOrder<br>
         space separated list of &lt;scene&gt;:&lt;deviceList&gt; items that will give a per scene order
         in which the devices should be switched.<br>
@@ -1133,6 +1141,7 @@ LightScene_editTable($) {
         <code>define media LightScene TV,DVD,Amplifier,masterPower<br>
               attr media switchingOrder .*On:masterPower,.* allOff:!.*,masterPower</code>
         </li>
+      <a id="LightScene-attr-traversalOrder"></a>
       <li>traversalOrder<br>
         comma separated list of scene names that should be traversed by the prevoiusScene and nextScene commands.<br>
         default not set -> all scenes will be traversed in alphabetical order
