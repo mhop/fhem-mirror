@@ -1,6 +1,4 @@
-
 # $Id$
-
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
 # see www.meethue.com for more information.
 # I am in no way affiliated with the Philips organization.
@@ -14,7 +12,8 @@ use FHEM::Meta;
 
 use Color;
 
-use POSIX;
+#use POSIX;
+use Time::HiRes qw(gettimeofday);
 use JSON;
 use SetExtensions;
 use Time::Local;
@@ -508,9 +507,30 @@ sub HUEDevice_Undefine($$)
 }
 
 sub
+HUEDevice_AddJson($$@)
+{
+  my ($name, $obj, $json) = @_;
+
+  my $o = eval { JSON->new->utf8(0)->decode($json) };
+  if( $@ ) {
+    Log3 $name, 2, "$name: json error: $@ in $json";
+
+  } elsif( $json !~ /\{.*\}/ ) {
+    Log3 $name, 2, "$name: json error: $json";
+
+  } else {
+    foreach my $key ( keys %{$o} ) {
+      $obj->{$key} = $o->{$key};
+    }
+  }
+
+  return $obj;
+}
+sub
 HUEDevice_SetParam($$@)
 {
-  my ($name, $obj, $cmd, $value, $value2) = @_;
+  my ($name, $obj, $cmd, $value, @aa) = @_;
+  my ($value2) = @aa;
 
   if( $cmd eq "color" ) {
     $value = int(1000000/$value);
@@ -720,10 +740,19 @@ HUEDevice_SetParam($$@)
     $obj->{'hue'}  = int($h*256);
     $obj->{'sat'}  = 0+$s;
     $obj->{'bri'}  = 0+$v;
+
   } elsif( $cmd eq "alert" ) {
     $obj->{'alert'}  = $value;
+
   } elsif( $cmd eq "effect" ) {
+    $obj->{'on'}  = JSON::true;
     $obj->{'effect'}  = $value;
+
+    if( defined($value2) ) {
+      my $json = join( ' ', @aa);
+      HUEDevice_AddJson( $name, $obj, $json );
+    }
+
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
   } elsif( $name &&  $cmd eq "delayedUpdate" ) {
@@ -739,9 +768,15 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq 'habridgeupdate' ) {
     $obj->{habridgeupdate} = JSON::true;
 
+  } elsif( $cmd =~ /\{/ ) {
+    $value='' if( !$value );
+    HUEDevice_AddJson( $name, $obj, "$cmd$value ".join( ' ', @aa) );
+
   } else {
     return 0;
   }
+
+  #Log3 $name, 5, "$name: ". Dumper $obj if($HUEDevice_hasDataDumper);
 
   return 1;
 }
@@ -949,8 +984,31 @@ HUEDevice_Set($@)
     $joined =~ s/on-till\s+[^\s]+//g; #bad workaround for: https://forum.fhem.de/index.php/topic,61636.msg728557.html#msg728557
     $joined =~ s/on-till-overnight\s+[^\s]+//g; #same bad workaround for: https://forum.fhem.de/index.php/topic,61636.msg1110193
     my @cmds = split(":", $joined);
-    for( my $i = 0; $i <= $#cmds; ++$i ) {
-      HUEDevice_SetParam($name, \%obj, split(" ", $cmds[$i]) );
+    while( @cmds ) {
+      my $cmd = shift(@cmds);
+
+      if( $cmd =~ m/{/ ) { # } for match
+        my $count = 0;
+        for my $i (0..length($cmd)-1) {
+          my $c = substr($cmd, $i, 1);
+          ++$count if( $c eq '{' );
+          --$count if( $c eq '}' );
+        }
+
+        while( $cmd && $count != 0 ) {
+          my $next = shift(@cmds);
+          last if( !defined($next) );
+          $cmd .= ':' . $next;
+
+          for my $i (0..length($next)-1) {
+            my $c = substr($next, $i, 1);
+            ++$count if( $c eq '{' );
+            --$count if( $c eq '}' );
+          }
+        }
+      }
+
+      HUEDevice_SetParam($name, \%obj, split(" ", $cmd) );
     }
   } else {
     my ($cmd, $value, $value2, @a) = @aa;
@@ -961,7 +1019,7 @@ HUEDevice_Set($@)
       return undef;
     }
 
-    HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
+    HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2, @a);
   }
 
   if( %obj ) {
@@ -1409,6 +1467,8 @@ HUEDevice_Parse($$)
   $hash->{type} = $result->{type} if( defined($result->{type}) );
   $hash->{class} = $result->{class} if( defined($result->{class}) );
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
+
+  $hash->{v2_id} = $result->{v2_id} if( defined($result->{v2_id}) );
 
   $hash->{helper}{json} = $result;
 
@@ -1945,6 +2005,8 @@ HUEDevice_Attr($$$;$)
 
 1;
 
+__END__
+
 =pod
 =item tag cloudfree
 =item tag publicAPI
@@ -1952,11 +2014,11 @@ HUEDevice_Attr($$$;$)
 =item summary_DE Ger&auml;te an einer Philips HUE Bridge, einem LIGHTIFY oder Tradfri Gateway
 =begin html
 
-<a name="HUEDevice"></a>
+<a id="HUEDevice"></a>
 <h3>HUEDevice</h3>
 <ul>
   <br>
-  <a name="HUEDevice_Define"></a>
+  <a id="HUEDevice-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; HUEDevice [group|sensor] &lt;id&gt; [&lt;interval&gt;]</code><br>
@@ -1981,7 +2043,7 @@ HUEDevice_Attr($$$;$)
     </ul>
   </ul><br>
 
-  <a name="HUEDevice_Readings"></a>
+  <a id="HUEDevice-readings"></a>
   <b>Readings</b>
   <ul>
     <li>bri<br>
@@ -2013,41 +2075,51 @@ HUEDevice_Attr($$$;$)
       </ul><br>
   </ul><br>
 
-  <a name="HUEDevice_Set"></a>
+  <a id="HUEDevice-set"></a>
     <b>Set</b>
     <ul>
       <li>on [&lt;ramp-time&gt;]</li>
       <li>off [&lt;ramp-time&gt;]</li>
       <li>toggle [&lt;ramp-time&gt;]</li>
+      <a id="HUEDevice-set-statusRequest"></a>
       <li>statusRequest<br>
         Request device status update.</li>
+      <a id="HUEDevice-set-pct"></a>
       <li>pct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         dim to &lt;value&gt;<br>
         Note: the FS20 compatible dimXX% commands are also accepted.</li>
+      <a id="HUEDevice-set-color"></a>
       <li>color &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; kelvin.</li>
+      <a id="HUEDevice-set-bri"></a>
       <li>bri &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set brighness to &lt;value&gt;; range is 0-254.</li>
       <li>dimUp [delta]</li>
       <li>dimDown [delta]</li>
+      <a id="HUEDevice-set-ct"></a>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (range is 2000-6493).</li>
       <li>ctUp [delta]</li>
       <li>ctDown [delta]</li>
+      <a id="HUEDevice-set-hue"></a>
       <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
       <li>hueUp [delta]</li>
       <li>hueDown [delta]</li>
+      <a id="HUEDevice-set-sat"></a>
       <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
       <li>satUp [delta]</li>
       <li>satDown [delta]</li>
+      <a id="HUEDevice-set-xy"></a>
       <li>xy &lt;x&gt;,&lt;y&gt; [&lt;ramp-time&gt;]<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
       <li>alert [none|select|lselect]</li>
-      <li>effect [none|colorloop]</li>
+      <li>effect [none|colorloop] [{&lt;json&gt;}]</li>
+      <a id="HUEDevice-set-transitiontime"></a>
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
+      <a id="HUEDevice-set-rgb"></a>
       <li>rgb &lt;rrggbb&gt;<br>
         set the color to (the nearest equivalent of) &lt;rrggbb&gt;</li>
       <br>
@@ -2058,13 +2130,15 @@ HUEDevice_Attr($$$;$)
       <li>deletescene &lt;id&gt;</li>
       <li>scene</li>
       <br>
+      <a id="HUEDevice-set-lights"></a>
       <li>lights &lt;lights&gt;<br>
       Only valid for groups. Changes the list of lights in this group.
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
+      <a id="HUEDevice-set-rename"></a>
       <li>rename &lt;new name&gt;<br>
       Renames the device in the bridge and changes the fhem alias.</li>
-      <li>json [setsensor|configsensor] &lt;json&gt;<br>
-      send &lt;json&gt; to the state or config endpoints for this device.</li>
+      <li>json [setsensor|configsensor] {&lt;json&gt;}<br>
+      send <code>{&lt;json&gt;}</code> to the state or config endpoints for this device.</li>
       <li>habridgeupdate [ : &lt; on | off &gt; ] [ : &lt; bri | pct &gt; &lt; value &gt; ] <br>
       This command is only for usage of HA-Bridges that are emulating an Hue Hub. <br>
       It updates your HA-Bridge internal light state of the devices without changing the devices itself.
@@ -2082,7 +2156,7 @@ HUEDevice_Attr($$$;$)
         </ul>
     </ul><br>
 
-  <a name="HUEDevice_Get"></a>
+  <a id="HUEDevice-get"></a>
     <b>Get</b>
     <ul>
       <li>rgb</li>
@@ -2093,42 +2167,54 @@ HUEDevice_Attr($$$;$)
       returns html code that can be used to create an icon that represents the device color in the room overview.</li>
     </ul><br>
 
-  <a name="HUEDevice_Attr"></a>
+  <a id="HUEDevice-attr"></a>
   <b>Attributes</b>
   <ul>
+    <a id="HUEDevice-attr-color-icon"></a>
     <li>color-icon<br>
       1 -> use lamp color as icon color and 100% shape as icon shape<br>
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
+    <a id="HUEDevice-attr-createActionReadings"></a>
     <li>createActionReadings<br>
       create readings for the last action in group devices</li>
+    <a id="HUEDevice-attr-createGroupReadings"></a>
     <li>createGroupReadings<br>
       create 'artificial' readings for group devices. default depends on the createGroupReadings setting in the bridge device.</li>
+    <a id="HUEDevice-attr-ignoreReachable"></a>
     <li>ignoreReachable<br>
       ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
+    <a id="HUEDevice-attr-setList"></a>
     <li>setList<br>
       The list of know set commands for sensor type devices. one command per line, eg.: <code><br>
    attr mySensor setList present:{&lt;json&gt;}\<br>
 absent:{&lt;json&gt;}</code></li>
+    <a id="HUEDevice-attr-configList"></a>
     <li>configList<br>
       The list of know config commands for sensor type devices. one command per line, eg.: <code><br>
 attr mySensor mode:{&lt;json&gt;}\<br>
 /heatsetpoint (.*)/:perl:{'{"heatsetpoint":'. $VALUE1 * 100 .'}'}<br>
 /sensitivity (.*)/:0,1,2,3:{"sensitivity":$1}</code></li>
+    <a id="HUEDevice-attr-readingList"></a>
     <li>readingList<br>
       The list of readings that should be created from the sensor state object. Space or comma separated.</li>
+    <a id="HUEDevice-attr-subType"></a>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
       ctdimmer -> device has color temperature control<br>
       dimmer -> device has brightnes controll<br>
       switch -> device has on/off controll<br></li>
+    <a id="HUEDevice-attr-transitiontime"></a>
     <li>transitiontime<br>
       default transitiontime for all set commands if not specified directly in the set.</li>
+    <a id="HUEDevice-attr-delayedUpdate"></a>
     <li>delayedUpdate<br>
       1 -> the update of the device status after a set command will be delayed for 1 second. usefull if multiple devices will be switched.
-</li>
+    </li>
+    <a id="HUEDevice-attr-devStateIcon"></a>
     <li>devStateIcon<br>
       will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
+    <a id="HUEDevice-attr-webCmd"></a>
     <li>webCmd<br>
       will be initialized to a device specific value according to subType.</li>
   </ul>
