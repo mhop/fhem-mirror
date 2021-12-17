@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
 #  (c) 2016-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
@@ -28,8 +28,22 @@ package FHEM::Devices::Nuki::Device;
 
 use strict;
 use warnings;
+use experimental qw( switch );
 
 use FHEM::Meta;
+
+use GPUtils qw(GP_Import);
+
+BEGIN {
+
+    # Import from main context
+    GP_Import(
+        qw( init_done
+          defs
+          modules
+          )
+    );
+}
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -37,15 +51,11 @@ eval {
     require JSON::MaybeXS;
     import JSON::MaybeXS qw( decode_json encode_json );
     1;
-};
-
-if ($@) {
-    $@ = undef;
+} or do {
 
     # try to use JSON wrapper
     #   for chance of better performance
     eval {
-
         # JSON preference order
         local $ENV{PERL_JSON_BACKEND} =
           'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
@@ -54,10 +64,7 @@ if ($@) {
         require JSON;
         import JSON qw( decode_json encode_json );
         1;
-    };
-
-    if ($@) {
-        $@ = undef;
+    } or do {
 
         # In rare cases, Cpanel::JSON::XS may
         #   be installed but JSON|JSON::MaybeXS not ...
@@ -65,10 +72,7 @@ if ($@) {
             require Cpanel::JSON::XS;
             import Cpanel::JSON::XS qw(decode_json encode_json);
             1;
-        };
-
-        if ($@) {
-            $@ = undef;
+        } or do {
 
             # In rare cases, JSON::XS may
             #   be installed but JSON not ...
@@ -76,10 +80,7 @@ if ($@) {
                 require JSON::XS;
                 import JSON::XS qw(decode_json encode_json);
                 1;
-            };
-
-            if ($@) {
-                $@ = undef;
+            } or do {
 
                 # Fallback to built-in JSON which SHOULD
                 #   be available since 5.014 ...
@@ -87,20 +88,17 @@ if ($@) {
                     require JSON::PP;
                     import JSON::PP qw(decode_json encode_json);
                     1;
-                };
-
-                if ($@) {
-                    $@ = undef;
+                } or do {
 
                     # Fallback to JSON::backportPP in really rare cases
                     require JSON::backportPP;
                     import JSON::backportPP qw(decode_json encode_json);
                     1;
-                }
-            }
-        }
-    }
-}
+                };
+            };
+        };
+    };
+};
 
 ######## Begin Device
 
@@ -193,9 +191,12 @@ my %doorsensorStates = (
 sub Define {
     my $hash = shift;
     my $def  = shift // return;
+    my $version;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
-    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
+    $version = FHEM::Meta::Get( $hash, 'version' );
+    our $VERSION = $version;
 
     my ( $name, undef, $nukiId, $deviceType ) = split( m{\s+}xms, $def );
     return 'too few parameters: define <name> NUKIDevice <nukiId> <deviceType>'
@@ -227,11 +228,11 @@ sub Define {
 
     $iodev = $hash->{IODev}->{NAME};
 
-    $hash->{BRIDGEAPI} = $::defs{$iodev}->{BRIDGEAPI}
+    $hash->{BRIDGEAPI} = $defs{$iodev}->{BRIDGEAPI}
       if ( defined($iodev)
         && $iodev );
 
-    my $d = $::modules{NUKIDevice}{defptr}{$nukiId};
+    my $d = $modules{NUKIDevice}{defptr}{$nukiId};
 
     return
         'NUKIDevice device '
@@ -250,11 +251,11 @@ sub Define {
     ::CommandAttr( undef, $name . ' model ' . $deviceTypes{$deviceType} )
       if ( ::AttrVal( $name, 'model', 'none' ) eq 'none' );
 
-    $::modules{NUKIDevice}{defptr}{$nukiId} = $hash;
+    $modules{NUKIDevice}{defptr}{$nukiId} = $hash;
 
     GetUpdate($hash)
       if ( ::ReadingsVal( $name, 'success', 'none' ) eq 'none'
-        && $::init_done );
+        && $init_done );
 
     return;
 }
@@ -266,7 +267,7 @@ sub Undef {
     my $name   = $hash->{NAME};
 
     ::Log3( $name, 3, "NUKIDevice ($name) - undefined with NukiId: $nukiId" );
-    delete( $::modules{NUKIDevice}{defptr}{$nukiId} );
+    delete( $modules{NUKIDevice}{defptr}{$nukiId} );
 
     return;
 }
@@ -277,7 +278,7 @@ sub Attr {
     my $attrName = shift;
     my $attrVal  = shift;
 
-    my $hash  = $::defs{$name};
+    my $hash  = $defs{$name};
     my $token = $hash->{IODev}->{TOKEN};
 
     if ( $attrName eq 'disable' ) {
@@ -330,17 +331,13 @@ sub Notify {
     GetUpdate($hash)
       if (
         (
-            grep /^INITIALIZED$/,
-            @{$events}
-            or grep /^REREADCFG$/,
-            @{$events}
-            or grep /^MODIFIED.$name$/,
-            @{$events}
-            or grep /^DEFINED.$name$/,
-            @{$events}
+               grep { /^INITIALIZED$/x } @{$events}
+            or grep { /^REREADCFG$/x } @{$events}
+            or grep { /^MODIFIED.$name$/x } @{$events}
+            or grep { /^DEFINED.$name$/x } @{$events}
         )
         && $devname eq 'global'
-        && $::init_done
+        && $init_done
       );
 
     return;
@@ -427,7 +424,7 @@ sub Parse {
     #########################################
     ####### Errorhandling #############
 
-    if ( $json !~ m/^[\[{].*[}\]]$/ ) {
+    if ( $json !~ m{\A[\[{].*[}\]]\z}xms ) {
         ::Log3( $name, 3, "NUKIDevice ($name) - invalid json detected: $json" );
         return "NUKIDevice ($name) - invalid json detected: $json";
     }
@@ -449,14 +446,14 @@ sub Parse {
     }
 
     my $nukiId = $decode_json->{nukiId};
-    if ( my $hash = $::modules{NUKIDevice}{defptr}{$nukiId} ) {
-        my $name = $hash->{NAME};
+    if ( my $dhash = $modules{NUKIDevice}{defptr}{$nukiId} ) {
+        my $dname = $dhash->{NAME};
 
-        WriteReadings( $hash, $decode_json );
-        ::Log3( $name, 4,
-            "NUKIDevice ($name) - find logical device: $hash->{NAME}" );
+        WriteReadings( $dhash, $decode_json );
+        ::Log3( $dname, 4,
+            "NUKIDevice ($dname) - find logical device: $dhash->{NAME}" );
 
-        return $hash->{NAME};
+        return $dhash->{NAME};
     }
     else {
         ::Log3( $name, 4,
@@ -472,16 +469,14 @@ sub Parse {
 
     ::Log3( $name, 5, "NUKIDevice ($name) - parse status message for $name" );
 
-    WriteReadings( $hash, $decode_json );
+    return WriteReadings( $hash, $decode_json );
 }
 
-sub WriteReadings {
-    my $hash        = shift;
-    my $decode_json = shift;
-    my $name        = $hash->{NAME};
-
+sub SmartlockState {
     ############################
     #### Status des Smartlock
+    my $hash        = shift;
+    my $decode_json = shift;
 
     if ( defined( $hash->{helper}{lockAction} ) ) {
         my $state;
@@ -527,6 +522,16 @@ sub WriteReadings {
         delete $hash->{helper}{lockAction};
     }
 
+    return $decode_json;
+}
+
+sub WriteReadings {
+    my $hash        = shift;
+    my $decode_json = shift;
+    my $name        = $hash->{NAME};
+
+    $decode_json = SmartlockState( $hash, $decode_json );
+
     ::readingsBeginUpdate($hash);
 
     my $t;
@@ -555,36 +560,43 @@ sub WriteReadings {
             && $t ne 'doorsensorState'
             && $t ne 'doorsensorStateName' );
 
-        ::readingsBulkUpdate(
-            $hash, $t,
-            (
-                  $v =~ m/^[0-9]$/
-                ? $lockStates{$v}{ $hash->{DEVICETYPEID} }
-                : $v
-            )
-        ) if ( $t eq 'state' );
-
-        ::readingsBulkUpdate( $hash, $t, $modes{$v}{ $hash->{DEVICETYPEID} } )
-          if ( $t eq 'mode' );
-
-        ::readingsBulkUpdate( $hash, $t, $deviceTypes{$v} )
-          if ( $t eq 'deviceType' );
-
-        ::readingsBulkUpdate( $hash, $t, $doorsensorStates{$v} )
-          if ( $t eq 'doorsensorState' );
-
-        ::readingsBulkUpdate( $hash, $t, ( $v == 1 ? 'true' : 'false' ) )
-          if ( $t eq 'paired' );
-
-        ::readingsBulkUpdate( $hash, $t, ( $v == 1 ? 'true' : 'false' ) )
-          if ( $t eq 'batteryCharging' );
-
-        ::readingsBulkUpdate( $hash, 'batteryState',
-            ( $v == 1 ? 'low' : 'ok' ) )
-          if ( $t eq 'batteryCritical' );
-
-        ::readingsBulkUpdate( $hash, 'batteryPercent', $v )
-          if ( $t eq 'batteryChargeState' );
+        given ($t) {
+            when ('state') {
+                ::readingsBulkUpdate(
+                    $hash, $t,
+                    (
+                          $v =~ m{\A[0-9]\z}xms
+                        ? $lockStates{$v}->{ $hash->{DEVICETYPEID} }
+                        : $v
+                    )
+                );
+            }
+            when ('mode') {
+                ::readingsBulkUpdate( $hash, $t,
+                    $modes{$v}{ $hash->{DEVICETYPEID} } );
+            }
+            when ('deviceType') {
+                ::readingsBulkUpdate( $hash, $t, $deviceTypes{$v} );
+            }
+            when ('doorsensorState') {
+                ::readingsBulkUpdate( $hash, $t, $doorsensorStates{$v} );
+            }
+            when ('paired') {
+                ::readingsBulkUpdate( $hash, $t,
+                    ( $v == 1 ? 'true' : 'false' ) );
+            }
+            when ('batteryCharging') {
+                ::readingsBulkUpdate( $hash, $t,
+                    ( $v == 1 ? 'true' : 'false' ) );
+            }
+            when ('batteryCritical') {
+                ::readingsBulkUpdate( $hash, 'batteryState',
+                    ( $v == 1 ? 'low' : 'ok' ) );
+            }
+            when ('batteryChargeState') {
+                ::readingsBulkUpdate( $hash, 'batteryPercent', $v )
+            }
+        }
     }
 
     ::readingsEndUpdate( $hash, 1 );
