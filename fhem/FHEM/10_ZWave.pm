@@ -66,6 +66,7 @@ my %zwave_class = (
     get   => { swbStatus   => "02",       },
     parse => { "..250300"  => "state:off",
                "..2503ff"  => "state:on",
+               "032503(..)"=> 'sprintf("swbStatus:%s", hex($1))',
                "052503(..)(..)(..)" => 'sprintf("swbStatus:%s target %s '.
                           'duration %s", hex($1), hex($2),ZWave_byte2time($3))',
                "03250100"  => "state:setOff",
@@ -2016,6 +2017,7 @@ ZWave_versionClassAllGet($@)
   return !$hash->{asyncGet}; # "veto" for parseHook/getAll
 }
 
+# https://sdomembers.z-wavealliance.org/document/dl/640
 my %zwave_ml_tbl = (
    '01' => { n => 'temperature',          st => ['C', 'F'] },
    '02' => { n => 'generalPurpose',       st => ['%', ''] },
@@ -2072,6 +2074,43 @@ my %zwave_ml_tbl = (
    '31' => { n => 'totalBodyWater',       st => ['Kg'] },
    '32' => { n => 'basicMetabolicRate',   st => ['J'] },
    '33' => { n => 'bodyMassIndex',        st => ['BMI'] },
+   '34' => { n => 'accelerationXaxis',    st => ['m/s2'] },
+   '35' => { n => 'accelerationYaxis',    st => ['m/s2'] },
+   '36' => { n => 'accelerationZaxis',    st => ['m/s2'] },
+   '37' => { n => 'smokeDensity',         st => ['%'] },
+   '38' => { n => 'waterFlow',            st => ['l/h'] },
+   '39' => { n => 'waterPressure',        st => ['kPa'] },
+   '3A' => { n => 'signalStrength',       st => ['RSSI  dBm'] },
+   '3B' => { n => 'particulateMatter10',  st => ['mol/m3', 'µg/m3'] },
+   '3C' => { n => 'respiratoryRate',      st => ['bpm'] },
+   '3D' => { n => 'relativeModulationLevel', st => ['%'] },
+   '3E' => { n => 'boilerWaterTemp',      st => ['C', 'F'] },
+   '3F' => { n => 'domesticHotWatertemp', st => ['C', 'F'] },
+   '40' => { n => 'outsideTemp',          st => ['C', 'F'] },
+   '41' => { n => 'exhaustTemp',          st => ['C', 'F'] },
+   '42' => { n => 'waterChlorineLevel',   st => ['mg/l'] },
+   '43' => { n => 'waterAcidity',         st => ['pH'] },
+   '44' => { n => 'waterOxidationReductionPotential', st => ['mV'] },
+   '45' => { n => 'heartRateLFHFratio',   st => [''] },
+   '46' => { n => 'motionDirection',      st => ['°'] },
+   '47' => { n => 'appliedForce',         st => ['N'] },
+   '48' => { n => 'returnAirTemp',        st => ['C', 'F'] },
+   '49' => { n => 'supplyAirTemp',        st => ['C', 'F'] },
+   '4A' => { n => 'condenserCoilTemp',    st => ['C', 'F'] },
+   '4B' => { n => 'evaporatorCoilTemp',   st => ['C', 'F'] },
+   '4C' => { n => 'liquidLineTemp',       st => ['C', 'F'] },
+   '4D' => { n => 'dischargeLineTemp',    st => ['C', 'F'] },
+   '4E' => { n => 'suctionPressure',      st => ['kPa', 'psi'] },
+   '4F' => { n => 'dischargePressure',    st => ['kPa', 'psi'] },
+   '50' => { n => 'defrostTemp',          st => ['C', 'F'] },
+   '51' => { n => 'ozone',                st => ['μg/m3'] },
+   '52' => { n => 'sulfurDioxide',        st => ['μg/m3'] },
+   '53' => { n => 'nitrogenDioxide',      st => ['μg/m3'] },
+   '54' => { n => 'ammonia',              st => ['μg/m3'] },
+   '55' => { n => 'lead',                 st => ['μg/m3'] },
+   '56' => { n => 'particulateMatter1',   st => ['μg/m3'] },
+   '57' => { n => 'personCounterEntering',st => [''] },
+   '58' => { n => 'personCounterExiting', st => [''] }
 );
 
 sub
