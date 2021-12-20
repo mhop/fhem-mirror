@@ -314,6 +314,7 @@ doUpdate($$$$)
 
   my @excl = split(" ", AttrVal("global", "exclude_from_update", ""));
   my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
+  my $hideExcl = AttrVal("global", "hideExcludedUpdates", 0); #Forum #124670
 
   my @rl = upd_getChanges($root, $basePath);
   ###########################
@@ -359,7 +360,7 @@ doUpdate($$$$)
                     ($cmd eq "CRE" ||               # either file is create only
                      ($lh{$fName}{TS} eq $r[1] &&   # or both TS and LEN is same
                       $lh{$fName}{LEN} eq $r[2]))); # as the remote one
-      if($isExcl && !$fileOk) {
+      if($isExcl && !$fileOk && !$hideExcl) {
         uLog 1, "update: skipping $fName, matches exclude_from_update";
         $nSkipped++;
         next;
@@ -593,7 +594,7 @@ upd_writeFile($$$$)
 =item summary_DE FHEM Programmdateien aktualisieren
 =begin html
 
-<a name="update"></a>
+<a id="update"></a>
 <h3>update</h3>
 <ul>
   <code>update [-noSSL] [&lt;fileName&gt;|all|check|checktime|force]
@@ -636,12 +637,12 @@ upd_writeFile($$$$)
     <li>update force</li>
     <li>update check http://fhem.de/fhemupdate/controls_fhem.txt</li>
   </ul>
-  <a name="updateattr"></a>
 
   <br>
+  <a id="update-attr"></a>
   <b>Attributes</b> (use attr global ...)
   <ul>
-    <a name="updateInBackground"></a>
+    <a id="update-attr-updateInBackground"></a>
     <li>updateInBackground<br>
         If this attribute is set (to 1), the update will be executed in a
         background process. The return message is communicated via events, and
@@ -649,14 +650,14 @@ upd_writeFile($$$$)
         Monitor. Default is set. Set it to 0 to switch it off.
         </li><br>
 
-    <a name="updateNoFileCheck"></a>
+    <a id="update-attr-updateNoFileCheck"></a>
     <li>updateNoFileCheck<br>
         If set, the command won't compare the local file size with the expected
         size. This attribute was introduced to satisfy some experienced FHEM
         user, its default value is 0.
         </li><br>
 
-    <a name="backup_before_update"></a>
+    <a id="update-attr-backup_before_update"></a>
     <li>backup_before_update<br>
         If this attribute is set, an update will back up your complete
         installation via the <a href="#backup">backup</a> command. The default
@@ -667,7 +668,7 @@ upd_writeFile($$$$)
         </ul>
         </li><br>
 
-    <a name="exclude_from_update"></a>
+    <a id="update-attr-exclude_from_update"></a>
     <li>exclude_from_update<br>
         Contains a space separated list of fileNames (regexps) which will be
         excluded by an update. The special value commandref will disable calling
@@ -682,6 +683,11 @@ upd_writeFile($$$$)
         updating it from another source, specify fhem.de.*:FILE.pm
         </li><br>
 
+    <a id="update-attr-hideExcludedUpdates"></a>
+    <li>hideExcludedUpdates<br>
+        if set to 1, do not print messages about excluded updates.
+        </li><br>
+
     <li><a href="#restoreDirs">restoreDirs</a></li><br>
 
   </ul>
@@ -690,7 +696,7 @@ upd_writeFile($$$$)
 =end html
 =begin html_DE
 
-<a name="update"></a>
+<a id="update"></a>
 <h3>update</h3>
 <ul>
   <code>update [-noSSL] [&lt;fileName&gt;|all|check|checktime|force]
@@ -738,12 +744,12 @@ upd_writeFile($$$$)
     <li>update force</li>
     <li>update check http://fhem.de/fhemupdate/controls_fhem.txt</li>
   </ul>
-  <a name="updateattr"></a>
 
   <br>
+  <a id="update-attr"></a>
   <b>Attribute</b>  (sind mit attr global zu setzen)
   <ul>
-    <a name="updateInBackground"></a>
+    <a id="update-attr-updateInBackground"></a>
     <li>updateInBackground<br>
         Wenn dieses Attribut gesetzt ist, wird der update Befehl in einem
         separaten Prozess ausgef&uuml;hrt und alle Meldungen werden per Event
@@ -752,7 +758,7 @@ upd_writeFile($$$$)
         Deaktivieren bitte Attribut auf 0 setzen.
         </li><br>
 
-    <a name="updateNoFileCheck"></a>
+    <a id="update-attr-updateNoFileCheck"></a>
     <li>updateNoFileCheck<br>
         Wenn dieses Attribut gesetzt ist, wird die Gr&ouml;&szlig;e der bereits
         vorhandenen, lokalen Datei nicht mit der Sollgr&ouml;&szlig;e
@@ -760,7 +766,7 @@ upd_writeFile($$$$)
         erfahrener FHEM Benutzer eingefuehrt, die Voreinstellung ist 0.
         </li><br>
 
-    <a name="backup_before_update"></a>
+    <a id="update-attr-backup_before_update"></a>
     <li>backup_before_update<br>
         Wenn dieses Attribut gesetzt ist, erstellt FHEM eine Sicherheitskopie
         der FHEM Installation vor dem update mit dem backup Befehl. Die
@@ -772,7 +778,7 @@ upd_writeFile($$$$)
         </ul>
         </li><br>
 
-    <a name="exclude_from_update"></a>
+    <a id="update-attr-exclude_from_update"></a>
     <li>exclude_from_update<br>
         Enth&auml;lt eine Liste durch Leerzeichen getrennter Dateinamen
         (Regexp), welche nicht beim update ber&uuml;cksichtigt werden.<br>
@@ -789,6 +795,12 @@ upd_writeFile($$$$)
         auszuschlie&szlig;en, weil sie von einer anderen Quelle bezogen wird,
         kann man fhem.de.*:FILE.pm spezifizieren.
 
+        </li><br>
+
+    <a id="update-attr-hideExcludedUpdates"></a>
+    <li>hideExcludedUpdates<br>
+        falls gesetzt, werden keine Meldungen bei exclude_from_update Dateien
+        generiert.
         </li><br>
 
     <li><a href="#restoreDirs">restoreDirs</a></li><br>

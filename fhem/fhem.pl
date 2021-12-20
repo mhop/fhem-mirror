@@ -334,6 +334,7 @@ my @globalAttrList = qw(
   dnsServer
   dupTimeout
   exclude_from_update
+  hideExcludedUpdates:1,0
   featurelevel:6.1,6.0,5.9,5.8,5.7,5.6,5.5,99.99
   genericDisplayType:switch,outlet,light,blind,speaker,thermostat
   holiday2we
