@@ -386,6 +386,7 @@ doUpdate($$$$)
     $nChanged++;
     my $sfx = ($arg eq "checktime" ? " $r[1]" : "");
     $sfx =~ s/_.*//;
+    next if($isCheck && $wouldExcl && $hideExcl);
     uLog 1, "$cmd $fName$sfx".
         ($isCheck && $wouldExcl ? " (excluded from update)" : "");
     next if($isCheck);
