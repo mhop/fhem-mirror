@@ -3162,8 +3162,10 @@ sub RHASSPY_ParseHttpResponse {
                 $siteIds = encode($cp,$ref->{$_}{satellite_site_ids});
             }
         }
-        my @ids = uniq(split q{,},$siteIds);
-        readingsBulkUpdate($hash, 'siteIds', join q{,}, @ids);
+        if ( $siteIds ) {
+            my @ids = uniq(split m{,},$siteIds);
+            readingsBulkUpdate($hash, 'siteIds', join q{,}, @ids);
+        }
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 

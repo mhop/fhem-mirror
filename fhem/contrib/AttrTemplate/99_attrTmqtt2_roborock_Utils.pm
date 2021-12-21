@@ -1,5 +1,5 @@
 ##############################################
-# $Id: attrTmqtt2_roborock_Utils.pm 2020-01-19 Beta-User $
+# $Id$
 #
 
 package main;
