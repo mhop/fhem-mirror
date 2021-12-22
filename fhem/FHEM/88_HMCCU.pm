@@ -31,7 +31,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 use strict;
 use warnings;
-use Data::Dumper;
+# use Data::Dumper;
 use Encode qw(decode encode);
 use RPC::XML::Client;
 use RPC::XML::Server;
@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 213491649';
+my $HMCCU_VERSION = '5.0 213551543';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -638,8 +638,6 @@ sub HMCCU_Attr ($@)
 		}
 		elsif ($attrname eq 'ccuflags') {
 			my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-			my @flags = ($attrval =~ /(intrpc|extrpc|procrpc)/g);
-			return "HMCCU: [$name] Flags extrpc, procrpc and intrpc cannot be combined" if (scalar (@flags) > 1);
 			if ($attrval =~ /(intrpc|extrpc)/) {
 				HMCCU_Log ($hash, 1, "HMCCU: [$name] RPC server mode $1 no longer supported. Using procrpc instead");
 				$attrval =~ s/(extrpc|intrpc)/procrpc/;
@@ -2884,19 +2882,9 @@ sub HMCCU_Substitute ($$$$$;$$)
 				'BOOL' => { '0' => 'false', '1' => 'true' }
 			);
 			my $parType = $paramDef->{TYPE};
-			if ($parType eq 'ENUM' && defined($paramDef->{VALUE_LIST})) {
-				my $i = defined($paramDef->{MIN}) ? $paramDef->{MIN} : 0;
-				if ($mode == 1) {
-					my %enumVals = map { $_ => $i++ } split(',', $paramDef->{VALUE_LIST});
-					return $enumVals{$value} if (exists($enumVals{$value}));
-				}
-				else {
-					my @enumList = split(',', $paramDef->{VALUE_LIST});
-					if (HMCCU_IsIntNum ($value)) {
-						my $idx = $value-$i;
-						return $enumList[$idx] if ($idx >= 0 && $idx < scalar(@enumList));
-					}
-				}
+			if ($parType eq 'ENUM' && defined($paramDef->{VALUE_LIST}) && HMCCU_IsIntNum($value)
+			) {
+				return HMCCU_GetEnumValues ($ioHash, $paramDef, undef, $value);
 			}
 			elsif (exists($ct{$parType}) && exists($ct{$parType}{$value})) {
 				return $ct{$parType}{$value};
@@ -2926,7 +2914,7 @@ sub HMCCU_SubstRule ($$$)
 
 	$substitutes =~ s/\$\{value\}/$value/g;
 	
-	my @sub_list = split /[, ]/,$substitutes;
+	my @sub_list = split /,/,$substitutes;
 	foreach my $s (@sub_list) {
 		my ($regexp, $text) = split /:/,$s,2;
 		next if (!defined($regexp) || !defined($text));
@@ -4391,11 +4379,13 @@ sub HMCCU_FindParamDef ($$$)
 ######################################################################
 # Get values of ENUM datapoint
 # object - Hash with parameter defintion or channel address
-# dpt - Datapoint name
-# value - Either a numeric value or an enumeration constant
-# If value is not specified, a comma separated list of enumeration
-# constants is returned.
-# Return value or undef if datapoint is not of type ENUM.
+# dpt - Datapoint name. Can be undef if object is a paramDef hash.
+# value - Either '#', a numeric value or an enumeration constant
+# If value is not specified, a string with a comma separated list of
+# enumeration constants is returned.
+# Return value, constant or list of constants depending on parameter
+# $value:
+#   $value = '#' : Return list of constant:value pairs
 ######################################################################
 
 sub HMCCU_GetEnumValues ($$$;$)
@@ -4405,19 +4395,22 @@ sub HMCCU_GetEnumValues ($$$;$)
 	my $paramDef = ref($object) eq 'HASH' ? $object : HMCCU_GetParamDef ($ioHash, $object, 'VALUES', $dpt);
 	if (defined($paramDef) && defined($paramDef->{TYPE}) && $paramDef->{TYPE} eq 'ENUM' && defined($paramDef->{VALUE_LIST})) {
 		my $i = defined($paramDef->{MIN}) && HMCCU_IsIntNum($paramDef->{MIN}) ? $paramDef->{MIN} : 0;
+		$i--;
 		my $j = $i;
 		my @valList = split(',',$paramDef->{VALUE_LIST});
-		my %valIndex = map { $_ => $i++ } @valList;
+		my %valIndex = map { $i++; $_ => $i if ($_ ne '') } @valList;	# Consider blanks in value list
 		if (defined($value)) {
 			if ($value eq '#') {
-				$j--;
+				# Return list of Constant:Value pairs
 				return join(',', map { $j++; $_ ne '' ? "$_:$j" : () } @valList);
 			}
 			elsif (HMCCU_IsIntNum($value)) {
+				# Return Constant for value. Constant might be ''
 				return $valList[$value] if ($value >= 0 && $value < scalar(@valList));
 			}
 			else {
-				return $valIndex{$value} if (exists($valIndex{$value}));
+				# Return Value for Constant
+				return $valIndex{$value} if ($value ne '' && exists($valIndex{$value}));
 			}
 		}
 		else {
@@ -5117,7 +5110,7 @@ sub HMCCU_IsRPCType ($$$)
 
 ######################################################################
 # Start external RPC server via RPC device.
-# Return number of RPC servers or 0 on error.
+# Return number of started/running RPC servers or 0 on error.
 ######################################################################
 
 sub HMCCU_StartExtRPCServer ($)
@@ -5127,22 +5120,10 @@ sub HMCCU_StartExtRPCServer ($)
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $attrset = 0;
-
-	# Change RPC type to procrpc
-	if ($ccuflags =~ /(extrpc|intrpc)/) {
-		$ccuflags =~ s/(extrpc|intrpc)/procrpc/g;
-		CommandAttr (undef, "$name ccuflags $ccuflags");
-		$attrset = 1;
-		
-		# Disable existing devices of type HMCCURPC
-		foreach my $d (keys %defs) {
-			my $ch = $defs{$d};
-			next if (!exists ($ch->{TYPE}) || !exists ($ch->{NAME}) || $ch->{TYPE} ne 'HMCCURPC');
-			CommandAttr (undef, $ch->{NAME}." disable 1") if (IsDisabled ($ch->{NAME}) != 1);
-		}
-	}
 	
-	my $c = 0;
+	my $c = 0;	# Started RPC servers
+	my $r = 0;	# Running RPC servers
+	my $f = 0;	# Failed RPC servers
 	my $d = 0;
 	my $s = 0;
 	my $interfaces = HMCCU_GetRPCInterfaceList ($hash, 0);
@@ -5166,15 +5147,20 @@ sub HMCCU_StartExtRPCServer ($)
 			my $dh = $defs{$hash->{hmccu}{interfaces}{$ifname2}{device}};
 			$hash->{hmccu}{interfaces}{$ifname2}{manager} = 'HMCCU';
 			my ($rc, $msg) = HMCCURPCPROC_StartRPCServer ($dh);
-			if (!$rc) {
+			if ($rc == 0) {
+				$f++;
 				HMCCU_SetRPCState ($hash, 'error', $ifname2, $msg);
 			}
-			else {
+			elsif ($rc == 1) {
 				$c++;
+			}
+			elsif ($rc == 2) {
+				$r++;
 			}
 		}
 		HMCCU_SetRPCState ($hash, 'starting') if ($c > 0);
-		return $c;
+		HMCCU_Log ($hash, 2, "RPC server start: $c started, $r already running, $f failed to start");
+		return $c+$r;
 	}
 	else {
 		HMCCU_Log ($hash, 0, 'Definition of some RPC devices failed');
@@ -7017,20 +7003,19 @@ sub HMCCU_UpdateRoleCommands ($$;$)
 				$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{fnc}  = $fnc // '';
 				if ($paramDef->{TYPE} eq 'ENUM' && defined($paramDef->{VALUE_LIST})) {
 					# Build lookup table
-					my @el = split(',', $paramDef->{VALUE_LIST});
-					my $i = 0;
-					foreach my $e (@el) {
-						$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{look}{$e} = $i;
-						$i++;
+					my $el = HMCCU_GetEnumValues ($ioHash, $paramDef, undef, '#');
+					my $min;
+					my $max;
+					foreach my $e (split(',',$el)) {
+						my ($cNam, $cVal) = split (':', $e);
+						$min = $cVal if (!defined($min) || $cVal<$min);
+						$max = $cVal if (!defined($max) || $cVal>$max);
+						$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{look}{$cNam} = $cVal;
 					}
 					 
 					# Parameter definition contains names for min and max value
-					$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{min} =
-						$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{look}{$paramDef->{MIN}}
-							if (exists($clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{look}{$paramDef->{MIN}}));					
-					$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{max} =
-						$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{look}{$paramDef->{MAX}}
-							if (exists($clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{look}{$paramDef->{MAX}}));					
+					$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{min} = $min;
+					$clHash->{hmccu}{roleCmds}{$cmdType}{$cmd}{subcmd}{$scn}{max} = $max;
 				}
 			
 				if (defined($par) && $par ne '') {
@@ -7325,7 +7310,7 @@ sub HMCCU_ExecuteRoleCommand ($@)
 		}
 
 		# Align new value with min/max boundaries
-		if (exists($cmd->{min}) && exists($cmd->{max})) {
+		if (exists($cmd->{min}) && exists($cmd->{max}) && HMCCU_IsFltNum($cmd->{min}) && HMCCU_IsFltNum($cmd->{max})) {
 			# Use mode = 0 in HMCCU_ScaleValue to get the min and max value allowed
 			HMCCU_Trace ($clHash, 2, "MinMax: value=$value, min=$cmd->{min}, max=$cmd->{max}");
 			my $scMin = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{min}, 2);
@@ -9230,9 +9215,7 @@ sub HMCCU_SetMultipleDatapoints ($$)
 				$v = "'".$v."'";
 			}
 			elsif ($paramDef->{TYPE} eq 'ENUM' && !HMCCU_IsIntNum($v)) {
-				HMCCU_Log ($clHash, 2, "Enum datapoint value = $v");
 				$v = HMCCU_GetEnumValues ($ioHash, $paramDef, $dpt, $v);
-				HMCCU_Log ($clHash, 2, "Enum datapoint number = $v");
 			}
 		}
 #		my $dptType = HMCCU_GetDatapointAttr ($ioHash, $ccuType, $chn, $dpt, 'type');
@@ -9293,8 +9276,8 @@ sub HMCCU_ScaleValue ($$$$$;$)
 	}
 	my $paramDef = HMCCU_GetParamDef ($ioHash, $ccuaddr, $paramSet, $dpt);
 	if (defined($paramDef)) {
-		$min = $paramDef->{MIN} if (defined($paramDef->{MIN}) && $paramDef->{MIN} ne '');
-		$max = $paramDef->{MAX} if (defined($paramDef->{MAX}) && $paramDef->{MAX} ne '');
+		$min = $paramDef->{MIN} if (defined($paramDef->{MIN}) && $paramDef->{MIN} ne '' && HMCCU_IsFltNum($paramDef->{MIN}));
+		$max = $paramDef->{MAX} if (defined($paramDef->{MAX}) && $paramDef->{MAX} ne '' && HMCCU_IsFltNum($paramDef->{MAX}));
 		$unit = $paramDef->{UNIT};
 		$unit = '100%' if (!defined($unit) && ($dpt eq 'LEVEL' || $dpt eq 'LEVEL_2' || $dpt eq 'LEVEL_SLATS'));
 	}
@@ -10014,8 +9997,8 @@ sub HMCCU_Max ($$)
 sub HMCCU_MinMax ($$$)
 {
 	my ($v, $min, $max) = @_;
-	$min = $v if (!defined($min) || $min eq '');
-	$max = $min if (!defined($max) || $max eq '');
+	$min = $v if (!defined($min) || $min eq '' || !HMCCU_IsFltNum($min));
+	$max = $min if (!defined($max) || $max eq '' || !HMCCU_IsFltNum($max));
 
 	return HMCCU_Max (HMCCU_Min ($v, $max), $min);
 }
@@ -10683,11 +10666,12 @@ sub HMCCU_MaxHashEntries ($$)
       <br/><br/>
       <ul>
       <li>Define used RPC interfaces with attribute 'rpcinterfaces'</li>
-      <li>Start RPC servers with command 'set rpcserver on'</li>
-      <li>Optionally enable automatic start of RPC servers with attribute 'rpcserver'</li>
+      <li>Start RPC servers with command 'set on'</li>
+      <li>Optionally enable automatic start of RPC servers by setting attribute 'rpcserver' to 'on'.</li>
       </ul><br/>
 	  When RPC servers are started for the first time, HMCCU will create a HMCCURPCPROC device for 
-	  each interface defined in attribut 'rpcinterfaces'.<br/>
+	  each interface defined in attribut 'rpcinterfaces'. These devices are assigned xto the same room
+	  as I/O device.<br/>
       After I/O device has been defined, start with the definition of client devices using modules HMCCUDEV (CCU devices)
       and HMCCUCHN (CCU channels) or with commands 'get createDev' or 'get create'.<br/>
    </ul>

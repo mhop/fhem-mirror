@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 213491649';
+my $HMCCUCHN_VERSION = '5.0 213551543';
 
 ######################################################################
 # Initialize module

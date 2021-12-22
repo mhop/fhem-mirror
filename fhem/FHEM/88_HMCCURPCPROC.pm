@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0 213491649';
+my $HMCCURPCPROC_VERSION = '5.0 213551543';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -1447,6 +1447,7 @@ sub HMCCURPCPROC_InitRPCServer ($$$$)
 ######################################################################
 # Start RPC server process
 # Return (State, Msg)
+# State: 0=Error, 1=Started, 2=Already running
 ######################################################################
 
 sub HMCCURPCPROC_StartRPCServer ($)
@@ -1461,7 +1462,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 		if (!exists($hash->{hmccu}{localaddr}) || !exists($hash->{rpcid}));
 		
 	# Check if RPC server is already running
-	return (0, 'RPC server already running') if (HMCCURPCPROC_CheckProcessState ($hash, 'running'));
+	return (2, 'RPC server already running') if (HMCCURPCPROC_CheckProcessState ($hash, 'running'));
 	
 	# Get parameters and attributes
 	my $ping          = AttrVal ($ioHash->{NAME}, 'rpcPingCCU', $HMCCURPCPROC_TIME_PING);
