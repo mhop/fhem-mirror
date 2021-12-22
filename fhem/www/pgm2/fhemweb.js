@@ -1584,7 +1584,7 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).change(function(arg) { cmd($(newEl).val()) });
   newEl.setValueFn = function(arg) {
     if(!vHash[arg] && typeof(arg) != "undefined")
-      arg = (arg+"").replaceAll(" ",".");    // Forum #124505
+      arg = (arg+"").replace(/ /g,"."); // #124505, replaceAll is Chrome 84+
     if(vHash[arg])
       $(newEl).val(arg);
   };
