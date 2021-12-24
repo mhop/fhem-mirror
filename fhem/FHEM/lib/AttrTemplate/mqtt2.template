@@ -1529,7 +1529,7 @@ set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_blind
 
 name:tasmota_2ch_shutter_venetian_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Configures a dual chanel tasmota device as venetian shutter; needs Tasmota version 10.0.0.1 or higher, see <a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,123842.0.html">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style device pct 100% = open.
+desc:Configures a dual chanel tasmota device as venetian shutter; needs Tasmota version 10.0.0.1 or higher, see <a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,123842.0.html">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style device pct 100% = open, and for a tilt range from -90 to 90 degrees.
 order:A_02b3
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
@@ -1564,27 +1564,26 @@ attr DEVICE readingList \
    STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
    STATTOPIC/POWER1:.* {{'state' => 'opening'} if $EVENT eq 'on'}\
    STATTOPIC/POWER2:.* {{'state' => 'closing'} if $EVENT eq 'on'}
-attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d.*:fts_shutter_90 8\d.*:fts_shutter_80 7\d.*:fts_shutter_70 6\d.*:fts_shutter_60 5\d.*:fts_shutter_50 4\d.*:fts_shutter_40 3\d.*:fts_shutter_30 2\d.*:fts_shutter_20 1\d.*:fts_shutter_10 \b\d\b.*:fts_shutter_10 set_.*:fts_shutter_updown
+attr DEVICE devStateIcon opening:fts_shutter_up@red:stop closing:fts_shutter_down@red:stop Online:10px-kreis-gruen Offline:10px-kreis-rot 0:fts_shutter_100 100:fts_shutter_10 \b\d\b.*:fts_shutter_90 1\d.*:fts_shutter_80 2\d.*:fts_shutter_70 3\d.*:fts_shutter_60 4\d.*:fts_shutter_50 5\d.*:fts_shutter_40 6\d.*:fts_shutter_30 7\d.*:fts_shutter_20 8\d.*:fts_shutter_10 9\d.*:fts_shutter_10 set_.*:fts_shutter_updown
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
-attr DEVICE webCmd :open:close:half:stop:pct
+attr DEVICE webCmd :open:close:half:stop:pctopenSlat:closeSlat:halfSlat:tiltSlat
 attr DEVICE eventMap open:opens close:closes
 attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:tiltSlat Shutter1_Target:pct  ANALOG_Temperature:temperature
-attr DEVICE userReadings state:pct:.* {ReadingsNum($name,"pct",0)}
+attr DEVICE userReadings state:pct:.* {ReadingsNum($name,'pct',0)}
 attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
 LWT\
 </a>\
 state\
 tiltSlat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-attr DEVICE setStateList open close half stop pct
+attr DEVICE setStateList open close half stop pct openSlat closeSlat halfSlat
 attr DEVICE comment After applying the template set "ShutterOpenDuration1", "ShutterCloseDuration1" and "shuttertiltconfig1" first.\
-Use the "set x_configuration" Option. Example: "set x_configuration ShutterOpenDuration1 35"\
-Shutter specific commands available: ShutterOpenDuration1, ShutterCloseDuration1, ShutterRelay1, ShutterSetHalfway1, ShutterSetClose1, ShutterInvert1, ShutterMotordelay1, ShutterCalibration1; you may use this for general setOptions in tasmota also.\
-commands may need restart to take effect.\
-For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
+Use the "set x_configuration" Option. Example: "set x_configuration ShutterOpenDuration1 35".\
+This is for a tilt range from -90 to 90 degrees, if you have different tilt options, adopt range manually\
+For calibration, tilt range settings, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20211116
+setreading DEVICE attrTemplateVersion 20211224
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 

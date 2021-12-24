@@ -3340,38 +3340,38 @@ sub handleIntentShortcuts {
 sub handleIntentSetOnOff {
     my $hash = shift // return;
     my $data = shift // return;
-    my ($value, $numericValue, $device, $room, $siteId, $mapping, $response);
 
     Log3($hash->{NAME}, 5, "handleIntentSetOnOff called");
 
     # Device AND Value must exist
-    if ( exists $data->{Device} && exists $data->{Value} ) {
-        $room = getRoomName($hash, $data);
-        $value = $data->{Value};
-        $device = getDeviceByName($hash, $room, $data->{Device});
-        $mapping = getMapping($hash, $device, 'SetOnOff');
+    return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Device} || !defined $data->{Value};
 
-        # Mapping found?
-        if ( defined $device && defined $mapping ) {
-            #check if confirmation is required
-            return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetOnOff', $device );
-            my $cmdOn  = $mapping->{cmdOn} // 'on';
-            my $cmdOff = $mapping->{cmdOff} // 'off';
-            my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
+    my $room = getRoomName($hash, $data);
+    my $device = getDeviceByName($hash, $room, $data->{Device}) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
+    my $value = $data->{Value};
 
-            # execute Cmd
-            analyzeAndRunCmd($hash, $device, $cmd);
-            Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+    # Mapping found?
+    #check if confirmation is required
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetOnOff', $device );
+    my $cmdOn  = $mapping->{cmdOn} // 'on';
+    my $cmdOff = $mapping->{cmdOff} // 'off';
+    my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
 
-            # Define response
-            if ( defined $mapping->{response} ) { 
-                $numericValue = $value eq 'on' ? 1 : 0;
-                $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
-                Log3($hash->{NAME}, 5, "Response is $response" );
-            }
-            else { $response = getResponse($hash, 'DefaultConfirmation'); }
-        }
+    # execute Cmd
+    analyzeAndRunCmd($hash, $device, $cmd);
+    Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
+    # Define response
+    my $response;
+    if ( defined $mapping->{response} ) { 
+        #my $numericValue = $value eq 'on' ? 1 : 0;
+        $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $value eq 'on' ? 1 : 0, $room); 
+        Log3($hash->{NAME}, 5, "Response is $response" );
     }
+    else { $response = getResponse($hash, 'DefaultConfirmation'); }
+
+
     # Send response
     $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
@@ -3411,11 +3411,8 @@ sub handleIntentSetOnOffGroup {
     my $needs_sorting = (@{$hash->{".asyncQueue"}});
 
     for my $device (@devlist) {
-        my $mapping = getMapping($hash, $device, 'SetOnOff');
+        my $mapping = getMapping($hash, $device, 'SetOnOff') // next;
 
-        # Mapping found?
-        next if !defined $mapping;
-        
         my $cmdOn  = $mapping->{cmdOn} // 'on';
         my $cmdOff = $mapping->{cmdOff} // 'off';
         my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
@@ -3445,63 +3442,61 @@ sub handleIntentSetOnOffGroup {
 sub handleIntentSetTimedOnOff {
     my $hash = shift // return;
     my $data = shift // return;
-    my ($value, $numericValue, $device, $room, $siteId, $mapping, $response);
 
     Log3($hash->{NAME}, 5, "handleIntentSetTimedOnOff called");
 
     return respond( $hash, $data, getResponse( $hash, 'duration_not_understood' ) ) 
     if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec};
-    
-    # Device AND Value must exist
-    return if !exists $data->{Device} || !exists $data->{Value};
 
-    $room = getRoomName($hash, $data);
-    $value = $data->{Value};
-    $device = getDeviceByName($hash, $room, $data->{Device});
-    $mapping = getMapping($hash, $device, 'SetOnOff');
+    # Device AND Value must exist
+    return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Device} || !defined $data->{Value};
+
+    my $room = getRoomName($hash, $data);
+    my $device = getDeviceByName($hash, $room, $data->{Device}) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
+    my $value = $data->{Value};
 
     # Mapping found?
-    if ( defined $device && defined $mapping ) {
-        return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
-        my $cmdOn  = $mapping->{cmdOn} // 'on';
-        my $cmdOff = $mapping->{cmdOff} // 'off';
-        my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
-        $cmd .= "-for-timer";
+    return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
+    my $cmdOn  = $mapping->{cmdOn} // 'on';
+    my $cmdOff = $mapping->{cmdOff} // 'off';
+    my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
+    $cmd .= "-for-timer";
 
-        my $allset = getAllSets($device);
-        return respond( $hash, $data, getResponse($hash, 'NoTimedOnDeviceFound') ) if $allset !~ m{\b$cmd(?:[\b:\s]|\Z)}xms;
+    my $allset = getAllSets($device);
+    return respond( $hash, $data, getResponse($hash, 'NoTimedOnDeviceFound') ) if $allset !~ m{\b$cmd(?:[\b:\s]|\Z)}xms;
 
-        my $hour = 0;
-        my $now1 = time;
-        my $now = $now1;
-        my @time = localtime($now);
-        if ( defined $data->{Hourabs} ) {
-            $hour  = $data->{Hourabs};
-            $now1 = $now1 - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
-        }
-        elsif ($data->{Hour}) {
-            $hour = $data->{Hour};
-        }
-        $now1 += HOURSECONDS * $hour;
-        $now1 += MINUTESECONDS * $data->{Min} if $data->{Min};
-        $now1 += $data->{Sec} if $data->{Sec};
-
-        $now1 += +DAYSECONDS if $now1 < $now;
-        $now1 = $now1 - $now;
-
-        $cmd .= " $now1";
-        # execute Cmd
-        analyzeAndRunCmd($hash, $device, $cmd);
-        Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
-
-        # Define response
-        if ( defined $mapping->{response} ) { 
-            $numericValue = $value eq 'on' ? 1 : 0;
-            $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
-            Log3($hash->{NAME}, 5, "Response is $response" );
-        }
-        else { $response = getResponse($hash, 'DefaultConfirmation'); }
+    my $hour = 0;
+    my $now1 = time;
+    my $now = $now1;
+    my @time = localtime($now);
+    if ( defined $data->{Hourabs} ) {
+        $hour  = $data->{Hourabs};
+        $now1 = $now1 - ($time[2] * HOURSECONDS) - ($time[1] * MINUTESECONDS) - $time[0]; #last midnight
     }
+    elsif ($data->{Hour}) {
+        $hour = $data->{Hour};
+    }
+    $now1 += HOURSECONDS * $hour;
+    $now1 += MINUTESECONDS * $data->{Min} if $data->{Min};
+    $now1 += $data->{Sec} if $data->{Sec};
+
+    $now1 += +DAYSECONDS if $now1 < $now;
+    $now1 = $now1 - $now;
+
+    $cmd .= " $now1";
+    # execute Cmd
+    analyzeAndRunCmd($hash, $device, $cmd);
+    Log3($hash->{NAME}, 5, "Running command [$cmd] on device [$device]" );
+
+    # Define response
+    my $response;
+    if ( defined $mapping->{response} ) { 
+        my $numericValue = $value eq 'on' ? 1 : 0;
+        $response = _getValue($hash, $device, _shuffle_answer($mapping->{response}), $numericValue, $room); 
+        Log3($hash->{NAME}, 5, "Response is $response" );
+    }
+    else { $response = getResponse($hash, 'DefaultConfirmation'); }
     # Send response
     $response //= getResponse($hash, 'DefaultError');
     respond( $hash, $data, $response );
@@ -4908,18 +4903,13 @@ __END__
 
 # Farben:
   Warum die Abfrage nach rgb? <code>if ( defined $data->{Colortemp} && defined $mapping->{rgb} && looks_like_number($data->{Colortemp}) ) {</code>
-  Gibt auch Lampen, die können nur ct
+  Gibt auch Lampen, die können nur ct (Beta-User: unklare Frage: der fragliche Zweig wird nur bei "falschem ct" angesteuert, ansonsten wird schon vorher "nativ" ct verwendet)
 
 # Custom Intents
  - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
-   also gar nicht ausgegeben und:
+   also gar nicht ausgegeben und: (Beta-User: klingt nach "silent cancelation", grade keine Idee).
 
-   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868.
-
-# "rhasspySpecials" bzw. rhasspyTweaks als weitere Attribute
-Denkbare Verwendung:
-- siteId2room für mobile Geräte (Denkbare Anwendungsfälle: Auswertung BT-RSSI per Perl, aktives Setzen über ein Reading? Oder einen intent? (tweak)
-- Bestätigungs-Mapping (special) (ist noch offen)
+   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868. (Beta-User: nicht mehr zuordenbar)
 
 # Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
 - kein "match in room" bei GetNumeric
@@ -4928,13 +4918,11 @@ Denkbare Verwendung:
 - gDT: mehr und bessere mappings?
 - Farbe und Farbtemperatur (fast fertig?)
 - Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
-  Irgendwie müssen wir die neue siteId in den Slot Rooms bringen
+  Irgendwie müssen wir die neue siteId in den Slot Rooms bringen (erl. mit extrarooms?)
 
-# Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700
+# Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700 (erl.)
 
-# Keine shortcuts-Intents, wenn Attribut nicht gesetzt: Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700 (erl.)
-
-# Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)?
+# Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)? (erl. (?))
 
 =end ToDo
 
@@ -4949,7 +4937,7 @@ https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 
 # Wetterdurchsage
 Ist möglich. Dazu hatte ich einen rudimentären Intent in diesem Thread erstellt. Müsste halt nur erweitert werden.
-https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754
+https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754 (evtl. ersetzt durch STATE-Abfrage/gDT info?)
 
 =end ToClarify
 
