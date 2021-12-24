@@ -454,7 +454,7 @@ sub isAktive {
 sub isDisabled {
     my $hash = shift // return;
 
-    return if IsDisabled( $hash->{NAME} );
+    return 1 if IsDisabled( $hash->{NAME} );
     my $disableCond = AttrVal( $hash->{NAME}, 'disableCond', undef) // return 0;
 
     return AnalyzePerlCommand( $hash, $disableCond );
