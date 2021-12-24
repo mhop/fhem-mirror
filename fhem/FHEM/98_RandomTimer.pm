@@ -126,7 +126,7 @@ sub Define {
     }
 
     my ( $e, $h, $m, $s, $f ) = GetTimeSpec($stspec);
-    return $e if ($e);
+    return $e if $e;
 
     return "invalid timeToSwitch <$timeToSwitch>, use 9999"
       if ( !( $timeToSwitch =~ m{^[0-9]{2,4}$}ixms ) );
@@ -158,8 +158,7 @@ sub Define {
         $hash->{helper}{offReading} = q{state};
     }
 
-    readingsSingleUpdate( $hash, 'TimeToSwitch', $hash->{helper}{TIMETOSWITCH},
-        1 );
+    readingsSingleUpdate( $hash, 'TimeToSwitch', $hash->{helper}{TIMETOSWITCH}, 1 );
 
     RemoveInternalTimer($hash,\&RT_SetTimer);
     InternalTimer(time,\&RT_SetTimer,$hash);
@@ -167,12 +166,8 @@ sub Define {
 }
 
 sub Undef {
-
-    my $hash = shift;
-    my $arg  = shift // return;
-    
+    my $hash = shift // return;
     RemoveInternalTimer($hash);
-    
     delete $modules{RandomTimer}{defptr}{ $hash->{NAME} };
     return;
 }
@@ -204,7 +199,7 @@ sub Attr {
             return $err if $err;
         }
     }
-  
+
     return;
 }
 
@@ -271,8 +266,7 @@ sub device_switch {
     Log3( $hash, 4, "[$hash->{NAME}] command: $command" );
 
     my $ret = AnalyzeCommandChain( $hash, $command );
-    Log3( $hash, 3, "[$hash->{NAME}] ERROR: $ret SENDING $command" )
-      if ($ret);
+    Log3( $hash, 3, "[$hash->{NAME}] ERROR: $ret SENDING $command" ) if $ret;
 
     return;
 }
@@ -319,20 +313,16 @@ sub disableDown {
     my $hash = shift // return;
     my $disableCondCmd = AttrVal( $hash->{NAME}, "disableCondCmd", 0 );
 
-    if ( $disableCondCmd ne 'none' ) {
-        Log3( $hash, 4,
-            "[$hash->{NAME}] setting requested disableCondCmd on $hash->{DEVICE}: " );
-        $hash->{COMMAND} =
-          AttrVal( $hash->{NAME}, 'disableCondCmd', 0 ) eq 'onCmd'
-          ? 'on'
-          : 'off';
-        device_switch($hash);
-    }
-    else {
-        Log3( $hash, 4,
-            "[$hash->{NAME}] no action requested on $hash->{DEVICE}" );
-    }
-    return;
+    return Log3( $hash, 4, "[$hash->{NAME}] no action requested on $hash->{DEVICE}" ) 
+        if $disableCondCmd eq 'none';
+
+    Log3( $hash, 4,
+        "[$hash->{NAME}] setting requested disableCondCmd on $hash->{DEVICE}: " );
+    $hash->{COMMAND} =
+        AttrVal( $hash->{NAME}, 'disableCondCmd', 0 ) eq 'onCmd'
+        ? 'on'
+        : 'off';
+    return device_switch($hash);
 }
 
 sub down {
@@ -341,8 +331,7 @@ sub down {
         "[$hash->{NAME}] setting requested keepDeviceAlive on $hash->{DEVICE}" );
     $hash->{COMMAND} =
       AttrVal( $hash->{NAME}, 'keepDeviceAlive', 0 ) ? 'on' : 'off';
-    device_switch($hash);
-    return;
+    return device_switch($hash);
 }
 
 sub RT_Exec {
@@ -465,11 +454,8 @@ sub isAktive {
 sub isDisabled {
     my $hash = shift // return;
 
-    my $disable = IsDisabled( $hash->{NAME} );
-    return $disable if $disable;
-
-    my $disableCond = AttrVal( $hash->{NAME}, "disableCond", "nf" );
-    return 0 if $disableCond eq 'nf';
+    return if IsDisabled( $hash->{NAME} );
+    my $disableCond = AttrVal( $hash->{NAME}, 'disableCond', undef) // return 0;
 
     return AnalyzePerlCommand( $hash, $disableCond );
 }
@@ -483,9 +469,9 @@ sub schaltZeitenErmitteln {
 
     readingsBeginUpdate($hash);
 
-    readingsBulkUpdate( $hash, "StartTime",
+    readingsBulkUpdate( $hash, 'StartTime',
         FmtDateTime( $hash->{helper}{startTime} ) );
-    readingsBulkUpdate( $hash, "StopTime",
+    readingsBulkUpdate( $hash, 'StopTime',
         FmtDateTime( $hash->{helper}{stopTime} ) );
     readingsEndUpdate( $hash, defined( $hash->{LOCAL} ? 0 : 1 ) );
     return;
@@ -496,7 +482,7 @@ sub setActive {
     my $value = shift // return;
     $hash->{helper}{active} = $value;
     my $trigger = ( isDisabled($hash) ) ? 0 : 1;
-    readingsSingleUpdate( $hash, "active", $value, $trigger );
+    readingsSingleUpdate( $hash, 'active', $value, $trigger );
     return;
 }
 
@@ -661,8 +647,8 @@ sub zeitBerechnen {
     $jetzt_arr[2] = $hour;
     $jetzt_arr[1] = $min;
     $jetzt_arr[0] = $sec;
-    my $next = timelocal_nocheck(@jetzt_arr);
-    return $next;
+    my $nxt = timelocal_nocheck(@jetzt_arr);
+    return $nxt;
 }
 
 1;
