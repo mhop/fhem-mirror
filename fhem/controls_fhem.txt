@@ -1,4 +1,4 @@
-REV 25370
+REV 25374
 DIR unused
 UPD 2021-12-23_07:45:03 370833 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -502,7 +502,7 @@ UPD 2020-06-22_07:45:03 25785 FHEM/98_ModbusTrovis5576.pm
 UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
-UPD 2021-12-24_07:45:02 32098 FHEM/98_RandomTimer.pm
+UPD 2021-12-25_07:45:03 32100 FHEM/98_RandomTimer.pm
 UPD 2021-11-07_07:45:02 100198 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -642,7 +642,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2021-10-17_07:45:03 5009 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-12-24_07:45:02 349027 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-12-25_07:45:03 349033 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -738,8 +738,8 @@ UPD 2021-12-24_07:45:06 4584021 docs/commandref.html
 UPD 2021-12-24_07:45:09 2822054 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2021-12-24_07:45:10 264925 docs/commandref_modular.html
-UPD 2021-12-24_07:45:11 275991 docs/commandref_modular_DE.html
+UPD 2021-12-25_07:45:11 264925 docs/commandref_modular.html
+UPD 2021-12-25_07:45:12 275991 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1761,6 +1761,7 @@ UPD 2020-03-02_07:45:03 7420 www/images/fhemSVG/vitrine.svg
 UPD 2020-03-02_07:45:03 11669 www/images/fhemSVG/vitrine1.svg
 UPD 2020-03-02_07:45:03 13363 www/images/fhemSVG/vitrine_door_transparent.svg
 UPD 2019-02-14_07:45:03 3164 www/images/fhemSVG/vmware.svg
+UPD 2021-12-25_07:45:03 7079 www/images/fhemSVG/wallbox.svg
 UPD 2020-07-26_07:45:03 3779 www/images/fhemSVG/wasserkocher_icon.svg
 UPD 2020-07-26_07:45:03 45633 www/images/fhemSVG/wasserzaehler_icon.svg
 UPD 2021-05-11_07:45:02 7760 www/images/fhemSVG/weather/Fair-Day.svg
