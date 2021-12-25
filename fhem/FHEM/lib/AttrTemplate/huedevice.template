@@ -11,16 +11,20 @@
 
 ###########################################
 # Eurotronic Spirit ZigBee (SPZB0001)
-name:C_01_Eurotronic_SPZB0001_Spirit_ZigBee
+name:Eurotronic_SPZB0001_Spirit_ZigBee
 filter:TYPE=HUEDevice
 desc: All necessary attr are set and also a helper CMDAlias for the Eurotronic Spirit ZigBee thermostat.<br><a href="https://eurotronic.org/produkte/zigbee-heizkoerperthermostat/spirit-zigbee/">Manufacturer link: Klick me</a>
+order:C_01
+par:ICON;ICON as set, defaults to max_heizungsthermostat;{ AttrVal('DEVICE','icon','max_heizungsthermostat') }
 attr DEVICE configList /mode (.*)/:{"mode":"$1"}\
 /heatsetpoint (.*)/:perl:{'{"heatsetpoint":' . $VALUE1 * 100 . '}'}\
 /displayflipped (.*)/:{"displayflipped": $1 }\
 lock:{"locked": true }\
 unlock:{"locked": false }
 attr DEVICE widgetOverride mode:auto,heat,off displayflipped:true,false heatsetpoint:16,16.5,17,17.5,18,18.5,19,19.5,20,20.5,21,21.5,22
-attr DEVICE icon max_heizungsthermostat
+attr DEVICE icon ICON
+setreading DEVICE attrTemplateVersion Eurotronic_SPZB0001_Spirit_ZigBee_20211015
+
 # Helper CMDAlias heatsetpointX100
 #par:DeviceRoom;Room of the Device.;{AttrVal("heatsetpointX100","room","HUEDevice" )}
 #defmod heatsetpointX100 cmdalias set .* heatsetpoint .* AS {fhem("set $EVTPART0 $EVTPART1 ". $EVTPART2 * 100)}
@@ -31,56 +35,96 @@ attr DEVICE icon max_heizungsthermostat
 
 ###########################################
 # Xiaomi/Aqara MCCGQ11LM Fenster Tür Sensor
-name:D_01_Xiaomi_Aqara_MCCGQ11LM_Window_Door_Sensor
+name:Xiaomi_Aqara_MCCGQ11LM_Window_Door_Sensor
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara window door sensor is a single sensor and interprets a normally closed contact .<br><a href="https://www.aqara.com/en/door_and_window_sensor-product.html">Manufacturer link: Klick me</a>
+order:D_01
+par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal('DEVICE','icon','fts_window_1w_open') }
+attr DEVICE icon ICON
 attr DEVICE devStateIcon open:fts_window_1w_open@#e56524 closed:fts_window_1w
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_MCCGQ11LM_Window_Door_Sensor_20211015
 
 
 ###########################################
 # Xiaomi/Aqara WSDCGQ11LM Temperatur Sensor
-name:E_01a_Xiaomi_Aqara_WSDCGQ11LM_Temperature_Sensor
+name:Xiaomi_Aqara_WSDCGQ11LM_Temperature_Sensor
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara temperature, humidity and pressure sensor is a multisensor, and is interpreted by ZigBee as three sensors that is temperature sensor.<br><a href="https://www.aqara.com/en/temperature_and_humidity_sensor-product.html">Manufacturer link: Klick me</a>
-attr DEVICE icon xiaomi_multi
+order:E_01a
+par:ICON;ICON as set, defaults to xiaomi_multi;{ AttrVal('DEVICE','icon','xiaomi_multi') }
+attr DEVICE icon ICON
 attr DEVICE stateFormat T: temperature °C
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_WSDCGQ11LM_Temperature_Sensor_20211015
 
 # Xiaomi/Aqara WSDCGQ11LM Pressure Sensor
-name:E_01b_Xiaomi_Aqara_WSDCGQ11LM_Pressure_Sensor
+name:Xiaomi_Aqara_WSDCGQ11LM_Pressure_Sensor
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara temperature, humidity and pressure sensor is a multisensor, and is interpreted by ZigBee as three sensors that is pressure sensor.<br><a href="https://www.aqara.com/en/temperature_and_humidity_sensor-product.html">Manufacturer link: Klick me</a>
-attr DEVICE icon xiaomi_multi
+order:E_01b
+par:ICON;ICON as set, defaults to xiaomi_multi;{ AttrVal('DEVICE','icon','xiaomi_multi') }
+attr DEVICE icon ICON
 attr DEVICE stateFormat P: pressure hPa
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_WSDCGQ11LM_Pressure_Sensor_20211015
 
 # Xiaomi/Aqara WSDCGQ11LM Humidity Sensor
-name:E_01c_Xiaomi_Aqara_WSDCGQ11LM_Humidity_Sensor
+name:Xiaomi_Aqara_WSDCGQ11LM_Humidity_Sensor
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara temperature, humidity and pressure sensor is a multisensor, and is interpreted by ZigBee as three sensors that is humidity sensor.<br><a href="https://www.aqara.com/en/temperature_and_humidity_sensor-product.html">Manufacturer link: Klick me</a>
-attr DEVICE icon xiaomi_multi
+order:E_01c
+par:ICON;ICON as set, defaults to xiaomi_multi;{ AttrVal('DEVICE','icon','xiaomi_multi') }
+attr DEVICE icon ICON
 attr DEVICE stateFormat H: humidity %
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_WSDCGQ11LM_Humidity_Sensor_20211015
 
 
 ###########################################
 # Xiaomi/Aqara RTCGQ11LM Motion Sensor
-name:F_01a_Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor
+name:Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara motion sensor is a multisensor, and is interpreted by ZigBee as two sensors that is motion sensor.<br><a href="https://www.aqara.com/en/motion_sensor.html">Manufacturer link: Klick me</a>
+order:F_01a
+par:ICON;ICON as set, defaults to motion_detector;{ AttrVal('DEVICE','icon','motion_detector') }
+attr DEVICE icon ICON
 attr DEVICE devStateIcon motion:people_sensor nomotion:message_presence
-attr DEVICE icon motion_detector
+attr DEVICE configList /duration (.*)/:{"duration":"$1"}\
+/delay (.*)/:{"delay":$1}\
+/ledindication (.*)/:true,false:{"ledindication":$1}\
+/on (.*)/:true,false:{"on":$1}\
+/sensitivity (.*)/:0,1,2:{"sensitivity":$1}
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor_20211215
+
+
+name:Xiaomi_Aqara_DJT11LM_Vibration_Sensor
+filter:TYPE=HUEDevice
+desc: The Xiaomi/Aqara vibration sensor
+order:F_01b
+par:ICON;ICON as set, defaults to secur_alarm;{ AttrVal('DEVICE','icon','secur_alarm') }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon motion:people_sensor nomotion:message_presence
+attr DEVICE configList /sensitivity (.*)/:0,1,2,3:{"sensitivity":$1}
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_DJT11LM_Vibration_Sensor_20211215
+
 
 # Xiaomi/Aqara RTCGQ11LM Lightlevel Sensor
-name:F_01a_Xiaomi_Aqara_RTCGQ11LM_Lightlevel_Sensor
+name:Xiaomi_Aqara_RTCGQ11LM_Lightlevel_Sensor
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara motion sensor is a multisensor, and is interpreted by ZigBee as two sensors that is lightlevel sensor.<br><a href="https://www.aqara.com/en/motion_sensor.html">Manufacturer link: Klick me</a>
-attr DEVICE icon IR
+order:F_01a1
+par:ICON;ICON as set, defaults to IR;{ AttrVal('DEVICE','icon','IR') }
+attr DEVICE icon ICON
 attr DEVICE stateFormat lux Lux
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_RTCGQ11LM_Lightlevel_Sensor_20211215
 
 
 ###########################################
 # Xiaomi/Aqara WXKG02LM Double Switch
-name:G_01_Xiaomi_Aqara_WXKG02LM_Double_Switch
+name:Xiaomi_Aqara_WXKG02LM_Double_Switch
 filter:TYPE=HUEDevice
 desc: The Xiaomi/Aqara Double Switch is double switch.<br><a href="https://www.aqara.com/en/86plug.html">Manufacturer link: Klick me</a>
+order:G_01
+par:ICON;ICON as set, defaults to taster_ch;{ AttrVal('DEVICE','icon','taster_ch') }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon 100.:taster_ch6_1 200.:taster_ch6_2 300.:taster_ch6_3 400.:taster_ch6_4 500.:taster_ch6_5 600.:taster_ch6_6
 attr DEVICE eventMap 1001:LeftLongPress\
 1002:LeftShortPress \
 1004:LeftDoublePress\
@@ -91,3 +135,17 @@ attr DEVICE eventMap 1001:LeftLongPress\
 3002:DoubleShortPress \
 3004:DoubleDoublePress
 attr DEVICE icon taster
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_WXKG02LM_Double_Switch_20211015
+
+###########################################
+# Melinera (Lidl) Smarte Lichterkette
+name:Melinera_LED_fairy_lights_ZigBee
+filter:TYPE=HUEDevice
+desc: Might fit for product distributed by Lidl; showcase how to hand oder dedicated or arbitrary values for setters.
+order:X_01
+par:ICON;ICON as set, defaults to light_fairy_lights;{ AttrVal('DEVICE','icon','light_fairy_lights') }
+attr DEVICE icon ICON
+attr DEVICE { usr => { 'effectSpeed\s+(.*)' => '{"effectSpeed":"$1"}', 'sparkles1' => '{"effect": "sparkles", "on": true,"effectColours": [[0,0,255],[0,255,0],[255,0,0]]}', 'sparkles2' => '{"effect": "sparkles", "on": true,"effectColours": [[0,255,0],[255,255,255],[255,0,0]]}', 'effectWColors(\w+)\s+(.*)' => '{"effect": "$1", "on": true,"effectColours": "$2" }', 'NormalWhite' => '{"sat": 0}' } }
+attr DEVICE widgetOverride effect:steady,snow,rainbow,snake,twinkle,fireworks,flag,waves,updown,vintage,fading,collide,strobe,sparkles,carnival,glow  effectSpeed:selectnumbers,0,1,10,0,lin sparkles1:noArg sparkles2:noArg
+attr DEVICE webCmd bri:effect:effectSpeed:sparkles1:sparkles2:NormalWhite
+setreading DEVICE attrTemplateVersion Melinera_LED_fairy_lights_ZigBee_20211222
