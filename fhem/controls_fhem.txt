@@ -1,4 +1,4 @@
-REV 25374
+REV 25376
 DIR unused
 UPD 2021-12-23_07:45:03 370833 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -639,7 +639,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2021-10-12_07:45:03 8973 FHEM/lib/AttrTemplate/general_use.template
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
-UPD 2021-10-17_07:45:03 5009 FHEM/lib/AttrTemplate/huedevice.template
+UPD 2021-12-26_07:45:02 8458 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
 UPD 2021-12-25_07:45:03 349033 FHEM/lib/AttrTemplate/mqtt2.template
@@ -738,8 +738,8 @@ UPD 2021-12-24_07:45:06 4584021 docs/commandref.html
 UPD 2021-12-24_07:45:09 2822054 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2021-12-25_07:45:11 264925 docs/commandref_modular.html
-UPD 2021-12-25_07:45:12 275991 docs/commandref_modular_DE.html
+UPD 2021-12-26_07:45:10 264925 docs/commandref_modular.html
+UPD 2021-12-26_07:45:11 275991 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
