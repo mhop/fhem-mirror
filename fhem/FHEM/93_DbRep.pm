@@ -57,6 +57,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.6"  => "26.12.2021  sub sqlCmd_DoParse uses credentials dependend of attr useAdminCredentials ".
+                            "fix warnings in sub export/import file, fix error of expfile_DoParse filedefinition ".
+                            "change retrieve minTimestamp forum:#124987",
+  "8.46.5"  => "19.12.2021  some code improvements ",
   "8.46.4"  => "14.12.2021  fix tableCurrentPurge ",
   "8.46.3"  => "12.12.2021  edit/fix minor faults in exportToFile/importFromFile, new getter initData ",
   "8.46.2"  => "08.12.2021  Pragma query possible in sqlCmd. So far only 'set', get encoding info from database ",
@@ -865,7 +869,7 @@ sub DbRep_Set {
       DbRep_Main($hash,$opt);  
   } 
   elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
-      $prop        // push @a, AttrVal($name,"expimpfile","");
+      $prop        // push @a, AttrVal($name, "expimpfile", "");
       my ($ar, $hr) = parseParams(join ' ', @a);
       my $f         = $ar->[2] // "";
       
@@ -879,7 +883,7 @@ sub DbRep_Set {
           return qq{The "MAXLINES" parameter must be a integer value !} if($e !~ /^MAXLINES=\d+$/);
       }
       
-      $prop            = $f." ".$e;
+      $prop            = $e ? $f." ".$e : $f;
       
       $hash->{LASTCMD} = $opt.' '.$prop;
       
@@ -897,7 +901,7 @@ sub DbRep_Set {
       
       $hash->{LASTCMD} = $opt.' '.$f;
       
-      DbRep_Main       ($hash,$opt,$f);  
+      DbRep_Main       ($hash, $opt, $f);  
   } 
   elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
@@ -1705,7 +1709,6 @@ sub DbRep_getInitData {
   my $fret     = $paref->{fret} // '';
 
   my $database = $hash->{DATABASE};
-  my $mintsdef = "1970-01-01 01:00:00";
 
   my $bst = [gettimeofday];                                     # Background-Startzeit
   
@@ -1719,12 +1722,8 @@ sub DbRep_getInitData {
  
   # ältesten Datensatz der DB ermitteln
   ######################################
-  my $mints     = qq{undefined - $mintsdef is used instead};
-  eval { $mints = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;") };
-  
-  Log3 ($name, 4, "DbRep $name - Oldest timestamp determined: $mints");
-  
-  $mints = $mints =~ /undefined/x ? $mintsdef : $mints;
+  $paref->{dbh} = $dbh;
+  my $mints     = _DbRep_getInitData_mints ($paref);
   
   # Encoding der Datenbank ermitteln
   ####################################
@@ -1779,44 +1778,12 @@ sub DbRep_getInitData {
       }
   }
   
-  # effektive Userrechte in MYSQL ermitteln
-  ##########################################
-  my $grants = '';
-  my ($sth,@uniq);  
+  # Userrechte ermitteln
+  #######################
+  $paref->{dbmodel}  = $dbmodel;
+  $paref->{database} = $database;
   
-  if($dbmodel =~ /MYSQL/) {
-      eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();"); 
-            $sth->execute();
-           };
-      if($@) {
-          Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
-      } 
-      else {
-          my $row = "";
-          
-          while (my @line = $sth->fetchrow_array()) {
-              for my $l (@line) {
-                  next if($l !~ /(\s+ON \*\.\*\s+|\s+ON `$database`)/ );
-                  $row .= "," if($row); 
-                  $row .= (split(" ON ",(split("GRANT ", $l, 2))[1], 2))[0];                 
-              }
-          }
-          
-          $sth->finish;
-          my %seen = ();
-          my @g    = split(/,(\s?)/, $row);
-          
-          for my $e (@g) {
-              next if(!$e || $e =~ /^\s+$/);
-              $seen{$e}++;
-          }
-          
-          @uniq   = keys %seen;
-          $grants = join ",", @uniq;
-          
-          Log3 ($name, 4, "DbRep $name - Grants determined: $grants");
-      }
-  }
+  my $grants         = _DbRep_getInitData_grants ($paref);
  
   $dbh->disconnect;
  
@@ -1835,6 +1802,81 @@ sub DbRep_getInitData {
   $prop = DbRep_trim ($prop) if($prop);
  
 return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants|$enc";
+}
+
+####################################################################################################
+#                          ältesten Datensatz der DB ermitteln
+####################################################################################################
+sub _DbRep_getInitData_mints {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $dbh   = $paref->{dbh};
+  
+  my $mintsdef  = "1970-01-01 01:00:00";
+  my $mints     = qq{undefined - $mintsdef is used instead};
+  eval { my $fr = $dbh->selectrow_array("SELECT min(TIMESTAMP) FROM history;");
+         $mints = $fr if($fr);
+       };
+  
+  Log3 ($name, 4, "DbRep $name - Oldest timestamp determined: $mints");
+  
+  $mints = $mints =~ /undefined/x ? $mintsdef : $mints;
+ 
+return $mints;
+}
+
+####################################################################################################
+#                          effektive Userrechte ermitteln  
+####################################################################################################
+sub _DbRep_getInitData_grants {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $dbmodel  = $paref->{dbmodel};
+  my $dbh      = $paref->{dbh};
+  my $database = $paref->{database};
+  
+  my $grants = q{};
+  
+  return $grants if($dbmodel eq 'SQLITE');
+  
+  my ($sth,@uniq);  
+  
+  if($dbmodel eq 'MYSQL') {
+      
+      eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();"); 
+            $sth->execute();
+           } 
+           or do { Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
+                   return $grants;
+                 };      
+
+      my $row = q{};
+      
+      while (my @line = $sth->fetchrow_array()) {
+          for my $l (@line) {
+              next if($l !~ /(\s+ON \*\.\*\s+|\s+ON `$database`)/ );
+              $row .= "," if($row); 
+              $row .= (split(" ON ",(split("GRANT ", $l, 2))[1], 2))[0];                 
+          }
+      }
+      
+      $sth->finish;
+      
+      my %seen = ();
+      my @g    = split(/,(\s?)/, $row);
+      
+      for my $e (@g) {
+          next if(!$e || $e =~ /^\s+$/);
+          $seen{$e}++;
+      }
+      
+      @uniq   = keys %seen;
+      $grants = join ",", @uniq;
+      
+      Log3 ($name, 4, "DbRep $name - Grants determined: $grants");
+  }
+ 
+return $grants;
 }
 
 ####################################################################################################
@@ -2075,8 +2117,16 @@ sub DbRep_Main {
          Log3 ($name, 3, "DbRep $name - WARNING - running process $hash->{HELPER}{RUNNING_INDEX}{pid} will be killed now to start a new index operation");
          BlockingKill($hash->{HELPER}{RUNNING_INDEX});
      }
-     Log3 ($name, 3, "DbRep $name - Command: $opt $prop"); 
-     $hash->{HELPER}{RUNNING_INDEX} = BlockingCall("DbRep_Index", "$name|$prop", "DbRep_IndexDone", $to, "DbRep_IndexAborted", $hash);
+     
+     Log3 ($name, 3, "DbRep $name - Command: $opt $prop");
+
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         cmdidx  => $prop
+     };     
+     
+     $hash->{HELPER}{RUNNING_INDEX} = BlockingCall("DbRep_Index", $params, "DbRep_IndexDone", $to, "DbRep_IndexAborted", $hash);
      ReadingsSingleUpdateValue ($hash, "state", "index operation in database is running - be patient and see Logfile !", 1);
      $hash->{HELPER}{RUNNING_INDEX}{loglevel} = 5 if($hash->{HELPER}{RUNNING_INDEX});  # Forum #77057
      return;
@@ -2272,13 +2322,23 @@ sub DbRep_Main {
          name    => $name,
          table   => "current",
          device  => $device,
-         reading => $reading,
+         reading => $reading
      };
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", $params, "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
  } 
- elsif ($opt eq "tableCurrentFillup") {         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "DbRep_ParseAborted", $hash);
+ elsif ($opt eq "tableCurrentFillup") {
+     $params = {
+         hash    => $hash,
+         name    => $name,
+         table   => "current",
+         device  => $device,
+         reading => $reading,
+         rsf     => $runtime_string_first,
+         rsn     => $runtime_string_next
+     };
+     
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", $params, "currentfillup_Done", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "diffValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "DbRep_ParseAborted", $hash);         
@@ -4196,9 +4256,8 @@ sub diffval_DoParse {
  my $hash       = $defs{$name};
  
  my ($sql,$sth,$selspec);
-
- # Background-Startzeit
- my $bst = [gettimeofday];
+ 
+ my $bst = [gettimeofday];                                                              # Background-Startzeit
             
  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
  if ($err) {
@@ -4207,18 +4266,14 @@ sub diffval_DoParse {
      return "$name|''|$device|$reading|''|''|''|$err|''";
  }
      
- # only for this block because of warnings if details of readings are not set
  no warnings 'uninitialized'; 
   
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                               # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
  
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
+ my @ts = split("\\|", $ts);                                                            # Timestampstring to Array
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");  
  
- #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
  if($dbmodel eq "MYSQL") {
      $selspec = "TIMESTAMP,VALUE, if(VALUE-\@V < 0 OR \@RB = 1 , \@diff:= 0, \@diff:= VALUE-\@V ) as DIFF, \@V:= VALUE as VALUEBEFORE, \@RB:= '0' as RBIT ";
  } 
@@ -4226,14 +4281,12 @@ sub diffval_DoParse {
      $selspec = "TIMESTAMP,VALUE";
  }
  
- # SQL-Startzeit
- my $st = [gettimeofday];
+ my $st = [gettimeofday];                                                              # SQL-Startzeit
  
- # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my @row_array;
  my @array;
 
- for my $row (@ts) {
+ for my $row (@ts) {                                                                   # DB-Abfrage zeilenweise für jeden Array-Eintrag
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
      my $runtime_string_first  = $a[1];
@@ -4292,7 +4345,7 @@ sub diffval_DoParse {
                  @sp   = $runtime_string." ".$timestamp." ".$vnew." ".$dse."\n";
                  $vold = $vnew;
                      
-                 push(@sqlite_array, @sp);
+                 push @sqlite_array, @sp;
              }
                  
              @array = @sqlite_array;
@@ -4315,11 +4368,10 @@ sub diffval_DoParse {
          }
      }
          
-     push(@row_array, @array);
+     push @row_array, @array;
  }
  
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
+ my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
 
  $dbh->disconnect;
   
@@ -4420,19 +4472,22 @@ sub diffval_DoParse {
  my $ncp = DbRep_calcount($hash,\%ch);
  
  my ($ncps,$ncpslist);
+ 
  if(%$ncp) {
      Log3 ($name, 3, "DbRep $name - time/aggregation periods containing only one dataset -> no diffValue calc was possible in period:");
+     
      for my $key (sort(keys%{$ncp})) {
          Log3 ($name, 3, $key) ;
      }
- $ncps     = join('§', %$ncp);  
- $ncpslist = encode_base64($ncps,""); 
+     
+     $ncps     = join('§', %$ncp);  
+     $ncpslist = encode_base64($ncps,""); 
  }
   
  # Ergebnishash als Einzeiler zurückgeben
  # ignorierte Zeilen ($diff > $difflimit)
  my $rowsrej;
- $rowsrej = encode_base64($rejectstr,"") if($rejectstr);
+ $rowsrej = encode_base64 ($rejectstr, "") if($rejectstr);
  
  # Ergebnishash  
  my $rows = join('§', %rh);
@@ -4455,12 +4510,11 @@ sub diffval_DoParse {
  my $rowlist = encode_base64($rows,"");
  $device     = encode_base64($device,"");
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+ my $brt = tv_interval($bst);                                                   # Background-Laufzeit ermitteln
  
  $rt = $rt.",".$brt;
  
- return "$name|$rowlist|$device|$reading|$rt|$rowsrej|$ncpslist|0|$irowdone";
+return "$name|$rowlist|$device|$reading|$rt|$rowsrej|$ncpslist|0|$irowdone";
 }
 
 ####################################################################################################
@@ -5003,15 +5057,20 @@ return;
 #   Current-Tabelle mit Device,Reading Kombinationen aus history auffüllen
 ####################################################################################################
 sub currentfillup_Push {
- my $string     = shift;
- my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
- my $hash       = $defs{$name};
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+ my $paref                = shift;    
+ my $hash                 = $paref->{hash};
+ my $name                 = $paref->{name};
+ my $table                = $paref->{table};
+ my $device               = $paref->{device};
+ my $reading              = $paref->{reading};
+ my $runtime_string_first = $paref->{rsf};
+ my $runtime_string_next  = $paref->{rsn};    
+    
+ my $dbloghash            = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  
  my ($sth,$sql,$selspec,$addon,@dwc,@rwc);
  
- # Background-Startzeit
- my $bst = [gettimeofday];
+ my $bst = [gettimeofday];                                                          # Background-Startzeit
  
  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
  if ($err) {
@@ -5020,38 +5079,35 @@ sub currentfillup_Push {
      return "$name|''|''|$err|''|''";
  }
  
- # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
- my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
+ my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);          # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
  
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                           # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
   
- # SQL-Startzeit
- my $st = [gettimeofday];
+ my $st = [gettimeofday];                                                           # SQL-Startzeit
 
- # insert history mit/ohne primary key
- # SQL zusammenstellen für DB-Operation
  if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
-     $selspec = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+     $selspec = "INSERT IGNORE INTO $table (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
      $addon   = "group by timestamp,device,reading";
      
- } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
-     $selspec = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+ } 
+ elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
+     $selspec = "INSERT OR IGNORE INTO $table (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
      $addon   = "group by timestamp,device,reading";
  
- } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-     $selspec = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
+ } 
+ elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+     $selspec = "INSERT INTO $table (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
      $addon   = "group by device,reading ON CONFLICT ($pkc) DO NOTHING";
  
- } else {
-     if($dbloghash->{MODEL} ne 'POSTGRESQL') {
-         # MySQL und SQLite
-         $selspec = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+ } 
+ else {
+     if($dbloghash->{MODEL} ne 'POSTGRESQL') {                                     # MySQL und SQLite
+         $selspec = "INSERT INTO $table (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
          $addon   = "group by device,reading";
-     } else {
-         # PostgreSQL
-         $selspec = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
+     } 
+     else {                                                                        # PostgreSQL
+         $selspec = "INSERT INTO $table (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
          $addon   = "group by device,reading";
      }
  }
@@ -5064,43 +5120,31 @@ sub currentfillup_Push {
      $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,$addon); 
  }
  
- # Log SQL Statement
  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");     
- 
- eval { $sth = $dbh->prepare($sql); };
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect();
-     return "$name|''|''|$err|''|''";
- }
- 
- 
+  
  my $irow;
  $dbh->begin_work();
-  
- eval {$sth->execute();};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh?" (possible PK violation) ":": ")."$@");
-     $dbh->rollback();
-     $dbh->disconnect();
-     return "$name|''|''|$err|''|''";
- } else {
-     $dbh->commit();
-     $irow = $sth->rows;
-     $dbh->disconnect();
- } 
  
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
+ eval{ $sth = $dbh->prepare($sql);
+       $sth->execute();
+     } 
+     or do { $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh ? " (possible PK violation) " : ": ")."$@");
+             $dbh->rollback();
+             $dbh->disconnect();
+             return "$name|''|''|$err|''|''";
+           };
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+ $dbh->commit();
+ $irow = $sth->rows;
+ $dbh->disconnect();
+ 
+ my $rt  = tv_interval($st);                                                # SQL-Laufzeit ermitteln
+ my $brt = tv_interval($bst);                                               # Background-Laufzeit ermitteln
 
  $rt = $rt.",".$brt;
  
- return "$name|$irow|$rt|0|$device|$reading";
+return "$name|$irow|$rt|0|$device|$reading";
 }
 
 ####################################################################################################
@@ -6186,7 +6230,7 @@ sub expfile_DoParse {
  my $rsf     = $paref->{rsf};
  my $file    = $paref->{file};
  my $ts      = $paref->{ts};
- 
+
  my ($sth,$sql);
 
  my $bst = [gettimeofday];                                            # Background-Startzeit
@@ -6196,6 +6240,13 @@ sub expfile_DoParse {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
      return "$name|''|''|$err|''|''|''";
+ }
+ 
+ if (!$rsf) {                                                        # ältesten Datensatz der DB ermitteln
+     Log3 ($name, 4, "DbRep $name - no time limits defined - determine the oldest record ...");
+  
+     $paref->{dbh} = $dbh;
+     $rsf          = _DbRep_getInitData_mints ($paref);
  }
  
  my $ml;
@@ -6290,7 +6341,8 @@ sub expfile_DoParse {
              $frows = 0;
          }
      } 
- }     
+ }    
+ 
  close(FH);
  
  Log3 ($name, 3, "DbRep $name - Number of exported datasets from $hash->{DATABASE} to file $outfile: ".$frows);
@@ -6379,6 +6431,13 @@ sub impfile_Push {
      return "$name|''|''|$err|''";
  }
  
+ if (!$rsf) {                                                        # ältesten Datensatz der DB ermitteln
+     Log3 ($name, 4, "DbRep $name - no time limits defined - determine the oldest record ...");
+  
+     $paref->{dbh} = $dbh;
+     $rsf          = _DbRep_getInitData_mints ($paref);
+ }
+ 
  my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);           # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
  
  $rsf       =~ s/[:\s]/_/g; 
@@ -6435,9 +6494,11 @@ sub impfile_Push {
      $al = $_;
      chomp $al; 
      my @alarr = split("\",\"", $al);
+     
      for (@alarr) {
          tr/"//d;
      }
+     
      my $i_timestamp = DbRep_trim($alarr[0]);
      my $i_device    = DbRep_trim($alarr[1]);
      my $i_type      = DbRep_trim($alarr[2]);
@@ -6445,6 +6506,7 @@ sub impfile_Push {
      my $i_reading   = DbRep_trim($alarr[4]);
      my $i_value     = DbRep_trim($alarr[5]);
      my $i_unit      = DbRep_trim($alarr[6] ? $alarr[6]: "");
+     
      $irowcount++;
      next if(!$i_timestamp);  #leerer Datensatz
      
@@ -6486,11 +6548,15 @@ sub impfile_Push {
          my $c = !$i_timestamp ? "field \"timestamp\" is empty" : 
                  !$i_device    ? "field \"device\" is empty"    : 
                  "field \"reading\" is empty";
-         $err = encode_base64("format error in in row $irowcount of $infile - cause: $c","");
+         $err  = encode_base64("format error in in row $irowcount of $infile - cause: $c","");
+         
          Log3 ($name, 2, "DbRep $name -> ERROR - Import of datasets NOT done. Formaterror in row $irowcount of $infile - cause: $c");     
+         
          close(FH);
+         
          $dbh->rollback;
          $dbh->disconnect;
+         
          return "$name|''|''|$err|''";
      }   
  }
@@ -6570,7 +6636,7 @@ sub sqlCmd_DoParse {
   # Background-Startzeit
   my $bst = [gettimeofday];
 
-  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
   if ($err) {
       $err = encode_base64($err,"");
       return "$name|''|$opt|$cmd|''|''|$err";
@@ -7154,27 +7220,41 @@ return;
 #
 ####################################################################################################
 sub DbRep_Index {
-  my $string     = shift;
-  my ($name,$cmdidx) = split("\\|", $string);
-  my $hash       = $defs{$name};
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $cmdidx     = $paref->{cmdidx};
+  
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $database   = $hash->{DATABASE};
   my $dbuser     = $dbloghash->{dbuser};
-  my $dbmodel    = $dbloghash->{MODEL};
-  my $grants     = $hash->{HELPER}{GRANTS};
 
-  my ($dbh,$err,$sth,$rows,@six);
   my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
   my $p          = 0;
+  
+  my ($sth,$rows,@six);
     
   Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
-    
+  
   my $bst = [gettimeofday];                                         # Background-Startzeit
+  
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
+  if ($err) {
+      $err = encode_base64($err,"");
+      return "$name|''|''|$err";
+  } 
+  
+  # Userrechte ermitteln
+  #######################
+  $paref->{dbmodel}  = $dbmodel;
+  $paref->{dbh}      = $dbh;
+  $paref->{database} = $database;
+  my $grants         = _DbRep_getInitData_grants ($paref);
   
   if($cmdidx ne "list_all" && $dbmodel =~ /MYSQL/) {                # Rechte Check MYSQL
       if($grants && $grants ne "ALL PRIVILEGES") {                  # Rechte INDEX und ALTER benötigt
-          my $i = index($grants,"INDEX");
-          my $a = index($grants,"ALTER");
+          my $i = index($grants, "INDEX");
+          my $a = index($grants, "ALTER");
           
           if($i == -1 || $a == -1) {
               $p = 1;
@@ -7185,16 +7265,19 @@ sub DbRep_Index {
       }
   }
   
-  Log3 ($name, 2, "DbRep $name - user \"$dbuser\" doesn't have rights \"INDEX\" and \"ALTER\" as needed - try use adminCredentials automatically !") 
-     if($p);
+  if($p) {
+      Log3 ($name, 2, "DbRep $name - user \"$dbuser\" doesn't have rights \"INDEX\" and \"ALTER\" as needed - try use adminCredentials automatically !");
+      
+      $dbh->disconnect();
+      
+      ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
+      if ($err) {
+          $err = encode_base64($err,"");
+          return "$name|''|''|$err";
+      }
+  }  
   
-  ($err,$dbh) = DbRep_dbConnect($name, $p);
-  if ($err) {
-      $err = encode_base64($err,"");
-      return "$name|''|''|$err";
-  }
-  
-  my ($cmd,$idx) = split("_",$cmdidx,2);
+  my ($cmd,$idx) = split "_", $cmdidx, 2;
   
   # SQL-Startzeit
   my $st = [gettimeofday];
@@ -13535,7 +13618,14 @@ return;
                                <br>
                                
                                <b>Note:</b> <br>
-                               The used database user needs the ALTER, CREATE and INDEX privilege. <br>
+                               The MySQL database user used requires the ALTER, CREATE and INDEX privilege. <br>
+                               These rights can be set with: <br><br>
+                               <ul>
+                                 set &lt;Name&gt; sqlCmd GRANT INDEX, ALTER, CREATE ON `&lt;db&gt;`.* TO '&lt;user&gt;'@'%';
+                               </ul>
+                               <br>
+                               The <a href="#useAdminCredentials">useAdminCredentials</a> attribute must usually be set to be able to
+                               change the rights of the used user.
                                    
                                </li> <br>
      
@@ -14592,7 +14682,7 @@ sub bdump {
                                   <table>  
                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> %L    </td><td>: is replaced by the value of global logdir attribute </td></tr>
-                                      <tr><td> %TSB  </td><td>: is replaced by the (calculated) value of the timestamp_begin attribute </td></tr>                                    
+                                      <tr><td> %TSB  </td><td>: is replaced by the (calculated) value of the start timestamp of the data selection </td></tr>                                    
                                       <tr><td>       </td><td>  </td></tr>
                                       <tr><td>       </td><td> <b>Common used POSIX-wildcards are:</b> </td></tr>
                                       <tr><td> %d    </td><td>: day of month (01..31) </td></tr>
@@ -16200,7 +16290,7 @@ return;
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
                                  zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
                                  blockieren. Aus diesem Grund wird die Ergebnismenge mit dem Attribut
-                                 <a href="#limit">'limit'</a> begrenzt. Bei Bedarf kann dieses Attribut 
+                                 <a href="#limit">limit</a> begrenzt. Bei Bedarf kann dieses Attribut 
                                  geändert werden, falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
                                  gewünscht ist. <br><br>
                                  </li> <br> 
@@ -16234,7 +16324,14 @@ return;
                                <br>
                                
                                <b>Hinweis:</b> <br>
-                               Der verwendete Datenbank-Nutzer benötigt das ALTER, CREATE und INDEX Privileg. <br>
+                               Der verwendete MySQL Datenbank-Nutzer benötigt das ALTER, CREATE und INDEX Privileg. <br>
+                               Diese Rechte können gesetzt werden mit: <br><br>
+                               <ul>
+                                 set &lt;Name&gt; sqlCmd GRANT INDEX, ALTER, CREATE ON `&lt;db&gt;`.* TO '&lt;user&gt;'@'%';
+                               </ul>
+                               <br>
+                               Das Attribut <a href="#useAdminCredentials">useAdminCredentials</a> muß gewöhnlich gesetzt sein um
+                               die Rechte des verwendeten Users ändern zu können.                               
                                    
                                </li> <br>                                
     <a name="insert"></a>   
@@ -17315,7 +17412,7 @@ sub bdump {
                                   <table>  
                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> %L    </td><td>: wird ersetzt durch den Wert des global logdir Attributs </td></tr>
-                                      <tr><td> %TSB  </td><td>: wird ersetzt durch den (berechneten) Wert des timestamp_begin Attributs </td></tr>                                    
+                                      <tr><td> %TSB  </td><td>: wird ersetzt durch den (berechneten) Wert des Starttimestamps der Datenselektion </td></tr>                                    
                                       <tr><td>       </td><td>  </td></tr>
                                       <tr><td>       </td><td> <b>Allgemein gebräuchliche POSIX-Wildcards sind:</b> </td></tr>
                                       <tr><td> %d    </td><td>: Tag des Monats (01..31) </td></tr>
