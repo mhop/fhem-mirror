@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbLog: logging negative temperature of Type FBDECT
+                      forum:#125005 
  - change:  93_DbRep: some changes according to forum:#124987
  - bugfix:  88_HMCCU: Fixed ENUM conversion bug
  - feature: 31_HUEDevice: allow json in set commands for lights.
