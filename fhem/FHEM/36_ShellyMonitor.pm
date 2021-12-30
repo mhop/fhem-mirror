@@ -61,6 +61,10 @@ my $SHELLY_DEF_SEN = {
 "2303" => { "type"=>"EVC", "desc"=>"inputEventCnt_2"},
 "3101" => { "type"=>"T", "desc"=>"extTemp_0", "unit"=>"C"},
 "3102" => { "type"=>"T", "desc"=>"extTemp_0f", "unit"=>"F"},
+# Used by Shelly TRV1
+"3103trv" => { "type"=>"T", "desc"=>"targetTemp", "unit"=>"C"},
+"3104trv" => { "type"=>"T", "desc"=>"targetTempF", "unit"=>"F"},
+# Used by Shelly HT
 "3103" => { "type"=>"H", "desc"=>"humidity"},
 "3104" => { "type"=>"T", "desc"=>"deviceTemp", "unit"=>"C"},
 "3105" => { "type"=>"T", "desc"=>"deviceTempF", "unit"=>"F"},
@@ -85,8 +89,13 @@ my $SHELLY_DEF_SEN = {
 # Used by Shelly Spot SHSPOT-1, Shelly Spot 2 SHSPOT-2:
 "3116" => { "type"=>"S", "desc"=>"dayLight"},
 "3117" => { "type"=>"S", "desc"=>"extInput"},
+# Used by Shelly TRV1
+"3116trv" => { "type"=>"S", "desc"=>"valveError"},
+"3117trv" => { "type"=>"S", "desc"=>"mode"},
+"3118" => { "type"=>"S", "desc"=>"mode"},
 "3119" => { "type"=>"S", "desc"=>"timestamp"},
 "3120" => { "type"=>"S", "desc"=>"active"},
+"3121" => { "type"=>"S", "desc"=>"valvePos", "unit"=>"%"},
 "3201" => { "type"=>"T", "desc"=>"extTemp_1", "unit"=>"C"},
 "3202" => { "type"=>"T", "desc"=>"extTemp_1f", "unit"=>"F"},
 "3301" => { "type"=>"T", "desc"=>"extTemp_2", "unit"=>"C"},
@@ -222,7 +231,8 @@ my %DEVID_MODEL = (
     "SHHT-1"   => "generic",
     "SHGS-1"   => "generic",
     "SHBTN-2"  => "generic",
-    "SHIX3-1"  => "generic"
+    "SHIX3-1"  => "generic",
+	"SHTRV-01" => "generic"
 );
 
 # Mapping of DeviceId in Multicast to suggested generic name
@@ -244,7 +254,8 @@ my %DEVID_PREFIX = (
     "SHGS-1"   => "shelly_gas",
     "SHBTN-2"  => "shelly_button",
     "SHIX3-1"  => "shelly_i3",
-    "SHMOS-01" => "shelly_motion"
+    "SHMOS-01" => "shelly_motion",
+	"SHTRV-01" => "shelly_trv"
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
@@ -678,6 +689,9 @@ sub ShellyMonitor_DoRead
         my $sensorid = @{$j}[1];
         my $svalue = @{$j}[2];
         my $defarr = $SHELLY_DEF_SEN->{$sensorid};
+	    if ($shellyCoIoTModel=~/^SHTRV.*/ && defined $SHELLY_DEF_SEN->{$sensorid . "trv"}) {
+		  $defarr = $SHELLY_DEF_SEN->{$sensorid . "trv"};
+		}
 
         if (defined $defarr) {
           my $rname = $defarr->{"desc"};
