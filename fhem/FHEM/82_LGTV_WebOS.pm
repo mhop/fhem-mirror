@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -57,11 +57,12 @@ use strict;
 use warnings;
 use FHEM::Meta;
 
-eval "use MIME::Base64;1"             or $missingModul .= "MIME::Base64 ";
-eval "use IO::Socket::INET;1"         or $missingModul .= "IO::Socket::INET ";
-eval "use Digest::SHA qw(sha1_hex);1" or $missingModul .= "Digest::SHA ";
-eval "use Encode qw(encode_utf8 decode_utf8);1" or $missingModul .= "Encode ";
-eval "use Blocking;1"                           or $missingModul .= "Blocking ";
+eval { use MIME::Base64;     1 } or $missingModul .= "MIME::Base64 ";
+eval { use IO::Socket::INET; 1 } or $missingModul .= "IO::Socket::INET ";
+eval { use Digest::SHA qw(sha1_hex); 1 } or $missingModul .= "Digest::SHA ";
+eval { use Encode qw(encode_utf8 decode_utf8); 1 }
+  or $missingModul .= "Encode ";
+eval { use Blocking; 1 } or $missingModul .= "Blocking ";
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -69,15 +70,11 @@ eval {
     require JSON::MaybeXS;
     import JSON::MaybeXS qw( decode_json encode_json );
     1;
-};
-
-if ($@) {
-    $@ = undef;
+} or do {
 
     # try to use JSON wrapper
     #   for chance of better performance
     eval {
-
         # JSON preference order
         local $ENV{PERL_JSON_BACKEND} =
           'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
@@ -86,10 +83,7 @@ if ($@) {
         require JSON;
         import JSON qw( decode_json encode_json );
         1;
-    };
-
-    if ($@) {
-        $@ = undef;
+    } or do {
 
         # In rare cases, Cpanel::JSON::XS may
         #   be installed but JSON|JSON::MaybeXS not ...
@@ -97,10 +91,7 @@ if ($@) {
             require Cpanel::JSON::XS;
             import Cpanel::JSON::XS qw(decode_json encode_json);
             1;
-        };
-
-        if ($@) {
-            $@ = undef;
+        } or do {
 
             # In rare cases, JSON::XS may
             #   be installed but JSON not ...
@@ -108,10 +99,7 @@ if ($@) {
                 require JSON::XS;
                 import JSON::XS qw(decode_json encode_json);
                 1;
-            };
-
-            if ($@) {
-                $@ = undef;
+            } or do {
 
                 # Fallback to built-in JSON which SHOULD
                 #   be available since 5.014 ...
@@ -119,53 +107,17 @@ if ($@) {
                     require JSON::PP;
                     import JSON::PP qw(decode_json encode_json);
                     1;
-                };
-
-                if ($@) {
-                    $@ = undef;
+                } or do {
 
                     # Fallback to JSON::backportPP in really rare cases
                     require JSON::backportPP;
                     import JSON::backportPP qw(decode_json encode_json);
                     1;
-                }
-            }
-        }
-    }
-}
-
-# Declare functions
-sub LGTV_WebOS_Initialize($);
-sub LGTV_WebOS_Define($$);
-sub LGTV_WebOS_Undef($$);
-sub LGTV_WebOS_Set($@);
-sub LGTV_WebOS_Open($);
-sub LGTV_WebOS_Close($);
-sub LGTV_WebOS_Read($);
-sub LGTV_WebOS_Write($@);
-sub LGTV_WebOS_Attr(@);
-sub LGTV_WebOS_Handshake($);
-sub LGTV_WebOS_ResponseProcessing($$);
-sub LGTV_WebOS_Header2Hash($);
-sub LGTV_WebOS_Pairing($);
-sub LGTV_WebOS_CreateSendCommand($$$;$);
-sub LGTV_WebOS_Hybi10Encode($;$$);
-sub LGTV_WebOS_WriteReadings($$);
-sub LGTV_WebOS_GetCurrentChannel($);
-sub LGTV_WebOS_GetForgroundAppInfo($);
-sub LGTV_WebOS_GetAudioStatus($);
-sub LGTV_WebOS_TimerStatusRequest($);
-sub LGTV_WebOS_GetExternalInputList($);
-sub LGTV_WebOS_ProcessRead($$);
-sub LGTV_WebOS_ParseMsg($$);
-sub LGTV_WebOS_Get3DStatus($);
-sub LGTV_WebOS_GetChannelProgramInfo($);
-sub LGTV_WebOS_FormartStartEndTime($);
-sub LGTV_WebOS_Presence($);
-sub LGTV_WebOS_PresenceRun($);
-sub LGTV_WebOS_PresenceDone($);
-sub LGTV_WebOS_PresenceAborted($);
-sub LGTV_WebOS_WakeUp_Udp($@);
+                };
+            };
+        };
+    };
+};
 
 my %lgCommands = (
 
@@ -232,12 +184,18 @@ my %openApps = (
     'Spotify'            => 'spotify-beehive',
     'DuplexIPTV'         => 'com.duplexiptv.app',
     'Disney+'            => 'com.disney.disneyplus-prod',
+    'Smart-IPTV'         => 'siptv',
+    'AppleTV'            => 'com.apple.appletv',
+    'Joyn'               => 'joyn',
+    'YouTube-Kids'       => 'youtube.leanback.kids.v4',
+    'DAZN'               => 'dazn',
+    'SkyQ'               => 'com.skygo.app.de.q',
+    'WaipuTv'            => 'tv.waipu.app.waipu-lg',
 );
 
 my %openAppsPackageName = reverse %openApps;
 
-sub LGTV_WebOS_Initialize($) {
-
+sub LGTV_WebOS_Initialize {
     my ($hash) = @_;
 
     # Provider
@@ -261,8 +219,7 @@ sub LGTV_WebOS_Initialize($) {
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub LGTV_WebOS_Define($$) {
-
+sub LGTV_WebOS_Define {
     my ( $hash, $def ) = @_;
 
     my @a = split( "[ \t][ \t]*", $def );
@@ -303,35 +260,33 @@ sub LGTV_WebOS_Define($$) {
             "LGTV_WebOS_TimerStatusRequest", $hash );
     }
 
-    return undef;
+    $hash->{helper}->{lastResponse} =
+      int( gettimeofday() );    # Check Socket KeepAlive
+
+    return;
 }
 
-sub LGTV_WebOS_Undef($$) {
-
+sub LGTV_WebOS_Undef {
     my ( $hash, $arg ) = @_;
 
     my $host = $hash->{HOST};
     my $name = $hash->{NAME};
 
     RemoveInternalTimer($hash);
-
-    LGTV_WebOS_Close($hash);
     delete $modules{LGTV_WebOS}{defptr}{ $hash->{HOST} };
-
     Log3 $name, 3, "LGTV_WebOS ($name) - device $name deleted";
 
-    return undef;
+    return;
 }
 
-sub LGTV_WebOS_Attr(@) {
-
+sub LGTV_WebOS_Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
     my $orig = $attrVal;
 
     if ( $attrName eq "disable" ) {
-        if ( $cmd eq "set" and $attrVal eq "1" ) {
+        if ( $cmd eq "set" && $attrVal eq "1" ) {
             RemoveInternalTimer($hash);
             readingsSingleUpdate( $hash, "state", "disabled", 1 );
             $hash->{PARTIAL} = '';
@@ -357,11 +312,10 @@ sub LGTV_WebOS_Attr(@) {
         }
     }
 
-    return undef;
+    return;
 }
 
-sub LGTV_WebOS_TimerStatusRequest($) {
-
+sub LGTV_WebOS_TimerStatusRequest {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -369,9 +323,9 @@ sub LGTV_WebOS_TimerStatusRequest($) {
 
     readingsBeginUpdate($hash);
 
-    if (    !IsDisabled($name)
-        and $hash->{CD}
-        and $hash->{helper}{device}{registered} == 1 )
+    if (   !IsDisabled($name)
+        && $hash->{CD}
+        && $hash->{helper}{device}{registered} == 1 )
     {
 
         Log3 $name, 4, "LGTV_WebOS ($name) - run get functions";
@@ -379,9 +333,9 @@ sub LGTV_WebOS_TimerStatusRequest($) {
         LGTV_WebOS_Presence($hash)
           if ( AttrVal( $name, 'pingPresence', 0 ) == 1 );
 
-        if (    $hash->{helper}{device}{channelguide}{counter} > 2
-            and AttrVal( $name, 'channelGuide', 0 ) == 1
-            and ReadingsVal( $name, 'launchApp', 'TV' ) eq 'TV' )
+        if (   $hash->{helper}{device}{channelguide}{counter} > 2
+            && AttrVal( $name, 'channelGuide', 0 ) == 1
+            && ReadingsVal( $name, 'launchApp', 'TV' ) eq 'TV' )
         {
 
             LGTV_WebOS_GetChannelProgramInfo($hash);
@@ -432,16 +386,19 @@ sub LGTV_WebOS_TimerStatusRequest($) {
 
     readingsEndUpdate( $hash, 1 );
 
-    LGTV_WebOS_Open($hash) if ( !IsDisabled($name) and not $hash->{CD} );
+    LGTV_WebOS_Open($hash) if ( !IsDisabled($name) && !$hash->{CD} );
 
     $hash->{helper}{device}{channelguide}{counter} =
       $hash->{helper}{device}{channelguide}{counter} + 1;
     InternalTimer( gettimeofday() + 10, "LGTV_WebOS_TimerStatusRequest",
         $hash );
+
+    LGTV_WebOS_SocketKeepAlive($hash);    # Check Socket KeepAlive
+
+    return;
 }
 
-sub LGTV_WebOS_Set($@) {
-
+sub LGTV_WebOS_Set {
     my ( $hash, $name, $cmd, @args ) = @_;
     my ( $arg, @params ) = @args;
 
@@ -455,7 +412,7 @@ sub LGTV_WebOS_Set($@) {
 
         LGTV_WebOS_Open($hash);
 
-        return undef;
+        return;
 
     }
     elsif ( $cmd eq 'clearInputList' ) {
@@ -464,7 +421,7 @@ sub LGTV_WebOS_Set($@) {
         delete $hash->{helper}{device}{inputs};
         delete $hash->{helper}{device}{inputapps};
 
-        return undef;
+        return;
 
     }
     elsif ( $cmd eq 'pairing' ) {
@@ -472,7 +429,7 @@ sub LGTV_WebOS_Set($@) {
 
         LGTV_WebOS_Pairing($hash);
 
-        return undef;
+        return;
 
     }
     elsif ( $cmd eq 'screenMsg' ) {
@@ -483,7 +440,7 @@ sub LGTV_WebOS_Set($@) {
         $uri = $lgCommands{$cmd}->[0];
 
     }
-    elsif ( $cmd eq 'on' or $cmd eq 'off' ) {
+    elsif ( $cmd eq 'on' || $cmd eq 'off' ) {
         return "usage: on/off" if ( @args != 0 );
 
         if ( $cmd eq 'off' ) {
@@ -664,17 +621,16 @@ sub LGTV_WebOS_Set($@) {
           . join( ',',
             => map qq{$_} => keys %{ $hash->{helper}{device}{inputs} } )
           if ( defined( $hash->{helper}{device}{inputs} )
-            and ref( $hash->{helper}{device}{inputs} ) eq "HASH" );
+            && ref( $hash->{helper}{device}{inputs} ) eq "HASH" );
 
         return "Unknown argument $cmd, choose one of $list";
     }
 
     $hash->{helper}{device}{runsetcmd} = $hash->{helper}{device}{runsetcmd} + 1;
-    LGTV_WebOS_CreateSendCommand( $hash, $uri, \%payload );
+    return LGTV_WebOS_CreateSendCommand( $hash, $uri, \%payload );
 }
 
-sub LGTV_WebOS_Open($) {
-
+sub LGTV_WebOS_Open {
     my $hash    = shift;
     my $name    = $hash->{NAME};
     my $host    = $hash->{HOST};
@@ -684,10 +640,11 @@ sub LGTV_WebOS_Open($) {
     Log3 $name, 4, "LGTV_WebOS ($name) - Baue Socket Verbindung auf";
 
     my $socket = new IO::Socket::INET(
-        PeerHost => $host,
-        PeerPort => $port,
-        Proto    => 'tcp',
-        Timeout  => $timeout
+        PeerHost  => $host,
+        PeerPort  => $port,
+        Proto     => 'tcp',
+        KeepAlive => 1,
+        Timeout   => $timeout
       )
       or return Log3 $name, 4,
       "LGTV_WebOS ($name) Couldn't connect to $host:$port";    # open Socket
@@ -696,31 +653,39 @@ sub LGTV_WebOS_Open($) {
     $hash->{CD} = $socket;             # sysread / close won't work on fileno
     $selectlist{$name} = $hash;
 
+    $hash->{helper}->{lastResponse} =
+      int( gettimeofday() );           # Check Socket KeepAlive
+
     Log3 $name, 4, "LGTV_WebOS ($name) - Socket Connected";
 
     LGTV_WebOS_Handshake($hash);
     Log3 $name, 4, "LGTV_WebOS ($name) - start Handshake";
 
+    return;
 }
 
-sub LGTV_WebOS_Close($) {
-
+sub LGTV_WebOS_Close {
     my $hash = shift;
     my $name = $hash->{NAME};
 
     return if ( !$hash->{CD} );
 
+    delete( $hash->{PARTIAL} );
+
     close( $hash->{CD} ) if ( $hash->{CD} );
-    delete( $hash->{FD} );
     delete( $hash->{CD} );
+
     delete( $selectlist{$name} );
+    delete( $hash->{FD} );
 
     readingsSingleUpdate( $hash, 'state', 'off', 1 );
 
     Log3 $name, 4, "LGTV_WebOS ($name) - Socket Disconnected";
+
+    return;
 }
 
-sub LGTV_WebOS_Write($@) {
+sub LGTV_WebOS_Write {
 
     my ( $hash, $string ) = @_;
     my $name = $hash->{NAME};
@@ -732,11 +697,23 @@ sub LGTV_WebOS_Write($@) {
 
     Log3 $name, 4, "LGTV_WebOS ($name) - $string";
     syswrite( $hash->{CD}, $string );
-    return undef;
+    return;
 }
 
-sub LGTV_WebOS_Read($) {
+sub LGTV_WebOS_SocketKeepAlive {
+    my $hash = shift;
+    my $name = $hash->{NAME};
 
+    if ( int( gettimeofday() ) - int( $hash->{helper}->{lastResponse} ) > 2 ) {
+        LGTV_WebOS_SocketClosePresenceAbsent( $hash, 'absent' );
+        Log3 $name, 4,
+"LGTV_WebOS ($name) - KeepAlive It looks like there no Data more response";
+    }
+
+    return;
+}
+
+sub LGTV_WebOS_Read {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -745,9 +722,11 @@ sub LGTV_WebOS_Read($) {
 
     Log3 $name, 4, "LGTV_WebOS ($name) - ReadFn started";
 
+    $hash->{helper}->{lastResponse} =
+      int( gettimeofday() );    # Check Socket KeepAlive
     $len = sysread( $hash->{CD}, $buf, 10240 );
 
-    if ( !defined($len) or !$len ) {
+    if ( !defined($len) || !$len ) {
 
         LGTV_WebOS_Close($hash);
 
@@ -782,10 +761,11 @@ sub LGTV_WebOS_Read($) {
 "LGTV_WebOS ($name) - coruppted data found, run LGTV_WebOS_ProcessRead: $buf";
         LGTV_WebOS_ProcessRead( $hash, $buf );
     }
+
+    return;
 }
 
-sub LGTV_WebOS_ProcessRead($$) {
-
+sub LGTV_WebOS_ProcessRead {
     my ( $hash, $data ) = @_;
     my $name = $hash->{NAME};
 
@@ -793,7 +773,7 @@ sub LGTV_WebOS_ProcessRead($$) {
 
     Log3 $name, 4, "LGTV_WebOS ($name) - process read";
 
-    if ( defined( $hash->{PARTIAL} ) and $hash->{PARTIAL} ) {
+    if ( defined( $hash->{PARTIAL} ) && $hash->{PARTIAL} ) {
 
         Log3 $name, 5, "LGTV_WebOS ($name) - PARTIAL: " . $hash->{PARTIAL};
         $buffer = $hash->{PARTIAL};
@@ -831,7 +811,7 @@ sub LGTV_WebOS_ProcessRead($$) {
           . $tail;
 
         LGTV_WebOS_ResponseProcessing( $hash, $json )
-          unless ( not defined($tail) and not($tail) );
+          unless ( !defined($tail) && not($tail) );
 
         ( $json, $tail ) = LGTV_WebOS_ParseMsg( $hash, $tail );
 
@@ -851,10 +831,11 @@ sub LGTV_WebOS_ProcessRead($$) {
 
     Log3 $name, 5, "LGTV_WebOS ($name) - Tail: " . $tail;
     Log3 $name, 5, "LGTV_WebOS ($name) - PARTIAL: " . $hash->{PARTIAL};
+
+    return;
 }
 
-sub LGTV_WebOS_Handshake($) {
-
+sub LGTV_WebOS_Handshake {
     my $hash  = shift;
     my $name  = $hash->{NAME};
     my $host  = $hash->{HOST};
@@ -880,10 +861,11 @@ sub LGTV_WebOS_Handshake($) {
 
     LGTV_WebOS_Pairing($hash);
     Log3 $name, 4, "LGTV_WebOS ($name) - start pairing routine";
+
+    return;
 }
 
-sub LGTV_WebOS_ResponseProcessing($$) {
-
+sub LGTV_WebOS_ResponseProcessing {
     my ( $hash, $response ) = @_;
     my $name = $hash->{NAME};
 
@@ -928,7 +910,7 @@ sub LGTV_WebOS_ResponseProcessing($$) {
             }
         }
 
-        return undef;
+        return;
     }
 
     elsif ( $response =~ m/^{"type":".+}}$/ ) {
@@ -944,7 +926,7 @@ sub LGTV_WebOS_ResponseProcessing($$) {
         Log3 $name, 4, "LGTV_WebOS ($name) - Corrected JSON String: $json"
           if ($json);
 
-        if ( not defined($json) or not($json) ) {
+        if ( !defined($json) || not($json) ) {
 
             Log3 $name, 4, "LGTV_WebOS ($name) - Corrected JSON String empty";
             return;
@@ -958,14 +940,15 @@ sub LGTV_WebOS_ResponseProcessing($$) {
 
         LGTV_WebOS_WriteReadings( $hash, $decode_json );
 
-        return undef;
+        return;
     }
 
     Log3 $name, 4, "LGTV_WebOS ($name) - no Match found";
+
+    return;
 }
 
-sub LGTV_WebOS_WriteReadings($$) {
-
+sub LGTV_WebOS_WriteReadings {
     my ( $hash, $decode_json ) = @_;
 
     my $name = $hash->{NAME};
@@ -978,9 +961,9 @@ sub LGTV_WebOS_WriteReadings($$) {
     readingsBeginUpdate($hash);
 
     if ( ref( $decode_json->{payload}{services} ) eq "ARRAY"
-        and scalar( @{ $decode_json->{payload}{services} } ) > 0 )
+        && scalar( @{ $decode_json->{payload}{services} } ) > 0 )
     {
-        foreach my $services ( @{ $decode_json->{payload}{services} } ) {
+        for my $services ( @{ $decode_json->{payload}{services} } ) {
 
             readingsBulkUpdateIfChanged(
                 $hash,
@@ -991,15 +974,15 @@ sub LGTV_WebOS_WriteReadings($$) {
     }
 
     elsif ( ref( $decode_json->{payload}{devices} ) eq "ARRAY"
-        and scalar( @{ $decode_json->{payload}{devices} } ) > 0 )
+        && scalar( @{ $decode_json->{payload}{devices} } ) > 0 )
     {
 
-        foreach my $devices ( @{ $decode_json->{payload}{devices} } ) {
+        for my $devices ( @{ $decode_json->{payload}{devices} } ) {
 
             if (
                 not
                 defined( $hash->{helper}{device}{inputs}{ $devices->{label} } )
-                or not defined(
+                || !defined(
                     $hash->{helper}{device}{inputapps}{ $devices->{appId} }
                 )
               )
@@ -1020,11 +1003,11 @@ sub LGTV_WebOS_WriteReadings($$) {
     }
 
     elsif ( ref( $decode_json->{payload}{programList} ) eq "ARRAY"
-        and scalar( @{ $decode_json->{payload}{programList} } ) > 0 )
+        && scalar( @{ $decode_json->{payload}{programList} } ) > 0 )
     {
         use Date::Parse;
         my $count = 0;
-        foreach my $programList ( @{ $decode_json->{payload}{programList} } ) {
+        for my $programList ( @{ $decode_json->{payload}{programList} } ) {
 
             if (
                 str2time(
@@ -1081,13 +1064,13 @@ sub LGTV_WebOS_WriteReadings($$) {
     }
 
     elsif (defined( $decode_json->{payload}{'mute'} )
-        or defined( $decode_json->{payload}{'muted'} ) )
+        || defined( $decode_json->{payload}{'muted'} ) )
     {
 
         if (
             defined( $decode_json->{payload}{'mute'} )
-            and (  $decode_json->{payload}{'mute'} eq 'true'
-                or $decode_json->{payload}{'mute'} == 1 )
+            && (   $decode_json->{payload}{'mute'} eq 'true'
+                || $decode_json->{payload}{'mute'} == 1 )
           )
         {
 
@@ -1096,7 +1079,7 @@ sub LGTV_WebOS_WriteReadings($$) {
         }
         elsif ( defined( $decode_json->{payload}{'mute'} ) ) {
             if (   $decode_json->{payload}{'mute'} eq 'false'
-                or $decode_json->{payload}{'mute'} == 0 )
+                || $decode_json->{payload}{'mute'} == 0 )
             {
 
                 readingsBulkUpdateIfChanged( $hash, 'mute', 'off' );
@@ -1105,8 +1088,8 @@ sub LGTV_WebOS_WriteReadings($$) {
 
         if (
             defined( $decode_json->{payload}{'muted'} )
-            and (  $decode_json->{payload}{'muted'} eq 'true'
-                or $decode_json->{payload}{'muted'} == 1 )
+            && (   $decode_json->{payload}{'muted'} eq 'true'
+                || $decode_json->{payload}{'muted'} == 1 )
           )
         {
 
@@ -1115,8 +1098,8 @@ sub LGTV_WebOS_WriteReadings($$) {
         }
         elsif (
             defined( $decode_json->{payload}{'muted'} )
-            and (  $decode_json->{payload}{'muted'} eq 'false'
-                or $decode_json->{payload}{'muted'} == 0 )
+            && (   $decode_json->{payload}{'muted'} eq 'false'
+                || $decode_json->{payload}{'muted'} == 0 )
           )
         {
 
@@ -1126,14 +1109,14 @@ sub LGTV_WebOS_WriteReadings($$) {
 
     elsif ( defined( $decode_json->{payload}{status3D}{status} ) ) {
         if (   $decode_json->{payload}{status3D}{status} eq 'false'
-            or $decode_json->{payload}{status3D}{status} == 0 )
+            || $decode_json->{payload}{status3D}{status} == 0 )
         {
 
             readingsBulkUpdateIfChanged( $hash, '3D', 'off' );
 
         }
         elsif ($decode_json->{payload}{status3D}{status} eq 'true'
-            or $decode_json->{payload}{status3D}{status} == 1 )
+            || $decode_json->{payload}{status3D}{status} == 1 )
         {
 
             readingsBulkUpdateIfChanged( $hash, '3D', 'on' );
@@ -1145,10 +1128,17 @@ sub LGTV_WebOS_WriteReadings($$) {
 
     elsif ( defined( $decode_json->{payload}{appId} ) ) {
 
-        if (  (   $decode_json->{payload}{appId} =~ /com.webos.app.externalinput/
-               or $decode_json->{payload}{appId} =~ /com.webos.app.hdmi/ )
-             and defined ($hash->{helper}{device}{inputapps}{ $decode_json->{payload}{appId} } )
-             and $hash->{helper}{device}{inputapps}{ $decode_json->{payload}{appId} }
+        if (
+            (
+                $decode_json->{payload}{appId} =~ /com.webos.app.externalinput/
+                || $decode_json->{payload}{appId} =~ /com.webos.app.hdmi/
+            )
+            && defined(
+                $hash->{helper}{device}{inputapps}
+                  { $decode_json->{payload}{appId} }
+            )
+            && $hash->{helper}{device}{inputapps}
+            { $decode_json->{payload}{appId} }
           )
         {
 
@@ -1158,22 +1148,22 @@ sub LGTV_WebOS_WriteReadings($$) {
             readingsBulkUpdateIfChanged( $hash, 'launchApp', '-' );
 
         }
-        elsif ( defined ( $openAppsPackageName{ $decode_json->{payload}{appId} } )
-            and $openAppsPackageName{ $decode_json->{payload}{appId} } )
+        elsif (
+            defined( $openAppsPackageName{ $decode_json->{payload}{appId} } )
+            && $openAppsPackageName{ $decode_json->{payload}{appId} } )
         {
 
             readingsBulkUpdateIfChanged( $hash, 'launchApp',
                 $openAppsPackageName{ $decode_json->{payload}{appId} } );
             readingsBulkUpdateIfChanged( $hash, 'input', '-' );
         }
-        
-        
+
     }
 
     if ( defined( $decode_json->{type} ) ) {
 
         if ( $decode_json->{type} eq 'registered'
-            and defined( $decode_json->{payload}{'client-key'} ) )
+            && defined( $decode_json->{payload}{'client-key'} ) )
         {
 
             $hash->{helper}{device}{registered} = 1;
@@ -1182,11 +1172,11 @@ sub LGTV_WebOS_WriteReadings($$) {
         elsif (
             (
                 $decode_json->{type} eq 'response'
-                and (  $decode_json->{payload}{returnValue} eq 'true'
-                    or $decode_json->{payload}{returnValue} == 1 )
+                && (   $decode_json->{payload}{returnValue} eq 'true'
+                    || $decode_json->{payload}{returnValue} == 1 )
             )
-            or ( $decode_json->{type} eq 'registered' )
-            and defined( $decode_json->{payload}{'client-key'} )
+            || ( $decode_json->{type} eq 'registered' )
+            && defined( $decode_json->{payload}{'client-key'} )
           )
         {
 
@@ -1199,10 +1189,11 @@ sub LGTV_WebOS_WriteReadings($$) {
         }
         elsif ( $decode_json->{type} eq 'error' ) {
 
-            $response = "error - $decode_json->{error}";
+            $response = "error - $decode_json->{error}"
+              if ( $decode_json->{error} ne '404 no such service or method' );
 
             if (   $decode_json->{error} eq '401 insufficient permissions'
-                or $decode_json->{error} eq
+                || $decode_json->{error} eq
                 '401 insufficient permissions (not registered)' )
             {
 
@@ -1253,10 +1244,11 @@ sub LGTV_WebOS_WriteReadings($$) {
     readingsBulkUpdateIfChanged( $hash, 'state', 'on' );
 
     readingsEndUpdate( $hash, 1 );
+
+    return;
 }
 
-sub LGTV_WebOS_Pairing($) {
-
+sub LGTV_WebOS_Pairing {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1334,16 +1326,17 @@ sub LGTV_WebOS_Pairing($) {
 
     LGTV_WebOS_CreateSendCommand( $hash, undef, $usedHandshake, 'register' );
     Log3 $name, 4, "LGTV_WebOS ($name) - Send pairing informations";
+
+    return;
 }
 
-sub LGTV_WebOS_CreateSendCommand($$$;$) {
-
+sub LGTV_WebOS_CreateSendCommand {
     my ( $hash, $uri, $payload, $type ) = @_;
 
     my $name = $hash->{NAME};
     my $err;
 
-    $type = 'request' if ( not defined($type) );
+    $type = 'request' if ( !defined($type) );
 
     my $command = {};
     $command->{'client-key'} = ReadingsVal( $name, 'lgKey', '' )
@@ -1361,15 +1354,13 @@ sub LGTV_WebOS_CreateSendCommand($$$;$) {
 
     LGTV_WebOS_Write( $hash, LGTV_WebOS_Hybi10Encode( $cmd, "text", 1 ) );
 
-    return undef;
+    return;
 }
 
-sub LGTV_WebOS_Hybi10Encode($;$$) {
-
-    my ( $payload, $type, $masked ) = @_;
-
-    $type   //= "text";
-    $masked //= 1;
+sub LGTV_WebOS_Hybi10Encode {
+    my $payload = shift;
+    my $type    = shift // 'text';
+    my $masked  = shift // 1;
 
     my @frameHead;
     my $frame         = "";
@@ -1416,7 +1407,7 @@ sub LGTV_WebOS_Hybi10Encode($;$$) {
         if ( $frameHead[2] > 127 ) {
 
             #$this->close(1004);
-            return undef;
+            return;
         }
 
     }
@@ -1465,8 +1456,7 @@ sub LGTV_WebOS_Hybi10Encode($;$$) {
     return $frame;
 }
 
-sub LGTV_WebOS_GetAudioStatus($) {
-
+sub LGTV_WebOS_GetAudioStatus {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1474,10 +1464,11 @@ sub LGTV_WebOS_GetAudioStatus($) {
       . $hash->{helper}{device}{runsetcmd};
     LGTV_WebOS_CreateSendCommand( $hash, $lgCommands{getAudioStatus}, undef )
       if ( $hash->{helper}{device}{runsetcmd} == 0 );
+
+    return;
 }
 
-sub LGTV_WebOS_GetCurrentChannel($) {
-
+sub LGTV_WebOS_GetCurrentChannel {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1486,10 +1477,11 @@ sub LGTV_WebOS_GetCurrentChannel($) {
       . $hash->{helper}{device}{runsetcmd};
     LGTV_WebOS_CreateSendCommand( $hash, $lgCommands{getCurrentChannel}, undef )
       if ( $hash->{helper}{device}{runsetcmd} == 0 );
+
+    return;
 }
 
-sub LGTV_WebOS_GetForgroundAppInfo($) {
-
+sub LGTV_WebOS_GetForgroundAppInfo {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1499,10 +1491,11 @@ sub LGTV_WebOS_GetForgroundAppInfo($) {
     LGTV_WebOS_CreateSendCommand( $hash, $lgCommands{getForegroundAppInfo},
         undef )
       if ( $hash->{helper}{device}{runsetcmd} == 0 );
+
+    return;
 }
 
-sub LGTV_WebOS_GetExternalInputList($) {
-
+sub LGTV_WebOS_GetExternalInputList {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1512,10 +1505,11 @@ sub LGTV_WebOS_GetExternalInputList($) {
     LGTV_WebOS_CreateSendCommand( $hash, $lgCommands{getExternalInputList},
         undef )
       if ( $hash->{helper}{device}{runsetcmd} == 0 );
+
+    return;
 }
 
-sub LGTV_WebOS_Get3DStatus($) {
-
+sub LGTV_WebOS_Get3DStatus {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1524,10 +1518,11 @@ sub LGTV_WebOS_Get3DStatus($) {
       . $hash->{helper}{device}{runsetcmd};
     LGTV_WebOS_CreateSendCommand( $hash, $lgCommands{get3DStatus}, undef )
       if ( $hash->{helper}{device}{runsetcmd} == 0 );
+
+    return;
 }
 
-sub LGTV_WebOS_GetChannelProgramInfo($) {
-
+sub LGTV_WebOS_GetChannelProgramInfo {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1536,14 +1531,16 @@ sub LGTV_WebOS_GetChannelProgramInfo($) {
     LGTV_WebOS_CreateSendCommand( $hash, $lgCommands{getChannelProgramInfo},
         undef )
       if ( $hash->{helper}{device}{runsetcmd} == 0 );
+
+    return;
 }
 
 #############################################
 ### my little Helper
 
-sub LGTV_WebOS_ParseMsg($$) {
-
-    my ( $hash, $buffer ) = @_;
+sub LGTV_WebOS_ParseMsg {
+    my $hash   = shift;
+    my $buffer = shift;
 
     my $name  = $hash->{NAME};
     my $open  = 0;
@@ -1552,7 +1549,7 @@ sub LGTV_WebOS_ParseMsg($$) {
     my $tail  = '';
 
     if ($buffer) {
-        foreach my $c ( split //, $buffer ) {
+        for my $c ( split //, $buffer ) {
             if ( $open == $close && $open > 0 ) {
                 $tail .= $c;
                 Log3 $name, 5,
@@ -1593,12 +1590,11 @@ sub LGTV_WebOS_ParseMsg($$) {
     return ( $msg, $tail );
 }
 
-sub LGTV_WebOS_Header2Hash($) {
-
+sub LGTV_WebOS_Header2Hash {
     my $string = shift;
     my %hash   = ();
 
-    foreach my $line ( split( "\r\n", $string ) ) {
+    for my $line ( split( "\r\n", $string ) ) {
         my ( $key, $value ) = split( ": ", $line );
         next if ( !$value );
 
@@ -1609,8 +1605,7 @@ sub LGTV_WebOS_Header2Hash($) {
     return \%hash;
 }
 
-sub LGTV_WebOS_FormartStartEndTime($) {
-
+sub LGTV_WebOS_FormartStartEndTime {
     my $string = shift;
 
     my @timeArray = split( ',', $string );
@@ -1620,8 +1615,7 @@ sub LGTV_WebOS_FormartStartEndTime($) {
 }
 
 ############ Presence Erkennung Begin #################
-sub LGTV_WebOS_Presence($) {
-
+sub LGTV_WebOS_Presence {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1629,10 +1623,11 @@ sub LGTV_WebOS_Presence($) {
       BlockingCall( "LGTV_WebOS_PresenceRun", $name . '|' . $hash->{HOST},
         "LGTV_WebOS_PresenceDone", 5, "LGTV_WebOS_PresenceAborted", $hash )
       unless ( exists( $hash->{helper}{RUNNING_PID} ) );
+
+    return;
 }
 
-sub LGTV_WebOS_PresenceRun($) {
-
+sub LGTV_WebOS_PresenceRun {
     my $string = shift;
     my ( $name, $host ) = split( "\\|", $string );
 
@@ -1641,17 +1636,16 @@ sub LGTV_WebOS_PresenceRun($) {
 
     $tmp = qx(ping -c 3 -w 2 $host 2>&1);
 
-    if ( defined($tmp) and $tmp ne "" ) {
+    if ( defined($tmp) && $tmp ne "" ) {
 
         chomp $tmp;
         Log3 $name, 5,
           "LGTV_WebOS ($name) - ping command returned with output:\n$tmp";
         $response = "$name|"
           . (
-            (
-                $tmp =~ /\d+ [Bb]ytes (from|von)/
-                  and not $tmp =~ /[Uu]nreachable/
-            ) ? "present" : "absent"
+            ( $tmp =~ /\d+ [Bb]ytes (from|von)/ && !$tmp =~ /[Uu]nreachable/ )
+            ? "present"
+            : "absent"
           );
 
     }
@@ -1662,12 +1656,12 @@ sub LGTV_WebOS_PresenceRun($) {
 
     Log3 $name, 4,
 "Sub LGTV_WebOS_PresenceRun ($name) - Sub finish, Call LGTV_WebOS_PresenceDone";
+
     return $response;
 }
 
-sub LGTV_WebOS_PresenceDone($) {
-
-    my ($string) = @_;
+sub LGTV_WebOS_PresenceDone {
+    my $string = shift;
 
     my ( $name, $response ) = split( "\\|", $string );
     my $hash = $defs{$name};
@@ -1684,11 +1678,12 @@ sub LGTV_WebOS_PresenceDone($) {
     LGTV_WebOS_SocketClosePresenceAbsent( $hash, $response );
 
     Log3 $name, 4, "Sub LGTV_WebOS_PresenceDone ($name) - presence done";
+
+    return;
 }
 
-sub LGTV_WebOS_PresenceAborted($) {
-
-    my ($hash) = @_;
+sub LGTV_WebOS_PresenceAborted {
+    my $hash = shift;
     my $name = $hash->{NAME};
 
     delete( $hash->{helper}{RUNNING_PID} );
@@ -1696,22 +1691,26 @@ sub LGTV_WebOS_PresenceAborted($) {
 
     Log3 $name, 4,
 "Sub LGTV_WebOS_PresenceAborted ($name) - The BlockingCall Process terminated unexpectedly. Timedout!";
+
+    return;
 }
 
-sub LGTV_WebOS_SocketClosePresenceAbsent($$) {
+sub LGTV_WebOS_SocketClosePresenceAbsent {
 
-    my ( $hash, $presence ) = @_;
+    my $hash     = shift;
+    my $presence = shift;
 
     my $name = $hash->{NAME};
 
     LGTV_WebOS_Close($hash)
-      if ( $presence eq 'absent' and not IsDisabled($name) and $hash->{CD} )
+      if ( $presence eq 'absent' && !IsDisabled($name) && $hash->{CD} )
       ;   # https://forum.fhem.de/index.php/topic,66671.msg694578.html#msg694578
      # Sobald pingPresence absent meldet und der Socket noch steht soll er geschlossen werden, da sonst FHEM nach 4-6 min für 10 min blockiert
+
+    return;
 }
 
-sub LGTV_WebOS_WakeUp_Udp($@) {
-
+sub LGTV_WebOS_WakeUp_Udp {
     my ( $hash, $mac_addr, $host, $port ) = @_;
     my $name = $hash->{NAME};
 
@@ -1724,14 +1723,14 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
         return 1;
     }
 
-    my $ip_addr = inet_aton($host);
+    my $ip_addr   = inet_aton($host);
     my $sock_addr = sockaddr_in( $port, $ip_addr );
     $mac_addr =~ s/://g;
     my $packet =
       pack( 'C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16 );
 
     setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 ) or die "setsockopt : $!";
-    send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
+    send( $sock, $packet, 0, $sock_addr )            or die "send : $!";
     close($sock);
 
     return 1;
@@ -1842,7 +1841,7 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
             Broadcast Address of the Network - wakeOnLanBroadcast &lt;network&gt;.255
         </ul>
     </ul>
-	<ul>
+    <ul>
         <ul>
             <li>wakeupCmd</li>
             Set a command to be executed when turning on an absent device. Can be an FHEM command or Perl command in {}.
@@ -1955,14 +1954,14 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
             </ul>
         </ul>
     </ul>
-	<ul>
+    <ul>
         <ul>
             <ul>
                 <li>wakeupCmd</li>
                 Befehl zum Einschalten des LG TV. M&ouml;glich ist ein FHEM Befehl oder Perl in {}.
             </ul>
         </ul>        
-    </ul>																				   
+    </ul>
     <p><br /><br /><strong>Generierte Readings/Events:</strong></p>
     <ul>
         <ul>
@@ -2009,9 +2008,9 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.4",
+  "version": "v3.3.3",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
     "CoolTux"
