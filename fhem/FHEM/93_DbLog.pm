@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.12.5"  => "31.12.2001 standard unit assignment for readings beginning with 'temperature' and 'humidity' removed, forum:#125087 ",
   "4.12.4"  => "27.12.2021 change ParseEvent for FBDECT, warning messages for deprecated commands added ",
   "4.12.3"  => "20.04.2021 change sub DbLog_ConnectNewDBH for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
   "4.12.2"  => "08.04.2021 change standard splitting ",
@@ -1116,11 +1117,11 @@ sub DbLog_ParseEvent {
       } 
   }
 
-  #globales Abfangen von 
+  #globales Abfangen von                                                  # removed in Version 4.12.5
   # - temperature
   # - humidity
-  if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
-  elsif($reading =~ m(^humidity))    { $unit = "%"; }                    # wenn reading mit humidity beginnt
+  #if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
+  #elsif($reading =~ m(^humidity))    { $unit = "%"; }                    # wenn reading mit humidity beginnt
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -2620,8 +2621,9 @@ sub DbLog_PushAsync {
               # ohne PK
               $sqlins = "INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
           } 
-          no warnings 'uninitialized';          
-          foreach my $row (@row_array) {
+          no warnings 'uninitialized'; 
+          
+          for my $row (@row_array) {
               my @a = split("\\|",$row);       
               s/_ESC_/\|/gxs for @a;                  # escaped Pipe return to "|"
               Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";
@@ -2632,7 +2634,8 @@ sub DbLog_PushAsync {
               $a[5] =~ s/\\/\\\\/g;                   # escape \ with \\
               $a[6] =~ s/\\/\\\\/g;                   # escape \ with \\
               $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
-          }   
+          }  
+          
           use warnings;
           
           chop($sqlins);
@@ -2645,9 +2648,9 @@ sub DbLog_PushAsync {
           if ($@) {
               Log3($name, 2, "DbLog $name -> Error start transaction for $history - $@");
           }
+          
           eval { $sth_ih = $dbh->prepare($sqlins);
-                 if($tl) {
-                     # Tracelevel setzen       
+                 if($tl) {                                                 # Tracelevel setzen       
                      $sth_ih->{TraceLevel} = "$tl|$tf";
                  }            
                  my $ins_hist = $sth_ih->execute();
