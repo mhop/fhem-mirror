@@ -423,7 +423,7 @@ sub ElectricityCalculator_Set($@)
 		$attr{$ElectricityCalcName}{ElectricityCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $ElectricityCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $ElectricityCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " " . $attr{$hash}{SiPrefixPower};
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
