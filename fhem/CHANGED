@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  82_LGTV_WebOS: fix net socket flapping
  - change:  93_DbLog: standard unit assignment for readings beginning with 
                       'temperature' removed, forum:#125087
  - feature: 36_ShellyMonitor: support for readings of Shelly TRV
