@@ -423,7 +423,7 @@ sub WaterCalculator_Set($@)
 		$attr{$WaterCalcName}{WaterCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $WaterCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $WaterCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " " . $attr{$hash}{WFRUnit};
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
