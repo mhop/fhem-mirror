@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2021 by Heiko Maaz
+#       (c) 2016-2022 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.9"  => "01.01.2022  minor fixes ",
   "8.46.8"  => "30.12.2021  some code refacturing and minor bug fixing ",
   "8.46.7"  => "27.12.2021  some code improvements, insert accept a multiline string ",
   "8.46.6"  => "26.12.2021  sub sqlCmd_DoParse uses credentials dependend of attr useAdminCredentials ".
@@ -7793,8 +7794,7 @@ sub DbRep_OptimizeDone {
   
   delete($hash->{HELPER}{RUNNING_OPTIMIZE});
   
-  my $erread = DbRep_afterproc ($hash, "optimize");                   # Befehl nach Procedure ausführen
-  my $state  = $erread // "optimize tables finished";
+  my ($erread, $state) = DbRep_afterproc ($hash, "optimize");                   # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -8608,8 +8608,7 @@ sub DbRep_DumpDone {
   delete($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   delete($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
   
-  my $erread = DbRep_afterproc ($hash, "dump");                    # Befehl nach Procedure ausführen
-  my $state  = $erread // "Database backup finished";
+  my ($erread, $state) = DbRep_afterproc ($hash, "dump");                    # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -8717,8 +8716,7 @@ sub DbRep_RepairDone {
   
   delete($hash->{HELPER}{RUNNING_REPAIR});
   
-  my $erread = DbRep_afterproc ($hash, "repair");                 # Befehl nach Procedure ausführen
-  my $state  = $erread // "Repair finished $hash->{DATABASE}";
+  my ($erread, $state) = DbRep_afterproc ($hash, "repair");                 # Befehl nach Procedure ausführen
   
   # Datenbankverbindung in DbLog wieder öffenen
   my $dbl = $dbloghash->{NAME};
@@ -9069,8 +9067,7 @@ sub DbRep_restoreDone {
   
   delete($hash->{HELPER}{RUNNING_RESTORE});
   
-  my $erread = DbRep_afterproc ($hash, "restore");                             # Befehl nach Procedure ausführen
-  my $state  = $erread // "Restore of $bfile finished";
+  my ($erread, $state) = DbRep_afterproc ($hash, "restore", $bfile);                             # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -9744,8 +9741,7 @@ sub DbRep_reduceLogDone {
   delete $hash->{HELPER}{RUNNING_REDUCELOG};
   delete $hash->{HELPER}{REDUCELOG};
   
-  my $erread = DbRep_afterproc ($hash, "reduceLog");                       # Befehl nach Procedure ausführen
-  my $state  = $erread // "reduceLog of $hash->{DATABASE} finished";
+  my ($erread, $state) = DbRep_afterproc ($hash, "reduceLog");                       # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -10976,26 +10972,35 @@ return;
 #                    Befehl nach Procedure ausführen
 ###################################################################################
 sub DbRep_afterproc {
-  my $hash = shift;
-  my $txt  = shift;
-  my $name = $hash->{NAME};
+  my $hash  = shift;
+  my $cmd   = shift;
+  my $bfile = shift // q{};
+  my $name  = $hash->{NAME};
+  
   my $erread;
   
   my $ead = AttrVal($name, "executeAfterProc", "");
   
   if($ead) {
-      Log3 ($name, 4, "DbRep $name - execute command after $txt: '$ead' ");
+      Log3 ($name, 4, "DbRep $name - execute command after $cmd: '$ead' ");
       
       my $err = AnalyzeCommandChain(undef, $ead);     
       
       if ($err) {
-          Log3 ($name, 2, qq{DbRep $name - command message after $txt: "$err"});
-          ReadingsSingleUpdateValue ($hash, "after".$txt."_message", $err, 1);
-          $erread = qq{WARNING - $txt finished, but message after command appeared};
+          Log3 ($name, 2, qq{DbRep $name - command message after $cmd: "$err"});
+          ReadingsSingleUpdateValue ($hash, "after".$cmd."_message", $err, 1);
+          $erread = qq{WARNING - $cmd finished, but message after command appeared};
       }
   }
 
-  my $state = $erread // "done";
+  my $rtxt  = $cmd eq "dump"      ? "Database backup finished"                : 
+              $cmd eq "repair"    ? "Repair finished $hash->{DATABASE}"       :
+              $cmd eq "restore"   ? "Restore of $bfile finished"              :
+              $cmd eq "reduceLog" ? "reduceLog of $hash->{DATABASE} finished" :
+              $cmd eq "optimize"  ? "optimize tables finished"                :
+              "done";
+  
+  my $state = $erread // $rtxt;                
   
 return ($erread, $state);  
 }
