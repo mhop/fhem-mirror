@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
-#       (c) 2018-2021 by Heiko Maaz
+#       (c) 2018-2022 by Heiko Maaz
 #       forked from 98_weblink.pm by Rudolf König
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.2" => "01.01.2022  minor code change in _setpopupStream ",
   "2.15.1" => "15.10.2021  fix warnings 'my variable masks earlier' ",
   "2.15.0" => "27.09.2021  model lastsnap: add setter snap ",
   "2.14.5" => "12.08.2020  avoid loose of adoption after restart ",
@@ -383,8 +384,12 @@ sub _setpopupStream {                    ## no critic "not used"
   # OK-Dialogbox oder Autoclose
   my $temp    = AttrVal($name, "popupStreamTo", $todef);
   my $to      = $prop // $temp;
-  unless ($to =~ /^\d+$/x || lc($to) eq "ok") { $to = $todef; }
-  $to         = ($to =~ /\d+/x) ? (1000 * $to) : $to;
+  
+  if ($to !~ /^\d+(\.\d+)?$/x && lc($to) ne "ok") { 
+      $to = $todef; 
+  }
+  
+  $to          = $to =~ /^\d+(\.\d+)?$/x ? 1000 * $to : $to;
   
   my $pd       = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
   my $htmlCode = $hash->{HELPER}{STREAM};
@@ -397,9 +402,10 @@ sub _setpopupStream {                    ## no critic "not used"
       Log3($name, 4, "$name - Stream to display: $htmlCode");
       Log3($name, 4, "$name - Stream display to webdevice: $pd");
       
-      if($to =~ /\d+/x) {
+      if($to =~ /^\d+(\.\d+)?$/x) {
           map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd");  ## no critic 'void context';
-      } else {
+      } 
+      else {
           map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");     ## no critic 'void context';
       } 
   }
@@ -681,18 +687,20 @@ sub FwFn {
   }
   
   if(IsDisabled($name)) {
-      if(AttrVal($name,"hideDisplayName",0)) {
+      if(AttrVal($name, "hideDisplayName", 0)) {
           $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
-      } else {
+      } 
+      else {
           $ret .= "<html>Stream-device is disabled</html>";
       } 
-      
-  } else {
+  } 
+  else {
       $ret .= $html;
       $ret .= sDevsWidget($name) if(IsModelMaster($hash)); 
   }
    
   my $al = AttrVal($name, "autoRefresh", 0);                                                             # Autorefresh nur des aufrufenden FHEMWEB-Devices
+  
   if($al) {  
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
@@ -756,10 +764,12 @@ sub webRefresh {
   { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }   ## no critic 'void context';
   
   my $al = AttrVal($name, "autoRefresh", 0);
+  
   if($al) {      
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
-  } else {
+  } 
+  else {
       RemoveInternalTimer($hash);
   }
   
