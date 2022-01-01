@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.46.9"  => "01.01.2022  minor fixes ",
+  "8.46.9"  => "01.01.2022  some more code refacturing, minor fixes ",
   "8.46.8"  => "30.12.2021  some code refacturing and minor bug fixing ",
   "8.46.7"  => "27.12.2021  some code improvements, insert accept a multiline string ",
   "8.46.6"  => "26.12.2021  sub sqlCmd_DoParse uses credentials dependend of attr useAdminCredentials ".
@@ -614,12 +614,12 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ###                New SQLite repair attempt                 ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        Log3 ($name, 3, "DbRep $name - start repair attempt of database ".$hash->{DATABASE}); 
-       # closetime Datenbank
-       my $dbl = $dbloghash->{NAME};
+       
+       my $dbl = $dbloghash->{NAME};                              # closetime Datenbank
        CommandSet(undef,"$dbl reopen $prop");
        
-       DbRep_beforeproc($hash, "repair");
-       DbRep_Main($hash,$opt);
+       DbRep_beforeproc ($hash, "repair");
+       DbRep_Main       ($hash,$opt);
        
        return;
   }
@@ -2153,9 +2153,14 @@ sub DbRep_Main {
  
  if ($opt =~ /optimizeTables|vacuum/) { 
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
-     BlockingKill($hash->{HELPER}{RUNNING_RESTORE})  if (exists($hash->{HELPER}{RUNNING_RESTORE}));     
+     BlockingKill($hash->{HELPER}{RUNNING_RESTORE})  if (exists($hash->{HELPER}{RUNNING_RESTORE}));
+
+     $params = {
+         hash  => $hash,
+         name  => $name
+     };      
      
-     $hash->{HELPER}{RUNNING_OPTIMIZE}           = BlockingCall("DbRep_optimizeTables", $name, "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
+     $hash->{HELPER}{RUNNING_OPTIMIZE}           = BlockingCall("DbRep_optimizeTables", $params, "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
      $hash->{HELPER}{RUNNING_OPTIMIZE}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_OPTIMIZE});
      
      ReadingsSingleUpdateValue ($hash, "state", "optimize tables is running - be patient and see Logfile !", 1);
@@ -2168,7 +2173,12 @@ sub DbRep_Main {
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE})      if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      BlockingKill($hash->{HELPER}{RUNNING_REPAIR})        if (exists($hash->{HELPER}{RUNNING_REPAIR}));
      
-     $hash->{HELPER}{RUNNING_REPAIR}           = BlockingCall("DbRep_sqliteRepair", $name, "DbRep_RepairDone", $to, "DbRep_RepairAborted", $hash);
+     $params = {
+         hash  => $hash,
+         name  => $name
+     }; 
+     
+     $hash->{HELPER}{RUNNING_REPAIR}           = BlockingCall("DbRep_sqliteRepair", $params, "DbRep_RepairDone", $to, "DbRep_RepairAborted", $hash);
      $hash->{HELPER}{RUNNING_REPAIR}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_REPAIR});
      
      ReadingsSingleUpdateValue ($hash, "state", "repair database is running - be patient and see Logfile !", 1);
@@ -3262,7 +3272,7 @@ sub averval_DoParse {
   if ($err) {
       $err = encode_base64($@,"");
       Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|$device|$reading|''|$err|''";
+      return "$name|$err";
   }
  
   Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".$acf);
@@ -3330,7 +3340,7 @@ sub averval_DoParse {
                or do { $err = encode_base64($@, "");
                        Log3 ($name, 2, "DbRep $name - $@");
                        $dbh->disconnect;
-                       return "$name|''|$device|$reading|''|$err|''";
+                       return "$name|$err";
                      };
      
           my @line = $sth->fetchrow_array();
@@ -3384,7 +3394,7 @@ sub averval_DoParse {
                    or do { $err = encode_base64($@,"");
                            Log3 ($name, 2, "DbRep $name - $@");
                            $dbh->disconnect;
-                           return "$name|''|$device|$reading|''|$err|''";
+                           return "$name|$err";
                          };
              
               my $val = $sth->fetchrow_array();
@@ -3483,7 +3493,7 @@ sub averval_DoParse {
                or do { $err = encode_base64($@,"");
                        Log3 ($name, 2, "DbRep $name - $@");
                        $dbh->disconnect;
-                       return "$name|''|$device|$reading|''|$err|''";
+                       return "$name|$err";
                      };
          
           if(!$tf || !$tl) {                                                   # kein Start- und/oder Ende Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich
@@ -3509,7 +3519,7 @@ sub averval_DoParse {
                    or do { $err = encode_base64($@,"");
                            Log3 ($name, 2, "DbRep $name - $@");
                            $dbh->disconnect;
-                           return "$name|''|$device|$reading|''|$err|''";
+                           return "$name|$err";
                          };      
 
               my @twm_array =  map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
@@ -3572,7 +3582,7 @@ sub averval_DoParse {
       if ($err) {
           Log3 ($hash->{NAME}, 2, "DbRep $name - $err"); 
           $err = encode_base64($err,"");
-          return "$name|''|$device|$reading|''|$err|''";
+          return "$name|$err";
       }
       
       $rt = $rt+$wrt;
@@ -3585,7 +3595,7 @@ sub averval_DoParse {
   my $brt = tv_interval($bst);                                                                      # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
  
-return "$name|$arrstr|$device|$reading|$rt|0|$irowdone|$gtsstr|$gtsreached";
+return "$name|''|$arrstr|$device|$reading|$rt|$irowdone|$gtsstr|$gtsreached";
 }
 
 ####################################################################################################
@@ -3594,20 +3604,20 @@ return "$name|$arrstr|$device|$reading|$rt|0|$irowdone|$gtsstr|$gtsreached";
 sub averval_ParseDone {
   my $string     = shift;
   my @a          = split "\\|", $string;
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $arrstr     = decode_base64($a[1]);
-  my $device     = decode_base64($a[2]);
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : undef;
+  my $arrstr     = decode_base64($a[2]);
+  my $device     = decode_base64($a[3]);
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $reading    = $a[3];
+  my $reading    = $a[4];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $bt         = $a[4];
-  my ($rt,$brt)  = split ",", $bt;
-  my $err        = $a[5] ? decode_base64($a[5]) : undef;
+  my $bt         = $a[5];
   my $irowdone   = $a[6];
-  my $gtsstr     = $a[7] ? decode_base64($a[7]) : undef;
+  my $gtsstr     = $a[7] ? decode_base64($a[8]) : undef;
   my $gtsreached = $a[8];
-  my $ndp        = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
+  
+  my $hash       = $defs{$name};
+  my $ndp        = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces);
   
   my $reading_runtime_string;
   
@@ -3622,6 +3632,8 @@ sub averval_ParseDone {
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
       return;
   }
+  
+  my ($rt,$brt)  = split ",", $bt;
  
   no warnings 'uninitialized'; 
   
@@ -7616,166 +7628,136 @@ return;
 #                             optimize Tables alle Datenbanken 
 ####################################################################################################
 sub DbRep_optimizeTables {
- my ($name)        = @_;
- my $hash          = $defs{$name};
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
  
- my $dbname        = $hash->{DATABASE};
- my $value         = 0;
+  my $dbname = $hash->{DATABASE};
+  my $value  = 0;
  
- my ($sth,$query,$r,$db_MB_start,$db_MB_end);
- my (%db_tables,@tablenames);
+  my ($sth,$ret,$query,$db_MB_start,$db_MB_end);
+  my (%db_tables,@tablenames);
  
- my $bst = [gettimeofday];                                                                   # Background-Startzeit
+  my $bst = [gettimeofday];                                                                   # Background-Startzeit
  
- my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
- if ($err) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$err|''|''";
- }
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+  if ($err) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      return "$name|$err";
+  }
  
- my $st = [gettimeofday];                                                                    # SQL-Startzeit
+  my $st = [gettimeofday];                                                                    # SQL-Startzeit
  
- if ($dbmodel =~ /MYSQL/) {
-     $query = "SHOW TABLE STATUS FROM `$dbname`";                                            # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
- 
-     Log3 ($name, 5, "DbRep $name - current query: $query ");
-     Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname....");
+  if ($dbmodel =~ /MYSQL/) {
+      $query = "SHOW TABLE STATUS FROM `$dbname`";                                            # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
+  
+      Log3 ($name, 5, "DbRep $name - current query: $query ");
+      Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname....");
     
-     eval { $sth = $dbh->prepare($query);
-            $sth->execute;
-          };
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-         $sth->finish;
-         $dbh->disconnect;
-         return "$name|''|$err|''|''";
-     }
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      return $ret if ($ret);
     
-     while ( $value = $sth->fetchrow_hashref()) {
-         Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
+      while ( $value = $sth->fetchrow_hashref()) {
+          Log3 ($name, 5, "DbRep $name - ......... Table definition found: .........");
          
-         for my $tk (sort(keys(%$value))) {
-             Log3 ($name, 5, "DbRep $name - $tk: $value->{$tk}") if(defined($value->{$tk}) && $tk ne "Rows");
-         }
+          for my $tk (sort(keys(%$value))) {
+              Log3 ($name, 5, "DbRep $name - $tk: $value->{$tk}") if(defined($value->{$tk}) && $tk ne "Rows");
+          }
          
-         Log3 ($name, 5, "DbRep $name - ......... Table definition END ............");
+          Log3 ($name, 5, "DbRep $name - ......... Table definition END ............");
      
-         if (defined $value->{Type}) {                                                      # check for old MySQL3-Syntax Type=xxx   
-             $value->{Engine} = $value->{Type};                                             # port old index type to index engine, so we can use the index Engine in the rest of the script
-         }
+          if (defined $value->{Type}) {                                                      # check for old MySQL3-Syntax Type=xxx   
+              $value->{Engine} = $value->{Type};                                             # port old index type to index engine, so we can use the index Engine in the rest of the script
+          }
          
-         $db_tables{$value->{Name}} = $value;
-     }
+          $db_tables{$value->{Name}} = $value;
+      }
 
-     @tablenames = sort(keys(%db_tables));
+      @tablenames = sort(keys(%db_tables));
  
-     if (@tablenames < 1) {
-         $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
-         Log3 ($name, 2, "DbRep $name - $err");
-         $err = encode_base64($@,"");
-         $sth->finish;
-         $dbh->disconnect;
-         return "$name|''|$err|''|''";
-     }
+      if (@tablenames < 1) {
+          $err = "There are no tables inside database $dbname ! It doesn't make sense to backup an empty database. Skipping this one.";
+          Log3 ($name, 2, "DbRep $name - $err");
+          $err = encode_base64($@,"");
+          $sth->finish;
+          $dbh->disconnect;
+          return "$name|$err";
+      }
 
-     $hash->{HELPER}{DBTABLES}      = \%db_tables;                                                         # Tabellen optimieren 
-     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
-     if ($err) {
-         $err = encode_base64($err,"");
-         return "$name|''|$err|''|''";
-     }
- }
+      $hash->{HELPER}{DBTABLES}      = \%db_tables;                                                         # Tabellen optimieren 
+      ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash, $dbh, @tablenames);
+      if ($err) {
+          $err = encode_base64($err,"");
+          return "$name|$err";
+      }
+  }
  
- if ($dbmodel =~ /SQLITE/) {
-     $db_MB_start = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);  # Anfangsgröße ermitteln
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
-     $query  ="VACUUM";
-     Log3 ($name, 5, "DbRep $name - current query: $query ");
+  if ($dbmodel =~ /SQLITE/) {
+      $db_MB_start = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);  # Anfangsgröße ermitteln
+      
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+      
+      $query  ="VACUUM";
+      
+      Log3 ($name, 5, "DbRep $name - current query: $query ");
  
-     Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
-     eval {$sth = $dbh->prepare($query);
-           $r = $sth->execute();
-          }; 
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! SQLite-Error: ".$@);
-         $sth->finish;
-         $dbh->disconnect;
-         return "$name|''|$err|''|''";
-     }
+      Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
+      
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      return $ret if ($ret);
      
-     $db_MB_end = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);    # Endgröße ermitteln
+      $db_MB_end = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);    # Endgröße ermitteln
      
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
- }
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+  }
   
- if ($dbmodel =~ /POSTGRESQL/) {
-     $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                                   # Anfangsgröße ermitteln
-     Log3 ($name, 5, "DbRep $name - current query: $query ");
-     eval { $sth = $dbh->prepare($query);
-            $sth->execute;
-          };
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
-         $sth->finish;
-         $dbh->disconnect;
-         return "$name|''|$err|''|''";
-     }
+  if ($dbmodel =~ /POSTGRESQL/) {
+      $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                                   # Anfangsgröße ermitteln
+      
+      Log3 ($name, 5, "DbRep $name - current query: $query ");
+      
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      return $ret if ($ret);
      
-     $value = $sth->fetchrow();
-     $value =~ tr/MB//d;
-     $db_MB_start = sprintf("%.2f",$value);
+      $value       = $sth->fetchrow();
+      $value       =~ tr/MB//d;
+      $db_MB_start = sprintf("%.2f",$value);
      
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
-     Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
+      Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
      
-     $query = "vacuum history";
+      $query = "vacuum history";
      
-     Log3 ($name, 5, "DbRep $name - current query: $query ");
- 
-     eval {$sth = $dbh->prepare($query);
-           $sth->execute();
-          }; 
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
-         $sth->finish;
-         $dbh->disconnect;
-         return "$name|''|$err|''|''";
-     }
+      Log3 ($name, 5, "DbRep $name - current query: $query ");
+
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      return $ret if ($ret);
      
-     $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                      # Endgröße ermitteln
-     Log3 ($name, 5, "DbRep $name - current query: $query ");
-     eval { $sth = $dbh->prepare($query);
-            $sth->execute;
-          };
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! PostgreSQL-Error: ".$@);
-         $sth->finish;
-         $dbh->disconnect;
-         return "$name|''|$err|''|''";
-     }
+      $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                      # Endgröße ermitteln
+      
+      Log3 ($name, 5, "DbRep $name - current query: $query ");
+      
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      return $ret if ($ret);
      
-     $value = $sth->fetchrow();
-     $value =~ tr/MB//d;
-     $db_MB_end = sprintf("%.2f",$value);
-     Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
- }
+      $value     = $sth->fetchrow();
+      $value     =~ tr/MB//d;
+      $db_MB_end = sprintf("%.2f",$value);
+      
+      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
+  }
   
- $sth->finish;
- $dbh->disconnect;
+  $sth->finish;
+  $dbh->disconnect;
   
- my $rt  = tv_interval($st);                                               # SQL-Laufzeit ermitteln
- my $brt = tv_interval($bst);                                              # Background-Laufzeit ermitteln
- $rt     = $rt.",".$brt;
+  my $rt  = tv_interval($st);                                               # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                              # Background-Laufzeit ermitteln
+  $rt     = $rt.",".$brt;
  
- Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
+  Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
-return "$name|$rt|''|$db_MB_start|$db_MB_end";
+return "$name|''|$rt|$db_MB_start|$db_MB_end";
 }
 
 ####################################################################################################
@@ -7784,13 +7766,13 @@ return "$name|$rt|''|$db_MB_start|$db_MB_end";
 sub DbRep_OptimizeDone {
   my $string       = shift;
   my @a            = split("\\|",$string);
-  my $hash         = $defs{$a[0]};
-  my $bt           = $a[1];
-  my ($rt,$brt)    = split(",", $bt);
-  my $err          = $a[2]?decode_base64($a[2]):undef;
+  my $name         = $a[0];
+  my $err          = $a[1] ? decode_base64($a[1]) : undef;
+  my $bt           = $a[2];
   my $db_MB_start  = $a[3];
   my $db_MB_end    = $a[4];
-  my $name         = $hash->{NAME};
+  
+  my $hash         = $defs{$name};
   
   delete($hash->{HELPER}{RUNNING_OPTIMIZE});
   
@@ -7801,6 +7783,8 @@ sub DbRep_OptimizeDone {
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
       return;
   } 
+  
+  my ($rt,$brt) = split(",", $bt);
  
   no warnings 'uninitialized'; 
     
@@ -8639,65 +8623,74 @@ return;
 #                                      Dump-Routine SQLite
 ####################################################################################################
 sub DbRep_sqliteRepair {
- my ($name)       = @_;
- my $hash         = $defs{$name};
- my $dbloghash    = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $db           = $hash->{DATABASE};
- my $dbname       = (split /[\/]/, $db)[-1];
- my $dbpath       = (split /$dbname/, $db)[0];
- my $dblogname    = $dbloghash->{NAME};
- my $sqlfile      = $dbpath."dump_all.sql";
- my ($c,$clog,$ret,$err);
-
- # Background-Startzeit
- my $bst = [gettimeofday];
+  my $paref       = shift;
+  my $hash        = $paref->{hash};
+  my $name        = $paref->{name};
   
- $c = "echo \".mode insert\n.output $sqlfile\n.dump\n.exit\" | sqlite3 $db; ";
- $clog = $c;
- $clog =~ s/\n/ /g;
- Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
- $ret = system qq($c);
- if($ret) {
-     $err = "Error in step \"dump corrupt database\" - see logfile";
-     $err = encode_base64($err,"");
-     return "$name|''|$err";
- }
+  my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $db          = $hash->{DATABASE};
+  my $dbname      = (split /[\/]/, $db)[-1];
+  my $dbpath      = (split /$dbname/, $db)[0];
+  my $dblogname   = $dbloghash->{NAME};
+  my $sqlfile     = $dbpath."dump_all.sql";
  
- $c = "mv $db $db.corrupt";
- $clog = $c;
- $clog =~ s/\n/ /g;
- Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
- $ret = system qq($c);
- if($ret) {
-     $err = "Error in step \"move atabase to corrupt-db\" - see logfile";
-     $err = encode_base64($err,"");
-     return "$name|''|$err";
- }
+  my $err;
+
+  my $bst = [gettimeofday];                                                    # Background-Startzeit
+  
+  my $c    = "echo \".mode insert\n.output $sqlfile\n.dump\n.exit\" | sqlite3 $db; ";
+  my $clog = $c;
+  $clog    =~ s/\n/ /g;
  
- $c = "echo \".read $sqlfile\n.exit\" | sqlite3 $db;";
- $clog = $c;
- $clog =~ s/\n/ /g;
- Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
- $ret = system qq($c);
- if($ret) {
-     $err = "Error in step \"read dump to new database\" - see logfile";
-     $err = encode_base64($err,"");
-     return "$name|''|$err";
- }
+  Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
  
- $c = "rm $sqlfile";
- $clog = $c;
- $clog =~ s/\n/ /g;
- Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
- $ret = system qq($c);
- if($ret) {
-     $err = "Error in step \"delete $sqlfile\" - see logfile";
-     $err = encode_base64($err,"");
-     return "$name|''|$err";
- }
+  my $ret = system qq($c);
+  if($ret) {
+      $err = "Error in step \"dump corrupt database\" - see logfile";
+      $err = encode_base64($err,"");
+      return "$name|''|$err";
+  }
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+  $c    = "mv $db $db.corrupt";
+  $clog = $c;
+  $clog =~ s/\n/ /g;
+ 
+  Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ 
+  $ret = system qq($c);
+  if($ret) {
+      $err = "Error in step \"move atabase to corrupt-db\" - see logfile";
+      $err = encode_base64($err,"");
+      return "$name|''|$err";
+  }
+ 
+  $c    = "echo \".read $sqlfile\n.exit\" | sqlite3 $db;";
+  $clog = $c;
+  $clog =~ s/\n/ /g;
+ 
+  Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ 
+  $ret = system qq($c);
+  if($ret) {
+      $err = "Error in step \"read dump to new database\" - see logfile";
+      $err = encode_base64($err,"");
+      return "$name|''|$err";
+  }
+ 
+  $c    = "rm $sqlfile";
+  $clog = $c;
+  $clog =~ s/\n/ /g;
+ 
+  Log3 ($name, 4, "DbRep $name - Systemcall: $clog");
+ 
+  $ret = system qq($c);
+  if($ret) {
+      $err = "Error in step \"delete $sqlfile\" - see logfile";
+      $err = encode_base64($err,"");
+      return "$name|''|$err";
+  }
+ 
+  my $brt = tv_interval($bst);                                          # Background-Laufzeit ermitteln
  
 return "$name|$brt|0";
 }
@@ -8710,7 +8703,7 @@ sub DbRep_RepairDone {
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
   my $brt        = $a[1];
-  my $err        = $a[2]?decode_base64($a[2]):undef;
+  my $err        = $a[2] ? decode_base64($a[2]) : undef;
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $name       = $hash->{NAME};
   
@@ -8728,12 +8721,11 @@ sub DbRep_RepairDone {
       return;
   } 
  
-  # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
   readingsBeginUpdate         ($hash);
   ReadingsBulkUpdateValue     ($hash, "background_processing_time", sprintf("%.4f",$brt));
-  ReadingsBulkUpdateTimeState ($hash,undef,undef,$state);
+  ReadingsBulkUpdateTimeState ($hash, undef, undef, $state);
   readingsEndUpdate           ($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Database repair $hash->{DATABASE} finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
@@ -10465,6 +10457,35 @@ sub DbRep_resolveDevspecs {
   }
  
 return ($devs,$devswc);
+}
+
+####################################################################################################
+#          SQL Query evaluieren und Return-String (bei Error in Verarbeitung) und $sth-String
+#          bei Erfolg
+####################################################################################################
+sub DbRep_prepareExecuteQuery {
+  my $name = shift; 
+  my $dbh  = shift;
+  my $sql  = shift;
+  
+  my $ret  = q{};
+  
+  my ($sth,$err);
+  
+  eval{ $sth = $dbh->prepare($sql);
+        $sth->execute();
+      } 
+      or do { $err = encode_base64($@,"");
+     
+              Log3 ($name, 2, "DbRep $name - ERROR - $@");
+              
+              $sth->finish;
+              $dbh->disconnect;
+              
+              $ret = "$name|$err";
+            };
+
+return ($ret, $sth);
 }
 
 ####################################################################################################
@@ -13945,7 +13966,7 @@ return;
                                  The processing of this command may take an extremely long time (without INDEX). <br><br>
                                  </li> <br> 
                                  
-    <li><b> repairSQLite </b>  - repairs a corrupted SQLite database. <br>
+    <li><b> repairSQLite [sec] </b>  - repairs a corrupted SQLite database. <br>
                                  A corruption is usally existent when the error message "database disk image is malformed"
                                  appears in reading "state" of the connected DbLog-device.
                                  If the command was started, the connected DbLog-device will firstly disconnected from the 
@@ -16667,7 +16688,7 @@ return;
                                  
                                  </li> <br>                                 
 
-    <li><b> repairSQLite </b>  - repariert eine korrupte SQLite-Datenbank. <br>
+    <li><b> repairSQLite [sec]</b>  - repariert eine korrupte SQLite-Datenbank. <br>
                                  Eine Korruption liegt im Allgemeinen vor wenn die Fehlermitteilung "database disk image is malformed"
                                  im state des DbLog-Devices erscheint.
                                  Wird dieses Kommando gestartet, wird das angeschlossene DbLog-Device zunächst automatisch für 10 Stunden
