@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.10" => "02.01.2022  more code refacturing, minor fixes ",
   "8.46.9"  => "01.01.2022  some more code refacturing, minor fixes ",
   "8.46.8"  => "30.12.2021  some code refacturing and minor bug fixing ",
   "8.46.7"  => "27.12.2021  some code improvements, insert accept a multiline string ",
@@ -792,7 +793,7 @@ sub DbRep_Set {
           }
       }
       
-      DbRep_beforeproc ($hash, "$hash->{LASTCMD}"); 
+      DbRep_beforeproc ($hash, $hash->{LASTCMD}); 
       DbRep_Main       ($hash,$opt,$prop);    
   } 
   elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {      
@@ -2271,7 +2272,7 @@ sub DbRep_Main {
          reading => $reading,
          ts      => $ts,
      };
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", $params, "count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count_DoParse", $params, "DbRep_count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt eq "averageValue") { 
      $params = {
@@ -2284,7 +2285,7 @@ sub DbRep_Main {
          ts      => $ts,
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", $params, "averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval_DoParse", $params, "DbRep_averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
  } 
  elsif ($opt eq "fetchrows") {
      $params = {
@@ -3249,7 +3250,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 ####################################################################################################
 # nichtblockierende DB-Abfrage averageValue
 ####################################################################################################
-sub averval_DoParse {
+sub DbRep_averval_DoParse {
   my $paref   = shift;    
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -3264,7 +3265,7 @@ sub averval_DoParse {
  
   my ($gts,$gtsstr) = (0,q{});                                                     # Variablen für Grünlandtemperatursumme GTS
  
-  my ($sql,$sth,$selspec,$addon,$gtsreached);
+  my ($sql,$sth,$ret,$selspec,$addon,$gtsreached);
 
   my $bst = [gettimeofday];                                                        # Background-Startzeit
  
@@ -3333,15 +3334,9 @@ sub averval_DoParse {
               $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon);
           }
           Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
-         
-          eval { $sth = $dbh->prepare($sql);
-                 $sth->execute();
-               } 
-               or do { $err = encode_base64($@, "");
-                       Log3 ($name, 2, "DbRep $name - $@");
-                       $dbh->disconnect;
-                       return "$name|$err";
-                     };
+          
+          ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+          return $ret if ($ret);
      
           my @line = $sth->fetchrow_array();
      
@@ -3388,14 +3383,8 @@ sub averval_DoParse {
               $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
               Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
-              eval { $sth = $dbh->prepare($sql);
-                     $sth->execute();
-                   } 
-                   or do { $err = encode_base64($@,"");
-                           Log3 ($name, 2, "DbRep $name - $@");
-                           $dbh->disconnect;
-                           return "$name|$err";
-                         };
+              ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+              return $ret if ($ret);
              
               my $val = $sth->fetchrow_array();
               
@@ -3513,14 +3502,8 @@ sub averval_DoParse {
               }
               Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
              
-              eval { $sth = $dbh->prepare($sql);
-                     $sth->execute();
-                   } 
-                   or do { $err = encode_base64($@,"");
-                           Log3 ($name, 2, "DbRep $name - $@");
-                           $dbh->disconnect;
-                           return "$name|$err";
-                         };      
+              ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+              return $ret if ($ret);     
 
               my @twm_array =  map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
              
@@ -3577,7 +3560,7 @@ sub averval_DoParse {
  
   my ($wrt,$irowdone);
   if($prop =~ /writeToDB/) {                                                                         # Ergebnisse in Datenbank schreiben
-      ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$wrstr,$qlf);
+      ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB ($name,$device,$reading,$wrstr,$qlf);
       
       if ($err) {
           Log3 ($hash->{NAME}, 2, "DbRep $name - $err"); 
@@ -3595,25 +3578,23 @@ sub averval_DoParse {
   my $brt = tv_interval($bst);                                                                      # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
  
-return "$name|''|$arrstr|$device|$reading|$rt|$irowdone|$gtsstr|$gtsreached";
+return "$name|0|$arrstr|$device|$reading|$rt|$irowdone|$gtsstr|$gtsreached";
 }
 
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage averageValue
 ####################################################################################################
-sub averval_ParseDone {
+sub DbRep_averval_ParseDone {
   my $string     = shift;
   my @a          = split "\\|", $string;
   my $name       = $a[0];
   my $err        = $a[1] ? decode_base64($a[1]) : undef;
-  my $arrstr     = decode_base64($a[2]);
-  my $device     = decode_base64($a[3]);
-     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  my $arrstr     = $a[2] ? decode_base64($a[2]) : undef;
+  my $device     = $a[3] ? decode_base64($a[3]) : undef;
   my $reading    = $a[4];
-     $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[5];
   my $irowdone   = $a[6];
-  my $gtsstr     = $a[7] ? decode_base64($a[8]) : undef;
+  my $gtsstr     = $a[7] ? decode_base64($a[7]) : undef;
   my $gtsreached = $a[8];
   
   my $hash       = $defs{$name};
@@ -3625,7 +3606,7 @@ sub averval_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                     # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
    
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -3633,7 +3614,9 @@ sub averval_ParseDone {
       return;
   }
   
-  my ($rt,$brt)  = split ",", $bt;
+  my ($rt,$brt) = split ",", $bt;
+  $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
  
   no warnings 'uninitialized'; 
   
@@ -3688,6 +3671,7 @@ sub averval_ParseDone {
           $rds                    = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."AVG".$acf."__".$runtime_string;
       }
+      
       if($acf eq "DMGWS") {
           ReadingsBulkUpdateValue ($hash, $reading_runtime_string, looks_like_number $c ? sprintf "%.1f",$c : $c);
       } 
@@ -3706,7 +3690,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage count
 ####################################################################################################
-sub count_DoParse {
+sub DbRep_count_DoParse {
   my $paref   = shift;    
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -3718,15 +3702,15 @@ sub count_DoParse {
   my $ced     = AttrVal($name, "countEntriesDetail", 0);
   my $vf      = AttrVal($name, "valueFilter",       "");
   
-  my ($dbh,$sql,$sth,$err);
+  my ($sql,$sth,$ret);
 
-  my $bst = [gettimeofday];                                        # Background-Startzeit
+  my $bst = [gettimeofday];                                             # Background-Startzeit
   
-  ($err,$dbh) = DbRep_dbConnect($name, 0);
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   if ($err) {
       $err = encode_base64($@,"");
       Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|$device|''|$err|$table";
+      return "$name|$err";
   }
      
   no warnings 'uninitialized'; 
@@ -3739,8 +3723,7 @@ sub count_DoParse {
   my @ts = split("\\|", $ts);
   Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
   
-  # SQL-Startzeit
-  my $st = [gettimeofday];
+  my $st = [gettimeofday];                                             # SQL-Startzeit
     
   my ($arrstr,@rsf,$ttail);
   my $addon   = '';
@@ -3775,15 +3758,8 @@ sub count_DoParse {
       }
       Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
      
-      eval{ $sth = $dbh->prepare($sql);
-            $sth->execute();
-          }; 
-      if ($@) {
-          $err = encode_base64($@,"");
-          Log3 ($name, 2, "DbRep $name - $@");
-          $dbh->disconnect;
-          return "$name|''|$device|''|$err|$table";
-      }
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+      return $ret if ($ret);
      
       if($ced) {                                                                         # detaillierter Readings-Count
           while (my @line = $sth->fetchrow_array()) {    
@@ -3815,31 +3791,31 @@ sub count_DoParse {
 
   $rt = $rt.",".$brt;
  
-return "$name|$arrstr|$device|$rt|0|$table";
+return "$name|0|$arrstr|$device|$rt|$table";
 }
 
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage count
 ####################################################################################################
-sub count_ParseDone {
+sub DbRep_count_ParseDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $arrstr     = decode_base64($a[1]);
-  my $device     = decode_base64($a[2]);
-     $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  my $bt         = $a[3];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[4]?decode_base64($a[4]):undef;
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : undef;
+  my $arrstr     = $a[2] ? decode_base64($a[2]) : undef;
+  my $device     = $a[3] ? decode_base64($a[3]) : undef;
+  my $bt         = $a[4];
   my $table      = $a[5];
+  
+  my $hash       = $defs{$name};
+  
   my $reading_runtime_string;
   
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                     # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -3847,16 +3823,17 @@ sub count_ParseDone {
       return;
   }
   
+  my ($rt,$brt) = split ",", $bt;
+  $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  
   Log3 ($name, 5, "DbRep $name - SQL result decoded: $arrstr") if($arrstr);
   
-  # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  # Readingaufbereitung
   readingsBeginUpdate($hash);
   
   my @arr = split("\\|", $arrstr);
-  foreach my $row (@arr) {
+  for my $row (@arr) {
       my @a               = split("#", $row);
       my $runtime_string  = $a[0];
       my $reading         = $a[1];
@@ -3871,10 +3848,12 @@ sub count_ParseDone {
           my ($ds,$rds) = ("","");
           $ds           = $device."__" if ($device);
           $rds          = $reading."__" if ($reading);
+          
           if(AttrVal($name,"countEntriesDetail",0)) {
               # $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
               $reading_runtime_string = $rsf.$rds."COUNT_".$table."__".$runtime_string;
-          } else {
+          } 
+          else {
               $reading_runtime_string = $rsf."COUNT_".$table."__".$runtime_string;
           }
       }
@@ -3882,8 +3861,8 @@ sub count_ParseDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c ? $c : "-");
   }
   
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate          ($hash, 1);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
+  readingsEndUpdate           ($hash, 1);
   
 return;
 }
@@ -4094,7 +4073,7 @@ sub maxval_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                     # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -4343,7 +4322,7 @@ sub minval_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                 # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                 # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -4694,7 +4673,7 @@ sub diffval_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");           # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});           # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -4901,7 +4880,7 @@ sub sumval_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                          # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -5026,7 +5005,7 @@ sub del_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                          # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -5305,7 +5284,7 @@ sub currentfillup_Done {
   
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "$hash->{LASTCMD}");                          # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5789,7 +5768,7 @@ sub fetchrows_ParseDone {
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc($hash, "$hash->{LASTCMD}");                          # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
