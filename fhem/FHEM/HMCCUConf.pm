@@ -94,6 +94,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'CLIMATECONTROL_VENT_DRIVE' => {
 		F => 3, S => 'VALVE_STATE', C => '', V => '', P => 2
 	},
+	'COND_SWITCH_TRANSMITTER_TEMPERATURE' => {
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => '', V => '', P => 1
+	},
 	'DIMMER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
 	},
@@ -245,6 +248,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'CLIMATE_TRANSCEIVER' =>
 		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?ACTUAL_HUMIDITY$:+humidity',
+	'COND_SWITCH_TRANSMITTER_TEMPERATURE' =>
+		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp',
 	'DIMMER' =>
 		'^(C#\.)?LEVEL$:+pct,+level',
 	'DIMMER_TRANSMITTER' =>
@@ -523,9 +528,6 @@ $HMCCU_CONFIG_VERSION = '5.0';
 ######################################################################
 
 %HMCCU_ATTR = (
-	'ACCELERATION_TRANSCEIVER' => {
-		'_none_' => ''
-	},
 	'BLIND' => {
 		'substexcl' => 'pct',
 		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
@@ -578,18 +580,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'cmdIcon' => 'open:fts_door_right_open lock:secur_locked unlock:secur_open',
 		'webCmd' => 'open:lock:unlock'
 	},
-	'MOTION_DETECTOR' => {
-		'_none_' => ''
-	},
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		'cmdIcon' => 'reset:rc_BACK',
 		'webCmd' => 'detection:reset'
-	},
-	'MULTI_MODE_INPUT_TRANSMITTER' => {
-		'_none_' => ''
-	},
-	'PASSAGE_DETECTOR_DIRECTION_TRANSMITTER' => {
-		'_none_' => ''
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		'cmdIcon' => 'reset:rc_BACK',
@@ -597,12 +590,6 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	},
 	'RAINDETECTOR_HEAT' => {
 		'cmdIcon' => 'on:general_an off:general_aus'
-	},
-	'SHUTTER_CONTACT'  => {
-		'_none_' => ''
-	},
-	'SHUTTER_CONTACT_TRANSCEIVER' => {
-		'_none_' => ''
 	},
 	'SHUTTER_TRANSMITTER' => {
 		'substexcl' => 'pct',
@@ -642,15 +629,6 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'cmdIcon' => 'on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
-	},
-	'CLIMATECONTROL_VENT_DRIVE' => {
-		'_none_' => ''
-	},
-	'CLIMATECONTROL_FLOOR_TRANSCEIVER' => {
-		'_none_' => ''
-	},
-	'WATER_DETECTION_TRANSMITTER' => {
-		'_none_' => ''
 	},
 	'WINMATIC' => {
 		'ccuflags' => 'noBoundsChecking',
@@ -2250,6 +2228,21 @@ if (lObjDevice) {
 string lGetOut = "";
 string lGetErr = "";
 string lCommand = "cat /usr/local/etc/config/groups.gson";
+integer lResult;
+lResult = system.Exec(lCommand,&lGetOut,&lGetErr);
+if(lResult == 0) {
+  WriteLine(lGetOut);
+}
+		)
+	},
+	"GetVersion" => {
+		description => "Get CCU version information",
+		syntax      => "",
+		parameters  => 0,
+		code        => qq(
+string lGetOut = "";
+string lGetErr = "";
+string lCommand = "cat /VERSION";
 integer lResult;
 lResult = system.Exec(lCommand,&lGetOut,&lGetErr);
 if(lResult == 0) {

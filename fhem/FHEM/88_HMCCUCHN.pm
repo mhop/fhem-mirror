@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 213551543';
+my $HMCCUCHN_VERSION = '5.0 220021858';
 
 ######################################################################
 # Initialize module
@@ -51,11 +51,11 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccucalculate '.
-		'ccuflags:multiple-strict,noBoundsChecking,ackState,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
+		'ccuflags:multiple-strict,hideStdReadings,replaceStdReadings,noBoundsChecking,ackState,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
 		'ccureadingfilter:textField-long statedatapoint controldatapoint '.
-		'ccureadingformat:name,namelc,address,addresslc '.
+		'ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc '.
 		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix '.
-		'ccuscaleval ccuverify:0,1,2 ccuget:State,Value '.
+		'ccuscaleval ccuverify:0,1,2 ccuget:State,Value devStateFlags '.
 		'disable:0,1 hmstatevals:textField-long statevals substitute:textField-long '.
 		'substexcl stripnumber peer:textField-long traceFilter '. $readingFnAttributes;
 }
@@ -274,6 +274,10 @@ sub HMCCUCHN_Attr ($@)
 			my $role = HMCCU_GetChannelRole ($clHash);
 			return "$clType [$name] Invalid value $attrval for attribute $attrname"
 				if (!HMCCU_SetSCDatapoints ($clHash, $attrname, $attrval, $role, 1));
+		}
+		elsif ($attrname eq 'devStateFlags') {
+			my @t = split(':', $attrval);
+			return "$clType [$name] Missing flag and or value expression in attribute $attrname" if (scalar(@t) != 3);
 		}
 	}
 	elsif ($cmd eq 'del') {
@@ -695,7 +699,8 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
 	  <li><b>get &lt;name&gt; extValues [&lt;filter-expr&gt;]</b><br/>
       	Update all readings for all parameters of parameter set VALUES (datapoints) and connected system
-		variables by using CCU Rega (Homematic script).
+		variables by using CCU Rega (Homematic script). This command will also update system variables bound
+		to the device.
 		If <i>filter-expr</i> is specified, only datapoints matching the expression are stored as readings.
 	  </li><br/>
       <li><b>get &lt;name&gt; paramsetDesc</b><br/>
@@ -709,7 +714,8 @@ sub HMCCUCHN_Get ($@)
 		If <i>filter-expr</i> is specified, only parameters matching the expression are stored as readings.
       </li><br/>
       <li><b>get &lt;name&gt; values [&lt;filter-expr&gt;]</b><br/>
-      	Update all readings for all parameters of parameter set VALUES (datapoints).
+      	Update all readings for all parameters of parameter set VALUES (datapoints). Hint: This command won't 
+		update system variables bound to the device. These variables can be read by using command 'get extValues'.
 		If <i>filter-expr</i> is specified, only parameters matching the expression are stored as readings.
       </li><br/>
       <li><b>get &lt;name&gt; weekProgram [&lt;program-number&gt;|<u>all</u>]</b><br/>
@@ -743,16 +749,18 @@ sub HMCCUCHN_Get ($@)
       	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>
       <a name="ccuflags"></a>
-      <li><b>ccuflags {ackState, logCommand, noBoundsChecking, noReadings, showDeviceReadings, showLinkReadings, showConfigReadings, trace}</b><br/>
+      <li><b>ccuflags {ackState, logCommand, noBoundsChecking, noReadings, hideStdReadings, replaceStdReadings, showDeviceReadings, showLinkReadings, showConfigReadings, trace}</b><br/>
       	Control behaviour of device:<br/>
       	ackState: Acknowledge command execution by setting STATE to error or success.<br/>
+		hideStdReadings: Do not show standard readings like 'measured-temp'<br/>
+		replaceStdReadings: Replace original readings like 'ACTUAL_TEMPERATURE' by standard readings like 'measured-temp' instead of adding standard readings<br/>
       	logCommand: Write get and set commands to FHEM log with verbose level 3.<br/>
 		noBoundsChecking: Datapoint values are not checked for min/max boundaries<br/>
       	noReadings: Do not update readings<br/>
       	showDeviceReadings: Show readings of device and channel 0.<br/>
       	showLinkReadings: Show link readings.<br/>
       	showMasterReadings: Show configuration readings.<br/>
-			showServiceReadings: Show service readings (HmIP only)<br/>
+		showServiceReadings: Show service readings (HmIP only)<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
       <a name="ccuget"></a>
@@ -767,15 +775,21 @@ sub HMCCUCHN_Get ($@)
          Syntax for <i>filter-rule</i> is either:<br/>
          [N:]{&lt;channel-name-expr&gt;}!RegExp&gt; or:<br/>
          [N:][&lt;channel-number&gt;[,&lt;channel-number&gt;].]&lt;RegExp&gt;<br/>
-         If <i>channel-name</i> or <i>channel-number</i> is specified the following rule 
-         applies only to this channel.<br/>
-         If a rule starts with 'N:' the filter is negated which means that a reading is 
-         stored if rule doesn't match.<br/><br/>
+         If <i>channel-name-expr</i> or <i>channel-number</i> is specified the following rule 
+         applies only to the specified or matching channel(s).<br/>
+         If a rule starts with 'N:' the filter is negated which means that a reading is stored if rule doesn't match.<br/>
+		 If you like to suppress the standard device readings like 'battery', a negated filter rule for the 
+		 corresponding datapoint must be specified (see example for LOW_BAT/battery below)<br/><br/>
          Examples:<br/>
          <code>
+		 # Show readings for all datapoints<br/>
          attr mydev ccureadingfilter .*<br/>
+		 # Show readings for matching datapoints of channel 1 and matching datapoints of all channels (2nd rule)<br/>
          attr mydev ccureadingfilter 1.(^ACTUAL|CONTROL|^SET_TEMP);(^WINDOW_OPEN|^VALVE)<br/>
+		 # Show reading datapoint LEVEL of channel MyBlindChannel<br/>
          attr mydev ccureadingfilter MyBlindChannel!^LEVEL$<br/>
+		 # Show every reading except LEVEL
+		 attr mydev ccureadingfilter N:LEVEL<br/>
          </code>
       </li><br/>
       <a name="ccureadingformat"></a>
@@ -795,9 +809,10 @@ sub HMCCUCHN_Get ($@)
          </code>
       </li><br/>
       <a name="ccureadingname"></a>
-      <li><b>ccureadingname &lt;old-readingname-expr&gt;:[+]&lt;new-readingname&gt[,...];[;...]</b><br/>
+      <li><b>ccureadingname &lt;old-readingname-expr&gt;:[[+]&lt;new-readingname&gt;[,...]][;...]</b><br/>
          Set alternative or additional reading names or group readings. Only part of old reading
-         name matching <i>old-readingname-exptr</i> is substituted by <i>new-readingname</i>.
+         name matching <i>old-readingname-expr</i> is substituted by <i>new-readingname</i>. If no 
+		 <i>new-readingname</i> is specified, default readings like battery can be suppressed.
          If <i>new-readingname</i> is preceded by '+' an additional reading is created. If 
          <i>old-readingname-expr</i> matches more than one reading the values of these readings
          are stored in one reading. This makes sense only in some cases, i.e. if a device has
@@ -807,22 +822,25 @@ sub HMCCUCHN_Get ($@)
          <code>
          # Rename readings 0.LOWBAT and 0.LOW_BAT as battery<br/>
          attr mydev ccureadingname 0.(LOWBAT|LOW_BAT):battery<br/>
-         # Add reading battery as a copy of readings LOWBAT and LOW_BAT.<br/>
+		 # Suppress battery reading (no new reading specified after ':')<br/>
+		 attr mydev ccureadingname battery:<br/>
+         # Add reading battery as a copy of readings LOWBAT and LOW_BAT (HMCCU does this by default).<br/>
          # Rename reading 4.SET_TEMPERATURE as desired-temp<br/>
-         attr mydev ccureadingname 0.(LOWBAT|LOW_BAT):+battery;1.SET_TEMPERATURE:desired-temp<br/>
+         attr mydev ccureadingname 1.SET_TEMPERATURE:desired-temp<br/>
          # Store values of readings n.PRESS_SHORT in new reading pressed.<br/>
          # Value of pressed is 1/true if any button is pressed<br/>
          attr mydev ccureadingname [1-4].PRESSED_SHORT:+pressed
          </code>
       </li><br/>
       <a name="ccuReadingPrefix"></a>
-      <li><b>ccuReadingPrefix &lt;paramset&gt;:&lt;prefix&gt;[,...]</b><br/>
+      <li><b>ccuReadingPrefix &lt;paramset&gt;[:&lt;prefix&gt;][,...]</b><br/>
       	Set reading name prefix for parameter sets. Default values for parameter sets are:<br/>
 			VALUES (state values): No prefix<br/>
 			MASTER (configuration parameters): 'R-'<br/>
 			LINK (links parameters): 'L-'<br/>
 			PEER (peering parameters): 'P-'<br/>
 			SERVICE (service parameters): S-<br/>
+		To hide prefix do not specify <i>prefix</i>.
       </li><br/>
       <a name="ccuscaleval"></a>
       <li><b>ccuscaleval &lt;[channelno.]datapoint&gt;:&lt;factor&gt;[,...]</b><br/>
@@ -857,6 +875,22 @@ sub HMCCUCHN_Get ($@)
          Set datapoint for device control by commands 'set control' and 'set toggle'.
          This attribute must be set if control datapoint cannot be detected automatically. 
       </li><br/>
+	  <a name="devStateFlags"></a>
+	  <li><b>devStateFlags &lt;datapoint&gt;:&lt;value-regexp&gt;:&lt;flag&gt; [...]</b><br/>
+	     Define flags depending on datapoint values which should appear in reading 'devstate'. All specified
+		 datapoints must be readable or updated by CCU events.<br/>
+		 Example: Add a flag 'unreachable' representing datapoint 0.UNREACH to reading 'devstate' (this will
+		 override the default setting for '0.UNREACH'):<br/>
+		 attr myDev devStateFlags 0.UNREACH:0|true:unreachable<br/>
+		 By default the following flags exists:<br/>
+		 0.CONFIG_PENDING:cfgPending<br/>
+		 0.DEVICE_IN_BOOTLOADER:boot<br/>
+		 0.UNREACH:unreach<br/>
+		 0.STICKY_UNREACH:stickyUnreach<br/>
+		 0.UPDATE_PENDING:updPending<br/>
+		 0.SABOTAGE:sabotage<br/>
+		 0.ERROR_SABOTAGE:sabotage<br/>
+	  </li><br/>
       <a name="disable"></a>
       <li><b>disable {<u>0</u> | 1}</b><br/>
       	Disable client device.

@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0 213551543';
+my $HMCCURPCPROC_VERSION = '5.0 220021858';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -3260,9 +3260,11 @@ sub HMCCURPCPROC_DecodeResponse ($)
 	   	are forwarded to FHEM. In this case increase this value or increase attribute
 	   	<b>rpcMaxEvents</b>. Default value is 500.
 	   </li><br/>
-		<li><b>rpcReadTimeout &lt;seconds&gt;</b><br/>
-			Wait the specified time for socket to become readable. Default value is 0.005 seconds.
-		</li>
+	   <li><b>rpcReadTimeout &lt;seconds&gt;</b><br/>
+		Wait the specified time for socket to become readable. Default value is 0.005 seconds.
+		When using a CCU2 and parameter set definitions cannot be read (timeout), increase this
+		value, i.e. to 0.01. Drawback: This could slow down the FHEM start time.
+	   </li><br/>
 	   <li><b>rpcServerAddr &lt;ip-address&gt;</b><br/>
 	   	Set local IP address of RPC servers on FHEM system. If attribute is missing the
 	   	corresponding attribute of I/O device (HMCCU device) is used or IP address is

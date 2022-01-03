@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 213551543';
+my $HMCCUDEV_VERSION = '5.0 220021858';
 
 ######################################################################
 # Initialize module
@@ -52,10 +52,10 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccuaggregate:textField-long ccucalculate:textField-long '. 
-		'ccuflags:multiple-strict,ackState,noBoundsChecking,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
+		'ccuflags:multiple-strict,ackState,hideStdReadings,replaceStdReadings,noBoundsChecking,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
 		'ccureadingfilter:textField-long '.
 		'ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc '.
-		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix '.
+		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix devStateFlags '.
 		'ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 '.
 		'hmstatevals:textField-long statevals substexcl substitute:textField-long statechannel statedatapoint '.
 		'controlchannel controldatapoint stripnumber peer:textField-long traceFilter '.
@@ -363,6 +363,10 @@ sub HMCCUDEV_Attr ($@)
 			my $role = HMCCU_GetChannelRole ($clHash, $chn);
 			return "$clType [$name] Invalid value $attrval for attribute $attrname"
 				if (!HMCCU_SetSCDatapoints ($clHash, $attrname, $attrval, $role, 1));
+		}
+		elsif ($attrname eq 'devStateFlags') {
+			my @t = split(':', $attrval);
+			return "$clType [$name] Missing flag and/or value expression in attribute $attrname" if (scalar(@t) != 3);
 		}
 	}
 	elsif ($cmd eq 'del') {
@@ -811,6 +815,10 @@ sub HMCCUDEV_Get ($@)
          Set channel number and datapoint for device control.
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>
+	  <li><b>devStateFlags &lt;datapoint&gt;:&lt;value-expr&gt;:&lt;flag&gt;</b><br/>
+	     Define flags for datapoint values which should appear in reading 'devstate'.
+         <a href="#HMCCUCHNattr">see HMCCUCHN</a>
+	  </li><br/>
       <li><b>disable {<u>0</u> | 1}</b><br/>
          <a href="#HMCCUCHNattr">see HMCCUCHN</a>
       </li><br/>

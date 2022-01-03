@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: Bugfixes and improvements
  - bugfix:  73_.*Calculator: bugfix - Correct unit for SymcCounter
  - bugfix:  82_LGTV_WebOS: fix net socket flapping
  - change:  93_DbLog: standard unit assignment for readings beginning with 
