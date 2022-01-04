@@ -33,6 +33,7 @@ MQTT2_SERVER_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     SSL:0,1
+    allowfrom
     autocreate:no,simple,complex
     clientId
     clientOrder
@@ -672,6 +673,22 @@ MQTT2_SERVER_ReadDebug($$)
   <b>Attributes</b>
   <ul>
 
+    <li><a href="#allowfrom">allowfrom</a>
+      </li><br>
+
+    <a id="MQTT2_SERVER-attr-autocreate"></a>
+    <li>autocreate [no|simple|complex]<br>
+      MQTT2_DEVICES will be automatically created upon receiving an
+      unknown message. Set this value to no to disable autocreating, the
+      default is simple.<br>
+      With simple the one-argument version of json2nameValue is added:
+      json2nameValue($EVENT), with complex the full version:
+      json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
+      on the attached devices and on the personal taste, and it is only
+      relevant for json payload. For non-json payload there is no difference
+      between simple and complex.
+      </li><br>
+
     <a id="MQTT2_SERVER-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>
       set the MQTT clientId for all connections, for setups with clients
@@ -740,19 +757,6 @@ MQTT2_SERVER_ReadDebug($$)
        Set the prefix for the SSL certificate, default is certs/server-, see
        also the SSL attribute.
        </li><br>
-
-    <a id="MQTT2_SERVER-attr-autocreate"></a>
-    <li>autocreate [no|simple|complex]<br>
-      MQTT2_DEVICES will be automatically created upon receiving an
-      unknown message. Set this value to no to disable autocreating, the
-      default is simple.<br>
-      With simple the one-argument version of json2nameValue is added:
-      json2nameValue($EVENT), with complex the full version:
-      json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
-      on the attached devices and on the personal taste, and it is only
-      relevant for json payload. For non-json payload there is no difference
-      between simple and complex.
-      </li><br>
 
   </ul>
 </ul>
