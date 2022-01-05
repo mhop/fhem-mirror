@@ -73,7 +73,7 @@ MQTT2_DEVICE_Define($$)
 
   return "wrong syntax for $name: define <name> MQTT2_DEVICE [clientid]"
         if(int(@a));
-  $hash->{DEVICETOPIC} = $name;
+  $hash->{DEVICETOPIC} = $name if(!AttrVal($name, "devicetopic", 0));
   if($hash->{CID}) {
     my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid};
     if(!$dpc->{$hash->{CID}}) {
