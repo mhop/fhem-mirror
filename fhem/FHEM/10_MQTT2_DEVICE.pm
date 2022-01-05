@@ -898,10 +898,12 @@ zigbee2mqtt_devStateIcon255($;$$)
   <a id="MQTT2_DEVICE-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; MQTT2_DEVICE</code>
+    <code>define &lt;name&gt; MQTT2_DEVICE [clientId]</code>
     <br><br>
     To enable a meaningful function you will need to set at least one of the
     readingList, setList or getList attributes below.<br>
+    Specifying the clientId (sometimes referred to as CID) is optional, and it
+    makes only sense, if the IO Device is an MQTT2_SERVER.
   </ul>
   <br>
 
