@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 220021858';
+my $HMCCUCHN_VERSION = '5.0 220061807';
 
 ######################################################################
 # Initialize module
@@ -532,7 +532,7 @@ sub HMCCUCHN_Get ($@)
          and all internally stored device parameter values are deleted.
       </li><br/>
 	  <li><b>set &lt;name&gt; close</b><br/>
-		[blind] Set level of a shutter or blind to 0%.
+		[blind,door] Set level of a shutter or blind to 0%.
 	  </li><br/>
 	  <li><b>set &lt;name&gt; color &lt;color-name&gt;</b><br/>
 	    [light] Set color of LED light.
@@ -609,7 +609,7 @@ sub HMCCUCHN_Get ($@)
          ON_TIME. 
       </li><br/>
 	  <li><b>set &lt;name&gt; open</b><br/>
-		[blind] Set level of a shutter or blind to 100%.
+		[blind,door] Set level of a shutter or blind to 100%.
 	  </li><br/>
       <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
          [dimmer,blind] Set datapoint LEVEL of a channel to the specified <i>value</i>. Optionally a <i>ontime</i>
@@ -624,12 +624,18 @@ sub HMCCUCHN_Get ($@)
 	  <li><b>set &lt;name&gt; pctSlats &lt;value&gt;</b><br/>
 	  	[blind] Like command 'set pct', but changes the level of slats (if available).
 	  </li><br/>
-		<li><b>set &lt;name&gt; readingFilter &lt;datapoint-list&gt;</b><br/>
-			Set attribute ccureadingfilter by selecting a list of datapoints. Parameter <i>datapoint-list</i>
-			is a comma seperated list of datapoints.
-		</li><br/>
+	  <li><b>set &lt;name&gt; press</b><br/>
+	    [key] Submit a short key press.
+	  </li><br/>
+	  <li><b>set &lt;name&gt; pressLong</b><br/>
+	    [key] Submit a long key press.
+	  </li><br/>
+	  <li><b>set &lt;name&gt; readingFilter &lt;datapoint-list&gt;</b><br/>
+		Set attribute ccureadingfilter by selecting a list of datapoints. Parameter <i>datapoint-list</i>
+		is a comma seperated list of datapoints.
+	  </li><br/>
       <li><b>set &lt;name&gt; stop</b><br/>
-      	[blind] Set datapoint STOP of a channel to true. This command is only available, if the
+      	[blind,door] Set datapoint STOP of a channel to true. This command is only available, if the
       	channel contains a datapoint STOP.
       </li><br/>
       <li><b>set &lt;name&gt; toggle</b><br/>
@@ -651,7 +657,10 @@ sub HMCCUCHN_Get ($@)
       	must be a valid datapoint name. If <i>type</i> is not specified, it's taken from
          parameter set definition. The default <i>type</i> is STRING.
          Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
-      </li>
+      </li><br/>
+	  <li><b>set &lt;name&gt; ventilate</b><br/>
+	    [garage door] Set door position to ventilation.
+	  </li>
    </ul>
    <br/>
    

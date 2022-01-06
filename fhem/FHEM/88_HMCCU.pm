@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 220021858';
+my $HMCCU_VERSION = '5.0 220061807';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -2413,7 +2413,7 @@ sub HMCCU_GetReadingName ($$$$$;$$$)
 		push @rnlist, $newReadings{$d};
 	}
 
-	# Build list of reading name rules
+	# Build list of reading name rul
 	my @srl = ();
 	my $crn = AttrVal ($name, 'ccureadingname', '');
 	push @srl, split(';', $crn) if ($crn ne '');
@@ -4476,7 +4476,7 @@ sub HMCCU_GetEnumValues ($$$;$)
 		$i--;
 		my $j = $i;
 		my @valList = split(',',$paramDef->{VALUE_LIST});
-		my %valIndex = map { $i++; $_ => $i if ($_ ne '') } @valList;	# Consider blanks in value list
+		my %valIndex = map { $i++; $_ ne '' ? ($_ => $i) : () } @valList;	# Consider blanks in value list
 		if (defined($value)) {
 			if ($value eq '#') {
 				# Return list of Constant:Value pairs
@@ -8970,6 +8970,7 @@ sub HMCCU_HMCommandNB ($$$)
 	my $ccureqtimeout = AttrVal ($ioHash->{NAME}, 'ccuReqTimeout', $HMCCU_TIMEOUT_REQUEST);
 	my $url = HMCCU_BuildURL ($ioHash, 'rega');
 
+	HMCCU_Trace ($ioHash, 2, "Executing command $cmd non blocking");
 	HMCCU_Trace ($clHash, 2, "URL=$url");
 
 	my $param = { url => $url, timeout => $ccureqtimeout, data => $cmd, method => "POST",
@@ -9062,6 +9063,7 @@ sub HMCCU_HMScriptExt ($$;$$$)
 	my $url = HMCCU_BuildURL ($hash, 'rega');
 	if (defined($cbFunc)) {
 		# Non blocking
+		HMCCU_Trace ($hash, 2, "Executing $hmscript non blocking");
 		my $param = { url => $url, timeout => $ccureqtimeout, data => $code, method => "POST",
 			callback => \&HMCCU_HMScriptCB, cbFunc => $cbFunc, devhash => $hash, ioHash => $ioHash };
 		if (defined($cbParam)) {

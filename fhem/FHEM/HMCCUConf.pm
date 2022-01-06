@@ -112,8 +112,14 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'DOOR_LOCK_STATE_TRANSMITTER' => {
 		F => 3, S => 'LOCK_STATE', C => 'LOCK_TARGET_LEVEL', V => 'open:2,unlocked:1,locked:0'
 	},
+	'DOOR_RECEIVER' => {
+		F => 3, S => 'DOOR_STATE', C => 'DOOR_COMMAND', V => 'open:1,stop:2,close:3,ventilate:4'
+	},
 	'ENERGIE_METER_TRANSMITTER' => {
 		F => 3, S => 'CURRENT', C => '', V => '', P => 1
+	},
+	'HB_GENERIC_DIST' => {
+		F => 3, S => 'DISTANCE', C => '', V => '', P => 1
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_POINT_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
@@ -258,6 +264,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'^(C#\.)?LEVEL$:+pct,+level;(C#\.)?COLOR$:+color',
 	'DIMMER_WEEK_PROFILE' =>
 		'^(C#\.)?WEEK_PROGRAM_CHANNEL_LOCKS$:+progMode',
+	'HB_GENERIC_DIST' =>
+		'^(C#\.)?BATTERY_VOLTAGE$:voltage',
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' =>
 		'^(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
 		'^(C#\.)?HUMIDITY$:+humidity;'.
@@ -417,6 +425,12 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'unlock' => 'V:LOCK_TARGET_LEVEL:1',
 		'lock' => 'V:LOCK_TARGET_LEVEL:0'
 	},
+	'DOOR_RECEIVER' => {
+		'open' => 'V:DOOR_COMMAND:1',
+		'stop' => 'V:DOOR_COMMAND:2',
+		'close' => 'V:DOOR_COMMAND:3',
+		'ventilate' => 'V:DOOR_COMMAND:4'
+	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'desired-temp' => 'V:SET_POINT_TEMPERATURE:?temperature',
 		'auto' => 'V:CONTROL_MODE:0',
@@ -440,7 +454,8 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'KEY' => {
 		'on' => 'V:PRESS_SHORT:1',
 		'off' => 'V:PRESS_SHORT:1',
-		'press' => 'V:PRESS_SHORT:1'
+		'press' => 'V:PRESS_SHORT:1',
+		'pressLong' => 'V:PRESS_LONG:1'
 	},
 	'KEYMATIC' => {
 		'open' => 'V:OPEN:true',
@@ -561,6 +576,10 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'DOOR_LOCK_STATE_TRANSMITTER' => {
 		'cmdIcon' => 'open:fts_door_open unlock:secur_open lock:secur_locked',
 		'webCmd' => 'lock:unlock:open'
+	},
+	'DOOR_RECEIVER' => {
+		'cmdIcon' => 'open:fts_garage_door_up stop:fts_garage_door_manual close:fts_garage_door_down ventilate:fts_garage_door_80',
+		'webCmd' => 'open:close:stop:ventilate'
 	},
 	'JALOUSIE' => {
 		'substexcl' => 'pct',
