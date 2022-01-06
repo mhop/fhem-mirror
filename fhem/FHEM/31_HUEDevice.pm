@@ -81,6 +81,8 @@ my %hueModels = (
                                                                                     icon => 'hue_filled_white_and_color_e27_b22', },
   LWB014 => {name => 'Hue Lux'                  ,type => 'Dimmable light'          ,subType => 'dimmer',
                                                                                     icon => 'hue_filled_white_and_color_e27_b22', },
+  LWV001 => {name => 'Hue White Filament Bulb'  ,type => 'Dimmable light'          ,subType => 'dimmer',
+                                                                                    icon => 'hue_filled_filament', },
   LTW001 => {name => 'Hue A19 White Ambience'   ,type => 'Color temperature light' ,subType => 'ctdimmer',
                                                                                     icon => 'hue_filled_white_and_color_e27_b22', },
   LTW004 => {name => 'Hue A19 White Ambience'   ,type => 'Color temperature light' ,subType => 'ctdimmer', },
