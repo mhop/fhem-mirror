@@ -150,7 +150,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/networkmap/graphviz:.* graphviz\
   $\DEVICETOPIC/bridge/networkmap/raw:.* raw\
   $\DEVICETOPIC/bridge/devices:.* devices\
-  $\DEVICETOPIC/bridge/info:.* info
+  $\DEVICETOPIC/bridge/info:.* info\
   $\DEVICETOPIC/bridge/groups:.* groups\
   $\DEVICETOPIC/bridge/extensions:.* extensions
 attr DEVICE setList\
