@@ -4511,7 +4511,7 @@ get_dest:noArg { $\DEVICETOPIC.valetudoRE($EVENT) }\
 goto:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
 map:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
 reset_consumable:main,side,filter,sensor { $\DEVICETOPIC.valetudoRE($EVENT) }\
-zone:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
+zone:{'multiple-strict,'.ReadingsVal($name,'zones','none')} { $\DEVICETOPIC.valetudoRE($EVENT) }\
 x_raw_payload:textField { $\DEVICETOPIC.valetudoRE($EVENT) }
 attr DEVICE userReadings autoReturn:valetudo_state_name:.Idle {fhem("sleep $name:bin_in_time:.0 waitbin;set $name charge");return 'return'}
 attr DEVICE setStateList charge fan_power get_dest goto locate map pause reset_consumable spot start stop zone x_raw_payload
