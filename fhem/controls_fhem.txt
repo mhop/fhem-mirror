@@ -1,6 +1,6 @@
-REV 25424
+REV 25432
 DIR unused
-UPD 2022-01-04_07:45:03 371427 ./CHANGED
+UPD 2022-01-07_07:45:02 371505 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-01-03_07:45:03 44989 ./MAINTAINER.txt
 UPD 2021-10-25_07:45:03 42987 ./configDB.pm
@@ -163,7 +163,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2020-11-26_07:45:03 17982 FHEM/30_tradfri.pm
 UPD 2020-02-06_07:45:08 29570 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2021-12-18_07:45:03 85261 FHEM/31_HUEDevice.pm
+UPD 2022-01-07_07:45:02 85484 FHEM/31_HUEDevice.pm
 UPD 2021-12-16_07:45:03 36760 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -416,16 +416,16 @@ UPD 2016-12-14_11:01:16 51480 FHEM/79_BDKM.pm
 UPD 2018-03-11_07:45:03 9772 FHEM/80_M232.pm
 UPD 2018-03-11_07:45:03 8527 FHEM/81_M232Counter.pm
 UPD 2017-09-27_07:45:02 34699 FHEM/82_LGTV_IP12.pm
-UPD 2022-01-02_07:45:03 68110 FHEM/82_LGTV_WebOS.pm
+UPD 2022-01-07_07:45:02 71362 FHEM/82_LGTV_WebOS.pm
 UPD 2018-03-11_07:45:03 3753 FHEM/82_M232Voltage.pm
 UPD 2018-07-17_07:45:04 37500 FHEM/83_IOhomecontrol.pm
 UPD 2018-07-17_07:45:04 6465 FHEM/84_IOhomecontrolDevice.pm
 UPD 2018-08-20_07:45:03 42219 FHEM/86_Robonect.pm
 UPD 2015-07-28_14:05:31 17571 FHEM/87_WS2000.pm
-UPD 2022-01-04_07:45:03 377372 FHEM/88_HMCCU.pm
-UPD 2022-01-04_07:45:03 49879 FHEM/88_HMCCUCHN.pm
-UPD 2022-01-04_07:45:03 34064 FHEM/88_HMCCUDEV.pm
-UPD 2022-01-04_07:45:03 104129 FHEM/88_HMCCURPCPROC.pm
+UPD 2022-01-07_07:45:02 377502 FHEM/88_HMCCU.pm
+UPD 2022-01-07_07:45:02 50196 FHEM/88_HMCCUCHN.pm
+UPD 2022-01-07_07:45:02 34064 FHEM/88_HMCCUDEV.pm
+UPD 2022-01-07_07:45:02 104129 FHEM/88_HMCCURPCPROC.pm
 UPD 2015-07-28_14:05:31 5836 FHEM/88_IPWE.pm
 UPD 2016-02-05_07:45:11 8459 FHEM/88_Itach_IRDevice.pm
 UPD 2021-08-10_07:45:02 62031 FHEM/88_Timer.pm
@@ -571,7 +571,7 @@ UPD 2015-07-28_14:05:29 562 FHEM/FhemUtils/release.pm
 UPD 2015-07-28_14:05:29 5739 FHEM/FhemUtils/update-20130127-001
 UPD 2021-02-13_09:02:50 3613 FHEM/FritzBoxUtils.pm
 UPD 2019-06-21_07:45:02 2767 FHEM/GPUtils.pm
-UPD 2022-01-04_07:45:03 90563 FHEM/HMCCUConf.pm
+UPD 2022-01-07_07:45:02 91208 FHEM/HMCCUConf.pm
 UPD 2021-10-31_07:45:02 203693 FHEM/HMConfig.pm
 UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
 UPD 2021-12-09_07:45:03 31793 FHEM/HttpUtils.pm
@@ -643,7 +643,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2021-12-26_07:45:02 8458 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-01-05_07:45:05 353155 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-01-07_07:45:02 353199 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -735,12 +735,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-01-06_07:45:09 4604963 docs/commandref.html
-UPD 2022-01-04_07:45:09 2812754 docs/commandref_DE.html
+UPD 2022-01-07_07:45:06 4605483 docs/commandref.html
+UPD 2022-01-07_07:45:09 2813265 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2022-01-06_07:45:13 264767 docs/commandref_modular.html
-UPD 2022-01-06_07:45:14 275826 docs/commandref_modular_DE.html
+UPD 2022-01-07_07:45:10 264767 docs/commandref_modular.html
+UPD 2022-01-07_07:45:12 275826 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1464,6 +1464,8 @@ UPD 2017-11-14_07:45:02 2937 www/images/fhemSVG/hm_keymatic.svg
 UPD 2015-07-28_14:05:32 9868 www/images/fhemSVG/hm_lan.svg
 UPD 2020-07-26_07:45:03 1110 www/images/fhemSVG/homeConnect.svg
 UPD 2015-07-28_14:05:32 5946 www/images/fhemSVG/hourglass.svg
+UPD 2022-01-07_07:45:02 2266 www/images/fhemSVG/hue2019_archetypesDoubleSpot.svg
+UPD 2022-01-07_07:45:02 1480 www/images/fhemSVG/hue2019_archetypesSingleSpot.svg
 UPD 2019-11-26_07:45:03 849 www/images/fhemSVG/hue2019_devicesMotionSensor.svg
 UPD 2017-11-14_07:45:02 10070 www/images/fhemSVG/hue_bridge.svg
 UPD 2016-04-27_07:45:12 1413 www/images/fhemSVG/hue_filled_aura.svg
@@ -1473,6 +1475,8 @@ UPD 2017-11-14_07:45:02 1499 www/images/fhemSVG/hue_filled_br30.svg
 UPD 2016-06-09_07:45:11 1227 www/images/fhemSVG/hue_filled_bridge_v1.svg
 UPD 2016-06-09_07:45:11 1408 www/images/fhemSVG/hue_filled_bridge_v2.svg
 UPD 2016-04-27_07:45:12 551 www/images/fhemSVG/hue_filled_entity.svg
+UPD 2022-01-07_07:45:02 2659 www/images/fhemSVG/hue_filled_filament.svg
+UPD 2022-01-07_07:45:02 942 www/images/fhemSVG/hue_filled_foh.svg
 UPD 2017-11-14_07:45:02 1816 www/images/fhemSVG/hue_filled_go.svg
 UPD 2017-11-14_07:45:02 1605 www/images/fhemSVG/hue_filled_gu10_par16.svg
 UPD 2017-11-14_07:45:02 686 www/images/fhemSVG/hue_filled_hds.svg
