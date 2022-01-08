@@ -1097,12 +1097,10 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE stateFormat {\
-  ReadingsVal($name, "state", "off") . " "\
-  ReadingsVal($name, "POWER2", "off") . " "\
-  . sprintf("%.1f°C ",ReadingsVal($name,"SI7021_Temperature",0))\
-  . sprintf("%.0f%%",ReadingsVal($name,"SI7021_Humidity",0))\
-  }
+attr DEVICE stateFormat { ReadingsVal($name, 'state', 'off') . ' ' .\
+  ReadingsVal($name, 'motion', 'off') . ' '\
+  . sprintf("%.1f°C ",ReadingsNum($name,'temperature',0))\
+  . sprintf("%.0f%%",ReadingsNum($name,'humidity',0)) }
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1110,23 +1108,24 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state\
-  STATTOPIC/POWER2:.* POWER2\
+  STATTOPIC/POWER2:.* motion\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE devStateIcon {\
-  my $state = lc ReadingsVal($name, "POWER2", "off");\
+  my $state = lc ReadingsVal($name, 'motion', 'off');\
   my $devStateIcon = 'building_security@green';\
   if ($state eq "on") {\
     $devStateIcon = 'building_security@red';\
   }\
-  "<div>" . FW_makeImage(lc ReadingsVal($name, "state", "off"))\
+  "<div>" . FW_makeImage(lc ReadingsVal($name, 'state', 'off'))\
     . FW_makeImage($devStateIcon) . sprintf(\
     "&nbsp;&nbsp;[Temp: %.1f°C / Feucht: %.0f%%]",\
-    ReadingsVal($name,"SI7021_Temperature",0),\
-    ReadingsVal($name,"SI7021_Humidity",0)\
+    ReadingsVal($name,"temperature",0),\
+    ReadingsVal($name,"humidity",0)\
     ) . "</div>"\
   }
+attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:0 Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 HSBColor:0 Color:0 SI7021_Temperature:temperature SI7021_Humidity:humidity SI7021_DewPoint:DewPoint
 attr DEVICE model tasmota_1ch+motion+SI7021
-setreading DEVICE attrTemplateVersion 20210515
+setreading DEVICE attrTemplateVersion 20220108
 
 name:tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
