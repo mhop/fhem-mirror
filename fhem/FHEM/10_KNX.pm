@@ -70,6 +70,7 @@
 #              E05.01 feature: utitity KNX_scan
 #              corrections cmd-ref
 #              optimize replaceByRegex
+# MH 20220108  fix KNX_scan sub (export-problem)
 
 
 package FHEM::KNX; ## no critic 'package'
@@ -113,11 +114,11 @@ BEGIN {
           AnalyzePerlCommand AnalyzeCommandChain EvalSpecials
           fhemTimeLocal)
     );
+}
     # export to main context (with different name)
     GP_Export(
-        qw(Initialize KNX_scan)
+        qw(Initialize)
     );
-}
 
 #string constants
 my $MODELERR    = "MODEL_NOT_DEFINED"; # for autocreate
@@ -1838,10 +1839,10 @@ sub dec_dpt232 { #RGB-Code
 
 ### get state of devices from KNX_Hardware
 ### called with devspec as argument
-### e.g : scanKNX() / scanKNX('device1') / scanKNX('device1, dev2,dev3,...' / scanKNX('room=Kueche'), ...
+### e.g : KNX_scan() / KNX_scan('device1') / KNX_scan('device1, dev2,dev3,...' / KNX_scan('room=Kueche'), ...
 ### returns number of "gets" executed
 #E05.01
-sub KNX_scan {
+sub main::KNX_scan {
 	my $devs = shift;
 	my @devlist = ();
 
@@ -1865,11 +1866,11 @@ sub KNX_scan {
 		foreach my $gads (@getnames) {
 			my $gad = (split(/[:]/ix,$gads))[0];
 			$k++;
-			Log3 $knxdef, 4, "scanKNXexec: [$k] get $knxdef $gad";
+			Log3 $knxdef, 4, "KNX_scan-exec: [$k] get $knxdef $gad";
 			$getsarr .= "$knxdef $gad,";
 		}
 	}
-	Log3 undef, 3, "scanKNX: $i devices selected / $j devices with get / $k gets executing...";
+	Log3 undef, 3, "KNX_scan: $i devices selected / $j devices with get / $k gets executing...";
 	doKNX_scan($getsarr) if ($k > 0);
 	return $k;
 }
