@@ -120,6 +120,9 @@ my %hueModels = (
   440400982841 => {name => 'Hue Play'           ,type => 'Extended color light'    ,subType => 'extcolordimmer',
                                                                                     icon => 'hue_filled_play', },
 
+  FOHSWITCH => {name => 'Friends of Hue Switch'     ,type => 'ZGPSwitch'           ,subType => 'sensor',
+                                                                                    icon => 'hue_filled_foh', },
+
  'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color temperature light' ,subType => 'ctdimmer',},
  'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
 
@@ -1724,6 +1727,7 @@ HUEDevice_Parse($$)
     $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', '' ) if( !$hash->{lastupdated} );
     $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', '' ) if( !$hash->{lastupdated_local} );
     return undef if( $hash->{lastupdated}
+                     && !defined($result->{v2_service})
                      && $hash->{lastupdated} eq $lastupdated
                      && (!$readings{state} || $readings{state} eq ReadingsVal( $name, 'state', '' ))  );
 
