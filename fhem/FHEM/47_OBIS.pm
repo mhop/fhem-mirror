@@ -410,6 +410,7 @@ sub OBIS_Parse_List
 			$str=$SML_specialities{"HEX2"}[1]->($str)
 		  } else {
 			$str=~s/([A-F0-9]{2})/chr(hex($1))/eg;
+			$str=~s/[[:cntrl:]]//g;
 			$str=~s/[^!-~\s\r\n\t]//g;
           }
         }

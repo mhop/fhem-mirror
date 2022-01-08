@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  47_OBIS: remove control characters in strings
  - feature: 10_KNX: KNX_scan Utility function
  - bugfix:  82_LGTV_WebOS: rewrite and change code, fix bugs of older version
  - bugfix:  88_HMCCU: Bugfixes and improvements
