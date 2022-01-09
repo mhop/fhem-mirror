@@ -4518,6 +4518,53 @@ attr DEVICE event-on-change-reading .*
 attr DEVICE model roborockRE
 setreading DEVICE attrTemplateVersion 20210510
 
+# new valtudo Template contributed by Otto123, should replace the old valetudo/rockrobo Template
+name:valetudo
+filter:TYPE=MQTT2_DEVICE
+desc:use this to control a rooted vacuum with valetudo. For further details visit https://github.com/Hypfer/Valetudo<br><br>NOTE: Initial version
+order:X_03b
+par:BASE_TOPIC;BASE_TOPIC typically is valetudo;{ AttrVal("DEVICE","readingList","") =~ m,(valetudo)[/].*:, ? $1 : undef }
+par:DEV_ID;DEV_ID is random by Firmware;{ AttrVal("DEVICE","readingList","") =~ m,valetudo[/]([^/]+)[/].*:, ? $1 : undef }
+{ Svn_GetFile("contrib/AttrTemplate/99_valetudoUtils.pm", "FHEM/99_valetudoUtils.pm", sub(){CommandReload(undef, "99_valetudoUtils")}) }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE alias DEV_ID
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE icon vacuum_top
+attr DEVICE readingList \
+  $\DEVICETOPIC/\x24state:.* _state\
+  $\DEVICETOPIC/AttachmentStateAttribute/dustbin:.* dustbin\
+  $\DEVICETOPIC/AttachmentStateAttribute/.* { $TOPIC =~ m,.*\/(.*),; {"$1"=>$EVENT} }\
+  $\DEVICETOPIC/BatteryStateAttribute/level:.* batteryPercent\
+  $\DEVICETOPIC/BatteryStateAttribute/status:.* batteryState\
+  $\DEVICETOPIC/BasicControlCapability/operation:.* operation\
+  $\DEVICETOPIC/CurrentStatisticsCapability/area:.* area\
+  $\DEVICETOPIC/CurrentStatisticsCapability/time:.* time\
+  $\DEVICETOPIC/ConsumableMonitoringCapability/.* { $TOPIC =~ m,.*\/(.*),; {"$1"=>$EVENT} }\
+  $\DEVICETOPIC/FanSpeedControlCapability/preset:.* fanSpeed\
+  $\DEVICETOPIC/LocateCapability/locate:.* locate\
+  $\DEVICETOPIC/MapData/map-data:.* {}\
+  $\DEVICETOPIC/MapData/segments:.* segments\
+  $\DEVICETOPIC/StatusStateAttribute/status:.* state\
+  $\DEVICETOPIC/StatusStateAttribute/detail:.* stateDetail\
+  $\DEVICETOPIC/StatusStateAttribute/error:.* stateError\
+  $\DEVICETOPIC/WaterUsageControlCapability/preset:.* waterUsage\
+  $\DEVICETOPIC/WifiConfigurationCapability/.* { $TOPIC =~ m,.*\/(.*),; {"$1"=>$EVENT} }\
+  $\DEVICETOPIC/ZoneCleaningCapability/presets:.* presets\
+  $\DEVICETOPIC/ZoneCleaningCapability/start:.* start
+attr DEVICE setList \
+  operation:PAUSE,START,STOP,HOME   $\DEVICETOPIC/BasicControlCapability/operation/set $EVTPART1\
+  clean_segment:{"multiple-strict,".valetudo_w($name,"segments")} { valetudo_c($NAME,$EVENT) }\
+  clean_zone:{valetudo_w($name,"presets")} { valetudo_c($NAME,$EVENT) }\
+  fanSpeed:off,min,low,medium,high,turbo,max   $\DEVICETOPIC/FanSpeedControlCapability/preset/set $EVTPART1\
+  waterUsage:off,min,low,medium,high,turbo,max   $\DEVICETOPIC/WaterUsageControlCapability/preset/set $EVTPART1\
+  locate:PERFORM   $\DEVICETOPIC/LocateCapability/locate/set $EVTPART1\
+  x_raw_payload:textField { valetudo_c($NAME,$EVENT) }
+attr DEVICE userReadings ip4:ips:.* {(split ',',ReadingsVal($name,'ips','error'))[0]}
+attr DEVICE event-on-change-reading .*
+attr DEVICE setStateList operation clean_segment clean_zone fanSpeed waterUsage x_raw_payload
+attr DEVICE model valetudo
+setreading DEVICE attrTemplateVersion 20220109 or prior
+
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
 desc:Template for a Worx Landroid mower.<br>The complete Setup is described in this <a href="https://forum.fhem.de/index.php/topic,111959.0.html">Forum Thread</a><br>Some Features requires support by model and firmware!
