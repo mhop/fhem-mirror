@@ -6721,15 +6721,15 @@ return;
 # set logdbrep sqlCmd select count(*) from history
 # set logdbrep sqlCmd select DEVICE,count(*) from history group by DEVICE HAVING count(*) > 10000
 sub DbRep_sqlCmd {
-  my $paref                = shift;
-  my $hash                 = $paref->{hash};
-  my $name                 = $paref->{name};
-  my $opt                  = $paref->{opt};
-  my $device               = $paref->{device};
-  my $reading              = $paref->{reading};
-  my $runtime_string_first = $paref->{rsf};
-  my $runtime_string_next  = $paref->{rsn};
-  my $cmd                  = $paref->{prop};
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+  my $device  = $paref->{device};
+  my $reading = $paref->{reading};
+  my $rsf     = $paref->{rsf};
+  my $rsn     = $paref->{rsn};
+  my $cmd     = $paref->{prop};
   
   my $srs = AttrVal($name, "sqlResultFieldSep", "|");
 
@@ -6828,49 +6828,18 @@ sub DbRep_sqlCmd {
       }
   }
   
-  # Allow inplace replacement of keywords for timings, device, reading (using attribute syntax)
-  my $sfx = AttrVal("global", "language", "EN");
-  $sfx    = $sfx eq "EN" ? "" : "_$sfx";
-  
-  $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
-  $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
-  
-  my $rdspec;
-  
-  if ($sql =~ /§device§/xs) {
-      if ($device eq "%") {
-          $err = qq{You must specify device(s) in attribute "device" if you use the placeholder "§device§" in your statement};
-          
-          Log3 ($name, 2, "DbRep $name - ERROR - $err"); 
-          
-          $err = qq{<html> $err </html>};
-          $err =~ s/"device"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#device' target='_blank'>device<\/a>/xs;
-          $err = encode_base64($err,"");
-          return "$name|$err";
-      }
-      
-      $rdspec = DbRep_createCommonSql( {hash => $hash, device => $device, dbmodel => $dbmodel} );
-      $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];       
-      $sql    =~ s/§device§/$rdspec/xg;
-  }
-  
-  if ($sql =~ /§reading§/xs) {
-      if ($reading eq "%") {
-          $err = qq{You must specify reading(s) in attribute "reading" if you use the placeholder "§reading§" in your statement};
-          
-          Log3 ($name, 2, "DbRep $name - ERROR - $err"); 
-          
-          $err = qq{<html> $err </html>};
-          $err =~ s/"reading"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#reading' target='_blank'>reading<\/a>/xs;
-          $err = encode_base64($err,"");
-          return "$name|$err";
-      }
-      
-      $rdspec = DbRep_createCommonSql( {hash => $hash, reading => $reading, dbmodel => $dbmodel} );
-      $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];  
-      $sql    =~ s/§reading§/$rdspec/xg;
-  }
-  
+  # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
+  ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
+                                               sql     => $sql,
+                                               device  => $device,
+                                               reading => $reading,
+                                               dbmodel => $dbmodel,
+                                               rsf     => $rsf,
+                                               rsn     => $rsn
+                                             }
+                                           );
+  return $err if ($err);
+   
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
   my $st = [gettimeofday];                                                         # SQL-Startzeit
@@ -6928,6 +6897,69 @@ sub DbRep_sqlCmd {
   $err    = q{};
  
 return "$name|$err|$rowstring|$opt|$cmd|$nrows|$rt";
+}
+
+####################################################################################################
+#        Ersetzung von Schlüsselwörtern für Time*, Devices und Readings 
+#        in SQL-Statements (unter Verwendung der Attributsyntax)
+####################################################################################################
+sub _DbRep_sqlReplaceKeywords {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $sql     = $paref->{sql};
+  my $device  = $paref->{device};
+  my $reading = $paref->{reading};
+  my $dbmodel = $paref->{dbmodel};
+  my $rsf     = $paref->{rsf};
+  my $rsn     = $paref->{rsn};
+
+  my $ret  = q{};
+  my $name = $hash->{NAME};
+  my $sfx  = AttrVal("global", "language", "EN");
+  $sfx     = $sfx eq 'EN' ? '' : "_$sfx";
+  
+  $sql =~ s/§timestamp_begin§/'$rsf'/g;
+  $sql =~ s/§timestamp_end§/'$rsn'/g;
+  
+  my ($rdspec,$err);
+  
+  if ($sql =~ /§device§/xs) {
+      if ($device eq "%") {
+          $err = qq{You must specify device(s) in attribute "device" if you use the placeholder "§device§" in your statement};
+          
+          Log3 ($name, 2, "DbRep $name - ERROR - $err"); 
+          
+          $err = qq{<html> $err </html>};
+          $err =~ s/"device"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#device' target='_blank'>device<\/a>/xs;
+          $err = encode_base64($err,"");
+          $ret = "$name|$err";
+          return $ret;
+      }
+      
+      $rdspec = DbRep_createCommonSql( {hash => $hash, device => $device, dbmodel => $dbmodel} );
+      $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];       
+      $sql    =~ s/§device§/$rdspec/xg;
+  }
+  
+  if ($sql =~ /§reading§/xs) {
+      if ($reading eq "%") {
+          $err = qq{You must specify reading(s) in attribute "reading" if you use the placeholder "§reading§" in your statement};
+          
+          Log3 ($name, 2, "DbRep $name - ERROR - $err"); 
+          
+          $err = qq{<html> $err </html>};
+          $err =~ s/"reading"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#reading' target='_blank'>reading<\/a>/xs;
+          $err = encode_base64($err,"");
+          $ret = "$name|$err";
+          return $ret;
+      }
+      
+      $rdspec = DbRep_createCommonSql( {hash => $hash, reading => $reading, dbmodel => $dbmodel} );
+      $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];  
+      $sql    =~ s/§reading§/$rdspec/xg;
+  }
+
+return ($ret, $sql);
 }
 
 ####################################################################################################
@@ -9261,7 +9293,6 @@ sub DbRep_reduceLog {
     my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
     
-    my $specs;
     my $valfilter = AttrVal($name, "valueFilter", undef);                               # Wertefilter
     
     my $specs = {
