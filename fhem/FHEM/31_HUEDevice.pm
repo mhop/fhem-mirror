@@ -504,7 +504,7 @@ sub HUEDevice_Undefine($$)
   RemoveInternalTimer($hash);
 
   my $code = $hash->{ID};
-  $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
+     $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
 
   delete($modules{HUEDevice}{defptr}{$code});
 
@@ -1491,10 +1491,25 @@ HUEDevice_Parse($$)
 
     if( $result->{lights} ) {
       $hash->{helper}{lights} = {map {$_=>1} @{$result->{lights}}};
-      $hash->{lights} = join( ",", sort { $a <=> $b } @{$result->{lights}} );
+      my $lights = join( ",", sort { $a <=> $b } @{$result->{lights}} );
+      if( $lights ne $hash->{lights} ) {
+        $hash->{lights} = $lights;
+
+        my $lights = join (' ', map( { my $code = $_;
+                                          $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
+                                       $modules{HUEDevice}{defptr}{$code}{NAME} } @{$result->{lights}}) );
+        #readingsSingleUpdate($hash,"rgb", $rgb,1);
+        setReadingsVal( $hash, ".associatedWith", $lights, TimeNow() );
+      }
+
+    } elsif( defined($result->{lights}) ) {
+      $hash->{lights} = '';
+      $hash->{helper}{lights} = {};
+      CommandDeleteReading( undef, "$name .associatedWith" );
+
     } else {
-      #$hash->{helper}{lights} = {};
       #$hash->{lights} = '';
+      #$hash->{helper}{lights} = {};
     }
 
     if( ref($result->{state}) eq 'HASH' ) {
