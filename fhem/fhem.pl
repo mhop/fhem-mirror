@@ -5360,6 +5360,7 @@ json2nameValue($;$$$$)
       foreach my $k (keys %r2) {
         setVal($ret, $prefix, $firstLevel ? $k : "${name}_$k", $r2{$k});
       }
+      return ("error parsing '$in2'", undef) if($in2 !~ m/^\s*$/);
 
     } elsif($val =~ m/^\[/) {
       ($err, $val, $in) = lObj($val, '[', ']');
@@ -5388,21 +5389,15 @@ json2nameValue($;$$$$)
       $in = $2;
 
     } else {
-      Log 1, "json2namevalue: Error parsing >$val< for prefix/name:$prefix$name";
-      $in = "";
+      return ("error parsing '$val'", undef);
+
     }
     return (undef, $in);
   }
 
   $in =~ s/^\s+//;
-  $in =~ s/\s+$//;
-  my $err;
-  ($err,$in) = eObj(\%ret, "", $in, "", $prefix, 1);
-  if($err) {
-    Log 4, $err;
-    %ret = ();
-    return \%ret;
-  }
+  my ($err, undef) = eObj(\%ret, "", $in, "", $prefix, 1);
+  return { json2nameValueErrorText=>$err, json2nameValueInput=>$in } if($err);
 
   return \%ret if(!defined($map) && !defined($filter));
   $map = eval $map if($map && !ref($map)); # passing hash through AnalyzeCommand
