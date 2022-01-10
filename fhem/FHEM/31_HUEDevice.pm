@@ -1492,7 +1492,8 @@ HUEDevice_Parse($$)
     if( $result->{lights} ) {
       $hash->{helper}{lights} = {map {$_=>1} @{$result->{lights}}};
       my $lights = join( ",", sort { $a <=> $b } @{$result->{lights}} );
-      if( $lights ne $hash->{lights} ) {
+      if( !defined($hash->{lights})
+          || $lights ne $hash->{lights} ) {
         $hash->{lights} = $lights;
 
         my $lights = join (' ', map( { my $code = $_;
