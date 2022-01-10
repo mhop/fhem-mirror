@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: usage of placeholder §device§, §reading§ in sqlCmd
+                      changed (refer to commandRef)
  - bugfix:  71_COE_Node: fix for negative temparatures by thor3
  - bugfix:  47_OBIS: remove control characters in strings
  - feature: 10_KNX: KNX_scan Utility function

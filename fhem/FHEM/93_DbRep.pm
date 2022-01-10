@@ -57,12 +57,13 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
   "8.46.11" => "03.01.2022  more code refacturing, minor fixes ",
   "8.46.10" => "02.01.2022  more code refacturing, minor fixes ",
   "8.46.9"  => "01.01.2022  some more code refacturing, minor fixes ",
   "8.46.8"  => "30.12.2021  some code refacturing and minor bug fixing ",
   "8.46.7"  => "27.12.2021  some code improvements, insert accept a multiline string ",
-  "8.46.6"  => "26.12.2021  sub sqlCmd_DoParse uses credentials dependend of attr useAdminCredentials ".
+  "8.46.6"  => "26.12.2021  sub DbRep_sqlCmd uses credentials dependend of attr useAdminCredentials ".
                             "fix warnings in sub export/import file, fix error of expfile_DoParse filedefinition ".
                             "change retrieve minTimestamp forum:#124987",
   "8.46.5"  => "19.12.2021  some code improvements ",
@@ -2029,7 +2030,8 @@ sub DbRep_dbConnect {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = $hash->{UTF8} // 0;
   
-  my ($dbh,$err);
+  my $dbh;
+  my $err = q{};
   
   if($uac) {
       my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash, "adminCredentials");
@@ -2272,7 +2274,7 @@ sub DbRep_Main {
          ts      => $ts,
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval_DoParse", $params, "DbRep_sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval", $params, "DbRep_sumvalDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "countEntries") {
      $params = {
@@ -2283,7 +2285,7 @@ sub DbRep_Main {
          reading => $reading,
          ts      => $ts,
      };
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count_DoParse", $params, "DbRep_count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count", $params, "DbRep_countDone", $to, "DbRep_ParseAborted", $hash);  
  } 
  elsif ($opt eq "averageValue") { 
      $params = {
@@ -2296,7 +2298,7 @@ sub DbRep_Main {
          ts      => $ts,
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval_DoParse", $params, "DbRep_averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval", $params, "DbRep_avervalDone", $to, "DbRep_ParseAborted", $hash); 
  } 
  elsif ($opt eq "fetchrows") {
      $params = {
@@ -2309,7 +2311,7 @@ sub DbRep_Main {
          rsn     => $runtime_string_next
      };
             
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", $params, "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_fetchrows", $params, "DbRep_fetchrowsDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "delDoublets") {
      $params = {
@@ -2375,7 +2377,7 @@ sub DbRep_Main {
          ts      => $ts,
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval_DoParse", $params, "DbRep_maxval_ParseDone", $to, "DbRep_ParseAborted", $hash);      
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval", $params, "DbRep_maxvalDone", $to, "DbRep_ParseAborted", $hash);      
  } 
  elsif ($opt eq "minValue") {
      $params = {
@@ -2388,7 +2390,7 @@ sub DbRep_Main {
          ts      => $ts,
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval_DoParse", $params, "DbRep_minval_ParseDone", $to, "DbRep_ParseAborted", $hash);        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval", $params, "DbRep_minvalDone", $to, "DbRep_ParseAborted", $hash);        
  } 
  elsif ($opt eq "delEntries") {
      delete $hash->{HELPER}{DELENTRIES};
@@ -2408,7 +2410,7 @@ sub DbRep_Main {
          DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return; 
      }
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del_DoParse", $params, "DbRep_del_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "tableCurrentPurge") {
      $params = {
@@ -2419,7 +2421,7 @@ sub DbRep_Main {
          reading => $reading
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del_DoParse", $params, "DbRep_del_ParseDone", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "tableCurrentFillup") {
      $params = {
@@ -2432,7 +2434,7 @@ sub DbRep_Main {
          rsn     => $runtime_string_next
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillup_Done", $to, "DbRep_ParseAborted", $hash);
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillupDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "diffValue") {  
      $params = {
@@ -2445,7 +2447,7 @@ sub DbRep_Main {
          ts      => $ts
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_diffval_DoParse", $params, "DbRep_diffval_ParseDone", $to, "DbRep_ParseAborted", $hash);         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_diffval", $params, "DbRep_diffvalDone", $to, "DbRep_ParseAborted", $hash);         
  } 
  elsif ($opt eq "insert") { 
       $params = {
@@ -2455,7 +2457,7 @@ sub DbRep_Main {
          prop  => $prop
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_insert", $params, "DbRep_insert_Done", $to, "DbRep_ParseAborted", $hash);           
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_insert", $params, "DbRep_insertDone", $to, "DbRep_ParseAborted", $hash);           
  } 
  elsif ($opt eq "deviceRename") { 
      $params = {
@@ -2467,7 +2469,7 @@ sub DbRep_Main {
          reading => $reading
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", $params, "change_Done", $to, "DbRep_ParseAborted", $hash);         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevOrRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
  } 
  elsif ($opt eq "readingRename") { 
      $params = {
@@ -2479,7 +2481,7 @@ sub DbRep_Main {
          reading => $reading
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", $params, "change_Done", $to, "DbRep_ParseAborted", $hash);         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevOrRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
  }
  elsif ($opt eq "changeValue") {
      $params = {
@@ -2494,7 +2496,7 @@ sub DbRep_Main {
          ts      => $ts
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", $params, "change_Done", $to, "DbRep_ParseAborted", $hash);    
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeVal", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);    
  } 
  elsif ($opt eq "sqlCmd") {                                       # Execute a generic sql command   
     $params = {
@@ -2502,11 +2504,13 @@ sub DbRep_Main {
         name    => $name,
         opt     => $opt,
         prop    => $prop,
+        device  => $device,
+        reading => $reading,
         rsf     => $runtime_string_first,
         rsn     => $runtime_string_next
     };    
     
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", $params, "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
  }
  elsif ($opt eq "sqlCmdHistory") {
     $params = {
@@ -2514,11 +2518,13 @@ sub DbRep_Main {
         name    => $name,
         opt     => $opt,
         prop    => $prop,
+        device  => $device,
+        reading => $reading,
         rsf     => $runtime_string_first,
         rsn     => $runtime_string_next
     };    
     
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", $params, "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
  }
  elsif ($opt eq "sqlSpecial") {                                  # Execute a special sql command
     my ($tq,$gcl);
@@ -2576,11 +2582,13 @@ sub DbRep_Main {
         name    => $name,
         opt     => $opt,
         prop    => $prop,
+        device  => $device,
+        reading => $reading,
         rsf     => $runtime_string_first,
         rsn     => $runtime_string_next
     };    
     
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", $params, "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
+    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
  } 
  elsif ($opt =~ /syncStandby/ ) {
     DbRep_beforeproc($hash, "syncStandby");                           # Befehl vor Procedure ausführen
@@ -3273,7 +3281,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 ####################################################################################################
 # nichtblockierende DB-Abfrage averageValue
 ####################################################################################################
-sub DbRep_averval_DoParse {
+sub DbRep_averval {
   my $paref   = shift;    
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -3604,7 +3612,7 @@ return "$name|$err|$arrstr|$device|$reading|$rt|$irowdone|$gtsstr|$gtsreached";
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage averageValue
 ####################################################################################################
-sub DbRep_averval_ParseDone {
+sub DbRep_avervalDone {
   my $string     = shift;
   my @a          = split "\\|", $string;
   my $name       = $a[0];
@@ -3710,7 +3718,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage count
 ####################################################################################################
-sub DbRep_count_DoParse {
+sub DbRep_count {
   my $paref   = shift;    
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -3814,7 +3822,7 @@ return "$name|$err|$arrstr|$device|$rt|$table";
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage count
 ####################################################################################################
-sub DbRep_count_ParseDone {
+sub DbRep_countDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -3887,7 +3895,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage maxValue
 ####################################################################################################
-sub DbRep_maxval_DoParse {
+sub DbRep_maxval {
  my $paref   = shift;    
  my $hash    = $paref->{hash};
  my $name    = $paref->{name};
@@ -4060,7 +4068,7 @@ return "$name|$err|$rowlist|$device|$reading|$rt|$irowdone";
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage maxValue
 ####################################################################################################
-sub DbRep_maxval_ParseDone {
+sub DbRep_maxvalDone {
   my $string    = shift;
   my @a         = split("\\|",$string);
   my $name      = $a[0];
@@ -4132,7 +4140,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage minValue
 ####################################################################################################
-sub DbRep_minval_DoParse {
+sub DbRep_minval {
  my $paref   = shift;    
  my $hash    = $paref->{hash};
  my $name    = $paref->{name};
@@ -4302,7 +4310,7 @@ return "$name|$err|$rowlist|$device|$reading|$rt|$irowdone";
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage minValue
 ####################################################################################################
-sub DbRep_minval_ParseDone {
+sub DbRep_minvalDone {
   my $string    = shift;
   my @a         = split("\\|",$string);
   my $name      = $a[0];
@@ -4373,7 +4381,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage diffValue
 ####################################################################################################
-sub DbRep_diffval_DoParse {
+sub DbRep_diffval {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -4631,7 +4639,7 @@ return "$name|$err|$rowlist|$device|$reading|$rt|$rowsrej|$ncpslist|$irowdone";
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
 ####################################################################################################
-sub DbRep_diffval_ParseDone {
+sub DbRep_diffvalDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -4726,7 +4734,7 @@ return;
 ####################################################################################################
 #                             nichtblockierende DB-Abfrage sumValue
 ####################################################################################################
-sub DbRep_sumval_DoParse {
+sub DbRep_sumval {
  my $paref   = shift;    
  my $hash    = $paref->{hash};
  my $name    = $paref->{name};
@@ -4836,7 +4844,7 @@ return "$name|$err|$arrstr|$device|$reading|$rt|$irowdone";
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage sumValue
 ####################################################################################################
-sub DbRep_sumval_ParseDone {
+sub DbRep_sumvalDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -4903,7 +4911,7 @@ return;
 ####################################################################################################
 # nichtblockierendes DB delete
 ####################################################################################################
-sub DbRep_del_DoParse {
+sub DbRep_del {
   my $paref                = shift;    
   my $hash                 = $paref->{hash};
   my $name                 = $paref->{name};
@@ -4960,7 +4968,7 @@ return "$name|$err|$rows|$rt|$table|$device|$reading";
 ####################################################################################################
 # Auswertungsroutine DB delete
 ####################################################################################################
-sub DbRep_del_ParseDone {
+sub DbRep_del_Done {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -5067,13 +5075,8 @@ sub DbRep_insert {
   ($err, $sth) = DbRep_prepareOnly ($name, $dbh, $sql);
   return $err if ($err);
   
-  if($dbh->{AutoCommit}) {                                # Transaktion wenn gewünscht und autocommit ein
-      eval{ $dbh->begin_work();
-          } 
-          or do { 
-                  Log3($name, 2, "DbRep $name -> Error start transaction: $@");
-                };
-  }
+  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+  return $err if ($err);
   
   eval{ $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit);
       } 
@@ -5084,7 +5087,9 @@ sub DbRep_insert {
               return "$name|$err";
             };
   
-  $dbh->commit();
+  $err = DbRep_commitOnly ($name, $dbh);
+  return $err if ($err);
+      
   $dbh->disconnect();
   
   $err  = q{};
@@ -5104,7 +5109,7 @@ return "$name|$err|$irow|$rt|$insert";
 ####################################################################################################
 # Auswertungsroutine DB insert
 ####################################################################################################
-sub DbRep_insert_Done {
+sub DbRep_insertDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -5158,7 +5163,7 @@ sub DbRep_currentfillup {
     
   my $dbloghash            = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  
-  my ($sth,$sql,$selspec,$addon,@dwc,@rwc);
+  my ($sth,$sql,$irow,$selspec,$addon,@dwc,@rwc);
  
   my $bst = [gettimeofday];                                                          # Background-Startzeit
  
@@ -5200,38 +5205,41 @@ sub DbRep_currentfillup {
   }
  
   # SQL-Statement zusammenstellen
-  if ($IsTimeSet || $IsAggrSet) {
-      $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
-  } 
-  else {
-      $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,$addon); 
-  }
- 
-  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");     
+  my $valfilter = AttrVal($name, "valueFilter", undef);                            # Wertefilter
   
-  my $irow;
-  $dbh->begin_work();
+  my $specs = {
+      hash      => $hash,
+      selspec   => $selspec,
+      device    => $device,
+      reading   => $reading,
+      dbmodel   => $dbmodel,
+      valfilter => $valfilter,
+      addon     => $addon
+  };
+  
+  if ($IsTimeSet || $IsAggrSet) {
+      $specs->{rsf} = $runtime_string_first;
+      $specs->{rsn} = $runtime_string_next;
+  }
+  
+  $sql = DbRep_createCommonSql($specs);
+
+  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+  return $err if ($err);
+  
+  ($err, $sth, $irow) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+  return $err if ($err);
  
-  eval{ $sth = $dbh->prepare($sql);
-        $sth->execute();
-      } 
-      or do { $err = encode_base64($@,"");
-              Log3 ($name, 2, "DbRep $name - Insert new dataset into database failed".($usepkh ? " (possible PK violation) " : ": ")."$@");
-              $dbh->rollback();
-              $dbh->disconnect();
-              return "$name|$err";
-            };
- 
-  $dbh->commit();
-  $irow = $sth->rows;
+  $err = DbRep_commitOnly ($name, $dbh);
+  return $err if ($err);
  
   $dbh->disconnect();
+  
+  $irow = $irow eq "0E0" ? 0 : $irow;
  
   my $rt  = tv_interval($st);                                                # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                               # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
-  
-  $err    = q{};
   
 return "$name|$err|$irow|$rt|$device|$reading";
 }
@@ -5239,7 +5247,7 @@ return "$name|$err|$irow|$rt|$device|$reading";
 ####################################################################################################
 #                      Auswertungsroutine Current-Tabelle auffüllen
 ####################################################################################################
-sub DbRep_currentfillup_Done {
+sub DbRep_currentfillupDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -5289,7 +5297,7 @@ return;
 ####################################################################################################
 #                    nichtblockierendes DB deviceRename / readingRename
 ####################################################################################################
-sub change_Push {
+sub DbRep_changeDevOrRead {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -5308,18 +5316,13 @@ sub change_Push {
   if ($err) {
       $err = encode_base64($@,"");
       Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|''|$err";
+      return "$name|$err";
   }
 
   my $st = [gettimeofday];                                # SQL-Startzeit
   
-  if($dbh->{AutoCommit}) {                                # Transaktion wenn gewünscht und autocommit ein
-      eval{ $dbh->begin_work();
-          } 
-          or do { 
-                  Log3($name, 2, "DbRep $name -> Error start transaction: $@");
-                };
-  }
+  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+  return $err if ($err);
  
   if ($renmode eq "devren") {
       $old  = delete $hash->{HELPER}{OLDDEV};
@@ -5330,10 +5333,6 @@ sub change_Push {
       $old =~ s/'/''/g;                                       # escape ' with ''
       $new =~ s/'/''/g;                                       # escape ' with ''
       $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,DEVICE='$new' WHERE DEVICE='$old'; "; 
-     
-      Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
-     
-      $sth = $dbh->prepare($sql) ;
   } 
   elsif ($renmode eq "readren") {
       $old        = delete $hash->{HELPER}{OLDREAD};              
@@ -5351,16 +5350,15 @@ sub change_Push {
       else {
           $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,READING='$new' WHERE READING='$old'; ";
       }
-     
-      Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
-     
-      $sth = $dbh->prepare($sql) ;
   }          
  
   $old =~ s/''/'/g;                                   # escape back 
   $new =~ s/''/'/g;                                   # escape back 
- 
+
   my $urow;
+  ($err, $sth) = DbRep_prepareOnly ($name, $dbh, $sql);
+  return $err if ($err);
+      
   eval{ $sth->execute();
       } 
       or do { $err = encode_base64($@,"");
@@ -5370,10 +5368,12 @@ sub change_Push {
               
               $dbh->rollback() if(!$dbh->{AutoCommit});
               $dbh->disconnect();
-              return "$name|''|''|$err";
+              return "$name|$err";
             };
                 
-  $dbh->commit() if(!$dbh->{AutoCommit});
+  $err = DbRep_commitOnly ($name, $dbh);
+  return $err if ($err);
+  
   $dbh->disconnect(); 
   
   $urow = $sth->rows;
@@ -5382,14 +5382,15 @@ sub change_Push {
   my $brt = tv_interval($bst);                        # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
   $old    = $dev ? "$dev:$old" : $old;
+  $err    = q{};
  
-return "$name|$urow|$rt|0|$old|$new|$renmode";
+return "$name|$err|$urow|$rt|$old|$new|$renmode";
 }
 
 ####################################################################################################
 #                        nichtblockierendes DB changeValue (Field VALUE)
 ####################################################################################################
-sub changeval_Push {
+sub DbRep_changeVal {
   my $paref                = shift;
   my $hash                 = $paref->{hash};
   my $name                 = $paref->{name};
@@ -5413,7 +5414,7 @@ sub changeval_Push {
   if ($err) {
       $err = encode_base64($@,"");
       Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|''|$err";
+      return "$name|$err";
   }
 
   # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
@@ -5422,13 +5423,8 @@ sub changeval_Push {
 
   my $st = [gettimeofday];                                             # SQL-Startzeit
  
-  if($dbh->{AutoCommit}) {                                            # Transaktion wenn gewünscht und autocommit ein
-      eval{ $dbh->begin_work();
-          } 
-          or do { 
-                  Log3($name, 2, "DbRep $name -> Error start transaction: $@");
-                };
-  }
+  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+  return $err if ($err);
  
  if (!$complex) {
      $old = delete $hash->{HELPER}{OLDVAL};
@@ -5442,16 +5438,27 @@ sub changeval_Push {
      my $addon   = $old =~ /%/ ? "WHERE VALUE LIKE '$old'" : "WHERE VALUE='$old'";
      my $selspec = "UPDATE $table SET TIMESTAMP=TIMESTAMP,VALUE='$new' $addon AND ";
      
+     my $valfilter = AttrVal($name, "valueFilter", undef);                            # Wertefilter
+     
+     my $specs = {
+         hash      => $hash,
+         selspec   => $selspec,
+         device    => $device,
+         reading   => $reading,
+         dbmodel   => $dbmodel,
+         valfilter => $valfilter,
+         addon     => ''
+     };
+     
      if ($IsTimeSet) {
-         $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $specs->{rsf} = $runtime_string_first;
+         $specs->{rsn} = $runtime_string_next;
      } 
-     else {
-         $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,'');
-     }
      
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+     $sql = DbRep_createCommonSql($specs);
      
-     $sth = $dbh->prepare($sql) ;
+     ($err, $sth) = DbRep_prepareOnly ($name, $dbh, $sql);
+     return $err if ($err);
      
      $old =~ s/''/'/g;                                           # escape back 
      $new =~ s/''/'/g;                                           # escape back 
@@ -5462,7 +5469,7 @@ sub changeval_Push {
                   Log3 ($name, 2, qq{DbRep $name - Failed to change old value "$old" to new value "$new": $@});
                   $dbh->rollback() if(!$dbh->{AutoCommit});
                   $dbh->disconnect();
-                  return "$name|''|''|$err";
+                  return "$name|$err";
                 };
 
      $urow = $sth->rows;
@@ -5492,16 +5499,9 @@ sub changeval_Push {
          else {
              $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,undef,undef,$addon);
          }
-         Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
          
-         eval{ $sth = $dbh->prepare($sql);
-               $sth->execute();
-             } 
-             or do { $err = encode_base64($@,"");
-                     Log3 ($name, 2, "DbRep $name - $@");
-                     $dbh->disconnect;
-                     return "$name|''|''|$err";
-                   };
+         ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+         return $err if ($err);
          
          no warnings 'uninitialized'; 
          #                     DEVICE   _ESC_  READING  _ESC_     DATE _ESC_ TIME        _ESC_  VALUE    _ESC_   UNIT
@@ -5521,7 +5521,7 @@ sub changeval_Push {
                  $err = encode_base64($@,"");
                  Log3 ($name, 2, "DbRep $name - $@");
                  $dbh->disconnect;
-                 return "$name|''|''|$err";
+                 return "$name|$err";
              }
              
              $value = $VALUE if(defined $VALUE);
@@ -5534,8 +5534,9 @@ sub changeval_Push {
              $unit  =~ s/'/''/g;                                  # escape ' with ''
              
              $sql = "UPDATE history SET TIMESTAMP=TIMESTAMP,VALUE='$value',UNIT='$unit' WHERE TIMESTAMP = '$date $time' AND DEVICE = '$device' AND READING = '$reading' AND VALUE='$oval'";
-             Log3 ($name, 5, "DbRep $name - SQL execute: $sql"); 
-             $sth = $dbh->prepare($sql) ;
+             
+             ($err, $sth) = DbRep_prepareOnly ($name, $dbh, $sql);
+             return $err if ($err);
      
              $value =~ s/''/'/g;                                  # escape back 
              $unit  =~ s/''/'/g;                                  # escape back 
@@ -5546,7 +5547,7 @@ sub changeval_Push {
                          Log3 ($name, 2, qq{DbRep $name - Failed to change old value "$old" to new value "$new": $@});
                          $dbh->rollback() if(!$dbh->{AutoCommit});
                          $dbh->disconnect();
-                         return "$name|''|''|$err";
+                         return "$name|$err";
                        };
  
              $urow++;
@@ -5554,31 +5555,33 @@ sub changeval_Push {
      }
  }
  
- $dbh->commit() if(!$dbh->{AutoCommit});
+ $err = DbRep_commitOnly ($name, $dbh);
+ return $err if ($err);
+  
  $dbh->disconnect();
 
  my $rt  = tv_interval($st);                                     # SQL-Laufzeit ermitteln
  my $brt = tv_interval($bst);                                    # Background-Laufzeit ermitteln
  $rt     = $rt.",".$brt;
  
-return "$name|$urow|$rt|0|$old|$new|$renmode";
+return "$name|$err|$urow|$rt|$old|$new|$renmode";
 }
 
 ####################################################################################################
 #                   Auswertungsroutine DB deviceRename/readingRename/changeValue
 ####################################################################################################
-sub change_Done {
+sub DbRep_changeDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $urow       = $a[1];
-  my $bt         = $a[2];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[3] ? decode_base64($a[3]) : undef;
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : '';
+  my $urow       = $a[2];
+  my $bt         = $a[3];
   my $old        = $a[4];
   my $new        = $a[5]; 
   my $renmode    = $a[6];
+  
+  my $hash       = $defs{$name};
   
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
@@ -5592,6 +5595,8 @@ sub change_Done {
       return;
   }
 
+  my ($rt,$brt)  = split(",", $bt);
+  
   no warnings 'uninitialized'; 
   
   readingsBeginUpdate     ($hash);
@@ -5635,7 +5640,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage fetchrows
 ####################################################################################################
-sub fetchrows_DoParse {
+sub DbRep_fetchrows {
   my $paref                = shift;    
   my $hash                 = $paref->{hash};
   my $name                 = $paref->{name};
@@ -5658,7 +5663,7 @@ sub fetchrows_DoParse {
   if ($err) {
       $err = encode_base64($@,"");
       Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|''|$err|''";
+      return "$name|$err";
   }
 
   my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                            # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
@@ -5669,21 +5674,12 @@ sub fetchrows_DoParse {
   } 
   else {
       $sql = DbRep_createSelectSql($hash, $table, "DEVICE,READING,TIMESTAMP,VALUE,UNIT", $device, $reading, undef, undef, "ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
-  }
- 
-  $sth = $dbh->prepare($sql);
- 
-  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");    
+  }   
 
   my $st = [gettimeofday];                                                           # SQL-Startzeit
  
-  eval{ $sth->execute();
-      } 
-      or do { $err = encode_base64($@,"");
-              Log3 ($name, 2, "DbRep $name - $@");
-              $dbh->disconnect;
-              return "$name|''|''|$err|''";
-            };
+  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+  return $err if ($err);
  
   no warnings 'uninitialized'; 
   
@@ -5712,34 +5708,25 @@ sub fetchrows_DoParse {
   $rowlist = encode_base64($rowlist,"");                                             # Daten müssen als Einzeiler zurückgegeben werden
   my $brt  = tv_interval($bst);                                                      # Background-Laufzeit ermitteln
   $rt      = $rt.",".$brt;
- 
-return "$name|$rowlist|$rt|0|$nrows";
+  $err     = q{};
+  
+return "$name|$err|$rowlist|$rt|$nrows";
 }
 
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage fetchrows
 ####################################################################################################
-sub fetchrows_ParseDone {
+sub DbRep_fetchrowsDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $rowlist    = decode_base64($a[1]);
-  my $bt         = $a[2];
-  my $err        = $a[3] ? decode_base64($a[3]) : '';
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : '';
+  my $rowlist    = $a[2] ? decode_base64($a[2]) : '';
+  my $bt         = $a[3];
   my $nrows      = $a[4];
-  my $name       = $hash->{NAME};
   
-  my $reading    = AttrVal($name, "reading",        '');
-  my $limit      = AttrVal($name, "limit",        1000);
-  my $fvfn       = AttrVal($name, "fetchValueFn",   '');
-  
-  my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
-  $color         =~ s/#// if($color =~ /red|blue|brown|green|orange/);
-  my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
-  
-  my @row;
-  my $reading_runtime_string;
-  
+  my $hash       = $defs{$name};
+    
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -5752,7 +5739,17 @@ sub fetchrows_ParseDone {
       return;
   } 
   
-  my ($rt,$brt) = split ",", $bt;
+  my ($rt,$brt)  = split ",", $bt;
+  my $reading    = AttrVal($name, "reading",        '');
+  my $limit      = AttrVal($name, "limit",        1000);
+  my $fvfn       = AttrVal($name, "fetchValueFn",   '');
+  
+  my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
+  $color         =~ s/#// if($color =~ /red|blue|brown|green|orange/);
+  my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
+  
+  my @row;
+  my $reading_runtime_string;
   
   my @row_array = split("\\|", $rowlist);
   s/_E#S#C_/\|/g for @row_array;                               # escaped Pipe return to "|"
@@ -6723,32 +6720,33 @@ return;
 ####################################################################################################
 # set logdbrep sqlCmd select count(*) from history
 # set logdbrep sqlCmd select DEVICE,count(*) from history group by DEVICE HAVING count(*) > 10000
-sub sqlCmd_DoParse {
-  my $paref                = shift;
-  my $hash                 = $paref->{hash};
-  my $name                 = $paref->{name};
-  my $opt                  = $paref->{opt};
-  my $runtime_string_first = $paref->{rsf};
-  my $runtime_string_next  = $paref->{rsn};
-  my $cmd                  = $paref->{prop};
+sub DbRep_sqlCmd {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+  my $device  = $paref->{device};
+  my $reading = $paref->{reading};
+  my $rsf     = $paref->{rsf};
+  my $rsn     = $paref->{rsn};
+  my $cmd     = $paref->{prop};
   
-  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
-  my $device     = AttrVal($name, "device",  undef);
-  my $reading    = AttrVal($name, "reading", undef);
+  my $srs = AttrVal($name, "sqlResultFieldSep", "|");
 
   my $bst = [gettimeofday];                                                          # Background-Startzeit
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
   if ($err) {
       $err = encode_base64($err,"");
-      return "$name|''|$opt|$cmd|''|''|$err";
+      return "$name|$err";
   }
        
   no warnings 'uninitialized'; 
   
   $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
-    
-  my $sql = $cmd =~ m/\;$/ ? $cmd : $cmd.";";
+  
+  $cmd   .= ";" if ($cmd !~ m/\;$/x);
+  my $sql = $cmd;
   
   my @pms;
   my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
@@ -6763,13 +6761,8 @@ sub sqlCmd_DoParse {
           $pm = ltrim($pm).";";
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
           
-          Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");    
-          
-          eval { $dbh->do($pm) } or do { $err = encode_base64($@, "");
-                                         Log3 ($name, 2, "DbRep $name - ERROR - $@");
-                                         $dbh->disconnect;
-                                         return "$name|''|$opt|$sql|''|''|$err";
-                                       }      
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
+          return $err if ($err);      
       }  
   } 
   
@@ -6788,14 +6781,9 @@ sub sqlCmd_DoParse {
           
           $pm = ltrim($pm).";";
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-          
-          Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");
-          
-          eval { $dbh->do($pm) } or do { $err = encode_base64($@, "");
-                                         Log3 ($name, 2, "DbRep $name - ERROR - $@");
-                                         $dbh->disconnect;
-                                         return "$name|''|$opt|$sql|''|''|$err";
-                                       }     
+                   
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
+          return $err if ($err);     
       }
   }
   
@@ -6814,18 +6802,13 @@ sub sqlCmd_DoParse {
           
           $pm = ltrim($pm).";";
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-          
-          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");
-          
-          eval { $dbh->do($pm) } or do { $err = encode_base64($@, "");
-                                         Log3 ($name, 2, "DbRep $name - ERROR - $@");
-                                         $dbh->disconnect;
-                                         return "$name|''|$opt|$sql|''|''|$err";
-                                      }    
+            
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
+          return $err if ($err);                                       
       }
   }
   
-  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293
+  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
   # z.B. PREPARE statement FROM @CMD
   if($sql =~ /^\s*PREPARE.*;/i) {   
       @pms = split(";",$sql);
@@ -6839,43 +6822,36 @@ sub sqlCmd_DoParse {
           
           $pm = ltrim($pm).";";
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-          
-          Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
-          
-          eval { $dbh->do($pm) } or do { $err = encode_base64($@, "");
-                                         Log3 ($name, 2, "DbRep $name - ERROR - $@");
-                                         $dbh->disconnect;
-                                         return "$name|''|$opt|$sql|''|''|$err";
-                                      }    
+           
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
+          return $err if ($err);                                      
       }
   }
   
-  # Allow inplace replacement of keywords for timings (use time attribute syntax), device, reading
-  $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
-  $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
-  $sql =~ s/§device§/'$device'/xg   if ($device);
-  $sql =~ s/§reading§/'$reading'/xg if ($reading);
-  
+  # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
+  ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
+                                               sql     => $sql,
+                                               device  => $device,
+                                               reading => $reading,
+                                               dbmodel => $dbmodel,
+                                               rsf     => $rsf,
+                                               rsn     => $rsn
+                                             }
+                                           );
+  return $err if ($err);
+   
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-  
-  Log3($name, 4, "DbRep $name - SQL execute: $sql");        
 
   my $st = [gettimeofday];                                                         # SQL-Startzeit
   
   my ($sth,$r);
   
-  eval {$sth = $dbh->prepare($sql);
-        $r   = $sth->execute();
-       }
-       or do { $err = encode_base64($@, "");
-               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-               $dbh->disconnect;
-               return "$name|''|$opt|$sql|''|''|$err";
-             };
+  ($err, $sth, $r) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+  return $err if ($err);
  
   my (@rows,$row,@head);
   my $nrows = 0;
-  
+
   if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
@@ -6887,26 +6863,21 @@ sub sqlCmd_DoParse {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $row = join("$srs", @line);
       
-          # join Delimiter "§" escapen
-          $row =~ s/§/|°escaped°|/g;
+          $row =~ s/§/|°escaped°|/g;                                              # join Delimiter "§" escapen
       
           push(@rows, $row);
-          # Anzahl der Datensätze
-          $nrows++;
+          $nrows++;                                                               # Anzahl der Datensätze
       }
   } 
   else {
       $nrows = $sth->rows;
-      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-      if ($@) {
-          $err = encode_base64($@,"");
-          Log3 ($name, 2, "DbRep $name - ERROR - $@");
-          $dbh->disconnect;
-          return "$name|''|$opt|$sql|''|''|$err";       
-      }
+      
+      $err = DbRep_commitOnly ($name, $dbh);
+      return $err if ($err);
      
       push(@rows, $r);
       my $com = (split(" ",$sql, 2))[0];
+      
       Log3 ($name, 3, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");  
   }
   
@@ -6922,30 +6893,91 @@ sub sqlCmd_DoParse {
   $cmd =~ s/ESC_ESC_ESC/;;/gx;                                                     # wiederherstellen der escapeten ";" -> ";;" 
   
   my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
-
-  $rt = $rt.",".$brt;
+  $rt     = $rt.",".$brt;
+  $err    = q{};
  
-return "$name|$rowstring|$opt|$cmd|$nrows|$rt|$err";
+return "$name|$err|$rowstring|$opt|$cmd|$nrows|$rt";
+}
+
+####################################################################################################
+#        Ersetzung von Schlüsselwörtern für Time*, Devices und Readings 
+#        in SQL-Statements (unter Verwendung der Attributsyntax)
+####################################################################################################
+sub _DbRep_sqlReplaceKeywords {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $sql     = $paref->{sql};
+  my $device  = $paref->{device};
+  my $reading = $paref->{reading};
+  my $dbmodel = $paref->{dbmodel};
+  my $rsf     = $paref->{rsf};
+  my $rsn     = $paref->{rsn};
+
+  my $ret  = q{};
+  my $name = $hash->{NAME};
+  my $sfx  = AttrVal("global", "language", "EN");
+  $sfx     = $sfx eq 'EN' ? '' : "_$sfx";
+  
+  $sql =~ s/§timestamp_begin§/'$rsf'/g;
+  $sql =~ s/§timestamp_end§/'$rsn'/g;
+  
+  my ($rdspec,$err);
+  
+  if ($sql =~ /§device§/xs) {
+      if ($device eq "%") {
+          $err = qq{You must specify device(s) in attribute "device" if you use the placeholder "§device§" in your statement};
+          
+          Log3 ($name, 2, "DbRep $name - ERROR - $err"); 
+          
+          $err = qq{<html> $err </html>};
+          $err =~ s/"device"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#device' target='_blank'>device<\/a>/xs;
+          $err = encode_base64($err,"");
+          $ret = "$name|$err";
+          return $ret;
+      }
+      
+      $rdspec = DbRep_createCommonSql( {hash => $hash, device => $device, dbmodel => $dbmodel} );
+      $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];       
+      $sql    =~ s/§device§/$rdspec/xg;
+  }
+  
+  if ($sql =~ /§reading§/xs) {
+      if ($reading eq "%") {
+          $err = qq{You must specify reading(s) in attribute "reading" if you use the placeholder "§reading§" in your statement};
+          
+          Log3 ($name, 2, "DbRep $name - ERROR - $err"); 
+          
+          $err = qq{<html> $err </html>};
+          $err =~ s/"reading"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#reading' target='_blank'>reading<\/a>/xs;
+          $err = encode_base64($err,"");
+          $ret = "$name|$err";
+          return $ret;
+      }
+      
+      $rdspec = DbRep_createCommonSql( {hash => $hash, reading => $reading, dbmodel => $dbmodel} );
+      $rdspec = (split /AND\s(?:1|true)/xis, $rdspec)[0];  
+      $sql    =~ s/§reading§/$rdspec/xg;
+  }
+
+return ($ret, $sql);
 }
 
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage sqlCmd
 ####################################################################################################
-sub sqlCmd_ParseDone {
+sub DbRep_sqlCmdDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $rowstring  = decode_base64($a[1]);
-  my $opt        = $a[2];
-  my $cmd        = $a[3];
-  my $nrows      = $a[4];
-  my $bt         = $a[5];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[6]?decode_base64($a[6]):undef;
-  my $srf        = AttrVal($name, "sqlResultFormat", "separated");
-  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : '';
+  my $rowstring  = $a[2] ? decode_base64($a[2]) : '';
+  my $opt        = $a[3];
+  my $cmd        = $a[4];
+  my $nrows      = $a[5];
+  my $bt         = $a[6];
   
+  my $hash       = $defs{$name};
+    
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -6957,6 +6989,10 @@ sub sqlCmd_ParseDone {
     ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
     return;
   }
+  
+  my ($rt,$brt)  = split ",", $bt;
+  my $srf        = AttrVal($name, "sqlResultFormat", "separated");
+  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   
   Log3 ($name, 5, "DbRep $name - SQL result decoded: $rowstring") if($rowstring);
   
@@ -6976,7 +7012,7 @@ sub sqlCmd_ParseDone {
   if(!@sqlhist || (@sqlhist && !($cmd ~~ @sqlhist))) {
       unshift @sqlhist,$cmd;
       pop @sqlhist if(@sqlhist > $hlc);
-      my $hl = join(",",@sqlhist);
+      my $hl                   = join(",",@sqlhist);
       $hash->{HELPER}{SQLHIST} = $hl;
       DbRep_setCmdFile($name."_sqlCmdList",$hl,$hash);       
   }
@@ -6985,8 +7021,8 @@ sub sqlCmd_ParseDone {
       $rowstring =~ s/§/]|[/g;
       $rowstring =~ s/\|°escaped°\|/§/g;
       ReadingsBulkUpdateValue ($hash, "SqlResult", $rowstring);
-    
-  } elsif ($srf eq "table") {
+  } 
+  elsif ($srf eq "table") {
       my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
       my @rows = split( /§/, $rowstring );
       my $row;
@@ -6998,9 +7034,9 @@ sub sqlCmd_ParseDone {
       }
       $row .= $res."</table></html>";
       
-      ReadingsBulkUpdateValue ($hash,"SqlResult", $row);    
-      
-  } elsif ($srf eq "mline") {
+      ReadingsBulkUpdateValue ($hash,"SqlResult", $row);       
+  } 
+  elsif ($srf eq "mline") {
       my $res = "<html>";
       my @rows = split( /§/, $rowstring );
       my $row;
@@ -7010,9 +7046,9 @@ sub sqlCmd_ParseDone {
       }
       $row .= $res."</html>";
       
-      ReadingsBulkUpdateValue ($hash, "SqlResult", $row );
-      
-  } elsif ($srf eq "separated") {
+      ReadingsBulkUpdateValue ($hash, "SqlResult", $row );  
+  } 
+  elsif ($srf eq "separated") {
       my @rows = split( /§/, $rowstring );
       my $bigint = @rows;
       my $numd = ceil(log10($bigint));
@@ -7024,7 +7060,8 @@ sub sqlCmd_ParseDone {
           my $fi = sprintf($formatstr, $i);
           ReadingsBulkUpdateValue ($hash, "SqlResultRow_".$fi, $row);
       }
-  } elsif ($srf eq "json") {
+  } 
+  elsif ($srf eq "json") {
       my %result = ();
       my @rows = split( /§/, $rowstring );
       my $bigint = @rows;
@@ -7051,210 +7088,195 @@ return;
 # nichtblockierende DB-Abfrage get db Metadaten
 ####################################################################################################
 sub dbmeta_DoParse {
- my $string      = shift;
- my @a           = split("\\|",$string);
- my $name        = $a[0];
- my $hash        = $defs{$name};
- my $opt         = $a[1];
- my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn      = $dbloghash->{dbconn};
- my $db          = $hash->{DATABASE};
- my $dbuser      = $dbloghash->{dbuser};
- my $dblogname   = $dbloghash->{NAME};
- my $dbpassword  = $attr{"sec$dblogname"}{secret};
- my $dbmodel     = $dbloghash->{MODEL};
- my $utf8        = $hash->{UTF8} // 0;
- 
- my ($dbh,$sth,$sql);
- my $err;
+  my $string      = shift;
+  my @a           = split("\\|",$string);
+  my $name        = $a[0];
+  my $hash        = $defs{$name};
+  my $opt         = $a[1];
 
- # Background-Startzeit
- my $bst = [gettimeofday];
+  my $db          = $hash->{DATABASE};
+  my $utf8        = $hash->{UTF8} // 0;
  
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
+  my ($sth,$sql);
+
+  my $bst = [gettimeofday];                                                     # Background-Startzeit
  
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|''|$err";
- }
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+  if ($err) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      return "$name|$err";
+  }
  
- # only for this block because of warnings if details of readings are not set
- no warnings 'uninitialized'; 
+  no warnings 'uninitialized'; 
   
- # Liste der anzuzeigenden Parameter erzeugen, sonst alle ("%"), abhängig von $opt
- my $param;
- $param = AttrVal($name, "showVariables", "%")    if($opt eq "dbvars");
- $param = AttrVal($name, "showSvrInfo", "[A-Z_]") if($opt eq "svrinfo");
- $param = AttrVal($name, "showStatus", "%")       if($opt eq "dbstatus");
- $param = "1" if($opt =~ /tableinfo|procinfo/);                              # Dummy-Eintrag für einen Schleifendurchlauf
- my @parlist = split(",",$param); 
+  my $param;                                                                    # Liste der anzuzeigenden Parameter erzeugen, sonst alle ("%"), abhängig von $opt
+  $param = AttrVal($name, "showVariables", "%")    if($opt eq "dbvars");
+  $param = AttrVal($name, "showSvrInfo", "[A-Z_]") if($opt eq "svrinfo");
+  $param = AttrVal($name, "showStatus", "%")       if($opt eq "dbstatus");
+  $param = "1" if($opt =~ /tableinfo|procinfo/);                                # Dummy-Eintrag für einen Schleifendurchlauf
+  
+  my @parlist = split ",", $param; 
  
- # SQL-Startzeit
- my $st = [gettimeofday];
+  my $st = [gettimeofday];                                                      # SQL-Startzeit
  
- my @row_array;
+  my @row_array;
  
  # due to incompatible changes made in MyQL 5.7.5, see http://johnemb.blogspot.de/2014/09/adding-or-removing-individual-sql-modes.html
  if($dbmodel eq "MYSQL") {
-     eval {$dbh->do("SET sql_mode=(SELECT REPLACE(\@\@sql_mode,'ONLY_FULL_GROUP_BY',''));");};
- }
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     $dbh->disconnect;
-     return "$name|''|''|''|$err";
+      $err = DbRep_dbhDo ($name, $dbh, "SET sql_mode=(SELECT REPLACE(\@\@sql_mode,'ONLY_FULL_GROUP_BY',''));");
+      return $err if ($err);
  }
  
  if ($opt ne "svrinfo") {
-    foreach my $ple (@parlist) {
+    for my $ple (@parlist) {
          if ($opt eq "dbvars") {
              $sql = "show variables like '$ple';";
-         } elsif ($opt eq "dbstatus") {
+         } 
+         elsif ($opt eq "dbstatus") {
              $sql = "show global status like '$ple';";
-         } elsif ($opt eq "tableinfo") {
+         } 
+         elsif ($opt eq "tableinfo") {
              $sql = "show Table Status from $db;";
-         } elsif ($opt eq "procinfo") {
+         } 
+         elsif ($opt eq "procinfo") {
              $sql = "show full processlist;";
          }
 
-         Log3($name, 4, "DbRep $name - SQL execute: $sql"); 
- 
-         $sth = $dbh->prepare($sql); 
-         eval {$sth->execute();};
- 
-         if ($@) {
-             # error bei sql-execute
-             $err = encode_base64($@,"");
-             Log3 ($name, 2, "DbRep $name - $@");
-             $dbh->disconnect;
-             return "$name|''|''|''|$err";
+         ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+         return $err if ($err);
          
-         } else {
-             # kein error bei sql-execute
-             if ($opt eq "tableinfo") {
-                 $param = AttrVal($name, "showTableInfo", "[A-Z_]");
-                 $param =~ s/,/\|/g;
-                 $param =~ tr/%//d;
-                 while ( my $line = $sth->fetchrow_hashref()) {
+         if ($opt eq "tableinfo") {
+             $param = AttrVal($name, "showTableInfo", "[A-Z_]");
+             $param =~ s/,/\|/g;
+             $param =~ tr/%//d;
+             
+             while (my $line = $sth->fetchrow_hashref()) {
+             
+                 Log3 ($name, 5, "DbRep $name - SQL result: $line->{Name}, $line->{Version}, $line->{Row_format}, $line->{Rows}, $line->{Avg_row_length}, $line->{Data_length}, $line->{Max_data_length}, $line->{Index_length}, $line->{Data_free}, $line->{Auto_increment}, $line->{Create_time}, $line->{Check_time}, $line->{Collation}, $line->{Checksum}, $line->{Create_options}, $line->{Comment}");
                  
-                     Log3 ($name, 5, "DbRep $name - SQL result: $line->{Name}, $line->{Version}, $line->{Row_format}, $line->{Rows}, $line->{Avg_row_length}, $line->{Data_length}, $line->{Max_data_length}, $line->{Index_length}, $line->{Data_free}, $line->{Auto_increment}, $line->{Create_time}, $line->{Check_time}, $line->{Collation}, $line->{Checksum}, $line->{Create_options}, $line->{Comment}");
-                     
-                     if($line->{Name} =~ m/($param)/i) {
-                         push(@row_array, $line->{Name}.".engine ".$line->{Engine}) if($line->{Engine});
-                         push(@row_array, $line->{Name}.".version ".$line->{Version}) if($line->{Version});
-                         push(@row_array, $line->{Name}.".row_format ".$line->{Row_format}) if($line->{Row_format});
-                         push(@row_array, $line->{Name}.".number_of_rows ".$line->{Rows}) if($line->{Rows});
-                         push(@row_array, $line->{Name}.".avg_row_length ".$line->{Avg_row_length}) if($line->{Avg_row_length});
-                         push(@row_array, $line->{Name}.".data_length_MB ".sprintf("%.2f",$line->{Data_length}/1024/1024)) if($line->{Data_length});
-                         push(@row_array, $line->{Name}.".max_data_length_MB ".sprintf("%.2f",$line->{Max_data_length}/1024/1024)) if($line->{Max_data_length});
-                         push(@row_array, $line->{Name}.".index_length_MB ".sprintf("%.2f",$line->{Index_length}/1024/1024)) if($line->{Index_length});
-                         push(@row_array, $line->{Name}.".data_index_length_MB ".sprintf("%.2f",($line->{Data_length}+$line->{Index_length})/1024/1024));
-                         push(@row_array, $line->{Name}.".data_free_MB ".sprintf("%.2f",$line->{Data_free}/1024/1024)) if($line->{Data_free});
-                         push(@row_array, $line->{Name}.".auto_increment ".$line->{Auto_increment}) if($line->{Auto_increment});
-                         push(@row_array, $line->{Name}.".create_time ".$line->{Create_time}) if($line->{Create_time});
-                         push(@row_array, $line->{Name}.".update_time ".$line->{Update_time}) if($line->{Update_time});
-                         push(@row_array, $line->{Name}.".check_time ".$line->{Check_time}) if($line->{Check_time});
-                         push(@row_array, $line->{Name}.".collation ".$line->{Collation}) if($line->{Collation});
-                         push(@row_array, $line->{Name}.".checksum ".$line->{Checksum}) if($line->{Checksum});
-                         push(@row_array, $line->{Name}.".create_options ".$line->{Create_options}) if($line->{Create_options});
-                         push(@row_array, $line->{Name}.".comment ".$line->{Comment}) if($line->{Comment});
-                     }
-                 }
-             } elsif ($opt eq "procinfo") {
-                   my $row;
-                   my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
-                   $res .= "<tr><td style='padding-right:5px;padding-left:5px;font-weight:bold'>ID</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>USER</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>HOST</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>DB</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>CMD</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>TIME_Sec</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>STATE</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>INFO</td>";
-                   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>PROGRESS</td></tr>";
-                                   
-                   while (my @line = $sth->fetchrow_array()) {
-                       Log3 ($name, 4, "DbRep $name - SQL result: @line");
-                       $row  = join("|", @line);
-                       $row  =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
-                       $row  =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
-                       $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
-                   }
-                   my $tab .= $res."</table></html>";
-                   push(@row_array, "ProcessList ".$tab);
-
-             } else {
-                 while (my @line = $sth->fetchrow_array()) {
-                     Log3 ($name, 4, "DbRep $name - SQL result: @line");
-                     my $row = join("§", @line);
-                     $row =~ s/ /_/g;
-                     @line = split("§", $row);                     
-                     push(@row_array, $line[0]." ".$line[1]);
+                 if($line->{Name} =~ m/($param)/i) {
+                     push(@row_array, $line->{Name}.".engine ".$line->{Engine}) if($line->{Engine});
+                     push(@row_array, $line->{Name}.".version ".$line->{Version}) if($line->{Version});
+                     push(@row_array, $line->{Name}.".row_format ".$line->{Row_format}) if($line->{Row_format});
+                     push(@row_array, $line->{Name}.".number_of_rows ".$line->{Rows}) if($line->{Rows});
+                     push(@row_array, $line->{Name}.".avg_row_length ".$line->{Avg_row_length}) if($line->{Avg_row_length});
+                     push(@row_array, $line->{Name}.".data_length_MB ".sprintf("%.2f",$line->{Data_length}/1024/1024)) if($line->{Data_length});
+                     push(@row_array, $line->{Name}.".max_data_length_MB ".sprintf("%.2f",$line->{Max_data_length}/1024/1024)) if($line->{Max_data_length});
+                     push(@row_array, $line->{Name}.".index_length_MB ".sprintf("%.2f",$line->{Index_length}/1024/1024)) if($line->{Index_length});
+                     push(@row_array, $line->{Name}.".data_index_length_MB ".sprintf("%.2f",($line->{Data_length}+$line->{Index_length})/1024/1024));
+                     push(@row_array, $line->{Name}.".data_free_MB ".sprintf("%.2f",$line->{Data_free}/1024/1024)) if($line->{Data_free});
+                     push(@row_array, $line->{Name}.".auto_increment ".$line->{Auto_increment}) if($line->{Auto_increment});
+                     push(@row_array, $line->{Name}.".create_time ".$line->{Create_time}) if($line->{Create_time});
+                     push(@row_array, $line->{Name}.".update_time ".$line->{Update_time}) if($line->{Update_time});
+                     push(@row_array, $line->{Name}.".check_time ".$line->{Check_time}) if($line->{Check_time});
+                     push(@row_array, $line->{Name}.".collation ".$line->{Collation}) if($line->{Collation});
+                     push(@row_array, $line->{Name}.".checksum ".$line->{Checksum}) if($line->{Checksum});
+                     push(@row_array, $line->{Name}.".create_options ".$line->{Create_options}) if($line->{Create_options});
+                     push(@row_array, $line->{Name}.".comment ".$line->{Comment}) if($line->{Comment});
                  }
              }
          } 
+         elsif ($opt eq "procinfo") {
+               my $row;
+               my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
+               $res .= "<tr><td style='padding-right:5px;padding-left:5px;font-weight:bold'>ID</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>USER</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>HOST</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>DB</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>CMD</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>TIME_Sec</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>STATE</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>INFO</td>";
+               $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>PROGRESS</td></tr>";
+                               
+               while (my @line = $sth->fetchrow_array()) {
+                   Log3 ($name, 4, "DbRep $name - SQL result: @line");
+                   
+                   $row  = join("|", @line);
+                   $row  =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
+                   $row  =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
+                   $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
+               }
+               
+               my $tab .= $res."</table></html>";
+               
+               push(@row_array, "ProcessList ".$tab);
+         } 
+         else {
+             while (my @line = $sth->fetchrow_array()) {
+                 
+                 Log3 ($name, 4, "DbRep $name - SQL result: @line");
+                 
+                 my $row = join("§", @line);
+                 $row    =~ s/ /_/g;
+                 @line   = split("§", $row);   
+                 
+                 push(@row_array, $line[0]." ".$line[1]);
+             }
+         }
+ 
          $sth->finish;
      }
  } 
  else {
      $param =~ s/,/\|/g;
      $param =~ tr/%//d;
-     # Log3 ($name, 5, "DbRep $name - showDbInfo: $param");
      
      if($dbmodel eq 'SQLITE') {
-         my $sf = $dbh->sqlite_db_filename();
-         if ($@) {
-             # error bei sql-execute
-             $err = encode_base64($@,"");
-             Log3 ($name, 2, "DbRep $name - $@");
-             $dbh->disconnect;
-             return "$name|''|''|''|$err";
-         } else {
-             # kein error bei sql-execute
-             my $key = "SQLITE_DB_FILENAME";
-             push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
-         }
-         my @a;
-         @a      = split(' ',qx(du -m $hash->{DATABASE})) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
-         my $key = "SQLITE_FILE_SIZE_MB";
-         push(@row_array, $key." ".$a[0]) if($key =~ m/($param)/i);
+         my $sf;
+         eval{ $sf = $dbh->sqlite_db_filename();
+               1;
+             } 
+             or do { $err = encode_base64($@,"");
+                     Log3 ($name, 2, "DbRep $name - $@");
+                     $dbh->disconnect;
+                     return "$name|$err";
+                   };
+         
+         my $key = "SQLITE_DB_FILENAME";
+         push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
+         
+         my @fi = split(' ',qx(du -m $hash->{DATABASE})) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+         $key   = "SQLITE_FILE_SIZE_MB";
+         
+         push(@row_array, $key." ".$fi[0]) if($key =~ m/($param)/i);
      }
      
      my $info;
      while( my ($key,$value) = each(%GetInfoType) ) {
-         eval { $info = $dbh->get_info($GetInfoType{"$key"}) };
-         if ($@) {
-             $err = encode_base64($@,"");
-             Log3 ($name, 2, "DbRep $name - $@");
-             $dbh->disconnect;
-             return "$name|''|''|''|$err";
-         } else {
-             if($utf8) {
-                 $info = Encode::encode_utf8($info) if($info);
-             }
-             push(@row_array, $key." ".$info) if($key =~ m/($param)/i);
+         eval{ $info = $dbh->get_info($GetInfoType{"$key"});
+               1;
+             } 
+             or do { $err = encode_base64($@,"");
+                     Log3 ($name, 2, "DbRep $name - $@");
+                     $dbh->disconnect;
+                     return "$name|$err";
+                    };
+
+         if($utf8) {
+             $info = Encode::encode_utf8($info) if($info);
          }
+         
+         push(@row_array, $key." ".$info) if($key =~ m/($param)/i);
      }
  }
  
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
- 
  $dbh->disconnect;
  
+ my $rt = tv_interval($st);                                              # SQL-Laufzeit ermitteln
+ 
  my $rowlist = join('§', @row_array);
+ 
  Log3 ($name, 5, "DbRep $name -> row_array: \n@row_array");
  
- # Daten müssen als Einzeiler zurückgegeben werden
- $rowlist = encode_base64($rowlist,"");
+ $rowlist = encode_base64($rowlist,"");                                  # Daten müssen als Einzeiler zurückgegeben werden
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
-
- $rt = $rt.",".$brt;
+ my $brt = tv_interval($bst);                                            # Background-Laufzeit ermitteln
+ $rt     = $rt.",".$brt;
+ $err    = q{};
  
- return "$name|$rowlist|$rt|$opt|0";
+return "$name|$err|$rowlist|$rt|$opt";
 }
 
 ####################################################################################################
@@ -7263,47 +7285,48 @@ sub dbmeta_DoParse {
 sub dbmeta_ParseDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $rowlist    = decode_base64($a[1]);
-  my $bt         = $a[2];
-  my $opt        = $a[3];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[4]?decode_base64($a[4]):undef;
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : '';
+  my $rowlist    = $a[2] ? decode_base64($a[2]) : '';
+  my $bt         = $a[3];
+  my $opt        = $a[4];
+  
+  my $hash       = $defs{$name};
   
   Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
   if ($err) {
-      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
       return;
   }
     
-  # only for this block because of warnings if details of readings are not set
+  my ($rt,$brt) = split ",", $bt;
+ 
   no warnings 'uninitialized'; 
   
-  # Readingaufbereitung
   readingsBeginUpdate($hash);
   
   my @row_array = split("§", $rowlist);
+  
   Log3 ($name, 5, "DbRep $name - SQL result decoded: \n@row_array") if(@row_array);
   
   my $pre = "";
-  $pre    = "VAR_" if($opt eq "dbvars");
+  $pre    = "VAR_"  if($opt eq "dbvars");
   $pre    = "STAT_" if($opt eq "dbstatus");
   $pre    = "INFO_" if($opt eq "tableinfo");
   
   foreach my $row (@row_array) {
-      my @a = split(" ", $row, 2);
-      my $k = $a[0];
-      my $v = $a[1];
+      my @va = split " ", $row, 2;
+      my $k = $va[0];
+      my $v = $va[1];
       ReadingsBulkUpdateValue ($hash, $pre.$k, $v);
   }
   
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
-  readingsEndUpdate($hash, 1);
+  ReadingsBulkUpdateTimeState ($hash, $brt, $rt, "done");
+  readingsEndUpdate           ($hash, 1);
     
 return;
 }
@@ -7328,7 +7351,7 @@ sub DbRep_Index {
   my $dbuser     = $dbloghash->{dbuser};
 
   my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
-  my $p          = 0;
+  my $p = 0;
   
   my ($sth,$rows,@six);
     
@@ -7339,7 +7362,7 @@ sub DbRep_Index {
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
   if ($err) {
       $err = encode_base64($err,"");
-      return "$name|''|''|$err";
+      return "$name|$err";
   } 
   
   # Userrechte ermitteln
@@ -7371,14 +7394,13 @@ sub DbRep_Index {
       ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
       if ($err) {
           $err = encode_base64($err,"");
-          return "$name|''|''|$err";
+          return "$name|$err";
       }
   }  
   
   my ($cmd,$idx) = split "_", $cmdidx, 2;
   
-  # SQL-Startzeit
-  my $st = [gettimeofday];
+  my $st = [gettimeofday];                                             # SQL-Startzeit
 
   if($dbmodel =~ /MYSQL/) {
       $sqlallidx = "SELECT TABLE_NAME,INDEX_NAME,COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = '$database';";
@@ -7427,16 +7449,18 @@ sub DbRep_Index {
       Log3 ($name, 2, "DbRep $name - DbRep_Index - $err");
       $err = encode_base64($err,"");
       $dbh->disconnect();
-      return "$name|''|''|$err"; 
+      return "$name|$err";
   }
   
   # alle Indizes auflisten
   Log3($name, 4, "DbRep $name - List all indexes: $sqlallidx");
+  
   my ($sql_table,$sql_idx,$sql_column);
   eval {$sth = $dbh->prepare($sqlallidx);
         $sth->execute();
         $sth->bind_columns(\$sql_table, \$sql_idx, \$sql_column);
        };
+       
   $ret = "";
   
   my ($lt,$li) = ("",""); my $i = 0;
@@ -7459,7 +7483,8 @@ sub DbRep_Index {
       $i++;      
   }
   
-  Log3($name, 3, "DbRep $name - Index found in database:\n$ret"); 
+  Log3($name, 3, "DbRep $name - Index found in database:\n$ret");
+  
   $ret = "Index found in database:\n========================\n".$ret;
   
   if($cmd !~ /list/) { 
@@ -7469,13 +7494,14 @@ sub DbRep_Index {
           eval {@six = $dbh->selectrow_array($sqlava);};
           if (@six) {
               Log3 ($name, 3, "DbRep $name - dropping index $idx ... ");
+              
               eval {$rows = $dbh->do($sqldel);};
               if ($@) {
                   if($cmd !~ /recreate/) {
                       $err = encode_base64($@,"");
                       Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
                       $dbh->disconnect();
-                      return "$name|''|''|$err";
+                      return "$name|$err";
                   }
               } 
               else {
@@ -7486,18 +7512,18 @@ sub DbRep_Index {
           else {
               $ret = "Index $idx doesn't exist, no need to drop it";
               Log3 ($name, 3, "DbRep $name - $ret");
-              
           }
       }
       
       if($sqlcre) {
           Log3 ($name, 3, "DbRep $name - creating index $idx ... ");
+          
           eval {$rows = $dbh->do($sqlcre);};
           if ($@) {
               $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
               $dbh->disconnect();
-              return "$name|''|''|$err";
+              return "$name|$err";
           } 
           else {
               $ret = "Index $idx created";
@@ -7512,14 +7538,12 @@ sub DbRep_Index {
  
   $dbh->disconnect();
   
-  $ret = encode_base64($ret,"");
-  
+  $ret    = encode_base64($ret,"");
   my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
-  
-  Log3 ($name, 5, "DbRep $name -> DbRep_Index finished");
+  $err    = q{};
     
-return "$name|$ret|$rt|''";
+return "$name|$err|$ret|$rt";
 }
 
 ####################################################################################################
@@ -7529,29 +7553,30 @@ sub DbRep_IndexDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : '';
+  my $ret        = $a[2] ? decode_base64($a[2]) : '';
+  my $bt         = $a[3];
+  
   my $hash       = $defs{$name};
-  my $ret        = $a[1]?decode_base64($a[1]):undef;
-  my $bt         = $a[2];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[3]?decode_base64($a[3]):undef;
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_INDEX}{pid}"});
+  
+  delete($hash->{HELPER}{RUNNING_INDEX});
   
   my ($erread, $state) = DbRep_afterproc ($hash, "index");                            # Befehl nach Procedure ausführen
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-      delete($hash->{HELPER}{RUNNING_INDEX});
       return;
   }
- 
-  no warnings 'uninitialized'; 
+  
+  my ($rt,$brt) = split ",", $bt; 
   
   readingsBeginUpdate         ($hash);
   ReadingsBulkUpdateValue     ($hash, "index_state", $ret);
   ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
   readingsEndUpdate           ($hash, 1);  
-
-  delete($hash->{HELPER}{RUNNING_INDEX});
   
 return;
 }
@@ -7609,10 +7634,8 @@ sub DbRep_optimizeTables {
  
   if ($dbmodel =~ /MYSQL/) {
       $query = "SHOW TABLE STATUS FROM `$dbname`";                                            # Eigenschaften der vorhandenen Tabellen ermitteln (SHOW TABLE STATUS -> Rows sind nicht exakt !!)
-
-      Log3 ($name, 3, "DbRep $name - Searching for tables inside database $dbname....");
     
-      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query, "Searching for tables inside database $dbname....");
       return $ret if ($ret);
     
       while ( $value = $sth->fetchrow_hashref()) {
@@ -7656,10 +7679,8 @@ sub DbRep_optimizeTables {
       Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
       
       $query  ="VACUUM";
- 
-      Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
-      
-      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+       
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query, "VACUUM database $dbname....");
       return $ret if ($ret);
      
       $db_MB_end = (split(' ',qx(du -m $hash->{DATABASE})))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);    # Endgröße ermitteln
@@ -7678,11 +7699,10 @@ sub DbRep_optimizeTables {
       $db_MB_start = sprintf("%.2f",$value);
      
       Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
-      Log3 ($name, 3, "DbRep $name - VACUUM database $dbname....");
      
       $query = "vacuum history";
 
-      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
+      ($ret, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query, "VACUUM database $dbname....");
       return $ret if ($ret);
      
       $query = "SELECT pg_size_pretty(pg_database_size('$dbname'))";                      # Endgröße ermitteln
@@ -9164,9 +9184,8 @@ sub DbRep_syncStandbyDone {
   my ($erread, $state) = DbRep_afterproc ($hash, "syncStandby");                         # Befehl nach Procedure ausführen
   
   if ($err) {
-      ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
       return;
   } 
 
@@ -9198,7 +9217,7 @@ sub DbRep_reduceLog {
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
     my $rlpar      = join " ", @a;
     
-    my $err;
+    my $err = q{};
     
     if (!$ots) {
         $err = qq{reduceLog needs at least one of attributes "timeOlderThan", "timeDiffToNow", "timestamp_begin" or "timestamp_end" to be set};
@@ -9210,7 +9229,7 @@ sub DbRep_reduceLog {
     Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 
     my ($dbh,$brt,$ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour);
-    my ($average,$processingDay,$lastUpdH);
+    my ($dbmodel,$average,$processingDay,$lastUpdH);
     my (%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
     
@@ -9245,7 +9264,7 @@ sub DbRep_reduceLog {
         @excludeRegex = split(',',$excludes);
     }
                
-    ($err,$dbh) = DbRep_dbConnect($name, 0);
+    ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
     if ($err) {
         $err = encode_base64($@,"");
         Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
@@ -9262,6 +9281,18 @@ sub DbRep_reduceLog {
     my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
     
+    my $valfilter = AttrVal($name, "valueFilter", undef);                               # Wertefilter
+    
+    my $specs = {
+        hash      => $hash,
+        selspec   => $selspec,
+        device    => $d,
+        reading   => $r,
+        dbmodel   => $dbmodel,
+        valfilter => $valfilter,
+        addon     => $addon
+    };
+    
     if($includes) {                                                                      # Option EX/INCLUDE wurde angegeben
         $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
                .($includes =~ /^(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
@@ -9270,11 +9301,14 @@ sub DbRep_reduceLog {
                ."ORDER BY TIMESTAMP ASC";
     } 
     elsif ($IsTimeSet || $IsAggrSet) {
-        $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,"'$nts'","'$ots'",$addon);
+        $specs->{rsf} = $nts;
+        $specs->{rsn} = $ots;
+        $sql = DbRep_createCommonSql ($specs);
     } 
     else {
-        $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,undef,undef,$addon); 
+        $sql = DbRep_createCommonSql ($specs);
     }
+    
     
     Log3 ($name, 3, "DbRep $name - reduce data older than: $ots (logical corrected), newer than: $nts");
     
@@ -9882,108 +9916,139 @@ return;
 #               SQL-Statement zusammenstellen Common
 ####################################################################################################
 sub DbRep_createCommonSql {
- my ($hash,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
- my $name      = $hash->{NAME};
- my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbmodel   = $dbloghash->{MODEL};
- my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
- my $tnfull    = 0;
- my ($sql,$vf,@dwc,@rwc);
+  my $specs     = shift;
+  my $hash      = $specs->{hash};
+  my $selspec   = $specs->{selspec} // q{};
+  my $device    = $specs->{device};
+  my $reading   = $specs->{reading};
+  my $dbmodel   = $specs->{dbmodel};
+  my $rsf       = $specs->{rsf};
+  my $rsn       = $specs->{rsn};
+  my $valfilter = $specs->{valfilter};
+  my $addon     = $specs->{addon} // q{};
+  
+  my ($sql,$vf,@dwc,@rwc);
  
- my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
+  my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
  
- if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-     $tnfull = 1;
- }
+  my $tnfull = 0;
  
- if(defined $valfilter) {
-     if ($dbmodel eq "POSTGRESQL") {
-         $vf = "VALUE ~ '$valfilter' AND ";
-     } 
-     else {
-         $vf = "VALUE REGEXP '$valfilter' AND ";
-     }
- }
+  if($rsn && $rsn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+      $tnfull = 1;
+  }
  
- $sql = $selspec." ";
- # included devices
- $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
- if($idevswc && $idevs !~ m(^%$)) {
-     @dwc    = split(",",$idevswc);
-     my $i   = 1;
-     my $len = scalar(@dwc);
-     foreach(@dwc) {
-         if($i<$len) {
-             $sql .= "DEVICE LIKE '$_' OR ";
-         } 
-         else {
-             $sql .= "DEVICE LIKE '$_' ";
-         }
-         $i++;
-     }
-     if($idanz) {
-         $sql .= "OR "; 
-     }
- }
- $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
- $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
- $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
- # excluded devices
- if($edevswc) {
-     @dwc = split(",",$edevswc);
-     foreach(@dwc) {
-         $sql .= "DEVICE NOT LIKE '$_' AND ";
-     }
- }
- $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
- $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
- $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
- # included readings
- $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
- if($irdswc && $ireading !~ m(^%$)) {
-     @rwc    = split(",",$irdswc);
-     my $i   = 1;
-     my $len = scalar(@rwc);
-     foreach(@rwc) {
-         if($i<$len) {
-             $sql .= "READING LIKE '$_' OR ";
-         } 
-         else {
-             $sql .= "READING LIKE '$_' ";
-         }
-         $i++;
-     }
-     if($iranz) {
-         $sql .= "OR "; 
-     }
- }
- $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
- $sql .= "READING IN ($ireading) "            if($iranz > 1);
- $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
- # excluded readings
- if($erdswc) {
-     @dwc = split(",",$erdswc);
-     foreach(@dwc) {
-         $sql .= "READING NOT LIKE '$_' AND ";
-     }
- }
- $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
- $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
- $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
- # add valueFilter
- $sql .= $vf if(defined $vf);
- # Timestamp Filter
- if (($tf && $tn)) {
-     $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
- } else {
-     if ($dbmodel eq "POSTGRESQL") {
-         $sql .= "true ";
-     } 
-     else {
-         $sql .= "1 ";
-     }
- }
- $sql .= "$addon;";
+  if(defined $valfilter) {
+      if ($dbmodel eq "POSTGRESQL") {
+          $vf = "VALUE ~ '$valfilter' AND ";
+      } 
+      else {
+          $vf = "VALUE REGEXP '$valfilter' AND ";
+      }
+  }
+ 
+  $sql = $selspec." " if($selspec);
+ 
+  # included devices
+  ###################
+  $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
+  if($idevswc && $idevs !~ m(^%$)) {
+      @dwc    = split ",", $idevswc;
+      my $i   = 1;
+      my $len = scalar(@dwc);
+     
+      for (@dwc) {
+          if($i<$len) {
+              $sql .= "DEVICE LIKE '$_' OR ";
+          } 
+          else {
+              $sql .= "DEVICE LIKE '$_' ";
+          }
+          $i++;
+      }
+     
+      if($idanz) {
+          $sql .= "OR "; 
+      }
+  }
+ 
+  $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
+  $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
+  $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ 
+  # excluded devices
+  ###################
+  if($edevswc) {
+      @dwc = split ",", $edevswc;
+     
+      for (@dwc) {
+          $sql .= "DEVICE NOT LIKE '$_' AND ";
+      }
+  }
+ 
+  $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
+  $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
+  $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
+ 
+  # included readings
+  ####################
+  $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
+  if($irdswc && $ireading !~ m(^%$)) {
+      @rwc    = split ",", $irdswc;
+      my $i   = 1;
+      my $len = scalar(@rwc);
+     
+      for (@rwc) {
+          if($i < $len) {
+              $sql .= "READING LIKE '$_' OR ";
+          } 
+          else {
+              $sql .= "READING LIKE '$_' ";
+          }
+          $i++;
+      }
+     
+      if($iranz) {
+          $sql .= "OR "; 
+      }
+  }
+ 
+  $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
+  $sql .= "READING IN ($ireading) "            if($iranz > 1);
+  $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ 
+  # excluded readings
+  ####################
+  if($erdswc) {
+      @dwc = split ",", $erdswc;
+     
+      for (@dwc) {
+          $sql .= "READING NOT LIKE '$_' AND ";
+      }
+  }
+ 
+  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
+  $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
+  $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
+ 
+  # add valueFilter
+  ##################
+  $sql .= $vf if(defined $vf);
+ 
+  # Timestamp Filter
+  ###################
+  if (($rsf && $rsn)) {
+      $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull ? "<=" : "<")." '$rsn' ";
+  } 
+  else {
+      if ($dbmodel eq "POSTGRESQL") {
+          $sql .= "true ";
+      } 
+      else {
+          $sql .= "1 ";
+      }
+  }
+ 
+  $sql .= "$addon;";
 
 return $sql;
 }
@@ -9992,111 +10057,134 @@ return $sql;
 #               SQL-Statement zusammenstellen für DB-Abfrage Select
 ####################################################################################################
 sub DbRep_createSelectSql {
- my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
- my $name      = $hash->{NAME};
- my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbmodel   = $dbloghash->{MODEL};
- my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
- my $tnfull    = 0;
+  my ($hash,$table,$selspec,$device,$reading,$rsf,$rsn,$addon) = @_;
+  my $name      = $hash->{NAME};
+  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbmodel   = $dbloghash->{MODEL};
+  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
+  
+  my ($sql,$vf,@dwc,@rwc);
  
- my ($sql,$vf,@dwc,@rwc);
+  my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
  
- my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
+  my $tnfull = 0;
  
- if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-     $tnfull = 1;
- }
+  if($rsn && $rsn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+      $tnfull = 1;
+  }
  
- if(defined $valfilter) {
-     if ($dbmodel eq "POSTGRESQL") {
-         $vf = "VALUE ~ '$valfilter' AND ";
-     } else {
-         $vf = "VALUE REGEXP '$valfilter' AND ";
-     }
- }
+  if(defined $valfilter) {
+      if ($dbmodel eq "POSTGRESQL") {
+          $vf = "VALUE ~ '$valfilter' AND ";
+      } 
+      else {
+          $vf = "VALUE REGEXP '$valfilter' AND ";
+      }
+  }
  
- $sql = "SELECT $selspec FROM $table where ";
+  $sql = "SELECT $selspec FROM $table where ";
  
- # included devices
- $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
- if($idevswc && $idevs !~ m(^%$)) {
-     @dwc    = split(",",$idevswc);
-     my $i   = 1;
-     my $len = scalar(@dwc);
-     foreach(@dwc) {
-         if($i<$len) {
-             $sql .= "DEVICE LIKE '$_' OR ";
-         } else {
-             $sql .= "DEVICE LIKE '$_' ";
-         }
-         $i++;
-     }
-     if($idanz) {
-         $sql .= "OR "; 
-     }
- }
- $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
- $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
- $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
+  # included devices
+  ###################
+  $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
+  if($idevswc && $idevs !~ m(^%$)) {
+      @dwc    = split ",", $idevswc;
+      my $i   = 1;
+      my $len = scalar(@dwc);
+     
+      for (@dwc) {
+          if($i<$len) {
+              $sql .= "DEVICE LIKE '$_' OR ";
+          } else {
+              $sql .= "DEVICE LIKE '$_' ";
+          }
+          $i++;
+      }
+     
+      if($idanz) {
+          $sql .= "OR "; 
+      }
+  }
  
- # excluded devices
- if($edevswc) {
-     @dwc = split(",",$edevswc);
-     foreach(@dwc) {
-         $sql .= "DEVICE NOT LIKE '$_' AND ";
-     }
- }
- $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
- $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
- $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
+  $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
+  $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
+  $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
  
- # included readings
- $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
- if($irdswc && $ireading !~ m(^%$)) {
-     @rwc    = split(",",$irdswc);
-     my $i   = 1;
-     my $len = scalar(@rwc);
-     foreach(@rwc) {
-         if($i<$len) {
-             $sql .= "READING LIKE '$_' OR ";
-         } else {
-             $sql .= "READING LIKE '$_' ";
-         }
-         $i++;
-     }
-     if($iranz) {
-         $sql .= "OR "; 
-     }
- }
- $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
- $sql .= "READING IN ($ireading) "            if($iranz > 1);
- $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
+  # excluded devices
+  ###################
+  if($edevswc) {
+      @dwc = split(",",$edevswc);
+     
+      for (@dwc) {
+          $sql .= "DEVICE NOT LIKE '$_' AND ";
+      }
+  }
  
- # excluded readings
- if($erdswc) {
-     @dwc = split(",",$erdswc);
-     foreach(@dwc) {
-         $sql .= "READING NOT LIKE '$_' AND ";
-     }
- }
- $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
- $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
- $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
+  $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
+  $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
+  $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
  
- # add valueFilter
- $sql .= $vf if(defined $vf);
+  # included readings
+  ####################
+  $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
+  if($irdswc && $ireading !~ m(^%$)) {
+      @rwc    = split ",", $irdswc;
+      my $i   = 1;
+      my $len = scalar(@rwc);
+     
+      for (@rwc) {
+          if($i<$len) {
+              $sql .= "READING LIKE '$_' OR ";
+          } 
+          else {
+              $sql .= "READING LIKE '$_' ";
+          }
+         
+          $i++;
+      }
+     
+      if($iranz) {
+          $sql .= "OR "; 
+      }
+  }
  
- # Timestamp Filter
- if (($tf && $tn)) {
-     $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
- } else {
-     if ($dbmodel eq "POSTGRESQL") {
-         $sql .= "true ";
-     } else {
-         $sql .= "1 ";
-     }
- }
- $sql .= "$addon;";
+  $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
+  $sql .= "READING IN ($ireading) "            if($iranz > 1);
+  $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ 
+  # excluded readings
+  ####################
+  if($erdswc) {
+      @dwc = split ",", $erdswc;
+     
+      for (@dwc) {
+          $sql .= "READING NOT LIKE '$_' AND ";
+      }
+  }
+ 
+  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
+  $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
+  $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
+ 
+  # add valueFilter
+  ##################
+  $sql .= $vf if(defined $vf);
+ 
+  # Timestamp Filter
+  ###################
+  if (($rsf && $rsn)) {
+      $sql .= "TIMESTAMP >= $rsf AND TIMESTAMP ".($tnfull?"<=":"<")." $rsn ";
+  } 
+  else {
+      if ($dbmodel eq "POSTGRESQL") {
+          $sql .= "true ";
+      } 
+      else {
+          $sql .= "1 ";
+      }
+  }
+ 
+  $sql .= "$addon;";
 
 return $sql;
 }
@@ -10105,7 +10193,7 @@ return $sql;
 #  SQL-Statement zusammenstellen für Löschvorgänge
 ####################################################################################################
 sub DbRep_createDeleteSql {
- my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
+ my ($hash,$table,$device,$reading,$rsf,$rsn,$addon) = @_;
  my $name      = $hash->{NAME};
  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbmodel   = $dbloghash->{MODEL};
@@ -10120,33 +10208,39 @@ sub DbRep_createDeleteSql {
  
  my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
  
- if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+ if($rsn && $rsn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
  }
  
  if(defined $valfilter) {
      if ($dbmodel eq "POSTGRESQL") {
          $vf = "VALUE ~ '$valfilter' AND ";
-     } else {
+     } 
+     else {
          $vf = "VALUE REGEXP '$valfilter' AND ";
      }
  }
  
  $sql = "delete FROM $table where ";
+ 
  # included devices
+ ###################
  $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
  if($idevswc && $idevs !~ m(^%$)) {
      @dwc    = split(",",$idevswc);
      my $i   = 1;
      my $len = scalar(@dwc);
-     foreach(@dwc) {
+     
+     for (@dwc) {
          if($i<$len) {
              $sql .= "DEVICE LIKE '$_' OR ";
-         } else {
+         } 
+         else {
              $sql .= "DEVICE LIKE '$_' ";
          }
          $i++;
      }
+     
      if($idanz) {
          $sql .= "OR "; 
      }
@@ -10154,23 +10248,29 @@ sub DbRep_createDeleteSql {
  $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
  $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
  $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ 
  # excluded devices
+ ###################
  if($edevswc) {
      @dwc = split(",",$edevswc);
-     foreach(@dwc) {
+     
+     for (@dwc) {
          $sql .= "DEVICE NOT LIKE '$_' AND ";
      }
  }
  $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
  $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
  $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
+ 
  # included readings
+ ####################
  $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
  if($irdswc && $ireading !~ m(^%$)) {
      @rwc    = split(",",$irdswc);
      my $i   = 1;
      my $len = scalar(@rwc);
-     foreach(@rwc) {
+     
+     for (@rwc) {
          if($i<$len) {
              $sql .= "READING LIKE '$_' OR ";
          } else {
@@ -10185,21 +10285,28 @@ sub DbRep_createDeleteSql {
  $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
  $sql .= "READING IN ($ireading) "            if($iranz > 1);
  $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ 
  # excluded readings
+ ####################
  if($erdswc) {
      @dwc = split(",",$erdswc);
-     foreach(@dwc) {
+     
+     for (@dwc) {
          $sql .= "READING NOT LIKE '$_' AND ";
      }
  }
  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
  $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
  $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
+ 
  # add valueFilter
+ ##################
  $sql .= $vf if(defined $vf);
+ 
  # Timestamp Filter
- if ($tf && $tn) {
-     $sql .= "TIMESTAMP >= '$tf' AND TIMESTAMP ".($tnfull?"<=":"<")." '$tn' $addon;";
+ ###################
+ if ($rsf && $rsn) {
+     $sql .= "TIMESTAMP >= '$rsf' AND TIMESTAMP ".($tnfull?"<=":"<")." '$rsn' $addon;";
  } else {
      if ($dbmodel eq "POSTGRESQL") {
          $sql .= "true;";
@@ -10216,8 +10323,9 @@ return $sql;
 ####################################################################################################
 sub DbRep_specsForSql {
  my $hash    = shift;
- my $device  = shift;
- my $reading = shift;
+ my $device  = shift // q{};
+ my $reading = shift // q{};
+ 
  my $name    = $hash->{NAME};
  
  my (@idvspcs,@edvspcs,@idvs,@edvs,@idvswc,@edvswc,@residevs,@residevswc);
@@ -10238,16 +10346,16 @@ sub DbRep_specsForSql {
  
  # Devices exkludiert
  if($edevice) {
-     @edvs             = split(",",$edevice); 
+     @edvs             = split ",", $edevice; 
      ($edevs,$edevswc) = DbRep_resolveDevspecs($name,$edevice,\@edvs);                                           
  }
  
- $edanz = split(",",$edevs);                                         # Anzahl der exkludierten Elemente (Lauf1)
+ $edanz = split ",", $edevs;                                         # Anzahl der exkludierten Elemente (Lauf1)
  
  # Devices inkludiert
- @idvs             = split(",",$idevice);
+ @idvs             = split ",", $idevice;
  ($idevs,$idevswc) = DbRep_resolveDevspecs($name,$idevice,\@idvs);
- $idanz            = split(",",$idevs);                              # Anzahl der inkludierten Elemente (Lauf1)
+ $idanz            = split ",", $idevs;                              # Anzahl der inkludierten Elemente (Lauf1)
  
  Log3 $name, 5, "DbRep $name - Devices for operation - \n"
                 ."included ($idanz): $idevs \n"
@@ -10256,8 +10364,8 @@ sub DbRep_specsForSql {
                 ."excluded with wildcard: $edevswc";
  
  # exkludierte Devices aus inkludierten entfernen (aufgelöste)
- @idvs = split(",",$idevs);
- @edvs = split(",",$edevs);
+ @idvs = split ",", $idevs;
+ @edvs = split ",", $edevs;
  
  for my $in (@idvs) {
      my $inc = 1;
@@ -10271,11 +10379,12 @@ sub DbRep_specsForSql {
      
      push(@residevs, $in) if($inc);
  }
- $edevs = join(",", map {($_ !~ /$nl/)?$_:();} @edvs) if($nl);
+ 
+ $edevs = join (",", map {($_ !~ /$nl/) ? $_ : ();} @edvs) if($nl);
  
  # exkludierte Devices aus inkludierten entfernen (wildcard konnte nicht aufgelöst werden)
- @idvswc = split(",",$idevswc);
- @edvswc = split(",",$edevswc);
+ @idvswc = split ",", $idevswc;
+ @edvswc = split ",", $edevswc;
  
  for my $inwc (@idvswc) {
      my $inc = 1;
@@ -10287,24 +10396,24 @@ sub DbRep_specsForSql {
          $nlwc .= $w;                                                # Liste der entfernten devices füllen
      }
      
-     push(@residevswc, $inwc) if($inc);
+     push @residevswc, $inwc if($inc);
  }
- $edevswc = join(",", map {($_ !~ /$nlwc/)?$_:();} @edvswc) if($nlwc);
+ $edevswc = join (",", map {($_ !~ /$nlwc/) ? $_ : ();} @edvswc) if($nlwc);
  
  # Ergebnis zusammenfassen
- $idevs   = join(",",@residevs);
+ $idevs   = join ",", @residevs;
  $idevs   =~ s/'/''/g;                                               # escape ' with ''
- $idevswc = join(",",@residevswc);
+ $idevswc = join ",", @residevswc;
  $idevswc =~ s/'/''/g;                                               # escape ' with ''
  
- $idanz = split(",",$idevs);                                         # Anzahl der inkludierten Elemente (Lauf2)
+ $idanz = split ",", $idevs;                                         # Anzahl der inkludierten Elemente (Lauf2)
 
  if($idanz > 1) {
      $idevs =~ s/,/','/g;
      $idevs = "'".$idevs."'";
  }
  
- $edanz = split(",",$edevs);                                         # Anzahl der exkludierten Elemente (Lauf2)
+ $edanz = split ",", $edevs;                                         # Anzahl der exkludierten Elemente (Lauf2)
 
  if($edanz > 1) {
      $edevs =~ s/,/','/g;
@@ -10321,14 +10430,14 @@ sub DbRep_specsForSql {
  
  if($reading =~ /EXCLUDE=/i) {
      ($ireading,$ereading) = split(/EXCLUDE=/i,$reading);
-     $ireading = $ireading ? DbRep_trim($ireading) : "%";
+     $ireading = $ireading ? DbRep_trim ($ireading) : "%";
  } 
  else {
      $ireading = $reading;
  }
 
  if($ereading) {
-     @erds = split(",",$ereading); 
+     @erds = split ",", $ereading; 
      
      for my $e (@erds) {
          if($e =~ /%/ && $e !~ /^%$/) {                              # Readings mit Wildcard (%) erfassen
@@ -10342,7 +10451,7 @@ sub DbRep_specsForSql {
      }                                           
  }
  
- @irds  = split(",",$ireading);                                      # Readings inkludiert
+ @irds  = split ",", $ireading;                                      # Readings inkludiert
  
  for my $i (@irds) {
      if($i =~ /%/ && $i !~ /^%$/) {                                  # Readings mit Wildcard (%) erfassen
@@ -10355,7 +10464,7 @@ sub DbRep_specsForSql {
      }
  }
  
- $iranz = split(",",$irdgs);
+ $iranz = split ",", $irdgs;
  
  if($iranz > 1) {
      $irdgs =~ s/,/','/g;
@@ -10363,7 +10472,7 @@ sub DbRep_specsForSql {
  }
  
  if($ereading) {                                                     # Readings exkludiert
-     $eranz = split(",",$erdgs);
+     $eranz = split ",", $erdgs;
      if($eranz > 1) {
          $erdgs =~ s/,/','/g;
          $erdgs = "'".$erdgs."'";
@@ -10416,12 +10525,13 @@ sub DbRep_prepareOnly {
   my $name = shift; 
   my $dbh  = shift;
   my $sql  = shift;
+  my $info = shift // "SQL prepare: $sql";
   
   my $ret  = q{};
   
   my ($sth,$err);
   
-  Log3 ($name, 4, "DbRep $name - SQL prepare: $sql");
+  Log3 ($name, 4, "DbRep $name - $info");
   
   eval{ $sth = $dbh->prepare($sql);
       } 
@@ -10442,27 +10552,25 @@ sub DbRep_prepareExecuteQuery {
   my $name = shift; 
   my $dbh  = shift;
   my $sql  = shift;
+  my $info = shift // "SQL execute: $sql";
   
   my $ret  = q{};
   
-  my ($sth,$err);
+  my ($sth,$err,$r);
   
-  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+  Log3 ($name, 4, "DbRep $name - $info");
   
   eval{ $sth = $dbh->prepare($sql);
-        $sth->execute();
+        $r   = $sth->execute();
       } 
       or do { $err = encode_base64($@,"");
-     
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              
               $sth->finish;
               $dbh->disconnect;
-              
               $ret = "$name|$err";
             };
 
-return ($ret, $sth);
+return ($ret, $sth, $r);
 }
 
 ####################################################################################################
@@ -10472,14 +10580,76 @@ sub DbRep_dbhDo {
   my $name = shift; 
   my $dbh  = shift;
   my $sql  = shift;
+  my $info = shift // "simple do statement: $sql";
   
   my $ret  = q{};
   
   my ($sth,$err);
   
-  Log3 ($name, 4, "DbRep $name - simple do statement: $sql");
+  Log3 ($name, 4, "DbRep $name - $info");
   
   eval{ $dbh->do($sql);
+      } 
+      or do { $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - ERROR - $@");
+              $dbh->disconnect;
+              $ret = "$name|$err";
+            };
+
+return $ret;
+}
+
+####################################################################################################
+#          nur Datenbank "begin transaction"
+#       $dbh->{AutoCommit} = 0;  # enable transactions, if possible
+#           oder
+#       $dbh->begin_work();
+####################################################################################################
+sub DbRep_beginDatabaseTransaction {
+  my $name = shift; 
+  my $dbh  = shift;
+  my $info = shift // "begin transaction";
+  
+  my $ret  = q{};
+  
+  my $err;
+  
+  eval{ if($dbh->{AutoCommit}) {
+            $dbh->begin_work();
+            Log3 ($name, 4, "DbRep $name - $info");
+            1;
+        }
+      } 
+      or do { $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - ERROR - $@");
+              $dbh->disconnect;
+              $ret = "$name|$err";
+            };
+
+return $ret;
+}
+
+####################################################################################################
+#          nur Datenbank "commit"
+####################################################################################################
+sub DbRep_commitOnly {
+  my $name = shift; 
+  my $dbh  = shift;
+  my $info = shift // "transaction committed";
+  
+  my $ret  = q{};
+  
+  my $err;
+  
+  eval{ if(!$dbh->{AutoCommit}) {
+            $dbh->commit();
+            Log3 ($name, 4, "DbRep $name - $info");
+            1;
+        }
+        else {
+            Log3 ($name, 4, "DbRep $name - data autocommitted");
+            1;
+        }
       } 
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -14080,20 +14250,25 @@ return;
                                  will are listed. <br><br>
                                  </li><br>
 
-    <li><b> sqlCmd </b>        - Execute an arbitrary user specific command. <br>
-                                 If the command contains a operation to delete data, the attribute <a href="#allowDeletion">'allowDeletion'</a> 
-                                 has to be set for security reason. <br>
-                                 The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
-                                 respectively "aggregation". <br>
-                                 This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
-                                 @closed:=NULL;" or the usage of SQLite PRAGMA before execution the SQL-Statement.
+    <li><b> sqlCmd </b>        - executes any user-specific command.  <br>
+                                 If this command contains a delete operation, for safety reasons the attribute 
+                                 <a href="#allowDeletion">allowDeletion</a> has to be set. <br>
+
+                                 sqlCmd also accepts the setting of SQL session variables such as.
+                                 "SET @open:=NULL, @closed:=NULL;" or the use of SQLite PRAGMA prior to the 
+                                 execution of the SQL statement.
                                  If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
-                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                
+                                 attribute <a href="#sqlCmdVars">sqlCmdVars</a> can be set. <br><br>
+                                 
                                  If the attributes <a href="#device">device</a>, <a href="#reading">reading</a>, 
-                                 <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
+                                 <a href="#timestamp_begin">timestamp_begin</a> respectively 
+                                 <a href="#timestamp_end">timestamp_end</a>
                                  set in the module are to be taken into account in the statement, 
                                  the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
-                                 <b>§timestamp_end§</b> can be used for this purpose. <br><br>
+                                 <b>§timestamp_end§</b> can be used for this purpose. <br>
+                                 It should be noted that the placeholders §device§ and §reading§ complex are resolved and 
+								 should be applied accordingly as in the example below.                                  
+                                 <br><br>
                                  
                                  If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
                                  original timestamp. <br><br>
@@ -14113,6 +14288,8 @@ return;
                                  <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
                                  <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
                                  <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where §device§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE  </li>
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, READING, count(*) from history where §device§ AND §reading§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE, READING  </li>
                                  </ul>
                                  <br>
                                  
@@ -14138,13 +14315,15 @@ return;
                                  <br>
                                  
                                  The result of the statement will be shown in <a href="#DbRepReadings">Reading</a> "SqlResult".
-                                 The formatting of result can be choosen by <a href="#DbRepattr">attribute</a> "sqlResultFormat", as well as the used
-                                 field separator can be determined by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep". <br><br>
+                                 The formatting of result can be choosen by attribute <a href="#sqlResultFormat">sqlResultFormat</a>, 
+                                 as well as the used field separator can be determined by attribute 
+                                 <a href="#sqlResultFieldSep">sqlResultFieldSep</a>. <br><br>
                             
                                  The module provides a command history once a sqlCmd command was executed successfully.
-                                 To use this option, activate the attribute "sqlCmdHistoryLength" with list lenght you want. <br><br>
+                                 To use this option, activate the attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> 
+                                 with list lenght you want. <br><br>
                                  
-                                 For a better overview the relevant attributes for sqlCmd are listed in a table: <br><br>
+                                 The attributes relevant for controlling sqlCmd are: <br><br>
 
                                    <ul>
                                    <table>  
@@ -16866,19 +17045,21 @@ return;
     <li><b> sqlCmd </b>        - führt ein beliebiges benutzerspezifisches Kommando aus. <br>
                                  Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das Attribut
                                  <a href="#allowDeletion">allowDeletion</a> gesetzt sein. <br>
-                                 Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
-                                 "device", "reading", "time.*" bzw. "aggregation" berücksichtigt. <br>
-                                 Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+                                 sqlCmd akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
                                  "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der 
                                  Ausführung des SQL-Statements.
                                  Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements 
                                  gesetzt werden, kann dafür das Attribut <a href="#sqlCmdVars">sqlCmdVars</a> 
-                                 verwendet werden. <br>
+                                 verwendet werden. <br><br>
+
                                  Sollen die im Modul gesetzten Attribute <a href="#device">device</a>, <a href="#reading">reading</a>,
                                  <a href="#timestamp_begin">timestamp_begin</a> bzw. 
                                  <a href="#timestamp_end">timestamp_end</a> im Statement berücksichtigt werden, können die Platzhalter 
                                  <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> bzw. 
-                                 <b>§timestamp_end§</b> dafür verwendet werden. <br><br>
+                                 <b>§timestamp_end§</b> eingesetzt werden. <br>
+                                 Dabei ist zu beachten, dass die Platzhalter §device§ und §reading§ komplex aufgelöst werden
+                                 und dementsprechend wie im unten stehenden Beispiel anzuwenden sind.                                 
+                                 <br><br>
                                  
                                  Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
                                  originalen Timestamps zu verhindern. <br><br>
@@ -16898,6 +17079,8 @@ return;
                                  <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
                                  <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
                                  <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>    
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where §device§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE  </li>
+                                 <li>set &lt;name&gt; sqlCmd select DEVICE, READING, count(*) from history where §device§ AND §reading§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE, READING  </li>
                                  </ul>
                                  <br>
                                  
@@ -16923,16 +17106,16 @@ return;
                                  <br>                                 
                                  
                                  Das Ergebnis des Statements wird im <a href="#DbRepReadings">Reading</a> "SqlResult" dargestellt.
-                                 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" ausgewählt, sowie der verwendete
-                                 Feldtrenner durch das <a href="#DbRepattr">Attribut</a> "sqlResultFieldSep" festgelegt werden. <br><br>
+                                 Die Ergebnis-Formatierung kann durch das Attribut <a href="#sqlResultFormat">sqlResultFormat</a> ausgewählt, 
+                                 sowie der verwendete Feldtrenner durch das Attribut <a href="#sqlResultFieldSep">sqlResultFieldSep</a> 
+                                 festgelegt werden. <br><br>
                                  
                                  Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich 
                                  ausgeführt wurde.
-                                 Um diese Option zu nutzen, ist das Attribut "sqlCmdHistoryLength" mit der gewünschten Listenlänge
-                                 zu aktivieren. <br><br>
+                                 Um diese Option zu nutzen, ist das Attribut <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> mit der 
+                                 gewünschten Listenlänge zu aktivieren. <br><br>
                                  
-                                 Zur besseren Übersicht sind die zur Steuerung von sqlCmd relevanten Attribute hier noch einmal
-                                 dargestellt: <br><br>
+                                 Die zur Steuerung von sqlCmd relevanten Attribute sind: <br><br>
 
                                    <ul>
                                    <table>  
