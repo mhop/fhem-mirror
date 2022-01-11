@@ -4108,6 +4108,7 @@ Dispatch($$;$$)
     $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
+        next if($modules{$m}{LOADED}); # checked in the loop above, #125292
         if($dmsg =~ m/$h->{$m}/s) {
           my ($order, $mname) = split(":", $m);
 
@@ -4129,6 +4130,7 @@ Dispatch($$;$$)
                   last;
                 }
               }
+              delete($hash->{".clientArray"});
 
             } else {
               Log 0, "ERROR: Cannot autoload $mname";
@@ -4140,7 +4142,6 @@ Dispatch($$;$$)
             return undef;
 
           }
-          delete($hash->{".clientArray"});
         }
       }
     }
