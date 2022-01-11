@@ -27,6 +27,7 @@ par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp \
   (tele|stat|shellies|valetudo|Advantech)/([^/]+)/.*:.* "$2"\
+  (shellyp(lus|ro4pm)[^/:_]{4,}+)/.*:.* "$1"\
   zigbee2mqtt/bridge/.*:.* "zigbee2mqtt"\
   sonos/connected.* "sonos"\
   tvheadend/[^/:]+.* "tvheadend"\
@@ -39,15 +40,16 @@ attr DEVICE bridgeRegexp \
   go-eCharger/([^/]+)/.*:.* "go_eCharger_$1"\
   owntracks/[^/]+/([^/:]+).* "owntracks_$1"\
   home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
+  instar/([^/]+)/.*:.* "instar_$1"\
   homeassistant/.*/config:.* ""\
-  instar/([^/]+)/.*:.* "instar_$1"
+  tasmota/discovery/[^/:]+/(config|sensors):.* ""
 attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith|IODev).*");return undef}
 attr DEVICE autocreate 1
 attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results... Especially make sure to not have two regexpes that may both match!
 attr DEVICE setStateList on off
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20210305
+setreading DEVICE attrTemplateVersion 20220110
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -939,12 +941,14 @@ attr DEVICE setList \
 attr DEVICE stateFormat Measured: temperature Battery: battery %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:btnLock current_heating_setpoint:desired-temp local_temperature:temperature
+attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:btnLock current_heating_setpoint:desired-temp local_temperature:temperature battery:batteryPercent voltage:batterymV
+attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_eurotronic_spirit
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210211
+setreading DEVICE attrTemplateVersion 20220110
+
 
 name:zigbee2mqtt_thermostat_with_weekrofile
 desc: Developed for <a href="https://zigbee.blakadder.com/Moes_HY368-ZB.html">Model HY368-ZB manufactured by Moes</a> via zigbee2mqtt <br>Might not completely work for all firmware versions and also some commands seem not yet to be fully integrated on the zigbee2mqtt side... <br>To contribute, participate in <a href="https://forum.fhem.de/index.php/topic,116535.0.html">Forum Thread</a>
@@ -981,13 +985,13 @@ Measured: temperature Battery: batteryPercent %
 attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode battery:batteryPercent voltage:batterymV
 attr DEVICE setStateList on off
-attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20211019
+setreading DEVICE attrTemplateVersion 20220110
 
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1145005.html#msg1145005
 name:zigbee2mqtt_thermostat_without_weekprofile
@@ -1009,14 +1013,14 @@ attr DEVICE setList \
 attr DEVICE periodicCmd temperature:55
 attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
-attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode voltage:batterymV
 attr DEVICE stateFormat btnLock\
 Measured: temperature Battery: batteryPercent %
-attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}, batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 attr DEVICE model zigbee2mqtt_thermostat_without_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20210406
+setreading DEVICE attrTemplateVersion 20220110
 
 ###########################################
 # TASMOTA
@@ -3343,12 +3347,12 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
   fhem2shelly/rpc:.* {}
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen';; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state params_switch_0_aenergy_total:aenergy_total params_switch_0_apower:apower temperature_tC:temperature temperature_tF:0 params_wifi_sta_ip:ip 
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
+attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total params_switch_0_apower:apower temperature_tC:temperature temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
-setreading DEVICE attrTemplateVersion 20220104
+setreading DEVICE attrTemplateVersion 20220110
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -3359,10 +3363,10 @@ desc:Early version of a base template for second generation shelly devices (name
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
-attr DEVICE jsonMap switch_state:state params_switch_0_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE model shellyPlus_1pm
-setreading DEVICE attrTemplateVersion 20220104
+setreading DEVICE attrTemplateVersion 20220110
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
