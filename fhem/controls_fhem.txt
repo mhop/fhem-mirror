@@ -1,11 +1,11 @@
-REV 25447
+REV 25454
 DIR unused
-UPD 2022-01-10_07:45:02 371673 ./CHANGED
+UPD 2022-01-11_07:45:03 371802 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-01-03_07:45:03 44989 ./MAINTAINER.txt
 UPD 2021-10-25_07:45:03 42987 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2021-12-21_07:45:12 169145 ./fhem.pl
+UPD 2022-01-11_07:45:12 169149 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2021-08-02_07:45:03 60624 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -163,7 +163,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2020-11-26_07:45:03 17982 FHEM/30_tradfri.pm
 UPD 2020-02-06_07:45:08 29570 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2022-01-10_07:45:02 86415 FHEM/31_HUEDevice.pm
+UPD 2022-01-11_07:45:03 86454 FHEM/31_HUEDevice.pm
 UPD 2021-12-16_07:45:03 36760 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -447,7 +447,7 @@ UPD 2021-11-16_07:45:04 18721 FHEM/91_watchdog.pm
 UPD 2021-09-14_07:45:02 62429 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2022-01-01_07:45:06 459739 FHEM/93_DbLog.pm
-UPD 2022-01-04_07:45:03 979982 FHEM/93_DbRep.pm
+UPD 2022-01-11_07:45:03 983700 FHEM/93_DbRep.pm
 UPD 2021-09-17_07:45:02 23547 FHEM/93_FHEM2FHEM.pm
 UPD 2021-02-07_07:45:02 33015 FHEM/93_InfluxDBLogger.pm
 UPD 2021-03-02_07:45:03 176340 FHEM/93_Log2Syslog.pm
@@ -643,7 +643,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2021-12-26_07:45:02 8458 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-01-10_07:45:02 356398 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-01-11_07:45:03 356762 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -735,12 +735,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-01-08_07:45:06 4606212 docs/commandref.html
-UPD 2022-01-07_07:45:09 2813265 docs/commandref_DE.html
+UPD 2022-01-11_07:45:07 4606839 docs/commandref.html
+UPD 2022-01-11_07:45:09 2813706 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2022-01-10_07:45:10 264763 docs/commandref_modular.html
-UPD 2022-01-10_07:45:12 275822 docs/commandref_modular_DE.html
+UPD 2022-01-11_07:45:10 264763 docs/commandref_modular.html
+UPD 2022-01-11_07:45:12 275822 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2019,6 +2019,8 @@ UPD 2015-07-28_14:05:33 1460 www/images/openautomation/fts_window_roof_open_1.sv
 UPD 2015-07-28_14:05:33 1575 www/images/openautomation/fts_window_roof_open_2.svg
 UPD 2015-07-28_14:05:33 2638 www/images/openautomation/fts_window_roof_shutter.svg
 UPD 2021-01-10_07:45:02 1562 www/images/openautomation/gefrierschrank.svg
+UPD 2022-01-11_07:45:03 9152 www/images/openautomation/hm_module_sensor.svg
+UPD 2022-01-11_07:45:03 8804 www/images/openautomation/hm_module_switch.svg
 UPD 2018-11-20_07:45:03 1008 www/images/openautomation/iconalias.txt
 UPD 2015-07-28_14:05:33 1469 www/images/openautomation/it_camera.svg
 UPD 2021-01-10_07:45:02 1028 www/images/openautomation/it_cpu.svg
@@ -2217,6 +2219,8 @@ UPD 2015-07-28_14:05:33 1651 www/images/openautomation/status_locked.svg
 UPD 2015-07-28_14:05:33 2065 www/images/openautomation/status_night.svg
 UPD 2015-07-28_14:05:33 1671 www/images/openautomation/status_open.svg
 UPD 2015-07-28_14:05:33 1617 www/images/openautomation/status_standby.svg
+UPD 2022-01-11_07:45:03 2869 www/images/openautomation/taster_ch6_8.svg
+UPD 2022-01-11_07:45:03 2878 www/images/openautomation/taster_ch6_9.svg
 UPD 2015-07-28_14:05:33 2716 www/images/openautomation/temp_control.svg
 UPD 2015-07-28_14:05:33 3038 www/images/openautomation/temp_frost.svg
 UPD 2015-07-28_14:05:33 2117 www/images/openautomation/temp_inside.svg
