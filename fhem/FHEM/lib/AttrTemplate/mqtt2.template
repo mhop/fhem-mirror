@@ -11,7 +11,7 @@
 ###########################################
 name:General_Info
 filter:TYPE=MQTT2_DEVICE
-desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
+desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread</a> for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
 order:000000
 
 ###############
