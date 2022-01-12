@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.2";
+my $Signalbot_VERSION="3.3";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -50,6 +50,7 @@ my %sets = (
   "contacts"      => "all,nonblocked",			#V0.8.1+
   "groups"        => "all,active,nonblocked",	#V0.8.1+
   "accounts"      => "noArg",					#V0.9.0+
+  "favorites"     => "noArg",
 #  "introspective" => "noArg"
 );
 
@@ -111,6 +112,7 @@ sub Signalbot_Initialize($) {
   $hash->{GetFn}     = 	"Signalbot_Get";
   $hash->{UndefFn}   = 	"Signalbot_Undef";
   $hash->{MessageReceived} = "Signalbot_MessageReceived";
+  $hash->{MessageReceivedV2} = "Signalbot_MessageReceivedV2";
   $hash->{ReceiptReceived} = "Signalbot_ReceiptReceived";
   $hash->{version}		= "Signalbot_Version_cb";
   $hash->{updateGroup}  = "Signalbot_UpdateGroup_cb";
@@ -125,6 +127,8 @@ sub Signalbot_Initialize($) {
 												"authTimeout ".
 												"authDev ".
 												"cmdKeyword ".
+												"cmdFavorite ".
+												"favorites ".
 												"autoJoin:yes,no ".
 												"registerMethod:SMS,Voice ".
 												"$readingFnAttributes";
@@ -366,11 +370,11 @@ sub Signalbot_Set($@) {					#
 
 		#Check for embedded fhem/perl commands
 		my $err;
-		($err, @recipients) = SignalBot_replaceCommands($hash,@recipients);
+		($err, @recipients) = Signalbot_replaceCommands($hash,@recipients);
 		if ($err) { return $err; }
-		($err, @groups) = SignalBot_replaceCommands($hash,@groups);
+		($err, @groups) = Signalbot_replaceCommands($hash,@groups);
 		if ($err) { return $err; }
-		($err, @attachments) = SignalBot_replaceCommands($hash,@attachments);
+		($err, @attachments) = Signalbot_replaceCommands($hash,@attachments);
 		if ($err) { return $err; }
 		
 		#Am Schluss eine Schleife über die Attachments und alle die mit /tmp/signalbot anfangen löschen (unlink)
@@ -474,6 +478,27 @@ sub Signalbot_Get($@) {
 			$ret.=$account."\n";
 		}
 		return $ret;
+	} elsif ($cmd eq "favorites") {
+		my @fav=split(";",AttrVal($name,"favorites",""));
+		return "No favorites defined" if @fav==0;
+		my $ret="Defined favorites:\n\n";
+		my $format="%2i (%s) %-15s %-50s\n";
+		$ret.="ID (A) Alias           Command\n";
+		my $cnt=1;
+		foreach (@fav) {
+			my $ff=$_;
+			$ff =~ /(\[(.*)\])?([\-]?)(.*)/;
+			my $aa="y";
+			if ($3 eq "-") {
+				$aa="n";
+			}
+			my $alias=$2;
+			$alias="" if !defined $2;
+			$ret.=sprintf($format,$cnt,$aa,$alias,$4);
+			$cnt++;
+		}
+		$ret.="\n(A)=GoogleAuth required to execute command";
+		return $ret;
 	}
 	
 	if ($gets{$cmd} =~ /$arg/) {
@@ -563,7 +588,7 @@ sub Signalbot_command($@){
 				$hash->{helper}{auth}{$sender}=1;
 				#Remove potential old timer so countdown start from scratch
 				RemoveInternalTimer("$hash->{NAME} $sender");
-				InternalTimer(gettimeofday() + $timeout, 'SignalBot_authTimeout', "$hash->{NAME} $sender", 0);
+				InternalTimer(gettimeofday() + $timeout, 'Signalbot_authTimeout', "$hash->{NAME} $sender", 0);
 				Signalbot_sendMessage($hash,$sender,"","You have control for ".$timeout."s");
 				$cmd=$restcmd;
 			} else {
@@ -573,8 +598,65 @@ sub Signalbot_command($@){
 				return $cmd;
 			}
 		}
+		my $auth=0;
+		if (defined $hash->{helper}{auth}{$sender} && $hash->{helper}{auth}{$sender}==1) {
+			$auth=1;
+		}
+		my $fav=AttrVal($hash->{NAME},"cmdFavorite",undef);
+		if (defined $fav && defined $cc[0] && $cc[0] eq $fav) {
+			shift @cc;
+			my @favorites=split(";",AttrVal($hash->{NAME},"favorites",""));
+			if (@cc>0) {
+				Log3 $hash->{NAME}, 4, $hash->{NAME}.": $sender executes favorite command $cc[0]";
+				if ($cc[0] =~/\d+$/) {
+					#Favorite by index
+					my $fid=$cc[0]-1;
+					if ($fid<@favorites) {
+						$cmd=$favorites[$fid];
+						$cmd =~ /(\[.*\])?([\-]?)(.*)/;
+						$cmd=$3 if defined $3;
+						#"-" defined favorite commands that do not require authentification
+						$auth=1 if (defined $2 && $2 eq "-");
+						Log3 $hash->{NAME}, 4, $hash->{NAME}.": $sender requests favorite command:$cmd";
+					} else {
+						$cmd="";
+						Signalbot_sendMessage($hash,$sender,"","favorite #$cc[0] not defined");
+						Log3 $hash->{NAME}, 4, $hash->{NAME}.": favorite #$cc[0] not defined";
+					}
+				} else {
+					my $alias=join(" ",@cc);
+					$cmd="";
+					foreach my $ff (@favorites) {
+						$ff =~ /(\[(.*)\])?([\-]?)(.*)/;
+						if (defined $2 && $2 eq $alias) {
+							$cmd=$4 if defined $4;
+					#"-" defined favorite commands that do not require authentification
+							$auth=1 if (defined $3 && $3 eq "-");
+						}
+					}
+					if ($cmd eq "") {
+						Signalbot_sendMessage($hash,$sender,"","favorite '$alias' not defined");
+						Log3 $hash->{NAME}, 4, $hash->{NAME}.": favorite '$alias' not defined";
+					}
+				}
+			} else {
+				return "No favorites defined" if @favorites==0;
+				my $ret="Defined favorites:\n\n";
+				my $format="%2i %-30s\n";
+				$ret.="ID Command\n";
+				my $cnt=1;
+				foreach (@favorites) {
+					my $ff=$_;
+					$ff =~ /(\[(.*)\])?([\-]?)(.*)/;
+					$ret.=sprintf($format,$cnt,$4);
+					$cnt++;
+				}
+				Signalbot_sendMessage($hash,$sender,"",$ret) if $auth;
+				$cmd="";
+			}
+		}
 		return $cmd if $cmd eq "";
-		if ($hash->{helper}{auth}{$sender}==1) {
+		if ($auth) {
 			Log3 $hash->{NAME}, 4, $hash->{NAME}.": $sender executes command $cmd";
 			my $error = AnalyzeCommand($hash, $cmd);
 			if (defined $error) {
@@ -591,12 +673,28 @@ sub Signalbot_command($@){
 }
 
 #Reset auth after timeout
-sub SignalBot_authTimeout($@) {
+sub Signalbot_authTimeout($@) {
 	my ($val)=@_;
 	my ($name,$sender)=split(" ",$val);
 	my $hash = $defs{$name};
 	$hash->{helper}{auth}{$sender}=0;
 }
+
+#Wrapper around the new MessageReceived callback - currently ignored since V0.10.0 sends both callbacks
+sub Signalbot_MessageReceivedV2 ($@) {
+	my ($hash,$timestamp,$source,$groupID,$message,$extras) = @_;
+	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Message CallbackV2 - ignored";	
+	return;
+	my $att = $extras->{attachments};
+	my @attachments;
+	if (defined $att) {
+		my @arr=@$att;
+		foreach (@arr) {
+			push @attachments, $_->{file};
+		}
+	}
+	Signalbot_MessageReceived($hash,$timestamp,$source,$groupID,$message,\@attachments);
+}	
 
 sub Signalbot_MessageReceived ($@) {
 	my ($hash,$timestamp,$source,$groupID,$message,$attachments) = @_;
@@ -657,7 +755,7 @@ sub Signalbot_MessageReceived ($@) {
 		readingsEndUpdate($hash, 0);
 
 		my $cmd=AttrVal($hash->{NAME},"cmdKeyword",undef);
-		if ($message =~ /^$cmd(.*)/) { 
+		if (defined $cmd && $message =~ /^$cmd(.*)/) { 
 			$babble=0; #Skip Babble execution in command mode
 			$message=Signalbot_command($hash,$source,$message);
 		}
@@ -802,6 +900,7 @@ sub Signalbot_setup($@){
 	return undef;
 }
 
+my $Signalbot_Retry=0;
 # After Dbus init successfully came back
 sub Signalbot_setup2($@) {
 	my ($hash) = @_;
@@ -826,14 +925,19 @@ sub Signalbot_setup2($@) {
 	my $account=ReadingsVal($name,"account","none");
 	if (!defined $version) {
 		$hash->{helper}{version}=0; #prevent uninitalized value in case of service not present
+		if ($Signalbot_Retry<3) {
+			$Signalbot_Retry++;
+			InternalTimer(gettimeofday() + 10, 'Signalbot_setup', $hash, 0);
+			Log3 $name, 3, $hash->{NAME}.": Could not init signal-cli - retry $Signalbot_Retry in 10 seconds";
+		}
 		return "Error calling version";
 	}
 	
 	my @ver=split('\.',$version);
-	#to be on the safe side allow 2 digits for lowest version number, so 0.8.0 results to 800
-	$hash->{helper}{version}=$ver[0]*1000+$ver[1]*100+$ver[2];
+	#to be on the safe side allow 2 digits for version number, so 0.8.0 results to 800, 1.10.11 would result in 11011
+	$hash->{helper}{version}=$ver[0]*10000+$ver[1]*100+$ver[2];
 	$hash->{VERSION}="Signalbot:".$Signalbot_VERSION." signal-cli:".$version." Protocol::DBus:".$Protocol::DBus::VERSION;
-	$hash->{model}=SignalBot_OSRel();
+	$hash->{model}=Signalbot_OSRel();
 	if($hash->{helper}{version}>800) {
 		my $state=Signalbot_CallS($hash,"isRegistered");
 		#Signal-cli 0.9.0 : isRegistered not existing and will return undef when in multi-mode (or false with my PR)
@@ -1079,7 +1183,7 @@ sub Signalbot_Read($@){
 			if (defined $callback) {
 				my $b=$msg->get_body();
 				my @body=@$b;
-				if ($callback eq "MessageReceived" || $callback eq "ReceiptReceived" || $callback eq "SyncMessageReceived") {
+				if ($callback eq "MessageReceived" || $callback eq "ReceiptReceived" || $callback eq "SyncMessageReceived" || $callback eq "MessageReceivedV2") {
 					my $func="Signalbot_$callback";
 					Log3 $hash->{NAME}, 5, $hash->{NAME}.": Sync Callback: $callback Args:".join(",",@body);
 					CallFn($hash->{NAME},$callback,$hash,@body);
@@ -1415,9 +1519,12 @@ sub Signalbot_Attr(@) {					#
 	} elsif($attr eq "authDev") {
 	return undef unless (defined $val && $val ne "" && $init_done);
 	my $bhash = $defs{$val};
+	return "Unknown device $val" if !defined $bhash;
 	return "Not a GoogleAuth device $val" unless $bhash->{TYPE} eq "GoogleAuth";
 	return undef;
 	} elsif($attr eq "cmdKeyword") {
+		return undef;
+	} elsif($attr eq "cmdFavorite") {
 		return undef;
 	} elsif($attr eq "babbleDev") {
 		return undef unless (defined $val && $val ne "" && $init_done);
@@ -1640,22 +1747,22 @@ sub Signalbot_Detail {
 		return "Perl module Protocol:DBus not found, please install with<br><b>sudo cpan install Protocol::DBus</b><br> and restart FHEM<br><br>";
 	}
 	my $multi=$hash->{helper}{multi};
+	my $version=$hash->{helper}{version};
+	$version=0 if !defined $version;
 	$multi=0 if !defined $multi;
-	if($hash->{helper}{version}<900) {
+	if($version<900) {
 		$ret .= "<b>signal-cli v0.9.0+ required.</b><br>Please use installer to install or update<br>";
-		$ret .= "Note: The installer only supports Debian based Linux distributions like Ubuntu and Raspberry OS<br>";
+		$ret .= "<b>Note:</b> The installer only supports Debian based Linux distributions like Ubuntu and Raspberry OS<br>";
 		$ret .= "      and X86 or armv7l CPUs<br>";
 	}
-	if($hash->{helper}{version}==901) {
+	if($version==901) {
 		$ret .= "<b>Warning: signal-cli v0.9.1 has issues affecting Signalbot.</b><br>Please use installer to downgrade to 0.9.0<br>";
 	}
-	if ($multi==0) {
+	if ($multi==0 && $version>0) {
 		$ret .= "Signal-cli is running in single-mode, please consider starting it without -u parameter (e.g. by re-running the installer)<br>";
 	}
-	if($hash->{helper}{version}<900 || $multi==0) {
-		$ret .= 'You can download the installer <a href="www/signal/signal_install.sh" download>here</a> or your www/signal directory and run it with<br><b>sudo ./signal_install.sh</b><br><br>';
-		$ret .= "Alternatively go to <a href=https://svn.fhem.de/fhem/trunk/fhem/thirdparty/signal-cli-packages>FHEM SVN thirdparty</a> and download the matching Debian package<br>";
-		$ret .= "Install with e.g. <b>sudo apt install ./signal-cli-dbus_0.9.0-1_buster_armhf.deb</b> (./ is important to tell apt this is a file)<br><br>";
+	if($version<900 || $multi==0) {
+		$ret .= '<br>You can download the installer <a href="www/signal/signal_install.sh" download>here</a> or your www/signal directory and run it with<br><b>sudo ./signal_install.sh</b><br><br>';
 	}
 	return $ret if ($hash->{helper}{version}<900);
 	
@@ -1758,7 +1865,7 @@ sub Signalbot_Undef($$) {				#
 #If its a media stream, a file is being created and the temporary filename (delete later!) is returned
 #Question: more complex commands could contain spaces but that will require more complex parsing
 
-sub SignalBot_replaceCommands(@) {
+sub Signalbot_replaceCommands(@) {
 	my ($hash, @data) = @_;
 	
 	my @processed=();
@@ -1788,7 +1895,7 @@ sub SignalBot_replaceCommands(@) {
 				return ($msg, @processed); 
 			}
 			
-			my ( $isMediaStream, $type ) = SignalBot_IdentifyStream( $hash, $msg );
+			my ( $isMediaStream, $type ) = Signalbot_IdentifyStream( $hash, $msg );
 			if ($isMediaStream<0) {
 				Log3 $hash->{NAME}, 5, $hash->{NAME}.": Media stream found $isMediaStream $type";
 				my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
@@ -1822,7 +1929,7 @@ sub SignalBot_replaceCommands(@) {
 }
 
 #Get OSRelease Version
-sub SignalBot_OSRel() {
+sub Signalbot_OSRel() {
 	my $fh;
 
 	if (!open($fh, "<", "/etc/os-release")) {
@@ -1849,7 +1956,7 @@ sub SignalBot_OSRel() {
 #   -3 for other media
 # and extension without dot as 2nd list element
 
-sub SignalBot_IdentifyStream($$) {
+sub Signalbot_IdentifyStream($$) {
 	my ($hash, $msg) = @_;
 
 	# signatures for media files are documented here --> https://en.wikipedia.org/wiki/List_of_file_signatures
@@ -2026,6 +2133,10 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 			Lists all accounts (phone numbers) registered on this computer. Only available when not attached to an account (account=none).
 			Use register or link to create new accounts.<br>
 		</li>
+		<li><b>get favorites</b><br>
+			<a id="Signalbot-get-favorites"></a>
+			Lists the defined favorites in the attribute "favorites" in a readable format<br>
+		</li>
 		<br>
 	</ul>
 
@@ -2072,12 +2183,30 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		<a id="Signalbot-attr-babbleExclude"></a>
 			RegExp pattern that, when matched, will exclude messages to be processed by the Babble connection<br>
 		</li>
-		<li><b>commandKeyword</b><br>
-		<a id="Signalbot-attr-commandKeyword"></a>
+		<li><b>cmdKeyword</b><br>
+		<a id="Signalbot-attr-cmdKeyword"></a>
 			One or more characters that mark a message as GoogleAuth protected command which is directly forwarded to FHEM for processing. Example: for "="<br>
 			=123456 set lamp off<br>
 			where "123456" is a GoogleAuth token. The command after the token is optional. After the authentification the user stay for "authTimeout" seconds authentificated and can execute command without token (e.g. "=set lamp on").<br>
 			<b>If the attribute is not defined, no commands can be issued</b>
+		</li>
+		<li><b>cmdFavorite</b><br>
+		<a id="Signalbot-attr-cmdFavorite"></a>
+			One or more characters that mark a message as favorite in GoogleAuth mode.<br>
+			The favorite is either followed by a number or an alias as defined in the "favorite" attribute.<br>
+			Assuming cmdKeyword "=" and cmdFavorite "fav", "=fav 1" will execute the first favorite.<br>
+			Just sending "=fav" will list the available favorites.<br>
+			<b>Note</b>: The cmdFavorite will be checked before an actual command is interpreted. So "set" will be a bad idea since you won't be able to use any "set" command anymore.
+		</li>
+		<li><b>favorites</b><br>
+		<a id="Signalbot-attr-favorites"></a>
+			Semicolon separated list of favorite definitions (see "cmdFavorite"). Favorites are identified either by their ID (defined by their order) or an optional alias in square brackets, preceding the command definition.<br><br>
+			Example: set lamp on;set lamp off;[lamp]set lamp on<br><br>
+			This defines 3 favorites numbered 1 to 3 where the third one can also be accessed with the alias "lamp".<br>
+			Using favorites you can define specific commands that can be executed without GoogleAuth by preceeding the command with a minus "-" sign.<br><br>
+			Example: -set lamp off;[lamp]-set lamp on;set door open<br><br>
+			Both favorites 1 and 2 (or "lamp") can be executed without authentification while facorite 3 requires to be authentificated.<br>
+			You can use "get favorites" to validate your list and identify the correct IDs.<br>
 		</li>
 		<li><b>defaultPeer</b><br>
 		<a id="Signalbot-attr-defaultPeer"></a>
