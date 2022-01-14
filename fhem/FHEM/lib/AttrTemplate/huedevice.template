@@ -10,6 +10,27 @@
 
 
 ###########################################
+# Generic devices section
+name:Generic_Multibutton_Remote
+filter:TYPE=HUEDevice
+desc: For remotes like Aqara Opple or 6 button 
+order:C_01
+par:RADIO_REGULAR_LEFT_RIGHT;Button orientation to the left and right, mounted normal. Fits e.g. Opple 6 buttons;{ undef }
+par:RADIO_TILTED_LEFT_RIGHT;Regular button orientation to the left and right, but mounted tilted 90 degrees;{ undef }
+par:RADIO_TOP_BUTTOM;Button orientation to the top and buttom. Fits e.g. Friends of Hue with hidden buttons 5/6;{ undef }
+par:ICON;ICON as set, defaults to fs20_S4A-2_1;{ AttrVal('DEVICE','icon','fs20_S4A-2_1') }
+attr DEVICE icon ICON
+option:{ RADIO_REGULAR_LEFT_RIGHT }
+attr DEVICE devStateIcon 100.:taster_ch6_1 200.:taster_ch6_2 300.:taster_ch6_3 400.:taster_ch6_4 500.:taster_ch6_5 600.:taster_ch6_6
+option:{ RADIO_TILTED_LEFT_RIGHT }
+attr DEVICE devStateIcon 100.:taster_ch6_5 200.:taster_ch6_6 300.:taster_ch6_8 400.:taster_ch6_9 500.:taster_ch6_1 600.:taster_ch6_2
+option:{ RADIO_TOP_BUTTOM }
+attr DEVICE devStateIcon 100.:taster_ch6_1 200.:taster_ch6_2 300.:taster_ch6_3 400.:taster_ch6_4 500.:taster_ch6_8 600.:taster_ch6_9
+option:global
+setreading DEVICE attrTemplateVersion Generic_Multibutton_Remote_20220114
+
+
+###########################################
 # Eurotronic Spirit ZigBee (SPZB0001)
 name:Eurotronic_SPZB0001_Spirit_ZigBee
 filter:TYPE=HUEDevice
@@ -77,21 +98,33 @@ attr DEVICE stateFormat H: humidity %
 setreading DEVICE attrTemplateVersion Xiaomi_Aqara_WSDCGQ11LM_Humidity_Sensor_20211015
 
 
+# generic Motion Sensor, https://forum.fhem.de/index.php/topic,125416.msg1200527.html#msg1200527
+name:Generic_Motion_Sensor
+filter:TYPE=HUEDevice
+desc: Might be suitable for all motion sensors without option to set duration...
+order:F_01
+set DEVICE attrTemplate Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor
+attr DEVICE configList /delay (.*)/:{"delay":$1}\
+/ledindication (.*)/:true,false:{"ledindication":$1}\
+/on (.*)/:true,false:{"on":$1}\
+/sensitivity (.*)/:0,1,2:{"sensitivity":$1}
+setreading DEVICE attrTemplateVersion Generic_Motion_Sensor_20220114
+
 ###########################################
 # Xiaomi/Aqara RTCGQ11LM Motion Sensor
 name:Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor
 filter:TYPE=HUEDevice
-desc: The Xiaomi/Aqara motion sensor is a multisensor, and is interpreted by ZigBee as two sensors that is motion sensor.<br><a href="https://www.aqara.com/en/motion_sensor.html">Manufacturer link: Klick me</a>
+desc: The Xiaomi/Aqara motion sensor is a multisensor, and is interpreted by ZigBee as two sensors that is motion sensor.<br><a href="https://www.aqara.com/en/motion_sensor.html">Manufacturer link: Klick me</a><br>Might be suitable for other motion sensors with option to set duration as well...
 order:F_01a
 par:ICON;ICON as set, defaults to motion_detector;{ AttrVal('DEVICE','icon','motion_detector') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon motion:people_sensor nomotion:message_presence
-attr DEVICE configList /duration (.*)/:{"duration":"$1"}\
+attr DEVICE configList /duration (.*)/:{"duration":$1}\
 /delay (.*)/:{"delay":$1}\
 /ledindication (.*)/:true,false:{"ledindication":$1}\
 /on (.*)/:true,false:{"on":$1}\
 /sensitivity (.*)/:0,1,2:{"sensitivity":$1}
-setreading DEVICE attrTemplateVersion Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor_20211215
+setreading DEVICE attrTemplateVersion Xiaomi_Aqara_RTCGQ11LM_Motion_Sensor_20220114
 
 
 name:Xiaomi_Aqara_DJT11LM_Vibration_Sensor
@@ -149,3 +182,4 @@ attr DEVICE { usr => { 'effectSpeed\s+(.*)' => '{"effectSpeed":"$1"}', 'sparkles
 attr DEVICE widgetOverride effect:steady,snow,rainbow,snake,twinkle,fireworks,flag,waves,updown,vintage,fading,collide,strobe,sparkles,carnival,glow  effectSpeed:selectnumbers,0,1,10,0,lin sparkles1:noArg sparkles2:noArg
 attr DEVICE webCmd bri:effect:effectSpeed:sparkles1:sparkles2:NormalWhite
 setreading DEVICE attrTemplateVersion Melinera_LED_fairy_lights_ZigBee_20211222
+

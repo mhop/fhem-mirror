@@ -154,6 +154,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/devices:.* devices\
   $\DEVICETOPIC/bridge/info:.* info\
   $\DEVICETOPIC/bridge/groups:.* groups\
+  $\DEVICETOPIC/bridge/event:.* { json2nameValue($EVENT) }\
   $\DEVICETOPIC/bridge/extensions:.* extensions
 attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
@@ -174,13 +175,13 @@ attr DEVICE setList\
   z_last_seen:disable,ISO_8601,epoch,ISO_8601_local $\DEVICETOPIC/bridge/config/last_seen $EVTPART1\
   z_ban:textField $\DEVICETOPIC/bridge/config/ban $EVTPART1\
   z_rename:textField $\DEVICETOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
-  z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
+  z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset 
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20211022
+setreading DEVICE attrTemplateVersion 2022014
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -2160,6 +2161,43 @@ set IO_DEV publish CMNDTOPIC/SetOption26 0
 attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal($name,"POWER","")) }
 
 ######
+#Tasmota bt2tasmota section
+
+name:tasmota_bt2tasmota_bridge
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:This is a very early version of a template meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details on bluetooth2tasmota visit https://tasmota.github.io/docs/Bluetooth_ESP32/ and  https://tasmota.github.io/docs/Commands/#ble-esp32<br>NOTE: Initial version, not yet tested...<br>Most likely will be subject to changes!!!
+order:A_06t01
+farewell:template has been applied successfully.\n Note: some changes have been applied to the mcu firmware settings. Incoming messages from bluetooth devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active. 
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:BRIDGETOPIC;bridgeRegexp to be set;{ my $rL = AttrVal('DEVICE','readingList',''); $rL =~ m,([^:]*)\btele(/.*/)LWT:, ? qq{${1}tele${2}([^/]+)} : $rL =~ m,([^:]*/)tele/LWT:, ? qq{${1}([^/]+)/tele} : undef }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; MI32Option6 1; SaveData 1
+par:ICON;ICON as set, defaults to MQTT;{ AttrVal('DEVICE','icon','mqtt') }
+attr DEVICE icon ICON
+attr DEVICE bridgeRegexp \
+  BRIDGETOPIC/SENSOR:.* "bt2t_$1"
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER:.* LED
+attr DEVICE setStateList on off
+attr DEVICE stateFormat LWT\
+<a href="http://IPAddress" target="_blank">Hostname</a><br>
+attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@red
+set IO_DEV publish CMNDTOPIC/restart 1
+attr DEVICE model tasmota_bt2tasmota_bridge
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20220111
+
+#$yyMMddhhmmsshex = sub{sprintf '%02X%02X%02X%02X%02X%02X', $_[5]-100, $_[4]+1, $_[3], $_[2], $_[1], $_[0]}->(localtime); # see https://forum.fhem.de/index.php/topic,123411.msg1179717.html#msg1179717
+
+
+######
 #Tasmota zigbee2tasmota section
 
 name:tasmota_zigbee2tasmota_bridge
@@ -3326,7 +3364,7 @@ setreading DEVICE attrTemplateVersion 20200831
 # Shelly Plus 1 using original firmware.
 name:shellyPlus_1
 filter:TYPE=MQTT2_DEVICE
-desc:Early version of a base template for second generation shelly devices (names with "plus", without power measurement). NOTE: requires to activate generic status update in firmware settings.
+desc:Early version of a base template for second generation shelly devices (names with "plus", without power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults).<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
 par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20
@@ -3347,26 +3385,27 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
   fhem2shelly/rpc:.* {}
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
 attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20220114
+set DEVICE x_reboot
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
 # Shelly Plus 1PM using original firmware.
 name:shellyPlus_1pm
 filter:TYPE=MQTT2_DEVICE
-desc:Early version of a base template for second generation shelly devices (names with "plus", with power measurement). NOTE: requires to activate generic status update in firmware settings.
+desc:Early version of a base template for second generation shelly devices (names with "plus", with power measurement). NOTE: requires to activate generic status update in firmware settings (if not available: reset device to factory defaults).<br>NOTE: Please wait some seconds to allow Shelly device to complete reboot.
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
 attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE model shellyPlus_1pm
-setreading DEVICE attrTemplateVersion 20220110
+setreading DEVICE attrTemplateVersion 20220114
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -3378,7 +3417,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
 order:A_20d
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip"target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
 attr DEVICE  readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/events/rpc:.* { return if $EVENT =~ m{switch:[1-3]}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
   fhem2shelly/rpc:.* {}
@@ -3409,7 +3448,7 @@ attr DEVICE_CH# devicetopic DEV_TPC
 loop:END
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 202201043
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20220114
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model shellypro4pm
 
 
