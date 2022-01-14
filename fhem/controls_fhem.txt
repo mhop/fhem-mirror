@@ -1,4 +1,4 @@
-REV 25460
+REV 25462
 DIR unused
 UPD 2022-01-13_07:45:03 371863 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -739,8 +739,8 @@ UPD 2022-01-13_07:45:07 4608502 docs/commandref.html
 UPD 2022-01-11_07:45:09 2813706 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2022-01-13_07:45:11 264835 docs/commandref_modular.html
-UPD 2022-01-13_07:45:12 275894 docs/commandref_modular_DE.html
+UPD 2022-01-14_07:45:10 264835 docs/commandref_modular.html
+UPD 2022-01-14_07:45:12 275894 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1465,6 +1465,7 @@ UPD 2015-07-28_14:05:32 9868 www/images/fhemSVG/hm_lan.svg
 UPD 2020-07-26_07:45:03 1110 www/images/fhemSVG/homeConnect.svg
 UPD 2015-07-28_14:05:32 5946 www/images/fhemSVG/hourglass.svg
 UPD 2022-01-07_07:45:02 2266 www/images/fhemSVG/hue2019_archetypesDoubleSpot.svg
+UPD 2022-01-14_07:45:02 1255 www/images/fhemSVG/hue2019_archetypesPendantRound.svg
 UPD 2022-01-07_07:45:02 1480 www/images/fhemSVG/hue2019_archetypesSingleSpot.svg
 UPD 2019-11-26_07:45:03 849 www/images/fhemSVG/hue2019_devicesMotionSensor.svg
 UPD 2017-11-14_07:45:02 10070 www/images/fhemSVG/hue_bridge.svg
