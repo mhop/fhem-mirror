@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "3.3";
+my $version = "3.4";
 
 #-- these we may get on request
 my %gets = (
@@ -120,6 +120,7 @@ my %shelly_models = (
     "shellyrgbw" => [0,0,4,1],
     "shellydimmer" => [0,0,1,1],
     "shellyem" => [1,0,0,2],
+    "shellyem3" => [1,0,0,3],
     "shellybulb" => [0,0,1,1],
     "shellyuni" => [2,0,0,1]
     );
@@ -1062,6 +1063,10 @@ sub Shelly_pwd($){
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
   
+  #-- for all models set internal temperature reading
+  if ($jhash->{'temperature'}) {
+    readingsBulkUpdateIfChanged($hash,"inttemp",$jhash->{'temperature'}); 
+  }
   #-- we have a Shelly 1/1pw, Shelly 4, Shelly 2/2.5,  ShellyPlug or ShellyEM switch type device
   if( ($model =~ /shelly1.*/) || ($model eq "shellyuni") || ($model eq "shellyplug") || ($model eq "shelly4") || ($model eq "shellyem") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
     for( my $i=0;$i<$channels;$i++){
@@ -1079,18 +1084,30 @@ sub Shelly_pwd($){
         readingsBulkUpdateIfChanged($hash,"state","OK");
       } 
     }
+    if ($model eq "shelluni") {
+      my  $voltage = $jhash->{'adcs'}[0]{'voltage'};
+      readingsBulkUpdateIfChanged($hash,"voltage",$voltage);
+    }
+
     my $metern = ($model eq "shellyem")?"emeters":"meters";
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
       $power = $jhash->{$metern}[$i]{'power'};
       $energy = int($jhash->{$metern}[$i]{'total'}/6)/10;
       readingsBulkUpdateIfChanged($hash,"power".$subs,$power);
-      readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy);
       if ($model eq "shellyem") {
         my $voltage = $jhash->{$metern}[$i]{'voltage'};
         readingsBulkUpdateIfChanged($hash,'voltage'.$subs,$voltage);
+        my $reactivePower = $jhash->{$metern}[$i]{'reactive'};
+        #my $apparentPower = sqrt( ($power * $power) + ($reactivePower * $reactivePower) );
+        #my $powerFactor = ($apparentPower != 0)?(int($power / $apparentPower * 100) / 100):"0";
+        #readingsBulkUpdateIfChanged($hash,'powerFactor'.$subs,$powerFactor);
+        $energy = $jhash->{$metern}[$i]{'total'};
+      }else{
+       $energy = int($jhash->{$metern}[$i]{'total'}/6)/10;
       }
-    }
+      readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy);
+    } 
     
   #-- we have a Shelly 2 roller type device
   }elsif( ($model =~ /shelly2.*/) && ($mode eq "roller") ){ 
@@ -1221,7 +1238,9 @@ sub Shelly_pwd($){
     readingsBulkUpdateIfChanged($hash,"L-green",$green);
     readingsBulkUpdateIfChanged($hash,"L-blue",$blue);
     readingsBulkUpdateIfChanged($hash,"L-white",$white);
-    readingsBulkUpdateIfChanged($hash,"overpower",$overpower);
+    #-- taken out in newer firmwares
+    readingsBulkUpdateIfChanged($hash,"overpower",$overpower)
+      if( $overpower);
     readingsBulkUpdateIfChanged($hash,"state",$ison);
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
