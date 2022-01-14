@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  73_AutoShuttersControl: change Attribut ASC_advDate 
+               to ASC_advStartDate. Add Attribut ASC_advEndDate
  - change:  50_Signalbot: new favorite feature and bug fixes
  - change:  93_DbRep: usage of placeholder §device§, §reading§ in sqlCmd
                       changed (refer to commandRef)

@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -46,7 +46,9 @@ use POSIX qw(strftime);
 use utf8;
 
 require Exporter;
-our @ISA       = qw(Exporter);
+use base qw(Exporter);
+
+# our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(
   PositionValueWindowRec
   AutoSearchTwilightDev
@@ -89,21 +91,7 @@ our %EXPORT_TAGS = (
 use GPUtils qw(GP_Import);
 ## Import der FHEM Funktionen
 BEGIN {
-    GP_Import(
-        qw(
-          devspec2array
-          CommandAttr
-          AttrVal
-          Log3
-          computeAlignTime
-          gettimeofday
-          sunset
-          sunset_abs
-          sunrise
-          sunrise_abs
-          cmdFromAnalyze
-          )
-    );
+    GP_Import(qw(cmdFromAnalyze));
 }
 
 sub PositionValueWindowRec {
@@ -156,12 +144,12 @@ sub AutoSearchTwilightDev {
 
     my $name = $hash->{NAME};
 
-    if ( devspec2array('TYPE=(Astro|Twilight)') > 0 ) {
-        CommandAttr( undef,
+    if ( ::devspec2array('TYPE=(Astro|Twilight)') > 0 ) {
+        ::CommandAttr( undef,
                 $name
               . ' ASC_twilightDevice '
-              . ( devspec2array('TYPE=(Astro|Twilight)') )[0] )
-          if ( AttrVal( $name, 'ASC_twilightDevice', 'none' ) eq 'none' );
+              . ( ::devspec2array('TYPE=(Astro|Twilight)') )[0] )
+          if ( ::AttrVal( $name, 'ASC_twilightDevice', 'none' ) eq 'none' );
     }
 
     return;
@@ -172,8 +160,10 @@ sub GetAttrValues {
     my $attribut = shift;
     my $default  = shift;
 
-    my @values = split( ' ',
-        AttrVal( $dev, $attribut, ( defined($default) ? $default : 'none' ) ) );
+    my @values = split(
+        ' ',
+        ::AttrVal( $dev, $attribut, ( defined($default) ? $default : 'none' ) )
+    );
     my ( $value1, $value2 ) = split( ':', $values[0] );
 
     my ( $value3, $value4, $value5, $value6, $value7, $value8 );
@@ -227,10 +217,10 @@ sub ExtractNotifyDevFromEvent {
 
     my %notifyDevs;
     while ( my $notifyDev = each %{ $hash->{monitoredDevs} } ) {
-        Log3( $hash->{NAME}, 4,
+        ::Log3( $hash->{NAME}, 4,
 "AutoShuttersControl ($hash->{NAME}) - ExtractNotifyDevFromEvent - NotifyDev: "
               . $notifyDev );
-        Log3( $hash->{NAME}, 5,
+        ::Log3( $hash->{NAME}, 5,
 "AutoShuttersControl ($hash->{NAME}) - ExtractNotifyDevFromEvent - ShuttersDev: "
               . $shuttersDev );
 
@@ -238,10 +228,10 @@ sub ExtractNotifyDevFromEvent {
             && $hash->{monitoredDevs}{$notifyDev}{$shuttersDev} eq
             $shuttersAttr )
         {
-            Log3( $hash->{NAME}, 4,
+            ::Log3( $hash->{NAME}, 4,
 "AutoShuttersControl ($hash->{NAME}) - ExtractNotifyDevFromEvent - ShuttersDevHash: "
                   . $hash->{monitoredDevs}{$notifyDev}{$shuttersDev} );
-            Log3( $hash->{NAME}, 5,
+            ::Log3( $hash->{NAME}, 5,
 "AutoShuttersControl ($hash->{NAME}) - ExtractNotifyDevFromEvent - return ShuttersDev: "
                   . $notifyDev );
             $notifyDevs{$notifyDev} = $shuttersDev;
@@ -279,24 +269,27 @@ sub _IsDay {
         (
             (
                 (
-                    int( gettimeofday() / 86400 ) != int(
-                        computeAlignTime( '24:00',
+                    int( ::gettimeofday() / 86400 ) != int(
+                        ::computeAlignTime(
+                            '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
-                              ->getTimeUpEarly ) / 86400
+                              ->getTimeUpEarly
+                        ) / 86400
                     )
-                    && ( !IsWe()
-                      || ( IsWe()
-                        && ( $FHEM::Automation::ShuttersControl::ascDev
-                          ->getSunriseTimeWeHoliday eq 'off'
-                          || $FHEM::Automation::ShuttersControl::shutters
-                            ->getTimeUpWeHoliday eq '01:25'
-                           )
-                         )
+                    && (
+                        !IsWe()
+                        || (
+                            IsWe()
+                            && ( $FHEM::Automation::ShuttersControl::ascDev
+                                ->getSunriseTimeWeHoliday eq 'off'
+                                || $FHEM::Automation::ShuttersControl::shutters
+                                ->getTimeUpWeHoliday eq '01:25' )
                         )
+                    )
                 )
                 || (
-                    int( gettimeofday() / 86400 ) != int(
-                        computeAlignTime(
+                    int( ::gettimeofday() / 86400 ) != int(
+                        ::computeAlignTime(
                             '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpWeHoliday
@@ -309,23 +302,23 @@ sub _IsDay {
                     ->getTimeUpWeHoliday ne '01:25'
                 )
             )
-            && int( gettimeofday() / 86400 ) == int(
-                computeAlignTime(
+            && int( ::gettimeofday() / 86400 ) == int(
+                ::computeAlignTime(
                     '24:00',
                     $FHEM::Automation::ShuttersControl::shutters->getTimeUpLate
                 ) / 86400
             )
         )
         || (
-            int( gettimeofday() / 86400 ) != int(
-                computeAlignTime(
+            int( ::gettimeofday() / 86400 ) != int(
+                ::computeAlignTime(
                     '24:00',
                     $FHEM::Automation::ShuttersControl::shutters
                       ->getTimeDownEarly
                 ) / 86400
             )
-            && int( gettimeofday() / 86400 ) == int(
-                computeAlignTime(
+            && int( ::gettimeofday() / 86400 ) == int(
+                ::computeAlignTime(
                     '24:00',
                     $FHEM::Automation::ShuttersControl::shutters
                       ->getTimeDownLate
@@ -390,19 +383,24 @@ sub _IsDay {
               . $FHEM::Automation::ShuttersControl::shutters->getSunrise );
     }
 
-    
     $respIsDay = 1
       if (
-           (  $FHEM::Automation::ShuttersControl::shutters->getDown eq 'roommate'
-             and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'asleep'
-                or $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'gotosleep' )
-           ) 
-        or (  $FHEM::Automation::ShuttersControl::shutters->getUp eq 'roommate'
-             and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'asleep'
-                or $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'gotosleep' )
-           )
+        (
+            $FHEM::Automation::ShuttersControl::shutters->getDown eq 'roommate'
+            and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne
+                'asleep'
+                or $FHEM::Automation::ShuttersControl::shutters->getRoommates
+                ne 'gotosleep' )
+        )
+        or (
+            $FHEM::Automation::ShuttersControl::shutters->getUp eq 'roommate'
+            and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne
+                'asleep'
+                or $FHEM::Automation::ShuttersControl::shutters->getRoommates
+                ne 'gotosleep' )
+        )
       );
-    
+
     return $respIsDay;
 }
 
@@ -436,7 +434,7 @@ sub ShuttersSunrise {
     my $oldFuncHash =
       $FHEM::Automation::ShuttersControl::shutters->getInTimerFuncHash;
     my $shuttersSunriseUnixtime =
-      computeAlignTime( '24:00', sunrise( 'REAL', 0, '4:30', '8:30' ) );
+      ::computeAlignTime( '24:00', ::sunrise( 'REAL', 0, '4:30', '8:30' ) );
 
     if ( $tm eq 'unix' ) {
         if ( $FHEM::Automation::ShuttersControl::shutters->getUp eq 'astro' ) {
@@ -449,11 +447,11 @@ sub ShuttersSunrise {
                 if ( !IsWe('tomorrow') ) {
                     if (
                         IsWe()
-                        && int( gettimeofday() / 86400 ) == int(
+                        && int( ::gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime(
+                                ::computeAlignTime(
                                     '24:00',
-                                    sunrise_abs(
+                                    ::sunrise_abs(
                                         $autoAstroMode,
                                         0,
                                         $FHEM::Automation::ShuttersControl::shutters
@@ -465,9 +463,9 @@ sub ShuttersSunrise {
                       )
                     {
                         $shuttersSunriseUnixtime = (
-                            computeAlignTime(
+                            ::computeAlignTime(
                                 '24:00',
-                                sunrise_abs(
+                                ::sunrise_abs(
                                     $autoAstroMode,
                                     0,
                                     $FHEM::Automation::ShuttersControl::shutters
@@ -477,11 +475,11 @@ sub ShuttersSunrise {
                         );
                     }
                     elsif (
-                        int( gettimeofday() / 86400 ) == int(
+                        int( ::gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime(
+                                ::computeAlignTime(
                                     '24:00',
-                                    sunrise_abs(
+                                    ::sunrise_abs(
                                         $autoAstroMode,
                                         0,
                                         $FHEM::Automation::ShuttersControl::shutters
@@ -495,9 +493,9 @@ sub ShuttersSunrise {
                       )
                     {
                         $shuttersSunriseUnixtime = (
-                            computeAlignTime(
+                            ::computeAlignTime(
                                 '24:00',
-                                sunrise_abs(
+                                ::sunrise_abs(
                                     $autoAstroMode,
                                     0,
                                     $FHEM::Automation::ShuttersControl::shutters
@@ -508,9 +506,9 @@ sub ShuttersSunrise {
                     }
                     else {
                         $shuttersSunriseUnixtime = (
-                            computeAlignTime(
+                            ::computeAlignTime(
                                 '24:00',
-                                sunrise_abs(
+                                ::sunrise_abs(
                                     $autoAstroMode,
                                     0,
                                     $FHEM::Automation::ShuttersControl::shutters
@@ -526,11 +524,11 @@ sub ShuttersSunrise {
                     if (
                         IsWe()
                         && (
-                            int( gettimeofday() / 86400 ) == int(
+                            int( ::gettimeofday() / 86400 ) == int(
                                 (
-                                    computeAlignTime(
+                                    ::computeAlignTime(
                                         '24:00',
-                                        sunrise_abs(
+                                        ::sunrise_abs(
                                             $autoAstroMode,
                                             0,
                                             $FHEM::Automation::ShuttersControl::shutters
@@ -539,11 +537,11 @@ sub ShuttersSunrise {
                                     ) + 1
                                 ) / 86400
                             )
-                            || int( gettimeofday() / 86400 ) != int(
+                            || int( ::gettimeofday() / 86400 ) != int(
                                 (
-                                    computeAlignTime(
+                                    ::computeAlignTime(
                                         '24:00',
-                                        sunrise_abs(
+                                        ::sunrise_abs(
                                             $autoAstroMode,
                                             0,
                                             $FHEM::Automation::ShuttersControl::shutters
@@ -556,9 +554,9 @@ sub ShuttersSunrise {
                       )
                     {
                         $shuttersSunriseUnixtime = (
-                            computeAlignTime(
+                            ::computeAlignTime(
                                 '24:00',
-                                sunrise_abs(
+                                ::sunrise_abs(
                                     $autoAstroMode,
                                     0,
                                     $FHEM::Automation::ShuttersControl::shutters
@@ -568,11 +566,11 @@ sub ShuttersSunrise {
                         );
                     }
                     elsif (
-                        int( gettimeofday() / 86400 ) == int(
+                        int( ::gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime(
+                                ::computeAlignTime(
                                     '24:00',
-                                    sunrise_abs(
+                                    ::sunrise_abs(
                                         $autoAstroMode,
                                         0,
                                         $FHEM::Automation::ShuttersControl::shutters
@@ -586,9 +584,9 @@ sub ShuttersSunrise {
                       )
                     {
                         $shuttersSunriseUnixtime = (
-                            computeAlignTime(
+                            ::computeAlignTime(
                                 '24:00',
-                                sunrise_abs(
+                                ::sunrise_abs(
                                     $autoAstroMode,
                                     0,
                                     $FHEM::Automation::ShuttersControl::shutters
@@ -601,11 +599,11 @@ sub ShuttersSunrise {
                     }
                     else {
                         if (
-                            int( gettimeofday() / 86400 ) == int(
+                            int( ::gettimeofday() / 86400 ) == int(
                                 (
-                                    computeAlignTime(
+                                    ::computeAlignTime(
                                         '24:00',
-                                        sunrise_abs(
+                                        ::sunrise_abs(
                                             $autoAstroMode,
                                             0,
                                             $FHEM::Automation::ShuttersControl::shutters
@@ -617,9 +615,9 @@ sub ShuttersSunrise {
                           )
                         {
                             $shuttersSunriseUnixtime = (
-                                computeAlignTime(
+                                ::computeAlignTime(
                                     '24:00',
-                                    sunrise_abs(
+                                    ::sunrise_abs(
                                         $autoAstroMode,
                                         0,
                                         $FHEM::Automation::ShuttersControl::shutters
@@ -630,9 +628,9 @@ sub ShuttersSunrise {
                         }
                         else {
                             $shuttersSunriseUnixtime = (
-                                computeAlignTime(
+                                ::computeAlignTime(
                                     '24:00',
-                                    sunrise_abs(
+                                    ::sunrise_abs(
                                         $autoAstroMode,
                                         0,
                                         $FHEM::Automation::ShuttersControl::shutters
@@ -646,9 +644,9 @@ sub ShuttersSunrise {
             }
             else {
                 $shuttersSunriseUnixtime = (
-                    computeAlignTime(
+                    ::computeAlignTime(
                         '24:00',
-                        sunrise_abs(
+                        ::sunrise_abs(
                             $autoAstroMode,
                             0,
                             $FHEM::Automation::ShuttersControl::shutters
@@ -669,11 +667,11 @@ sub ShuttersSunrise {
             {
                 if ( !IsWe('tomorrow') ) {
                     if (
-                        int( gettimeofday() / 86400 ) == int(
+                        int( ::gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime(
+                                ::computeAlignTime(
                                     '24:00',
-                                    sunrise_abs(
+                                    ::sunrise_abs(
                                         $autoAstroMode,
                                         0,
                                         $FHEM::Automation::ShuttersControl::shutters
@@ -690,7 +688,7 @@ sub ShuttersSunrise {
                           ( $shuttersSunriseUnixtime + 86400 )
                           if ( $shuttersSunriseUnixtime <
                             ( $oldFuncHash->{sunrisetime} + 180 )
-                            && $oldFuncHash->{sunrisetime} < gettimeofday() );
+                            && $oldFuncHash->{sunrisetime} < ::gettimeofday() );
                     }
                 }
             }
@@ -698,7 +696,7 @@ sub ShuttersSunrise {
                 $shuttersSunriseUnixtime = ( $shuttersSunriseUnixtime + 86400 )
                   if ( $shuttersSunriseUnixtime <
                     ( $oldFuncHash->{sunrisetime} + 180 )
-                    && $oldFuncHash->{sunrisetime} < gettimeofday() );
+                    && $oldFuncHash->{sunrisetime} < ::gettimeofday() );
             }
         }
         elsif ( $FHEM::Automation::ShuttersControl::shutters->getUp eq 'time' )
@@ -711,8 +709,8 @@ sub ShuttersSunrise {
             {
                 if ( !IsWe('tomorrow') ) {
                     if (
-                        int( gettimeofday() / 86400 ) == int(
-                            computeAlignTime(
+                        int( ::gettimeofday() / 86400 ) == int(
+                            ::computeAlignTime(
                                 '24:00',
                                 $FHEM::Automation::ShuttersControl::shutters
                                   ->getTimeUpWeHoliday
@@ -720,13 +718,13 @@ sub ShuttersSunrise {
                         )
                       )
                     {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpWeHoliday );
                     }
                     elsif (
-                        int( gettimeofday() / 86400 ) == int(
-                            computeAlignTime(
+                        int( ::gettimeofday() / 86400 ) == int(
+                            ::computeAlignTime(
                                 '24:00',
                                 $FHEM::Automation::ShuttersControl::shutters
                                   ->getTimeUpEarly
@@ -736,12 +734,12 @@ sub ShuttersSunrise {
                         ->getSunrise
                       )
                     {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpEarly ) + 86400;
                     }
                     else {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpEarly );
                     }
@@ -749,8 +747,8 @@ sub ShuttersSunrise {
                 else {
                     if (
                         IsWe()
-                        && int( gettimeofday() / 86400 ) == int(
-                            computeAlignTime(
+                        && int( ::gettimeofday() / 86400 ) == int(
+                            ::computeAlignTime(
                                 '24:00',
                                 $FHEM::Automation::ShuttersControl::shutters
                                   ->getTimeUpWeHoliday
@@ -758,13 +756,13 @@ sub ShuttersSunrise {
                         )
                       )
                     {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpWeHoliday );
                     }
                     elsif (
-                        int( gettimeofday() / 86400 ) == int(
-                            computeAlignTime(
+                        int( ::gettimeofday() / 86400 ) == int(
+                            ::computeAlignTime(
                                 '24:00',
                                 $FHEM::Automation::ShuttersControl::shutters
                                   ->getTimeUpEarly
@@ -772,13 +770,13 @@ sub ShuttersSunrise {
                         )
                       )
                     {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpEarly );
                     }
                     elsif (
-                        int( gettimeofday() / 86400 ) != int(
-                            computeAlignTime(
+                        int( ::gettimeofday() / 86400 ) != int(
+                            ::computeAlignTime(
                                 '24:00',
                                 $FHEM::Automation::ShuttersControl::shutters
                                   ->getTimeUpWeHoliday
@@ -786,19 +784,19 @@ sub ShuttersSunrise {
                         )
                       )
                     {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpWeHoliday );
                     }
                     else {
-                        $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                        $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpWeHoliday ) + 86400;
                     }
                 }
             }
             else {
-                $shuttersSunriseUnixtime = computeAlignTime( '24:00',
+                $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
                     $FHEM::Automation::ShuttersControl::shutters
                       ->getTimeUpEarly );
             }
@@ -806,15 +804,14 @@ sub ShuttersSunrise {
         elsif ( $FHEM::Automation::ShuttersControl::shutters->getUp eq
             'brightness' )
         {
-            $shuttersSunriseUnixtime = computeAlignTime( '24:00',
-                $FHEM::Automation::ShuttersControl::shutters->getTimeUpLate
-            );
+            $shuttersSunriseUnixtime = ::computeAlignTime( '24:00',
+                $FHEM::Automation::ShuttersControl::shutters->getTimeUpLate );
         }
 
         return $shuttersSunriseUnixtime;
     }
     elsif ( $tm eq 'real' ) {
-        return sunrise_abs(
+        return ::sunrise_abs(
             $autoAstroMode,
             0,
             $FHEM::Automation::ShuttersControl::shutters->getTimeUpEarly,
@@ -858,15 +855,15 @@ sub ShuttersSunset {
     my $oldFuncHash =
       $FHEM::Automation::ShuttersControl::shutters->getInTimerFuncHash;
     my $shuttersSunsetUnixtime =
-      computeAlignTime( '24:00', sunset( 'REAL', 0, '15:30', '21:30' ) );
+      ::computeAlignTime( '24:00', ::sunset( 'REAL', 0, '15:30', '21:30' ) );
 
     if ( $tm eq 'unix' ) {
         if ( $FHEM::Automation::ShuttersControl::shutters->getDown eq 'astro' )
         {
             $shuttersSunsetUnixtime = (
-                computeAlignTime(
+                ::computeAlignTime(
                     '24:00',
-                    sunset_abs(
+                    ::sunset_abs(
                         $autoAstroMode,
                         0,
                         $FHEM::Automation::ShuttersControl::shutters
@@ -880,13 +877,13 @@ sub ShuttersSunset {
                 $shuttersSunsetUnixtime += 86400
                   if ( $shuttersSunsetUnixtime <
                     ( $oldFuncHash->{sunsettime} + 180 )
-                    && $oldFuncHash->{sunsettime} < gettimeofday() );
+                    && $oldFuncHash->{sunsettime} < ::gettimeofday() );
             }
         }
         elsif (
             $FHEM::Automation::ShuttersControl::shutters->getDown eq 'time' )
         {
-            $shuttersSunsetUnixtime = computeAlignTime( '24:00',
+            $shuttersSunsetUnixtime = ::computeAlignTime( '24:00',
                 $FHEM::Automation::ShuttersControl::shutters->getTimeDownEarly
             );
         }
@@ -894,13 +891,13 @@ sub ShuttersSunset {
             'brightness' )
         {
             $shuttersSunsetUnixtime =
-              computeAlignTime( '24:00',
+              ::computeAlignTime( '24:00',
                 $FHEM::Automation::ShuttersControl::shutters->getTimeDownLate );
         }
         return $shuttersSunsetUnixtime;
     }
     elsif ( $tm eq 'real' ) {
-        return sunset_abs(
+        return ::sunset_abs(
             $autoAstroMode,
             0,
             $FHEM::Automation::ShuttersControl::shutters->getTimeDownEarly,
@@ -923,7 +920,7 @@ sub IsAfterShuttersTimeBlocking {
 
     if (
         (
-            int( gettimeofday() ) -
+            int( ::gettimeofday() ) -
             $FHEM::Automation::ShuttersControl::shutters->getLastManPosTimestamp
         ) <
         $FHEM::Automation::ShuttersControl::shutters->getBlockingTimeAfterManual
@@ -933,7 +930,7 @@ sub IsAfterShuttersTimeBlocking {
                 $FHEM::Automation::ShuttersControl::shutters->getSunriseUnixTime
             )
             && $FHEM::Automation::ShuttersControl::shutters->getSunriseUnixTime
-            - ( int( gettimeofday() ) ) <
+            - ( int( ::gettimeofday() ) ) <
             $FHEM::Automation::ShuttersControl::shutters
             ->getBlockingTimeBeforDayOpen
         )
@@ -943,7 +940,7 @@ sub IsAfterShuttersTimeBlocking {
                 $FHEM::Automation::ShuttersControl::shutters->getSunriseUnixTime
             )
             && $FHEM::Automation::ShuttersControl::shutters->getSunsetUnixTime
-            - ( int( gettimeofday() ) ) <
+            - ( int( ::gettimeofday() ) ) <
             $FHEM::Automation::ShuttersControl::shutters
             ->getBlockingTimeBeforNightClose
         )
@@ -982,7 +979,7 @@ sub IsAfterShuttersManualBlocking {
     }
     elsif (
         (
-            int( gettimeofday() ) -
+            int( ::gettimeofday() ) -
             $FHEM::Automation::ShuttersControl::shutters->getLastManPosTimestamp
         ) <
         $FHEM::Automation::ShuttersControl::shutters->getBlockingTimeAfterManual
@@ -1019,24 +1016,32 @@ sub PerlCodeCheck {
 sub IsAdv {
     use HTTP::Date;
     my ( undef, undef, undef, $monthday, $month, $year, undef, undef, undef ) =
-      localtime( gettimeofday() );
+      localtime( ::gettimeofday() );
     my $adv = 0;
     $year += 1900;
 
-    if ( $month < 1 ) {
-        if ( $monthday < 7 ) {
-            $adv = 1;
-        }
+    if (   $month < 1
+        && $FHEM::Automation::ShuttersControl::ascDev->getAdvEndDate eq
+        'EpiphanyDay' )
+    {
+        $adv = $monthday < 7 ? 1 : 0;
+    }
+    elsif ($month < 2
+        && $FHEM::Automation::ShuttersControl::ascDev->getAdvEndDate eq
+        'CandlemasDay' )
+    {
+        $adv = $month = 1 || ( $month = 2 && $monthday < 3 ) ? 1 : 0;
     }
     else {
         my $time = str2time( $year . '-12-25' );
         my $wday = ( localtime($time) )[6];
         $wday = $wday ? $wday : 7;
-        $time -= ( $FHEM::Automation::ShuttersControl::ascDev
-            ->getAdvDate eq 'DeadSunday'
-              ? ($wday + 27) * 86400
-              : ($wday + 21) * 86400
-          );
+        $time -= (
+            $FHEM::Automation::ShuttersControl::ascDev->getAdvStartDate eq
+              'DeadSunday'
+            ? ( $wday + 27 ) * 86400
+            : ( $wday + 21 ) * 86400
+        );
         $adv = 1 if ( $time < time );
     }
 
@@ -1046,18 +1051,19 @@ sub IsAdv {
 sub IsInTime {
     my $dfi = shift;
 
-    $dfi =~ s/{([^\x7d]*)}/$cmdFromAnalyze=$1; eval $1/ge; # Forum #69787
-    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
-    my $dhms = sprintf("%s\@%02d:%02d:%02d", $wday, $hour, $min, $sec);
-    foreach my $ft (split(" ", $dfi)) {
-        my ($from, $to) = split("-", $ft);
-        if(defined($from) && defined($to)) {
-            $from = "$wday\@$from" if(index($from,"@") < 0);
-            $to   = "$wday\@$to"   if(index($to,  "@") < 0);
-            return 1 if($from le $dhms && $dhms le $to);
+    $dfi =~ s/{([^\x7d]*)}/$cmdFromAnalyze=$1; eval $1/ge;    # Forum #69787
+    my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) =
+      localtime( ::gettimeofday() );
+    my $dhms = sprintf( "%s\@%02d:%02d:%02d", $wday, $hour, $min, $sec );
+    foreach my $ft ( split( " ", $dfi ) ) {
+        my ( $from, $to ) = split( "-", $ft );
+        if ( defined($from) && defined($to) ) {
+            $from = "$wday\@$from" if ( index( $from, "@" ) < 0 );
+            $to   = "$wday\@$to"   if ( index( $to,   "@" ) < 0 );
+            return 1 if ( $from le $dhms && $dhms le $to );
         }
     }
-    
+
     return 0;
 }
 

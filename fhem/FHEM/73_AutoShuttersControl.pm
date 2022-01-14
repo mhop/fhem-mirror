@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -49,25 +49,16 @@ use utf8;
 use FHEM::Meta;
 
 use FHEM::Automation::ShuttersControl;
-use GPUtils qw(GP_Import GP_Export);
+use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
 BEGIN {
     # Import from main context
-    GP_Import(
-        qw(
-          readingFnAttributes
-          )
-    );
-
-    #-- Export to main context with different name
-    GP_Export(
-        qw(
-          Initialize
-          )
-    );
+    GP_Import(qw(readingFnAttributes));
 }
+
+sub ::AutoShuttersControl_Initialize { goto &Initialize }
 
 sub Initialize {
     my $hash = shift;
@@ -81,7 +72,7 @@ sub Initialize {
     $hash->{UndefFn}    = \&FHEM::Automation::ShuttersControl::Undef;
     $hash->{DeleteFn}   = \&FHEM::Automation::ShuttersControl::Delete;
     $hash->{ShutdownFn} = \&FHEM::Automation::ShuttersControl::Shutdown;
-    $hash->{AttrList}   =
+    $hash->{AttrList} =
         'ASC_tempSensor '
       . 'ASC_brightnessDriveUpDown '
       . 'ASC_autoShuttersControlMorning:on,off '
@@ -100,7 +91,8 @@ sub Initialize {
       . 'ASC_expert:1 '
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
-      . 'ASC_advDate:DeadSunday,FirstAdvent '
+      . 'ASC_advStartDate:DeadSunday,FirstAdvent '
+      . 'ASC_advEndDate:CandlemasDay,EpiphanyDay '
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
     $hash->{FW_detailFn} =
@@ -328,8 +320,11 @@ __END__
             <li><strong>ASC_freezeTemp</strong> - Temperature threshold for the freeze protection. The freeze protection
                 prevents the shutter to be operated by <abbr>ASC</abbr>. Last operating order will be kept.
             </li>
-            <a id="AutoShuttersControl-attr-ASC_advDate"></a>
-            <li><strong>ASC_advDate</strong> - Advent Season, selected FirstAdvent or DeadSunday.
+            <a id="AutoShuttersControl-attr-ASC_advStartDate"></a>
+            <li><strong>ASC_advStartDate</strong> - Begin of Advent Season, selected FirstAdvent or DeadSunday.
+            </li>
+            <a id="AutoShuttersControl-attr-ASC_advEndDate"></a>
+            <li><strong>ASC_advEndDate</strong> - End of Advent Season, selected CandlemasDay 6. January or EpiphanyDay 2. February.
             </li>
             <a id="AutoShuttersControl-attr-ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS]</strong> - Contains
@@ -416,11 +411,11 @@ __END__
                 after the last manual operation in seconds. Defaults to 1200 (20 minutes).
             </li>
             <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforDayOpen"></a>
-            <li><strong>ASC_BlockingTime_beforeDayOpen</strong> - Time in which no closing operation is made by
+            <li><strong>ASC_BlockingTime_beforDayOpen</strong> - Time in which no closing operation is made by
                 <abbr>ASC</abbr> after opening at the morning in seconds. Defaults to 3600 (one hour).
             </li>
-            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforeNightClose"></a>
-            <li><strong>ASC_BlockingTime_beforeNightClose</strong> - Time in which no closing operation is made by
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforNightClose"></a>
+            <li><strong>ASC_BlockingTime_beforNightClose</strong> - Time in which no closing operation is made by
                 <abbr>ASC</abbr> before closing at the evening in seconds. Defaults to 3600 (one hour).
             </li>
             <a id="AutoShuttersControl-attr-ASC_BrightnessSensor"></a>
@@ -1006,8 +1001,10 @@ __END__
             <li><strong>ASC_expert</strong> - ist der Wert 1, so werden erweiterte Informationen bez&uuml;glich des NotifyDevs unter set und get angezeigt</li>
             <a id="AutoShuttersControl-attr-ASC_freezeTemp"></a>
             <li><strong>ASC_freezeTemp</strong> - Temperatur, ab welcher der Frostschutz greifen soll und der Rollladen nicht mehr f&auml;hrt. Der letzte Fahrbefehl wird gespeichert.</li>
-            <a id="AutoShuttersControl-attr-ASC_advDate"></a>
-            <li><strong>ASC_advDate</strong> - Adventszeit, Auswahl ab wann die Adventszeit beginnen soll.</li>
+            <a id="AutoShuttersControl-attr-ASC_advStartDate"></a>
+            <li><strong>ASC_advStartDate</strong> - Start der Adventszeit, Auswahl ab wann die Adventszeit beginnen soll. 1. Advent oder Totensonntag</li>
+            <a id="AutoShuttersControl-attr-ASC_advEndDate"></a>
+            <li><strong>ASC_advEndDate</strong> - Ende der Adventszeit, Auswahl ab wann die Adventszeit Enden soll. EpiphanyDay 6. Januar oder CandlemasDay 2. Februar</li>
             <a id="AutoShuttersControl-attr-ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor - DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS:[WAITINGTIME]]</strong> - der Inhalt ist eine Kombination aus Devicename, Readingname, Wert ab dem getriggert werden soll, Hysterese Wert ab dem der Status Regenschutz aufgehoben werden soll und der "wegen Regen geschlossen Position", sowie der Wartezeit bis dann tats&auml;chlich die aktion ausgeführt wird.</li>
             <a id="AutoShuttersControl-attr-ASC_residentsDev"></a>
@@ -1041,10 +1038,10 @@ __END__
             <li><strong>ASC_AutoAstroModeMorningHorizon</strong> - H&ouml;he &uuml;ber Horizont,a wenn beim Attribut ASC_autoAstroModeMorning HORIZON ausgew&auml;hlt (default: none)</li>
             <a id="AutoShuttersControl-attr-ASC_BlockingTime_afterManual"></a>
             <li><strong>ASC_BlockingTime_afterManual</strong> - wie viel Sekunden soll die Automatik nach einer manuellen Fahrt aussetzen. (default: 1200)</li>
-            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforeDayOpen"></a>
-            <li><strong>ASC_BlockingTime_beforeDayOpen</strong> - wie viel Sekunden vor dem morgendlichen &ouml;ffnen soll keine schlie&szlig;en Fahrt mehr stattfinden. (default: 3600)</li>
-            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforeNightClose"></a>
-            <li><strong>ASC_BlockingTime_beforeNightClose</strong> - wie viel Sekunden vor dem n&auml;chtlichen schlie&szlig;en soll keine &ouml;ffnen Fahrt mehr stattfinden. (default: 3600)</li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforDayOpen"></a>
+            <li><strong>ASC_BlockingTime_beforDayOpen</strong> - wie viel Sekunden vor dem morgendlichen &ouml;ffnen soll keine schlie&szlig;en Fahrt mehr stattfinden. (default: 3600)</li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforNightClose"></a>
+            <li><strong>ASC_BlockingTime_beforNightClose</strong> - wie viel Sekunden vor dem n&auml;chtlichen schlie&szlig;en soll keine &ouml;ffnen Fahrt mehr stattfinden. (default: 3600)</li>
             <a id="AutoShuttersControl-attr-ASC_BrightnessSensor"></a>
             <li><strong>ASC_BrightnessSensor - DEVICE[:READING] WERT-MORGENS:WERT-ABENDS</strong> / 'Sensorname[:brightness [400:800]]' Angaben zum Helligkeitssensor mit (Readingname, optional) f&uuml;r die Beschattung und dem Fahren der Rollladen nach brightness und den optionalen Brightnesswerten f&uuml;r Sonnenauf- und Sonnenuntergang. (default: none)</li>
             <a id="AutoShuttersControl-attr-ASC_Down"></a>
@@ -1465,7 +1462,7 @@ __END__
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.10.19",
+  "version": "v0.10.20",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
@@ -1479,7 +1476,7 @@ __END__
     "runtime": {
       "requires": {
         "FHEM": 5.00918799,
-        "perl": 5.016, 
+        "perl": 5.023, 
         "Meta": 0,
         "JSON": 0,
         "Date::Parse": 0

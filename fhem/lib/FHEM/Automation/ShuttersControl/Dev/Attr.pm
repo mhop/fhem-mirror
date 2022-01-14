@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -44,23 +44,12 @@ use strict;
 use warnings;
 use utf8;
 
-use GPUtils qw(GP_Import);
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(
-          AttrVal
-          gettimeofday)
-    );
-}
-
 sub getShuttersOffset {
     my $self = shift;
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_shuttersDriveDelay', -1 );
+    return ::AttrVal( $name, 'ASC_shuttersDriveDelay', -1 );
 }
 
 sub getBrightnessMinVal {
@@ -70,7 +59,7 @@ sub getBrightnessMinVal {
 
     return $self->{ASC_brightness}->{triggermin}
       if ( exists( $self->{ASC_brightness}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_brightness}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_brightness}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->getBrightnessMaxVal;
 
     return $self->{ASC_brightness}->{triggermin};
@@ -83,8 +72,8 @@ sub getBrightnessMaxVal {
 
     return $self->{ASC_brightness}->{triggermax}
       if ( exists( $self->{ASC_brightness}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_brightness}->{LASTGETTIME} ) < 2 );
-    $self->{ASC_brightness}->{LASTGETTIME} = int( gettimeofday() );
+        && ( ::gettimeofday() - $self->{ASC_brightness}->{LASTGETTIME} ) < 2 );
+    $self->{ASC_brightness}->{LASTGETTIME} = int( ::gettimeofday() );
 
     my ( $triggermax, $triggermin ) =
       FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name,
@@ -104,7 +93,7 @@ sub _getTwilightDevice {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_twilightDevice', 'none' );
+    return ::AttrVal( $name, 'ASC_twilightDevice', 'none' );
 }
 
 sub getAutoAstroModeEvening {
@@ -112,7 +101,7 @@ sub getAutoAstroModeEvening {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoAstroModeEvening', 'REAL' );
+    return ::AttrVal( $name, 'ASC_autoAstroModeEvening', 'REAL' );
 }
 
 sub getAutoAstroModeEveningHorizon {
@@ -120,7 +109,7 @@ sub getAutoAstroModeEveningHorizon {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoAstroModeEveningHorizon', 0 );
+    return ::AttrVal( $name, 'ASC_autoAstroModeEveningHorizon', 0 );
 }
 
 sub getAutoAstroModeMorning {
@@ -128,7 +117,7 @@ sub getAutoAstroModeMorning {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoAstroModeMorning', 'REAL' );
+    return ::AttrVal( $name, 'ASC_autoAstroModeMorning', 'REAL' );
 }
 
 sub getAutoAstroModeMorningHorizon {
@@ -136,7 +125,7 @@ sub getAutoAstroModeMorningHorizon {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoAstroModeMorningHorizon', 0 );
+    return ::AttrVal( $name, 'ASC_autoAstroModeMorningHorizon', 0 );
 }
 
 sub getAutoShuttersControlMorning {
@@ -144,7 +133,7 @@ sub getAutoShuttersControlMorning {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoShuttersControlMorning', 'on' );
+    return ::AttrVal( $name, 'ASC_autoShuttersControlMorning', 'on' );
 }
 
 sub getAutoShuttersControlEvening {
@@ -152,7 +141,7 @@ sub getAutoShuttersControlEvening {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoShuttersControlEvening', 'on' );
+    return ::AttrVal( $name, 'ASC_autoShuttersControlEvening', 'on' );
 }
 
 sub getAutoShuttersControlComfort {
@@ -160,7 +149,7 @@ sub getAutoShuttersControlComfort {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_autoShuttersControlComfort', 'off' );
+    return ::AttrVal( $name, 'ASC_autoShuttersControlComfort', 'off' );
 }
 
 sub getFreezeTemp {
@@ -168,7 +157,7 @@ sub getFreezeTemp {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_freezeTemp', 3 );
+    return ::AttrVal( $name, 'ASC_freezeTemp', 3 );
 }
 
 sub getSlatDriveCmdInverse {
@@ -176,7 +165,7 @@ sub getSlatDriveCmdInverse {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_slatDriveCmdInverse', 0 );
+    return ::AttrVal( $name, 'ASC_slatDriveCmdInverse', 0 );
 }
 
 sub _getTempSensor {
@@ -186,11 +175,11 @@ sub _getTempSensor {
 
     return $self->{ASC_tempSensor}->{device}
       if ( exists( $self->{ASC_tempSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_tempSensor}->{LASTGETTIME} ) < 2 );
-    $self->{ASC_tempSensor}->{LASTGETTIME} = int( gettimeofday() );
+        && ( ::gettimeofday() - $self->{ASC_tempSensor}->{LASTGETTIME} ) < 2 );
+    $self->{ASC_tempSensor}->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $device, $reading ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name, 'ASC_tempSensor',
-        'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name,
+        'ASC_tempSensor', 'none' );
 
     ## erwartetes Ergebnis
     # DEVICE:READING
@@ -208,7 +197,7 @@ sub getTempSensorReading {
 
     return $self->{ASC_tempSensor}->{reading}
       if ( exists( $self->{ASC_tempSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_tempSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_tempSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getTempSensor;
     return $self->{ASC_tempSensor}->{reading};
 }
@@ -220,8 +209,9 @@ sub _getResidentsDev {
 
     return $self->{ASC_residentsDev}->{device}
       if ( exists( $self->{ASC_residentsDev}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_residentsDev}->{LASTGETTIME} ) < 2 );
-    $self->{ASC_residentsDev}->{LASTGETTIME} = int( gettimeofday() );
+        && ( ::gettimeofday() - $self->{ASC_residentsDev}->{LASTGETTIME} ) <
+        2 );
+    $self->{ASC_residentsDev}->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $device, $reading ) =
       FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name,
         'ASC_residentsDev', 'none' );
@@ -240,7 +230,8 @@ sub getResidentsReading {
 
     return $self->{ASC_residentsDev}->{reading}
       if ( exists( $self->{ASC_residentsDev}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_residentsDev}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_residentsDev}->{LASTGETTIME} ) <
+        2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev;
     return $self->{ASC_residentsDev}->{reading};
 }
@@ -252,11 +243,11 @@ sub _getRainSensor {
 
     return $self->{ASC_rainSensor}->{device}
       if ( exists( $self->{ASC_rainSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
-    $self->{ASC_rainSensor}->{LASTGETTIME} = int( gettimeofday() );
+        && ( ::gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
+    $self->{ASC_rainSensor}->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $device, $reading, $max, $hyst, $pos, $wait ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name, 'ASC_rainSensor',
-        'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name,
+        'ASC_rainSensor', 'none' );
 
     ## erwartetes Ergebnis
     # DEVICE:READING MAX:HYST
@@ -266,10 +257,10 @@ sub _getRainSensor {
     $self->{ASC_rainSensor}->{reading} =
       ( $reading ne 'none' ? $reading : 'rain' );
     $self->{ASC_rainSensor}->{triggermax} = (
-         (   $max ne 'none'
-          && $max =~ m{\A(-?\d+(\.\d+)?)\z}xms )
+        ( $max ne 'none' && $max =~ m{\A(-?\d+(\.\d+)?)\z}xms )
         ? $max
-        : 1000 );
+        : 1000
+    );
 
     $self->{ASC_rainSensor}->{triggerhyst} = (
           $hyst ne 'none'
@@ -277,10 +268,11 @@ sub _getRainSensor {
         : ( $self->{ASC_rainSensor}->{triggermax} * 0 )
     );
 
-    $self->{ASC_rainSensor}->{shuttersClosedPos} =
-      (   $pos ne 'none'
+    $self->{ASC_rainSensor}->{shuttersClosedPos} = (
+          $pos ne 'none'
         ? $pos
-        : $FHEM::Automation::ShuttersControl::shutters->getClosedPos );
+        : $FHEM::Automation::ShuttersControl::shutters->getClosedPos
+    );
     $self->{ASC_rainSensor}->{waitingTime} =
       ( $wait ne 'none' ? $wait : 0 );
 
@@ -294,7 +286,7 @@ sub getRainSensorReading {
 
     return $self->{ASC_rainSensor}->{reading}
       if ( exists( $self->{ASC_rainSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getRainSensor;
     return $self->{ASC_rainSensor}->{reading};
 }
@@ -306,7 +298,7 @@ sub getRainTriggerMax {
 
     return $self->{ASC_rainSensor}->{triggermax}
       if ( exists( $self->{ASC_rainSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getRainSensor;
     return $self->{ASC_rainSensor}->{triggermax};
 }
@@ -318,7 +310,7 @@ sub getRainTriggerMin {
 
     return $self->{ASC_rainSensor}->{triggerhyst}
       if ( exists( $self->{ASC_rainSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getRainSensor;
     return $self->{ASC_rainSensor}->{triggerhyst};
 }
@@ -330,7 +322,7 @@ sub getRainSensorShuttersClosedPos {
 
     return $self->{ASC_rainSensor}->{shuttersClosedPos}
       if ( exists( $self->{ASC_rainSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getRainSensor;
     return $self->{ASC_rainSensor}->{shuttersClosedPos};
 }
@@ -342,7 +334,7 @@ sub getRainWaitingTime {
 
     return $self->{ASC_rainSensor}->{waitingTime}
       if ( exists( $self->{ASC_rainSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_rainSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getRainSensor;
     return $self->{ASC_rainSensor}->{waitingTime};
 }
@@ -354,11 +346,11 @@ sub _getWindSensor {
 
     return $self->{ASC_windSensor}->{device}
       if ( exists( $self->{ASC_windSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_windSensor}->{LASTGETTIME} ) < 2 );
-    $self->{ASC_windSensor}->{LASTGETTIME} = int( gettimeofday() );
+        && ( ::gettimeofday() - $self->{ASC_windSensor}->{LASTGETTIME} ) < 2 );
+    $self->{ASC_windSensor}->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $device, $reading ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name, 'ASC_windSensor',
-        'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $name,
+        'ASC_windSensor', 'none' );
 
     return $device if ( $device eq 'none' );
     $self->{ASC_windSensor}->{device} = $device;
@@ -375,7 +367,7 @@ sub getWindSensorReading {
 
     return $self->{ASC_windSensor}->{reading}
       if ( exists( $self->{ASC_windSensor}->{LASTGETTIME} )
-        && ( gettimeofday() - $self->{ASC_windSensor}->{LASTGETTIME} ) < 2 );
+        && ( ::gettimeofday() - $self->{ASC_windSensor}->{LASTGETTIME} ) < 2 );
     $FHEM::Automation::ShuttersControl::ascDev->_getWindSensor;
     return (
         defined( $self->{ASC_windSensor}->{reading} )
@@ -389,18 +381,23 @@ sub getBlockAscDrivesAfterManual {
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_blockAscDrivesAfterManual', 0 );
+    return ::AttrVal( $name, 'ASC_blockAscDrivesAfterManual', 0 );
 }
 
-sub getAdvDate {
+sub getAdvStartDate {
     my $self = shift;
 
     my $name = $self->{name};
 
-    return AttrVal( $name, 'ASC_advDate', 'FirstAdvent' );
+    return ::AttrVal( $name, 'ASC_advStartDate', 'FirstAdvent' );
 }
 
+sub getAdvEndDate {
+    my $self = shift;
 
+    my $name = $self->{name};
 
+    return ::AttrVal( $name, 'ASC_advEndDate', 'EpiphanyDay' );
+}
 
 1;

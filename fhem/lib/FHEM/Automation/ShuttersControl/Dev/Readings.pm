@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -48,12 +48,7 @@ use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
 BEGIN {
-    GP_Import(
-        qw(
-          readingsSingleUpdate
-          ReadingsVal
-          defs)
-    );
+    GP_Import(qw(defs));
 }
 
 sub setDelayCmdReading {
@@ -62,7 +57,7 @@ sub setDelayCmdReading {
     my $name = $self->{name};
     my $hash = $defs{$name};
 
-    readingsSingleUpdate(
+    ::readingsSingleUpdate(
         $hash,
         $FHEM::Automation::ShuttersControl::shutters->getShuttersDev
           . '_lastDelayPosValue',
@@ -79,7 +74,7 @@ sub setStateReading {
     my $name = $self->{name};
     my $hash = $defs{$name};
 
-    readingsSingleUpdate(
+    ::readingsSingleUpdate(
         $hash, 'state',
         (
             defined($value)
@@ -97,7 +92,7 @@ sub setPosReading {
     my $name = $self->{name};
     my $hash = $defs{$name};
 
-    readingsSingleUpdate(
+    ::readingsSingleUpdate(
         $hash,
         $FHEM::Automation::ShuttersControl::shutters->getShuttersDev
           . '_PosValue',
@@ -113,7 +108,7 @@ sub setLastPosReading {
     my $name = $self->{name};
     my $hash = $defs{$name};
 
-    readingsSingleUpdate(
+    ::readingsSingleUpdate(
         $hash,
         $FHEM::Automation::ShuttersControl::shutters->getShuttersDev
           . '_lastPosValue',
@@ -128,7 +123,7 @@ sub getPartyMode {
 
     my $name = $self->{name};
 
-    return ReadingsVal( $name, 'partyMode', 'off' );
+    return ::ReadingsVal( $name, 'partyMode', 'off' );
 }
 
 sub getHardLockOut {
@@ -136,7 +131,7 @@ sub getHardLockOut {
 
     my $name = $self->{name};
 
-    return ReadingsVal( $name, 'hardLockOut', 'none' );
+    return ::ReadingsVal( $name, 'hardLockOut', 'none' );
 }
 
 sub getSunriseTimeWeHoliday {
@@ -144,7 +139,7 @@ sub getSunriseTimeWeHoliday {
 
     my $name = $self->{name};
 
-    return ReadingsVal( $name, 'sunriseTimeWeHoliday', 'none' );
+    return ::ReadingsVal( $name, 'sunriseTimeWeHoliday', 'none' );
 }
 
 sub getMonitoredDevs {
@@ -152,14 +147,14 @@ sub getMonitoredDevs {
 
     my $name = $self->{name};
 
-    $self->{monitoredDevs} = ReadingsVal( $name, '.monitoredDevs', 'none' );
+    $self->{monitoredDevs} = ::ReadingsVal( $name, '.monitoredDevs', 'none' );
     return $self->{monitoredDevs};
 }
 
 sub getOutTemp {
     my $self = shift;
 
-    return ReadingsVal(
+    return ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::ascDev->_getTempSensor,
         $FHEM::Automation::ShuttersControl::ascDev->getTempSensorReading,
         -100 );
@@ -169,7 +164,8 @@ sub getResidentsStatus {
     my $self = shift;
 
     my $val =
-      ReadingsVal( $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev,
+      ::ReadingsVal(
+        $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev,
         $FHEM::Automation::ShuttersControl::ascDev->getResidentsReading,
         'none' );
 
@@ -178,7 +174,7 @@ sub getResidentsStatus {
         return $1 && $1 eq 'pet' ? 'absent' : $2;
     }
     elsif (
-        ReadingsVal(
+        ::ReadingsVal(
             $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev,
             'homealoneType', '-' ) eq 'PET'
       )
@@ -196,7 +192,8 @@ sub getResidentsLastStatus {
     my $self = shift;
 
     my $val =
-      ReadingsVal( $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev,
+      ::ReadingsVal(
+        $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev,
         'lastState', 'none' );
 
     if ( $val =~ m{^(?:(.+)_)?(.+)$}xms ) {
@@ -204,7 +201,7 @@ sub getResidentsLastStatus {
         return $1 && $1 eq 'pet' ? 'absent' : $2;
     }
     elsif (
-        ReadingsVal(
+        ::ReadingsVal(
             $FHEM::Automation::ShuttersControl::ascDev->_getResidentsDev,
             'lastHomealoneType', '-' ) eq 'PET'
       )
@@ -223,7 +220,7 @@ sub getAutoShuttersControlShading {
 
     my $name = $self->{name};
 
-    return ReadingsVal( $name, 'controlShading', 'none' );
+    return ::ReadingsVal( $name, 'controlShading', 'none' );
 }
 
 sub getSelfDefense {
@@ -231,7 +228,7 @@ sub getSelfDefense {
 
     my $name = $self->{name};
 
-    return ReadingsVal( $name, 'selfDefense', 'none' );
+    return ::ReadingsVal( $name, 'selfDefense', 'none' );
 }
 
 sub getAzimuth {
@@ -239,13 +236,13 @@ sub getAzimuth {
 
     my $azimuth;
 
-    $azimuth = ReadingsVal(
+    $azimuth = ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::ascDev->_getTwilightDevice,
         'azimuth', -1 )
       if (
         $defs{ $FHEM::Automation::ShuttersControl::ascDev->_getTwilightDevice }
         ->{TYPE} eq 'Twilight' );
-    $azimuth = ReadingsVal(
+    $azimuth = ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::ascDev->_getTwilightDevice,
         'SunAz', -1 )
       if (
@@ -260,13 +257,13 @@ sub getElevation {
 
     my $elevation;
 
-    $elevation = ReadingsVal(
+    $elevation = ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::ascDev->_getTwilightDevice,
         'elevation', -1 )
       if (
         $defs{ $FHEM::Automation::ShuttersControl::ascDev->_getTwilightDevice }
         ->{TYPE} eq 'Twilight' );
-    $elevation = ReadingsVal(
+    $elevation = ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::ascDev->_getTwilightDevice,
         'SunAlt', -1 )
       if (
@@ -281,7 +278,7 @@ sub getASCenable {
 
     my $name = $self->{name};
 
-    return ReadingsVal( $name, 'ascEnable', 'none' );
+    return ::ReadingsVal( $name, 'ascEnable', 'none' );
 }
 
 1;

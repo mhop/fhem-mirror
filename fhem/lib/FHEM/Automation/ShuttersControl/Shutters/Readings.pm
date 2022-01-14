@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -44,21 +44,10 @@ use strict;
 use warnings;
 use utf8;
 
-use GPUtils qw(GP_Import);
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(
-          ReadingsVal
-          ReadingsNum)
-    );
-}
-
 sub getBrightness {
     my $self = shift;
 
-    return ReadingsNum(
+    return ::ReadingsNum(
         $FHEM::Automation::ShuttersControl::shutters->_getBrightnessSensor,
         $FHEM::Automation::ShuttersControl::shutters->getBrightnessReading,
         -1 );
@@ -67,7 +56,7 @@ sub getBrightness {
 sub getWindStatus {
     my $self = shift;
 
-    return ReadingsVal(
+    return ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::ascDev->_getWindSensor,
         $FHEM::Automation::ShuttersControl::ascDev->getWindSensorReading, -1 );
 }
@@ -75,7 +64,7 @@ sub getWindStatus {
 sub getStatus {
     my $self = shift;
 
-    return ReadingsNum( $self->{shuttersDev},
+    return ::ReadingsNum( $self->{shuttersDev},
         $FHEM::Automation::ShuttersControl::shutters->getPosCmd, 0 );
 }
 
@@ -88,7 +77,7 @@ sub getDelayCmd {
 sub getASCenable {
     my $self = shift;
 
-    return ReadingsVal( $self->{shuttersDev}, 'ASC_Enable', 'on' );
+    return ::ReadingsVal( $self->{shuttersDev}, 'ASC_Enable', 'on' );
 }
 
 1;

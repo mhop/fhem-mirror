@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -44,37 +44,41 @@ use strict;
 use warnings;
 use utf8;
 
-use GPUtils qw(GP_Import);
+require Exporter;
+use base qw(Exporter);
 
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
+# our @ISA       = qw(Exporter);
+our @EXPORT_OK = qw(
+  getRoommateStatus
+  getRoommateLastStatus
+);
+our %EXPORT_TAGS = (
+    ALL => [
         qw(
-          ReadingsVal)
-    );
-}
+          getRoommateStatus
+          getRoommateLastStatus
+          )
+    ],
+);
 
-sub _getRoommateStatus {
+sub getRoommateStatus {
     my $self = shift;
 
     my $roommate = $self->{roommate};
 
-    return ReadingsVal( $roommate,
+    return ::ReadingsVal( $roommate,
         $FHEM::Automation::ShuttersControl::shutters->getRoommatesReading,
         'none' );
 }
 
-sub _getRoommateLastStatus {
+sub getRoommateLastStatus {
     my $self = shift;
 
     my $roommate = $self->{roommate};
     my $default  = $self->{defaultarg};
 
     $default = 'none' if ( !defined($default) );
-    return ReadingsVal( $roommate, 'lastState', $default );
+    return ::ReadingsVal( $roommate, 'lastState', $default );
 }
-
-
-
 
 1;

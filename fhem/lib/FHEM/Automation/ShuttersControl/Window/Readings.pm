@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -44,20 +44,10 @@ use strict;
 use warnings;
 use utf8;
 
-use GPUtils qw(GP_Import);
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(
-          ReadingsVal)
-    );
-}
-
 sub getWinStatus {
     my $self = shift;
 
-    return ReadingsVal(
+    return ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::shutters->_getWinDev,
         $FHEM::Automation::ShuttersControl::shutters->getWinDevReading,
         'closed' );

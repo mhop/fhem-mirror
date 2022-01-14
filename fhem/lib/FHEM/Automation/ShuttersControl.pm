@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -72,11 +72,13 @@ use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
 use Data::Dumper;    #only for Debugging
 use Date::Parse;
+use experimental qw( switch );
 
 use FHEM::Automation::ShuttersControl::Shutters;
 use FHEM::Automation::ShuttersControl::Dev;
 
-use FHEM::Automation::ShuttersControl::Shading qw (CheckASC_ConditionsForShadingFn);
+use FHEM::Automation::ShuttersControl::Shading
+  qw (CheckASC_ConditionsForShadingFn);
 use FHEM::Automation::ShuttersControl::EventProcessingFunctions qw (:ALL);
 use FHEM::Automation::ShuttersControl::Helper qw (:ALL);
 
@@ -86,27 +88,20 @@ eval {
     require JSON::MaybeXS;
     import JSON::MaybeXS qw( decode_json encode_json );
     1;
-};
-
-if ($@) {
-    $@ = undef;
+} or do {
 
     # try to use JSON wrapper
     #   for chance of better performance
     eval {
-
         # JSON preference order
         local $ENV{PERL_JSON_BACKEND} =
           'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-          if ( !defined( $ENV{PERL_JSON_BACKEND} ) );
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
 
         require JSON;
         import JSON qw( decode_json encode_json );
         1;
-    };
-
-    if ($@) {
-        $@ = undef;
+    } or do {
 
         # In rare cases, Cpanel::JSON::XS may
         #   be installed but JSON|JSON::MaybeXS not ...
@@ -114,10 +109,7 @@ if ($@) {
             require Cpanel::JSON::XS;
             import Cpanel::JSON::XS qw(decode_json encode_json);
             1;
-        };
-
-        if ($@) {
-            $@ = undef;
+        } or do {
 
             # In rare cases, JSON::XS may
             #   be installed but JSON not ...
@@ -125,10 +117,7 @@ if ($@) {
                 require JSON::XS;
                 import JSON::XS qw(decode_json encode_json);
                 1;
-            };
-
-            if ($@) {
-                $@ = undef;
+            } or do {
 
                 # Fallback to built-in JSON which SHOULD
                 #   be available since 5.014 ...
@@ -136,55 +125,40 @@ if ($@) {
                     require JSON::PP;
                     import JSON::PP qw(decode_json encode_json);
                     1;
-                };
-
-                if ($@) {
-                    $@ = undef;
+                } or do {
 
                     # Fallback to JSON::backportPP in really rare cases
                     require JSON::backportPP;
                     import JSON::backportPP qw(decode_json encode_json);
                     1;
-                }
-            }
-        }
-    }
-}
+                };
+            };
+        };
+    };
+};
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
 BEGIN {
-
     # Import from main context
     GP_Import(
         qw(
-          devspec2array
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsEndUpdate
           defs
           modules
-          Log3
-          CommandAttr
           attr
-          CommandDeleteAttr
-          CommandDeleteReading
-          CommandSet
           readingFnAttributes
-          AttrVal
-          ReadingsVal
-          IsDisabled
-          deviceEvents
-          init_done
-          addToDevAttrList
-          addToAttrList
-          delFromDevAttrList
-          delFromAttrList
-          gettimeofday
-          InternalTimer
-          RemoveInternalTimer)
+          ::AttrVal
+          ::ReadingsVal
+          ::IsDisabled
+          ::deviceEvents
+          ::init_done
+          ::addToDevAttrList
+          ::addToAttrList
+          ::delFromDevAttrList
+          ::delFromAttrList
+          ::gettimeofday
+          ::InternalTimer
+          ::RemoveInternalTimer)
     );
 
     #-- Export to main context with different name
@@ -198,6 +172,7 @@ BEGIN {
 }
 
 ## Die Attributsliste welche an die Rolläden verteilt wird. Zusammen mit Default Werten
+##no critic
 our %userAttrList = (
     'ASC_Mode_Up:absent,always,off,home'                            => '-',
     'ASC_Mode_Down:absent,always,off,home'                          => '-',
@@ -227,8 +202,8 @@ our %userAttrList = (
     'ASC_LockOut:soft,hard,off'                  => '-',
     'ASC_LockOut_Cmd:inhibit,blocked,protection' => '-',
     'ASC_BlockingTime_afterManual'               => '-',
-    'ASC_BlockingTime_beforeNightClose'           => '-',
-    'ASC_BlockingTime_beforeDayOpen'              => '-',
+    'ASC_BlockingTime_beforeNightClose'          => '-',
+    'ASC_BlockingTime_beforeDayOpen'             => '-',
     'ASC_BrightnessSensor'                       => '-',
     'ASC_Shading_Pos:10,20,30,40,50,60,70,80,90,100'       => [ '', 80, 20 ],
     'ASC_Shading_Mode:absent,always,off,home'              => '-',
@@ -267,6 +242,11 @@ our %userAttrList = (
     'ASC_SlatPosCmd_SlatDevice'             => '-',
 );
 
+## 2 Objekte werden erstellt
+our $shutters = FHEM::Automation::ShuttersControl::Shutters->new();
+our $ascDev   = FHEM::Automation::ShuttersControl::Dev->new();
+##use critic
+
 my %posSetCmds = (
     ZWave       => 'dim',
     Siro        => 'pct',
@@ -283,10 +263,6 @@ my %posSetCmds = (
     SELVE       => 'position',
     EnOcean     => 'position',
 );
-
-## 2 Objekte werden erstellt
-our $shutters = FHEM::Automation::ShuttersControl::Shutters->new();
-our $ascDev   = FHEM::Automation::ShuttersControl::Dev->new();
 
 sub ascAPIget {
     my $getCommand = shift;
@@ -331,12 +307,14 @@ sub ascAPIset {
 sub Define {
     my $hash = shift // return;
     my $aArg = shift // return;
+    my $version;
 
-    return $@ if ( !FHEM::Meta::SetInternals($hash) );
-    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    $version = FHEM::Meta::Get( $hash, 'version' );
+    our $VERSION = $version;
 
     return 'only one AutoShuttersControl instance allowed'
-      if ( devspec2array('TYPE=AutoShuttersControl') > 1 )
+      if ( ::devspec2array('TYPE=AutoShuttersControl') > 1 )
       ; # es wird geprüft ob bereits eine Instanz unseres Modules existiert,wenn ja wird abgebrochen
     return 'too few parameters: define <name> ShuttersControl'
       if ( scalar( @{$aArg} ) != 2 );
@@ -351,24 +329,24 @@ sub Define {
                   #$hash->{ascDev} = $ascDev;
     $ascDev->setName($name);
 
-    readingsSingleUpdate(
+    ::readingsSingleUpdate(
         $hash,
         'state',
 'please set attribute ASC with value 1 or 2 in all auto controlled shutter devices and then execute \'set DEVICENAME scanForShutters\'',
         1
     );
 
-    CommandAttr( undef, $name . ' room ASC' )
-      if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
-    CommandAttr( undef, $name . ' icon fts_shutter_automatic' )
-      if ( AttrVal( $name, 'icon', 'none' ) eq 'none' );
-    CommandAttr( undef,
+    ::CommandAttr( undef, $name . ' room ASC' )
+      if ( ::AttrVal( $name, 'room', 'none' ) eq 'none' );
+    ::CommandAttr( undef, $name . ' icon fts_shutter_automatic' )
+      if ( ::AttrVal( $name, 'icon', 'none' ) eq 'none' );
+    ::CommandAttr( undef,
         $name . ' devStateIcon { ShuttersControl_DevStateIcon($name) }' )
-      if ( AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
+      if ( ::AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
 
-    addToAttrList('ASC:0,1,2','AutoShuttersControl');
+    ::addToAttrList( 'ASC:0,1,2', 'AutoShuttersControl' );
 
-    Log3( $name, 3, "AutoShuttersControl ($name) - defined" );
+    ::Log3( $name, 3, "AutoShuttersControl ($name) - defined" );
 
     $modules{AutoShuttersControl}{defptr}{ $hash->{MID} } = $hash;
 
@@ -381,11 +359,11 @@ sub Undef {
 
     UserAttributs_Readings_ForShutters( $hash, 'del' )
       ; # es sollen alle Attribute und Readings in den Rolläden Devices gelöscht werden welche vom Modul angelegt wurden
-    delFromAttrList('ASC:0,1,2');
+    ::delFromAttrList('ASC:0,1,2');
 
     delete( $modules{AutoShuttersControl}{defptr}{ $hash->{MID} } );
 
-    Log3( $name, 3, "AutoShuttersControl ($name) - delete device $name" );
+    ::Log3( $name, 3, "AutoShuttersControl ($name) - delete device $name" );
     return;
 }
 
@@ -413,10 +391,10 @@ sub Notify {
     my $name    = $hash->{NAME};
     my $devname = $dev->{NAME};
     my $devtype = $dev->{TYPE};
-    my $events  = deviceEvents( $dev, 1 );
+    my $events  = ::deviceEvents( $dev, 1 );
     return if ( !$events );
 
-    Log3( $name, 4,
+    ::Log3( $name, 4,
             "AutoShuttersControl ($name) - Devname: "
           . $devname
           . " Name: "
@@ -426,46 +404,45 @@ sub Notify {
 
     if (
         (
-            grep m{^DEFINED.$name$}xms,
-            @{$events} && $devname eq 'global' && $init_done
+            grep { /^DEFINED.$name$/ }
+            @{$events} && $devname eq 'global' && $::init_done
         )
-        || (
-            grep m{^INITIALIZED$}xms,
-            @{$events} or grep m{^REREADCFG$}xms,
-            @{$events} or grep m{^MODIFIED.$name$}xms,
-            @{$events}
-        )
+        || (   grep { /^INITIALIZED$/ } @{$events}
+            or grep { /^REREADCFG$/ } @{$events}
+            or grep { /^MODIFIED.$name$/ } @{$events} )
         && $devname eq 'global'
       )
     {
-        readingsSingleUpdate( $hash, 'partyMode', 'off', 0 )
+        ::readingsSingleUpdate( $hash, 'partyMode', 'off', 0 )
           if ( $ascDev->getPartyMode eq 'none' );
-        readingsSingleUpdate( $hash, 'hardLockOut', 'off', 0 )
+        ::readingsSingleUpdate( $hash, 'hardLockOut', 'off', 0 )
           if ( $ascDev->getHardLockOut eq 'none' );
-        readingsSingleUpdate( $hash, 'sunriseTimeWeHoliday', 'off', 0 )
+        ::readingsSingleUpdate( $hash, 'sunriseTimeWeHoliday', 'off', 0 )
           if ( $ascDev->getSunriseTimeWeHoliday eq 'none' );
-        readingsSingleUpdate( $hash, 'selfDefense', 'off', 0 )
+        ::readingsSingleUpdate( $hash, 'selfDefense', 'off', 0 )
           if ( $ascDev->getSelfDefense eq 'none' );
-        readingsSingleUpdate( $hash, 'controlShading', 'off', 0 )
+        ::readingsSingleUpdate( $hash, 'controlShading', 'off', 0 )
           if ( $ascDev->getAutoShuttersControlShading eq 'none' );
-        readingsSingleUpdate( $hash, 'ascEnable', 'on', 0 )
+        ::readingsSingleUpdate( $hash, 'ascEnable', 'on', 0 )
           if ( $ascDev->getASCenable eq 'none' );
-        CommandAttr( undef,
+        ::CommandAttr( undef,
             $name . ' devStateIcon { ShuttersControl_DevStateIcon($name) }' )
           if (
-            AttrVal(
+            ::AttrVal(
                 $name, 'devStateIcon',
                 '{ ShuttersControl_DevStateIcon($name) }'
             ) ne '{ ShuttersControl_DevStateIcon($name) }'
           );
-        CommandDeleteAttr( undef, $name . ' event-on-change-reading' )
-          if ( AttrVal( $name, 'event-on-change-reading', 'none' ) ne 'none' );
-        CommandDeleteAttr( undef, $name . ' event-on-update-reading' )
-          if ( AttrVal( $name, 'event-on-update-reading', 'none' ) ne 'none' );
+        ::CommandDeleteAttr( undef, $name . ' event-on-change-reading' )
+          if (
+            ::AttrVal( $name, 'event-on-change-reading', 'none' ) ne 'none' );
+        ::CommandDeleteAttr( undef, $name . ' event-on-update-reading' )
+          if (
+            ::AttrVal( $name, 'event-on-update-reading', 'none' ) ne 'none' );
 
 # Ist der Event ein globaler und passt zum Rest der Abfrage oben wird nach neuen Rolläden Devices gescannt und eine Liste im Rolladenmodul sortiert nach Raum generiert
         ShuttersDeviceScan($hash)
-          if ( ReadingsVal( $name, 'userAttrList', 'none' ) ne 'none' );
+          if ( ::ReadingsVal( $name, 'userAttrList', 'none' ) ne 'none' );
     }
     return
       if ( ref( $hash->{helper}{shuttersList} ) ne 'ARRAY'
@@ -474,49 +451,52 @@ sub Notify {
     my $posReading = $shutters->getPosCmd;
 
     if ( $devname eq $name ) {
-        if ( grep m{^userAttrList:.rolled.out$}xms, @{$events} ) {
+        if ( grep { /^userAttrList:.rolled.out$/ } @{$events} ) {
             if ( scalar( @{ $hash->{helper}{shuttersList} } ) > 0 ) {
                 WriteReadingsShuttersList($hash);
                 UserAttributs_Readings_ForShutters( $hash, 'add' );
-                InternalTimer(
-                    gettimeofday() + 3,
+                ::InternalTimer(
+                    ::gettimeofday() + 3,
 'FHEM::Automation::ShuttersControl::RenewSunRiseSetShuttersTimer',
                     $hash
                 );
-                InternalTimer(
-                    gettimeofday() + 5,
+                ::InternalTimer(
+                    ::gettimeofday() + 5,
                     'FHEM::Automation::ShuttersControl::AutoSearchTwilightDev',
                     $hash
                 );
-                InternalTimer(
-                    gettimeofday() + 5,
-                    sub() { CommandSet( undef, $name . ' controlShading on' ) },
+                ::InternalTimer(
+                    ::gettimeofday() + 5,
+                    sub() {
+                        ::CommandSet( undef, $name . ' controlShading on' );
+                    },
                     $hash
                   )
-                  if ( ReadingsVal( $name, 'controlShading', 'off' ) ne 'off' );
+                  if (
+                    ::ReadingsVal( $name, 'controlShading', 'off' ) ne 'off' );
             }
         }
-        elsif ( grep m{^partyMode:.off$}xms, @{$events} ) {
+        elsif ( grep { /^partyMode:.off$/ } @{$events} ) {
             EventProcessingPartyMode($hash);
         }
-        elsif ( grep m{^sunriseTimeWeHoliday:.(on|off)$}xms, @{$events} ) {
+        elsif ( grep { /^sunriseTimeWeHoliday:.(on|off)$/ } @{$events} ) {
             RenewSunRiseSetShuttersTimer($hash);
         }
     }
     elsif ( $devname eq "global" )
     { # Kommt ein globales Event und beinhaltet folgende Syntax wird die Funktion zur Verarbeitung aufgerufen
         if (
-            grep
-m{^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownValue_beforeNightClose|.*ASC_PrivacyUpValue_beforeDayOpen|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon|.*ASC_Roommate_Device|.*ASC_WindowRec|.*ASC_residentsDev|.*ASC_rainSensor|.*ASC_windSensor|.*ASC_tempSensor|.*ASC_BrightnessSensor|.*ASC_twilightDevice|.*ASC_ExternalTrigger|.*ASC_Shading_StateChange_SunnyCloudy|.*ASC_TempSensor|.*ASC_Shading_Mode)(\s.*|$)}xms,
-            @{$events}
+            grep {
+/^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownValue_beforeNightClose|.*ASC_PrivacyUpValue_beforeDayOpen|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon|.*ASC_Roommate_Device|.*ASC_WindowRec|.*ASC_residentsDev|.*ASC_rainSensor|.*ASC_windSensor|.*ASC_tempSensor|.*ASC_BrightnessSensor|.*ASC_twilightDevice|.*ASC_ExternalTrigger|.*ASC_Shading_StateChange_SunnyCloudy|.*ASC_TempSensor|.*ASC_Shading_Mode)(\s.*|$) /
+            } @{$events}
           )
         {
             EventProcessingGeneral( $hash, undef, join( ' ', @{$events} ) );
         }
     }
-    elsif ( grep m{^($posReading):\s\d{1,3}(\.\d{1,3})?$}xms, @{$events} ) {
+    elsif ( grep { /^($posReading):\s\d{1,3}(\.\d{1,3})?$/ } @{$events} ) {
         ASC_Debug( 'Notify: '
-              . ' ASC_Pos_Reading Event vom Rollo ' 
+              . ' ASC_Pos_Reading Event vom Rollo '
               . $devname
               . ' wurde erkannt '
               . ' - RECEIVED EVENT: '
@@ -539,104 +519,111 @@ sub Set {
     my $cmd  = shift @$aArg
       // return qq{"set $name" needs at least one argument};
 
-    if ( lc $cmd eq 'renewalltimer' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-        RenewSunRiseSetShuttersTimer($hash);
-    }
-    elsif ( lc $cmd eq 'renewtimer' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        CreateSunRiseSetShuttersTimer( $hash, $aArg->[0] );
-    }
-    elsif ( lc $cmd eq 'scanforshutters' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-        ShuttersDeviceScan($hash);
-    }
-    elsif ( lc $cmd eq 'createnewnotifydev' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-        CreateNewNotifyDev($hash);
-    }
-    elsif ( lc $cmd eq 'partymode' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 )
-          if ( $aArg->[0] ne ReadingsVal( $name, 'partyMode', 0 ) );
-    }
-    elsif ( lc $cmd eq 'hardlockout' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-        HardewareBlockForShutters( $hash, $aArg->[0] );
-    }
-    elsif ( lc $cmd eq 'sunrisetimeweholiday' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-    }
-    elsif ( lc $cmd eq 'controlshading' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+    $cmd = lc($cmd);
 
-        my $response = CheckASC_ConditionsForShadingFn($hash,$aArg->[0]);
-        readingsSingleUpdate(
-            $hash, $cmd,
-            (
-                $aArg->[0] eq 'off' ? $aArg->[0]
-                : (
-                      $response eq 'none' ? $aArg->[0]
-                    : $response
-                )
-            ),
-            1
-        );
-    }
-    elsif ( lc $cmd eq 'selfdefense' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-    }
-    elsif ( lc $cmd eq 'ascenable' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
-    }
-    elsif ( lc $cmd eq 'advdrivedown' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
-        EventProcessingAdvShuttersClose($hash);
-    }
-    elsif ( lc $cmd eq 'shutterascenabletoggle' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
-        readingsSingleUpdate(
-            $defs{ $aArg->[0] },
-            'ASC_Enable',
-            (
-                ReadingsVal( $aArg->[0], 'ASC_Enable', 'off' ) eq 'on'
-                ? 'off'
-                : 'on'
-            ),
-            1
-        );
-    }
-    elsif ( lc $cmd eq 'wiggle' ) {
-        return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+    given ($cmd) {
+        when ('renewalltimer') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+            RenewSunRiseSetShuttersTimer($hash);
+        }
+        when ('renewtimer') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            CreateSunRiseSetShuttersTimer( $hash, $aArg->[0] );
+        }
+        when ('scanforshutters') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+            ShuttersDeviceScan($hash);
+        }
+        when ('createnewnotifydev') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+            CreateNewNotifyDev($hash);
+        }
+        when ('partymode') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 )
+              if ( $aArg->[0] ne ::ReadingsVal( $name, 'partyMode', 0 ) );
+        }
+        when ('hardlockout') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+            HardewareBlockForShutters( $hash, $aArg->[0] );
+        }
+        when ('sunrisetimeweholiday') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+        }
+        when ('controlshading') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
 
-        (
-            $aArg->[0] eq 'all'
-            ? wiggleAll($hash)
-            : wiggle( $hash, $aArg->[0] )
-        );
-    }
-    else {
-        my $list = 'scanForShutters:noArg';
-        $list .=
+            my $response = CheckASC_ConditionsForShadingFn( $hash, $aArg->[0] );
+            ::readingsSingleUpdate(
+                $hash, $cmd,
+                (
+                    $aArg->[0] eq 'off' ? $aArg->[0]
+                    : (
+                          $response eq 'none' ? $aArg->[0]
+                        : $response
+                    )
+                ),
+                1
+            );
+        }
+        when ('selfdefense') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+        }
+        when ('ascenable') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
+        }
+        when ('advdrivedown') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+            EventProcessingAdvShuttersClose($hash);
+        }
+        when ('shutterascenabletoggle') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+            ::readingsSingleUpdate(
+                $defs{ $aArg->[0] },
+                'ASC_Enable',
+                (
+                    ::ReadingsVal( $aArg->[0], 'ASC_Enable', 'off' ) eq 'on'
+                    ? 'off'
+                    : 'on'
+                ),
+                1
+            );
+        }
+        when ('wiggle') {
+            return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
+
+            (
+                $aArg->[0] eq 'all'
+                ? wiggleAll($hash)
+                : wiggle( $hash, $aArg->[0] )
+            );
+        }
+        default {
+            my $list = 'scanForShutters:noArg';
+            $list .=
 ' renewAllTimer:noArg advDriveDown:noArg partyMode:on,off hardLockOut:on,off sunriseTimeWeHoliday:on,off controlShading:on,off selfDefense:on,off ascEnable:on,off wiggle:all,'
-          . join( ',', @{ $hash->{helper}{shuttersList} } )
-          . ' shutterASCenableToggle:'
-          . join( ',', @{ $hash->{helper}{shuttersList} } )
-          . ' renewTimer:'
-          . join( ',', @{ $hash->{helper}{shuttersList} } )
-          if ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-            && defined( $hash->{helper}{shuttersList} )
-            && scalar( @{ $hash->{helper}{shuttersList} } ) > 0 );
-        $list .= ' createNewNotifyDev:noArg'
-          if ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-            && AttrVal( $name, 'ASC_expert', 0 ) == 1 );
+              . join( ',', @{ $hash->{helper}{shuttersList} } )
+              . ' shutterASCenableToggle:'
+              . join( ',', @{ $hash->{helper}{shuttersList} } )
+              . ' renewTimer:'
+              . join( ',', @{ $hash->{helper}{shuttersList} } )
+              if (
+                ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
+                && defined( $hash->{helper}{shuttersList} )
+                && scalar( @{ $hash->{helper}{shuttersList} } ) > 0 );
+            $list .= ' createNewNotifyDev:noArg'
+              if (
+                ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
+                && ::AttrVal( $name, 'ASC_expert', 0 ) == 1 );
 
-        return "Unknown argument $cmd,choose one of $list";
+            return "Unknown argument $cmd,choose one of $list";
+        }
     }
+
     return;
 }
 
@@ -656,8 +643,8 @@ sub Get {
     else {
         my $list = "";
         $list .= " showNotifyDevsInformations:noArg"
-          if ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
-            && AttrVal( $name, 'ASC_expert', 0 ) == 1 );
+          if ( ::ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
+            && ::AttrVal( $name, 'ASC_expert', 0 ) == 1 );
 
         return "Unknown argument $cmd,choose one of $list";
     }
@@ -671,15 +658,15 @@ sub ShuttersDeviceScan {
     delete $hash->{helper}{shuttersList};
 
     my @list;
-    @list = devspec2array('ASC=[1-2]');
+    @list = ::devspec2array('ASC=[1-2]');
 
-    CommandDeleteReading( undef, $name . ' .*_nextAstroTimeEvent' );
+    ::CommandDeleteReading( undef, $name . ' .*_nextAstroTimeEvent' );
 
     if ( scalar(@list) == 0 ) {
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, 'userAttrList', 'none' );
-        readingsBulkUpdate( $hash, 'state',        'no shutters found' );
-        readingsEndUpdate( $hash, 1 );
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'userAttrList', 'none' );
+        ::readingsBulkUpdate( $hash, 'state',        'no shutters found' );
+        ::readingsEndUpdate( $hash, 1 );
         return;
     }
     my $shuttersList = '';
@@ -694,24 +681,25 @@ sub ShuttersDeviceScan {
         #### vorher empfiehlt es sich die dort vergebenen Parameter aus zu lesen um sie dann hier wieder neu zu setzen. Dazu wird das shutters Objekt um einen Eintrag
         #### 'AttrUpdateChanges' erweitert
         if (
-            ReadingsVal(
+            ::ReadingsVal(
                 $shuttersDev, '.ASC_AttrUpdateChanges_' . $hash->{VERSION},
                 0
             ) == 0
           )
         {
             $shutters->setAttrUpdateChanges( 'ASC_ShuttersPlace',
-                AttrVal( $shuttersDev, 'ASC_ShuttersPlace', 'none' ) );
-            delFromDevAttrList( $shuttersDev, 'ASC_ShuttersPlace' );
+                ::AttrVal( $shuttersDev, 'ASC_ShuttersPlace', 'none' ) );
+            ::delFromDevAttrList( $shuttersDev, 'ASC_ShuttersPlace' );
+
 #             $shutters->setAttrUpdateChanges( 'ASC_Down',
-#                 AttrVal( $shuttersDev, 'ASC_Down', 'none' ) );
-#             delFromDevAttrList( $shuttersDev, 'ASC_Down' );
+#                 ::AttrVal( $shuttersDev, 'ASC_Down', 'none' ) );
+#             ::delFromDevAttrList( $shuttersDev, 'ASC_Down' );
 #             $shutters->setAttrUpdateChanges( 'ASC_Self_Defense_Mode',
-#                 AttrVal( $shuttersDev, 'ASC_Self_Defense_Mode', 'none' ) );
-#             delFromDevAttrList( $shuttersDev, 'ASC_Self_Defense_Mode' );
+#                 ::AttrVal( $shuttersDev, 'ASC_Self_Defense_Mode', 'none' ) );
+#             ::delFromDevAttrList( $shuttersDev, 'ASC_Self_Defense_Mode' );
 #             $shutters->setAttrUpdateChanges( 'ASC_Self_Defense_Exclude',
-#                 AttrVal( $shuttersDev, 'ASC_Self_Defense_Exclude', 'none' ) );
-#             delFromDevAttrList( $shuttersDev, 'ASC_Self_Defense_Exclude' );
+#                 ::AttrVal( $shuttersDev, 'ASC_Self_Defense_Exclude', 'none' ) );
+#             ::delFromDevAttrList( $shuttersDev, 'ASC_Self_Defense_Exclude' );
         }
 
         ####
@@ -732,8 +720,8 @@ sub ShuttersDeviceScan {
 #             ( $shutters->getStatus != $shutters->getShadingPos ? 'in' : 'out' )
 #         );
         $shutters->setPushBrightnessInArray( $shutters->getBrightness );
-        readingsSingleUpdate( $defs{$shuttersDev}, 'ASC_Enable', 'on', 0 )
-          if ( ReadingsVal( $shuttersDev, 'ASC_Enable', 'none' ) eq 'none' );
+        ::readingsSingleUpdate( $defs{$shuttersDev}, 'ASC_Enable', 'on', 0 )
+          if ( ::ReadingsVal( $shuttersDev, 'ASC_Enable', 'none' ) eq 'none' );
 
         if ( $shutters->getIsDay ) {
             $shutters->setSunrise(1);
@@ -757,7 +745,7 @@ sub ShuttersDeviceScan {
         $hash->{NOTIFYDEV} = $notifyDevString;
     }
 
-    readingsSingleUpdate( $hash, 'userAttrList', 'rolled out', 1 );
+    ::readingsSingleUpdate( $hash, 'userAttrList', 'rolled out', 1 );
 
     return;
 }
@@ -768,19 +756,21 @@ sub WriteReadingsShuttersList {
 
     my $name = $hash->{NAME};
 
-    CommandDeleteReading( undef, $name . ' room_.*' );
+    ::CommandDeleteReading( undef, $name . ' room_.*' );
 
-    readingsBeginUpdate($hash);
+    ::readingsBeginUpdate($hash);
     for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
-        readingsBulkUpdate(
+        ::readingsBulkUpdate(
             $hash,
             'room_'
-              . ::makeReadingName( AttrVal( $shuttersDev, 'room', 'unsorted' ) ),
-            ReadingsVal(
+              . ::makeReadingName(
+                ::AttrVal( $shuttersDev, 'room', 'unsorted' )
+              ),
+            ::ReadingsVal(
                 $name,
                 'room_'
                   . ::makeReadingName(
-                    AttrVal( $shuttersDev, 'room', 'unsorted' )
+                    ::AttrVal( $shuttersDev, 'room', 'unsorted' )
                   ),
                 ''
               )
@@ -788,35 +778,37 @@ sub WriteReadingsShuttersList {
               . $shuttersDev
           )
           if (
-            ReadingsVal(
+            ::ReadingsVal(
                 $name,
                 'room_'
                   . ::makeReadingName(
-                    AttrVal( $shuttersDev, 'room', 'unsorted' )
+                    ::AttrVal( $shuttersDev, 'room', 'unsorted' )
                   ),
                 'none'
             ) ne 'none'
           );
 
-        readingsBulkUpdate(
+        ::readingsBulkUpdate(
             $hash,
             'room_'
-              . ::makeReadingName( AttrVal( $shuttersDev, 'room', 'unsorted' ) ),
+              . ::makeReadingName(
+                ::AttrVal( $shuttersDev, 'room', 'unsorted' )
+              ),
             $shuttersDev
           )
           if (
-            ReadingsVal(
+            ::ReadingsVal(
                 $name,
                 'room_'
                   . ::makeReadingName(
-                    AttrVal( $shuttersDev, 'room', 'unsorted' )
+                    ::AttrVal( $shuttersDev, 'room', 'unsorted' )
                   ),
                 'none'
             ) eq 'none'
           );
     }
-    readingsBulkUpdate( $hash, 'state', 'active' );
-    readingsEndUpdate( $hash, 0 );
+    ::readingsBulkUpdate( $hash, 'state', 'active' );
+    ::readingsEndUpdate( $hash, 0 );
 
     return;
 }
@@ -829,7 +821,7 @@ sub UserAttributs_Readings_ForShutters {
 
     while ( my ( $attrib, $attribValue ) = each %{userAttrList} ) {
         for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
-            addToDevAttrList( $shuttersDev, $attrib, 'AutoShuttersControl' )
+            ::addToDevAttrList( $shuttersDev, $attrib, 'AutoShuttersControl' )
               ; ## fhem.pl bietet eine Funktion um ein userAttr Attribut zu befüllen. Wir schreiben also in den Attribut userAttr alle unsere Attribute rein. Pro Rolladen immer ein Attribut pro Durchlauf
             ## Danach werden die Attribute die im userAttr stehen gesetzt und mit default Werten befüllt
             ## CommandAttr hat nicht funktioniert. Führte zu Problemen
@@ -847,7 +839,7 @@ sub UserAttributs_Readings_ForShutters {
                 }
                 else {
                     $attr{$shuttersDev}{ ( split( ':', $attrib ) )[0] } =
-                      $attribValue->[ AttrVal( $shuttersDev, 'ASC', 2 ) ]
+                      $attribValue->[ ::AttrVal( $shuttersDev, 'ASC', 2 ) ]
                       if (
                         !defined(
                             $attr{$shuttersDev}{ ( split( ':', $attrib ) )[0] }
@@ -858,17 +850,17 @@ sub UserAttributs_Readings_ForShutters {
 
                 ### associatedWith damit man sieht das der Rollladen mit einem ASC Device verbunden ist
                 my $associatedString =
-                  ReadingsVal( $shuttersDev, 'associatedWith', 'none' );
+                  ::ReadingsVal( $shuttersDev, 'associatedWith', 'none' );
                 if ( $associatedString ne 'none' ) {
                     my %hash;
                     %hash = map { ( $_ => 1 ) }
                       split( ',', "$associatedString,$name" );
 
-                    readingsSingleUpdate( $defs{$shuttersDev},
+                    ::readingsSingleUpdate( $defs{$shuttersDev},
                         'associatedWith', join( ',', sort keys %hash ), 0 );
                 }
                 else {
-                    readingsSingleUpdate( $defs{$shuttersDev},
+                    ::readingsSingleUpdate( $defs{$shuttersDev},
                         'associatedWith', $name, 0 );
                 }
                 #######################################
@@ -877,25 +869,25 @@ sub UserAttributs_Readings_ForShutters {
             elsif ( $cmd eq 'del' ) {
                 $shutters->setShuttersDev($shuttersDev);
 
-                RemoveInternalTimer( $shutters->getInTimerFuncHash );
-                CommandDeleteReading( undef, $shuttersDev . ' .?(ASC)_.*' );
-                CommandDeleteAttr( undef, $shuttersDev . ' ASC' );
-                delFromDevAttrList( $shuttersDev, $attrib );
+                ::RemoveInternalTimer( $shutters->getInTimerFuncHash );
+                ::CommandDeleteReading( undef, $shuttersDev . ' .?(ASC)_.*' );
+                ::CommandDeleteAttr( undef, $shuttersDev . ' ASC' );
+                ::delFromDevAttrList( $shuttersDev, $attrib );
 
                 ### associatedWith wird wieder entfernt
                 my $associatedString =
-                  ReadingsVal( $shuttersDev, 'associatedWith', 'none' );
+                  ::ReadingsVal( $shuttersDev, 'associatedWith', 'none' );
                 my %hash;
                 %hash = map { ( $_ => 1 ) }
                   grep { " $name " !~ m{ $shuttersDev }xms }
                   split( ',', "$associatedString,$name" );
 
                 if ( keys %hash > 1 ) {
-                    readingsSingleUpdate( $defs{$shuttersDev},
+                    ::readingsSingleUpdate( $defs{$shuttersDev},
                         'associatedWith', join( ',', sort keys %hash ), 0 );
                 }
                 else {
-                    CommandDeleteReading( undef,
+                    ::CommandDeleteReading( undef,
                         $shuttersDev . ' associatedWith' );
                 }
                 ###################################
@@ -932,7 +924,7 @@ sub AddNotifyDev {
         $hash->{monitoredDevs}{$dev}{$shuttersDev} = $shuttersAttr;
     }
 
-    readingsSingleUpdate( $hash, '.monitoredDevs',
+    ::readingsSingleUpdate( $hash, '.monitoredDevs',
         eval { encode_json( $hash->{monitoredDevs} ) }, 0 );
 
     return;
@@ -950,7 +942,7 @@ sub DeleteNotifyDev {
       ExtractNotifyDevFromEvent( $hash, $shuttersDev, $shuttersAttr );
 
     for my $notifyDev ( keys( %{$notifyDevs} ) ) {
-        Log3( $name, 4,
+        ::Log3( $name, 4,
             "AutoShuttersControl ($name) - DeleteNotifyDev - NotifyDev: "
               . $notifyDev );
         delete $hash->{monitoredDevs}{$notifyDev}{$shuttersDev};
@@ -967,7 +959,7 @@ sub DeleteNotifyDev {
             $hash->{NOTIFYDEV} = join( ',', sort keys %hash );
         }
     }
-    readingsSingleUpdate( $hash, '.monitoredDevs',
+    ::readingsSingleUpdate( $hash, '.monitoredDevs',
         eval { encode_json( $hash->{monitoredDevs} ) }, 0 );
 
     return;
@@ -1014,11 +1006,13 @@ sub ShuttersCommandSet {
                     || $shutters->getLockOut eq 'hard' )
                 && !$shutters->getQueryShuttersPos($posValue)
             )
-            || (   CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+            || (
+                   CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                 && $shutters->getShuttersPlace eq 'terrace'
                 && !$shutters->getQueryShuttersPos($posValue)
                 && (   $shutters->getLockOut eq 'soft'
-                    || $shutters->getLockOut eq 'hard' ) )
+                    || $shutters->getLockOut eq 'hard' )
+            )
             || (   $shutters->getRainProtectionStatus eq 'protected'
                 || $shutters->getWindProtectionStatus eq 'protected' )
         )
@@ -1027,7 +1021,7 @@ sub ShuttersCommandSet {
         $shutters->setDelayCmd($posValue);
         $ascDev->setDelayCmdReading;
         $shutters->setNoDelay(0);
-        Log3( $name, 4,
+        ::Log3( $name, 4,
             "AutoShuttersControl ($name) - ShuttersCommandSet in Delay" );
 
         ASC_Debug( 'FnShuttersCommandSet: '
@@ -1038,7 +1032,7 @@ sub ShuttersCommandSet {
     else {
         $shutters->setDriveCmd($posValue);
         $ascDev->setLastPosReading;
-        Log3( $name, 4,
+        ::Log3( $name, 4,
 "AutoShuttersControl ($name) - ShuttersCommandSet setDriveCmd wird aufgerufen"
         );
 
@@ -1054,28 +1048,30 @@ sub ShuttersCommandSet {
 ## Sub welche die InternalTimer nach entsprechenden Sunset oder Sunrise zusammen stellt
 sub CreateSunRiseSetShuttersTimer {
     my $hash        = shift;
-    my $shuttersDev = shift // return Log3( $hash->{NAME}, 1,
+    my $shuttersDev = shift // return ::Log3( $hash->{NAME}, 1,
 "AutoShuttersControl ($hash->{NAME}) - Error in function  CreateSunRiseSetShuttersTimer. No shuttersDev given"
     );
 
     my $name            = $hash->{NAME};
-    my $shuttersDevHash = $defs{$shuttersDev} // return Log3( $hash->{NAME}, 1,
+    my $shuttersDevHash = $defs{$shuttersDev} // return ::Log3(
+        $hash->{NAME},
+        1,
 "AutoShuttersControl ($hash->{NAME}) - Error in function  CreateSunRiseSetShuttersTimer. No shuttersDevHash found for device name $shuttersDev"
     );
     my %funcHash;
     $shutters->setShuttersDev($shuttersDev);
 
-    return if ( IsDisabled($name) );
+    return if ( ::IsDisabled($name) );
 
     my $shuttersSunriseUnixtime = ShuttersSunrise( $shuttersDev, 'unix' ) + 1;
-    my $shuttersSunsetUnixtime = ShuttersSunset( $shuttersDev, 'unix' ) + 1;
+    my $shuttersSunsetUnixtime  = ShuttersSunset( $shuttersDev, 'unix' ) + 1;
 
     $shutters->setSunriseUnixTime($shuttersSunriseUnixtime);
     $shutters->setSunsetUnixTime($shuttersSunsetUnixtime);
 
     ## In jedem Rolladen werden die errechneten Zeiten hinterlegt,es sei denn das autoShuttersControlEvening/Morning auf off steht
-    readingsBeginUpdate($shuttersDevHash);
-    readingsBulkUpdate(
+    ::readingsBeginUpdate($shuttersDevHash);
+    ::readingsBulkUpdate(
         $shuttersDevHash,
         'ASC_Time_DriveDown',
         (
@@ -1089,7 +1085,7 @@ sub CreateSunRiseSetShuttersTimer {
             : 'AutoShuttersControl off'
         )
     );
-    readingsBulkUpdate(
+    ::readingsBulkUpdate(
         $shuttersDevHash,
         'ASC_Time_DriveUp',
         (
@@ -1103,10 +1099,10 @@ sub CreateSunRiseSetShuttersTimer {
             : 'AutoShuttersControl off'
         )
     );
-    readingsEndUpdate( $shuttersDevHash, 0 );
+    ::readingsEndUpdate( $shuttersDevHash, 0 );
 
-    readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged(
+    ::readingsBeginUpdate($hash);
+    ::readingsBulkUpdateIfChanged(
         $hash,
         $shuttersDev . '_nextAstroTimeEvent',
         (
@@ -1118,9 +1114,9 @@ sub CreateSunRiseSetShuttersTimer {
             )
         )
     );
-    readingsEndUpdate( $hash, 1 );
+    ::readingsEndUpdate( $hash, 1 );
 
-    RemoveInternalTimer( $shutters->getInTimerFuncHash )
+    ::RemoveInternalTimer( $shutters->getInTimerFuncHash )
       if ( defined( $shutters->getInTimerFuncHash ) );
 
     ## Setzt den Privacy Modus für die Sichtschutzfahrt auf den Status 0
@@ -1137,8 +1133,10 @@ sub CreateSunRiseSetShuttersTimer {
           PrivacyUpTime( $shuttersDevHash, $shuttersSunriseUnixtime );
     }
     else {
-        CommandDeleteReading( undef, $shuttersDev . ' ASC_Time_PrivacyDriveUp' )
-          if ( ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveUp', 'none' ) ne
+        ::CommandDeleteReading( undef,
+            $shuttersDev . ' ASC_Time_PrivacyDriveUp' )
+          if (
+            ::ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveUp', 'none' ) ne
             'none' );
     }
 
@@ -1148,11 +1146,11 @@ sub CreateSunRiseSetShuttersTimer {
           PrivacyDownTime( $shuttersDevHash, $shuttersSunsetUnixtime );
     }
     else {
-        CommandDeleteReading( undef,
+        ::CommandDeleteReading( undef,
             $shuttersDev . ' ASC_Time_PrivacyDriveDown' )
           if (
-            ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveDown', 'none' ) ne
-            'none' );
+            ::ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveDown', 'none' )
+            ne 'none' );
     }
 
     ## kleine Hilfe für InternalTimer damit ich alle benötigten Variablen an die Funktion übergeben kann welche von Internal Timer aufgerufen wird.
@@ -1165,9 +1163,9 @@ sub CreateSunRiseSetShuttersTimer {
     ## Ich brauche beim löschen des InternalTimer den Hash welchen ich mitgegeben habe,dieser muss gesichert werden
     $shutters->setInTimerFuncHash( \%funcHash );
 
-    InternalTimer( $shuttersSunsetUnixtime, \&SunSetShuttersAfterTimerFn,
+    ::InternalTimer( $shuttersSunsetUnixtime, \&SunSetShuttersAfterTimerFn,
         \%funcHash );
-    InternalTimer( $shuttersSunriseUnixtime, \&SunRiseShuttersAfterTimerFn,
+    ::InternalTimer( $shuttersSunriseUnixtime, \&SunRiseShuttersAfterTimerFn,
         \%funcHash );
 
     $ascDev->setStateReading('created new drive timer');
@@ -1184,7 +1182,7 @@ sub RenewSunRiseSetShuttersTimer {
 
         $shutters->setShuttersDev($shuttersDev);
 
-        RemoveInternalTimer( $shutters->getInTimerFuncHash );
+        ::RemoveInternalTimer( $shutters->getInTimerFuncHash );
         $shutters->setInTimerFuncHash(undef);
         CreateSunRiseSetShuttersTimer( $hash, $shuttersDev );
 
@@ -1193,15 +1191,18 @@ sub RenewSunRiseSetShuttersTimer {
         #### vorher empfiehlt es sich die dort vergebenen Parameter aus zu lesen um sie dann hier wieder neu zu setzen. Dazu wird das shutters Objekt um einen Eintrag
         #### 'AttrUpdateChanges' erweitert
         if (
-            ( int( gettimeofday() ) - $::fhem_started ) < 60
-            and ReadingsVal(
+            ( int( ::gettimeofday() ) - $::fhem_started ) < 60
+            and ::ReadingsVal(
                 $shuttersDev, '.ASC_AttrUpdateChanges_' . $hash->{VERSION},
                 0
             ) == 0
           )
         {
-            $attr{$shuttersDev}{'ASC_ShuttersPlace'} = $shutters->getAttrUpdateChanges('ASC_ShuttersPlace')
-              if ( $shutters->getAttrUpdateChanges('ASC_ShuttersPlace') ne 'none' );
+            $attr{$shuttersDev}{'ASC_ShuttersPlace'} =
+              $shutters->getAttrUpdateChanges('ASC_ShuttersPlace')
+              if ( $shutters->getAttrUpdateChanges('ASC_ShuttersPlace') ne
+                'none' );
+
 #             $attr{$shuttersDev}{'ASC_Down'} =
 #               $shutters->getAttrUpdateChanges('ASC_Down')
 #               if ( $shutters->getAttrUpdateChanges('ASC_Down') ne 'none' );
@@ -1214,59 +1215,65 @@ sub RenewSunRiseSetShuttersTimer {
 #                 $shutters->getAttrUpdateChanges('ASC_Self_Defense_Exclude') eq
 #                 'on' );
 
-            CommandDeleteReading( undef,
+            ::CommandDeleteReading( undef,
                 $shuttersDev . ' .ASC_AttrUpdateChanges_.*' )
               if (
-                ReadingsVal( $shuttersDev,
+                ::ReadingsVal( $shuttersDev,
                     '.ASC_AttrUpdateChanges_' . $hash->{VERSION}, 'none' ) eq
                 'none'
               );
-            readingsSingleUpdate( $dhash,
+            ::readingsSingleUpdate( $dhash,
                 '.ASC_AttrUpdateChanges_' . $hash->{VERSION},
                 1, 0 );
         }
 
         $attr{$shuttersDev}{ASC_BlockingTime_beforeNightClose} =
-          AttrVal( $shuttersDev, 'ASC_BlockingTime_beforNightClose', 'none' )
-          if ( AttrVal( $shuttersDev, 'ASC_BlockingTime_beforNightClose', 'none' ) ne 'none' );
-        delFromDevAttrList( $shuttersDev, 'ASC_BlockingTime_beforNightClose' );
+          ::AttrVal( $shuttersDev, 'ASC_BlockingTime_beforNightClose', 'none' )
+          if (
+            ::AttrVal( $shuttersDev, 'ASC_BlockingTime_beforNightClose',
+                'none' ) ne 'none'
+          );
+        ::delFromDevAttrList( $shuttersDev,
+            'ASC_BlockingTime_beforNightClose' );
 
         $attr{$shuttersDev}{ASC_BlockingTime_beforeDayOpen} =
-          AttrVal( $shuttersDev, 'ASC_BlockingTime_beforDayOpen', 'none' )
-          if ( AttrVal( $shuttersDev, 'ASC_BlockingTime_beforDayOpen', 'none' ) ne 'none' );
-        delFromDevAttrList( $shuttersDev, 'ASC_BlockingTime_beforDayOpen' );
+          ::AttrVal( $shuttersDev, 'ASC_BlockingTime_beforDayOpen', 'none' )
+          if (
+            ::AttrVal( $shuttersDev, 'ASC_BlockingTime_beforDayOpen', 'none' )
+            ne 'none' );
+        ::delFromDevAttrList( $shuttersDev, 'ASC_BlockingTime_beforDayOpen' );
 #
 #         $attr{$shuttersDev}{ASC_Shading_StateChange_SunnyCloudy} =
-#             AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Sunny', 'none' ) . ':'
-#           . AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Cloudy', 'none' )
+#             ::AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Sunny', 'none' ) . ':'
+#           . ::AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Cloudy', 'none' )
 #           if (
-#             AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Sunny', 'none' ) ne 'none'
-#             && AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Cloudy', 'none' ) ne
+#             ::AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Sunny', 'none' ) ne 'none'
+#             && ::AttrVal( $shuttersDev, 'ASC_Shading_StateChange_Cloudy', 'none' ) ne
 #             'none' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Shading_StateChange_Sunny' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Shading_StateChange_Cloudy' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_Shading_StateChange_Sunny' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_Shading_StateChange_Cloudy' );
 #
 #         $attr{$shuttersDev}{ASC_Shading_InOutAzimuth} =
-#           ( AttrVal( $shuttersDev, 'ASC_Shading_Direction', 180 ) -
-#               AttrVal( $shuttersDev, 'ASC_Shading_Angle_Left', 85 ) )
+#           ( ::AttrVal( $shuttersDev, 'ASC_Shading_Direction', 180 ) -
+#               ::AttrVal( $shuttersDev, 'ASC_Shading_Angle_Left', 85 ) )
 #           . ':'
-#           . ( AttrVal( $shuttersDev, 'ASC_Shading_Direction', 180 ) +
-#               AttrVal( $shuttersDev, 'ASC_Shading_Angle_Right', 85 ) )
-#           if ( AttrVal( $shuttersDev, 'ASC_Shading_Direction', 'none' ) ne 'none'
-#             || AttrVal( $shuttersDev, 'ASC_Shading_Angle_Left',  'none' ) ne 'none'
-#             || AttrVal( $shuttersDev, 'ASC_Shading_Angle_Right', 'none' ) ne 'none' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Shading_Direction' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Shading_Angle_Left' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_Shading_Angle_Right' );
+#           . ( ::AttrVal( $shuttersDev, 'ASC_Shading_Direction', 180 ) +
+#               ::AttrVal( $shuttersDev, 'ASC_Shading_Angle_Right', 85 ) )
+#           if ( ::AttrVal( $shuttersDev, 'ASC_Shading_Direction', 'none' ) ne 'none'
+#             || ::AttrVal( $shuttersDev, 'ASC_Shading_Angle_Left',  'none' ) ne 'none'
+#             || ::AttrVal( $shuttersDev, 'ASC_Shading_Angle_Right', 'none' ) ne 'none' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_Shading_Direction' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_Shading_Angle_Left' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_Shading_Angle_Right' );
 #
 #         $attr{$shuttersDev}{ASC_PrivacyDownValue_beforeNightClose} =
-#           AttrVal( $shuttersDev, 'ASC_PrivacyDownTime_beforNightClose', 'none' )
+#           ::AttrVal( $shuttersDev, 'ASC_PrivacyDownTime_beforNightClose', 'none' )
 #           if (
-#             AttrVal( $shuttersDev, 'ASC_PrivacyDownTime_beforNightClose', 'none' ) ne
+#             ::AttrVal( $shuttersDev, 'ASC_PrivacyDownTime_beforNightClose', 'none' ) ne
 #             'none' );
-#         delFromDevAttrList( $shuttersDev, 'ASC_PrivacyDownTime_beforNightClose' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_PrivacyDownTime_beforNightClose' );
 #
-#         delFromDevAttrList( $shuttersDev, 'ASC_ExternalTriggerDevice' );
+#         ::delFromDevAttrList( $shuttersDev, 'ASC_ExternalTriggerDevice' );
     }
 
     return;
@@ -1331,7 +1338,7 @@ sub wiggle {
         }
     }
 
-    InternalTimer( gettimeofday() + 60, \&_SetCmdFn, \%h );
+    ::InternalTimer( ::gettimeofday() + 60, \&SetCmdFn, \%h );
 
     return;
 }
@@ -1520,43 +1527,43 @@ sub CreateNewNotifyDev {
     $hash->{NOTIFYDEV} = "global," . $name;
     delete $hash->{monitoredDevs};
 
-    CommandDeleteReading( undef, $name . ' .monitoredDevs' );
+    ::CommandDeleteReading( undef, $name . ' .monitoredDevs' );
     my $shuttersList = '';
     for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
         AddNotifyDev( $hash,
-            AttrVal( $shuttersDev, 'ASC_Roommate_Device', 'none' ),
+            ::AttrVal( $shuttersDev, 'ASC_Roommate_Device', 'none' ),
             $shuttersDev, 'ASC_Roommate_Device' )
-          if (
-            AttrVal( $shuttersDev, 'ASC_Roommate_Device', 'none' ) ne 'none' );
-        AddNotifyDev( $hash, AttrVal( $shuttersDev, 'ASC_WindowRec', 'none' ),
+          if ( ::AttrVal( $shuttersDev, 'ASC_Roommate_Device', 'none' ) ne
+            'none' );
+        AddNotifyDev( $hash, ::AttrVal( $shuttersDev, 'ASC_WindowRec', 'none' ),
             $shuttersDev, 'ASC_WindowRec' )
-          if ( AttrVal( $shuttersDev, 'ASC_WindowRec', 'none' ) ne 'none' );
+          if ( ::AttrVal( $shuttersDev, 'ASC_WindowRec', 'none' ) ne 'none' );
         AddNotifyDev( $hash,
-            AttrVal( $shuttersDev, 'ASC_BrightnessSensor', 'none' ),
+            ::AttrVal( $shuttersDev, 'ASC_BrightnessSensor', 'none' ),
             $shuttersDev, 'ASC_BrightnessSensor' )
-          if (
-            AttrVal( $shuttersDev, 'ASC_BrightnessSensor', 'none' ) ne 'none' );
+          if ( ::AttrVal( $shuttersDev, 'ASC_BrightnessSensor', 'none' ) ne
+            'none' );
         AddNotifyDev( $hash,
-            AttrVal( $shuttersDev, 'ASC_ExternalTrigger', 'none' ),
+            ::AttrVal( $shuttersDev, 'ASC_ExternalTrigger', 'none' ),
             $shuttersDev, 'ASC_ExternalTrigger' )
-          if (
-            AttrVal( $shuttersDev, 'ASC_ExternalTrigger', 'none' ) ne 'none' );
+          if ( ::AttrVal( $shuttersDev, 'ASC_ExternalTrigger', 'none' ) ne
+            'none' );
 
         $shuttersList = $shuttersList . ',' . $shuttersDev;
     }
 
-    AddNotifyDev( $hash, AttrVal( $name, 'ASC_residentsDev', 'none' ),
+    AddNotifyDev( $hash, ::AttrVal( $name, 'ASC_residentsDev', 'none' ),
         $name, 'ASC_residentsDev' )
-      if ( AttrVal( $name, 'ASC_residentsDev', 'none' ) ne 'none' );
-    AddNotifyDev( $hash, AttrVal( $name, 'ASC_rainSensor', 'none' ),
+      if ( ::AttrVal( $name, 'ASC_residentsDev', 'none' ) ne 'none' );
+    AddNotifyDev( $hash, ::AttrVal( $name, 'ASC_rainSensor', 'none' ),
         $name, 'ASC_rainSensor' )
-      if ( AttrVal( $name, 'ASC_rainSensor', 'none' ) ne 'none' );
-    AddNotifyDev( $hash, AttrVal( $name, 'ASC_twilightDevice', 'none' ),
+      if ( ::AttrVal( $name, 'ASC_rainSensor', 'none' ) ne 'none' );
+    AddNotifyDev( $hash, ::AttrVal( $name, 'ASC_twilightDevice', 'none' ),
         $name, 'ASC_twilightDevice' )
-      if ( AttrVal( $name, 'ASC_twilightDevice', 'none' ) ne 'none' );
-    AddNotifyDev( $hash, AttrVal( $name, 'ASC_windSensor', 'none' ),
+      if ( ::AttrVal( $name, 'ASC_twilightDevice', 'none' ) ne 'none' );
+    AddNotifyDev( $hash, ::AttrVal( $name, 'ASC_windSensor', 'none' ),
         $name, 'ASC_windSensor' )
-      if ( AttrVal( $name, 'ASC_windSensor', 'none' ) ne 'none' );
+      if ( ::AttrVal( $name, 'ASC_windSensor', 'none' ) ne 'none' );
 
     $hash->{NOTIFYDEV} = $hash->{NOTIFYDEV} . $shuttersList;
 
@@ -1638,7 +1645,7 @@ sub ShuttersInformation {
         $ret .= "<td>" . $shutters->getLockOut . "</td>";
         $ret .= "<td> </td>";
         $ret .= "<td>"
-          . ReadingsVal( $shuttersDev, 'ASC_ShuttersLastDrive', 'none' )
+          . ::ReadingsVal( $shuttersDev, 'ASC_ShuttersLastDrive', 'none' )
           . "</td>";
         $ret .= "<td> </td>";
         $ret .= "<td>" . $shutters->getStatus . "</td>";
@@ -1663,7 +1670,7 @@ sub GetMonitoredDevs {
     my $hash = shift;
 
     my $notifydevs = eval {
-        decode_json( ReadingsVal( $hash->{NAME}, '.monitoredDevs', 'none' ) );
+        decode_json( ::ReadingsVal( $hash->{NAME}, '.monitoredDevs', 'none' ) );
     };
     my $ret = '<html><table><tr><td>';
     $ret .= '<table class="block wide">';
@@ -1708,26 +1715,34 @@ sub _DetermineSlatCmd {
     my $value    = shift;
     my $posValue = shift;
 
-    return $posValue    == $shutters->getShadingPos
-            && $shutters->getShadingPositionAssignment      ne 'none'   ? $shutters->getShadingPositionAssignment
-        : $posValue     == $shutters->getVentilatePos
-            && $shutters->getVentilatePositionAssignment    ne 'none'   ? $shutters->getVentilatePositionAssignment
-        : $posValue     == $shutters->getOpenPos
-            && $shutters->getOpenPositionAssignment         ne 'none'   ? $shutters->getOpenPositionAssignment
-        : $posValue     == $shutters->getClosedPos
-            && $shutters->getClosedPositionAssignment       ne 'none'   ? $shutters->getClosedPositionAssignment
-        : $posValue     == $shutters->getSleepPos
-            && $shutters->getSleepPositionAssignment        ne 'none'   ? $shutters->getSleepPositionAssignment
-        : $posValue     == $shutters->getComfortOpenPos
-            && $shutters->getComfortOpenPositionAssignment  ne 'none'   ? $shutters->getComfortOpenPositionAssignment
-        : $posValue     == $shutters->getPrivacyUpPos
-            && $shutters->getPrivacyUpPositionAssignment    ne 'none'   ? $shutters->getPrivacyUpPositionAssignment
-        : $posValue     == $shutters->getPrivacyDownPos
-            && $shutters->getPrivacyDownPositionAssignment  ne 'none'   ? $shutters->getPrivacyDownPositionAssignment
-        : $value;
+    return $posValue == $shutters->getShadingPos
+      && $shutters->getShadingPositionAssignment ne 'none'
+      ? $shutters->getShadingPositionAssignment
+      : $posValue == $shutters->getVentilatePos
+      && $shutters->getVentilatePositionAssignment ne 'none'
+      ? $shutters->getVentilatePositionAssignment
+      : $posValue == $shutters->getOpenPos
+      && $shutters->getOpenPositionAssignment ne 'none'
+      ? $shutters->getOpenPositionAssignment
+      : $posValue == $shutters->getClosedPos
+      && $shutters->getClosedPositionAssignment ne 'none'
+      ? $shutters->getClosedPositionAssignment
+      : $posValue == $shutters->getSleepPos
+      && $shutters->getSleepPositionAssignment ne 'none'
+      ? $shutters->getSleepPositionAssignment
+      : $posValue == $shutters->getComfortOpenPos
+      && $shutters->getComfortOpenPositionAssignment ne 'none'
+      ? $shutters->getComfortOpenPositionAssignment
+      : $posValue == $shutters->getPrivacyUpPos
+      && $shutters->getPrivacyUpPositionAssignment ne 'none'
+      ? $shutters->getPrivacyUpPositionAssignment
+      : $posValue == $shutters->getPrivacyDownPos
+      && $shutters->getPrivacyDownPositionAssignment ne 'none'
+      ? $shutters->getPrivacyDownPositionAssignment
+      : $value;
 }
 
-sub _SetCmdFn {
+sub SetCmdFn {
     my $h = shift;
 
     my $shuttersDev = $h->{shuttersDev};
@@ -1750,7 +1765,7 @@ sub _SetCmdFn {
     }
     else {
         $shutters->setLastDrive(
-            ReadingsVal( $shuttersDev, 'ASC_ShuttersLastDrive', 'none' ) );
+            ::ReadingsVal( $shuttersDev, 'ASC_ShuttersLastDrive', 'none' ) );
         ASC_Debug( 'FnSetCmdFn: '
               . $shuttersDev
               . ' - Abbruch aktuelle Position ist gleich der Zielposition '
@@ -1809,12 +1824,12 @@ sub _SetCmdFn {
             $driveCommand = _DetermineSlatCmd( $driveCommand, $posValue );
         }
         elsif ($shutters->getShadingPositionAssignment =~ m{\A\d{1,3}\z}xms
-            || $shutters->getOpenPositionAssignment =~ m{\A\d{1,3}\z}xms
-            || $shutters->getClosedPositionAssignment =~ m{\A\d{1,3}\z}xms
-            || $shutters->getPrivacyUpPositionAssignment =~ m{\A\d{1,3}\z}xms
+            || $shutters->getOpenPositionAssignment        =~ m{\A\d{1,3}\z}xms
+            || $shutters->getClosedPositionAssignment      =~ m{\A\d{1,3}\z}xms
+            || $shutters->getPrivacyUpPositionAssignment   =~ m{\A\d{1,3}\z}xms
             || $shutters->getPrivacyDownPositionAssignment =~ m{\A\d{1,3}\z}xms
-            || $shutters->getSleepPositionAssignment =~ m{\A\d{1,3}\z}xms
-            || $shutters->getVentilatePositionAssignment =~ m{\A\d{1,3}\z}xms
+            || $shutters->getSleepPositionAssignment       =~ m{\A\d{1,3}\z}xms
+            || $shutters->getVentilatePositionAssignment   =~ m{\A\d{1,3}\z}xms
             || $shutters->getComfortOpenPositionAssignment =~
             m{\A\d{1,3}\z}xms )
         {
@@ -1822,47 +1837,49 @@ sub _SetCmdFn {
         }
     }
 
-    if ( $commandTemplate ne 'none' ) {     # Patch von Beta-User Forum https://forum.fhem.de/index.php/topic,123659.0.html
-        # Nutzervariablen setzen
+    if ( $commandTemplate ne 'none' )
+    { # Patch von Beta-User Forum https://forum.fhem.de/index.php/topic,123659.0.html
+            # Nutzervariablen setzen
         my %specials = (
-             '$name'        => $shuttersDev,
-             '$pos'       => $posValue,
-             '$slatPos'   => $slatPos,
-             '$cause'      => $shutters->getLastDrive
+            '$name'    => $shuttersDev,
+            '$pos'     => $posValue,
+            '$slatPos' => $slatPos,
+            '$cause'   => $shutters->getLastDrive
         );
-        
-        $commandTemplate  = ::EvalSpecials($commandTemplate, %specials);
+
+        $commandTemplate = ::EvalSpecials( $commandTemplate, %specials );
+
         # CMD ausführen
         ::AnalyzeCommandChain( $h, $commandTemplate );
     }
     else {
-        CommandSet( undef,
+        ::CommandSet( undef,
                 $shuttersDev
-            . ':FILTER='
-            . $shutters->getPosCmd . '!='
-            . $posValue . ' '
-            . $driveCommand );
+              . ':FILTER='
+              . $shutters->getPosCmd . '!='
+              . $posValue . ' '
+              . $driveCommand );
 
-        InternalTimer(
-            gettimeofday() + 3,
+        ::InternalTimer(
+            ::gettimeofday() + 3,
             sub() {
-                CommandSet(
+                ::CommandSet(
                     undef,
                     (
-                        $shutters->getSlatDevice ne 'none'
+                          $shutters->getSlatDevice ne 'none'
                         ? $shutters->getSlatDevice
                         : $shuttersDev
-                    )
-                    . ' '
-                    . $shutters->getSlatPosCmd . ' '
-                    . $slatPos
+                      )
+                      . ' '
+                      . $shutters->getSlatPosCmd . ' '
+                      . $slatPos
                 );
             },
             $shuttersDev
-        )
-        if ( $slatPos > -1
+          )
+          if ( $slatPos > -1
             && $shutters->getSlatPosCmd ne 'none' );
-    
+
     }
 
     $shutters->setSelfDefenseAbsent( 0, 0 )
@@ -1872,13 +1889,13 @@ sub _SetCmdFn {
     return;
 }
 
-sub _setShuttersLastDriveDelayed {
+sub setShuttersLastDriveDelayed {
     my $h = shift;
 
     my $shuttersDevHash = $h->{devHash};
     my $lastDrive       = $h->{lastDrive};
 
-    readingsSingleUpdate( $shuttersDevHash, 'ASC_ShuttersLastDrive',
+    ::readingsSingleUpdate( $shuttersDevHash, 'ASC_ShuttersLastDrive',
         $lastDrive, 1 );
 
     return;
@@ -1886,9 +1903,9 @@ sub _setShuttersLastDriveDelayed {
 
 sub ASC_Debug {
     return
-      if ( !AttrVal( $ascDev->getName, 'ASC_debug', 0 ) );
+      if ( !::AttrVal( $ascDev->getName, 'ASC_debug', 0 ) );
 
-    my $debugMsg = shift;
+    my $debugMsg       = shift;
     my $debugTimestamp = strftime( "%Y.%m.%d %T", localtime(time) );
 
     print(
@@ -1907,7 +1924,7 @@ sub PrivacyUpTime {
     my $privacyUpUnixtime;
 
     if ( ( $shuttersSunriseUnixtime - $shutters->getPrivacyUpTime ) >
-        ( gettimeofday() + 1 )
+        ( ::gettimeofday() + 1 )
         || $shutters->getPrivacyUpStatus == 2 )
     {
         $privacyUpUnixtime =
@@ -1916,7 +1933,7 @@ sub PrivacyUpTime {
         $privacyUpUnixtime += 86400
           if ( $shutters->getPrivacyUpStatus == 2 );
 
-        readingsSingleUpdate( $shuttersDevHash, 'ASC_Time_PrivacyDriveUp',
+        ::readingsSingleUpdate( $shuttersDevHash, 'ASC_Time_PrivacyDriveUp',
             strftime( "%d.%m.%Y - %H:%M", localtime($privacyUpUnixtime) ), 1 );
         ## Setzt den PrivacyUp Modus für die Sichtschutzfahrt auf den Status 1
         ## und gibt die Unixtime für die nächste Fahrt korrekt zurück
@@ -1926,7 +1943,7 @@ sub PrivacyUpTime {
         }
     }
     else {
-        readingsSingleUpdate(
+        ::readingsSingleUpdate(
             $shuttersDevHash,
             'ASC_Time_PrivacyDriveUp',
             strftime(
@@ -1950,7 +1967,7 @@ sub PrivacyDownTime {
     my $privacyDownUnixtime;
 
     if ( ( $shuttersSunsetUnixtime - $shutters->getPrivacyDownTime ) >
-        ( gettimeofday() + 1 )
+        ( ::gettimeofday() + 1 )
         || $shutters->getPrivacyDownStatus == 2 )
     {
         $privacyDownUnixtime =
@@ -1959,7 +1976,7 @@ sub PrivacyDownTime {
         $privacyDownUnixtime += 86400
           if ( $shutters->getPrivacyDownStatus == 2 );
 
-        readingsSingleUpdate( $shuttersDevHash, 'ASC_Time_PrivacyDriveDown',
+        ::readingsSingleUpdate( $shuttersDevHash, 'ASC_Time_PrivacyDriveDown',
             strftime( "%d.%m.%Y - %H:%M", localtime($privacyDownUnixtime) ),
             1 );
         ## Setzt den PrivacyDown Modus für die Sichtschutzfahrt auf den Status 1
@@ -1970,7 +1987,7 @@ sub PrivacyDownTime {
         }
     }
     else {
-        readingsSingleUpdate(
+        ::readingsSingleUpdate(
             $shuttersDevHash,
             'ASC_Time_PrivacyDriveDown',
             strftime(
@@ -1995,55 +2012,55 @@ sub DevStateIcon {
     return if ( !$hash );
     my $name = $hash->{NAME};
 
-    if ( ReadingsVal( $name, 'state', undef ) eq 'created new drive timer' ) {
+    if ( ::ReadingsVal( $name, 'state', undef ) eq 'created new drive timer' ) {
         return '.*:clock';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'selfDefense terrace' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'selfDefense terrace' ) {
         return '.*:fts_door_tilt';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) =~ m{.*asleep$}xms ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) =~ m{.*asleep$}xms ) {
         return '.*:scene_sleeping';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) =~
+    elsif ( ::ReadingsVal( $name, 'state', undef ) =~
         m{^roommate(.come)?.(awoken|home)$}xms )
     {
         return '.*:user_available';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) =~
+    elsif ( ::ReadingsVal( $name, 'state', undef ) =~
         m{^residents.(home|awoken)$}xms )
     {
         return '.*:status_available';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'manual' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'manual' ) {
         return '.*:fts_shutter_manual';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'selfDefense inactive' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'selfDefense inactive' ) {
         return '.*:status_open';
     }
     elsif (
-        ReadingsVal( $name, 'state', undef ) =~ m{^selfDefense.*.active$}xms )
+        ::ReadingsVal( $name, 'state', undef ) =~ m{^selfDefense.*.active$}xms )
     {
         return '.*:status_locked';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'day open' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'day open' ) {
         return '.*:scene_day';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'night close' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'night close' ) {
         return '.*:scene_night';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'shading in' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'shading in' ) {
         return '.*:fts_shutter_shadding_run';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'shading out' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'shading out' ) {
         return '.*:fts_shutter_shadding_stop';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'active' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'active' ) {
         return '.*:hourglass';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) =~ m{.*privacy.*}xms ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) =~ m{.*privacy.*}xms ) {
         return '.*:fts_shutter_50';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) eq 'adv delay close' ) {
+    elsif ( ::ReadingsVal( $name, 'state', undef ) eq 'adv delay close' ) {
         return '.*:christmas_tree';
     }
 
@@ -2056,7 +2073,7 @@ sub RemoveShuttersTimer {
     for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
         $shutters->setShuttersDev($shuttersDev);
 
-        RemoveInternalTimer( $shutters->getInTimerFuncHash );
+        ::RemoveInternalTimer( $shutters->getInTimerFuncHash );
         $shutters->setInTimerFuncHash(undef);
     }
 

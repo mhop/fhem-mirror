@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -47,7 +47,7 @@ use utf8;
 use FHEM::Automation::ShuttersControl::Window::Attr;
 use FHEM::Automation::ShuttersControl::Window::Readings;
 
-our @ISA =
+use base
   qw(FHEM::Automation::ShuttersControl::Window::Attr FHEM::Automation::ShuttersControl::Window::Readings);
 
 1;

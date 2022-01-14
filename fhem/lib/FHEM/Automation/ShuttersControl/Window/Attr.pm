@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -44,17 +44,6 @@ use strict;
 use warnings;
 use utf8;
 
-use GPUtils qw(GP_Import);
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(
-          AttrVal
-          gettimeofday)
-    );
-}
-
 sub setSubTyp {
     my $self    = shift;
     my $attrVal = shift;
@@ -67,7 +56,8 @@ sub setSubTyp {
 sub getSubTyp {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_WindowRec_subType', 'twostate' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_WindowRec_subType',
+        'twostate' );
 }
 
 sub setWinDev {
@@ -87,15 +77,15 @@ sub _getWinDev {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_WindowRec}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_WindowRec}->{LASTGETTIME} ) <
         2
       );
     $self->{ $self->{shuttersDev} }->{ASC_WindowRec}->{LASTGETTIME} =
-      int( gettimeofday() );
+      int( ::gettimeofday() );
     my ( $device, $reading ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_WindowRec', 'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_WindowRec', 'none' );
 
     ### erwartetes Ergebnis
     # DEVICE:READING VALUEACTIVE:VALUEINACTIVE POSACTIVE:POSINACTIVE
@@ -116,7 +106,7 @@ sub getWinDevReading {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_WindowRec}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_WindowRec}->{LASTGETTIME} ) <
         2
       );
