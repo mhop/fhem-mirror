@@ -519,40 +519,38 @@ sub Set {
     my $cmd  = shift @$aArg
       // return qq{"set $name" needs at least one argument};
 
-    $cmd = lc($cmd);
-
     given ($cmd) {
-        when ('renewalltimer') {
+        when ('renewAllTimer') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
             RenewSunRiseSetShuttersTimer($hash);
         }
-        when ('renewtimer') {
+        when ('renewTimer') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             CreateSunRiseSetShuttersTimer( $hash, $aArg->[0] );
         }
-        when ('scanforshutters') {
+        when ('scanForShutters') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
             ShuttersDeviceScan($hash);
         }
-        when ('createnewnotifydev') {
+        when ('createNewNotifyDev') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
             CreateNewNotifyDev($hash);
         }
-        when ('partymode') {
+        when ('partyMode') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 )
               if ( $aArg->[0] ne ::ReadingsVal( $name, 'partyMode', 0 ) );
         }
-        when ('hardlockout') {
+        when ('hardLockOut') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
             HardewareBlockForShutters( $hash, $aArg->[0] );
         }
-        when ('sunrisetimeweholiday') {
+        when ('sunriseTimeWeHoliday') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
         }
-        when ('controlshading') {
+        when ('controlShading') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
 
             my $response = CheckASC_ConditionsForShadingFn( $hash, $aArg->[0] );
@@ -568,19 +566,19 @@ sub Set {
                 1
             );
         }
-        when ('selfdefense') {
+        when ('selfDefense') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
         }
-        when ('ascenable') {
+        when ('ascEnable') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             ::readingsSingleUpdate( $hash, $cmd, $aArg->[0], 1 );
         }
-        when ('advdrivedown') {
+        when ('advDriveDown') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
             EventProcessingAdvShuttersClose($hash);
         }
-        when ('shutterascenabletoggle') {
+        when ('shutterASCenableToggle') {
             return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
             ::readingsSingleUpdate(
                 $defs{ $aArg->[0] },
