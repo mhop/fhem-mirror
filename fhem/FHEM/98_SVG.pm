@@ -943,7 +943,7 @@ SVG_calcOffsets($$)
         my @range = split(" ", $fr);
         my @t = localtime;
         $SVG_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
-        $SVG_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
+        $SVG_devs{$d}{to} = $range[1] ? ResolveDateWildcards($range[1], @t):"9";
         return;
 
       }

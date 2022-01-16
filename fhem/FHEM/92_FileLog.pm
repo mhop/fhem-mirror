@@ -785,6 +785,7 @@ FileLog_Get($@)
                         localtime(time_str2num("$fy-$fm-$fd 00:00:00")));
 
         if(AttrVal($name, "createGluedFile", 0)) {
+          $to = (split(" ", TimeNow()))[0] if($to eq "9"); # Special
           if($to =~ m/^(....)-(..)-(..)/) {
             my ($ty,$tm,$td) = ($1,$2,$3);
             my $linf_to = ResolveDateWildcards($hash->{logfile},
