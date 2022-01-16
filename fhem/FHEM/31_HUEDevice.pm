@@ -1498,8 +1498,8 @@ HUEDevice_Parse($$)
 
         my $lights = join (' ', map( { my $code = $_;
                                           $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
-                                       $modules{HUEDevice}{defptr}{$code}{NAME} } @{$result->{lights}}) );
-        #readingsSingleUpdate($hash,"rgb", $rgb,1);
+                                       return $modules{HUEDevice}{defptr}{$code}{NAME} if(defined($modules{HUEDevice}{defptr}{$code}));
+                                       return ''  } @{$result->{lights}}) );
         setReadingsVal( $hash, ".associatedWith", $lights, TimeNow() );
       }
 
@@ -1733,6 +1733,10 @@ HUEDevice_Parse($$)
       #Aqara Cube
       $readings{gesture} = $state->{gesture} if( defined($state->{gesture}) );
 
+      #frient Air Quality Sensor
+      $readings{airqualityppb} = $state->{airqualityppb} if( defined($state->{airqualityppb}) );
+      $readings{airquality} = $state->{airquality} if( defined($state->{airquality}) );
+
       if( my $entries = $hash->{helper}{readingList} ) {
         foreach my $entry (@{$entries}) {
           $readings{$entry} = $state->{$entry} if( defined($state->{$entry}) );
@@ -1851,6 +1855,7 @@ HUEDevice_Parse($$)
     }
   }
 
+  my %readings;
   readingsBeginUpdate($hash);
 
   my $state = $result->{'state'};
@@ -1883,6 +1888,11 @@ HUEDevice_Parse($$)
 
   my $lastseen = undef;
      $lastseen = $result->{lastseen} if( defined($result->{lastseen}) );
+
+
+  $readings{dynamics_speed} = $state->{dynamics_speed};
+  $readings{dynamics_status} = $state->{dynamics_status};
+
 
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -1969,6 +1979,12 @@ HUEDevice_Parse($$)
 
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
 
+  foreach my $key ( keys %readings ) {
+    if( defined($readings{$key}) ) {
+      readingsBulkUpdate($hash, $key, $readings{$key}, 1) if( !defined($hash->{helper}{$key}) || $hash->{helper}{$key} ne $readings{$key} );
+      $hash->{helper}{$key} = $readings{$key};
+    }
+  }
   readingsEndUpdate($hash,1);
 
   if( defined($colormode) && !defined($rgb) ) {
