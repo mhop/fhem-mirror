@@ -11443,7 +11443,7 @@ sub DbRep_initSQLcmdCache {
           $count++;
       }
       
-      Log3 ($name, 4, qq{DbRep $name - SQL history restored from Cache file - count: "$count"}) if($count);
+      Log3 ($name, 4, qq{DbRep $name - SQL history restored from Cache file - count: $count}) if($count);
   }
     
 return;
@@ -11474,26 +11474,37 @@ sub DbRep_addSQLcmdCache {
       }     
   }
   
-  _DbRep_insertSQLtoCache ($name, $tmpsql) if($doIns);
-  
-  my (undef, $cstr) = DbRep_listSQLcmdCache ($name);
-  DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash) if($cstr);     
+  if($doIns) {
+      _DbRep_insertSQLtoCache ($name, $tmpsql);
+      
+      my (undef, $cstr) = DbRep_listSQLcmdCache ($name, 1);
+      DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash) if($cstr);
+  }  
   
 return;
 }
 
 ####################################################################################################
 #          SQL Cache listen
+#    $write:  0 - listen für Anzeige bzw. Drop-Down Liste
+#             1 - erzeuge Liste zum Schreiben in Cache File
 ####################################################################################################
 sub DbRep_listSQLcmdCache {               
-  my $name = shift;
+  my $name  = shift;
+  my $write = shift // 0;
   
   my $cache;
   my $cstr = q{};
   
   for my $key (sort{$b<=>$a} keys %{$data{DbRep}{$name}{sqlcache}{cmd}}) { 
       $cache .= $key." => ".$data{DbRep}{$name}{sqlcache}{cmd}{$key}."\n";  
-      $cstr  .= _DbRep_convertSQL ($data{DbRep}{$name}{sqlcache}{cmd}{$key}).",";      
+      
+      if ($write) {
+          $cstr .= $key."|=>|"._DbRep_convertSQL ($data{DbRep}{$name}{sqlcache}{cmd}{$key}).",";
+      }
+      else {
+          $cstr .= _DbRep_convertSQL ($data{DbRep}{$name}{sqlcache}{cmd}{$key}).",";
+      }      
   }
   
 return ($cache,$cstr);
@@ -11506,9 +11517,16 @@ sub _DbRep_insertSQLtoCache {
   my $name = shift;
   my $cmd  = shift; 
   
-  $data{DbRep}{$name}{sqlcache}{index}++;
-  my $index = $data{DbRep}{$name}{sqlcache}{index};
-  $data{DbRep}{$name}{sqlcache}{cmd}{$index} = $cmd;
+  if ($cmd =~ /\|=\>\|/xs) {
+      my ($k,$v)                             = split /\|=\>\|/, $cmd, 2;
+      $data{DbRep}{$name}{sqlcache}{cmd}{$k} = $v;
+      $data{DbRep}{$name}{sqlcache}{index}   = $k if($k > $data{DbRep}{$name}{sqlcache}{index});
+  }
+  else {
+      $data{DbRep}{$name}{sqlcache}{index}++;
+      my $index = $data{DbRep}{$name}{sqlcache}{index};
+      $data{DbRep}{$name}{sqlcache}{cmd}{$index} = $cmd;   
+  }
   
   return if(!$init_done);                                                          # nicht beim initialen Laden ausführen
   
