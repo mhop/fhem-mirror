@@ -11421,19 +11421,29 @@ sub DbRep_initSQLcmdCache {
   my $name = shift; 
   my $hash = $defs{$name};
   
+  RemoveInternalTimer ($name, "DbRep_initSQLcmdCache");
+  if (!$init_done) {
+      InternalTimer(time+1, "DbRep_initSQLcmdCache", $name, 0);
+      return;
+  }
+  
   $data{DbRep}{$name}{sqlcache}{index} = 0;                              # SQL-CommandHistory CacheIndex
   
   my ($err,$hl) = DbRep_getCmdFile($name."_sqlCmdList");
   
   if($hl) {
       $hl = (split ":", $hl, 2)[1];
-      Log3 ($name, 4, "DbRep $name - history sql commandlist read from file ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep");
   
-      my @cmds = split ",", $hl;
+      my @cmds  = split ",", $hl;
+      my $count = 0;
+      
       for my $elem (@cmds) {
           $elem = _DbRep_deconvertSQL ($elem);     
           _DbRep_insertSQLtoCache     ($name, $elem);
+          $count++;
       }
+      
+      Log3 ($name, 4, qq{DbRep $name - SQL history restored from Cache file - count: "$count"}) if($count);
   }
     
 return;
