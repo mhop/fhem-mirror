@@ -1,6 +1,6 @@
-REV 25467
+REV 25470
 DIR unused
-UPD 2022-01-15_07:45:03 371992 ./CHANGED
+UPD 2022-01-16_07:45:06 372070 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-01-03_07:45:03 44989 ./MAINTAINER.txt
 UPD 2021-10-25_07:45:03 42987 ./configDB.pm
@@ -380,7 +380,7 @@ UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
 UPD 2021-03-23_07:45:03 28884 FHEM/72_TA_CMI_JSON.pm
 UPD 2020-10-26_07:45:03 225504 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2022-01-15_07:45:03 116240 FHEM/73_AutoShuttersControl.pm
+UPD 2022-01-16_07:45:06 116240 FHEM/73_AutoShuttersControl.pm
 UPD 2021-10-24_07:45:02 232046 FHEM/73_DoorBird.pm
 UPD 2022-01-02_07:45:03 147507 FHEM/73_ElectricityCalculator.pm
 UPD 2021-10-27_07:45:03 48129 FHEM/73_GardenaSmartBridge.pm
@@ -739,14 +739,14 @@ UPD 2022-01-15_07:45:07 4608734 docs/commandref.html
 UPD 2022-01-15_07:45:10 2813987 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2022-01-15_07:45:11 264823 docs/commandref_modular.html
-UPD 2022-01-15_07:45:12 275882 docs/commandref_modular_DE.html
+UPD 2022-01-16_07:45:14 264823 docs/commandref_modular.html
+UPD 2022-01-16_07:45:16 275882 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
-UPD 2022-01-15_07:45:03 75895 lib/FHEM/Automation/ShuttersControl.pm
+UPD 2022-01-16_07:45:06 75873 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2022-01-15_07:45:03 2735 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2022-01-15_07:45:03 11902 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2022-01-15_07:45:03 7314 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
@@ -1467,6 +1467,7 @@ UPD 2015-07-28_14:05:32 5946 www/images/fhemSVG/hourglass.svg
 UPD 2022-01-07_07:45:02 2266 www/images/fhemSVG/hue2019_archetypesDoubleSpot.svg
 UPD 2022-01-14_07:45:02 1255 www/images/fhemSVG/hue2019_archetypesPendantRound.svg
 UPD 2022-01-07_07:45:02 1480 www/images/fhemSVG/hue2019_archetypesSingleSpot.svg
+UPD 2022-01-16_07:45:06 1987 www/images/fhemSVG/hue2019_archetypesWallSpot.svg
 UPD 2019-11-26_07:45:03 849 www/images/fhemSVG/hue2019_devicesMotionSensor.svg
 UPD 2017-11-14_07:45:02 10070 www/images/fhemSVG/hue_bridge.svg
 UPD 2016-04-27_07:45:12 1413 www/images/fhemSVG/hue_filled_aura.svg
