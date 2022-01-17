@@ -734,7 +734,13 @@ HttpUtils_DataComplete($)
 
       my $ret = substr($r, 0, $l);
       if( $hash->{EventSource} ) {
-        $hash->{callback}($hash, undef, $ret);
+        $hash->{httpdata} .= $ret;
+        if( $ret !~ /\n$/ ) {
+          # data is incomplete
+        } else {
+          $hash->{callback}($hash, undef, $hash->{httpdata});
+          $hash->{httpdata} = '';
+        }
 
       } else {
         $hash->{httpdata} .= $ret;
