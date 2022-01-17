@@ -4108,10 +4108,9 @@ Dispatch($$;$$)
     $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
-        next if($modules{$m}{LOADED}); # checked in the loop above, #125292
+        my ($order, $mname) = split(":", $m);
+        next if($modules{$mname}{LOADED}); # checked in the loop above, #125292
         if($dmsg =~ m/$h->{$m}/s) {
-          my ($order, $mname) = split(":", $m);
-
           if(AttrVal("global", "autoload_undefined_devices", 1)) {
             my $newm = LoadModule($mname);
             $mname = $newm if($newm ne "UNDEFINED");
