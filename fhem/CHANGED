@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+- change: 90_SIGNALduino_un.pm
+              fix some PerlCritic hints (#914)
+              revised commandref
  - feature: 00_SIGNALduino.pm  version 3.5.2
               xFSK processing
               Added support for directio and none.
