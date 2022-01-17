@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2021 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2022 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster)
@@ -30,7 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "4.12.5"  => "31.12.2001 standard unit assignment for readings beginning with 'temperature' and removed, forum:#125087 ",
+  "4.12.6"  => "17.01.2022 change log message deprecated to outdated, forum:#topic,41089.msg1201261.html#msg1201261 ",
+  "4.12.5"  => "31.12.2021 standard unit assignment for readings beginning with 'temperature' and removed, forum:#125087 ",
   "4.12.4"  => "27.12.2021 change ParseEvent for FBDECT, warning messages for deprecated commands added ",
   "4.12.3"  => "20.04.2021 change sub DbLog_ConnectNewDBH for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
   "4.12.2"  => "08.04.2021 change standard splitting ",
@@ -660,7 +661,7 @@ sub DbLog_Set {
     my $ret;
 
     if ($a[1] eq 'reduceLog') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> reduceLog" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
         my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
         if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
         if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
@@ -676,7 +677,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'reduceLogNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> reduceLog" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
         my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
         if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
         if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
@@ -934,7 +935,7 @@ sub DbLog_Set {
         return;
     }
     elsif ($a[1] eq 'count') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> countEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
         $dbh = DbLog_ConnectNewDBH($hash);
         
         if(!$dbh) {
@@ -953,7 +954,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'countNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> countEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
         if ($hash->{HELPER}{COUNT_PID} && $hash->{HELPER}{COUNT_PID}{pid} !~ m/DEAD/){  
             $ret = "DbLog count already in progress. Please wait until the running process is finished.";
         } 
@@ -964,7 +965,7 @@ sub DbLog_Set {
         }           
     }
     elsif ($a[1] eq 'deleteOldDays') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> delEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
         Log3 ($name, 3, "DbLog $name -> Deletion of records older than $a[2] days in database $db requested");
         my ($c, $cmd);
         
@@ -994,7 +995,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'deleteOldDaysNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> delEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
         if (defined $a[2] && $a[2] =~ /^\d+$/) {
             if ($hash->{HELPER}{DELDAYS_PID} && $hash->{HELPER}{DELDAYS_PID}{pid} !~ m/DEAD/) {  
                 $ret = "deleteOldDaysNbl already in progress. Please wait until the running process is finished.";
@@ -1012,7 +1013,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'userCommand') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> sqlCmd" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
         $dbh = DbLog_ConnectNewDBH($hash);
         if(!$dbh) {
             Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB connect not possible");
@@ -7040,7 +7041,7 @@ sub DbLog_showChildHandles {
         Performs simple sql select statements on the connected database. Usercommand and result will be written into 
         corresponding readings.</br>
         The result can only be a single line. 
-        The execution of SQL-Statements in DbLog is deprecated. Therefore the analysis module 
+        The execution of SQL-Statements in DbLog is outdated. Therefore the analysis module 
         <a href=https://fhem.de/commandref.html#DbRep>DbRep</a> should be used.</br>
       </ul><br/>
 
@@ -8445,7 +8446,7 @@ attr SMA_Energymeter DbLogValueFn
         Führt einfache sql select Befehle auf der Datenbank aus. Der Befehl und ein zurückgeliefertes 
         Ergebnis wird in das Reading "userCommand" bzw. "userCommandResult" geschrieben. Das Ergebnis kann nur 
         einzeilig sein. 
-        Die Ausführung von SQL-Befehlen in DbLog sind deprecated. Dafür sollte das Auswertungsmodul 
+        Die Ausführung von SQL-Befehlen in DbLog ist veraltet. Dafür sollte das Auswertungsmodul 
         <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden.</br>
       </ul><br>
 
