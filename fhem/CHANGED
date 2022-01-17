@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_WS07.pm
+               protocol definition 7.1 for Mebus HQ7312-2 (#1050)
  - feature: 14_SD_WS.pm: 
               protocol 27 for sensor EFS-3110A (#890)
               protocol 106 for GT-TMBBQ-0   
