@@ -1,6 +1,21 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-- change: 90_SIGNALduino_un.pm
+ - feature: 14_SD_WS.pm: 
+              protocol 27 for sensor EFS-3110A (#890)
+              protocol 106 for GT-TMBBQ-0   
+              protocol 110 for ADE WS1907 Weather station (#970)
+              protocol 111 for TS-FT002 water tank level (#1000)
+              protocol 113 for GFGT 433 B1 Wireless Grill sensor (#1003)
+              protocol 108 for BRESSER 5-in-1 Weather Center
+                  and BRESSER Professional Rain Gauge (#973)
+              protocol 115 for Bresser 6-in-1 and 
+                  5-in-1 Comfort Wetter Center (#1010)
+              new protocol 107 for Fine Offset WH51 (#1055)
+              new protocol 116 for Fine Offset WH57 (#1061)
+ - bugfix: 14_SD_WS.pm: 
+              Update protocol 64 for sensor WH2A (#1009)
+              Conrad S522 protocol 33 no reading batteryState (#1042)
+ - change: 90_SIGNALduino_un.pm
               fix some PerlCritic hints (#914)
               revised commandref
  - feature: 00_SIGNALduino.pm  version 3.5.2
