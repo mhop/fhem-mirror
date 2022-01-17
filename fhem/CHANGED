@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: new design of sqlCmdHistory, minor fixes
  - feature: 14_SD_WS07.pm
                protocol definition 7.1 for Mebus HQ7312-2 (#1050)
  - feature: 14_SD_WS.pm: 
