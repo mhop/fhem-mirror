@@ -7001,7 +7001,7 @@ sub DbRep_sqlCmdDone {
   ReadingsBulkUpdateValue ($hash, "sqlCmd", $cmd); 
   ReadingsBulkUpdateValue ($hash, "sqlResultNumRows", $nrows);
   
-  DbRep_addSQLcmdCache ($name, $cmd);                              # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
+  DbRep_addSQLcmdCache ($name);                                                 # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
   
   if ($srf eq "sline") {
       $rowstring =~ s/§/]|[/g;
@@ -11455,11 +11455,8 @@ return;
 ####################################################################################################
 sub DbRep_addSQLcmdCache {                
   my $name = shift; 
-  my $cmd  = shift; 
   
   my $hash = $defs{$name};
-  
-  $cmd     = _DbRep_convertSQL ($cmd);
   
   my $hlc = AttrVal($name, "sqlCmdHistoryLength", 0);                              # Anzahl der Einträge in Drop-Down Liste
   
@@ -11500,7 +11497,7 @@ sub DbRep_listSQLcmdCache {
       $cache .= $key." => ".$data{DbRep}{$name}{sqlcache}{cmd}{$key}."\n";  
       
       if ($write) {
-          $cstr .= $key."|=>|"._DbRep_convertSQL ($data{DbRep}{$name}{sqlcache}{cmd}{$key}).",";
+          $cstr .= $key."|=>|"._DbRep_convertSQL ($data{DbRep}{$name}{sqlcache}{cmd}{$key}, 1).",";
       }
       else {
           $cstr .= _DbRep_convertSQL ($data{DbRep}{$name}{sqlcache}{cmd}{$key}).",";
@@ -11547,9 +11544,16 @@ return;
 
 ####################################################################################################
 #          SQL Statement konvertieren 
+#    $write - setzen für Schreiben Cache File
 ####################################################################################################
 sub _DbRep_convertSQL {
-  my $cmd  = shift; 
+  my $cmd   = shift;
+  my $write = shift // 0;
+  
+  if($write) {
+      $cmd =~ s/\n/&#42;/g;
+      $cmd =~ s/\s/&nbsp;/g;
+  }
   
   $cmd =~ s/\s+/&nbsp;/g; 
   $cmd =~ s/,/&#65292;/g;                                               # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
@@ -11564,6 +11568,7 @@ return $cmd;
 sub _DbRep_deconvertSQL {
   my $cmd  = shift; 
   
+  $cmd =~ s/&#42;/\n/g;
   $cmd =~ s/&nbsp;/ /g; 
   $cmd =~ s/&#65292;/,/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
    
