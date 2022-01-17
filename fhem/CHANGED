@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  89_FULLY: Removed parseParam
  - bugfix:  73_AutoShuttersControl: fix setter Readings in ShuttersControl.pm
  - change:  73_AutoShuttersControl: change Attribut ASC_advDate 
                to ASC_advStartDate. Add Attribut ASC_advEndDate

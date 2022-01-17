@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 2.2
+#  89_FULLY.pm 2.3
 #
 #  $Id$
 #
@@ -10,7 +10,7 @@
 #  This program free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License V2.
 #
-#  (c) 2021 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2022 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 
@@ -44,7 +44,7 @@ sub FULLY_Decrypt ($);
 sub FULLY_Ping ($$);
 sub FULLY_SetPolling ($$;$);
 
-my $FULLY_VERSION = '2.2';
+my $FULLY_VERSION = '2.3';
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -78,7 +78,6 @@ sub FULLY_Initialize ($)
 	$hash->{NotifyFn}    = "FULLY_Notify";
 	$hash->{ShutdownFn}  = "FULLY_Shutdown";
 	$hash->{FW_detailFn} = "FULLY_Detail";
-	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval:slider,10,10,86400 requestTimeout:slider,1,1,20 repeatCommand:0,1,2 " .
 		"disable:0,1 expert:0,1 waitAfterPing:0,1,2 updateAfterCommand:0,1 " .
@@ -91,20 +90,21 @@ sub FULLY_Initialize ($)
 
 sub FULLY_Define ($$)
 {
-	my ($hash, $a, $h) = @_;
-	my $name = $hash->{NAME};
+	my ($hash, $def) = @_;
+	my @a = split( "[ \t][ \t]*", $def);
+	my $name = $a[0];
 	my $host = '';
 	
 	return "Usage: define devname FULLY [http|https]://IP_or_Hostname [password] [poll-interval]"
-		if (@$a < 3);
+		if (@a < 3);
 
-	if ($$a[2] =~ /^(https?):\/\/(.+)/) {
+	if ($a[2] =~ /^(https?):\/\/(.+)/) {
 		$hash->{prot} = $1;
 		$host = $2;
 	}
 	else {
 		$hash->{prot} = $FULLY_DEFAULT_PROT;
-		$host = $$a[2];
+		$host = $a[2];
 	}
 
 	if ($host =~ /^([^:]+):([0-9]+)$/) {
@@ -122,17 +122,17 @@ sub FULLY_Define ($$)
 	$hash->{nextUpdate}      = 'off';
 	$hash->{fully}{schedule} = 0;
 	
-	if (@$a == 4) {
-		if ($$a[3] =~ /^[0-9]+$/) {
-			$hash->{fully}{interval} = $$a[3];
+	if (@a == 4) {
+		if ($a[3] =~ /^[0-9]+$/) {
+			$hash->{fully}{interval} = $a[3];
 		}
 		else {
-			$hash->{fully}{password} = $$a[3];
+			$hash->{fully}{password} = $a[3];
 		}
 	}
-	elsif (@$a == 5) {
-		$hash->{fully}{password} = $$a[3];
-		$hash->{fully}{interval} = $$a[4];
+	elsif (@a == 5) {
+		$hash->{fully}{password} = $a[3];
+		$hash->{fully}{interval} = $a[4];
 	}
 
 	if (!exists($hash->{fully}{password})) {
@@ -318,9 +318,7 @@ sub FULLY_Detail ($@)
 
 sub FULLY_Set ($@)
 {
-	my ($hash, $a, $h) = @_;
-	my $name = shift @$a;
-	my $opt = shift @$a;
+	my ($hash, $name, $opt, @a) = @_;
 	my $options = "brightness:slider,0,1,255 photo:noArg clearCache:noArg clearWebstorage:noArg ".
 		"clearCookies:noArg exit:noArg foreground:noArg lock:noArg startApp ".
 		"motionDetection:on,off off:noArg on:noArg on-for-timer playSound playVideo restart:noArg ".
@@ -362,7 +360,7 @@ sub FULLY_Set ($@)
 		push (@c, $cmds{$opt});
 	}
 	elsif ($opt eq 'authentication') {
-		my $password = shift @$a;
+		my $password = shift @a;
 
 		if (!defined($password)) {
 			setKeyValue ($name."_password", undef);
@@ -382,7 +380,7 @@ sub FULLY_Set ($@)
 		return 'Password for FULLY authentication stored';		
 	}
 	elsif ($opt eq 'on-for-timer') {
-		my $par = shift @$a // "forever";
+		my $par = shift @a // "forever";
 
 		if ($par eq 'forever') {
 			push (@c, "setBooleanSetting", "screenOn");
@@ -407,70 +405,70 @@ sub FULLY_Set ($@)
 		$hash->{onForTimer} = $par;
 	}
 	elsif ($opt eq 'screenOffTimer') {
-		my $value = shift @$a // return "Usage: set $name $opt {seconds}";
+		my $value = shift @a // return "Usage: set $name $opt {seconds}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "timeToScreenOffV2", "value" => "$value" });
 	}
 	elsif ($opt eq 'screenSaver') {
-		my $state = shift @$a;
+		my $state = shift @a;
 		return "Usage: set $name $opt { start | stop }" if (!defined ($state) || $state !~ /^(start|stop)$/);
 		push (@c, ($state eq 'start') ? "startScreensaver" : "stopScreensaver");
 	}
 	elsif ($opt eq 'screenSaverTimer') {
-		my $value = shift @$a // return "Usage: set $name $opt {seconds}";
+		my $value = shift @a // return "Usage: set $name $opt {seconds}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "timeToScreensaverV2", "value" => "$value" });
 	}
 	elsif ($opt eq 'screenSaverURL') {
-		my $value = shift @$a // return "Usage: set $name $opt {URL}";
+		my $value = shift @a // return "Usage: set $name $opt {URL}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "screensaverURL", "value" => "$value" });
 	}
 	elsif ($opt eq 'startURL') {
-		my $value = shift @$a // return "Usage: set $name $opt {URL}";
+		my $value = shift @a // return "Usage: set $name $opt {URL}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "startURL", "value" => "$value" });
 	}
 	elsif ($opt eq 'startApp') {
-		my $app = shift @$a // return "Usage set $name $opt {APK-Name}";
+		my $app = shift @a // return "Usage set $name $opt {APK-Name}";
 		push (@c, "startApplication");
 		push (@p, { "package" => "$app" } );
 	}
 	elsif ($opt eq 'brightness') {
-		my $value = shift @$a // return "Usage: set $name brightness 0-255";
+		my $value = shift @a // return "Usage: set $name brightness 0-255";
 		$value = 255 if ($value > 255);
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "screenBrightness", "value" => "$value" });
 	}
 	elsif ($opt eq 'motionDetection') {
-		my $state = shift @$a // return "Usage: set $name motionDetection { on | off }";
+		my $state = shift @a // return "Usage: set $name motionDetection { on | off }";
 		my $value = $state eq 'on' ? 'true' : 'false';
 		push (@c, "setBooleanSetting");
 		push (@p, { "key" => "motionDetection", "value" => "$value" });
 	}
 	elsif ($opt eq 'speak') {
-		my $text = shift @$a // return 'Usage: set $name speak "{Text}"';
+		my $text = shift @a // return 'Usage: set $name speak "{Text}"';
 		my $enctext = FULLY_SubstDeviceReading ($text);
 		push (@c, "textToSpeech");
 		push (@p, { "text" => "$enctext" });
 	}
 	elsif ($opt eq 'overlayMessage') {
-		my $text = shift @$a // return 'Usage: set $name overlayMessage "{Text}"';
+		my $text = shift @a // return 'Usage: set $name overlayMessage "{Text}"';
 		my $enctext = FULLY_SubstDeviceReading ($text);
 		push (@c, "setOverlayMessage");
 		push (@p, { "text" => "$enctext" });
 	}
 	elsif ($opt eq 'playSound') {
-		my $url = shift @$a // return "Usage: set $name playSound {url} [loop]";
-		my $loop = shift @$a;
+		my $url = shift @a // return "Usage: set $name playSound {url} [loop]";
+		my $loop = shift @a;
 		$loop = defined ($loop) ? 'true' : 'false';
 		push (@c, "playSound");
 		push (@p, { "url" => "$url", "loop" => "$loop"});
 	}
 	elsif ($opt eq 'playVideo') {
-		my $url = shift @$a // return "Usage: set $name playVideo {url} [showControls] [exitOnTouch] [exitOnCompletion] [loop]";
+		my $url = shift @a // return "Usage: set $name $opt {url} [showControls] [exitOnTouch] [exitOnCompletion] [loop]";
 		my %pvo = ('loop' => 0, 'showControls' => 0, 'exitOnTouch' => 0, 'exitOnCompletion' => 0);
-		while (my $pvf = shift @$a) {
+		while (my $pvf = shift @a) {
 			return "Illegal option $pvf" if (!exists($pvo{$pvf}));
 			$pvo{$pvf} = 1;
 		}
@@ -479,15 +477,15 @@ sub FULLY_Set ($@)
 		push (@p, \%pvo);
 	}
 	elsif ($opt eq 'volume') {
-		my $level = shift @$a;
-		my $stream = shift @$a;
+		my $level = shift @a;
+		my $stream = shift @a;
 		return "Usage: set $name volume {level} {stream}"
 			if (!defined ($stream) || $level !~ /^[0-9]+$/ || $stream !~ /^[0-9]+$/);
 		push (@c, "setAudioVolume");
 		push (@p, { "level" => "$level", "stream" => "$stream"});
 	}
 	elsif ($opt eq 'url') {
-		my $url = shift @$a;
+		my $url = shift @a;
 		if (defined ($url)) {
 			push (@c, "loadURL");
 			push (@p, { "url" => "$url" });
@@ -498,8 +496,8 @@ sub FULLY_Set ($@)
 	}
 	elsif ($opt eq 'setStringSetting' || $opt eq 'setBooleanSetting') {
 		return "FULLY: Command $opt only available in expert mode" if ($expert == 0);
-		my $key = shift @$a;
-		my $value = shift @$a;
+		my $key = shift @a;
+		my $value = shift @a;
 		return "Usage: set $name $opt {key} {value}" if (!defined ($value));
 		push (@c, $opt);
 		push (@p, { "key" => "$key", "value" => "$value" });
@@ -524,9 +522,8 @@ sub FULLY_Set ($@)
 
 sub FULLY_Get ($@)
 {
-	my ($hash, $a, $h) = @_;
-	my $name = shift @$a;
-	my $opt = shift @$a;
+	my ($hash, $name, $opt, @a) = @_;
+
 	my $options = "info:noArg update:noArg";
 	
 	return "Device disabled" if (AttrVal ($name, 'disable', 0) == 1);
@@ -969,6 +966,7 @@ sub FULLY_Ping ($$)
 	
 	return $temp;
 }
+
 
 1;
 
