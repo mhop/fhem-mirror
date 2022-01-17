@@ -4547,7 +4547,7 @@ sub DbRep_diffval {
   $sth->finish;
   $dbh->disconnect;
   
-  Log3 ($name, 5, "DbRep $name - raw data of row_array result:\n @row_array");
+  # Log3 ($name, 5, "DbRep $name - raw data of row_array result:\n @row_array");
  
   my $difflimit = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
  
@@ -4584,7 +4584,7 @@ sub DbRep_diffval {
           return "$name|$err";
       }
 
-      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, \nTIMESTAMP: $timestamp, VALUE: $value, DIFF: $diff");
+      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value, DIFF: $diff");
       
       $diff_current = $timestamp." ".$diff;                                    # String ignorierter Zeilen erzeugen 
       
@@ -4672,7 +4672,7 @@ sub DbRep_diffval {
           return "$name|$err";
       }
      
-      $rt = $rt+$wrt;
+      $rt = $rt + $wrt;
   }
  
   my $rowlist = encode_base64($rows,  "");
@@ -5042,12 +5042,12 @@ sub DbRep_del_Done {
   my ($reading_runtime_string, $ds, $rds);
   
   if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-      $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."--DELETED_ROWS--";
+      $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."--DELETED_ROWS";
   } 
   else {
-      $ds   = $device."--" if ($device && $table ne "current");
+      $ds   = $device. "--" if ($device  && $table ne "current");
       $rds  = $reading."--" if ($reading && $table ne "current");
-      $reading_runtime_string = $ds.$rds."--DELETED_ROWS_".uc($table)."--";
+      $reading_runtime_string = $ds.$rds."DELETED_ROWS_".uc($table);
   }
   
   readingsBeginUpdate ($hash);
@@ -10415,7 +10415,7 @@ sub DbRep_prepareExecuteQuery {
       } 
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
-              $sth->finish;
+              $sth->finish if($sth);
               $dbh->disconnect;
               $ret = "$name|$err";
             };
@@ -14383,14 +14383,22 @@ return;
                                  </ul>
                                  <br>
                                  
-                                 The result of the statement will be shown in <a href="#DbRepReadings">Reading</a> "SqlResult".
                                  The formatting of result can be choosen by attribute <a href="#sqlResultFormat">sqlResultFormat</a>, 
                                  as well as the used field separator can be determined by attribute 
                                  <a href="#sqlResultFieldSep">sqlResultFieldSep</a>. <br><br>
                             
                                  The module provides a command history once a sqlCmd command was executed successfully.
                                  To use this option, activate the attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> 
-                                 with list lenght you want. <br><br>
+                                 with list lenght you want. <br>
+                                 If the command history is enabled, an indexed list of stored SQL statements is available 
+                                 with <b>___list_sqlhistory___</b> within the sqlCmdHistory command. 
+                                 An SQL statement can be executed by specifying its index in <b>sqlCmd</b> in this form:
+                                 <br><br>
+                                 
+                                   <ul>
+                                     set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
+                                   </ul>
+                                 <br>
                                  
                                  The attributes relevant for controlling sqlCmd are: <br><br>
 
@@ -17174,7 +17182,6 @@ return;
                                  </ul>
                                  <br>                                 
                                  
-                                 Das Ergebnis des Statements wird im <a href="#DbRepReadings">Reading</a> "SqlResult" dargestellt.
                                  Die Ergebnis-Formatierung kann durch das Attribut <a href="#sqlResultFormat">sqlResultFormat</a> ausgewählt, 
                                  sowie der verwendete Feldtrenner durch das Attribut <a href="#sqlResultFieldSep">sqlResultFieldSep</a> 
                                  festgelegt werden. <br><br>
@@ -17182,7 +17189,16 @@ return;
                                  Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich 
                                  ausgeführt wurde.
                                  Um diese Option zu nutzen, ist das Attribut <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> mit der 
-                                 gewünschten Listenlänge zu aktivieren. <br><br>
+                                 gewünschten Listenlänge zu aktivieren. <br>
+                                 Ist die Kommando-Historie aktiviert, ist mit <b>___list_sqlhistory___</b> innerhalb des Kommandos 
+                                 sqlCmdHistory eine indizierte Liste der gespeicherten SQL-Statements verfügbar.
+                                 Ein SQL-Statement kann durch Angabe seines Index im <b>sqlCmd</b> ausgeführt werden mit: 
+                                 <br><br>
+                                 
+                                   <ul>
+                                     set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
+                                   </ul>    
+                                 <br>
                                  
                                  Die zur Steuerung von sqlCmd relevanten Attribute sind: <br><br>
 
