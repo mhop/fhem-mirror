@@ -407,7 +407,7 @@ sub DbRep_Initialize {
                        "showVariables ".
                        "showStatus ".
                        "showTableInfo ".
-                       "sqlCmdHistoryLength:0,5,10,15,20,25,30,35,40,45,50 ".
+                       "sqlCmdHistoryLength:slider,0,1,200 ".
                        "sqlCmdVars ".
                        "sqlResultFormat:separated,mline,sline,table,json ".
                        "sqlResultFieldSep:|,:,\/ ".
