@@ -998,7 +998,13 @@ sub DbRep_Set {
           
           if ($sqlcmd =~ /^ckey:/ix) {
               my $key = (split ":", $sqlcmd)[1]; 
-              $sqlcmd = $data{DbRep}{$name}{sqlcache}{cmd}{$key} if (exists $data{DbRep}{$name}{sqlcache}{cmd}{$key});
+              
+              if (exists $data{DbRep}{$name}{sqlcache}{cmd}{$key}) {
+                  $sqlcmd = $data{DbRep}{$name}{sqlcache}{cmd}{$key};
+              }
+              else {
+                  return qq{SQL statement with key "$key" doesn't exists in history};
+              }
           }
           
           $sqlcmd .= ";" if ($sqlcmd !~ m/\;$/x);
