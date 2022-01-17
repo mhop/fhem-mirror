@@ -1,5 +1,35 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 00_SIGNALduino.pm  version 3.5.2
+              xFSK processing
+              Added support for directio and none.
+              Extension for "get sduino ccreg" (#918)
+              parse subs optimized (#926)
+              update reading  config when change settings (#948)
+              Allow incremental addition of match list entries (#1026)
+              added commandref rfmode & cc1101_reg_user
+              added hardware ESP32cc1101, MAPLEMINI_F103CB on attribute
+              added new attrib rfmode to changed to xFSK & revised commandref
+              added separat sub SIGNALduino_Attr_rfmode
+              added set cmd LaCrossePairForSec (for LaCrosse
+ - change: 00_SIGNALduino.pm  version 3.5.2
+              added N to send SN  xFSK sendCommand
+              added new sub SIGNALduino_calcRSSI to simplification code
+              revised Parse_MN and loglevel
+              revised logoutput text SIGNALduino_Get_Command
+              rename "get raw" to "get rawmsg" (#925)
+ - bugfix: 00_SIGNALduino.pm  version 3.5.2
+              SIGNALduino_CheckccConfResponse is more robust #1015 (#1031)
+              fix PERL WARNING (#895) (#972)
+              get ccreg command caused stacktrace #898
+              Bugfix define with hostname 901 (#904)
+              Wrong version assignment fixed
+              module runs now without fhemweb instance 
+              display protocol list (#947)
+              require 99_Utils only if really needed (#950)
+              corrected incorrect logoutput (#951)
+              Fix Multiple send delay (#941)
+              Fixes high CPU and MEM usage in patternExists (#988)
  - bugfix:  89_FULLY: Removed parseParam
  - bugfix:  73_AutoShuttersControl: fix setter Readings in ShuttersControl.pm
  - change:  73_AutoShuttersControl: change Attribut ASC_advDate 
