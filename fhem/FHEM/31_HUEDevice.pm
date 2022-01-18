@@ -220,7 +220,7 @@ HUEDevice_devStateIcon($)
   my $name = $hash->{NAME};
 
   return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
-  return ".*:light_question:toggle" if( ReadingsVal($name, 'mode', 'homeautomation') ne 'homeautomation' );
+  return ".*:light_toggle:toggle" if( ReadingsVal($name, 'mode', 'homeautomation') ne 'homeautomation' );
 
   my $pct = ReadingsVal($name, 'pct', 100);
   my $subtype = AttrVal($name, 'subType', 'extcolordimmer' );
@@ -266,7 +266,9 @@ HUEDevice_devStateIcon($)
   return ".*:$s:toggle" if( $subtype eq "dimmer" );
   return ".*:$s:toggle" if( $subtype eq "switch" );
 
-  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:light_toggle@#".CommandGet("","$name RGB").":toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette'
+                                                                      && $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:light_toggle:toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette' );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
 
   return '<div style="width:32px;height:19px;'.
@@ -1498,8 +1500,8 @@ HUEDevice_Parse($$)
 
         my $lights = join (' ', map( { my $code = $_;
                                           $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
-                                       return $modules{HUEDevice}{defptr}{$code}{NAME} if(defined($modules{HUEDevice}{defptr}{$code}));
-                                       return ''  } @{$result->{lights}}) );
+                                       defined($modules{HUEDevice}{defptr}{$code}) ? $modules{HUEDevice}{defptr}{$code}{NAME} : '';
+                                     } @{$result->{lights}}) );
         setReadingsVal( $hash, ".associatedWith", $lights, TimeNow() );
       }
 
@@ -1611,7 +1613,30 @@ HUEDevice_Parse($$)
   $hash->{swversion} = $result->{swversion} if( defined($result->{swversion}) );
   $hash->{swconfigid} = $result->{swconfigid} if( defined($result->{swconfigid}) );
   $hash->{manufacturername} = $result->{manufacturername} if( defined($result->{manufacturername}) );
+  $hash->{productname} = $result->{productname} if( defined($result->{productname}) );
   $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($result->{luminaireuniqueid}) );
+
+  if( !defined($hash->{helper}{capabilities}) ) {
+    if( my $capabilities = $result->{capabilities} ) {
+      if( my $inputs = $capabilities->{inputs} ) {
+        $hash->{inputs} = scalar @{$inputs};
+
+        $hash->{helper}{events} = [];
+        my $i = 0;
+        foreach my $input (@{$inputs}) {
+          $hash->{helper}{events}[$i] = {};
+          foreach my $event (@{$input->{events}}) {
+            $hash->{helper}{events}[$i]{$event->{eventtype}} = $event->{buttonevent};
+          }
+
+          ++$i;
+        }
+
+      }
+
+      $hash->{helper}{capabilities} = $capabilities;
+    }
+  }
 
   #https://github.com/dresden-elektronik/deconz-rest-plugin/issues/2590
   #$hash->{lastseen} = $result->{lastseen} if( defined($result->{lastseen}) );
@@ -1695,6 +1720,8 @@ HUEDevice_Parse($$)
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
       $readings{state} = $state->{open}?'open':'closed' if( defined($state->{open}) );
       $readings{state} = $state->{lightlevel} if( defined($state->{lightlevel}) && !defined($state->{lux}) );
+      #$readings{state} = $state->{input} if( defined($state->{input}) );
+      #$readings{state} = $state->{eventtype} if( defined($state->{eventtype}) );
       $readings{state} = $state->{buttonevent} if( defined($state->{buttonevent}) );
       $readings{state} = $state->{presence}?'motion':'nomotion' if( defined($state->{presence}) );
       $readings{state} = $state->{fire}?'fire':'nofire' if( defined($state->{fire}) );
