@@ -36,6 +36,7 @@
               added separat sub SIGNALduino_Attr_rfmode
               added set cmd LaCrossePairForSec (for LaCrosse
  - change: 00_SIGNALduino.pm  version 3.5.2
+              dependency added: Perl package Digest::CRC needed  
               added N to send SN  xFSK sendCommand
               added new sub SIGNALduino_calcRSSI to simplification code
               revised Parse_MN and loglevel
