@@ -538,6 +538,7 @@ sub DbRep_Set {
   if (AttrVal($name, "sqlCmdHistoryLength", 0)) {
       $hl .= "___purge_sqlhistory___";
       $hl .= ",___list_sqlhistory___"; 
+      $hl .= ",___save_sqlhistory___";
       $hl .= ",___restore_sqlhistory___";      
   }
   
@@ -1038,6 +1039,12 @@ sub DbRep_Set {
           if($sqlcmd eq "___list_sqlhistory___") {
               my ($cache) = DbRep_listSQLcmdCache ($name);
               return $cache;
+          }
+          
+          if($sqlcmd eq "___save_sqlhistory___") {
+              my $err = DbRep_writeSQLcmdCache ($hash);                                # SQL Cache File schreiben
+              $err  //= "SQL history entries of $name successfully saved";
+              return $err;
           }
           
           if($sqlcmd eq "___restore_sqlhistory___") {
@@ -1800,6 +1807,7 @@ sub DbRep_Shutdown {
   
   DbRep_delread          ($hash,1);
   RemoveInternalTimer    ($hash);
+  DbRep_writeSQLcmdCache ($hash);                                              # SQL Cache File schreiben
   
 return; 
 }
@@ -11416,8 +11424,10 @@ sub DbRep_setCmdFile {
   }
   
   push @new, "$key:$value" if(!$fnd && defined($value));
+  
+  my $err = FileWrite($param, @new);
 
-return FileWrite($param, @new);
+return $err;
 }
 
 ####################################################################################################
@@ -11539,7 +11549,6 @@ sub DbRep_addSQLcmdCache {
   
   if($doIns) {
       _DbRep_insertSQLtoCache ($name, $tmpsql);
-      DbRep_writeSQLcmdCache ($hash);                                              # SQL Cache File schreiben
   }  
   
 return;
@@ -11615,9 +11624,9 @@ sub DbRep_writeSQLcmdCache {
   my $name = $hash->{NAME};  
        
   my (undef, $cstr) = DbRep_listSQLcmdCache ($name, 1);
-  DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash);  
+  my $err           = DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash);  
   
-return;
+return $err;
 }
 
 ####################################################################################################
@@ -14485,6 +14494,7 @@ return;
 
     <li><b> sqlCmdHistory </b>   - If activated with the attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
                                    a stored SQL statement can be selected from a list and executed.
+                                   The SQL cache is automatically saved when FHEM is closed and restored when the system is started.
                                    The following entries execute special functions:  
                                    <br><br>
 
@@ -14493,7 +14503,8 @@ return;
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>___purge_sqlhistory___</b>   </td><td>: deletes the history cache                                                         </td></tr>
                                       <tr><td> <b>___list_sqlhistory___ </b>   </td><td>: shows the SQL statements currently in the cache, including their cache key (ckey) </td></tr>
-                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: Undoes a previously executed "___purge_sqlhistory___"                             </td></tr>
+                                      <tr><td> <b>___save_sqlhistory___</b>    </td><td>: backs up the history cache manually                                               </td></tr>
+                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: restores the last backup of the history cache                                     </td></tr>
                                    </table>
                                    </ul>
                                    <br>                                    
@@ -17293,6 +17304,7 @@ return;
                                  
     <li><b> sqlCmdHistory </b>   - Wenn mit dem Attribut <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> aktiviert, kann
                                    ein gespeichertes SQL-Statement aus einer Liste ausgewählt und ausgeführt werden.
+                                   Der SQL Cache wird beim Beenden von FHEM automatisch gesichert und beim Start des Systems wiederhergestellt.
                                    Mit den nachfolgenden Einträgen werden spezielle Funktionen ausgeführt: 
                                    <br><br>
                                    
@@ -17301,7 +17313,8 @@ return;
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
                                       <tr><td> <b>___purge_sqlhistory___</b>   </td><td>: löscht den History Cache                                                           </td></tr>
                                       <tr><td> <b>___list_sqlhistory___ </b>   </td><td>: zeigt die aktuell im Cache vorhandenen SQL-Statements incl. ihrem Cache Key (ckey) </td></tr>
-                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: macht ein zuvor ausgeführtes "___purge_sqlhistory___" rückgängig                   </td></tr>
+                                      <tr><td> <b>___save_sqlhistory___</b>    </td><td>: sichert den History Cache manuell                                                  </td></tr>
+                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: stellt die letzte Sicherung des History Cache wieder her                           </td></tr>
                                    </table>
                                    </ul>
                                    <br> 
