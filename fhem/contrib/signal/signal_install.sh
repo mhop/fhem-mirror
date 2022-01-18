@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.1"
+SCRIPTVERSION="3.3"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -17,6 +17,13 @@ TMPFILE=/tmp/signal$$.tmp
 VIEWER=eog
 DBVER=0.19
 OPERATION=$1
+JAVA_VERSION=11.0
+
+if [ $OPERATION = "experimental" ]; then
+  SIGNALVERSION="0.10.1"
+  JAVA_VERSION=17.0
+  OPERATION=
+fi
 
 #Make sure picture viewer exists
 VIEWER=`which $VIEWER`
@@ -142,13 +149,15 @@ OSNAME=`uname`
 APT=`which apt`
 if [ $ARCH = "armv7l" ]; then 
 	ARCH="armhf"
+	ARCHJ="arm"
 elif [ $ARCH = "x86_64" ]; then
 	ARCH="amd64"
+	ARCHJ="x64"
 fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
 IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
-KNOWN=("amd64-glibc2.27-0.9.0" "amd64-glibc2.28-0.9.0" "amd64-glibc2.31-0.9.0" "armhf-glibc2.28-0.9.0" "amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2")
+KNOWN=("amd64-glibc2.27-0.9.0" "amd64-glibc2.28-0.9.0" "amd64-glibc2.31-0.9.0" "armhf-glibc2.28-0.9.0" "amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "armhf-glibc2.31-0.10.1")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
@@ -246,8 +255,38 @@ else
 	adduser --disabled-password --gecos none $SIGNALUSER
     echo 'created'
 fi
-}
 
+echo -n "Checking system Java version ... "
+JVER=`java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+echo $JVER
+if ! [ "$JAVA_VERSION" = "$JVER" ]; then
+	if [ -e /opt/java ]; then
+		echo -n "Checking for Java in /opt/java ... "
+		JVER=`/opt/java/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+		echo $JVER
+	fi
+	if ! [ "$JVER" = "$JAVA_VERSION" ]; then
+		echo "Java version mismatch - version $JAVA_VERSION required"
+		echo -n "Download from adoptium.net (this can take a while) ..."
+		cd /tmp
+		JAVA_ARC=OpenJDK17U-jdk_$ARCHJ\_linux_hotspot_17.0.1_12.tar.gz
+		wget -qN https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.1%2B12/$JAVA_ARC
+		if [ -z $JAVA_ARC ]; then
+			echo "failed"
+			exit
+		fi
+		echo "successful"
+		cd /opt
+		echo -n "Unpacking ..."
+		tar zxf /tmp/$JAVA_ARC
+		rm -rf /opt/java
+		mv jdk* java
+		rm /tmp/$JAVA_ARC
+		echo "done"
+	fi
+	JAVA_HOME=/opt/java
+fi
+}
 
 #Check, install the signal-cli package as system dbus
 #After this, signal-cli should be running and ready to use over dbus
@@ -290,18 +329,22 @@ if [ $NEEDINSTALL = 1 ]; then
 		echo "done"
 		echo "Unpacking ..."
 		cd $SIGNALPATH
-		tar xf /tmp/signal-cli-$SIGNALVERSION.tar.gz
+		tar zxf /tmp/signal-cli-$SIGNALVERSION.tar.gz
 		rm -rf signal
 		mv "signal-cli-$SIGNALVERSION" signal
 		if [ "$GETLIBS" = 1 ]; then
 			echo -n "Downloading native libraries..."
 			cd /tmp
 			rm -rf libsignal_jni.so libzkgroup.so
-			wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libzkgroup.so
+			if [ $JAVA_VERSION = "11.0" ]; then
+				wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libzkgroup.so
+			fi
 			wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libsignal_jni.so
 			echo "done"
 			echo "Updating native libs for $IDENTSTR"
-			zip -u $SIGNALPATH/signal/lib/zkgroup-java-*.jar libzkgroup.so
+			if [ $JAVA_VERSION = "11.0" ]; then
+				zip -u $SIGNALPATH/signal/lib/zkgroup-java-*.jar libzkgroup.so
+			fi
 			zip -u $SIGNALPATH/signal/lib/signal-client-java-*.jar libsignal_jni.so
 			#Use updated libs in jar instead of /usr/lib
 			#mv libsignal_jni.so libzkgroup.so $LIBPATH
@@ -309,6 +352,12 @@ if [ $NEEDINSTALL = 1 ]; then
 		fi
 		echo "done"
 		rm -f /tmp/signal-cli-$SIGNALVERSION.tar.gz
+		cd /opt/signal/bin
+		mv signal-cli signal-cli.org
+		echo "#!/bin/sh" >signal-cli
+		echo "JAVA_HOME=$JAVA_HOME" >>signal-cli
+		cat signal-cli.org >>signal-cli
+		chmod a+x signal-cli
 	fi
 fi
 
@@ -578,6 +627,35 @@ if [ $OPERATION = "remove" ]; then
 fi
 
 if [ $OPERATION = "start" ]; then
+	start_service
+fi
+
+if [ $OPERATION = "backup" ]; then
+	echo "Creating backup of all configuration files"
+	stop_service
+	rm signal-backup.tar.gz
+	tar czPf signal-backup.tar.gz $SIGNALVAR $DBSYSTEMD/org.asamk.Signal.conf  $DBSYSTEMS/org.asamk.Signal.service $SYSTEMD/signal.service
+	start_service
+	ls -l signal-backup.tar.gz
+fi
+
+if [ $OPERATION = "restore" ]; then
+	if ! [ -e signal-backup.tar.gz ]; then
+		echo "Make sure signal-backup.tar.gz is in current directory"
+		exit
+	fi
+	echo "Are you sure you want to restore all signal-cli configuration files?"
+	echo -n "Any existing configuration will be lost (y/N)? "
+	read REPLY
+	if ! [ "$REPLY" = "y" ]; then
+		echo "Aborting..."
+		exit
+	fi
+	stop_service
+	echo -n "Restoring backup..."
+	tar xPf signal-backup.tar.gz
+	chown -R $SIGNALUSER: $SIGNALVAR
+	echo "done"
 	start_service
 fi
 
