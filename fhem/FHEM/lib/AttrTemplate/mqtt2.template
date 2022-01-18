@@ -181,7 +181,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 2022014
+setreading DEVICE attrTemplateVersion 20220114
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -3379,19 +3379,22 @@ attr DEVICE setList\
   on-for-timer $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":true,"toggle_after":$EVTPART1}}\
   off-for-timer $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":false,"toggle_after":$EVTPART1}}\
   x_update:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Update","params": {"stage":"stable"}}\
-  x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Reboot"}
+  x_reboot:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Shelly.Reboot"}\
+  x_eco:true,false $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Sys.SetConfig","params": {"config": {"device": {"eco_mode": $EVTPART1}}}}
 attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/events/rpc:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/status/mqtt:.* { json2nameValue($EVENT, 'mqtt_', $JSONMAP) }\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
+  $\DEVICETOPIC/status/cloud:.* {}\
+  $\DEVICETOPIC/rpc:.* {}\
   fhem2shelly/rpc:.* {}
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); my $reb = ReadingsVal($name,'sys_restart_required','false') eq 'true'?'<a href="/fhem?cmd.dummy=set '.$name.' x_reboot&XHR=1"> ... Notwendigen Reboot durchführen</a>':''; qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a>$reb<div>Temp: $temp °C</div>)}
 attr DEVICE jsonMap switch_state:state switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model shellyPlus_1
-setreading DEVICE attrTemplateVersion 20220115
+setreading DEVICE attrTemplateVersion 20220117
 set DEVICE x_reboot
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
@@ -3403,10 +3406,10 @@ desc:Early version of a base template for second generation shelly devices (name
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 order:A_20a
 set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot':'10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,3); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); my $reb = ReadingsVal($name,'sys_restart_required','false') eq 'true'?'<a href="/fhem?cmd.dummy=set '.$name.' x_reboot&XHR=1"> ... Notwendigen Reboot durchführen</a>':''; qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a>$reb<div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
 attr DEVICE jsonMap switch_state:state switch_aenergy_total:aenergy_total switch_apower:apower switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
 attr DEVICE model shellyPlus_1pm
-setreading DEVICE attrTemplateVersion 20220114
+setreading DEVICE attrTemplateVersion 20220117
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
