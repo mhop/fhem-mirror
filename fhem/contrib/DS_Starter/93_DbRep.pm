@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.47.1"  => "18.01.2022  new sqlCmdHistory func ___restore_sqlhistory___ ",
+  "8.48.0"  => "18.01.2022  new sqlCmdHistory func ___restore_sqlhistory___ , ___save_sqlhistory___ ",
   "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
   "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
   "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
