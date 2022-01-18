@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 25451 2022-01-10 18:40:13Z DS_Starter $
+# $Id: 93_DbRep.pm 25492 2022-01-17 22:28:33Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,7 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.47.0"  => "16.01.2022  new design of sqlCmdHistory ",
+  "8.47.1"  => "18.01.2022  new sqlCmdHistory func ___restore_sqlhistory___ ",
+  "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
   "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
   "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
   "8.46.11" => "03.01.2022  more code refacturing, minor fixes ",
@@ -344,7 +345,11 @@ my %DbRep_vHintsExt_de = (
 my %dbrep_col                 = ("DEVICE"  => 64, "READING" => 64, );                  # Standard Feldbreiten falls noch nicht getInitData ausgeführt
 my $dbrep_defdecplaces        = 4;                                                     # Nachkommastellen Standard      
 my $dbrep_dump_path_def       = $attr{global}{modpath}."/log/";                        # default Pfad für local Dumps
-my $dbrep_dump_remotepath_def = "./";                                                  # default Pfad für remote Dumps    
+my $dbrep_dump_remotepath_def = "./";                                                  # default Pfad für remote Dumps   
+my $dbrep_fName               = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";   # default Pfad/Name SQL Cache File
+
+
+
        
 ###################################################################################
 # DbRep_Initialize
@@ -500,6 +505,7 @@ sub DbRep_Set {
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbmodel        = $dbloghash->{MODEL};
   my $dbname         = $hash->{DATABASE};
+  
   my $sd ="";
   
   my (@bkps,$dir);
@@ -529,9 +535,10 @@ sub DbRep_Set {
   
   # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
   my (undef, $hl) = DbRep_listSQLcmdCache ($name);
-  if ($hl) {
+  if (AttrVal($name, "sqlCmdHistoryLength", 0)) {
       $hl .= "___purge_sqlhistory___";
-      $hl .= ",___list_sqlhistory___";   
+      $hl .= ",___list_sqlhistory___"; 
+      $hl .= ",___restore_sqlhistory___";      
   }
   
   my $setlist = "Unknown argument $opt, choose one of ".
@@ -1013,7 +1020,6 @@ sub DbRep_Set {
           
           @cmd    = split(/\s/, $sqlcmd);
           $sqlcmd = join(" ", @cmd);
-          # $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;    # V8.36.0 20.03.2020
       }
       
       if($opt eq "sqlCmdHistory") {
@@ -1032,6 +1038,11 @@ sub DbRep_Set {
           if($sqlcmd eq "___list_sqlhistory___") {
               my ($cache) = DbRep_listSQLcmdCache ($name);
               return $cache;
+          }
+          
+          if($sqlcmd eq "___restore_sqlhistory___") {
+              my $count = DbRep_initSQLcmdCache ($name);
+              return $count ? "SQL history entries of $name restored: $count" : undef;
           }
       }
       
@@ -1763,12 +1774,17 @@ return;
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 ###################################################################################
 sub DbRep_Delete {
-    my ($hash, $arg) = @_;
+    my $hash = shift;
+    my $arg  = shift;
+    
     my $name = $hash->{NAME};
     
     # gespeicherte Credentials löschen
     my $index = $hash->{TYPE}."_".$name."_adminCredentials";
     setKeyValue($index, undef);
+    
+    # gespeichertes SQL Cache löschen
+    DbRep_deleteSQLhistFromFile ($name);
     
 return;
 }
@@ -1777,12 +1793,13 @@ return;
 # DbRep_Shutdown
 ###################################################################################
 sub DbRep_Shutdown {  
-  my ($hash) = @_;
+  my $hash = shift;
  
   my $dbh = $hash->{DBH}; 
   $dbh->disconnect() if(defined($dbh)); 
-  DbRep_delread($hash,1);
-  RemoveInternalTimer($hash);
+  
+  DbRep_delread          ($hash,1);
+  RemoveInternalTimer    ($hash);
   
 return; 
 }
@@ -11353,15 +11370,32 @@ return ($success, $username, $passwd);
 }
 
 ####################################################################################################
+#                           anlegen Keyvalue-File für DbRep wenn nicht vorhanden
+####################################################################################################
+sub DbRep_createCmdFile {
+  my $hash   = shift;
+  
+  my $param = {
+               FileName   => $dbrep_fName,
+               #ForceType  => "file",
+              };
+  my @new;
+  push(@new, "# This file is auto generated from 93_DbRep.pm",
+             "# Please do not modify, move or delete it.",
+             "");
+
+return FileWrite($param, @new);
+}
+
+####################################################################################################
 #                      Schreibroutine in DbRep Keyvalue-File
 ####################################################################################################
 sub DbRep_setCmdFile {
   my ($key,$value,$hash) = @_;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
   
   my $param = {
-               FileName   => $fName,
-               ForceType  => "file",
+               FileName   => $dbrep_fName,
+               #ForceType  => "file",
               };
               
   my ($err, @old) = FileRead($param);
@@ -11387,35 +11421,60 @@ return FileWrite($param, @new);
 }
 
 ####################################################################################################
-#                           anlegen Keyvalue-File für DbRep wenn nicht vorhanden
+#                       Leseroutine aus DbRep Keyvalue-File
 ####################################################################################################
-sub DbRep_createCmdFile {
-  my $hash   = shift;
-  my $fName  = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
+sub DbRep_getCmdFile {
+  my $key   = shift;
   
   my $param = {
-               FileName   => $fName,
-               ForceType  => "file",
+               FileName   => $dbrep_fName,
+               #ForceType  => "file",
               };
-  my @new;
-  push(@new, "# This file is auto generated from 93_DbRep.pm",
-             "# Please do not modify, move or delete it.",
-             "");
+              
+  my ($err, @l) = FileRead($param);
+  return ($err, '') if($err);
+  
+  for my $line (@l) {
+      return ('', $line) if($line =~ m/^$key:(.*)/);
+  }
 
-return FileWrite($param, @new);
+return;
 }
 
 ####################################################################################################
-#          SQL Cache für sqlCmd History löschen
+#          SQL Cache für sqlCmd History aus RAM löschen
 ####################################################################################################
 sub DbRep_deleteSQLcmdCache {
   my $name = shift; 
-  my $hash = $defs{$name};
   
   delete $data{DbRep}{$name}{sqlcache};
   $data{DbRep}{$name}{sqlcache}{index} = 0;                              # SQL-CommandHistory CacheIndex
 
-  DbRep_setCmdFile($name."_sqlCmdList", "", $hash);                      # Löschen der sql History Liste im DbRep-Keyfile
+return;
+}
+
+####################################################################################################
+#          SQL Cache für sqlCmd History aus File löschen
+####################################################################################################
+sub DbRep_deleteSQLhistFromFile {
+  my $name = shift; 
+  
+  my $key         = $name."_sqlCmdList";
+  my ($err, @old) = FileRead($dbrep_fName);
+  my @new;
+  
+  if(!$err) {
+      for my $l (@old) {
+          if($l =~ m/^$key:/) {
+              next;
+          } 
+          else {
+              push @new, $l;
+          }
+      }
+
+      FileWrite($dbrep_fName, @new);
+  }
 
 return;
 }
@@ -11424,7 +11483,8 @@ return;
 #          SQL Cache für sqlCmd History initialisieren
 ####################################################################################################
 sub DbRep_initSQLcmdCache {
-  my $name = shift; 
+  my $name = shift;
+  
   my $hash = $defs{$name};
   
   RemoveInternalTimer ($name, "DbRep_initSQLcmdCache");
@@ -11433,15 +11493,15 @@ sub DbRep_initSQLcmdCache {
       return;
   }
   
-  $data{DbRep}{$name}{sqlcache}{index} = 0;                              # SQL-CommandHistory CacheIndex
+  DbRep_deleteSQLcmdCache ($name);
   
   my ($err,$hl) = DbRep_getCmdFile($name."_sqlCmdList");
+  my $count     = 0;
   
   if($hl) {
       $hl = (split ":", $hl, 2)[1];
   
       my @cmds  = split ",", $hl;
-      my $count = 0;
       
       for my $elem (@cmds) {
           $elem = _DbRep_deconvertSQL ($elem);     
@@ -11452,7 +11512,7 @@ sub DbRep_initSQLcmdCache {
       Log3 ($name, 4, qq{DbRep $name - SQL history restored from Cache file - count: $count}) if($count);
   }
     
-return;
+return $count;
 }
 
 ####################################################################################################
@@ -11479,9 +11539,7 @@ sub DbRep_addSQLcmdCache {
   
   if($doIns) {
       _DbRep_insertSQLtoCache ($name, $tmpsql);
-      
-      my (undef, $cstr) = DbRep_listSQLcmdCache ($name, 1);
-      DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash) if($cstr);
+      DbRep_writeSQLcmdCache ($hash);                                              # SQL Cache File schreiben
   }  
   
 return;
@@ -11549,6 +11607,20 @@ return;
 }
 
 ####################################################################################################
+#             SQL Cache History speichern
+####################################################################################################
+sub DbRep_writeSQLcmdCache {                
+  my $hash = shift;
+
+  my $name = $hash->{NAME};  
+       
+  my (undef, $cstr) = DbRep_listSQLcmdCache ($name, 1);
+  DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash);  
+  
+return;
+}
+
+####################################################################################################
 #          SQL Statement konvertieren 
 #    $write - setzen für Schreiben Cache File
 ####################################################################################################
@@ -11579,28 +11651,6 @@ sub _DbRep_deconvertSQL {
   $cmd =~ s/&#65292;/,/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
    
 return $cmd;
-}
-
-####################################################################################################
-#                       Leseroutine aus DbRep Keyvalue-File
-####################################################################################################
-sub DbRep_getCmdFile {
-  my $key   = shift;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
-  
-  my $param = {
-               FileName   => $fName,
-               ForceType  => "file",
-              };
-              
-  my ($err, @l) = FileRead($param);
-  return ($err, '') if($err);
-  
-  for my $line (@l) {
-      return ('', $line) if($line =~ m/^$key:(.*)/);
-  }
-
-return;
 }
 
 ####################################################################################################
@@ -12625,12 +12675,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 25451 2022-01-10 18:40:13Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 25492 2022-01-17 22:28:33Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 25451 2022-01-10 18:40:13Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 25492 2022-01-17 22:28:33Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -14433,12 +14483,22 @@ return;
                                  </li><br>
                                  </ul>  
 
-    <li><b> sqlCmdHistory </b>   - If history is activated with attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a>, an already
-                                   successfully executed sqlCmd-command can be repeated from a drop-down list. <br>
-                                   With execution of "___purge_sqlhistory___" the history can be deleted. 
-                                   <br><br>                                   
+    <li><b> sqlCmdHistory </b>   - If activated with the attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
+                                   a stored SQL statement can be selected from a list and executed.
+                                   The following entries execute special functions:  
+                                   <br><br>
+
+                                   <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>___purge_sqlhistory___</b>   </td><td>: deletes the history cache                                                         </td></tr>
+                                      <tr><td> <b>___list_sqlhistory___ </b>   </td><td>: shows the SQL statements currently in the cache, including their cache key (ckey) </td></tr>
+                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: Undoes a previously executed "___purge_sqlhistory___"                             </td></tr>
+                                   </table>
+                                   </ul>
+                                   <br>                                    
                              
-                                   For a better overview the relevant attributes for this command are listed in a table: <br><br>
+                                   The attributes relevant to controlling this function are: <br><br>
 
                                    <ul>
                                    <table>  
@@ -17232,12 +17292,21 @@ return;
                                  </ul>
                                  
     <li><b> sqlCmdHistory </b>   - Wenn mit dem Attribut <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> aktiviert, kann
-                                   aus einer Liste ein bereits erfolgreich ausgeführtes sqlCmd-Kommando wiederholt werden. <br>
-                                   Mit Ausführung von "___purge_sqlhistory___" kann die Historie gelöscht 
-                                   werden. <br><br>
+                                   ein gespeichertes SQL-Statement aus einer Liste ausgewählt und ausgeführt werden.
+                                   Mit den nachfolgenden Einträgen werden spezielle Funktionen ausgeführt: 
+                                   <br><br>
                                    
-                                   Zur besseren Übersicht sind die zur Steuerung dieser Funktion von relevanten Attribute 
-                                   hier noch einmal zusammenstellt: <br><br>
+                                   <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>___purge_sqlhistory___</b>   </td><td>: löscht den History Cache                                                           </td></tr>
+                                      <tr><td> <b>___list_sqlhistory___ </b>   </td><td>: zeigt die aktuell im Cache vorhandenen SQL-Statements incl. ihrem Cache Key (ckey) </td></tr>
+                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: macht ein zuvor ausgeführtes "___purge_sqlhistory___" rückgängig                   </td></tr>
+                                   </table>
+                                   </ul>
+                                   <br> 
+                                   
+                                   Die zur Steuerung dieser Funktion relevante Attribute sind: <br><br>
 
                                    <ul>
                                    <table>  
