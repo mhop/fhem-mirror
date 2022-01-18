@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.48.0"  => "18.01.2022  new sqlCmdHistory func ___restore_sqlhistory___ , ___save_sqlhistory___ ",
+  "8.48.0"  => "18.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ",
   "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
   "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
   "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
@@ -533,8 +533,7 @@ sub DbRep_Set {
   closedir(DIR);
   my $cj = @bkps ? join(",",reverse(sort @bkps)) : " ";
   
-  # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
-  my (undef, $hl) = DbRep_listSQLcmdCache ($name);
+  my (undef, $hl) = DbRep_listSQLcmdCache ($name);                     # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
   if (AttrVal($name, "sqlCmdHistoryLength", 0)) {
       $hl .= "___purge_sqlhistory___";
       $hl .= ",___list_sqlhistory___"; 
@@ -542,40 +541,54 @@ sub DbRep_Set {
       $hl .= ",___restore_sqlhistory___";      
   }
   
+  my $specials = "50mostFreqLogsLast2days";
+  $specials   .= ",allDevCount";
+  $specials   .= ",allDevReadCount";
+  $specials   .= ",50DevReadCount";
+  $specials   .= ",recentReadingsOfDevice";
+  $specials   .= $dbmodel eq "MYSQL" ? ",readingsDifferenceByTimeDelta" : "";
+  
+  my $indl     = "list_all";
+  $indl       .= ",recreate_Search_Idx";
+  $indl       .= ",drop_Search_Idx";
+  $indl       .= ",recreate_Report_Idx";
+  $indl       .= ",drop_Report_Idx";
+  
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
-                (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime " : "").
-                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime " : "").
-                (($hash->{ROLE} ne "Agent") ? "changeValue " : "").
-                (($hash->{ROLE} ne "Agent") ? "delDoublets:adviceDelete,delete " : "").
-                (($hash->{ROLE} ne "Agent") ? "delEntries " : "").
-                (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete " : "").
                 "deviceRename ".
-                (($hash->{ROLE} ne "Agent") ? "readingRename " : "").
-                (($hash->{ROLE} ne "Agent") ? "exportToFile " : "").
-                (($hash->{ROLE} ne "Agent") ? "importFromFile " : "").
-                (($hash->{ROLE} ne "Agent") ? "maxValue:display,writeToDB,deleteOther " : "").
-                (($hash->{ROLE} ne "Agent") ? "minValue:display,writeToDB,deleteOther " : "").
-                (($hash->{ROLE} ne "Agent") ? "fetchrows:history,current " : "").  
-                (($hash->{ROLE} ne "Agent") ? "diffValue:display,writeToDB " : "").   
-                (($hash->{ROLE} ne "Agent") ? "index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx " : "").
+                (($hash->{ROLE} ne "Agent") ? "delDoublets:adviceDelete,delete "         : "").
+                (($hash->{ROLE} ne "Agent") ? "delEntries "                              : "").
+                (($hash->{ROLE} ne "Agent") ? "changeValue "                             : "").
+                (($hash->{ROLE} ne "Agent") ? "readingRename "                           : "").
+                (($hash->{ROLE} ne "Agent") ? "exportToFile "                            : "").
+                (($hash->{ROLE} ne "Agent") ? "importFromFile "                          : "").
+                (($hash->{ROLE} ne "Agent") ? "maxValue:display,writeToDB,deleteOther "  : "").
+                (($hash->{ROLE} ne "Agent") ? "minValue:display,writeToDB,deleteOther "  : "").
+                (($hash->{ROLE} ne "Agent") ? "fetchrows:history,current "               : "").  
+                (($hash->{ROLE} ne "Agent") ? "diffValue:display,writeToDB "             : "").   
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/) ? "adminCredentials " : "").
-                (($hash->{ROLE} ne "Agent") ? "insert ":"").
-                (($hash->{ROLE} ne "Agent") ? "reduceLog ":"").
-                (($hash->{ROLE} ne "Agent") ? "sqlCmd:textField-long ": "").
-                (($hash->{ROLE} ne "Agent" && $hl) ? "sqlCmdHistory:".$hl." " : "").
-                (($hash->{ROLE} ne "Agent") ? "sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice".(($dbmodel eq "MYSQL")?",readingsDifferenceByTimeDelta":"")." " : "").
-                (($hash->{ROLE} ne "Agent") ? "syncStandby " : "").
-                (($hash->{ROLE} ne "Agent") ? "tableCurrentFillup:noArg " : "").
-                (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg " : "").
+                (($hash->{ROLE} ne "Agent") ? "insert "                                  : "").
+                (($hash->{ROLE} ne "Agent") ? "reduceLog "                               : "").
+                (($hash->{ROLE} ne "Agent") ? "sqlCmd:textField-long "                   : "").
+                (($hash->{ROLE} ne "Agent" && $hl) ? "sqlCmdHistory:".$hl." "            : "").
+                (($hash->{ROLE} ne "Agent") ? "sqlSpecial:".$specials." "                : "").
+                (($hash->{ROLE} ne "Agent") ? "syncStandby "                             : "").
+                (($hash->{ROLE} ne "Agent") ? "tableCurrentFillup:noArg "                : "").
+                (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg "                 : "").
+                (($hash->{ROLE} ne "Agent") ? "countEntries:history,current "            : "").              
+                (($hash->{ROLE} ne "Agent") ? "index:".$indl." "                         : "").
+                (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime "         : "").
+                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime "     : "").
+                (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete "                    : "").                
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "dumpMySQL:clientSide,serverSide " : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "dumpSQLite:noArg "                : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "repairSQLite "                    : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "optimizeTables:noArg "            : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/) ? "vacuum:noArg "                    : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "restoreMySQL:".$cj." "            : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "restoreSQLite:".$cj." "           : "").
-                (($hash->{ROLE} ne "Agent")?"countEntries:history,current ":"");
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "restoreSQLite:".$cj." "           : "")
+                ;
   
   return if(IsDisabled($name));
     
@@ -953,7 +966,10 @@ sub DbRep_Set {
               $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
           } 
           elsif ($prop eq "allDevReadCount") {
-              $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
+              $prop = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
+          } 
+          elsif ($prop eq "50DevReadCount") {
+              $prop = "select DEVICE AS device, READING AS reading, count(0) AS number from history group by DEVICE, READING order by number DESC limit 50;";
           } 
           elsif ($prop eq "allDevCount") {
               $prop = "select device, count(*) from history group by DEVICE;";
@@ -14534,17 +14550,16 @@ return;
                                  The following predefined reportings are selectable: <br><br>
                                    <ul>
                                    <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>:       reports the 50 most occuring log entries of the last 2 days </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>:       all devices occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>:       all device/reading combinations occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>recentReadingsOfDevice </b>  </td><td>:       determines the newest records of a device available in the database. The
-                                                                                                device must be defined in attribute <a href="#device">device</a>. 
-                                                                                                Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
-                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: determines the value difference of successive data records of a reading. The
-                                                                                                device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>. 
-                                                                                                Only <b>one</b> device to be evaluated and only <b>one</b> reading to be evaluated can be specified. 
-                                                                                                The time limits of the evaluation are defined by the time.*-attributes. </td></tr>
+                                   <colgroup> <col width=30%> <col width=70%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b>       </td><td> reports the 50 most occuring log entries of the last 2 days                         </td></tr>
+                                      <tr><td> <b>allDevCount </b>                   </td><td> all devices occuring in database and their quantity                                 </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>               </td><td> all device/reading combinations occuring in database and their quantity             </td></tr>
+                                      <tr><td> <b>50DevReadCount </b>                </td><td> the 50 most frequently included device/reading combinations in the database         </td></tr>
+                                      <tr><td> <b>recentReadingsOfDevice </b>        </td><td> determines the newest records of a device available in the database. The            </td></tr>
+                                      <tr><td>                                       </td><td> device must be defined in attribute <a href="#device">device</a>.                   </td></tr>                                 
+                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td> determines the value difference of successive data records of a reading. The        </td></tr>
+                                      <tr><td>                                       </td><td> device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>.  </td></tr>
+                                      <tr><td>                                       </td><td> The time limits of the evaluation are defined by the time.*-attributes.                                              </td></tr>
                                    </table>
                                    </ul>
                                    <br>
@@ -17346,17 +17361,16 @@ return;
                                  Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
                                    <ul>
                                    <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b>    </td><td>:    ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
-                                      <tr><td> <b>allDevCount </b>                </td><td>:    alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>            </td><td>:    alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
-                                      <tr><td> <b>recentReadingsOfDevice </b>     </td><td>:    ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
-                                                                                                Device muß im Attribut <a href="#device">device</a> definiert sein. 
-                                                                                                Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
-                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende
-                                                                                                Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. 
-                                                                                                Es kann nur <b>ein</b> auszuwertendes Device und nur <b>ein</b> auszuwertendes Reading angegeben werden. 
-                                                                                                Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt. </td></tr>                        
+                                   <colgroup> <col width=27%> <col width=73%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b>       </td><td> ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage                   </td></tr>
+                                      <tr><td> <b>allDevCount </b>                   </td><td> alle in der Datenbank vorkommenden Devices und deren Anzahl                                      </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>               </td><td> alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl                 </td></tr>
+                                      <tr><td> <b>50DevReadCount </b>                </td><td> die 50 am häufigsten in der Datenbank enthaltenen Device/Reading-Kombinationen                   </td></tr>
+                                      <tr><td> <b>recentReadingsOfDevice </b>        </td><td> ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende  </td></tr>
+                                      <tr><td>                                       </td><td> Device muß im Attribut <a href="#device">device</a> definiert sein.                              </td></tr>
+                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td> ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende   </td></tr>
+                                      <tr><td>                                       </td><td> Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. </td></tr>
+                                      <tr><td>                                       </td><td> Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt.                                        </td></tr>                        
                                    </table>
                                    </ul>
                                    <br>
