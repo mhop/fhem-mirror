@@ -12,7 +12,8 @@ use warnings;
 
 use FHEM::Meta;
 
-use POSIX;
+#use POSIX;
+use Time::HiRes qw(gettimeofday);
 use JSON;
 use Data::Dumper;
 
@@ -326,6 +327,9 @@ sub HUEBridge_Undefine($$)
 {
   my ($hash,$arg) = @_;
 
+  HUEBridge_closeWebsocket($hash);
+  HUEBridge_closeEventStream($hash);
+
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -345,7 +349,8 @@ HUEBridge_hash2header($)
 
   return $header;
 }
-sub HUEBridge_closeWebsocket($)
+sub
+HUEBridge_closeWebsocket($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -361,7 +366,8 @@ sub HUEBridge_closeWebsocket($)
 
   delete($hash->{PORT});
 }
-sub HUEBridge_openWebsocket($)
+sub
+HUEBridge_openWebsocket($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -403,7 +409,65 @@ sub HUEBridge_openWebsocket($)
   }
 }
 
-sub HUEBridge_fillBridgeInfo($$)
+sub
+HUEBridge_closeEventStream($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash, "HUEBridge_openEventStream" );
+
+  return if( !defined($hash->{helper}{HTTP_CONNECTION}) );
+
+  $hash->{EventStream} = 'closing';
+  Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+
+  HttpUtils_Close( $hash->{helper}{HTTP_CONNECTION} );
+  delete $hash->{helper}{HTTP_CONNECTION};
+
+  delete $hash->{buf};
+
+  delete($hash->{EventStream});
+  Log3 $name, 4, "name: EventStream: closed";
+}
+sub
+HUEBridge_openEventStream($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $lastID;
+     $lastID = $hash->{helper}{HTTP_CONNECTION}{lastID} if( defined($hash->{helper}{HTTP_CONNECTION}) );
+
+  HUEBridge_closeEventStream($hash);
+
+  $hash->{EventStream} = 'connecting';
+  Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+
+  my $params = {
+               url => "https://$hash->{host}/eventstream/clip/v2",
+       httpversion => '1.1',
+            method => 'GET',
+           timeout => 60*60,
+incrementalTimeout => 1,
+        noshutdown => 1,
+         keepalive => 1,
+            header => {                Accept => 'text/event-stream',
+                        'HUE-Application-Key' => $attr{$name}{key}, },
+              type => 'event',
+              hash => $hash,
+          callback => \&HUEBridge_dispatch,
+     };
+  $params->{header}{'Last-Event-ID'} = $lastID if( $lastID );
+
+  $hash->{helper}{HTTP_CONNECTION} = {};
+  map { $hash->{helper}{HTTP_CONNECTION}{$_} = $params->{$_} } keys %{$params};
+
+  HttpUtils_NonblockingGet( $hash->{helper}{HTTP_CONNECTION} );
+}
+
+sub
+HUEBridge_fillBridgeInfo($$)
 {
   my ($hash,$config) = @_;
   my $name = $hash->{NAME};
@@ -413,10 +477,11 @@ sub HUEBridge_fillBridgeInfo($$)
   $hash->{bridgeid} = $config->{bridgeid};
   $hash->{swversion} = $config->{swversion};
   $hash->{apiversion} = $config->{apiversion};
+  $hash->{zigbeechannel} = $config->{zigbeechannel};
 
-  if( defined($config->{websocketport}) ) {
-    $hash->{websocketport} = $config->{websocketport};
-    HUEBridge_openWebsocket($hash) if( !defined($hash->{CD}) );
+  delete $hash->{has_v2_api};
+  if( $hash->{swversion} >= 1948086000 ) {
+    $hash->{has_v2_api} = 1;
   }
 
   if( $hash->{apiversion} ) {
@@ -424,10 +489,22 @@ sub HUEBridge_fillBridgeInfo($$)
     $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
   }
 
-  if( !defined($config->{'linkbutton'})
+
+  if( defined($config->{websocketport}) ) {
+    $hash->{websocketport} = $config->{websocketport};
+    HUEBridge_openWebsocket($hash) if( !defined($hash->{CD}) );
+
+  } elsif( $hash->{has_v2_api} ) {
+    HUEBridge_openEventStream($hash) if( !defined($hash->{helper}{HTTP_CONNECTION}) );
+
+  }
+
+
+  if( $hash->{modelid}
+      && !defined($config->{'linkbutton'})
       && !defined($attr{$name}{icon}) ) {
-    $attr{$name}{icon} = 'hue_filled_bridge_v1' if( $hash->{modelid} && $hash->{modelid} eq 'BSB001' );
-    $attr{$name}{icon} = 'hue_filled_bridge_v2' if( $hash->{modelid} && $hash->{modelid} eq 'BSB002' );
+    $attr{$name}{icon} = 'hue_filled_bridge_v1' if( $hash->{modelid} eq 'BSB001' );
+    $attr{$name}{icon} = 'hue_filled_bridge_v2' if( $hash->{modelid} eq 'BSB002' );
   }
 }
 
@@ -447,12 +524,14 @@ HUEBridge_OpenDev($)
 
   if( defined($err) && $err ) {
     Log3 $name, 2, "HUEBridge_OpenDev: error reading description: ". $err;
+
   } else {
     Log3 $name, 5, "HUEBridge_OpenDev: got description: $ret";
     $ret =~ m/<modelName>([^<]*)/;
     $hash->{modelName} = $1;
     $ret =~ m/<manufacturer>([^<]*)/;
     $hash->{manufacturer} = $1;
+
   }
 
   my $result = HUEBridge_Call($hash, undef, 'config', undef);
@@ -468,15 +547,29 @@ HUEBridge_OpenDev($)
 
       HUEBridge_Pair($hash);
       return;
+
+    } else {
+      HUEBridge_fillBridgeInfo($hash, $result);
     }
 
   $hash->{mac} = $result->{mac};
-  #$hash->{bridgeid} = $result->{bridgeid};
+
+  my $params = {
+              url => "https://$hash->{host}/auth/v1",
+      #httpversion => '1.1',
+           method => 'GET',
+          timeout => 5,
+           header => { 'HUE-Application-Key' => $attr{$name}{key}, },
+             type => 'application id',
+             hash => $hash,
+         callback => \&HUEBridge_dispatch,
+     };
+  HttpUtils_NonblockingGet( $params );
 
   readingsSingleUpdate($hash, 'state', 'connected', 1 );
-  HUEBridge_GetUpdate($hash);
 
   HUEBridge_Autocreate($hash);
+  HUEBridge_GetUpdate($hash);
 
   return undef;
 }
@@ -619,7 +712,13 @@ HUEBridge_Set($@)
   #return "$name: not connected" if( $hash->{STATE} ne 'connected'  );
 
   # usage check
-  if($cmd eq 'statusRequest') {
+  if($cmd eq 'reconnect') {
+
+    #HUEBridge_OpenDev( $hash );
+    HUEBridge_openEventStream( $hash );
+    return undef;
+
+  } elsif($cmd eq 'statusRequest') {
     return "usage: statusRequest" if( @args != 0 );
 
     $hash->{LOCAL} = 1;
@@ -997,6 +1096,81 @@ HUEBridge_Set($@)
     readingsSingleUpdate($hash, 'state', 'inactive', 1 );
     return undef;
 
+  } elsif($cmd eq 'v2effect' ) {
+    my $params = {
+                url => "https://$hash->{host}/clip/v2/resource/light/$arg",
+             method => 'PUT',
+            timeout => 5,
+             header => { 'HUE-Application-Key' => $attr{$name}{key}, },
+               type => $cmd,
+               hash => $hash,
+           callback => \&HUEBridge_dispatch,
+               data => '{"on":{"on": true}}',
+               #data => '{"effect":{"effect": "candle"}}',
+               #data => '{"effect":{"effect": "breathe"}}',
+       };
+
+    my($err,$data) = HttpUtils_BlockingGet( $params );
+
+    if( !$data ) {
+      Log3 $name, 2, "$name: empty answer received for $cmd";
+      return undef;
+    } elsif( $data =~ m'HTTP/1.1 200 OK' ) {
+      Log3 $name, 4, "$name: empty answer received for $cmd";
+      return undef;
+    } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
+      #Log3 $name, 2, "$name: invalid json detected for $cmd: $data";
+      #return undef;
+    }
+
+    Log3 $name, 4, "$name: got: $data";
+
+    my $json = eval { JSON->new->utf8(0)->decode($data) };
+    Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+    return undef if( !$json );
+
+    Log3 $name, 1, "$name: error: ". Dumper $json->{errors} if( scalar @{$json->{errors}} );
+    return Dumper $json if( scalar @{$json->{errors}} );
+
+    return;
+
+  } elsif($cmd eq 'v2scene' ) {
+    my $params = {
+                url => "https://$hash->{host}/clip/v2/resource/scene/$arg",
+             method => 'PUT',
+            timeout => 5,
+             header => { 'HUE-Application-Key' => $attr{$name}{key}, },
+               type => $cmd,
+               hash => $hash,
+           callback => \&HUEBridge_dispatch,
+               #data => '{ "recall": { "action": "active" } }',
+               data => '{ "recall": { "action": "dynamic_palette" } }',
+       };
+
+    my($err,$data) = HttpUtils_BlockingGet( $params );
+
+    if( !$data ) {
+      Log3 $name, 2, "$name: empty answer received for $cmd";
+      return undef;
+    } elsif( $data =~ m'HTTP/1.1 200 OK' ) {
+      Log3 $name, 4, "$name: empty answer received for $cmd";
+      return undef;
+    } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
+      #Log3 $name, 2, "$name: invalid json detected for $cmd: $data";
+      #return undef;
+    }
+
+    Log3 $name, 4, "$name: got: $data";
+
+    my $json = eval { JSON->new->utf8(0)->decode($data) };
+    Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+    return undef if( !$json );
+
+    Log3 $name, 1, "$name: error: ". Dumper $json->{errors} if( scalar @{$json->{errors}} );
+    return Dumper $json if( scalar @{$json->{errors}} );
+
+    return;
+
   } else {
     my $list = "active inactive delete creategroup deletegroup savescene deletescene modifyscene";
 
@@ -1025,8 +1199,26 @@ HUEBridge_Set($@)
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     $list .= " createrule updaterule updateschedule enableschedule disableschedule deleterule createsensor deletesensor configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
 
+    if( $hash->{has_v2_api} ) {
+      $list .= " v2scene";
+    }
+
     return "Unknown argument $cmd, choose one of $list";
   }
+}
+
+sub
+HUEBridge_nameOfResource($$)
+{
+  my ($hash, $id) = @_;
+  my $name = $hash->{NAME};
+  return "$name: v2 api not supported" if( !$hash->{has_v2_api} );
+
+  if( my $resource = $hash->{helper}{resource}{by_id}{$id} ) {
+    return $resource->{metadata}{name};
+  }
+
+  return '<unknown>';
 }
 
 sub
@@ -1177,12 +1369,13 @@ HUEBridge_Get($@)
          $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
       $fhem_name = "" if( !$fhem_name );
       $ret .= sprintf( "%2i: %-15s %-15s %-20s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
-      $ret .= sprintf( " %s", encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' );
+      $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{config}) ) if( $arg && $arg eq 'detail' );
+      $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{capabilities}) ) if( $arg && $arg eq 'detail' );
       $ret .= "\n";
     }
     if( $arg && $arg eq 'detail' ) {
-      $ret = sprintf( "%2s  %-15s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE,CONFIG" ) .$ret if( $ret );
+      $ret = sprintf( "%2s  %-15s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE,CONFIG,CAPABILITIES" ) .$ret if( $ret );
     } else {
       $ret = sprintf( "%2s  %-15s %-15s %-20s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
     }
@@ -1199,7 +1392,7 @@ HUEBridge_Get($@)
     $ret = sprintf( "%-20s %-20s %-30s %s\n", "CREATE", "LAST USE", "NAME", "KEY" ) .$ret if( $ret );
     return $ret;
 
- } elsif($cmd eq 'startup' ) {
+  } elsif($cmd eq 'startup' ) {
     my $result =  HUEBridge_Call($hash, undef, 'lights', undef);
     return $result->{error}{description} if( $result->{error} );
     my $ret = "";
@@ -1218,10 +1411,48 @@ HUEBridge_Get($@)
     $ret = sprintf( "%2s  %-25s %-15s %s\t%s\n", "ID", "NAME", "FHEM", "MODE", "CONFIGURED" ) .$ret if( $ret );
     return $ret;
 
+  } elsif($cmd eq 'v2resource' ) {
+    if( $arg ) {
+      my $ret;
+      foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+        $ret .= Dumper $entry if( $entry->{id_v1} =~ /$arg$/ );
+      }
+      foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+        $ret .= Dumper $entry if( $entry->{type} eq $arg );
+      }
+      return $ret if( $ret );
+
+      return Dumper $hash->{helper}{resource}{by_id}{$arg};
+    }
+    return Dumper $hash->{helper}{resource};
+
+  } elsif($cmd eq 'v2resourcetypes' ) {
+    my %result;
+    foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+      next if( $arg && $arg ne $entry->{type} );
+      $result{$entry->{id}} = 1 if( $arg );
+      $result{$entry->{type}} = 1 if( !$arg );
+    }
+    return join( "\n", keys %result );
+
+  } elsif($cmd eq 'v2scenes' ) {
+    my $ret;
+    foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+      next if( $entry->{type} ne 'scene' );
+      $ret .= sprintf( "%-36s %-25s %-10s", $entry->{id}, $entry->{metadata}{name}, HUEBridge_nameOfResource($hash,$entry->{group}{rid}) );
+      $ret .= "\n";
+    }
+    $ret = sprintf( "%-36s %-25s %-15s %s\t%s\n", "ID", "NAME", "ROOM", "", "" ) .$ret if( $ret );
+    return $ret;
+
   } else {
     my $list = "lights:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg schedules:noArg whitelist:noArg";
     if( $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (26<<8) ) {
       $list .= " startup:noArg";
+    }
+
+    if( $hash->{has_v2_api} ) {
+      $list .= " v2resource v2resourcetypes v2scenes";
     }
 
     return "Unknown argument $cmd, choose one of $list";
@@ -1241,20 +1472,28 @@ HUEBridge_GetUpdate($)
 
   if( $hash->{websocketport} && !$hash->{PORT} ) {
     HUEBridge_openWebsocket($hash);
+
+  } elsif( $hash->{has_v2_api} ) {
+    HUEBridge_openEventStream($hash) if( !defined($hash->{helper}{HTTP_CONNECTION}) );
+
   }
 
   my $type;
   my $result;
-  my $poll_devices = AttrVal($name, "pollDevices", 1);
+  my $poll_devices = AttrVal($name, "pollDevices", 2);
   if( $poll_devices ) {
     my ($now) = gettimeofday();
-    if( $poll_devices > 1 || $hash->{LOCAL} || $now - $hash->{helper}{last_config_timestamp} > 300 ) {
+    if( $poll_devices > 1 || $hash->{LOCAL} || !$hash->{helper}{last_config_timestamp}
+                                            || $now - $hash->{helper}{last_config_timestamp} > 300 ) {
       $result = HUEBridge_Call($hash, $hash, undef, undef);
       $hash->{helper}{last_config_timestamp} = $now;
+
     } else {
       $type = 'lights';
       $result = HUEBridge_Call($hash, $hash, 'lights', undef);
+
     }
+
   } else {
     $type = 'config';
     $result = HUEBridge_Call($hash, $hash, 'config', undef);
@@ -1313,6 +1552,8 @@ HUEBridge_updateGroups($$)
   foreach my $chash ( values %{$groups} ) {
     my $count = 0;
     my %readings;
+      $readings{all_on} = 1;
+      $readings{any_on} = 0;
     my ($hue,$sat,$bri);
     foreach my $light ( split(',', $chash->{lights}) ) {
       next if( !$light );
@@ -1371,6 +1612,9 @@ HUEBridge_updateGroups($$)
 
       $readings{on} |= ($current->{on}?'1':'0');
 
+      $readings{all_on} = 0 if( !($current->{on}?'1':'0') );
+      $readings{any_on} |=  ($current->{on}?'1':'0');
+
       if( AttrVal($lhash->{NAME}, 'ignoreReachable', 0) ) {
         $readings{reachable} |= 1;
       } else {
@@ -1395,6 +1639,8 @@ HUEBridge_updateGroups($$)
 
       ++$count;
     }
+
+    $readings{all_on} = 0 if( !$count );
 
     if( AttrVal($name, 'ignoreReachable', 0) ) {
       delete $readings{reachable};
@@ -1459,7 +1705,7 @@ HUEBridge_Parse($$)
   my($hash,$config) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "parse status message for $name";
+  Log3 $name, 4, "$name: parse status message";
   #Log3 $name, 5, Dumper $config;
 
   $hash->{helper}{lights} = $config->{lights} if( $config->{lights} );
@@ -1469,8 +1715,6 @@ HUEBridge_Parse($$)
   #Log 3, Dumper $config;
   $config = $config->{config} if( defined($config->{config}) );
   HUEBridge_fillBridgeInfo($hash, $config);
-
-  $hash->{zigbeechannel} = $config->{zigbeechannel};
 
   if( my $utc = $config->{UTC} ) {
     substr( $utc, 10, 1, '_' );
@@ -1526,11 +1770,10 @@ HUEBridge_Autocreate($;$$)
     }
   }
 
-  my $autocreated = 0;
+  my @ignored = (0, 0, 0);
+  my @created = (0, 0, 0);
   my $result =  HUEBridge_Call($hash,undef, 'lights', undef);
-  foreach my $key ( keys %{$result} ) {
-    my $id= $key;
-
+  foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
     my $code = $name ."-". $id;
     if( defined($modules{HUEDevice}{defptr}{$code}) ) {
       Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
@@ -1555,14 +1798,18 @@ HUEBridge_Autocreate($;$$)
       HUEDeviceSetIcon($devname);
       $defs{$devname}{helper}{fromAutocreate} = 1 ;
 
-      $autocreated++;
+      $created[0]++;
     }
   }
 
   $result =  HUEBridge_Call($hash,undef, 'groups', undef);
-  $result->{0} = { name => "Lightset 0", };
-  foreach my $key ( keys %{$result} ) {
-    my $id= $key;
+  $result->{0} = { name => "Lightset 0", type => 'LightGroup' };
+  foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
+    if( $result->{$id}{type} eq 'Entertainment' ) {
+      Log3 $name, 4, "$name: ignoring group $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
+      $ignored[1]++;
+      next;
+    }
 
     my $code = $name ."-G". $id;
     if( defined($modules{HUEDevice}{defptr}{$code}) ) {
@@ -1588,14 +1835,18 @@ HUEBridge_Autocreate($;$$)
       HUEDeviceSetIcon($devname);
       $defs{$devname}{helper}{fromAutocreate} = 1 ;
 
-      $autocreated++;
+      $created[1]++;
     }
   }
 
-  if( $sensors || $hash->{websocket} ) {
+  if( $sensors || $hash->{websocket} || $hash->{has_v2_api} ) {
     $result =  HUEBridge_Call($hash,undef, 'sensors', undef);
-    foreach my $key ( keys %{$result} ) {
-      my $id= $key;
+    foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
+      if( $result->{$id}{type} eq 'CLIPGenericStatus' ) {
+        Log3 $name, 4, "$name: ignoring sensor $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
+        $ignored[2]++;
+        next;
+      }
 
       my $code = $name ."-S". $id;
       if( defined($modules{HUEDevice}{defptr}{$code}) ) {
@@ -1621,17 +1872,21 @@ HUEBridge_Autocreate($;$$)
         HUEDeviceSetIcon($devname);
         $defs{$devname}{helper}{fromAutocreate} = 1 ;
 
-        $autocreated++;
+        $created[2]++;
       }
     }
   }
 
-  if( $autocreated ) {
-    Log3 $name, 2, "$name: autocreated $autocreated devices";
+  sub sum { my $sum = 0; $sum += $_ for @_;  return $sum }
+
+  my $created = join( '/', @created );
+  my $ignored = join( '/', @ignored );
+  if( !$force || sum(@created) || sum(@ignored) ) {
+    Log3 $name, 2, "$name: autocreate: created $created devices (ignored $ignored)";
     CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
   }
 
-  return "created $autocreated devices";
+  return "created $created devices (ignored $ignored)";
 }
 
 sub
@@ -1879,6 +2134,7 @@ HUEBridge_HTTP_Call2($$$$;$)
     return HUEBridge_ProcessResponse($hash, $json);
 
     HUEBridge_dispatch( {hash=>$hash,chash=>$chash,type=>$path},$err,$data );
+
   } else {
     Log3 $name, 4, "using HttpUtils_NonblockingGet: $method ". ($path?$path:'');
 
@@ -1900,16 +2156,279 @@ HUEBridge_HTTP_Call2($$$$;$)
 }
 
 sub
+HUEBridge_getv2resources($;$)
+{
+  my ($hash,$blocking) = @_;
+  my $name = $hash->{NAME};
+
+  my $params = {
+              url => "https://$hash->{host}/clip/v2/resource",
+           method => 'GET',
+          timeout => 5,
+           header => { 'HUE-Application-Key' => $attr{$name}{key}, },
+             type => 'resource',
+             hash => $hash,
+         callback => \&HUEBridge_dispatch,
+     };
+
+  if( $blocking ) {
+    my($err,$data) = HttpUtils_BlockingGet( $params );
+
+    HUEBridge_dispatch($params, $err, $data );
+
+  } else {
+    HttpUtils_NonblockingGet( $params );
+
+  }
+}
+
+sub
 HUEBridge_dispatch($$$;$)
 {
   my ($param, $err, $data, $json) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
-  #Log3 $name, 5, "HUEBridge_dispatch";
+  Log3 $name, 4, "$name: dispatch";
+  Log3 $name, 5, "HUEBridge_dispatch". ($param->{type}?": $param->{type}":"");
+
+  my $type = $param->{type};
 
   if( $err ) {
     Log3 $name, 2, "$name: http request failed: $err";
+
+    if( $type eq 'event' ) {
+      if( defined($hash->{helper}{HTTP_CONNECTION}) && defined($hash->{helper}{HTTP_CONNECTION}{lastID}) ) {
+        $hash->{EventStream} = 'terminated';
+        Log3 $name, 2, "name: EventStream: $hash->{EventStream}";
+        HUEBridge_openEventStream( $hash );
+
+      } else {
+        $hash->{EventStream} = 'terminated; retrying later';
+        Log3 $name, 2, "name: EventStream: $hash->{EventStream}";
+
+        RemoveInternalTimer($hash, "HUEBridge_openEventStream" );
+        InternalTimer(gettimeofday()+2, "HUEBridge_openEventStream", $hash, 0);
+
+      }
+    }
+
+    return undef;
+
+  } elsif( defined($type) && $type eq 'resource' ) {
+    $json = eval { JSON->new->utf8(0)->decode($data) };
+    Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+
+    delete $hash->{helper}{resource};
+    return undef if( !$json );
+
+    Log3 $name, 1, "$name: error: ". Dumper $json->{errors} if( scalar @{$json->{errors}} );
+
+    $hash->{helper}{resource} = $json;
+    Log3 $name, 5, "$name: received: ". Dumper $json;
+
+    foreach my $item (@{$hash->{helper}{resource}{data}}) {
+      $hash->{helper}{resource}{by_id}{$item->{id}} = $item;
+    }
+    return undef;
+
+  } elsif( defined($type) && $type eq 'event' ) {
+    $hash->{EventStream} = 'connected';
+    Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+
+    if( $hash->{INTERVAL} && $hash->{INTERVAL} < 60 ) {
+      $hash->{INTERVAL} = 60;
+      Log3 $name, 2, "$name: EventStream connected, changing interval to $hash->{INTERVAL}";
+    }
+
+    CommandDeleteAttr( undef, "$name pollDevices" ) if defined( AttrVal($name, 'pollDevices', undef) );
+
+    #Log3 $name, 5, "$name: EventStream: got: $data";
+
+    while($data =~ m/([^:]*):\s*(.+)(\r?\n)?(.*)/) {
+      my $key = $1;
+      my $value = $2;
+      $data = $4;
+
+      if( !$key ) {
+        Log3 $name, 5, "$name: ignoring: $value";
+
+        HUEBridge_getv2resources($hash);
+        next;
+      }
+
+      if( $key eq 'id' ) {
+        Log3 $name, 5, "$name: EventStream: got id: $value";
+        $hash->{helper}{HTTP_CONNECTION}{lastID} = $value;
+
+      } elsif( $key eq 'data' ) {
+        Log3 $name, 5, "$name: EventStream: got data: $value";
+
+        if( $value && $value !~ m/^[\[{].*[\]}]$/ ) {
+          Log3 $name, 2, "$name: invalid json detected: $value";
+          return undef;
+        }
+
+        $json = eval { JSON->new->utf8(0)->decode($value) };
+        Log3 $name, 2, "$name: json error: $@ in $value" if( $@ );
+
+        return undef if( !$json );
+        Log3 $name, 4, "$name: received: ". Dumper $json;
+
+        for my $event ( @{$json} ) {
+          my $changed = "";
+
+          if( $event->{type} eq 'update' ) {
+            Log3 $name, 4, "$name: got $event->{type} event";
+
+            for my $data ( @{$event->{data}} ) {
+              my(undef, $t, $id) = split( '/', $data->{id_v1} );
+              if( !defined($t) || !defined($id) ) {
+                Log3 $name, 3, "$name: ignoring event type $data->{type}";
+                next;
+              }
+
+              my $code;
+              $code = $name ."-". $id if( $t eq 'lights' );
+              $code = $name ."-S". $id if( $t eq 'sensors' );
+              $code = $name ."-G". $id if( $t eq 'groups' );
+              if( !$code ) {
+                Log3 $name, 3, "$name: ignoring event for $t";
+                next;
+              }
+
+              if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+                my $creationtime = substr($event->{creationtime},0,19);
+                   #substr( $creationtime, 10, 1, '_' );
+                   #$creationtime = FmtDateTime( SVG_time_to_sec($creationtime) + $hash->{helper}{offsetUTC}  ) if( defined($hash->{helper}{offsetUTC}) );
+                   #substr( $creationtime, 10, 1, 'T' );
+                my $obj = {      state => { lastupdated => $creationtime },
+                                 v2_id => $data->{owner}{rid},
+                            v2_service => $data->{id} };
+                   $obj->{v2_id} = $obj->{v2_service} if( $t eq 'groups' );
+
+                my $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
+                if( !$device ) {
+                  Log3 $name, 2, "$name: event for unknown device received, tying to refresh resouces";
+                  HUEBridge_getv2resources($hash, 1);
+                  HUEBridge_Autocreate($hash);
+                  $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
+                }
+                my $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
+                if( !$service ) {
+                  Log3 $name, 2, "$name: event for unknown service received, tying to refresh resouces";
+                  HUEBridge_getv2resources($hash, 1);
+                  $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
+                }
+#Log 1, Dumper $device;
+#Log 1, Dumper $service;
+
+                if( $data->{type} eq 'motion' ) {
+                  $obj->{state}{presence} = $data->{motion}{motion} if( defined($data->{motion}) );
+
+                } elsif( $data->{type} eq 'button' ) {
+                  my $input = $service->{metadata}{control_id};
+                  my $eventtype = $data->{button}{last_event};
+#Log 1, "input: $input";
+#Log 1, "eventtype: $eventtype";
+
+                  my $buttonevent;
+                  if( $input
+                      && defined($chash->{helper}{events})
+                      && defined($chash->{helper}{events}[$input-1])
+                      && defined($chash->{helper}{events}[$input-1]{$eventtype}) ) {
+                    $buttonevent = $chash->{helper}{events}[$input-1]{$eventtype};
+
+                  } elsif( $eventtype eq 'initial_press' ) {
+                    $buttonevent = "${input}000";
+
+                  } elsif( $eventtype eq 'repeat' ) {
+                    $buttonevent = "${input}001";
+
+                  } elsif( $eventtype eq 'short_release' ) {
+                    $buttonevent = "${input}002";
+
+                  } elsif( $eventtype eq 'long_release' ) {
+                    $buttonevent = "${input}003";
+                  }
+
+                  #$obj->{state}{input} = $input;
+                  #$obj->{state}{eventtype} = $eventtype;
+                  $obj->{state}{buttonevent} = $buttonevent;
+
+                } elsif( $data->{type} eq 'temperature' ) {
+                  $obj->{state}{temperature} = int($data->{temperature}{temperature}*100) if( defined($data->{temperature})
+                                                                                              && $data->{temperature}{temperature_valid} );
+
+                } elsif( $data->{type} eq 'light_level' ) {
+                  $obj->{state}{lightlevel} = $data->{light}{light_level} if( defined($data->{light})
+                                                                              && $data->{light}{light_level_valid} );
+                } elsif( $data->{type} eq 'zigbee_connectivity' ) {
+                  $obj->{state}{reachable} = ($data->{status} eq 'connected') ? 1 : 0;
+
+                } else {
+                  $obj->{state}{on} = $data->{on}{on} if( defined($data->{on}) );
+
+                  $obj->{state}{bri} = int($data->{dimming}{brightness} * 254 / 100) if( defined($data->{dimming}) );
+
+                  if( defined($data->{color}) ) {
+                    if( my $xy = $data->{color}{xy} ) {
+                      $obj->{state}{colormode} = 'xy';
+                      $obj->{state}{xy} = [$xy->{x}, $xy->{y}];
+                    }
+                  }
+                  if( defined($data->{color_temperature}) && defined($data->{color_temperature}{mirek}) ) {
+                    $obj->{state}{colormode} = 'ct';
+                    $obj->{state}{ct} = $data->{color_temperature}{mirek};
+                  }
+                }
+
+                if( defined($data->{dynamics}) ) {
+                  $obj->{state}{dynamics_speed} = $data->{dynamics}{speed} if( $data->{dynamics}{speed_valid} );
+                  $obj->{state}{dynamics_status} = $data->{dynamics}{status};
+
+		}
+
+                Log3 $name, 4, "$name: created from event: ". Dumper $obj;
+
+                if( HUEDevice_Parse($chash, $obj) && !$chash->{helper}{devtype} ) {
+                  $changed .= "," if( $changed );
+                  $changed .= $chash->{ID};
+                }
+
+              } else {
+                Log3 $name, 3, "$name: message for unknown device received: $code";
+
+              }
+            }
+
+          } elsif( $event->{type} eq 'add' ) {
+            Log3 $name, 4, "$name: got $event->{type} event";
+
+            HUEBridge_getv2resources($hash, 1);
+            HUEBridge_Autocreate($hash);
+
+          } else {
+           Log3 $name, 3, "$name: unknown event type $event->{type}: $data";
+
+          }
+
+          HUEBridge_updateGroups($hash, $changed) if( $changed ); # not needed ?
+        }
+
+      } else {
+        Log3 $name, 4, "$name: EventStream: unknown event: $key: $value";
+
+      }
+
+    }
+    return undef;
+
+  } elsif( defined($type) && $type eq 'application id' ) {
+    if( $param->{httpheader} =~ m/hue-application-id:\s?([^\s;]*)/i ) {
+      $hash->{'application id'} = $1;
+    }
+
   } elsif( $data || $json ) {
     if( !$data && !$json ) {
       Log3 $name, 2, "$name: empty answer received";
@@ -1922,12 +2441,10 @@ HUEBridge_dispatch($$$;$)
     my $queryAfterSet = AttrVal( $name,'queryAfterSet', 1 );
 
     if( !$json ) {
-      $json = eval { JSON->new->utf8(0)->decode($data) } if( !$json );
+      $json = eval { JSON->new->utf8(0)->decode($data) };
       Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
     }
     return undef if( !$json );
-
-    my $type = $param->{type};
 
     if( ref($json) eq 'ARRAY' ) {
       HUEBridge_ProcessResponse($hash,$json) if( !$queryAfterSet );
@@ -2195,6 +2712,8 @@ HUEBridge_Attr($$$)
 
 1;
 
+__END__
+
 =pod
 =item tag cloudfree
 =item tag publicAPI
@@ -2342,9 +2861,9 @@ HUEBridge_Attr($$$)
       1 -> use HttpUtils_NonblockingGet<br>
       not set -> use old module specific implementation</li>
     <li>pollDevices<br>
-      1 -> the bridge will poll all lights in one go instead of each device polling itself independently<br>
+      1 -> the bridge will poll all lights in one go instead of each light polling itself independently<br>
       2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
-      default is 1.</li>
+      default is 2. will be deleted if v2 api is detected and eventstream connects.</li>
     <li>createGroupReadings<br>
       create 'artificial' readings for group devices.</li>
       0 -> create readings only for group devices where createGroupReadings ist set to 1

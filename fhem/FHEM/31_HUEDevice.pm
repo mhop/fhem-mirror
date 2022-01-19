@@ -492,8 +492,10 @@ HUEDevice_Define($$) {
   RemoveInternalTimer($hash);
   if( $init_done ) {
     HUEDevice_GetUpdate($hash);
+
   } else {
     InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0);
+
   }
 
   return undef;
@@ -1456,6 +1458,27 @@ HUEDevice_Parse($$)
 {
   my($hash,$result) = @_;
   my $name = $hash->{NAME};
+
+  if( !defined($hash->{has_v2_api}) && defined($hash->{IODev}) ) {
+    $hash->{has_v2_api} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
+
+    Log3 $name, 4, "$name: bridge has v2 api: $hash->{has_v2_api}";
+
+    if( $hash->{INTERVAL} && $hash->{has_v2_api} ) {
+      if( defined($hash->{IODev}{EventStream}) && $hash->{IODev}{EventStream} eq 'connected' ) {
+        delete $hash->{INTERVAL};
+        Log3 $name, 2, "$name: bridge has v2 api, EventStream connected, removing interval";
+
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0) if( $hash->{INTERVAL} );
+
+      } else { 
+        delete $hash->{has_v2_api};
+        Log3 $name, 2, "$name: bridge has v2 api, EventStream not jet connected";
+
+      }
+    }
+  }
 
   if( ref($result) ne "HASH" ) {
     if( ref($result) && $HUEDevice_hasDataDumper) {
