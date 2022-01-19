@@ -1952,31 +1952,33 @@ HUEDevice_Parse($$)
   if( defined($state->{'pct'}) ) {
     $pct = $state->{'pct'};
     $s = $pct;
-  } elsif( $on )
-    {
-      $s = 'on';
-      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
-      if( $bri < 0 || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
-          $pct = 100;
+  } elsif( $on ) {
+    $s = 'on';
+    if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
-      } else {
-        $pct = int($bri * 99 / 254 + 1);
-        if( $pct > 0
-            && $pct < 100  ) {
-          $s = $dim_values{int($pct/7)};
-        }
-        $s = 'off' if( $pct == 0 );
+    if( $bri < 0 || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
+        $pct = 100;
+
+    } else {
+      $pct = int($bri * 99 / 254 + 1);
+      if( $pct > 0
+          && $pct < 100  ) {
+        $s = $dim_values{int($pct/7)};
 
       }
+
+      $s = 'off' if( $pct == 0 );
+
     }
-  else
-    {
-      $on = 0;
-      $s = 'off';
-      $pct = 0;
-      if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
-    }
+  } else {
+    $on = 0;
+    $s = 'off';
+    $pct = 0;
+    if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
+  }
+
+  $readings{dynamics_status} = 'none' if( !$on && defined($hash->{helper}{dynamics_status}) && !defined($readings{dynamics_status}) );
 
   if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"pct", $pct);}
   #if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"level", $pct . ' %');}
