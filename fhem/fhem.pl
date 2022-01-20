@@ -5174,10 +5174,11 @@ computeClientArray($$)
     @a = grep { $modules{$_} && $modules{$_}{Match} } @mRe;
 
   } else {
+    my @cmRe = map { qr/^$_$/ } @mRe;  # 125292, precompile, speedup 5x for CUL
     foreach my $m (sort { $modules{$a}{ORDER}.$a cmp $modules{$b}{ORDER}.$b }
                     grep { defined($modules{$_}{ORDER}) } keys %modules) {
-      foreach my $re (@mRe) {
-        if($m =~ m/^$re$/) {
+      foreach my $re (@cmRe) {
+        if($m =~ $re) {
           push @a, $m if($modules{$m}{Match});
           last;
         }
