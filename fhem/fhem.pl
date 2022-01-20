@@ -4119,6 +4119,7 @@ Dispatch($$;$$)
               my @tfound = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
               use strict "refs"; $readingsUpdateDelayTrigger = 0;
               $parserMod = $mname;
+              delete($hash->{".clientArray"});
 
               if(int(@tfound) && defined($tfound[0])) {
                 if($tfound[0] && $tfound[0] eq "[NEXT]") {
@@ -4129,7 +4130,6 @@ Dispatch($$;$$)
                   last;
                 }
               }
-              delete($hash->{".clientArray"});
 
             } else {
               Log 0, "ERROR: Cannot autoload $mname";
