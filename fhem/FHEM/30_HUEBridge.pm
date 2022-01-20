@@ -484,8 +484,14 @@ HUEBridge_fillBridgeInfo($$)
   $hash->{apiversion} = $config->{apiversion};
   $hash->{zigbeechannel} = $config->{zigbeechannel};
 
+  delete $hash->{is_deCONZ};
+  if( defined($config->{websocketport})
+      || defined($hash->{modelid}) && $hash->{modelid} eq 'deCONZ' ) {
+    $hash->{is_deCONZ} = 1;
+  }
+
   delete $hash->{has_v2_api};
-  if( $hash->{swversion} >= 1948086000 ) {
+  if( !$hash->{is_deCONZ} && $hash->{swversion} >= 1948086000 ) {
     $hash->{has_v2_api} = 1;
   }
 

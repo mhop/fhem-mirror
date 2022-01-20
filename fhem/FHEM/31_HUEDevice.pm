@@ -839,8 +839,8 @@ HUEDevice_Set($@)
       return "usage: scene <id>|<name>" if( !@args );
       my $arg = join( ' ', @args );
       my $deConz;
-      if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
-        if( defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' ) {
+      if( $hash->{IODev} ) {
+        if( $hash->{IODev}{is_deCONZ} ) {
           $deConz = 1;
           $arg = HUEBridge_scene2id_deCONZ($hash, $arg);
         } else {
@@ -1121,7 +1121,7 @@ HUEDevice_Set($@)
 
   if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
     $list .= " alert:none,select,lselect";
-    $list .= ",breathe,okay,channelchange,finish,stop" if( defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' );
+    $list .= ",breathe,okay,channelchange,finish,stop" if( $hash->{IODev}{is_deCONZ} );
 
     $list .= " effect:none,colorloop" if( $subtype =~ m/color/ );
 
@@ -1134,7 +1134,7 @@ HUEDevice_Set($@)
     }
   }
 
-  if( $hash->{IODev} && defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' ) {
+  if( $hash->{IODev} && $hash->{IODev}{is_deCONZ} ) {
     if( my $scenes = $hash->{helper}{scenes} ) {
       my @names;
       for my $scene (@{$scenes}) {
@@ -1459,9 +1459,9 @@ HUEDevice_Parse($$)
   my($hash,$result) = @_;
   my $name = $hash->{NAME};
 
-  if( !defined($hash->{has_v2_api}) && defined($hash->{IODev}) ) {
+  if( !defined($hash->{has_v2_api}) && defined($hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge') ) {
     $hash->{has_v2_api} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
-    $hash->{has_v2_api} = 0 if( defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' );
+    $hash->{has_v2_api} = 0 if( $hash->{IODev}{is_DECONZ} );
 
     Log3 $name, 4, "$name: bridge has v2 api: ". ($hash->{has_v2_api} ? 1 : 0);
 
@@ -1473,7 +1473,7 @@ HUEDevice_Parse($$)
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0) if( $hash->{INTERVAL} );
 
-      } else { 
+      } else {
         delete $hash->{has_v2_api};
         Log3 $name, 2, "$name: bridge has v2 api, EventStream not jet connected";
 
