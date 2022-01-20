@@ -724,9 +724,11 @@ HUEBridge_Set($@)
 
   # usage check
   if($cmd eq 'reconnect') {
+    HUEBridge_closeWebsocket($hash);
+    HUEBridge_closeEventStream($hash);
 
-    #HUEBridge_OpenDev( $hash );
-    HUEBridge_openEventStream( $hash );
+    HUEBridge_OpenDev( $hash );
+    #HUEBridge_openEventStream( $hash );
     return undef;
 
   } elsif($cmd eq 'statusRequest') {
