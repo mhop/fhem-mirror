@@ -126,13 +126,17 @@ HUEBridge_Read($)
             HUEDevice_Parse($chash, $obj);
             HUEBridge_updateGroups($hash, $chash->{ID}) if( !$chash->{helper}{devtype} );
 
+            delete $hash->{helper}{ignored}{$code};
+
           } elsif( HUEDevice_moveToBridge( $obj->{uniqueid}, $name, $obj->{id} ) ) {
             if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
               HUEDevice_Parse($chash, $obj);
+
+              delete $hash->{helper}{ignored}{$code};
             }
 
-          } else {
-            Log3 $name, 4, "$name: message for unknown device received: $code";
+          } elsif( !$hash->{helper}{ignored}{$code} ) {
+            Log3 $name, 2, "$name: websocket: event for unknown device received: $code";
           }
 
         } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'scene-called' ) {
@@ -276,6 +280,7 @@ HUEBridge_Define($$)
 
   $attr{$name}{"key"} = join "",map { unpack "H*", chr(rand(256)) } 1..16 unless defined( AttrVal($name, "key", undef) );
 
+  $hash->{helper}{ignored} = {};
   $hash->{helper}{last_config_timestamp} = 0;
 
   if( !defined($hash->{helper}{count}) ) {
@@ -1105,8 +1110,8 @@ HUEBridge_Set($@)
                type => $cmd,
                hash => $hash,
            callback => \&HUEBridge_dispatch,
-               data => '{"on":{"on": true}}',
-               #data => '{"effect":{"effect": "candle"}}',
+               #data => '{"on":{"on": true}}',
+               data => '{"effect":{"effect": "candle"}}',
                #data => '{"effect":{"effect": "breathe"}}',
        };
 
@@ -1805,13 +1810,14 @@ HUEBridge_Autocreate($;$$)
   $result =  HUEBridge_Call($hash,undef, 'groups', undef);
   $result->{0} = { name => "Lightset 0", type => 'LightGroup' };
   foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
+    my $code = $name ."-G". $id;
     if( $result->{$id}{type} eq 'Entertainment' ) {
       Log3 $name, 4, "$name: ignoring group $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
       $ignored[1]++;
+      $hash->{helper}{ignored}{$code} = 1;
       next;
     }
 
-    my $code = $name ."-G". $id;
     if( defined($modules{HUEDevice}{defptr}{$code}) ) {
       Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
       next;
@@ -1842,13 +1848,14 @@ HUEBridge_Autocreate($;$$)
   if( $sensors || $hash->{websocket} || $hash->{has_v2_api} ) {
     $result =  HUEBridge_Call($hash,undef, 'sensors', undef);
     foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
+      my $code = $name ."-S". $id;
       if( $result->{$id}{type} eq 'CLIPGenericStatus' ) {
         Log3 $name, 4, "$name: ignoring sensor $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
         $ignored[2]++;
+        $hash->{helper}{ignored}{$code} = 1;
         next;
       }
 
-      my $code = $name ."-S". $id;
       if( defined($modules{HUEDevice}{defptr}{$code}) ) {
         Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
         next;
@@ -2284,7 +2291,7 @@ HUEBridge_dispatch($$$;$)
             for my $data ( @{$event->{data}} ) {
               my(undef, $t, $id) = split( '/', $data->{id_v1} );
               if( !defined($t) || !defined($id) ) {
-                Log3 $name, 3, "$name: ignoring event type $data->{type}";
+                Log3 $name, 3, "$name: EventSource: ignoring event type $data->{type}";
                 next;
               }
 
@@ -2293,7 +2300,7 @@ HUEBridge_dispatch($$$;$)
               $code = $name ."-S". $id if( $t eq 'sensors' );
               $code = $name ."-G". $id if( $t eq 'groups' );
               if( !$code ) {
-                Log3 $name, 3, "$name: ignoring event for $t";
+                Log3 $name, 3, "$name: EventSource: ignoring event for $t";
                 next;
               }
 
@@ -2309,14 +2316,14 @@ HUEBridge_dispatch($$$;$)
 
                 my $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 if( !$device ) {
-                  Log3 $name, 2, "$name: event for unknown device received, tying to refresh resouces";
+                  Log3 $name, 2, "$name: EventSource: event for unknown device received, tying to refresh resouces";
                   HUEBridge_getv2resources($hash, 1);
                   HUEBridge_Autocreate($hash);
                   $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 }
                 my $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 if( !$service ) {
-                  Log3 $name, 2, "$name: event for unknown service received, tying to refresh resouces";
+                  Log3 $name, 2, "$name: EventSource: event for unknown service received, tying to refresh resouces";
                   HUEBridge_getv2resources($hash, 1);
                   $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 }
@@ -2396,8 +2403,10 @@ HUEBridge_dispatch($$$;$)
                   $changed .= $chash->{ID};
                 }
 
-              } else {
-                Log3 $name, 3, "$name: message for unknown device received: $code";
+                delete $hash->{helper}{ignored}{$code};
+
+              } elsif( !$hash->{helper}{ignored}{$code} ) {
+                Log3 $name, 3, "$name: EventSource: update for unknown device received: $code";
 
               }
             }
@@ -2472,8 +2481,12 @@ HUEBridge_dispatch($$$;$)
 
             if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
               HUEDevice_Parse($chash, $sensors->{$id});
-            } else {
-              Log3 $name, 4, "$name: message for unknown sensor received: $code";
+
+              delete $hash->{helper}{ignored}{$code};
+
+            } elsif( !$hash->{helper}{ignored}{$code} ) {
+              Log3 $name, 4, "$name: data for unknown sensor received: $code";
+
             }
           }
         }
@@ -2485,8 +2498,12 @@ HUEBridge_dispatch($$$;$)
 
             if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
               HUEDevice_Parse($chash, $groups->{$id});
-            } else {
-              Log3 $name, 2, "$name: message for unknown group received: $code";
+
+              delete $hash->{helper}{ignored}{$code};
+
+            } elsif( !$hash->{helper}{ignored}{$code} ) {
+              Log3 $name, 2, "$name: data for unknown group received: $code";
+
             }
           }
         }
@@ -2507,11 +2524,17 @@ HUEBridge_dispatch($$$;$)
               $changed .= $chash->{ID};
             }
 
-          } elsif( HUEDevice_moveToBridge( $lights->{$id}{uniqueid}, $name, $id ) ) {
-            HUEDevice_Parse($hash, $lights->{$id});
+            delete $hash->{helper}{ignored}{$code};
 
-          } else {
-            Log3 $name, 3, "$name: message for unknown device received: $code";
+          } elsif( HUEDevice_moveToBridge( $lights->{$id}{uniqueid}, $name, $id ) ) {
+            if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+              HUEDevice_Parse($hash, $lights->{$id});
+
+              delete $hash->{helper}{ignored}{$code};
+            }
+
+          } elsif( !$hash->{helper}{ignored}{$code} ) {
+            Log3 $name, 3, "$name: data for unknown device received: $code";
 
           }
         }
