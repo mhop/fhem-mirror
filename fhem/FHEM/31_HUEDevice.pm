@@ -1801,9 +1801,14 @@ HUEDevice_Parse($$)
 
     $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', '' ) if( !$hash->{lastupdated} );
     $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', '' ) if( !$hash->{lastupdated_local} );
+    substr($hash->{lastupdated},10, 1, '_' );
+    substr($lastupdated,10, 1, '_' );
+    my $hlu = SVG_time_to_sec( $hash->{lastupdated} );
+    my $lu = SVG_time_to_sec( $lastupdated );
     return undef if( $hash->{lastupdated}
-                     && !defined($result->{v2_service})
-                     && $hash->{lastupdated} eq $lastupdated
+                     && $hlu <= $lu
+                     #&& !defined($result->{v2_service})
+                     #&& $hash->{lastupdated} eq $lastupdated
                      && (!$readings{state} || $readings{state} eq ReadingsVal( $name, 'state', '' ))  );
 
     Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
