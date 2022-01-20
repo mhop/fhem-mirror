@@ -1459,7 +1459,22 @@ HUEDevice_Parse($$)
   my($hash,$result) = @_;
   my $name = $hash->{NAME};
 
-  if( !defined($hash->{has_v2_api}) && defined($hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge') ) {
+  if( ref($result) ne "HASH" ) {
+    if( ref($result) && $HUEDevice_hasDataDumper) {
+       #Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
+      Log3 $name, 2, "$name: got wrong status message for $name: $result";
+    } else {
+      Log3 $name, 2, "$name: got wrong status message for $name: $result";
+    }
+    return undef;
+  }
+
+  Log3 $name, 4, "parse status message for $name";
+  #Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
+
+  if( !defined($hash->{has_v2_api}) # only if not already checked
+      && $result->{v2_service}      # only for updates from eventstream events
+      && defined($hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge') ) {
     $hash->{has_v2_api} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
     $hash->{has_v2_api} = 0 if( $hash->{IODev}{is_DECONZ} );
 
@@ -1480,19 +1495,6 @@ HUEDevice_Parse($$)
       }
     }
   }
-
-  if( ref($result) ne "HASH" ) {
-    if( ref($result) && $HUEDevice_hasDataDumper) {
-       #Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
-      Log3 $name, 2, "$name: got wrong status message for $name: $result";
-    } else {
-      Log3 $name, 2, "$name: got wrong status message for $name: $result";
-    }
-    return undef;
-  }
-
-  Log3 $name, 4, "parse status message for $name";
-  #Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
 
   $hash->{name} = $result->{name} if( defined($result->{name}) );
   $hash->{type} = $result->{type} if( defined($result->{type}) );
@@ -1733,9 +1735,10 @@ HUEDevice_Parse($$)
         #add offset to UTC for displaying in fhem
         $sec += $offset;
         $lastupdated_local = FmtDateTime($sec);
-      }else{
 
+      }else{
         $lastupdated_local = $lastupdated;
+
       }
 
       $readings{reachable} = ($state->{reachable}?1:0) if( defined($state->{reachable}) );
