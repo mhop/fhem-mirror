@@ -2399,6 +2399,8 @@ HUEBridge_dispatch($$$;$)
                     $obj->{state}{battery_state} = $data->{power_state}{battery_state};
                   }
 
+                } elsif( $data->{type} eq 'entertainment_configuration' ) {
+
                 } elsif( $data->{type} eq 'grouped_light' ) {
 
                 } elsif( $data->{type} eq 'light'
