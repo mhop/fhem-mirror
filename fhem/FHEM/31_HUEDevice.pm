@@ -1462,7 +1462,7 @@ HUEDevice_Parse($$)
   if( !defined($hash->{has_v2_api}) && defined($hash->{IODev}) ) {
     $hash->{has_v2_api} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
 
-    Log3 $name, 4, "$name: bridge has v2 api: $hash->{has_v2_api}";
+    Log3 $name, 4, "$name: bridge has v2 api: ". ($hash->{has_v2_api} ? 1 : 0);
 
     if( $hash->{INTERVAL} && $hash->{has_v2_api} ) {
       if( defined($hash->{IODev}{EventStream}) && $hash->{IODev}{EventStream} eq 'connected' ) {
