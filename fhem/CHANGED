@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  10_KNX: fix dpt14 set 0
  - bugfix:  89_FULLY: Fixed speak and overlayMessage commands.
  - bugfix:  74_XiaomiBTLESens: fix incurrect temperatur then value is negativ
  - feature: 30_HUEBridge: support eventstream api (push events)

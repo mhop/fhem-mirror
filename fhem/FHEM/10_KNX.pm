@@ -71,6 +71,8 @@
 #              corrections cmd-ref
 #              optimize replaceByRegex
 # MH 20220108  fix KNX_scan sub (export-problem)
+# MH 202201xx  E05.02 fix dpt14 "0"
+#              avoid undefined event when autocreate ignoreTypes is set
 
 
 package FHEM::KNX; ## no critic 'package'
@@ -100,7 +102,7 @@ BEGIN {
         qw(readingsSingleUpdate readingsBulkUpdate readingsBulkUpdateIfChanged readingsBeginUpdate readingsEndUpdate
           Log3
           AttrVal ReadingsVal ReadingsNum
-          addToDevAttrList  
+          addToDevAttrList
           AssignIoPort IOWrite
           CommandDefMod CommandModify CommandDelete
           defs modules attr
@@ -277,15 +279,16 @@ my %dpttypes = (
 	'dpt13.013'     => {CODE=>'dpt13', UNIT=>q{kWh}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,10}/ix, MIN=>-2147483648, MAX=>2147483647},
 
 	# 4-Octet single precision float
-	'dpt14'         => {CODE=>'dpt14', UNIT=>q{},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef,
+#E05.02	'dpt14'         => {CODE=>'dpt14', UNIT=>q{},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef,
+	'dpt14'         => {CODE=>'dpt14', UNIT=>q{},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef,
                             DEC=>\&dec_dpt14,ENC=>\&enc_dpt14,},
-	'dpt14.019'     => {CODE=>'dpt14', UNIT=>q{A},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
-	'dpt14.027'     => {CODE=>'dpt14', UNIT=>q{V},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
-	'dpt14.033'     => {CODE=>'dpt14', UNIT=>q{Hz}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
-	'dpt14.056'     => {CODE=>'dpt14', UNIT=>q{W},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
-	'dpt14.068'     => {CODE=>'dpt14', UNIT=>q{&deg;C},    FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
-	'dpt14.076'     => {CODE=>'dpt14', UNIT=>q{m&sup3;},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
-	'dpt14.057'     => {CODE=>'dpt14', UNIT=>q{cos &Phi;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef},
+	'dpt14.019'     => {CODE=>'dpt14', UNIT=>q{A},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.027'     => {CODE=>'dpt14', UNIT=>q{V},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.033'     => {CODE=>'dpt14', UNIT=>q{Hz}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.056'     => {CODE=>'dpt14', UNIT=>q{W},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.068'     => {CODE=>'dpt14', UNIT=>q{&deg;C},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.076'     => {CODE=>'dpt14', UNIT=>q{m&sup3;},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.057'     => {CODE=>'dpt14', UNIT=>q{cos&Phi;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 
 	# 14-Octet String
 	'dpt16'         => {CODE=>'dpt16', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/.{1,14}/ix, MIN=>undef, MAX=>undef, SETLIST=>'multiple,>CLR<',
@@ -377,7 +380,7 @@ sub KNX_Define {
 	# check if the last arg matches any IO-Device - and assign it - else use the automatic mechanism
 	if ( $a[int(@a) - 1] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ix ) {
 		my $iodevCandidate = pop(@a); 
-		my @tulList = devspec2array('TYPE=(TUL|KNXTUL|KNXIO)'); #E05.00
+		my @tulList = devspec2array('TYPE=(TUL|KNXTUL|KNXIO)');
 		my $found = undef;
 		foreach my $tuls (@tulList) {
 			if ($tuls eq $iodevCandidate) {
@@ -938,7 +941,7 @@ sub KNX_Attr {
 			foreach my $iodev (@IOList) {
 				return if ($iodev eq $aVal); # ok
 			}
-#E05.00			# add support for fhem2fhem as io-dev
+			# add support for fhem2fhem as io-dev
 			my @IOList2 = devspec2array('TYPE=FHEM2FHEM');
 			foreach my $iodev (@IOList2) {
 				next if ($iodev ne $aVal); 
@@ -1030,15 +1033,16 @@ sub KNX_Parse {
 
 	#gad not defined yet, give feedback for autocreate
 	if (not (exists $modules{KNX}{defptr}{$gadCode})) {
-#		#E05.00 check if any autocreate device is disabled
-#		my @acList = devspec2array('TYPE=autocreate');
-#		foreach my $acdev (@acList) {
-#			return q{} if (Value($defs{$acdev}) eq 'disabled'); # dont go thru "UNDEFINED...."
-#		}
 		#format gad
 		my $gad = KNX_hexToName($gadCode);
 		#create name
 		my $newDevName = sprintf("KNX_%.2d%.2d%.3d",split (/\//x, $gad));
+		#E05.02 check if any autocreate device has ignoretype "KNX..." set
+		my @acList = devspec2array('TYPE=autocreate');
+		foreach my $acdev (@acList) {
+			my $igntypes = AttrVal($acdev,'ignoreTypes','');
+			return q{} if($newDevName =~ /$igntypes/x);
+		}
 		return "UNDEFINED $newDevName KNX $gad:$MODELERR";
 	}
 
@@ -1171,13 +1175,8 @@ sub KNX_SetReadings {
 	#append post-string, if supplied
 	my $suffix = AttrVal($name, 'format', undef);
 	$transval .= q{ } . $suffix if (defined($suffix));
-#E05.01	#execute stateRegex
+	#execute stateRegex
 	my $state = KNX_replaceByRegex ($hash, $rdName, $transval);
-#	my $regAttr = AttrVal($name, "stateRegex", undef);
-#	my $state = KNX_replaceByRegex ($regAttr, $rdName, $transval);
-#
-#	my $logstr = (defined($state))?$state:'UNDEFINED';
-#	Log3 ($name, 5, "KNX_SetReadings: $name - replaced $rdName value from: $transval to $logstr") if ($transval ne $logstr);
 
 	my $lsvalue = 'fhem'; # called from set
 	$lsvalue = KNX_hexToName2($src) if (defined($src) && ($src ne q{})); # called from parse
@@ -1310,7 +1309,6 @@ sub KNX_checkAndClean {
 	return $value;
 }
 
-#E05.01
 # replace state-values by Attr stateRegex
 sub KNX_replaceByRegex {
 	my ($hash, $rdName, $input) = @_;
@@ -1319,11 +1317,6 @@ sub KNX_replaceByRegex {
 	my $regAttr = AttrVal($name, 'stateRegex', undef);
 	return $input if (! defined($regAttr));
 
-#sub KNX_replaceByRegex {
-#	my ($regAttr, $rdName, $input) = @_;
-#
-#	return $input if (! defined($regAttr));
-#
 	my $retVal = $input;
 
 	#execute regex, if defined
@@ -1841,7 +1834,6 @@ sub dec_dpt232 { #RGB-Code
 ### called with devspec as argument
 ### e.g : KNX_scan() / KNX_scan('device1') / KNX_scan('device1, dev2,dev3,...' / KNX_scan('room=Kueche'), ...
 ### returns number of "gets" executed
-#E05.01
 sub main::KNX_scan {
 	my $devs = shift;
 	my @devlist = ();
