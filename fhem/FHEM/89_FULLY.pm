@@ -447,14 +447,16 @@ sub FULLY_Set ($@)
 		push (@p, { "key" => "motionDetection", "value" => "$value" });
 	}
 	elsif ($opt eq 'speak') {
-		my $text = shift @a // return 'Usage: set $name speak "{Text}"';
+		my $text = join(' ',@a);
+		return 'Usage: set $name speak {Text}' if (!defined($text) || $text eq '');
 		my $enctext = FULLY_SubstDeviceReading ($text);
 		push (@c, "textToSpeech");
 		push (@p, { "text" => "$enctext" });
 	}
 	elsif ($opt eq 'overlayMessage') {
-		my $text = shift @a // return 'Usage: set $name overlayMessage "{Text}"';
-		my $enctext = FULLY_SubstDeviceReading ($text);
+		my $text = join(' ',@a);
+		return 'Usage: set $name overlayMessage [{Text}]' if (!defined($text));;
+		my $enctext = $text ne '' ? FULLY_SubstDeviceReading ($text) : '';
 		push (@c, "setOverlayMessage");
 		push (@p, { "text" => "$enctext" });
 	}
@@ -497,8 +499,8 @@ sub FULLY_Set ($@)
 	elsif ($opt eq 'setStringSetting' || $opt eq 'setBooleanSetting') {
 		return "FULLY: Command $opt only available in expert mode" if ($expert == 0);
 		my $key = shift @a;
-		my $value = shift @a;
-		return "Usage: set $name $opt {key} {value}" if (!defined ($value));
+		my $value = join(' ',@a);
+		return "Usage: set $name $opt {key} {value}" if (!defined($value) || $value eq '');
 		push (@c, $opt);
 		push (@p, { "key" => "$key", "value" => "$value" });
 	}
