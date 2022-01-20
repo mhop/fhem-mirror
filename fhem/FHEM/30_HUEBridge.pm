@@ -2399,7 +2399,10 @@ HUEBridge_dispatch($$$;$)
                     $obj->{state}{battery_state} = $data->{power_state}{battery_state};
                   }
 
-                } elsif( $data->{type} eq 'light' ) {
+                } elsif( $data->{type} eq 'grouped_light' ) {
+
+                } elsif( $data->{type} eq 'light'
+                         || $data->{type} eq 'grouped_light' ) {
                   $obj->{state}{on} = $data->{on}{on} if( defined($data->{on}) );
 
                   $obj->{state}{bri} = int($data->{dimming}{brightness} * 254 / 100) if( defined($data->{dimming}) );
