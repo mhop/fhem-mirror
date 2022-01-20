@@ -1461,6 +1461,7 @@ HUEDevice_Parse($$)
 
   if( !defined($hash->{has_v2_api}) && defined($hash->{IODev}) ) {
     $hash->{has_v2_api} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
+    $hash->{has_v2_api} = 0 if( defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' );
 
     Log3 $name, 4, "$name: bridge has v2 api: ". ($hash->{has_v2_api} ? 1 : 0);
 
