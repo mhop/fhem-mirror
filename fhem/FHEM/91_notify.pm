@@ -275,6 +275,8 @@ notify_fhemwebFn($$$$)
       $ret .= "</tr>";
     }
   }
+  $ret .= '<script>setTimeout(function(){if(FW_checkNotifydev)'.
+          'FW_checkNotifydev("REGEXP")}, 100)</script>';
 
   my @et = devspec2array("TYPE=eventTypes");
   if(!@et) {

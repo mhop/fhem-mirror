@@ -566,6 +566,8 @@ FileLog_fhemwebFn($$$$)
   # DETAIL only from here on
   my $hash = $defs{$d};
 
+  $ret .= '<script>setTimeout(function(){if(FW_checkNotifydev)'.
+          'FW_checkNotifydev("REGEXP")}, 100)</script>';
   $ret .= "<br>Regexp parts";
   $ret .= "<br><table class=\"block wide\">";
   my @ra = split(/\|/, $hash->{REGEXP});

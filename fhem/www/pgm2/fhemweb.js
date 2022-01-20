@@ -2130,6 +2130,30 @@ FW_getSVG(emb)
   return undefined;
 }
 
+function
+FW_checkNotifydev(reName)
+{
+  var internals={};
+  $("table.internals tr td div.dname").each(function(){
+    internals[$(this).html()] = this;
+  });
+  if(!internals[reName] || internals.NOTIFYDEV)
+    return;
+  $(internals[reName])
+    .html(reName+" <a>(!)</a>")
+    .css("cursor","pointer")
+    .click(function(){
+      var val = $(internals[reName]).closest("tr").find("div[informid]").text();
+      FW_okDialog("Could not optimize the regexp:<ul>"+val+
+                "</ul>How I tried (notifyRegexpCheck):<ul><pre></pre></ul>");
+      FW_cmd(FW_root+'?cmd={notifyRegexpCheck("'+val+'")}&XHR=1',
+      function(res){
+        $("#FW_okDialog pre").html(res);
+      });
+
+    });
+}
+
 /*
 =pod
 
