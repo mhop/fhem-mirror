@@ -429,7 +429,7 @@ HUEBridge_closeEventStream($)
   return if( !defined($hash->{helper}{HTTP_CONNECTION}) );
 
   $hash->{EventStream} = 'closing';
-  Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+  Log3 $name, 4, "$name: EventStream: $hash->{EventStream}";
 
   HttpUtils_Close( $hash->{helper}{HTTP_CONNECTION} );
   delete $hash->{helper}{HTTP_CONNECTION};
@@ -437,7 +437,7 @@ HUEBridge_closeEventStream($)
   delete $hash->{buf};
 
   delete($hash->{EventStream});
-  Log3 $name, 4, "name: EventStream: closed";
+  Log3 $name, 4, "$name: EventStream: closed";
 }
 sub
 HUEBridge_openEventStream($)
@@ -451,7 +451,7 @@ HUEBridge_openEventStream($)
   HUEBridge_closeEventStream($hash);
 
   $hash->{EventStream} = 'connecting';
-  Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+  Log3 $name, 4, "$name: EventStream: $hash->{EventStream}";
 
   my $params = {
                url => "https://$hash->{host}/eventstream/clip/v2",
@@ -2219,12 +2219,12 @@ HUEBridge_dispatch($$$;$)
     if( $type eq 'event' ) {
       if( defined($hash->{helper}{HTTP_CONNECTION}) && defined($hash->{helper}{HTTP_CONNECTION}{lastID}) ) {
         $hash->{EventStream} = 'terminated';
-        Log3 $name, 2, "name: EventStream: $hash->{EventStream}";
+        Log3 $name, 2, "$name: EventStream: $hash->{EventStream}";
         HUEBridge_openEventStream( $hash );
 
       } else {
         $hash->{EventStream} = 'terminated; retrying later';
-        Log3 $name, 2, "name: EventStream: $hash->{EventStream}";
+        Log3 $name, 2, "$name: EventStream: $hash->{EventStream}";
 
         RemoveInternalTimer($hash, "HUEBridge_openEventStream" );
         InternalTimer(gettimeofday()+2, "HUEBridge_openEventStream", $hash, 0);
@@ -2254,7 +2254,7 @@ HUEBridge_dispatch($$$;$)
   } elsif( defined($type) && $type eq 'event' ) {
     if( $hash->{EventStream} && $hash->{EventStream} ne 'connected' ) {
       $hash->{EventStream} = 'connected';
-      Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+      Log3 $name, 4, "$name: EventStream: $hash->{EventStream}";
     }
 
     if( defined(my $create = AttrVal($name,'createEventTimestampReading',undef )) ) {
