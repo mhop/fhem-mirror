@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  74_XiaomiBTLESens: fix incurrect temperatur then value is negativ
  - feature: 30_HUEBridge: support eventstream api (push events)
  - change:  70_DENON_AVR: added soundformat strings. patch by All-Ex
  - change:  50_Signalbot: link improved, reply command added, bugfixes
