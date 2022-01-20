@@ -1432,10 +1432,10 @@ HUEBridge_Get($@)
     if( $arg ) {
       my $ret;
       foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
-        $ret .= Dumper $entry if( $entry->{id_v1} =~ /$arg$/ );
+        $ret .= Dumper $entry if( $entry->{id_v1} && $entry->{id_v1} =~ /$arg$/ );
       }
       foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
-        $ret .= Dumper $entry if( $entry->{type} eq $arg );
+        $ret .= Dumper $entry if( $entry->{type} && $entry->{type} eq $arg );
       }
       return $ret if( $ret );
 
@@ -2290,26 +2290,27 @@ HUEBridge_dispatch($$$;$)
         Log3 $name, 5, "$name: EventStream: got data: $value";
 
         if( $value && $value !~ m/^[\[{].*[\]}]$/ ) {
-          Log3 $name, 2, "$name: invalid json detected: $value";
+          Log3 $name, 2, "$name: EventStream: invalid json detected: $value";
           return undef;
         }
 
         $json = eval { JSON->new->utf8(0)->decode($value) };
-        Log3 $name, 2, "$name: json error: $@ in $value" if( $@ );
+        Log3 $name, 2, "$name: EventStream: json error: $@ in $value" if( $@ );
 
         return undef if( !$json );
-        Log3 $name, 4, "$name: received: ". Dumper $json;
+        Log3 $name, 4, "$name: EventStream: received: ". Dumper $json;
 
+        my $changed = "";
         for my $event ( @{$json} ) {
-          my $changed = "";
-
           if( $event->{type} eq 'update' ) {
-            Log3 $name, 4, "$name: got $event->{type} event";
+            Log3 $name, 4, "$name: EventStream: got $event->{type} event";
 
             for my $data ( @{$event->{data}} ) {
+              Log3 $name, 4, "$name:              with part for resource type $data->{type}";
+
               my(undef, $t, $id) = split( '/', $data->{id_v1} );
               if( !defined($t) || !defined($id) ) {
-                Log3 $name, 3, "$name: EventSource: ignoring event type $data->{type}";
+                Log3 $name, 3, "$name: EventStream: ignoring event type $data->{type}";
                 next;
               }
 
@@ -2318,11 +2319,12 @@ HUEBridge_dispatch($$$;$)
               $code = $name ."-S". $id if( $t eq 'sensors' );
               $code = $name ."-G". $id if( $t eq 'groups' );
               if( !$code ) {
-                Log3 $name, 3, "$name: EventSource: ignoring event for $t";
+                Log3 $name, 3, "$name: EventStream: ignoring event for $t";
                 next;
               }
 
               if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+                my $handled = 1;
                 my $creationtime = substr($event->{creationtime},0,19);
                    #substr( $creationtime, 10, 1, '_' );
                    #$creationtime = FmtDateTime( SVG_time_to_sec($creationtime) + $hash->{helper}{offsetUTC}  ) if( defined($hash->{helper}{offsetUTC}) );
@@ -2334,14 +2336,14 @@ HUEBridge_dispatch($$$;$)
 
                 my $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 if( !$device ) {
-                  Log3 $name, 2, "$name: EventSource: event for unknown device received, tying to refresh resouces";
+                  Log3 $name, 2, "$name: EventStream: event for unknown device received, tying to refresh resouces";
                   HUEBridge_getv2resources($hash, 1);
                   HUEBridge_Autocreate($hash);
                   $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 }
                 my $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 if( !$service ) {
-                  Log3 $name, 2, "$name: EventSource: event for unknown service received, tying to refresh resouces";
+                  Log3 $name, 2, "$name: EventStream: event for unknown service received, tying to refresh resouces";
                   HUEBridge_getv2resources($hash, 1);
                   $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 }
@@ -2391,7 +2393,13 @@ HUEBridge_dispatch($$$;$)
                 } elsif( $data->{type} eq 'zigbee_connectivity' ) {
                   $obj->{state}{reachable} = ($data->{status} eq 'connected') ? 1 : 0;
 
-                } else {
+                } elsif( $data->{type} eq 'device_power' ) {
+                  if( defined($data->{power_state}) ) {
+                    $obj->{state}{battery} = $data->{power_state}{battery_level};
+                    $obj->{state}{battery_state} = $data->{power_state}{battery_state};
+                  }
+
+                } elsif( $data->{type} eq 'light' ) {
                   $obj->{state}{on} = $data->{on}{on} if( defined($data->{on}) );
 
                   $obj->{state}{bri} = int($data->{dimming}{brightness} * 254 / 100) if( defined($data->{dimming}) );
@@ -2402,46 +2410,57 @@ HUEBridge_dispatch($$$;$)
                       $obj->{state}{xy} = [$xy->{x}, $xy->{y}];
                     }
                   }
+
                   if( defined($data->{color_temperature}) && defined($data->{color_temperature}{mirek}) ) {
                     $obj->{state}{colormode} = 'ct';
                     $obj->{state}{ct} = $data->{color_temperature}{mirek};
                   }
+
+                  if( defined($data->{dynamics}) ) {
+                    $obj->{state}{dynamics_speed} = $data->{dynamics}{speed} if( $data->{dynamics}{speed_valid} );
+                    $obj->{state}{dynamics_status} = $data->{dynamics}{status};
+		  }
+
+                } else {
+                 Log3 $name, 3, "$name: EventStream: update for unknown type $data->{type} received";
+                 $handled = 0;
+
                 }
 
-                if( defined($data->{dynamics}) ) {
-                  $obj->{state}{dynamics_speed} = $data->{dynamics}{speed} if( $data->{dynamics}{speed_valid} );
-                  $obj->{state}{dynamics_status} = $data->{dynamics}{status};
+                if( $handled ) {
+                  Log3 $name, 4, "$name: created from event: ". Dumper $obj;
 
-		}
+                  if( HUEDevice_Parse($chash, $obj) && !$chash->{helper}{devtype} ) {
+                    $changed .= "," if( $changed );
+                    $changed .= $chash->{ID};
+                  }
 
-                Log3 $name, 4, "$name: created from event: ". Dumper $obj;
-
-                if( HUEDevice_Parse($chash, $obj) && !$chash->{helper}{devtype} ) {
-                  $changed .= "," if( $changed );
-                  $changed .= $chash->{ID};
+                  delete $hash->{helper}{ignored}{$code};
                 }
-
-                delete $hash->{helper}{ignored}{$code};
 
               } elsif( !$hash->{helper}{ignored}{$code} ) {
-                Log3 $name, 3, "$name: EventSource: update for unknown device received: $code";
+                Log3 $name, 3, "$name: EventStream: update for unknown device received: $code";
 
               }
             }
 
           } elsif( $event->{type} eq 'add' ) {
-            Log3 $name, 4, "$name: got $event->{type} event";
+            Log3 $name, 4, "$name: EventStream: got $event->{type} event";
 
             HUEBridge_getv2resources($hash, 1);
             HUEBridge_Autocreate($hash);
 
+          } elsif( $event->{type} eq 'delete' ) {
+            Log3 $name, 4, "$name: EventStream: got $event->{type} event";
+
           } else {
-           Log3 $name, 3, "$name: unknown event type $event->{type}: $data";
+           Log3 $name, 3, "$name: EventStream: unknown event type $event->{type}: $data";
 
           }
 
-          HUEBridge_updateGroups($hash, $changed) if( $changed ); # not needed ?
         }
+
+        HUEBridge_updateGroups($hash, $changed) if( $changed ); # not needed ?
 
       } else {
         Log3 $name, 4, "$name: EventStream: unknown event: $key: $value";
@@ -2503,7 +2522,7 @@ HUEBridge_dispatch($$$;$)
               delete $hash->{helper}{ignored}{$code};
 
             } elsif( !$hash->{helper}{ignored}{$code} ) {
-              Log3 $name, 4, "$name: data for unknown sensor received: $code";
+              Log3 $name, 3, "$name: data for unknown sensor received: $code";
 
             }
           }
