@@ -47,7 +47,7 @@ sub HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
 
   #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
 
@@ -73,6 +73,10 @@ HUEBridge_Read($)
 
   } elsif( $hash->{websocket} ) {
     $hash->{buf} .= $buf;
+
+    if( defined(my $create = AttrVal($name,'createEventTimestampReading',undef )) ) {
+      readingsSingleUpdate($hash, 'event', 'timestamp', $create ) if( defined($create) );
+    }
 
     do {
       my $fin = (ord(substr($hash->{buf},0,1)) & 0x80)?1:0;
@@ -2248,8 +2252,14 @@ HUEBridge_dispatch($$$;$)
     return undef;
 
   } elsif( defined($type) && $type eq 'event' ) {
-    $hash->{EventStream} = 'connected';
-    Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+    if( $hash->{EventStream} && $hash->{EventStream} ne 'connected' ) {
+      $hash->{EventStream} = 'connected';
+      Log3 $name, 4, "name: EventStream: $hash->{EventStream}";
+    }
+
+    if( defined(my $create = AttrVal($name,'createEventTimestampReading',undef )) ) {
+      readingsSingleUpdate($hash, 'event', 'timestamp', $create ) if( defined($create) );
+    }
 
     if( $hash->{INTERVAL} && $hash->{INTERVAL} < 60 ) {
       $hash->{INTERVAL} = 60;
@@ -2895,6 +2905,11 @@ __END__
       1 -> the bridge will poll all lights in one go instead of each light polling itself independently<br>
       2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
       default is 2. will be deleted if v2 api is detected and eventstream connects.</li>
+    <li>createEventTimestampReading<br>
+      timestamp reading for every event received</li>
+      0 -> update reading without fhem event
+      1 -> update reading with fhem event
+      undef -> don't create reading
     <li>createGroupReadings<br>
       create 'artificial' readings for group devices.</li>
       0 -> create readings only for group devices where createGroupReadings ist set to 1
