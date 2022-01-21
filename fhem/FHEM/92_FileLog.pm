@@ -667,9 +667,12 @@ FileLog_logWrapper($)
   if(defined($type) && $type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
-    $path =~ s/%L/$attr{global}{logdir}/g
-        if($path =~ m/%/ && $attr{global}{logdir});
-    $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
+    my @t = localtime(gettimeofday());
+    $path = ResolveDateWildcards($path, @t);
+    if(!-f $path) {
+      $path = AttrVal($d,"archivedir","") . "/$file";
+      $path = ResolveDateWildcards($path, @t);
+    }
 
     FW_addContent();
     FW_pO "<div class=\"tiny\">" if($FW_ss);
