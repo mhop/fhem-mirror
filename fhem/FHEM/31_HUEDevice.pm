@@ -1803,6 +1803,11 @@ HUEDevice_Parse($$)
           $readings{$entry} = $state->{$entry} if( defined($state->{$entry}) );
         }
       }
+
+    } else {
+      # how can this happen?
+      Log3 $name, 1, "$name: HUEDevice_Parse called without \$result->{state}: ". ($HUEDevice_hasDataDumper?Dumper $result:'');
+
     }
 
     CommandDeleteReading( undef, "$name .lastupdated" );
@@ -1815,7 +1820,7 @@ HUEDevice_Parse($$)
        foreach my $key ( keys %readings ) {
          if( defined($readings{$key}) ) {
            my $rut = ReadingsTimestamp($name,$key,undef);
-           if( !defined($result->{v2_service}) && defined($rut) && $ts <= time_str2num($rut) ) {
+           if( !defined($result->{v2_service}) && $ts && defined($rut) && $ts <= time_str2num($rut) ) {
              Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, current reading timestamp is $rut";
              next;
            }
