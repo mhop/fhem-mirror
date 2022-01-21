@@ -1810,7 +1810,7 @@ HUEDevice_Parse($$)
                      && $hlu <= $lu
                      && !defined($result->{v2_service})
                      #&& $hash->{lastupdated} eq $lastupdated
-                     && (!$readings{state} || $readings{state} eq ReadingsVal( $name, 'state', '' ))
+                     #&& (!defined($readings{state}) || $readings{state} eq ReadingsVal( $name, 'state', '' ))
                    );
 
     Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
