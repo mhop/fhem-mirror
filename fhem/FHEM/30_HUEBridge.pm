@@ -588,7 +588,8 @@ HUEBridge_OpenDev($)
 
   return undef;
 }
-sub HUEBridge_Pair($)
+sub
+HUEBridge_Pair($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -1437,7 +1438,12 @@ HUEBridge_Get($@)
     return $ret;
 
   } elsif($cmd eq 'ignored' ) {
-    return join( "\n", keys %{$hash->{helper}{ignored}} );
+    return join( "\n", sort keys %{$hash->{helper}{ignored}} );
+
+  } elsif($cmd eq 'get2resources' ) {
+    HUEBridge_getv2resources($hash, 1);
+
+    return "done";
 
   } elsif($cmd eq 'v2resource' ) {
     if( $arg ) {
@@ -1880,7 +1886,8 @@ HUEBridge_Autocreate($;$$)
         next;
       }
 
-      if( $result->{$id}{type} eq 'CLIPGenericStatus' ) {
+      if( $result->{$id}{recycle}
+          || $result->{$id}{type} eq 'CLIPGenericStatus' ) {
         Log3 $name, 4, "$name: ignoring sensor $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
         $ignored[2]++;
         $hash->{helper}{ignored}{$code} = 1;
@@ -2189,10 +2196,24 @@ HUEBridge_HTTP_Call2($$$$;$)
 }
 
 sub
+HUEBridge_schedule($$;$)
+{
+  my ($hash,$fn,$delay) = @_;
+     $delay = 5 if( !$delay );
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "$name: scheduling $fn in $delay secs";
+
+  RemoveInternalTimer($hash,$fn);
+  InternalTimer(gettimeofday()+$delay, $fn, $hash, 0);
+}
+sub
 HUEBridge_getv2resources($;$)
 {
   my ($hash,$blocking) = @_;
   my $name = $hash->{NAME};
+
+  return if( !$hash->{has_v2_api} );
 
   my $params = {
               url => "https://$hash->{host}/clip/v2/resource",
@@ -2251,18 +2272,24 @@ HUEBridge_dispatch($$$;$)
   } elsif( defined($type) && $type eq 'resource' ) {
     $json = eval { JSON->new->utf8(0)->decode($data) };
     Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+    Log3 $name, 1, "$name: error: ". Dumper $json->{errors} if( scalar @{$json->{errors}} );
 
+    my $current = $hash->{helper}{resource};
     delete $hash->{helper}{resource};
     return undef if( !$json );
-
-    Log3 $name, 1, "$name: error: ". Dumper $json->{errors} if( scalar @{$json->{errors}} );
 
     $hash->{helper}{resource} = $json;
     Log3 $name, 5, "$name: received: ". Dumper $json;
 
-    foreach my $item (@{$hash->{helper}{resource}{data}}) {
+    my $count = 0;
+    foreach my $item (@{$json->{data}}) {
       $hash->{helper}{resource}{by_id}{$item->{id}} = $item;
+
+      $count++ if( $current && !$current->{by_id}{$item->{id}} );
     }
+    Log3 $name, 4, "$name: found $count new resources";
+    HUEBridge_Autocreate($hash) if( $count );
+
     return undef;
 
   } elsif( defined($type) && $type eq 'event' ) {
@@ -2325,6 +2352,7 @@ HUEBridge_dispatch($$$;$)
               my(undef, $t, $id) = split( '/', $data->{id_v1} );
               if( !defined($t) || !defined($id) ) {
                 Log3 $name, 3, "$name: EventStream: ignoring event type $data->{type}";
+                Log3 $name, 5, Dumper $data;
                 next;
               }
 
@@ -2335,6 +2363,7 @@ HUEBridge_dispatch($$$;$)
               if( !$code ) {
                 # handle events for scenes ?
                 Log3 $name, 4, "$name: EventStream: ignoring event for $t";
+                Log3 $name, 5, Dumper $data;
                 next;
               }
 
@@ -2351,14 +2380,13 @@ HUEBridge_dispatch($$$;$)
 
                 my $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 if( !$device ) {
-                  Log3 $name, 2, "$name: EventStream: event for unknown device received, tying to refresh resouces";
+                  Log3 $name, 2, "$name: EventStream: event for unknown device received, trying to refresh resouces";
                   HUEBridge_getv2resources($hash, 1);
-                  HUEBridge_Autocreate($hash);
                   $device = $hash->{helper}{resource}{by_id}{$obj->{v2_id}};
                 }
                 my $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 if( !$service ) {
-                  Log3 $name, 2, "$name: EventStream: event for unknown service received, tying to refresh resouces";
+                  Log3 $name, 2, "$name: EventStream: event for unknown service received, trying to refresh resouces";
                   HUEBridge_getv2resources($hash, 1);
                   $service = $hash->{helper}{resource}{by_id}{$obj->{v2_service}};
                 }
@@ -2416,23 +2444,28 @@ HUEBridge_dispatch($$$;$)
 
                 } elsif( $data->{type} eq 'entertainment_configuration' ) {
                   Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  Log3 $name, 5, Dumper $data;
                   $handled = 0;
 
                 } elsif( $data->{type} eq 'bridge_home' ) {
-                  HUEBridge_getv2resources($hash, 1);
+                  HUEBridge_schedule($hash,'HUEBridge_Autocreate');
                   Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  Log3 $name, 5, Dumper $data;
                   $handled = 0;
 
                 } elsif( $data->{type} eq 'room' ) {
                   Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  Log3 $name, 5, Dumper $data;
                   $handled = 0;
 
                 } elsif( $data->{type} eq 'zone' ) {
                   Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  Log3 $name, 5, Dumper $data;
                   $handled = 0;
 
                 } elsif( $data->{type} eq 'grouped_light' ) {
                   Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  Log3 $name, 5, Dumper $data;
                   $handled = 0;
 
                 } elsif( $data->{type} eq 'light'
@@ -2484,8 +2517,7 @@ HUEBridge_dispatch($$$;$)
           } elsif( $event->{type} eq 'add' ) {
             Log3 $name, 4, "$name: EventStream: got $event->{type} event";
 
-            HUEBridge_getv2resources($hash, 1);
-            HUEBridge_Autocreate($hash);
+            HUEBridge_schedule($hash,'HUEBridge_getv2resources');
 
           } elsif( $event->{type} eq 'delete' ) {
             Log3 $name, 4, "$name: EventStream: got $event->{type} event";
@@ -2561,6 +2593,7 @@ HUEBridge_dispatch($$$;$)
             } elsif( !$hash->{helper}{ignored}{$code} ) {
               Log3 $name, 3, "$name: data for unknown sensor received: $code";
 
+              HUEBridge_schedule($hash,'HUEBridge_Autocreate');
             }
           }
         }
@@ -2578,6 +2611,7 @@ HUEBridge_dispatch($$$;$)
             } elsif( !$hash->{helper}{ignored}{$code} ) {
               Log3 $name, 2, "$name: data for unknown group received: $code";
 
+              HUEBridge_schedule($hash,'HUEBridge_Autocreate');
             }
           }
         }
@@ -2907,9 +2941,9 @@ __END__
     <li>updateschedule &lt;id&gt; &lt;attributes json&gt;<br>
       updates the given schedule in the bridge with &lt;attributes json&gt; </li>
     <li>enableschedule &lt;id&gt;<br>
-      enables the given shedule</li>
+      enables the given schedule</li>
     <li>disableschedule &lt;id&gt;<br>
-      disables the given shedule</li>
+      disables the given schedule</li>
     <li>createrule &lt;name&gt; &lt;conditions&amp;actions json&gt;<br>
       Creates a new rule in the bridge.</li>
     <li>deleterule &lt;id&gt;<br>
