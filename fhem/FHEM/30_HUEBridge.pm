@@ -735,6 +735,12 @@ HUEBridge_Set($@)
     #HUEBridge_openEventStream( $hash );
     return undef;
 
+  } elsif($cmd eq 'close') {
+    HUEBridge_closeWebsocket($hash);
+    HUEBridge_closeEventStream($hash);
+
+    return undef;
+
   } elsif($cmd eq 'statusRequest') {
     return "usage: statusRequest" if( @args != 0 );
 
@@ -1287,6 +1293,7 @@ HUEBridge_Get($@)
       $result->{$key}{class} = '' if( !defined($result->{$key}{class}) );   #deCONZ fix
       $result->{$key}{lights} = [] if( !defined($result->{$key}{lights}) ); #deCONZ fix
       $ret .= sprintf( "%2i: %-15s %-15s %-15s %-15s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type}, $result->{$key}{class} );
+      $ret .= ' (ignored)' if( $hash->{helper}{ignored}{$code} );
       if( !$arg && $hash->{helper}{lights} ) {
         $ret .= sprintf( " %s\n", join( ",", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$result->{$key}{lights}} ) );
       } else {
@@ -1385,16 +1392,17 @@ HUEBridge_Get($@)
       my $fhem_name = '';
          $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
       $fhem_name = "" if( !$fhem_name );
-      $ret .= sprintf( "%2i: %-15s %-15s %-20s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+      $ret .= sprintf( "%2i: %-20s %-15s %-20s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+      $ret .= ' (ignored)' if( $hash->{helper}{ignored}{$code} );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{config}) ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{capabilities}) ) if( $arg && $arg eq 'detail' );
       $ret .= "\n";
     }
     if( $arg && $arg eq 'detail' ) {
-      $ret = sprintf( "%2s  %-15s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE,CONFIG,CAPABILITIES" ) .$ret if( $ret );
+      $ret = sprintf( "%2s  %-20s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE,CONFIG,CAPABILITIES" ) .$ret if( $ret );
     } else {
-      $ret = sprintf( "%2s  %-15s %-15s %-20s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
+      $ret = sprintf( "%2s  %-20s %-15s %-20s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
     }
     return $ret;
 
@@ -1427,6 +1435,9 @@ HUEBridge_Get($@)
     }
     $ret = sprintf( "%2s  %-25s %-15s %s\t%s\n", "ID", "NAME", "FHEM", "MODE", "CONFIGURED" ) .$ret if( $ret );
     return $ret;
+
+  } elsif($cmd eq 'ignored' ) {
+    return join( "\n", keys %{$hash->{helper}{ignored}} );
 
   } elsif($cmd eq 'v2resource' ) {
     if( $arg ) {
@@ -1766,11 +1777,13 @@ HUEBridge_Parse($$)
 
       $hash->{updatestate} .= " [$devicetypes]" if( $devicetypes );
     }
+
   } elsif ( defined(  $hash->{swupdate} ) ) {
     delete( $hash->{updatestate} );
     delete( $hash->{helper}{updatestate} );
   }
 
+  #update state timestamp
   readingsSingleUpdate($hash, 'state', $hash->{READINGS}{state}{VAL}, 0);
 }
 
@@ -1823,15 +1836,15 @@ HUEBridge_Autocreate($;$$)
   $result->{0} = { name => "Lightset 0", type => 'LightGroup' };
   foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
     my $code = $name ."-G". $id;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+      next;
+    }
+
     if( $result->{$id}{type} eq 'Entertainment' ) {
       Log3 $name, 4, "$name: ignoring group $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
       $ignored[1]++;
       $hash->{helper}{ignored}{$code} = 1;
-      next;
-    }
-
-    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
-      Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
       next;
     }
 
@@ -1861,15 +1874,15 @@ HUEBridge_Autocreate($;$$)
     $result =  HUEBridge_Call($hash,undef, 'sensors', undef);
     foreach my $id ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-S". $id;
+      if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+        next;
+      }
+
       if( $result->{$id}{type} eq 'CLIPGenericStatus' ) {
         Log3 $name, 4, "$name: ignoring sensor $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
         $ignored[2]++;
         $hash->{helper}{ignored}{$code} = 1;
-        next;
-      }
-
-      if( defined($modules{HUEDevice}{defptr}{$code}) ) {
-        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
         next;
       }
 
@@ -2208,7 +2221,7 @@ HUEBridge_dispatch($$$;$)
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "$name: dispatch";
+  Log3 $name, 4, "$name: dispatch". ($param->{url}?": $param->{url}":"");
   Log3 $name, 5, "HUEBridge_dispatch". ($param->{type}?": $param->{type}":"");
 
   my $type = $param->{type};
@@ -2216,7 +2229,7 @@ HUEBridge_dispatch($$$;$)
   if( $err ) {
     Log3 $name, 2, "$name: http request failed: $err";
 
-    if( $type eq 'event' ) {
+    if( $type && $type eq 'event' ) {
       if( defined($hash->{helper}{HTTP_CONNECTION}) && defined($hash->{helper}{HTTP_CONNECTION}{lastID}) ) {
         $hash->{EventStream} = 'terminated';
         Log3 $name, 2, "$name: EventStream: $hash->{EventStream}";
@@ -2298,7 +2311,7 @@ HUEBridge_dispatch($$$;$)
         Log3 $name, 2, "$name: EventStream: json error: $@ in $value" if( $@ );
 
         return undef if( !$json );
-        Log3 $name, 4, "$name: EventStream: received: ". Dumper $json;
+        Log3 $name, 5, "$name: EventStream: received: ". Dumper $json;
 
         my $changed = "";
         for my $event ( @{$json} ) {
@@ -2306,7 +2319,7 @@ HUEBridge_dispatch($$$;$)
             Log3 $name, 4, "$name: EventStream: got $event->{type} event";
 
             for my $data ( @{$event->{data}} ) {
-              Log3 $name, 4, "$name:              with part for resource type $data->{type}";
+              Log3 $name, 4, "$name:              event part for resource type $data->{type}";
 
               my(undef, $t, $id) = split( '/', $data->{id_v1} );
               if( !defined($t) || !defined($id) ) {
@@ -2319,7 +2332,8 @@ HUEBridge_dispatch($$$;$)
               $code = $name ."-S". $id if( $t eq 'sensors' );
               $code = $name ."-G". $id if( $t eq 'groups' );
               if( !$code ) {
-                Log3 $name, 3, "$name: EventStream: ignoring event for $t";
+                # handle events for scenes ?
+                Log3 $name, 4, "$name: EventStream: ignoring event for $t";
                 next;
               }
 
@@ -2400,8 +2414,25 @@ HUEBridge_dispatch($$$;$)
                   }
 
                 } elsif( $data->{type} eq 'entertainment_configuration' ) {
+                  Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  $handled = 0;
+
+                } elsif( $data->{type} eq 'bridge_home' ) {
+                  HUEBridge_getv2resources($hash, 1);
+                  Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  $handled = 0;
+
+                } elsif( $data->{type} eq 'room' ) {
+                  Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  $handled = 0;
+
+                } elsif( $data->{type} eq 'zone' ) {
+                  Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  $handled = 0;
 
                 } elsif( $data->{type} eq 'grouped_light' ) {
+                  Log3 $name, 4, "$name: ignoring resource type $data->{type}";
+                  $handled = 0;
 
                 } elsif( $data->{type} eq 'light'
                          || $data->{type} eq 'grouped_light' ) {
@@ -2433,7 +2464,7 @@ HUEBridge_dispatch($$$;$)
                 }
 
                 if( $handled ) {
-                  Log3 $name, 4, "$name: created from event: ". Dumper $obj;
+                  Log3 $name, 5, "$name: created from event: ". Dumper $obj;
 
                   if( HUEDevice_Parse($chash, $obj) && !$chash->{helper}{devtype} ) {
                     $changed .= "," if( $changed );

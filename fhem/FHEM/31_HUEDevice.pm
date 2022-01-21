@@ -81,7 +81,15 @@ my %hueModels = (
                                                                                     icon => 'hue_filled_white_and_color_e27_b22', },
   LWB014 => {name => 'Hue Lux'                  ,type => 'Dimmable light'          ,subType => 'dimmer',
                                                                                     icon => 'hue_filled_white_and_color_e27_b22', },
+  LWO003 => {name => 'Hue White Filament Bulb G125' ,type => 'Dimmable light'          ,subType => 'dimmer',
+                                                                                    icon => 'hue_filled_filament', },
   LWV001 => {name => 'Hue White Filament Bulb'  ,type => 'Dimmable light'          ,subType => 'dimmer',
+                                                                                    icon => 'hue_filled_filament', },
+  LTO001 => {name => 'Hue Filament Bulb G93'    ,type => 'Color temperature light' ,subType => 'ctdimmer',
+                                                                                    icon => 'hue_filled_filament', },
+  LTO002 => {name => 'Hue Filament Bulb G125'   ,type => 'Color temperature light' ,subType => 'ctdimmer',
+                                                                                    icon => 'hue_filled_filament', },
+  LTO004 => {name => 'Hue Filament Bulb G25'    ,type => 'Color temperature light' ,subType => 'ctdimmer',
                                                                                     icon => 'hue_filled_filament', },
   LTW001 => {name => 'Hue A19 White Ambience'   ,type => 'Color temperature light' ,subType => 'ctdimmer',
                                                                                     icon => 'hue_filled_white_and_color_e27_b22', },
@@ -494,14 +502,15 @@ HUEDevice_Define($$) {
     HUEDevice_GetUpdate($hash);
 
   } else {
-    InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0);
+    InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0) if( $hash->{INTERVAL} );
 
   }
 
   return undef;
 }
 
-sub HUEDevice_Undefine($$)
+sub
+HUEDevice_Undefine($$)
 {
   my ($hash,$arg) = @_;
 
@@ -1461,8 +1470,8 @@ HUEDevice_Parse($$)
 
   if( ref($result) ne "HASH" ) {
     if( ref($result) && $HUEDevice_hasDataDumper) {
-       #Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
-      Log3 $name, 2, "$name: got wrong status message for $name: $result";
+      Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
+      #Log3 $name, 2, "$name: got wrong status message for $name: $result";
     } else {
       Log3 $name, 2, "$name: got wrong status message for $name: $result";
     }
@@ -1670,6 +1679,7 @@ HUEDevice_Parse($$)
 
   $hash->{power} = $result->{power} if( defined($result->{power}) );
 
+
   if( $hash->{helper}->{devtype} eq 'S' ) {
     my %readings;
 
@@ -1689,6 +1699,7 @@ HUEDevice_Parse($$)
       $hash->{tholddark} = $config->{tholddark} if( defined($config->{tholddark}) );
       $hash->{sensitivity} = $config->{sensitivity} if( defined($config->{sensitivity}) );
 
+
       $readings{battery} = $config->{battery} if( defined($config->{battery}) );
       $readings{batteryPercent} = $config->{battery} if( defined($config->{battery}) );
 
@@ -1705,8 +1716,8 @@ HUEDevice_Parse($$)
       $readings{mode} = $config->{mode} if( defined ($config->{mode}) );
     }
 
-    my $lastupdated = '';
-    my $lastupdated_local = '';
+    my $lastupdated;
+    my $ts;
     my $offset = 0;
     if( my $state = $result->{state} ) {
       $lastupdated = $state->{lastupdated};
@@ -1714,30 +1725,25 @@ HUEDevice_Parse($$)
       return undef if( !$lastupdated );
       return undef if( $lastupdated eq 'none' );
 
-      substr( $lastupdated, 10, 1, ' ' ) if($lastupdated);
+      $ts = time_str2num($lastupdated);
 
       if( my $iohash = $hash->{IODev} ) {
-        substr( $lastupdated, 10, 1, '_' );
-        my $sec = SVG_time_to_sec($lastupdated);
-
-        $lastupdated = FmtDateTime($sec);
-
         if( my $offset_bridge = $iohash->{helper}{offsetUTC} ) {
           $offset = $offset_bridge;
-          Log3 $name, 4, "$name: use offsetUTC $offset from bridge";
-        }else{
-          #we do not have received the offsetUTC from the bridge, use the system offsetUTC until we received it
+          Log3 $name, 5, "$name: using offsetUTC $offset from bridge";
+        } else {
+          # bridge has no offsetUTC configured, use the system offsetUTC for now
           my @t = localtime(time);
           $offset = timegm(@t) - timelocal(@t);
-          Log3 $name, 4, "$name: use offsetUTC $offset from system";
+          Log3 $name, 5, "$name: using offsetUTC $offset from system";
         }
 
-        #add offset to UTC for displaying in fhem
-        $sec += $offset;
-        $lastupdated_local = FmtDateTime($sec);
+        $ts += $offset;
+        $lastupdated = FmtDateTime($ts);
 
-      }else{
-        $lastupdated_local = $lastupdated;
+      } else {
+        # what to do? can this happen?
+        Log3 $name, 1, "$name: HUEDevice_Parse called without hash->{IODev}";
 
       }
 
@@ -1799,25 +1805,8 @@ HUEDevice_Parse($$)
       }
     }
 
-    $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', '' ) if( !$hash->{lastupdated} );
-    $hash->{lastupdated_local} = ReadingsVal( $name, '.lastupdated_local', '' ) if( !$hash->{lastupdated_local} );
-
-    substr($hash->{lastupdated},10, 1, '_' ) if( $hash->{lastupdated} );
-    substr($lastupdated,10, 1, '_' ) if( $lastupdated );
-    my $hlu = SVG_time_to_sec( $hash->{lastupdated} );
-    my $lu = SVG_time_to_sec( $lastupdated );
-    return undef if( $hash->{lastupdated}
-                     && $hlu <= $lu
-                     && !defined($result->{v2_service})
-                     #&& $hash->{lastupdated} eq $lastupdated
-                     #&& (!defined($readings{state}) || $readings{state} eq ReadingsVal( $name, 'state', '' ))
-                   );
-
-    Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
-    #Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
-
-    $hash->{lastupdated} = $lastupdated;
-    $hash->{lastupdated_local} = $lastupdated_local;
+    CommandDeleteReading( undef, "$name .lastupdated" );
+    CommandDeleteReading( undef, "$name .lastupdated_local" );
 
     if( scalar keys %readings ) {
        readingsBeginUpdate($hash);
@@ -1825,25 +1814,20 @@ HUEDevice_Parse($$)
        my $i = 0;
        foreach my $key ( keys %readings ) {
          if( defined($readings{$key}) ) {
-           if( $lastupdated_local) {
-             $hash->{'.updateTimestamp'} = $lastupdated_local;
-             $hash->{CHANGETIME}[$i] = $lastupdated_local;
+           my $rut = ReadingsTimestamp($name,$key,undef);
+           if( !defined($result->{v2_service}) && defined($rut) && $ts <= time_str2num($rut) ) {
+             Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, current reading timestamp is $rut";
+             next;
            }
 
+           if( $lastupdated ) {
+             $hash->{'.updateTimestamp'} = $lastupdated;
+             $hash->{CHANGETIME}[$i] = $lastupdated;
+           }
            readingsBulkUpdate($hash, $key, $readings{$key}, 1);
 
            ++$i;
          }
-       }
-
-       if( $lastupdated_local ) {
-         $hash->{'.updateTimestamp'} = $lastupdated_local;
-         $hash->{CHANGETIME}[$i] = $lastupdated_local;
-         readingsBulkUpdate($hash, '.lastupdated_local', $lastupdated_local, 0);
-       }
-
-       if( $lastupdated ) {
-         readingsBulkUpdate($hash, '.lastupdated', $lastupdated, 0);
        }
 
        readingsEndUpdate($hash,1);
