@@ -1288,12 +1288,12 @@ HUEBridge_Get($@)
       my $code = $name ."-G". $key;
       my $fhem_name = '';
          $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+         $fhem_name = ' (ignored)' if( !$fhem_name && $hash->{helper}{ignored}{$code} );
       $fhem_name = "" if( !$fhem_name );
       $result->{$key}{type} = '' if( !defined($result->{$key}{type}) );     #deCONZ fix
       $result->{$key}{class} = '' if( !defined($result->{$key}{class}) );   #deCONZ fix
       $result->{$key}{lights} = [] if( !defined($result->{$key}{lights}) ); #deCONZ fix
       $ret .= sprintf( "%2i: %-15s %-15s %-15s %-15s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type}, $result->{$key}{class} );
-      $ret .= ' (ignored)' if( $hash->{helper}{ignored}{$code} );
       if( !$arg && $hash->{helper}{lights} ) {
         $ret .= sprintf( " %s\n", join( ",", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$result->{$key}{lights}} ) );
       } else {
@@ -1391,9 +1391,9 @@ HUEBridge_Get($@)
       my $code = $name ."-S". $key;
       my $fhem_name = '';
          $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+         $fhem_name = ' (ignored)' if( !$fhem_name && $hash->{helper}{ignored}{$code} );
       $fhem_name = "" if( !$fhem_name );
       $ret .= sprintf( "%2i: %-20s %-15s %-20s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
-      $ret .= ' (ignored)' if( $hash->{helper}{ignored}{$code} );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{config}) ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{capabilities}) ) if( $arg && $arg eq 'detail' );
@@ -1841,7 +1841,8 @@ HUEBridge_Autocreate($;$$)
       next;
     }
 
-    if( $result->{$id}{type} eq 'Entertainment' ) {
+    if( $result->{$id}{recycle}
+        || $result->{$id}{type} eq 'Entertainment' ) {
       Log3 $name, 4, "$name: ignoring group $id ($result->{$id}{name}) of type $result->{$id}{type} in autocreate";
       $ignored[1]++;
       $hash->{helper}{ignored}{$code} = 1;
