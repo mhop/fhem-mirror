@@ -5352,7 +5352,7 @@ json2nameValue($;$$$$)
 
       my %r2;
       my $in2 = $val;
-      while($in2 =~ m/^\s*"([^"]+)"\s*:\s*(.*)$/s) {
+      while($in2 =~ m/^\s*"([^"]*)"\s*:\s*(.*)$/s) { # 125340
         my ($name,$val) = ($1,$2);
         $name =~ s/[^a-z0-9._\-\/]/_/gsi;
         ($err,$in2) = eObj(\%r2, $name, $val, $in2, $prefix);
@@ -5378,9 +5378,10 @@ json2nameValue($;$$$$)
         $idx++;
       }
 
-    } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
+    } elsif($val =~ m/^((-?[0-9.]+)([eE][+-]?[0-9]+)?)(.*)$/ && # 125340
+            looks_like_number($1)) {
       setVal($ret, $prefix, $name, $1);
-      $in = $2;
+      $in = $4;
 
     } elsif($val =~ m/^(true|false)(.*)$/s) {
       setVal($ret, $prefix, $name, $1);
