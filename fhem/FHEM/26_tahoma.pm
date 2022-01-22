@@ -59,6 +59,7 @@
 # 2019-06-15 V 0222 new Attribute levelRound
 # 2021-03-05 V 0223 new Attributes intervalLoginMin and intervalLoginMax
 # 2021-06-08 V 0224 response 'TOO_MANY_OPERATIONS_IN_PROGRESS' didn't start a re-login
+# 2022-01-22 V 0225 reconnect after disable removed
 
 package main;
 
@@ -138,7 +139,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0223";
+  my $ModuleVersion = "0225";
   
   my $subtype;
   my $name = $a[0];
@@ -514,6 +515,22 @@ sub tahoma_readStatusTimer($)
   InternalTimer(gettimeofday()+2, "tahoma_readStatusTimer", $hash, 0);
 }
 
+sub tahoma_disconnect($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "$name: tahoma_disconnect";
+
+  RemoveInternalTimer($hash);
+  HttpUtils_Close($hash);
+  $hash->{socket} = undef;
+  $hash->{request_active} = undef;
+  $hash->{logged_in} = undef;
+  $hash->{startup_run} = undef;
+  $hash->{startup_done} = undef;
+  $hash->{STATE} = 'Disconnected';
+}
+
 sub tahoma_connect($)
 {
   my ($hash) = @_;
@@ -787,6 +804,12 @@ sub tahoma_applyRequest($$$)
     return;
   }
   
+  if (!$hash->{IODev}->{logged_in})
+  {
+    Log3 $name, 3, "$name: tahoma_applyRequest failed - not logged in";
+    return;
+  }
+  
   my @devices = ();
   if ( defined($hash->{device}) ) {
     push ( @devices, { device => $hash->{device}, class => $hash->{inClass}, commands => $hash->{COMMANDS}, levelInvert => $attr{$hash->{NAME}}{levelInvert} } );
@@ -858,6 +881,12 @@ sub tahoma_scheduleActionGroup($$)
     return;
   }
 
+  if (!$hash->{IODev}->{logged_in})
+  {
+    Log3 $name, 3, "$name: tahoma_scheduleActionGroup failed - not logged in";
+    return;
+  }
+  
   $delay = 1 if(!defined($delay));
   $delay = ($delay+time)*1000;
   $delay = $delay . '';
@@ -886,6 +915,12 @@ sub tahoma_launchActionGroup($)
     return;
   }
 
+  if (!$hash->{IODev}->{logged_in})
+  {
+    Log3 $name, 3, "$name: tahoma_launchActionGroup failed - not logged in";
+    return;
+  }
+  
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
     noshutdown => 1,
@@ -1544,7 +1579,7 @@ sub tahoma_Set($$@)
   }
 
   if( $hash->{SUBTYPE} eq "ACCOUNT") {
-    $list = "cancel:noArg reset:noArg refreshAllStates:noArg getStates:noArg";
+    $list = "cancel:noArg reset:noArg disconnect:noArg reconnect:noArg refreshAllStates:noArg getStates:noArg";
 
     if( $cmd eq "cancel" ) {
       tahoma_cancelExecutions($hash);
@@ -1554,6 +1589,15 @@ sub tahoma_Set($$@)
       HttpUtils_Close($hash);
       $hash->{logged_in} = undef;
       $hash->{loginRetryTimer} = undef;
+      return undef;
+    }
+    elsif( $cmd eq "disconnect" ) {
+      tahoma_disconnect($hash);
+      return undef;
+    }
+    elsif( $cmd eq "reconnect" ) {
+      tahoma_disconnect($hash);
+      tahoma_connect($hash);
       return undef;
     }
     elsif( $cmd eq "refreshAllStates" ) {
@@ -1621,10 +1665,11 @@ sub tahoma_Attr($$$)
     $hash->{getLoginIntervalMax} = $attrVal;
   } elsif( $attrName eq "disable" ) {
     my $hash = $defs{$name};
-    RemoveInternalTimer($hash);
     if( $cmd eq "set" && $attrVal ne "0" ) {
+      tahoma_disconnect($hash) if $hash->{SUBTYPE} eq "ACCOUNT";
     } else {
       $attr{$name}{$attrName} = 0;
+      tahoma_connect($hash) if $hash->{SUBTYPE} eq "ACCOUNT";
     }
   } elsif( $attrName eq "blocking" ) {
     my $hash = $defs{$name};
@@ -1745,6 +1790,7 @@ sub tahoma_GetCookies($$)
     my ($hash, $header) = @_;
     my $name = $hash->{NAME};
     Log3 $name, 5, "$name: tahoma_GetCookies looking for Cookies in header";
+    Log3 $name, 5, "$name: tahoma_GetCookies header=$header";
     foreach my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
         Log3 $name, 5, "$name: Set-Cookie: $cookie";
         $cookie =~ /([^,; ]+)=([^,; ]+)[;, ]*(.*)/;
