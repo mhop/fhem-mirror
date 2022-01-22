@@ -155,6 +155,7 @@ sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
 sub setAttrList($$);
 sub setDevAttrList($;$);
+sub setNotifyDev($$);
 sub toJSON($);
 sub utf8ToLatin1($);
 
@@ -5602,6 +5603,19 @@ notifyRegexpChanged($$;$)
   } else {
     delete($hash->{NOTIFYDEV});
   }
+}
+
+sub
+setNotifyDev($$)
+{
+  my ($hash, $ntfydev) = @_;
+
+  if($ntfydev) {
+    $hash->{NOTIFYDEV} = $ntfydev;
+  } else {
+    delete($hash->{NOTIFYDEV});
+  }
+  %ntfyHash = ();
 }
 
 sub
