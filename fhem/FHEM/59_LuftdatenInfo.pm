@@ -283,7 +283,7 @@ sub LuftdatenInfo_GetHttpResponse($$) {
     header   => "Accept: application/json",
     callback => \&LuftdatenInfo_ParseHttpResponse,
   };
-  $param->{url} = "http://api.luftdaten.info/v1/sensor/$arg/"
+  $param->{url} = "https://data.sensor.community/airrohr/v1/sensor/$arg/"
     if($MODE eq "remote");
   $param->{url} = "http://$arg/data.json"
     if($MODE eq "local");
