@@ -569,6 +569,7 @@ my %setsHSA = (
 my $duoStatusRequest      = "0DFFnn400000000000000000000000000000yyyyyy01";
 my $duoCommand            = "0Dccnnnnnnnnnnnnnnnnnnnn000000zzzzzzyyyyyy00";
 my $duoCommand2           = "0Dccnnnnnnnnnnnnnnnnnnnn000000000000yyyyyy00";
+my $duoCommand3           = "0Dccnnnnnnnnnnnnnnnnnnnn000000000000yyyyyy01";
 my $duoWeatherConfig      = "0D001B400000000000000000000000000000yyyyyy00";
 my $duoWeatherWriteConfig = "0DFF1Brrnnnnnnnnnnnnnnnnnnnn00000000yyyyyy00";
 my $duoSetTime            = "0D0110800001mmmmmmmmnnnnnn0000000000yyyyyy00";
@@ -580,7 +581,7 @@ DUOFERN_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^(06|0F).{42}";
+  $hash->{Match}     = "^(06|0F|81).{42}";
   $hash->{SetFn}     = "DUOFERN_Set";
   $hash->{DefFn}     = "DUOFERN_Define";
   $hash->{UndefFn}   = "DUOFERN_Undef";
@@ -942,6 +943,18 @@ DUOFERN_Set($@)
     $buf =~ s/cc/$chanNo/;
 
     IOWrite( $hash, $buf );
+    
+    if ($cmd eq "remotePair") {
+      $buf = $duoCommand3;
+      $buf =~ s/yyyyyy/$code/;
+      $buf =~ s/nnnnnnnnnnnnnnnnnnnn/$command/;
+      $buf =~ s/nn/$argV/;
+      $buf =~ s/tt/$timer/;
+      $buf =~ s/wwww/$argW/;
+      $buf =~ s/cc/$chanNo/;
+      
+      IOWrite( $hash, $buf );
+    }
     
     if ($hash->{device}) {
       $hash = $defs{$hash->{device}};
