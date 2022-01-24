@@ -36,7 +36,7 @@ sub
 EseraMulti_Initialize($) 
 {
   my ($hash) = @_;
-  $hash->{Match}         = "DS2438";
+  $hash->{Match}         = "DS2438|11121|11132|11133|11134|11135";
   $hash->{DefFn}         = "EseraMulti_Define";
   $hash->{UndefFn}       = "EseraMulti_Undef";
   $hash->{ParseFn}       = "EseraMulti_Parse";

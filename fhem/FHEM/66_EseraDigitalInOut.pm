@@ -39,7 +39,7 @@ sub
 EseraDigitalInOut_Initialize($) 
 {
   my ($hash) = @_;
-  $hash->{Match}         = "DS2408";
+  $hash->{Match}         = "DS2408|11220|11233|11228|11229|11216|SYS1|SYS2";
   $hash->{DefFn}         = "EseraDigitalInOut_Define";
   $hash->{UndefFn}       = "EseraDigitalInOut_Undef";
   $hash->{ParseFn}       = "EseraDigitalInOut_Parse";
