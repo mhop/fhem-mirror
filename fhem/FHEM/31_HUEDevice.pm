@@ -589,7 +589,7 @@ HUEDevice_SetParam($$@)
 
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
-    # temporary disablea for everything. hast do be disabled for groups.
+    # temporary disable for everything. hast do be disabled for groups.
     # see https://forum.fhem.de/index.php/topic,11020.msg497825.html#msg497825
     #$obj->{'bri'} = 254 if( $name && ReadingsVal($name,"bri","0") eq 0 && AttrVal($name, 'subType', 'dimmer') ne 'switch'  );
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
@@ -1481,25 +1481,26 @@ HUEDevice_Parse($$)
   Log3 $name, 4, "parse status message for $name";
   #Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
 
-  if( !defined($hash->{has_v2_api}) # only if not already checked
-      && $result->{v2_service}      # only for updates from eventstream events
+  if( !defined($hash->{has_events})                          # only if not already checked
+      && ($result->{v2_service} || $result->{v2_service}{t}) # only for updates from events
       && defined($hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge') ) {
-    $hash->{has_v2_api} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
-    $hash->{has_v2_api} = 0 if( $hash->{IODev}{is_DECONZ} );
+    $hash->{has_events} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
+    $hash->{has_events} = 1 if( $hash->{IODev}{is_DECONZ} );
 
-    Log3 $name, 4, "$name: bridge has v2 api: ". ($hash->{has_v2_api} ? 1 : 0);
+    Log3 $name, 4, "$name: bridge has events api: ". ($hash->{has_events} ? 1 : 0);
 
-    if( $hash->{INTERVAL} && $hash->{has_v2_api} ) {
-      if( defined($hash->{IODev}{EventStream}) && $hash->{IODev}{EventStream} eq 'connected' ) {
+    if( $hash->{INTERVAL} && $hash->{has_events} ) {
+      if( $hash->{IODev}{websocket}
+          || (defined($hash->{IODev}{EventStream}) && $hash->{IODev}{EventStream} eq 'connected' )) {
         delete $hash->{INTERVAL};
-        Log3 $name, 2, "$name: bridge has v2 api, EventStream connected, removing interval";
+        Log3 $name, 2, "$name: bridge has events api, events connected, removing interval";
 
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+$hash->{INTERVAL}, "HUEDevice_GetUpdate", $hash, 0) if( $hash->{INTERVAL} );
 
       } else {
-        delete $hash->{has_v2_api};
-        Log3 $name, 2, "$name: bridge has v2 api, EventStream not jet connected";
+        delete $hash->{has_events};
+        Log3 $name, 2, "$name: bridge has events api, events not jet connected";
 
       }
     }
@@ -1753,11 +1754,13 @@ HUEDevice_Parse($$)
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
       $readings{state} = $state->{open}?'open':'closed' if( defined($state->{open}) );
       $readings{state} = $state->{lightlevel} if( defined($state->{lightlevel}) && !defined($state->{lux}) );
-      #$readings{state} = $state->{input} if( defined($state->{input}) );
-      #$readings{state} = $state->{eventtype} if( defined($state->{eventtype}) );
       $readings{state} = $state->{buttonevent} if( defined($state->{buttonevent}) );
       $readings{state} = $state->{presence}?'motion':'nomotion' if( defined($state->{presence}) );
       $readings{state} = $state->{fire}?'fire':'nofire' if( defined($state->{fire}) );
+
+      $readings{input} = $state->{input} if( defined($state->{input}) );
+      $readings{eventtype} = $state->{eventtype} if( defined($state->{eventtype}) );
+      $readings{eventduration} = $state->{eventduration} if( defined($state->{eventduration}) );
 
       $readings{dark} = $state->{dark}?'1':'0' if( defined($state->{dark}) );
       $readings{humidity} = $state->{humidity} * 0.01 if( defined($state->{humidity}) );
@@ -1817,7 +1820,8 @@ HUEDevice_Parse($$)
          if( defined($readings{$key}) ) {
            if( $lastupdated ) {
              my $rut = ReadingsTimestamp($name,$key,undef);
-             if( !defined($result->{v2_service}) && $ts && defined($rut) && $ts <= time_str2num($rut) ) {
+             if( (!defined($result->{v2_service}) || !defined($result->{t}))
+                 && $ts && defined($rut) && $ts <= time_str2num($rut) ) {
                Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, current reading timestamp is $rut";
                next;
              }

@@ -104,6 +104,8 @@ HUEBridge_Read($)
 
       if( $data eq '?' ) {
         #ignore keepalive
+        #RemoveInternalTimer($hash, 'HUEBridge_openWebsocket' );
+        #InternalTimer(gettimeofday()+300, 'HUEBridge_openWebsocket', $hash, 0);
 
       } elsif( $op == 0x01 ) {
         my $obj = eval { JSON->new->utf8(0)->decode($data) };
@@ -363,6 +365,8 @@ HUEBridge_closeWebsocket($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash, 'HUEBridge_openWebsocket' );
 
   delete $hash->{buf};
   delete $hash->{websocket};
@@ -1440,7 +1444,7 @@ HUEBridge_Get($@)
   } elsif($cmd eq 'ignored' ) {
     return join( "\n", sort keys %{$hash->{helper}{ignored}} );
 
-  } elsif($cmd eq 'get2resources' ) {
+  } elsif($cmd eq 'getv2resources' ) {
     HUEBridge_getv2resources($hash, 1);
 
     return "done";
@@ -2422,8 +2426,8 @@ HUEBridge_dispatch($$$;$)
                     $buttonevent = "${input}003";
                   }
 
-                  #$obj->{state}{input} = $input;
-                  #$obj->{state}{eventtype} = $eventtype;
+                  $obj->{state}{input} = $input;
+                  $obj->{state}{eventtype} = $eventtype;
                   $obj->{state}{buttonevent} = $buttonevent;
 
                 } elsif( $data->{type} eq 'temperature' ) {
