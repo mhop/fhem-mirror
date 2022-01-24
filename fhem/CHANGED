@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCAM: module ready for SVS 9.0.0 forum:#125646
  - bugfix:  59_LuftdatenInfo: fix API endpoint
  - bugfix:  10_KNX: fix dpt14 set 0
  - bugfix:  89_FULLY: Fixed speak and overlayMessage commands.

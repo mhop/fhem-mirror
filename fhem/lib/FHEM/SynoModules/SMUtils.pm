@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       SMUtils.pm
 #
-#       (c) 2020-2021 by Heiko Maaz
+#       (c) 2020-2022 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides routines for FHEM modules developed for Synology use cases.
@@ -50,7 +50,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.23.1');
+use version 0.77; our $VERSION = version->declare('1.23.2');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -69,6 +69,7 @@ our @EXPORT_OK = qw(
                      smUrlEncode
                      plotPngToFile
                      completeAPI
+                     ApiVal
                      showAPIinfo
                      setCredentials
                      getCredentials
@@ -691,17 +692,62 @@ return ($err, $file);
 sub completeAPI {  
   my $jdata  = shift // carp "got no data Hash reference" && return;
   my $apiref = shift // carp $carpnoapir                  && return;
-  
+    
   for my $key (keys %{$apiref}) {
-      next if($key =~ /^PARSET$/x); 
-      $apiref->{$key}{PATH} = $jdata->{data}{$apiref->{$key}{NAME}}{path}       // return;
-      $apiref->{$key}{VER}  = $jdata->{data}{$apiref->{$key}{NAME}}{maxVersion} // return;
-      $apiref->{$key}{MOD}  = "no";                                                       # MOD = Version nicht modifiziert
+      next if($key =~ /^PARSET$/x);
+      $apiref->{$key}{PATH} = $jdata->{data}{$apiref->{$key}{NAME}}{path};
+      $apiref->{$key}{VER}  = $jdata->{data}{$apiref->{$key}{NAME}}{maxVersion};
+      $apiref->{$key}{MOD}  = "no";                                                                    # MOD = Version nicht modifiziert
+      
+      my $incomplete = defined $apiref->{$key}{PATH} ? 0 : 1;
+      return if(failInc ($apiref->{$key}{mk}, $incomplete));
   }
 
-  $apiref->{PARSET} = 1;                                                                  # alle API Hash values erfolgreich gesetzt
+  $apiref->{PARSET} = 1;                                                                               # alle API Hash values erfolgreich gesetzt
   
 return 1;
+}
+
+###############################################################################
+#      API Key must include Check
+###############################################################################
+sub failInc {
+  my $mk         = shift;
+  my $incomplete = shift;
+  
+  if ($incomplete && $mk) {
+      return 1;
+  }
+  
+return;      
+}
+
+###############################################################################
+#                  liefert den Wert eines API-Keys
+#        
+#        $apihash : Hash der API-Keys
+#        $key     : MOD  - Modifizierung des API-Keys
+#                   NAME - API-Name
+#                   PATH - API-Pfad      
+#                   VER  - API-Version  
+#                   mk   - Muß-Key ? -> 0 = optional, 1 = muß
+#        $def     : default-Wert
+###############################################################################
+sub ApiVal {
+  my $hash    = shift;
+  my $apihash = shift;
+  my $key     = shift;
+  my $def     = shift;  
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if(defined ($apihash)      &&
+     defined ($apihash->{$key})) {
+     return  $apihash->{$key};
+  }
+
+return $def;
 }
 
 ###############################################################################
@@ -718,20 +764,22 @@ sub showAPIinfo {
   my $out  = "<html>";
   $out    .= "<b>Synology $type API Info</b> <br><br>";
   $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
-  $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>Modified</b> </td></tr>";
+  $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>MustKey</b> </td><td> <b>Modified</b> </td></tr>";
   $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td> </td></tr>";
 
   for my $key (sort keys %{$apiref}) {
       next if($key =~ /^PARSET$/x);
-      my $apiname = $apiref->{$key}{NAME};
-      my $apipath = $apiref->{$key}{PATH};
-      my $apiver  = $apiref->{$key}{VER};
-      my $apimod  = $apiref->{$key}{MOD};
+      my $apiname = ApiVal ($hash, $apiref->{$key}, 'NAME', '');
+      my $apipath = ApiVal ($hash, $apiref->{$key}, 'PATH', '');
+      my $apiver  = ApiVal ($hash, $apiref->{$key}, 'VER',  '');
+      my $apimod  = ApiVal ($hash, $apiref->{$key}, 'MOD',  '');
+      my $mk      = ApiVal ($hash, $apiref->{$key}, 'mk',   '');
 
       $out .= "<tr>";
       $out .= "<td> $apiname </td>";
       $out .= "<td> $apipath </td>";
       $out .= "<td style=\"text-align: center\"> $apiver  </td>";
+      $out .= "<td style=\"text-align: center\"> $mk      </td>";
       $out .= "<td style=\"text-align: center\"> $apimod  </td>";
       $out .= "</tr>";
   }
