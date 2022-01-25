@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  14_Hideki.pm: fix match regex - forum:#125679
  - bugfix:  66_EseraOneWire: fix match list
  - change:  49_SSCAM: module ready for SVS 9.0.0 forum:#125646
  - bugfix:  59_LuftdatenInfo: fix API endpoint
