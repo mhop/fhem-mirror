@@ -1413,6 +1413,33 @@ option:{ CALLSPEECHRECOGN }
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
 
+# sonoff NSPanel flashed with Tasmota.
+name:tasmota_NSPanel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:Early version for Sonoff NSPanel (2 channel) device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel. <br>See <a href="https://forum.fhem.de/index.php/topic,125423.0.html">Forum Thread</a> and <a href="https://templates.blakadder.com/sonoff_NSPanel.html">Tasmota Template Repository</a>
+order:A_02a7
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=1 SETCHANNELINFO=1
+attr DEVICE icon tradfri_filled_floalt
+attr DEVICE setList \
+  off:noArg    CMNDTOPIC/POWER1 0\
+  on:noArg     CMNDTOPIC/POWER1 1\
+  toggle:noArg CMNDTOPIC/POWER1 2\
+  setOtaUrl:textField CMNDTOPIC/OtaUrl $EVTPART1\
+  upgrade:noArg   CMNDTOPIC/upgrade 1\
+  x_NSPSend_json:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(CMNDTOPIC/NSPSend $payload)}\
+  x_NSPSend_delete:selectnumbers,1,1,8,0,lin CMNDTOPIC/NSPSend {"index":$EVTPART1, "type":"delete"}
+attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
+LWT\
+</a>\
+state
+attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
+attr DEVICE,DEVICE_CH2 webCmd :
+attr DEVICE,DEVICE_CH2 model tasmota_NSPanel_split
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220125
+
+
 #contributed by 87insane
 # tasmota 2ch as shutter device.
 name:tasmota_2ch_shutter_invert_1
