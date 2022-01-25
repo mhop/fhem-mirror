@@ -410,7 +410,7 @@ FHEM/74_UnifiVideo.pm        justme1968           Sonstiges
 FHEM/74_XiaomiBTLESens       CoolTux              Sonstige Systeme
 FHEM/75_MSG.pm               loredo               Automatisierung
 FHEM/75_msgConfig.pm         loredo               Automatisierung
-FHEM/76_msgDialog.pm         rudolfkoenig/orphan  Frontends/Sprachsteuerung
+FHEM/76_msgDialog.pm         orphan/Beta-User     Frontends/Sprachsteuerung https://forum.fhem.de/index.php/topic,125710.0.html
 FHEM/76_MSGFile.pm           gandy                Automatisierung
 FHEM/76_MSGMail.pm           gandy                Automatisierung
 FHEM/76_SMAEVCharger.pm      jual                 Sonstige Systeme

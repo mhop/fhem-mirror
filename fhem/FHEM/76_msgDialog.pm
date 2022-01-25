@@ -5,7 +5,7 @@
 #
 # 76_msgDialog.pm
 #
-# Copyright by igami
+# Originally initiated by igami
 #
 # This file is part of FHEM.
 #
@@ -86,8 +86,8 @@ sub msgDialog_Define($$) {
 
   my $msgConfig = $modules{msgConfig}{defptr}{NAME};
 
-  addToDevAttrList($msgConfig, "$TYPE\_evalSpecials:textField-long ");
-  addToDevAttrList($msgConfig, "$TYPE\_msgCommand:textField ");
+  addToDevAttrList($msgConfig, "$TYPE\_evalSpecials:textField-long", 'msgDialog');
+  addToDevAttrList($msgConfig, "$TYPE\_msgCommand:textField", 'msgDialog');
 
   $DEF = msgDialog_evalSpecials($hash, $DEF);
   $DEF = eval{JSON->new->decode($DEF)};
@@ -432,15 +432,19 @@ sub msgDialog_update_msgCommand($) {
 
 1;
 
+__END__
 # commandref ##################################################################
 =pod
+=encoding utf8
+
+
 =item helper
 =item summary    dialogs for instant messaging
 =item summary_DE Dialoge f&uuml;r Sofortnachrichten
 
 =begin html
 
-<a name="msgDialog"></a>
+<a id="msgDialog"></a>
 <h3>msgDialog</h3>
 <ul>
   With msgDialog you can define dialogs for instant messages via TelegramBot, Jabber and yowsup (WhatsApp).<br>
@@ -455,8 +459,8 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogdefine"></a>
-  <b>Define</b>
+  <a id="msgDialog-define"></a>
+  <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; msgDialog &lt;JSON&gt;</code><br>
     Because of the complexity, it is easiest to define an empty dialog first.
@@ -549,14 +553,16 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogset"></a>
-  <b>Set</b>
+  <a id="msgDialog-set"></a>
+  <h4>Set</h4>
   <ul>
+    <a id="msgDialog-set-reset"></a>
     <li>
       <code>reset</code><br>
       Resets the dialog for all users.
     </li>
     <br>
+    <a id="msgDialog-set-say"></a>
     <li>
       <code>
         say [@&lt;recipient1&gt;[,&lt;recipient2&gt;,...]]
@@ -568,6 +574,7 @@ sub msgDialog_update_msgCommand($) {
       recipients specified under the allowed attribute.
     </li>
     <br>
+    <a id="msgDialog-set-updateAllowed"></a>
     <li>
       <code>updateAllowed</code><br>
       Updates the selection for the allowed attribute.
@@ -575,9 +582,10 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogget"></a>
-  <b>Get</b>
+  <a id="msgDialog-get"></a>
+  <h4>Get</h4>
   <ul>
+    <a id="msgDialog-get-trigger"></a>
     <li>
       <code>trigger</code><br>
       Lists all TRIGGERs of the first level where setOnly is not specified.
@@ -585,14 +593,16 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogattr"></a>
-  <b>Attribute</b>
+  <a id="msgDialog-attr"></a>
+  <h4>Attributes</h4>
   <ul>
+    <a id="msgDialog-attr-allowed"></a>
     <li>
       <code>allowed</code><br>
       List with all RESIDENTS and ROOMMATE that are authorized for this dialog.
     </li>
     <br>
+    <a id="msgDialog-attr-disable"></a>
     <li>
       <code>disable 1</code><br>
       Dialog is deactivated.
@@ -604,6 +614,7 @@ sub msgDialog_update_msgCommand($) {
       </a>
     </li>
     <br>
+    <a id="msgDialog-attr-evalSpecials" data-pattern=".*evalSpecials"></a>
     <li>
       <code>evalSpecials key1=value1 key2=value2 ...</code><br>
       Space Separate list of name=value pairs.<br>
@@ -616,18 +627,19 @@ sub msgDialog_update_msgCommand($) {
       from msgDialog is used.
     </li>
     <br>
+    <a id="msgDialog-attr-msgCommand" data-pattern=".*msgCommand"></a>
     <li>
       <code>msgCommand &lt;command&gt;</code><br>
       Command used to send a message.<br>
       The default is
       <code>"msg push \@$recipients $message"</code>.<br>
-      This attribute is available as "msgDialog_msgCommand" in the msgConfig device.
+      This attribute is available in the msgConfig device.
     </li>
   </ul>
   <br>
 
-  <a name="msgDialogreadings"></a>
-  <b>Reading</b>
+  <a id="msgDialog-readings"></a>
+  <h4>Readings</h4>
   <ul>
     <li>
       <code>$recipient_history</code><br>
@@ -638,7 +650,7 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogTelegramBot"></a>
+  <a id="msgDialog-TelegramBot"></a>
   <b>Notes for use with TelegramBot:</b>
   <ul>
     It may be necessary to set the attribute "utf8specials" to 1 in the
@@ -649,7 +661,7 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogJabber"></a>
+  <a id="msgDialog-Jabber"></a>
   <b>Notes for use with Jabber:</b>
   <ul>
     The msg command supports the TelegramBot_MTYPE. The default is empty. The
@@ -657,14 +669,14 @@ sub msgDialog_update_msgCommand($) {
   </ul>
   <br>
 
-  <a name="msgDialogyowsub"></a>
+  <a id="msgDialog-yowsub"></a>
   <b>Notes for use with yowsub (WhatsApp):</b>
   <ul>
     No experiences so far.
   </ul>
   <br>
 
-  <a name="msgDialogexamples"></a>
+  <a id="msgDialog-examples"></a>
   <b>Examples:</b>
   <ul>
     <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
@@ -853,7 +865,7 @@ plot=Waschkeller_washer_SVG
 
 =begin html_DE
 
-<a name="msgDialog"></a>
+<a id="msgDialog"></a>
 <h3>msgDialog</h3>
 <ul>
   Mit msgDialog k&ouml;nnen Dialoge f&uuml;r Sofortnachrichten &uuml;ber
@@ -873,8 +885,8 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogdefine"></a>
-  <b>Define</b>
+  <a id="msgDialog-define"></a>
+  <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; msgDialog &lt;JSON&gt;</code><br>
     Aufgrunder komplexit&auml;t ist es am einfachsten erst einen leeren Dialog
@@ -976,14 +988,16 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogset"></a>
-  <b>Set</b>
+  <a id="msgDialog-set"></a>
+  <h4>Set</h4>
   <ul>
+    <a id="msgDialog-set-reset"></a>
     <li>
       <code>reset</code><br>
       Setzt den Dialog f&uuml;r alle Benutzer zur&uuml;ck.
     </li>
     <br>
+    <a id="msgDialog-set-say"></a>
     <li>
       <code>
         say [@&lt;recipient1&gt;[,&lt;recipient2&gt;,...]]
@@ -995,6 +1009,7 @@ plot=Waschkeller_washer_SVG
       dem Attribut allowed angegebenen Empf&auml;nger fortgef&uuml;hrt.
     </li>
     <br>
+    <a id="msgDialog-set-updateAllowed"></a>
     <li>
       <code>updateAllowed</code><br>
       Aktualisiert die Auswahl f&uuml;r das Attribut allowed.
@@ -1002,8 +1017,8 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogget"></a>
-  <b>Get</b>
+  <a id="msgDialog-get"></a>
+  <h4>Get</h4>
   <ul>
     <li>
       <code>trigger</code><br>
@@ -1013,15 +1028,17 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogattr"></a>
-  <b>Attribute</b>
+<a id="msgDialog-attr"></a>
+  <h4>Attribute</h4>
   <ul>
-    <li>
+    <a id="msgDialog-attr-allowed"></a>
+      <li>
       <code>allowed</code><br>
       Liste mit allen RESIDENTS und ROOMMATE die f&uuml;r diesen Dialog
       berechtigt sind.
     </li>
     <br>
+    <a id="msgDialog-attr-disable"></a>
     <li>
       <code>disable 1</code><br>
       Dialog ist deaktiviert.
@@ -1034,6 +1051,7 @@ plot=Waschkeller_washer_SVG
     </li>
     <br>
     <li>
+    <a id="msgDialog-attr-evalSpecials" data-pattern=".*evalSpecials"></a>
       <code>evalSpecials key1=value1 key2=value2 ...</code><br>
       Leerzeichen getrennte Liste von Name=Wert Paaren.<br>
       Wert kann Leerzeichen enthalten, falls es in "" oder {} eingeschlossen
@@ -1048,6 +1066,7 @@ plot=Waschkeller_washer_SVG
       Wert aus msgDialog verwendet.
     </li>
     <br>
+    <a id="msgDialog-attr-msgCommand" data-pattern=".*msgCommand"></a>
     <li>
       <code>msgCommand &lt;command&gt;</code><br>
       Befehl der zum Versenden einer Nachricht verwendet wird.<br>
@@ -1059,8 +1078,8 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogreadings"></a>
-  <b>Reading</b>
+  <a if="msgDialog-readings"></a>
+  <h4>Readings</h4>
   <ul>
     <li>
       <code>$recipient_history</code><br>
@@ -1072,7 +1091,7 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogTelegramBot"></a>
+  <a id="msgDialog-TelegramBot"></a>
   <b>Hinweise zur Benutzung mit Telegram:</b>
   <ul>
     Es kann notwendig sein, dass im TelegramBot das Attribut "utf8specials" auf
@@ -1084,7 +1103,7 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogJabber"></a>
+  <a id="msgDialog-Jabber"></a>
   <b>Hinweise zur Benutzung mit Jabber:</b>
   <ul>
     Bei dem msg Befehl kann der Jabber_MTYPE angegeben werden. Die Vorgabe ist
@@ -1092,14 +1111,14 @@ plot=Waschkeller_washer_SVG
   </ul>
   <br>
 
-  <a name="msgDialogyowsub"></a>
+  <a id="msgDialog-yowsub"></a>
   <b>Hinweise zur Benutzung mit yowsub (WhatsApp):</b>
   <ul>
     Bisher noch keine Erfahungen.
   </ul>
   <br>
 
-  <a name="msgDialogexamples"></a>
+  <a id="msgDialog-examples"></a>
   <b>Beispiele:</b>
   <ul>
     <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
