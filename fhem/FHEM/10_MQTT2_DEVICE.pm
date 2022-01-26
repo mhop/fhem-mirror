@@ -361,10 +361,11 @@ MQTT2_DEVICE_Get($@)
 {
   my ($hash, @a) = @_;
   return "Not enough arguments for get" if(!defined($a[1]));
+  my $name = $hash->{NAME};
 
-  my ($gets,$cmdList) = MQTT2_getCmdHash(AttrVal($hash->{NAME}, "getList", ""));
+  my ($gets,$cmdList) = MQTT2_getCmdHash(AttrVal($name, "getList", ""));
   return "Unknown argument $a[1], choose one of $cmdList" if(!$gets->{$a[1]});
-  return undef if(IsDisabled($hash->{NAME}));
+  return undef if(IsDisabled($name));
   Log3 $hash, 3, "MQTT2_DEVICE get ".join(" ", @a);
 
   my ($getReading, $cmd) = split(" ",$gets->{$a[1]},2);
