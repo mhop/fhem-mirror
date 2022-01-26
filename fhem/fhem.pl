@@ -155,6 +155,7 @@ sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
 sub setAttrList($$);
 sub setDevAttrList($;$);
+sub setDisableNotifyFn($$);
 sub setNotifyDev($$);
 sub toJSON($);
 sub utf8ToLatin1($);
@@ -5604,6 +5605,20 @@ notifyRegexpChanged($$;$)
   } else {
     delete($hash->{NOTIFYDEV});
   }
+}
+
+sub
+setDisableNotifyFn($$)
+{
+  my ($hash, $doit) = @_;
+
+  if($doit) {
+    delete($hash->{NOTIFYDEV});
+    $hash->{disableNotifyFn} = 1
+  } else {
+    delete($hash->{disableNotifyFn});
+  }
+  %ntfyHash = ();
 }
 
 sub
