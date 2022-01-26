@@ -1124,7 +1124,9 @@ HUEBridge_Set($@)
     readingsSingleUpdate($hash, 'state', 'inactive', 1 );
     return undef;
 
-  } elsif($cmd eq 'v2effect' ) {
+  } elsif($cmd eq 'v2json' ) {
+    return "usage: $cmd <v2 light id> <json>" if( !@params );
+
     my $params = {
                 url => "https://$hash->{host}/clip/v2/resource/light/$arg",
              method => 'PUT',
@@ -1133,9 +1135,44 @@ HUEBridge_Set($@)
                type => $cmd,
                hash => $hash,
            callback => \&HUEBridge_dispatch,
-               #data => '{"on":{"on": true}}',
-               data => '{"effect":{"effect": "candle"}}',
-               #data => '{"effect":{"effect": "breathe"}}',
+               data => join( ' ', @params ),
+       };
+
+    my($err,$data) = HttpUtils_BlockingGet( $params );
+
+    if( !$data ) {
+      Log3 $name, 2, "$name: empty answer received for $cmd";
+      return undef;
+    } elsif( $data =~ m'HTTP/1.1 200 OK' ) {
+      Log3 $name, 4, "$name: empty answer received for $cmd";
+      return undef;
+    } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
+      #Log3 $name, 2, "$name: invalid json detected for $cmd: $data";
+      #return undef;
+    }
+
+    Log3 $name, 4, "$name: got: $data";
+
+    my $json = eval { JSON->new->utf8(0)->decode($data) };
+    Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+    return undef if( !$json );
+
+    Log3 $name, 1, "$name: error: ". Dumper $json->{errors} if( scalar @{$json->{errors}} );
+    return Dumper $json if( scalar @{$json->{errors}} );
+
+    return;
+
+  } elsif($cmd eq 'v2effect' ) {
+    return "usage: $cmd <v2 light id> <effect>" if( !@params );
+    my $params = {
+                url => "https://$hash->{host}/clip/v2/resource/light/$arg",
+             method => 'PUT',
+            timeout => 5,
+             header => { 'HUE-Application-Key' => $attr{$name}{key}, },
+               type => $cmd,
+               hash => $hash,
+           callback => \&HUEBridge_dispatch,
+               data => '{"effects": {"effect": "'. $params[0] .'"}, "on": {"on": true}}',
        };
 
     my($err,$data) = HttpUtils_BlockingGet( $params );
@@ -1235,6 +1272,22 @@ HUEBridge_Set($@)
   }
 }
 
+sub
+HUEBridge_V2IdOfV1Id($$$)
+{
+  my ($hash, $type, $id) = @_;
+  my $name = $hash->{NAME};
+  return "undef" if( !$hash->{has_v2_api} );
+
+  foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+    next if( $entry->{id_v1} ne $id );
+    next if( $entry->{type} ne $type );
+
+    return $entry->{id};
+  }
+
+  return undef;
+}
 sub
 HUEBridge_nameOfResource($$)
 {
@@ -2490,6 +2543,10 @@ HUEBridge_dispatch($$$;$)
                     $obj->{state}{ct} = $data->{color_temperature}{mirek};
                   }
 
+                  if( defined($data->{effects}) ) {
+                    $obj->{state}{v2effect} = $data->{effects}{status} if( $data->{effects}{status} );
+		  }
+
                   if( defined($data->{dynamics}) ) {
                     $obj->{state}{dynamics_speed} = $data->{dynamics}{speed} if( $data->{dynamics}{speed_valid} );
                     $obj->{state}{dynamics_status} = $data->{dynamics}{status};
@@ -2526,7 +2583,7 @@ HUEBridge_dispatch($$$;$)
           } elsif( $event->{type} eq 'delete' ) {
             Log3 $name, 4, "$name: EventStream: got $event->{type} event";
 
-          } else {
+          } else { #handle type error
            Log3 $name, 3, "$name: EventStream: unknown event type $event->{type}: $data";
 
           }

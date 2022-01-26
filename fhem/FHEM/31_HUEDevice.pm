@@ -274,10 +274,12 @@ HUEDevice_devStateIcon($)
   return ".*:$s:toggle" if( $subtype eq "dimmer" );
   return ".*:$s:toggle" if( $subtype eq "switch" );
 
-  return ".*:light_toggle@#".CommandGet("","$name RGB").":toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette'
-                                                                      && $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
-  return ".*:light_toggle:toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette'
-                                      && AttrVal($name, "color-icons", 0) != 0 );
+  my $effect = ReadingsVal($name, 'effect', 'none') ne 'none'
+               || ReadingsVal($name, 'v2effect', 'no_effect') ne 'no_effect'
+               || ReadingsVal($name, 'dynamics_status', 'none') ne 'none'; # eq 'dynamic_palette' ?
+
+  return ".*:light_toggle@#".CommandGet("","$name RGB").":toggle" if( $effect && $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:light_toggle:toggle" if( $effect && AttrVal($name, "color-icons", 0) != 0 );
 
   return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
@@ -458,6 +460,8 @@ HUEDevice_Define($$) {
     $hash->{helper}{xy} = '';
     $hash->{helper}{alert} = '';
     $hash->{helper}{effect} = '';
+    $hash->{helper}{v2effect} = '';
+    $hash->{helper}{dynamics_status} = '';
 
     $hash->{helper}{pct} = -1;
     $hash->{helper}{rgb} = "";
@@ -793,7 +797,17 @@ HUEDevice_SetParam($$@)
     $value='' if( !$value );
     HUEDevice_AddJson( $name, $obj, "$cmd$value ".join( ' ', @aa) );
 
+  } elsif( $cmd eq 'v2effect' ) {
+    my $hash = $defs{$name};
+    my $shash = $hash->{IODev};
+    my $id = HUEBridge_V2IdOfV1Id( $shash, 'light', "/lights/$hash->{ID}" );
+
+    HUEBridge_Set( $shash, $shash->{NAME}, $cmd, $id, $value );
+
+    $obj->{'on'}  = JSON::true;
+
   } else {
+
     return 0;
   }
 
@@ -1143,6 +1157,12 @@ HUEDevice_Set($@)
 
     if( $hash->{helper}->{devtype} eq 'G' ) {
       $list .= " savescene deletescene";
+    }
+
+    if( $hash->{IODev}{has_v2_api} ) {
+      my $id = HUEBridge_V2IdOfV1Id( $hash->{IODev}, 'light', "/lights/$hash->{ID}" );
+
+      $list .= eval { " v2effect:". join(',', @{$hash->{IODev}{helper}{resource}{by_id}{$id}{effects}{effect_values}} ) } if( $id );
     }
   }
 
@@ -1944,6 +1964,7 @@ HUEDevice_Parse($$)
      $lastseen = $result->{lastseen} if( defined($result->{lastseen}) );
 
 
+  $readings{v2effect} = $state->{v2effect};
   $readings{dynamics_speed} = $state->{dynamics_speed};
   $readings{dynamics_status} = $state->{dynamics_status};
 
@@ -2006,6 +2027,7 @@ HUEDevice_Parse($$)
   }
 
   $readings{dynamics_status} = 'none' if( !$on && defined($hash->{helper}{dynamics_status}) && !defined($readings{dynamics_status}) );
+  $readings{v2effect} = 'none' if( !$on && defined($hash->{helper}{v2effect}) && !defined($readings{v2effect}) );
 
   if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"pct", $pct);}
   #if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"level", $pct . ' %');}
