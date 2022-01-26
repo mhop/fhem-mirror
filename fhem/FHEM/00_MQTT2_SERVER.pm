@@ -245,17 +245,16 @@ MQTT2_SERVER_out($$$;$)
   if($dump) {
     my $cpt = $cptype{ord(substr($msg,0,1)) >> 4};
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    my $fd = defined($hash->{FD}) ? $hash->{FD} : "NoFd";
-    Log3 $dump, 5, "out\@$fd $cpt: $msg";
+    Log3 $dump, 5, "out\@$hash->{PEER}:$hash->{PORT} $cpt: $msg";
   }
 }
 
 sub
 MQTT2_SERVER_Read($@)
 {
-  my ($hash, $reread, $debug) = @_;
+  my ($hash, $reread) = @_;
 
-  if(!$debug && $hash->{SERVERSOCKET}) {   # Accept and create a child
+  if($hash->{SERVERSOCKET}) {   # Accept and create a child
     my $nhash = TcpServer_Accept($hash, "MQTT2_SERVER");
     return if(!$nhash);
     $nhash->{CD}->blocking(0);
@@ -264,9 +263,8 @@ MQTT2_SERVER_Read($@)
     return;
   }
 
-  my $sname = ($debug ? $hash->{NAME} : $hash->{SNAME});
+  my $sname = $hash->{SNAME};
   my $cname = $hash->{NAME};
-  $hash->{cid} = "debug" if($debug);
   my $c = $hash->{CD};
 
   if(!$reread) {
@@ -313,8 +311,7 @@ MQTT2_SERVER_Read($@)
   if($dump) {
     my $msg = substr($hash->{BUF}, 0, $off+$tlen);
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    my $fd = defined($hash->{FD}) ? $hash->{FD} : "NoFd";
-    Log3 $sname, 5, "in\@$fd $cpt: $msg";
+    Log3 $sname, 5, "in\@$hash->{PEER}:$hash->{PORT} $cpt: $msg";
   }
 
   $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
@@ -608,15 +605,19 @@ MQTT2_SERVER_getStr($$$)
   return ($r, $off+2+$l);
 }
 
-#{MQTT2_SERVER_ReadDebug($defs{m2s}, '(162)(50)(164)(252)(0).7c:2f:80:97:b0:98/GenericAc(130)(26)(212)4(0)(21)BLE2MQTT/OTA/')}
+# {MQTT2_SERVER_ReadDebug("m2s", '0(12)(0)(5)HelloWorld')}
 sub
 MQTT2_SERVER_ReadDebug($$)
 {
-  my ($hash, $s) = @_;
+  my ($name, $s) = @_;
   $s =~ s/\((\d{1,3})\)/chr($1)/ge;
-  $hash->{BUF} = $s;
   Log 1, "Debug len:".length($s);
-  MQTT2_SERVER_Read($hash, 1, 1);
+  my $cName = $name."_debugClient";
+  $defs{$cName} = { NAME=>$cName, SNAME=>$name, cid=>$name,
+                    TYPE=>"MQTT2_SERVER", PEER=>"", PORT=>"", BUF=>$s };
+  MQTT2_SERVER_Read($defs{$cName}, 1);
+  delete($attr{$cName});
+  delete($defs{$cName});
 }
 
 1;
