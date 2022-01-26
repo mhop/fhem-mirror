@@ -276,7 +276,10 @@ HUEDevice_devStateIcon($)
 
   return ".*:light_toggle@#".CommandGet("","$name RGB").":toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette'
                                                                       && $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
-  return ".*:light_toggle:toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette' );
+  return ".*:light_toggle:toggle" if( ReadingsVal($name, 'dynamics_status', 'none') eq 'dynamic_palette'
+                                      && AttrVal($name, "color-icons", 0) != 0 );
+
+  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
 
   return '<div style="width:32px;height:19px;'.
