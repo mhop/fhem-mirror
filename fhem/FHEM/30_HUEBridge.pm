@@ -573,17 +573,19 @@ HUEBridge_OpenDev($)
 
   $hash->{mac} = $result->{mac};
 
-  my $params = {
-              url => "https://$hash->{host}/auth/v1",
-      #httpversion => '1.1',
-           method => 'GET',
-          timeout => 5,
-           header => { 'HUE-Application-Key' => $attr{$name}{key}, },
-             type => 'application id',
-             hash => $hash,
-         callback => \&HUEBridge_dispatch,
-     };
-  HttpUtils_NonblockingGet( $params );
+  if( !$hash->{is_deCONZ} ) {
+    my $params = {
+                url => "https://$hash->{host}/auth/v1",
+        #httpversion => '1.1',
+             method => 'GET',
+            timeout => 5,
+             header => { 'HUE-Application-Key' => $attr{$name}{key}, },
+               type => 'application id',
+               hash => $hash,
+           callback => \&HUEBridge_dispatch,
+       };
+    HttpUtils_NonblockingGet( $params );
+  }
 
   readingsSingleUpdate($hash, 'state', 'connected', 1 );
 
