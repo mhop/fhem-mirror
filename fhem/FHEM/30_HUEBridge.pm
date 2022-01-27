@@ -1277,9 +1277,13 @@ HUEBridge_V2IdOfV1Id($$$)
 {
   my ($hash, $type, $id) = @_;
   my $name = $hash->{NAME};
+  return "undef" if( !$id );
+  return "undef" if( !$type );
   return "undef" if( !$hash->{has_v2_api} );
 
   foreach my $entry ( values %{$hash->{helper}{resource}{by_id}} ) {
+    next if( !$entry->{id_v1} );
+    next if( !$entry->{type} );
     next if( $entry->{id_v1} ne $id );
     next if( $entry->{type} ne $type );
 
