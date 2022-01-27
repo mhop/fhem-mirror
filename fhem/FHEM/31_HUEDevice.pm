@@ -2027,7 +2027,7 @@ HUEDevice_Parse($$)
   }
 
   $readings{dynamics_status} = 'none' if( !$on && defined($hash->{helper}{dynamics_status}) && !defined($readings{dynamics_status}) );
-  $readings{v2effect} = 'none' if( !$on && defined($hash->{helper}{v2effect}) && !defined($readings{v2effect}) );
+  $readings{v2effect} = 'no_effect' if( !$on && defined($hash->{helper}{v2effect}) && !defined($readings{v2effect}) );
 
   if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"pct", $pct);}
   #if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"level", $pct . ' %');}
