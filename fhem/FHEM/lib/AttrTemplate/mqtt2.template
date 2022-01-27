@@ -1356,7 +1356,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 } 
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
 copy DEVICE DEVICE_CH2
-defmod DEVICE_CH2 DEVICE_CH2
+defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_CH2
 deleteattr DEVICE_CH2 alias
 attr DEVICE_CH2 readingList \
   STATTOPIC/POWER2:.* state
@@ -1367,7 +1367,7 @@ attr DEVICE_CH2 setList \
   toggle:noArg CMNDTOPIC/POWER2 2
 attr DEVICE_CH2 setStateList on off toggle
 attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20211030
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
@@ -1418,10 +1418,21 @@ name:tasmota_NSPanel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Early version for Sonoff NSPanel (2 channel) device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel. <br>See <a href="https://forum.fhem.de/index.php/topic,125423.0.html">Forum Thread</a> and <a href="https://templates.blakadder.com/sonoff_NSPanel.html">Tasmota Template Repository</a>
 order:A_02a7
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=1 SETCHANNELINFO=1
 attr DEVICE icon tradfri_filled_floalt
+attr DEVICE comment Initial configuration is just an example. You may delete these parts if not needed. For more info see Forum Thread (https://forum.fhem.de/index.php/topic,125423.0.html) and Tasmota Template Repository (https://templates.blakadder.com/sonoff_NSPanel.html).
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/LWT:Online {my $cmds=AttrVal('DEVICE','initConfig','');fhem("$cmds"); undef}\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { $EVENT =~ m,\A..NSPanel.+id...(\d+).+params..(.+)..\z, ? json2nameValue($2,"Pan_${1}_",$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER1:.* state\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -1435,9 +1446,11 @@ LWT\
 </a>\
 state
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
+attr DEVICE userattr initConfig
+attr DEVICE initConfig set DEVICE x_NSPSend_delete 1; set DEVICE x_NSPSend_delete 2; set DEVICE x_NSPSend_delete 3; set DEVICE x_NSPSend_delete 4; set DEVICE x_NSPSend_delete 5; set DEVICE x_NSPSend_delete 6; set DEVICE x_NSPSend_delete 7; set DEVICE x_NSPSend_delete 8; set DEVICE x_NSPSend_json {"HMI_resources":[{"index":1,"ctype":"group","id":"1","uiid":1}]};
 attr DEVICE,DEVICE_CH2 webCmd :
 attr DEVICE,DEVICE_CH2 model tasmota_NSPanel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220125
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
 
 
 #contributed by 87insane
@@ -1595,17 +1608,14 @@ attr DEVICE readingList \
    STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
    STATTOPIC/POWER1:.* {{'state' => 'opening'} if $EVENT eq 'on'}\
    STATTOPIC/POWER2:.* {{'state' => 'closing'} if $EVENT eq 'on'}
-attr DEVICE devStateIcon opening:fts_shutter_up@red:stop closing:fts_shutter_down@red:stop Online:10px-kreis-gruen Offline:10px-kreis-rot 0:fts_shutter_100 100:fts_shutter_10 \b\d\b.*:fts_shutter_90 1\d.*:fts_shutter_80 2\d.*:fts_shutter_70 3\d.*:fts_shutter_60 4\d.*:fts_shutter_50 5\d.*:fts_shutter_40 6\d.*:fts_shutter_30 7\d.*:fts_shutter_20 8\d.*:fts_shutter_10 9\d.*:fts_shutter_10 set_.*:fts_shutter_updown
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','Offline') eq 'Offline' ? 'rot' : 'gruen'; $onl = FW_makeImage("10px-kreis-$onl"); my $ip = ReadingsVal($name,'IPAddress','none'); my $pct = int((109 - ReadingsNum($name,'pct',0))/10)*10; my $open = ReadingsVal($name,'state',''); my $lvicon = $open eq 'opening' ? 'fts_shutter_up@red' : $open eq 'closing' ? 'fts_shutter_down@red' : "fts_shutter_$pct"; $lvicon = FW_makeImage($lvicon); my $lvcmd = ($open eq 'opening' || $open eq 'closing') ? 'stop' : $pct > 50 ? 'close' : 'open'; my $slt = ReadingsNum($name,'tiltSlat',90); my $slticon = 'fts_blade_arc_close_'; $slticon .= $slt > 0 ? '00' : $slt > -45 ? '50' : '100'; $slticon = FW_makeImage($slticon); my $sltcmd = $slt > 0 ? 'closeSlat' : $slt > -45 ? 'openSlat' : 'halfSlat'; qq(<a href="http://$ip" target="_blank">$onl</a> <div><a href="/fhem?cmd.dummy=set $name $lvcmd&XHR=1">$lvicon</a></div> <div><a href="/fhem?cmd.dummy=set $name $sltcmd&XHR=1">$slticon $slt</a>) }
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
-attr DEVICE webCmd :open:close:half:stop:pctopenSlat:closeSlat:halfSlat:tiltSlat
-attr DEVICE eventMap open:opens close:closes
-attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:tiltSlat Shutter1_Target:pct  ANALOG_Temperature:temperature
+attr DEVICE webCmd :open:close:half:stop:openSlat:closeSlat:halfSlat:tiltSlat
+#attr DEVICE eventMap open:opens close:closes
+deleteattr DEVICE eventMap
+attr DEVICE jsonMap POWER1:0 POWER2:0 Shutter1_Tilt:tiltSlat Shutter1_Target:pct ANALOG_Temperature:temperature
 attr DEVICE userReadings state:pct:.* {ReadingsNum($name,'pct',0)}
-attr DEVICE stateFormat <a href="http://IPAddress" target="_blank">\
-LWT\
-</a>\
-state\
-tiltSlat
+attr DEVICE stateFormat LWT level: state slat: tiltSlat
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE setStateList open close half stop pct openSlat closeSlat halfSlat
 attr DEVICE comment After applying the template set "ShutterOpenDuration1", "ShutterCloseDuration1" and "shuttertiltconfig1" first.\
@@ -1614,7 +1624,7 @@ This is for a tilt range from -90 to 90 degrees, if you have different tilt opti
 For calibration, tilt range settings, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20211224
+setreading DEVICE attrTemplateVersion 20220127
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 
@@ -2922,14 +2932,14 @@ order:A_11a
 set DEVICE attrTemplate shellyplug
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
-defmod DEVICE_CH2 DEVICE_CH2
+defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
 attr DEVICE,DEVICE_CH2 model shelly2_split
 set DEVICE,DEVICE_CH2  attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20211030
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
 
 # shelly2.5 using original firmware.
 # Based on user 87insane contribution in https://forum.fhem.de/index.php/topic,94060.msg962167.html#msg962167
@@ -2944,7 +2954,7 @@ par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumptio
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 set DEVICE attrTemplate shelly1_w_energy_measuring \CALLSPEECHRECOGN=0 \RADIO_SETUSERREADING=RADIO_SETUSERREADING \RADIO_DONOTSETUSERREADING=RADIO_DONOTSETUSERREADING
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
-defmod DEVICE_CH2 DEVICE_CH2
+defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
   shellies/DEVNAME/relay/1:.* relay1\
   shellies/DEVNAME/input/1:.* input1\
@@ -2965,7 +2975,7 @@ attr DEVICE_CH2 setList \
   on:noArg shellies/DEVNAME/relay/1/command on
 attr DEVICE_CH2 devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen"; my $light = ReadingsVal($name,"state","off"); my $cons = ReadingsVal($name,"relay_1_power","unknown"); my $temp = ReadingsVal($name,"temperature","-100");"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C<b></b>"}
 attr DEVICE,DEVICE_CH2 model shelly25_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20211030
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
 option:{ CALLSPEECHRECOGN }  
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
@@ -2980,9 +2990,9 @@ attr DEVICE getList \
   power0:noArg shellies/DEVNAME/relay/0/power power0\
   energy0:noArg shellies/DEVNAME/relay/0/energy energy0
 attr DEVICE model shelly4pro_split
-setreading DEVICE attrTemplateVersion 20211030
+setreading DEVICE attrTemplateVersion 20220127
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4 \MAKECOPIES=1
-defmod DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 DEVICE_channels
+defmod DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 MQTT2_\DEVICE DEVICE_channels
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
