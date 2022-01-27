@@ -2638,6 +2638,16 @@ HUEBridge_dispatch($$$;$)
     }
 
     if( $hash == $param->{chash} ) {
+      readingsBeginUpdate($hash);
+      foreach my $resource (qw(lights groups sensors scenes rules schedules)) {
+        next if( !defined($json->{$resource}) );
+
+        readingsBulkUpdateIfChanged($hash, $resource, scalar %{$json->{$resource}}, 1);
+      }
+      readingsEndUpdate($hash,1);
+    }
+
+    if( $hash == $param->{chash} ) {
       if( !defined($type) ) {
         HUEBridge_Parse($hash,$json);
 
