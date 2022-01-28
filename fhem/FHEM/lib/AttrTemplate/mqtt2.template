@@ -1421,7 +1421,20 @@ order:A_02a7
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:RADIO_COMPLETE;Full execution of all settings;{ undef }
+par:RADIO_UPDATECH1ONLY_NO;Exclude 2. channel, full execution of all settings to main channel;{ undef }
+par:RADIO_UPDATECH1ONLY_NOINITCFG;Exclude 2. channel and content of attribute initConfig in main channel;{ undef }
+attr DEVICE userattr initConfig
+option:{ RADIO_COMPLETE }
 set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=1 SETCHANNELINFO=1
+attr DEVICE_CH2 webCmd :
+attr DEVICE_CH2 model tasmota_NSPanel_split
+setreading DEVICE_CH2 attrTemplateVersion 20220128
+option:{ RADIO_UPDATECH1ONLY_NO || RADIO_COMPLETE }
+attr DEVICE initConfig set DEVICE x_NSPSend_delete 1; set DEVICE x_NSPSend_delete 2; set DEVICE x_NSPSend_delete 3; set DEVICE x_NSPSend_delete 4; set DEVICE x_NSPSend_delete 5; set DEVICE x_NSPSend_delete 6; set DEVICE x_NSPSend_delete 7; set DEVICE x_NSPSend_delete 8; set DEVICE x_NSPSend_json {"HMI_resources":[{"index":1,"ctype":"group","id":"1","uiid":1}]};
+option:{ RADIO_UPDATECH1ONLY_NO }
+set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
+option:global
 attr DEVICE icon tradfri_filled_floalt
 attr DEVICE comment Initial configuration is just an example. You may delete these parts if not needed. For more info see Forum Thread (https://forum.fhem.de/index.php/topic,125423.0.html) and Tasmota Template Repository (https://templates.blakadder.com/sonoff_NSPanel.html).
 attr DEVICE readingList \
@@ -1446,11 +1459,9 @@ LWT\
 </a>\
 state
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
-attr DEVICE userattr initConfig
-attr DEVICE initConfig set DEVICE x_NSPSend_delete 1; set DEVICE x_NSPSend_delete 2; set DEVICE x_NSPSend_delete 3; set DEVICE x_NSPSend_delete 4; set DEVICE x_NSPSend_delete 5; set DEVICE x_NSPSend_delete 6; set DEVICE x_NSPSend_delete 7; set DEVICE x_NSPSend_delete 8; set DEVICE x_NSPSend_json {"HMI_resources":[{"index":1,"ctype":"group","id":"1","uiid":1}]};
 attr DEVICE,DEVICE_CH2 webCmd :
 attr DEVICE,DEVICE_CH2 model tasmota_NSPanel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220128
 
 
 #contributed by 87insane
@@ -3493,6 +3504,27 @@ set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20220115
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model shellypro4pm
+
+
+name:shellyPlus_i4
+filter:TYPE=MQTT2_DEVICE
+desc:Untested first version of template for second generation shelly device i4 (named with "plus").
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shellyp(lus|ro4pm)[^/:_]{4,}+)> ? $1 : undef }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+order:A_20h
+par:ICON;ICON as set, defaults to fs20_S4A-2_1;{ AttrVal('DEVICE','icon','fs20_S4A-2_1') }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE icon ICON
+attr DEVICE devicetopic DEV_TPC
+attr DEVICE  readingList $\DEVICETOPIC/online:.* online\
+  $\DEVICETOPIC/events/rpc:.* { $EVENT =~ m{params...*id..(\d).*event...([^"]+).} ? { state => "$1_$2" } : json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE stateFormat <a href="http://ip" target="_blank">\
+online\
+</a>\
+state
+attr DEVICE jsonMap switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
+attr DEVICE model shellyPlus_i4
+setreading DEVICE attrTemplateVersion 20220128
 
 
 ###########################################
