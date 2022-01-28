@@ -831,7 +831,7 @@ HUEBridge_Set($@)
     return "usage: deletegroup <id>" if( @args != 1 );
 
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue group" if( $defs{$arg}{ID} != m/^G/ );
+      return "$arg is not a hue group" if( $defs{$arg}{ID} !~ m/^G/ );
       $defs{$arg}{ID} =~ m/G(.*)/;
       $arg = $1;
     }
