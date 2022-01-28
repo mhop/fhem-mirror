@@ -1162,7 +1162,14 @@ HUEDevice_Set($@)
     if( $hash->{IODev}{has_v2_api} ) {
       my $id = HUEBridge_V2IdOfV1Id( $hash->{IODev}, 'light', "/lights/$hash->{ID}" );
 
-      $list .= eval { " v2effect:". join(',', @{$hash->{IODev}{helper}{resource}{by_id}{$id}{effects}{effect_values}} ) } if( $id );
+      if( $id
+          && $hash->{IODev}{helper}{resource}{by_id}{$id}
+          && $hash->{IODev}{helper}{resource}{by_id}{$id}{effects} ) {
+        $list .= eval { " v2effect:". join(',', @{$hash->{IODev}{helper}{resource}{by_id}{$id}{effects}{effect_values}} ) };
+        if($@) {
+          Log3 $name, 2, "$name: error reading effects: ". $@;
+        }
+      }
     }
   }
 
