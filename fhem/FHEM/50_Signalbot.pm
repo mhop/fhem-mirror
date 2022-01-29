@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.4";
+my $Signalbot_VERSION="3.5";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -401,7 +401,7 @@ sub Signalbot_Set($@) {					#
 			my @newatt;
 			foreach my $file (@attachments) {
 				if ( -e $file ) {
-					if ($file =~ /[tmp\/signalbot]/) {
+					if (! $file =~ /tmp\/signalbot/) {
 						$file =~ /^.*?\.([^.]*)?$/;
 						my $type = $1;
 						my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
@@ -411,7 +411,9 @@ sub Signalbot_Set($@) {					#
 						push @newatt, $file;
 					}
 				} else {
-					return "File not found: $file";
+					my $png=Signalbot_getPNG($hash,$file);
+					return "File not found: $file" if !defined $png;
+					push @newatt, $png;
 				}
 			}
 			@attachments=@newatt;
@@ -1911,21 +1913,10 @@ sub Signalbot_replaceCommands(@) {
 			my ( $isMediaStream, $type ) = Signalbot_IdentifyStream( $hash, $msg );
 			if ($isMediaStream<0) {
 				Log3 $hash->{NAME}, 5, $hash->{NAME}.": Media stream found $isMediaStream $type";
-				my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
-				my $fh;
-				#tempfile() would be the better way, but is not readable by signal-cli (how to set world-readable?)
-				#could be changed with "chmod 0666, $tmpfilename;" which should even work on Windows, but what's the point - dbus/signal-cli works on Linux only anyways
-				#my ($fh, $tmpfilename) = tempfile();
-				if(!open($fh, ">", $tmpfilename,)) {
-				#if (!defined $fh) {
-					Log3 $hash->{NAME}, 3, $hash->{NAME}.": Can't write $tmpfilename";
-					#return undef since this is a fatal error 
-					return ("Can't write $tmpfilename",@processed);
-				}
-				print $fh $msg;
-				close($fh);
+				my $ret=Signalbot_copyToFile($msg,$type);
+				return ("Can't write to temporary file",@processed) if !defined $ret;
 				#If we created a file return the filename instead
-				push @processed, $tmpfilename;
+				push @processed, $ret;
 			} else {
 				Log3 $hash->{NAME}, 5, $hash->{NAME}.": normal text found:$msg";
 				#No mediastream - return what it was
@@ -1939,6 +1930,144 @@ sub Signalbot_replaceCommands(@) {
 	}
 	
 	return (undef,@processed);
+}
+
+sub Signalbot_copyToFile(@) {
+	my ($msg,$type) = @_;
+	my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
+	my $fh;
+	if(!open($fh, ">", $tmpfilename,)) {
+		#return undef since this is a fatal error
+		return undef;
+	}
+	print $fh $msg;
+	close($fh);
+	return $tmpfilename;
+}	
+
+sub Signalbot_getPNG(@) {
+	my ($hash, $file) = @_;
+
+	my @special=split(",",$file);
+	#does the first part equal to a FHEM device?
+	my $sname = shift @special;
+	my $shash = $defs{$sname};
+	if (defined $shash) {
+		Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Attachment matches device $sname of type $shash->{TYPE}";
+		my $svg;
+		if ($shash->{TYPE} eq "SVG") {
+			$svg=plotAsPng($sname,@special);
+		}
+		if ($shash->{TYPE} eq "DOIF") {
+			$svg=Signalbot_DOIFAsPng($shash,@special);
+		}
+		return undef if !defined $svg;
+		return Signalbot_copyToFile($svg,"png");
+	}
+	return;
+}
+
+sub
+Signalbot_DOIFAsPng($@)
+{
+	my ($hash,@params) = @_;
+	my (@webs, $mimetype, $svgdata, $rsvg, $pngImg);
+
+	my $matchid=-1;
+	my $sizex=-1;
+	my $sizey=-1;
+	my $zoom=1.0;
+	my $matchdev="";
+	my $matchread="";
+	my $target="uiTable";
+
+	#If no further information given, take the first entry of uitables
+	if (@params == 0) {
+		$matchid=1;
+	} else {
+		foreach my $p (@params) {
+			my @par=split("=",$p);
+			my $cm=shift @par;
+			my $val=shift @par;
+			$matchid=$p if looks_like_number($p);
+			next if (!defined $cm || !defined $val);
+			if ($cm eq "id") {
+				$matchid=$val if looks_like_number($val);
+			} elsif ($cm eq "zoom") {
+				$zoom=$val if looks_like_number($val);
+			} elsif ($cm eq "dev") {
+				$matchdev=$val;
+			} elsif ($cm eq "val") {
+				$matchread=$val;
+			} elsif ($cm eq "sizex") {
+				$sizex=$val if looks_like_number($val);
+			} elsif ($cm eq "sizey") {
+				$sizey=$val if looks_like_number($val);
+			} elsif ($cm eq "state") {
+				$target="uiState";
+			}
+		}
+	}
+	$target="uiState" if (!defined $hash->{$target}{table});
+	my $table=$hash->{$target}{table};
+	
+	# "Error: uiTable/uiState not defined" 
+	return undef if (!defined $table);
+	
+	my $id=0;
+	my $cmd;
+	OUTER:
+	for (my $i=0;$i < scalar keys %{$table};$i++){
+		for (my $k=0;$k < scalar keys %{$table->{$i}};$k++){
+			for (my $l=0;$l < scalar keys %{$table->{$i}{$k}};$l++){
+				for (my $m=0;$m < scalar keys %{$table->{$i}{$k}{$l}};$m++) {
+					$id++;
+					my $tab=$table->{$i}{$k}{$l}{$m};
+					$tab =~ /.*DOIF_Widget\(.*?,.*?,.*?,(.*),.*\)/;
+					$cmd=$1;
+					next if !defined $cmd;
+					if ($matchid==$id) {
+						last OUTER;
+					} elsif ($matchid==-1) {
+						$cmd =~ /.*ReadingValDoIf\(\$hash,\'(.*?)\',\'(.*?)\'.*\)/;
+						next if ($matchdev ne "" && $matchdev ne $1);
+						next if ($matchread ne "" && $matchread ne $2);
+						last OUTER;
+					}
+				}
+			}
+		}
+		#Nothing found, since if something found we skip out with "last"
+		$cmd="";
+	}
+
+	if (defined $cmd && $cmd ne "") {
+		$cmd="package ui_Table;"."$cmd".";";
+		$svgdata=eval($cmd);
+		print $@;
+	} else {
+		#print "Error: uiTable format error (no card)";
+		return undef;
+	}
+	
+	# "Error: getting data from card" 
+	return undef if (! defined $svgdata);
+	$svgdata='<?xml version="1.0" encoding="UTF-8"?> <svg>'.$svgdata.'</svg>';
+
+	eval {
+		require Image::LibRSVG;
+		$rsvg = new Image::LibRSVG();
+		if ($sizex != -1 && $sizey !=-1) {
+		$rsvg->loadFromStringAtZoomWithMax($svgdata, $zoom, $zoom, $sizex, $sizey  );
+		} else {
+		$rsvg->loadFromStringAtZoom($svgdata, $zoom, $zoom);
+		}
+		$pngImg = $rsvg->getImageBitmap();
+	};
+	if (defined $pngImg && $pngImg ne "") {
+		return $pngImg if $pngImg;
+	}
+	return;
 }
 
 #Get OSRelease Version

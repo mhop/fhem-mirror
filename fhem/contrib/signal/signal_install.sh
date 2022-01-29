@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.3"
+SCRIPTVERSION="3.5"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -20,7 +20,7 @@ OPERATION=$1
 JAVA_VERSION=11.0
 
 if [ $OPERATION = "experimental" ]; then
-  SIGNALVERSION="0.10.1"
+  SIGNALVERSION="0.10.2"
   JAVA_VERSION=17.0
   OPERATION=
 fi
@@ -157,13 +157,22 @@ fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
 IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
-KNOWN=("amd64-glibc2.27-0.9.0" "amd64-glibc2.28-0.9.0" "amd64-glibc2.31-0.9.0" "armhf-glibc2.28-0.9.0" "amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "armhf-glibc2.31-0.10.1")
+KNOWN=("amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "armhf-glibc2.31-0.10.2" "armhf-glibc2.28-0.10.2" "amd64-glibc2.27-0.10.2" "amd64-glibc2.31-0.10.2")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
     echo "$IDENTSTR is an unsupported combination - signal-cli binary libraries might not work"
-	GETLIBS=0
+	if [ $ARCH = "amd64" && $GLIBC < "2.31" ]; then
+		GLIBC=2.28
+		echo "Fallback to GLIBC $GLIBC";
+	elif [ $ARCH = "armhf" && $GLIBC < "2.31" ]; then
+	    GLIBC=2.27
+		echo "Fallback to GLIBC $GLIBC";
+	else
+	   GETLIBS=0
+	fi
 fi
+IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
 
 if [ $OSNAME != "Linux" ]; then
 	echo "Only Linux systems are supported (you: $OSNAME), quitting"
@@ -284,7 +293,7 @@ if ! [ "$JAVA_VERSION" = "$JVER" ]; then
 		rm /tmp/$JAVA_ARC
 		echo "done"
 	fi
-	JAVA_HOME=/opt/java
+	export JAVA_HOME=/opt/java
 fi
 }
 
@@ -352,12 +361,6 @@ if [ $NEEDINSTALL = 1 ]; then
 		fi
 		echo "done"
 		rm -f /tmp/signal-cli-$SIGNALVERSION.tar.gz
-		cd /opt/signal/bin
-		mv signal-cli signal-cli.org
-		echo "#!/bin/sh" >signal-cli
-		echo "JAVA_HOME=$JAVA_HOME" >>signal-cli
-		cat signal-cli.org >>signal-cli
-		chmod a+x signal-cli
 	fi
 fi
 
@@ -411,6 +414,7 @@ After=network-online.target
 [Service]
 Type=dbus
 Environment="SIGNAL_CLI_OPTS=-Xms2m"
+Environment="JAVA_HOME=$JAVA_HOME"
 ExecStart=$SIGNALPATH/signal/bin/signal-cli --config $SIGNALVAR daemon --system
 User=$SIGNALUSER
 BusName=org.asamk.Signal

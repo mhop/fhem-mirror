@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 50_Signalbot: native SVG plot and DOIF uiTable widget handling
  - change:  32_withings: updated oauth endpoint
  - feature: 31_HUEDevice: added v2effect command
  - bugfix:  14_Hideki.pm: fix match regex - forum:#125679
