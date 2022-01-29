@@ -343,6 +343,7 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'snoring' => { name => "Snoring", reading => "snoringDuration", unit => "s", },
                         'snoringepisodecount' => { name => "Snoring Episode Count", reading => "snoringEpisodeCount", unit => 0, },
                         'breathing_event_probability' => { name => "Breathing Event Probability", reading => "breathingEventProbability", unit => 0, },
+                        'night_events' => { name => "Night Events", reading => "nightEvents", unit => 0, },
                         'apnea_activated' => { name => "Apnea Activated", reading => "apneaActivated", unit => 0, },
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
                         'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
@@ -1230,6 +1231,7 @@ sub withings_getUsers($) {
   my @users = ();
   foreach my $user (@{$json->{body}{users}}) {
     next if( !defined($user->{id}) );
+    next if( $user->{idparentaccount} ne $hash->{AccountID} );
 
     push( @users, $user );
   }
@@ -3821,7 +3823,7 @@ sub withings_AuthRefresh($) {
   my $ref = ReadingsVal($name,'.refresh_token','');
 
   my $datahash = {
-    url => "https://account.withings.com/oauth2/token",
+    url => "https://wbsapi.withings.net/v2/oauth2",
     method => "POST",
     timeout => 10,
     noshutdown => 1,
@@ -3850,13 +3852,13 @@ sub withings_AuthRefresh($) {
 
   Log3 $name, 4, "$name: REFRESH SUCCESS: $data";
 
-  #readingsSingleUpdate( $hash, "access_token", $json->{access_token}, 1 ) if(defined($json->{access_token}));
-  $hash->{helper}{OAuthKey} = $json->{access_token} if(defined($json->{access_token}));
-  #readingsSingleUpdate( $hash, "expires_in", $json->{expires_in}, 1 ) if(defined($json->{expires_in}));
-  $hash->{helper}{OAuthValid} = (int(time)+$json->{expires_in}) if(defined($json->{expires_in}));
-  readingsSingleUpdate( $hash, ".refresh_token", $json->{refresh_token}, 1 ) if(defined($json->{refresh_token}));
+  #readingsSingleUpdate( $hash, "access_token", $json->{body}{access_token}, 1 ) if(defined($json->{body}{access_token}));
+  $hash->{helper}{OAuthKey} = $json->{body}{access_token} if(defined($json->{body}{access_token}));
+  #readingsSingleUpdate( $hash, "expires_in", $json->{body}{expires_in}, 1 ) if(defined($json->{body}{expires_in}));
+  $hash->{helper}{OAuthValid} = (int(time)+$json->{body}{expires_in}) if(defined($json->{body}{expires_in}));
+  readingsSingleUpdate( $hash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{expires_in}-60, "withings_AuthRefresh", $hash, 0);
+  InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $hash, 0);
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
 
@@ -4238,6 +4240,11 @@ sub withings_DbLog_splitFn($) {
     $value = $parts[1];
     $unit = 'mmHg';
   }
+  elsif($event =~ m/^vascularAge/)
+  {
+    $value = $parts[1];
+    $unit = 'a';
+  }
   else
   {
     $value = $parts[1];
@@ -4427,6 +4434,7 @@ sub withings_weekdays2Int( $ ) {
     <li>heartSounds</li>
     <li>pulseWave</li>
     <li>spo2</li>
+    <li>vascularAge</li>
 
     <li>bodyTemperature</li>
     <li>skinTemperature</li>
