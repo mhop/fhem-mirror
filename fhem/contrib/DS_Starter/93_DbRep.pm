@@ -57,7 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.48.0"  => "18.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ",
+  "8.48.0"  => "29.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ".
+                            "change _DbRep_mysqlOptimizeTables ",
   "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
   "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
   "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
@@ -225,8 +226,8 @@ my %DbRep_vNotesExtern = (
   "5.6.0"   => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
   "5.4.0"   => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
   "5.3.1"   => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
-  "5.3.0"   => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
-  "5.0.6"   => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
+  "5.3.0"   => "26.06.2017 change of _DbRep_mysqlOptimizeTables, new command optimizeTables ",
+  "5.0.6"   => "13.06.2017 add Aria engine to _DbRep_mysqlOptimizeTables ",
   "5.0.3"   => "07.06.2017 DbRep_mysql_DumpServerSide added ",
   "5.0.1"   => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
   "5.0.0"   => "04.06.2017 MySQL Dump nonblocking added ",
@@ -339,6 +340,20 @@ my %DbRep_vHintsExt_de = (
          "Siehe dazu auch die Informationen zu <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
+
+# Hash der Main-Grundfunktionen
+my %dbrep_hmainf = (                                                                                                           
+    sumValue           => { fn => "DbRep_sumval",        fndone => "DbRep_sumvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    countEntries       => { fn => "DbRep_count",         fndone => "DbRep_countDone",         fnabort => "DbRep_ParseAborted", timeset => 1                     },   
+    averageValue       => { fn => "DbRep_averval",       fndone => "DbRep_avervalDone",       fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" }, 
+    fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted", timeset => 1                     },
+    maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },     
+    minValue           => { fn => "DbRep_minval",        fndone => "DbRep_minvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },  
+    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    tableCurrentPurge  => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted", timeset => 0, table => "current" },    
+    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted", timeset => 1, table => "current" }, 
+); 
 
 
 # Variablendefinitionen
@@ -578,16 +593,16 @@ sub DbRep_Set {
                 (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg "                 : "").
                 (($hash->{ROLE} ne "Agent") ? "countEntries:history,current "            : "").              
                 (($hash->{ROLE} ne "Agent") ? "index:".$indl." "                         : "").
-                (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime "         : "").
-                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime "     : "").
-                (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete "                    : "").                
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "dumpMySQL:clientSide,serverSide " : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "dumpSQLite:noArg "                : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "repairSQLite "                    : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "optimizeTables:noArg "            : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/) ? "vacuum:noArg "                    : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "restoreMySQL:".$cj." "            : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "restoreSQLite:".$cj." "           : "")
+                (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime "          : "").
+                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime "      : "").
+                (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete "                     : "").                
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "dumpMySQL:clientSide,serverSide "  : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "dumpSQLite:noArg "                 : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "repairSQLite "                     : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "optimizeTables:showInfo,execute "  : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/) ? "vacuum:noArg "                     : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "restoreMySQL:".$cj." "             : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "restoreSQLite:".$cj." "            : "")
                 ;
   
   return if(IsDisabled($name));
@@ -672,7 +687,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        
        DbRep_beforeproc ($hash, "optimize");    
-       DbRep_Main       ($hash,$opt);
+       DbRep_Main       ($hash, $opt, $prop);
        
        return;
   }
@@ -2326,7 +2341,8 @@ sub DbRep_Main {
 
      $params = {
          hash  => $hash,
-         name  => $name
+         name  => $name,
+         prop  => $prop
      };      
      
      $hash->{HELPER}{RUNNING_OPTIMIZE}           = BlockingCall("DbRep_optimizeTables", $params, "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
@@ -2403,9 +2419,10 @@ sub DbRep_Main {
  
  # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
- my $ts = "no_aggregation";                                                                  # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
+ 
  my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);
 
+ my $ts = "no_aggregation";                                                                  # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
  if($IsTimeSet || $IsAggrSet) {
      ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
  } 
@@ -2417,58 +2434,162 @@ sub DbRep_Main {
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries|^sql/x); 
  
  #####  Funktionsaufrufe #####
- ############################# 
- if ($opt eq "sumValue") {
+ #############################
+ if($dbrep_hmainf{$opt} && defined &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
          hash    => $hash,
          name    => $name,
-         table   => "history",
+         table   => $dbrep_hmainf{$opt}{table} // $prop,
          device  => $device,
          reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
+         opt     => $opt,
+         prop    => $prop
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval", $params, "DbRep_sumvalDone", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "countEntries") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => $prop,
-         device  => $device,
-         reading => $reading,
-         ts      => $ts,
-     };
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count", $params, "DbRep_countDone", $to, "DbRep_ParseAborted", $hash);  
- } 
- elsif ($opt eq "averageValue") { 
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
-     };
+     if($dbrep_hmainf{$opt}{timeset}) {
+         $params->{ts}  = $ts;
+         $params->{rsf} = $runtime_string_first;
+         $params->{rsn} = $runtime_string_next;
+     }
+      
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall ($dbrep_hmainf{$opt}{fn}, 
+                                                  $params, 
+                                                  $dbrep_hmainf{$opt}{fndone}, 
+                                                  $to, 
+                                                  $dbrep_hmainf{$opt}{fnabort}, 
+                                                  $hash
+                                                 );      
+ }
+  
+# if ($opt eq "sumValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval", $params, "DbRep_avervalDone", $to, "DbRep_ParseAborted", $hash); 
- } 
- elsif ($opt eq "fetchrows") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => $prop,
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next
-     };
-            
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_fetchrows", $params, "DbRep_fetchrowsDone", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "delDoublets") {
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval", $params, "DbRep_sumvalDone", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "countEntries") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+ #        table   => $prop,
+#         device  => $device,
+#         reading => $reading,
+#         ts      => $ts,
+#     };
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count", $params, "DbRep_countDone", $to, "DbRep_ParseAborted", $hash);  
+# } 
+# if ($opt eq "averageValue") { 
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval", $params, "DbRep_avervalDone", $to, "DbRep_ParseAborted", $hash); 
+# } 
+# if ($opt eq "fetchrows") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => $prop,
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         rsn     => $runtime_string_next
+#     };
+#            
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_fetchrows", $params, "DbRep_fetchrowsDone", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "exportToFile") {
+#     DbRep_beforeproc ($hash, "export");
+#     
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         file    => $prop,
+#         ts      => $ts,
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_expfile", $params, "DbRep_expfile_Done", $to, "DbRep_ParseAborted", $hash); 
+# } 
+# elsif ($opt eq "importFromFile") {     
+#     DbRep_beforeproc ($hash, "import");
+     
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         rsf     => $runtime_string_first,
+#         prop    => $prop,
+#     };    
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_impfile", $params, "DbRep_impfile_Done", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "maxValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval", $params, "DbRep_maxvalDone", $to, "DbRep_ParseAborted", $hash);      
+# } 
+# elsif ($opt eq "minValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval", $params, "DbRep_minvalDone", $to, "DbRep_ParseAborted", $hash);        
+# }
+# elsif ($opt eq "tableCurrentPurge") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "current",
+#         device  => $device,
+#         reading => $reading
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "tableCurrentFillup") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "current",
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         rsn     => $runtime_string_next
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillupDone", $to, "DbRep_ParseAborted", $hash);
+# }
+ if ($opt eq "delDoublets") {
      $params = {
          hash    => $hash,
          name    => $name,
@@ -2494,59 +2615,6 @@ sub DbRep_Main {
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_delseqdoubl", $params, "DbRep_deldoubl_Done", $to, "DbRep_ParseAborted", $hash);   
  } 
- elsif ($opt eq "exportToFile") {
-     DbRep_beforeproc ($hash, "export");
-     
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         file    => $prop,
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_expfile", $params, "DbRep_expfile_Done", $to, "DbRep_ParseAborted", $hash); 
- } 
- elsif ($opt eq "importFromFile") {     
-     DbRep_beforeproc ($hash, "import");
-     
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         rsf     => $runtime_string_first,
-         file    => $prop,
-     };    
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_impfile", $params, "DbRep_impfile_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "maxValue") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval", $params, "DbRep_maxvalDone", $to, "DbRep_ParseAborted", $hash);      
- } 
- elsif ($opt eq "minValue") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval", $params, "DbRep_minvalDone", $to, "DbRep_ParseAborted", $hash);        
- } 
  elsif ($opt eq "delEntries") {
      delete $hash->{HELPER}{DELENTRIES};
      DbRep_beforeproc ($hash, "delEntries");
@@ -2566,30 +2634,6 @@ sub DbRep_Main {
      }
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "tableCurrentPurge") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "current",
-         device  => $device,
-         reading => $reading
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "tableCurrentFillup") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "current",
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillupDone", $to, "DbRep_ParseAborted", $hash);
  } 
  elsif ($opt eq "diffValue") {  
      $params = {
@@ -6393,10 +6437,11 @@ sub DbRep_expfile {
   my $paref   = shift;    
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
+  my $table   = $paref->{table};
   my $device  = $paref->{device};
   my $reading = $paref->{reading};
   my $rsf     = $paref->{rsf};
-  my $file    = $paref->{file};
+  my $file    = $paref->{prop};
   my $ts      = $paref->{ts};
 
   my ($sth,$sql);
@@ -6463,10 +6508,10 @@ sub DbRep_expfile {
       my $runtime_string_next  = $a[2];   
  
       if ($IsTimeSet || $IsAggrSet) {
-          $sql = DbRep_createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+          $sql = DbRep_createSelectSql($hash, $table, "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT", $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
       } 
       else {
-          $sql = DbRep_createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,$addon);
+          $sql = DbRep_createSelectSql($hash, $table, "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT", $device, $reading, undef, undef, $addon);
       }
      
       Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
@@ -6576,8 +6621,9 @@ sub DbRep_impfile {
   my $paref  = shift;    
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $table  = $paref->{table};
   my $rsf    = $paref->{rsf};
-  my $infile = $paref->{file};
+  my $infile = $paref->{prop};
 
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
 
@@ -6620,16 +6666,16 @@ sub DbRep_impfile {
   # insert history mit/ohne primary key
   my $sql;
   if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
-      $sql = "INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      $sql = "INSERT IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
   } 
   elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
-      $sql = "INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      $sql = "INSERT OR IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
   } 
   elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-      $sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
+      $sql = "INSERT INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
   } 
   else {
-      $sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      $sql = "INSERT INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
   }
  
   my $sth;
@@ -7635,6 +7681,7 @@ sub DbRep_optimizeTables {
   my $paref  = shift;
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $prop   = $paref->{prop} // '';                     # default execute wenn nichts angegeben (wg. Kompatibilität)
  
   my $dbname = $hash->{DATABASE};
   my $value  = 0;
@@ -7683,11 +7730,16 @@ sub DbRep_optimizeTables {
       }
 
       $hash->{HELPER}{DBTABLES}      = \%db_tables;                                                         # Tabellen optimieren 
-      ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash, $dbh, @tablenames);
-      if ($err) {
-          $err = encode_base64($err,"");
-          return "$name|$err";
-      }
+      
+      my $opars = {
+          hash   => $hash,
+          dbh    => $dbh,
+          omode  => $prop,
+          tables => \@tablenames
+      };
+      
+      ($err, $db_MB_start, $db_MB_end) = _DbRep_mysqlOptimizeTables ($opars);
+      return $err if($err);
   }
  
   if ($dbmodel =~ /SQLITE/) {
@@ -7737,13 +7789,116 @@ sub DbRep_optimizeTables {
   $sth->finish;
   $dbh->disconnect;
   
+  $db_MB_start = encode_base64($db_MB_start,"");
+  $db_MB_end   = encode_base64($db_MB_end,  "");
+  
   my $rt  = tv_interval($st);                                               # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                              # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
  
-  Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
+  Log3 ($name, 3, "DbRep $name - Optimize tables of $dbname finished - total time (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|''|$rt|$db_MB_start|$db_MB_end";
+}
+
+####################################################################################################
+#             Tabellenoptimierung MySQL
+####################################################################################################
+sub _DbRep_mysqlOptimizeTables {
+  my $opars  = shift;
+  my $hash   = $opars->{hash};
+  my $dbh    = $opars->{dbh};
+  my $omode  = $opars->{omode};
+  my $tables = $opars->{tables};
+  
+  my $name      = $hash->{NAME};
+  my $dbname    = $hash->{DATABASE};
+  my $db_tables = $hash->{HELPER}{DBTABLES};
+  my $result    = 0;
+  my $opttbl    = 0;
+  
+  my ($err,$sth,$db_MB_start,$db_MB_end);
+  
+  ($err, $db_MB_start) = _DbRep_mysqlOpdAndFreeSpace ($hash, $dbh);
+  
+  Log3 ($name, 3, "DbRep $name - Estimate of $dbname before optimize (MB): $db_MB_start");
+  
+  if($omode eq "showInfo") {                                                                     # nur Info, keine Ausführung
+      return ('',$db_MB_start,'');
+  }
+  
+  Log3 ($name, 3, "DbRep $name - Optimizing tables");
+  
+  for my $tablename (@{$tables}) {                                                                # optimize table if engine supports optimization
+      my $engine = '';
+      $engine    = uc($db_tables->{$tablename}{Engine}) if($db_tables->{$tablename}{Engine});
+
+      if ($engine =~ /(MYISAM|BDB|INNODB|ARIA)/xi) {
+          Log3($name, 3, "DbRep $name - Optimizing table `$tablename` ($engine). It may take a while ...");
+                    
+          ($err, $sth, $result) = DbRep_prepareExecuteQuery ($name, $dbh, "OPTIMIZE TABLE `$tablename`");
+           
+          if ($result) {
+              Log3($name, 3, "DbRep $name - Table ".($opttbl+1)." `$tablename` optimized successfully.");
+              $opttbl++;
+          } 
+          else {
+              Log3($name, 2, "DbRep $name - Error while optimizing table $tablename. Continue with next table or backup.");
+          }
+      }
+  }
+
+  Log3($name, 3, "DbRep $name - $opttbl tables have been optimized.") if($opttbl > 0);
+     
+  ($err, $db_MB_end) = _DbRep_mysqlOpdAndFreeSpace ($hash, $dbh);
+  
+  Log3 ($name, 3, "DbRep $name - Estimate of $dbname after optimize (MB): $db_MB_end");
+  
+return ('',$db_MB_start,$db_MB_end);
+}
+
+####################################################################################################
+#             MySQL Datenbank belegten und freien Speicher ermitteln
+####################################################################################################
+sub _DbRep_mysqlOpdAndFreeSpace  {
+  my $hash   = shift;
+  my $dbh    = shift;
+  
+  my $name   = $hash->{NAME};
+  my $dbname = $hash->{DATABASE};
+
+  my $query = qq{SELECT table_name, };                                                                         # SQL zur Größenermittlung
+  $query   .= qq{round (data_length / 1024 / 1024, 2) "data size in MB", }; 
+  $query   .= qq{round (index_length / 1024 / 1024, 2) "index size in MB", };
+  $query   .= qq{round (data_free / 1024 / 1024, 2) "free space in MB" };
+  $query   .= qq{FROM information_schema.TABLES where table_schema = '$dbname'; };
+  
+  my ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);                               # Anfangsgröße ermitteln
+  return $err if ($err);
+  
+  my ($dl,$il,$fs) = (0,0,0);
+  my $tn           = '';
+  
+  while (my @line = $sth->fetchrow_array()) {
+      $tn  = $line[0] // '';
+      $dl += $line[1] // 0;
+      $il += $line[2] // 0;
+      $fs += $line[3] // 0;      
+      
+      # Log3 ($name, 5, "DbRep $name - Size details: table name -> $line[0], data size -> $line[1] MB, index size -> $line[2] MB, Space free -> $line[3] MB");
+  }
+  
+  $query  = qq{SELECT round ((COUNT(*) * 300 * 1024)/1048576 + 150, 2) "overhead in MB" };
+  $query .= qq{FROM information_schema.TABLES where table_schema = '$dbname'; };
+  
+  my ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);                               # Overhead ermitteln
+  return $err if ($err);
+  
+  my $ovh = $sth->fetchrow_array();
+  
+  my $db_MB_size = "Data size -> $dl, Index size -> $il, Space free -> $fs, Overhead -> $ovh";
+  
+return ($err, $db_MB_size);
 }
 
 ####################################################################################################
@@ -7753,10 +7908,10 @@ sub DbRep_OptimizeDone {
   my $string       = shift;
   my @a            = split("\\|",$string);
   my $name         = $a[0];
-  my $err          = $a[1] ? decode_base64($a[1]) : undef;
+  my $err          = $a[1] ? decode_base64($a[1]) : '';
   my $bt           = $a[2];
-  my $db_MB_start  = $a[3];
-  my $db_MB_end    = $a[4];
+  my $db_MB_start  = $a[3] ? decode_base64($a[3]) : '';
+  my $db_MB_end    = $a[4] ? decode_base64($a[4]) : '';
   
   my $hash         = $defs{$name};
   
@@ -7816,7 +7971,7 @@ sub DbRep_mysql_DumpClientSide {
  my $dbpraefix                  = "";
  
  my ($sth,$tablename,$sql_create,$rct,$insert,$first_insert,$backupfile,$drc,$drh,$e,
-     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end,$db_MB_start,$db_MB_end);
+     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end);
  my (@ar,@tablerecords,@tablenames,@tables,@ergebnis);
  my (%db_tables);
  
@@ -7961,12 +8116,16 @@ sub DbRep_mysql_DumpClientSide {
 
  if($optimize_tables_beforedump) {                                             # Tabellen optimieren vor dem Dump
      $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
      
-     if ($err) {
-         $err = encode_base64($err,"");
-         return "$name|$err";
-     }
+     my $opars = {
+         hash   => $hash,
+         dbh    => $dbh,
+         omode  => "execute",
+         tables => \@tablenames
+     };
+     
+     ($err) = _DbRep_mysqlOptimizeTables ($opars);
+     return $err if($err);
  }
     
  $st_e .= "-- TABLE-INFO\n";                                                   # Tabelleneigenschaften für SQL-File ermitteln
@@ -7975,8 +8134,7 @@ sub DbRep_mysql_DumpClientSide {
      my $dump_table = 1;
      
      if ($dbpraefix ne "") {
-         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {
-             # exclude table from backup because it doesn't fit to praefix
+         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {         # exclude table from backup because it doesn't fit to praefix
              $dump_table = 0;
          }
      }
@@ -8130,7 +8288,7 @@ sub DbRep_mysql_DumpClientSide {
              $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
          }
 
-         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, , $character_set);        # write sql commands to file
+         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);        # write sql commands to file
          $sql_text = "";
 
          if ($db_tables{$tablename}{skip_data} == 0) {
@@ -8211,7 +8369,7 @@ sub DbRep_mysql_DumpServerSide {
  my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  
- my ($sth,$db_MB_start,$db_MB_end,$drh);
+ my ($sth,$drh);
  my (%db_tables,@tablenames);
  
  my $bst = [gettimeofday];                                              # Background-Startzeit
@@ -8257,11 +8415,16 @@ sub DbRep_mysql_DumpServerSide {
  
  if($optimize_tables_beforedump) {                                                       # Tabellen optimieren vor dem Dump
      $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
-     if ($err) {
-         $err = encode_base64($err,"");
-         return "$name|$err"; 
-     }
+     
+     my $opars = {
+         hash   => $hash,
+         dbh    => $dbh,
+         omode  => "execute",
+         tables => \@tablenames
+     };
+     
+     ($err) = _DbRep_mysqlOptimizeTables($opars);
+     return $err if($err);
  }
  
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table'");
@@ -10453,12 +10616,12 @@ sub DbRep_prepareExecuteQuery {
   
   my $ret  = q{};
   
-  my ($sth,$err,$r);
-  
+  my ($sth,$err,$result);
+
   Log3 ($name, 4, "DbRep $name - $info");
   
-  eval{ $sth = $dbh->prepare($sql);
-        $r   = $sth->execute();
+  eval{ $sth    = $dbh->prepare($sql);
+        $result = $sth->execute();
       } 
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -10467,7 +10630,7 @@ sub DbRep_prepareExecuteQuery {
               $ret = "$name|$err";
             };
 
-return ($ret, $sth, $r);
+return ($ret, $sth, $result);
 }
 
 ####################################################################################################
@@ -11441,7 +11604,7 @@ sub DbRep_setCmdFile {
   
   push @new, "$key:$value" if(!$fnd && defined($value));
   
-  my $err = FileWrite($param, @new);
+  $err = FileWrite($param, @new);
 
 return $err;
 }
@@ -11676,79 +11839,6 @@ sub _DbRep_deconvertSQL {
   $cmd =~ s/&#65292;/,/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
    
 return $cmd;
-}
-
-####################################################################################################
-#             Tabellenoptimierung MySQL
-####################################################################################################
-sub DbRep_mysqlOptimizeTables {
-  my ($hash,$dbh,@tablenames) = @_;
-  my $name   = $hash->{NAME};
-  my $dbname = $hash->{DATABASE};
-  my $ret    = 0;
-  my $opttbl = 0;
-  my $db_tables = $hash->{HELPER}{DBTABLES};
-  
-  my ($engine,$tablename,$query,$sth,$value,$db_MB_start,$db_MB_end);
-
-  # Anfangsgröße ermitteln
-  $query = "SELECT sum( data_length + index_length ) / 1024 / 1024 FROM information_schema.TABLES where table_schema='$dbname' "; 
-  Log3 ($name, 5, "DbRep $name - current query: $query ");
-  eval { $sth = $dbh->prepare($query);
-         $sth->execute;
-       };
-  if ($@) {
-      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-      $sth->finish;
-      $dbh->disconnect;
-      return ($@,undef,undef);
-  }
-  
-  $value = $sth->fetchrow();
-     
-  $db_MB_start = sprintf("%.2f",$value);
-  Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
-     
-  Log3($name, 3, "DbRep $name - Optimizing tables");
-  
-  foreach $tablename (@tablenames) {
-      #optimize table if engine supports optimization
-      $engine = '';
-      $engine = uc($db_tables->{$tablename}{Engine}) if($db_tables->{$tablename}{Engine});
-
-      if ($engine =~ /(MYISAM|BDB|INNODB|ARIA)/) {
-          Log3($name, 3, "DbRep $name - Optimizing table `$tablename` ($engine). It will take a while.");
-          my $sth_to = $dbh->prepare("OPTIMIZE TABLE `$tablename`");
-          $ret = $sth_to->execute; 
-           
-          if ($ret) {
-              Log3($name, 3, "DbRep $name - Table ".($opttbl+1)." `$tablename` optimized successfully.");
-              $opttbl++;
-          } 
-          else {
-              Log3($name, 2, "DbRep $name - Error while optimizing table $tablename. Continue with next table or backup.");
-          }
-      }
-  }
-
-  Log3($name, 3, "DbRep $name - $opttbl tables have been optimized.") if($opttbl > 0);
-     
-  # Endgröße ermitteln
-  eval { $sth->execute; };
-  if ($@) {
-      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-      $sth->finish;
-      $dbh->disconnect;
-      return ($@,undef,undef);
-  }
-  
-  $value = $sth->fetchrow();
-  $db_MB_end = sprintf("%.2f",$value);
-  Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
-     
-  $sth->finish;
-  
-return (undef,$db_MB_start,$db_MB_end);
 }
 
 ####################################################################################################
@@ -14188,9 +14278,20 @@ return;
                                  
                                  </li><br>   
 
-    <li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br>
+    <li><b> optimizeTables [showInfo | execute]</b> 
+                                  - optimize tables in the connected database (MySQL). <br><br>
+                                  
+                                  <ul>
+                                  <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>showInfo</b>  </td><td>: shows information about the used / free space within the database   </td></tr>
+                                      <tr><td> <b>execute</b>   </td><td>: performs optimization of all tables in the database                 </td></tr>
+                                   </table>
+                                  </ul>
+                                  <br> 
+                                  
                                   Before and after an optimization it is possible to execute a FHEM command. 
-                                  (please see <a href="#DbRepattr">attributes</a>  "executeBeforeProc", "executeAfterProc") 
+                                  (please see attributes <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>) 
                                   <br><br>
                                 
                                  <ul>
@@ -14417,7 +14518,7 @@ return;
                                  the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
                                  <b>§timestamp_end§</b> can be used for this purpose. <br>
                                  It should be noted that the placeholders §device§ and §reading§ complex are resolved and 
-								 should be applied accordingly as in the example below.                                  
+                                 should be applied accordingly as in the example below.                                  
                                  <br><br>
                                  
                                  If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
@@ -16989,17 +17090,29 @@ return;
                                  
                                  </li> <br>                                 
                                  
-    <li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br>
-                                  Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
-                                  (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
-                                  <br><br>
+    <li><b> optimizeTables [showInfo | execute]</b> 
+                                - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br><br>
+                                
+                                <ul>
+                                <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>showInfo</b>  </td><td>: zeigt Informationen zum belegten / freien Speicherplatz innerhalb der Datenbank   </td></tr>
+                                    <tr><td> <b>execute</b>   </td><td>: führt die Optimierung aller Tabellen in der Datenbank aus                         </td></tr>
+                                 </table>
+                                </ul>
+                                <br>                                
+                                
+                                Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
+                                (siehe Attribute <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>)
+                                <br><br>
                                  
                                 <ul>
-                                <b>Hinweis:</b> <br>
-                                Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
-                                im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
+                                  <b>Hinweis:</b> <br>
+                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
+                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
                                 </li>
-                                </ul><br>
+                                </ul>
+                                <br>
                                                                          
     <li><b> readingRename &lt;[Device:]alterReadingname&gt;,&lt;neuerReadingname&gt; </b>  <br>
                                  Benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
