@@ -7896,7 +7896,7 @@ sub _DbRep_mysqlOpdAndFreeSpace  {
   
   my $ovh = $sth->fetchrow_array();
   
-  my $db_MB_size = "Data size -> $dl, Index size -> $il, Space free -> $fs, Overhead -> $ovh";
+  my $db_MB_size = "Data size: $dl, Index size: $il, Space free: $fs, Overhead: $ovh";
   
 return ($err, $db_MB_size);
 }
