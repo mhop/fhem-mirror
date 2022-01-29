@@ -25,7 +25,7 @@ use JSON;
 
 use POSIX qw( strftime );
 use Time::Local qw(timelocal);
-use Digest::SHA qw(hmac_sha1_base64);
+use Digest::SHA qw(hmac_sha1_base64 hmac_sha256_hex);
 
 #use Encode qw(encode);
 #use LWP::Simple;
@@ -3670,6 +3670,8 @@ sub withings_addExtension($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  return undef if($name =~ /test/);
+
   #withings_removeExtension() ;
   my $url = "/withings";
   delete $data{FWEXT}{$url} if($data{FWEXT}{$url});
@@ -3732,6 +3734,47 @@ sub withings_Webcall() {
       return ( "text/plain; charset=utf-8",
           "1" );
     }
+    if($request =~ /appli=/){
+      $request =~ /appli=(.*?)(&|$)/;
+      my $appli = $1 || undef;
+
+      if($appli eq "1"){
+        Log3 "withings", 4, "New user measurement ".$request;
+      }
+      if($appli eq "2"){
+        Log3 "withings", 4, "New temperature measurement ".$request;
+      }
+      if($appli eq "4"){
+        Log3 "withings", 4, "New heart measurement ".$request;
+      }
+      if($appli eq "16"){
+        Log3 "withings", 4, "New activity measurement ".$request;
+      }
+      if($appli eq "44"){
+        Log3 "withings", 4, "New sleep measurement ".$request;
+      }
+      if($appli eq "46"){
+        Log3 "withings", 4, "New user profile measurement ".$request;
+      }
+      if($appli eq "50"){
+        readingsSingleUpdate( $userhash, "in_bed", 1, 1 );
+      }
+      if($appli eq "51"){
+        readingsSingleUpdate( $userhash, "in_bed", 0, 1 );
+      }
+      if($appli eq "52"){
+        Log3 "withings", 4, "Withings sleep mat was inflated ".$request;
+      }
+      if($appli eq "53"){
+        Log3 "withings", 4, "Withings device setup ".$request;
+      }
+      if($appli eq "54"){
+        Log3 "withings", 4, "New ECG data ".$request;
+      }
+      if($appli eq "55"){
+        Log3 "withings", 4, "ECG failed ".$request;
+      }
+    }
     InternalTimer(gettimeofday()+2, "withings_poll", $userhash, 0);
 
     return ( "text/plain; charset=utf-8",
@@ -3756,19 +3799,19 @@ sub withings_AuthApp($;$) {
   my $cid = AttrVal($name,'client_id','');
   my $cb = AttrVal($name,'callback_url','');
 
-  my $url = "https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=".$cid."&scope=user.info,user.metrics,user.activity&state=connect&redirect_uri=".$cb;
+  my $url = "https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=".$cid."&scope=user.info,user.metrics,user.activity,user.sleepevents&state=connect&redirect_uri=".$cb;
   return $url if(!defined($code) || $code eq "");
 
   my $cs = AttrVal($name,'client_secret','');
 
-  Log3 "withings", 2, "Withings auth call ".$code;
+  Log3 "withings", 4, "Withings auth call ".$code." ".$cb." ".$name;
 
   my $datahash = {
-    url => "https://account.withings.com/oauth2/token",
+    url => "https://wbsapi.withings.net/v2/oauth2",
     method => "POST",
     timeout => 10,
     noshutdown => 1,
-    data => { grant_type => 'authorization_code', client_id => $cid, client_secret => $cs, code => $code, redirect_uri => $cb },
+    data => { action => 'requesttoken', grant_type => 'authorization_code', client_id => $cid, client_secret => $cs, code => $code, redirect_uri => $cb },
   };
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
@@ -3786,26 +3829,26 @@ sub withings_AuthApp($;$) {
     Log3 $name, 1, "$name: LOGIN JSON ERROR: $data";
     return undef;
   }
-  if(defined($json->{errors})){
+  if(defined($json->{error})){
     Log3 $name, 2, "$name: LOGIN RETURN ERROR: $data";
     return undef;
   }
 
   Log3 $name, 4, "$name: LOGIN SUCCESS: $data";
 
-  my $user = $json->{userid} || "NOUSER";
+  my $user = $json->{body}{userid} || "NOUSER";
   my $userhash = $modules{$hash->{TYPE}}{defptr}{"U$user"};
   if(!defined($userhash)){
     Log3 $name, 2, "$name: LOGIN USER ERROR: $data";
     return undef;
   }
   #readingsSingleUpdate( $hash, "access_token", $json->{access_token}, 1 ) if(defined($json->{access_token}));
-  $userhash->{helper}{OAuthKey} = $json->{access_token} if(defined($json->{access_token}));
+  $userhash->{helper}{OAuthKey} = $json->{body}{access_token} if(defined($json->{body}{access_token}));
   #readingsSingleUpdate( $hash, "expires_in", $json->{expires_in}, 1 ) if(defined($json->{expires_in}));
-  $userhash->{helper}{OAuthValid} = (int(time)+$json->{expires_in}) if(defined($json->{expires_in}));
-  readingsSingleUpdate( $userhash, ".refresh_token", $json->{refresh_token}, 1 ) if(defined($json->{refresh_token}));
+  $userhash->{helper}{OAuthValid} = (int(time)+$json->{body}{expires_in}) if(defined($json->{body}{expires_in}));
+  readingsSingleUpdate( $userhash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
+  InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
 
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
@@ -3818,6 +3861,9 @@ sub withings_AuthRefresh($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+
+  #my $nonce = withings_GetNonce($hash);
+
   my $cid = AttrVal($hash->{IODev}->{NAME},'client_id','');
   my $cs = AttrVal($hash->{IODev}->{NAME},'client_secret','');
   my $ref = ReadingsVal($name,'.refresh_token','');
@@ -3827,7 +3873,7 @@ sub withings_AuthRefresh($) {
     method => "POST",
     timeout => 10,
     noshutdown => 1,
-    data => { grant_type => 'refresh_token', client_id => $cid, client_secret => $cs, refresh_token => $ref },
+    data => { action => 'requesttoken', client_id => $cid, grant_type => 'refresh_token', client_secret => $cs, refresh_token => $ref },
   };
 
 
@@ -3845,7 +3891,7 @@ sub withings_AuthRefresh($) {
     Log3 $name, 1, "$name: REFRESH JSON ERROR: $data";
     return undef;
   }
-  if(defined($json->{errors})){
+  if(defined($json->{error})){
     Log3 $name, 2, "$name: REFRESH RETURN ERROR: $data";
     return undef;
   }
@@ -3863,6 +3909,50 @@ sub withings_AuthRefresh($) {
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
 
   return undef;
+}
+
+sub withings_GetNonce($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $acc = $hash->{helper}{OAuthKey};
+  my $cid = AttrVal($name,'client_id','');
+  my $ts = int(time());
+
+  my $sig = "getnonce,$cid,".$ts;
+  $sig=hmac_sha256_hex($sig, AttrVal($name,'client_secret',''));
+
+  my $datahash = {
+    url => "https://wbsapi.withings.net/v2/signature",
+    method => "POST",
+    timeout => 10,
+    noshutdown => 1,
+    data => { action => 'getnonce', client_id => $cid, timestamp => $ts, signature => $sig },
+  };
+
+
+  my($err,$data) = HttpUtils_BlockingGet($datahash);
+
+  if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/)
+  {
+    Log3 $name, 1, "$name: NONCE ERROR $err";
+    return undef;
+  }
+
+  my $json = eval { JSON::decode_json($data) };
+  if($@)
+  {
+    Log3 $name, 1, "$name: NONCE JSON ERROR: $data";
+    return undef;
+  }
+  if(!defined($json->{body}{nonce})){
+    Log3 $name, 2, "$name: NONCE RETURN ERROR: $data";
+    return undef;
+  }
+
+  Log3 $name, 5, "$name: NONCE SUCCESS: ";
+  return $json->{body}{nonce};
+
 }
 
 sub withings_AuthList($) {
@@ -3894,7 +3984,7 @@ sub withings_AuthList($) {
     Log3 $name, 1, "$name: LIST JSON ERROR: $data";
     return undef;
   }
-  if(defined($json->{errors})){
+  if(defined($json->{error})){
     Log3 $name, 2, "$name: LIST RETURN ERROR: $data";
     return undef;
   }
@@ -3921,7 +4011,7 @@ sub withings_AuthUnsubscribe($) {
   my $acc = $hash->{helper}{OAuthKey};
   my $cb = AttrVal($hash->{IODev}->{NAME},'callback_url','');
 
-  my @applis = ("1", "4", "16", "44", "46");
+  my @applis = ("1", "2", "4", "16", "44", "46", "50", "51", "52", "54", "55");
   foreach my $appli (@applis) {
 
     my $datahash = {
@@ -3967,7 +4057,7 @@ sub withings_AuthSubscribe($) {
 
   my $acc = $hash->{helper}{OAuthKey};
   my $cb = AttrVal($hash->{IODev}->{NAME},'callback_url','');
-  my @applis = ("1", "4", "16", "44", "46");
+  my @applis = ("1", "2", "4", "16", "44", "46", "50", "51", "52", "54", "55");
 
   my $ret = "Please open the following URLs in your browser to subscribe:\n\n";
   foreach my $appli (@applis) {
