@@ -50,7 +50,7 @@ HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 eventstreamTimeout createGroupReadings:1,0 httpUtils:1,0 ignoreUnknown:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 eventstreamTimeout createGroupReadings:1,0 httpUtils:1,0 forceAutocreate:1,0 ignoreUnknown:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
 
   #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
 
@@ -1908,11 +1908,29 @@ HUEBridge_Autocreate($;$$)
 {
   my ($hash,$force,$sensors)= @_;
   my $name = $hash->{NAME};
+     $force = AttrVal($name, 'forceAutocreate', $force);
 
   if( !$force ) {
+    my $type = $hash->{TYPE};
+
     foreach my $d (keys %defs) {
-      next if($defs{$d}{TYPE} ne "autocreate");
-      return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+      next if($defs{$d}{TYPE} ne 'autocreate');
+
+      if(AttrVal($defs{$d}{NAME},'disable',undef)) {
+        Log3 $name, 2, "$name: autocreate is disabled, please enable it at least for $type. see: ignoreTypes" if( !AttrVal($name, 'ignoreUnknown', undef) );
+        return undef;
+
+      } elsif( my $it = AttrVal($name, 'ignoreTypes', '') ) {
+        if($it && $name =~ m/$it/i) {
+          Log3 $name, 2, "$name: autocreate is disabled for $type, please enable" if( !AttrVal($name, 'ignoreUnknown', undef) );
+          return undef;
+
+        } elsif($it && "$type:$name" =~ m/$it/i) {
+          Log3 $name, 2, "$name: autocreate is disabled for this bridge, please enable" if( !AttrVal($name, 'ignoreUnknown', undef) );
+          return undef;
+        }
+
+      }
     }
   }
 
@@ -2622,7 +2640,7 @@ HUEBridge_dispatch($$$;$)
                   delete $hash->{helper}{ignored}{$code};
                 }
 
-              } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, "ignoreUnknown", undef) ) {
+              } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
                 Log3 $name, 3, "$name: EventStream: update for unknown device received: $code";
 
               }
@@ -2714,7 +2732,7 @@ HUEBridge_dispatch($$$;$)
 
               delete $hash->{helper}{ignored}{$code};
 
-            } elsif( $hash->{has_v2_api} && !$hash->{helper}{ignored}{$code} && !AttrVal($name, "ignoreUnknown", undef) ) {
+            } elsif( $hash->{has_v2_api} && !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
               Log3 $name, 3, "$name: data for unknown sensor received: $code";
 
               HUEBridge_schedule($hash,'HUEBridge_Autocreate');
@@ -2732,7 +2750,7 @@ HUEBridge_dispatch($$$;$)
 
               delete $hash->{helper}{ignored}{$code};
 
-            } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, "ignoreUnknown", undef) ) {
+            } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
               Log3 $name, 2, "$name: data for unknown group received: $code";
 
               HUEBridge_schedule($hash,'HUEBridge_Autocreate');
@@ -2765,7 +2783,7 @@ HUEBridge_dispatch($$$;$)
               delete $hash->{helper}{ignored}{$code};
             }
 
-          } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, "ignoreUnknown", undef) ) {
+          } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
             Log3 $name, 3, "$name: data for unknown device received: $code";
 
           }
@@ -3129,8 +3147,10 @@ __END__
       0 -> create readings only for group devices where createGroupReadings ist set to 1<br>
       1 -> create readings for all group devices where createGroupReadings ist not set or set to 1<br>
       undef -> do nothing</li>
+    <li>forceAutocreate<br>
+      try to create devices even if autocreate is disabled.</li>
     <li>ignoreUnknown<br>
-      don't try to autocreate devices after data or events with unknown references are received.</li>
+      don't try to create devices after data or events with unknown references are received.</li>
     <li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
     <li>noshutdown<br>
