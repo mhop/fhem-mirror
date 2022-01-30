@@ -50,7 +50,7 @@ HUEBridge_Initialize($)
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 eventstreamTimeout createGroupReadings:1,0 httpUtils:1,0 forceAutocreate:1,0 ignoreUnknown:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals createEventTimestampReading:1,0 eventstreamTimeout createGroupReadings:1,0 httpUtils:1,0 forceAutocreate:1,0 ignoreUnknown:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterEvent:1,0 queryAfterSet:1,0 $readingFnAttributes";
 
   #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
 
@@ -2525,6 +2525,8 @@ HUEBridge_dispatch($$$;$)
                   $obj->{state}{presence} = $data->{motion}{motion} if( defined($data->{motion}) );
 
                 } elsif( $data->{type} eq 'button' ) {
+                  RemoveInternalTimer($chash, 'updateFinalButtonState' );
+
                   my $input = $service->{metadata}{control_id};
                   my $eventtype = $data->{button}{last_event};
 #Log 1, "input: $input";
@@ -2638,6 +2640,8 @@ HUEBridge_dispatch($$$;$)
                   }
 
                   delete $hash->{helper}{ignored}{$code};
+                  InternalTimer(gettimeofday()+1, "updateFinalButtonState", $chash, 0) if( $data->{type} eq 'button'
+                                                                                             && AttrVal( $name,'queryAfterEvent', 0 ) );
                 }
 
               } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
@@ -3151,6 +3155,8 @@ __END__
       try to create devices even if autocreate is disabled.</li>
     <li>ignoreUnknown<br>
       don't try to create devices after data or events with unknown references are received.</li>
+    <li>queryAfterEvent<br>
+      the bridge will request the real button state 1 sec after the final event in a quick series. default is 0.</li>
     <li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
     <li>noshutdown<br>

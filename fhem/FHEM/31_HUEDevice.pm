@@ -502,6 +502,7 @@ HUEDevice_Define($$) {
     $interval = 60 if( defined($interval) && $interval < 1 );
     $hash->{INTERVAL} = $interval;
 
+    $hash->{helper}{state} = '';
   }
 
   RemoveInternalTimer($hash);
@@ -1415,6 +1416,13 @@ HUEDevice_ReadFromServer($@)
 }
 
 sub
+updateFinalButtonState($)
+{
+  my ($hash) = @_;
+  $hash->{helper}{forceUpdate} = 1;
+  HUEDevice_GetUpdate($hash);
+}
+sub
 HUEDevice_GetUpdate($)
 {
   my ($hash) = @_;
@@ -1693,6 +1701,7 @@ HUEDevice_Parse($$)
           $hash->{helper}{events}[$i] = {};
           foreach my $event (@{$input->{events}}) {
             $hash->{helper}{events}[$i]{$event->{eventtype}} = $event->{buttonevent};
+            $hash->{helper}{events}[$i]{$event->{buttonevent}} = $event->{eventtype};
           }
 
           ++$i;
@@ -1837,6 +1846,41 @@ HUEDevice_Parse($$)
         }
       }
 
+
+      if( $hash->{helper}{forceUpdate}
+          && defined($state->{buttonevent}) ) {
+        if( $hash->{helper}{state} eq $readings{state} ) {
+          delete $hash->{helper}{forceUpdate};
+
+        } else {
+          my $input = substr($state->{buttonevent}, 0, 1);
+          $readings{input} = substr($state->{buttonevent}, 0, 1);
+          if( $input
+              && defined($hash->{helper}{events})
+              && defined($hash->{helper}{events}[$input-1])
+              && defined($hash->{helper}{events}[$input-1]{$state->{buttonevent}}) ) {
+            $readings{eventtype} = $hash->{helper}{events}[$input-1]{$state->{buttonevent}};
+
+          } elsif( my $type = substr($state->{buttonevent}, 2, 2) ) {
+            if( $type eq 00 ) {
+              $readings{eventtype} = 'initial_press';
+
+            } elsif( $type eq 00 ) {
+              $readings{eventtype} = 'repeat';
+
+            } elsif( $type eq 00 ) {
+              $readings{eventtype} = 'short_release';
+
+            } elsif( $type eq 00 ) {
+              $readings{eventtype} = 'long_release';
+
+            } 
+          }
+
+        }
+      }
+      $hash->{helper}{state} = $readings{state} if( defined($readings{state}) );
+
     }
 
     CommandDeleteReading( undef, "$name .lastupdated" );
@@ -1850,7 +1894,8 @@ HUEDevice_Parse($$)
          if( defined($readings{$key}) ) {
            if( $lastupdated ) {
              my $rut = ReadingsTimestamp($name,$key,undef);
-             if( (!defined($result->{v2_service}) || !defined($result->{t}))
+             if( !$hash->{helper}{forceUpdate}
+                 && !defined($result->{v2_service}) && !defined($result->{t})
                  && $ts && defined($rut) && $ts <= time_str2num($rut) ) {
                Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, current reading timestamp is $rut";
                next;
@@ -1867,6 +1912,8 @@ HUEDevice_Parse($$)
 
        readingsEndUpdate($hash,1);
        delete $hash->{CHANGETIME};
+
+       delete $hash->{helper}{forceUpdate};
      }
 
     return undef;
