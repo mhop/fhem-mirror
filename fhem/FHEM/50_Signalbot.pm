@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.5";
+my $Signalbot_VERSION="3.6";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -413,6 +413,7 @@ sub Signalbot_Set($@) {					#
 				} else {
 					my $png=Signalbot_getPNG($hash,$file);
 					return "File not found: $file" if !defined $png;
+					return $png if ($png =~ /^Error:.*/);
 					push @newatt, $png;
 				}
 			}
@@ -1962,6 +1963,7 @@ sub Signalbot_getPNG(@) {
 			$svg=Signalbot_DOIFAsPng($shash,@special);
 		}
 		return undef if !defined $svg;
+		return $svg if ($svg =~ /^Error:.*/);
 		return Signalbot_copyToFile($svg,"png");
 	}
 	return;
@@ -2010,9 +2012,9 @@ Signalbot_DOIFAsPng($@)
 	}
 	$target="uiState" if (!defined $hash->{$target}{table});
 	my $table=$hash->{$target}{table};
-	
+
 	# "Error: uiTable/uiState not defined" 
-	return undef if (!defined $table);
+	return "Error: $target not defined in $hash->{NAME}" if (!defined $table);
 	
 	my $id=0;
 	my $cmd;
@@ -2044,30 +2046,29 @@ Signalbot_DOIFAsPng($@)
 	if (defined $cmd && $cmd ne "") {
 		$cmd="package ui_Table;"."$cmd".";";
 		$svgdata=eval($cmd);
-		print $@;
+		return if $@;
 	} else {
-		#print "Error: uiTable format error (no card)";
-		return undef;
+		return "Error: uiTable format error";
 	}
 	
-	# "Error: getting data from card" 
-	return undef if (! defined $svgdata);
+	return "Error: getting converting uiTable to SVG for $cmd" if (! defined $svgdata);
 	$svgdata='<?xml version="1.0" encoding="UTF-8"?> <svg>'.$svgdata.'</svg>';
 
+	my $ret;
 	eval {
 		require Image::LibRSVG;
 		$rsvg = new Image::LibRSVG();
 		if ($sizex != -1 && $sizey !=-1) {
-		$rsvg->loadFromStringAtZoomWithMax($svgdata, $zoom, $zoom, $sizex, $sizey  );
+		$ret=$rsvg->loadFromStringAtZoomWithMax($svgdata, $zoom, $zoom, $sizex, $sizey  );
 		} else {
-		$rsvg->loadFromStringAtZoom($svgdata, $zoom, $zoom);
+		$ret=$rsvg->loadFromStringAtZoom($svgdata, $zoom, $zoom);
 		}
-		$pngImg = $rsvg->getImageBitmap();
+		$pngImg = $rsvg->getImageBitmap() if $ret;
 	};
 	if (defined $pngImg && $pngImg ne "") {
 		return $pngImg if $pngImg;
 	}
-	return;
+	return "Error: Converting SVG to PNG for $cmd";
 }
 
 #Get OSRelease Version
