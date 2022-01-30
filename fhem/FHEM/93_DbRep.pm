@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.48.0"  => "29.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ".
+                            "change _DbRep_mysqlOptimizeTables, revise insert command ",
   "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
   "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
   "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
@@ -224,8 +226,8 @@ my %DbRep_vNotesExtern = (
   "5.6.0"   => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
   "5.4.0"   => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
   "5.3.1"   => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
-  "5.3.0"   => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
-  "5.0.6"   => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
+  "5.3.0"   => "26.06.2017 change of _DbRep_mysqlOptimizeTables, new command optimizeTables ",
+  "5.0.6"   => "13.06.2017 add Aria engine to _DbRep_mysqlOptimizeTables ",
   "5.0.3"   => "07.06.2017 DbRep_mysql_DumpServerSide added ",
   "5.0.1"   => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
   "5.0.0"   => "04.06.2017 MySQL Dump nonblocking added ",
@@ -339,12 +341,41 @@ my %DbRep_vHintsExt_de = (
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
 
+# Hash der Main-Grundfunktionen
+my %dbrep_hmainf = (                                                                                                           
+    sumValue           => { fn => "DbRep_sumval",        fndone => "DbRep_sumvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    countEntries       => { fn => "DbRep_count",         fndone => "DbRep_countDone",         fnabort => "DbRep_ParseAborted", timeset => 1                     },   
+    sqlCmd             => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted", timeset => 1                     },
+    averageValue       => { fn => "DbRep_averval",       fndone => "DbRep_avervalDone",       fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" }, 
+    fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted", timeset => 1                     },
+    maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },     
+    minValue           => { fn => "DbRep_minval",        fndone => "DbRep_minvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },  
+    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    tableCurrentPurge  => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted", timeset => 0, table => "current" },    
+    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted", timeset => 1, table => "current" }, 
+    dbvars             => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted", timeset => 0                     },
+    dbstatus           => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted", timeset => 0                     },
+    tableinfo          => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted", timeset => 0                     },
+    procinfo           => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted", timeset => 0                     },
+    svrinfo            => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted", timeset => 0                     },
+    diffValue          => { fn => "DbRep_diffval",       fndone => "DbRep_diffvalDone",       fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
+    insert             => { fn => "DbRep_insert",        fndone => "DbRep_insertDone",        fnabort => "DbRep_ParseAborted", timeset => 0, table => "history" },
+    deviceRename       => { fn => "DbRep_changeDevRead", fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted", timeset => 0, table => "history", renmode => "devren"    },
+    readingRename      => { fn => "DbRep_changeDevRead", fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted", timeset => 0, table => "history", renmode => "readren"   },
+    changeValue        => { fn => "DbRep_changeVal",     fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history", renmode => "changeval" },         
+); 
+
 
 # Variablendefinitionen
 my %dbrep_col                 = ("DEVICE"  => 64, "READING" => 64, );                  # Standard Feldbreiten falls noch nicht getInitData ausgeführt
 my $dbrep_defdecplaces        = 4;                                                     # Nachkommastellen Standard      
 my $dbrep_dump_path_def       = $attr{global}{modpath}."/log/";                        # default Pfad für local Dumps
-my $dbrep_dump_remotepath_def = "./";                                                  # default Pfad für remote Dumps    
+my $dbrep_dump_remotepath_def = "./";                                                  # default Pfad für remote Dumps   
+my $dbrep_fName               = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";   # default Pfad/Name SQL Cache File
+
+
+
        
 ###################################################################################
 # DbRep_Initialize
@@ -500,6 +531,7 @@ sub DbRep_Set {
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbmodel        = $dbloghash->{MODEL};
   my $dbname         = $hash->{DATABASE};
+  
   my $sd ="";
   
   my (@bkps,$dir);
@@ -527,47 +559,62 @@ sub DbRep_Set {
   closedir(DIR);
   my $cj = @bkps ? join(",",reverse(sort @bkps)) : " ";
   
-  # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
-  my (undef, $hl) = DbRep_listSQLcmdCache ($name);
-  if ($hl) {
+  my (undef, $hl) = DbRep_listSQLcmdCache ($name);                     # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
+  if (AttrVal($name, "sqlCmdHistoryLength", 0)) {
       $hl .= "___purge_sqlhistory___";
-      $hl .= ",___list_sqlhistory___";   
+      $hl .= ",___list_sqlhistory___"; 
+      $hl .= ",___save_sqlhistory___";
+      $hl .= ",___restore_sqlhistory___";      
   }
+  
+  my $specials = "50mostFreqLogsLast2days";
+  $specials   .= ",allDevCount";
+  $specials   .= ",allDevReadCount";
+  $specials   .= ",50DevReadCount";
+  $specials   .= ",recentReadingsOfDevice";
+  $specials   .= $dbmodel eq "MYSQL" ? ",readingsDifferenceByTimeDelta" : "";
+  
+  my $indl     = "list_all";
+  $indl       .= ",recreate_Search_Idx";
+  $indl       .= ",drop_Search_Idx";
+  $indl       .= ",recreate_Report_Idx";
+  $indl       .= ",drop_Report_Idx";
   
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
-                (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime " : "").
-                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime " : "").
-                (($hash->{ROLE} ne "Agent") ? "changeValue " : "").
-                (($hash->{ROLE} ne "Agent") ? "delDoublets:adviceDelete,delete " : "").
-                (($hash->{ROLE} ne "Agent") ? "delEntries " : "").
-                (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete " : "").
                 "deviceRename ".
-                (($hash->{ROLE} ne "Agent") ? "readingRename " : "").
-                (($hash->{ROLE} ne "Agent") ? "exportToFile " : "").
-                (($hash->{ROLE} ne "Agent") ? "importFromFile " : "").
-                (($hash->{ROLE} ne "Agent") ? "maxValue:display,writeToDB,deleteOther " : "").
-                (($hash->{ROLE} ne "Agent") ? "minValue:display,writeToDB,deleteOther " : "").
-                (($hash->{ROLE} ne "Agent") ? "fetchrows:history,current " : "").  
-                (($hash->{ROLE} ne "Agent") ? "diffValue:display,writeToDB " : "").   
-                (($hash->{ROLE} ne "Agent") ? "index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx " : "").
+                (($hash->{ROLE} ne "Agent") ? "delDoublets:adviceDelete,delete "         : "").
+                (($hash->{ROLE} ne "Agent") ? "delEntries "                              : "").
+                (($hash->{ROLE} ne "Agent") ? "changeValue "                             : "").
+                (($hash->{ROLE} ne "Agent") ? "readingRename "                           : "").
+                (($hash->{ROLE} ne "Agent") ? "exportToFile "                            : "").
+                (($hash->{ROLE} ne "Agent") ? "importFromFile "                          : "").
+                (($hash->{ROLE} ne "Agent") ? "maxValue:display,writeToDB,deleteOther "  : "").
+                (($hash->{ROLE} ne "Agent") ? "minValue:display,writeToDB,deleteOther "  : "").
+                (($hash->{ROLE} ne "Agent") ? "fetchrows:history,current "               : "").  
+                (($hash->{ROLE} ne "Agent") ? "diffValue:display,writeToDB "             : "").   
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/) ? "adminCredentials " : "").
-                (($hash->{ROLE} ne "Agent") ? "insert ":"").
-                (($hash->{ROLE} ne "Agent") ? "reduceLog ":"").
-                (($hash->{ROLE} ne "Agent") ? "sqlCmd:textField-long ": "").
-                (($hash->{ROLE} ne "Agent" && $hl) ? "sqlCmdHistory:".$hl." " : "").
-                (($hash->{ROLE} ne "Agent") ? "sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice".(($dbmodel eq "MYSQL")?",readingsDifferenceByTimeDelta":"")." " : "").
-                (($hash->{ROLE} ne "Agent") ? "syncStandby " : "").
-                (($hash->{ROLE} ne "Agent") ? "tableCurrentFillup:noArg " : "").
-                (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg " : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "dumpMySQL:clientSide,serverSide " : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "dumpSQLite:noArg "                : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "repairSQLite "                    : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "optimizeTables:noArg "            : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/) ? "vacuum:noArg "                    : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "restoreMySQL:".$cj." "            : "").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "restoreSQLite:".$cj." "           : "").
-                (($hash->{ROLE} ne "Agent")?"countEntries:history,current ":"");
+                (($hash->{ROLE} ne "Agent") ? "insert "                                  : "").
+                (($hash->{ROLE} ne "Agent") ? "reduceLog "                               : "").
+                (($hash->{ROLE} ne "Agent") ? "sqlCmd:textField-long "                   : "").
+                (($hash->{ROLE} ne "Agent" && $hl) ? "sqlCmdHistory:".$hl." "            : "").
+                (($hash->{ROLE} ne "Agent") ? "sqlSpecial:".$specials." "                : "").
+                (($hash->{ROLE} ne "Agent") ? "syncStandby "                             : "").
+                (($hash->{ROLE} ne "Agent") ? "tableCurrentFillup:noArg "                : "").
+                (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg "                 : "").
+                (($hash->{ROLE} ne "Agent") ? "countEntries:history,current "            : "").              
+                (($hash->{ROLE} ne "Agent") ? "index:".$indl." "                         : "").
+                (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime "          : "").
+                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime "      : "").
+                (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete "                     : "").                
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "dumpMySQL:clientSide,serverSide "  : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "dumpSQLite:noArg "                 : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "repairSQLite "                     : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "optimizeTables:showInfo,execute "  : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/) ? "vacuum:noArg "                     : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "restoreMySQL:".$cj." "             : "").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "restoreSQLite:".$cj." "            : "")
+                ;
   
   return if(IsDisabled($name));
     
@@ -651,7 +698,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        
        DbRep_beforeproc ($hash, "optimize");    
-       DbRep_Main       ($hash,$opt);
+       DbRep_Main       ($hash, $opt, $prop);
        
        return;
   }
@@ -872,8 +919,9 @@ sub DbRep_Set {
           return qq{At least data for "Date", "Time" and "Value" is needed to insert. "Unit" is optional. Inputformat is "YYYY-MM-DD,HH:MM:SS,<Value>,<Unit>"};
       }
 
-      unless ($i_date =~ /(\d{4})-(\d{2})-(\d{2})/) {return "Input for date is not valid. Use format YYYY-MM-DD !";}
-      unless ($i_time =~ /(\d{2}):(\d{2}):(\d{2})/) {return "Input for time is not valid. Use format HH:MM:SS !";}
+      if ($i_date !~ /^(\d{4})-(\d{2})-(\d{2})$/x || $i_time !~ /^(\d{2}):(\d{2}):(\d{2})$/x) {
+          return "Input for date is not valid. Use format YYYY-MM-DD,HH:MM:SS";
+      }
       
       my $i_timestamp = $i_date." ".$i_time;
       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
@@ -945,7 +993,10 @@ sub DbRep_Set {
               $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
           } 
           elsif ($prop eq "allDevReadCount") {
-              $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
+              $prop = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
+          } 
+          elsif ($prop eq "50DevReadCount") {
+              $prop = "select DEVICE AS device, READING AS reading, count(0) AS number from history group by DEVICE, READING order by number DESC limit 50;";
           } 
           elsif ($prop eq "allDevCount") {
               $prop = "select device, count(*) from history group by DEVICE;";
@@ -1013,7 +1064,6 @@ sub DbRep_Set {
           
           @cmd    = split(/\s/, $sqlcmd);
           $sqlcmd = join(" ", @cmd);
-          # $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;    # V8.36.0 20.03.2020
       }
       
       if($opt eq "sqlCmdHistory") {
@@ -1032,6 +1082,17 @@ sub DbRep_Set {
           if($sqlcmd eq "___list_sqlhistory___") {
               my ($cache) = DbRep_listSQLcmdCache ($name);
               return $cache;
+          }
+          
+          if($sqlcmd eq "___save_sqlhistory___") {
+              my $err = DbRep_writeSQLcmdCache ($hash);                                # SQL Cache File schreiben
+              $err  //= "SQL history entries of $name successfully saved";
+              return $err;
+          }
+          
+          if($sqlcmd eq "___restore_sqlhistory___") {
+              my $count = DbRep_initSQLcmdCache ($name);
+              return $count ? "SQL history entries of $name restored: $count" : undef;
           }
       }
       
@@ -1677,7 +1738,7 @@ sub DbRep_Notify {
  my $events = deviceEvents($dev_hash,0);  
  return if(!$events);
 
- foreach my $event (@{$events}) {
+ for my $event (@{$events}) {
      $event  = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
@@ -1686,8 +1747,7 @@ sub DbRep_Notify {
          DbRep_modAssociatedWith ($own_hash,"set",$awdev);
      }
      
-     if ($own_hash->{ROLE} eq "Agent") {
-         # wenn Rolle "Agent" Verbeitung von RENAMED Events
+     if ($own_hash->{ROLE} eq "Agent") {                               # wenn Rolle "Agent" Verbeitung von RENAMED Events
          next if ($event !~ /RENAMED/);
          
          my $strucChanged;                                             # altes in neues device in der DEF des angeschlossenen DbLog-device ändern (neues device loggen)
@@ -1697,8 +1757,9 @@ sub DbRep_Notify {
          if ( $dblog_hash->{DEF} =~ m/( |\(|\|)$evl[1]( |\)|\||:)/ ) {
              $dblog_hash->{DEF}    =~ s/$evl[1]/$evl[2]/;
              $dblog_hash->{REGEXP} =~ s/$evl[1]/$evl[2]/;
-             # Definitionsänderung wurde vorgenommen
-             $strucChanged = 1;
+             
+             $strucChanged = 1;                                        # Definitionsänderung wurde vorgenommen
+             
              Log3 ($myName, 3, "DbRep Agent $myName - $dblog_name substituted in DEF, old: \"$evl[1]\", new: \"$evl[2]\" "); 
          }  
          
@@ -1707,20 +1768,21 @@ sub DbRep_Notify {
          $own_hash->{HELPER}{OLDDEV}  = $evl[1];
          $own_hash->{HELPER}{NEWDEV}  = $evl[2];
          $own_hash->{HELPER}{RENMODE} = "devren";
-         DbRep_Main($own_hash,"deviceRename");
+         DbRep_Main($own_hash, "deviceRename");
          
-         # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
-         foreach(devspec2array("TYPE=DbRep")) {
-             my $repname = $_;
-             next if($_ eq $myName);
-             my $repattrdevice = $attr{$_}{device};
+         for my $repname (devspec2array("TYPE=DbRep")) {                      # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
+             next if($repname eq $myName);
+             
+             my $repattrdevice = $attr{$repname}{device};
              next if(!$repattrdevice);
-             my $repdb         = $defs{$_}{DATABASE};
+             my $repdb         = $defs{$repname}{DATABASE};
+             
              if ($repattrdevice eq $evl[1] && $repdb eq $own_hash->{DATABASE}) { 
-                 $attr{$_}{device} = $evl[2];
-                 # Definitionsänderung wurde vorgenommen
-                 $strucChanged = 1;
-                 Log3 ($myName, 3, "DbRep Agent $myName - $_ attr device changed, old: \"$evl[1]\", new: \"$evl[2]\" "); 
+                 $attr{$repname}{device} = $evl[2];
+                 
+                 $strucChanged = 1;                                  # Definitionsänderung wurde vorgenommen
+                 
+                 Log3 ($myName, 3, "DbRep Agent $myName - $repname attr device changed, old: \"$evl[1]\", new: \"$evl[2]\" "); 
              }
          }
      # if ($strucChanged) {CommandSave("","")};
@@ -1763,12 +1825,17 @@ return;
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 ###################################################################################
 sub DbRep_Delete {
-    my ($hash, $arg) = @_;
+    my $hash = shift;
+    my $arg  = shift;
+    
     my $name = $hash->{NAME};
     
     # gespeicherte Credentials löschen
     my $index = $hash->{TYPE}."_".$name."_adminCredentials";
     setKeyValue($index, undef);
+    
+    # gespeichertes SQL Cache löschen
+    DbRep_deleteSQLhistFromFile ($name);
     
 return;
 }
@@ -1777,12 +1844,14 @@ return;
 # DbRep_Shutdown
 ###################################################################################
 sub DbRep_Shutdown {  
-  my ($hash) = @_;
+  my $hash = shift;
  
   my $dbh = $hash->{DBH}; 
   $dbh->disconnect() if(defined($dbh)); 
-  DbRep_delread($hash,1);
-  RemoveInternalTimer($hash);
+  
+  DbRep_delread          ($hash,1);
+  RemoveInternalTimer    ($hash);
+  DbRep_writeSQLcmdCache ($hash);                                              # SQL Cache File schreiben
   
 return; 
 }
@@ -2159,8 +2228,7 @@ sub DbRep_dbConnect {
   eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
                                                                     RaiseError          => 1, 
                                                                     AutoCommit          => 1,
-                                                                    AutoInactiveDestroy => 1, 
-                                                                    mysql_enable_utf8   => $utf8
+                                                                    AutoInactiveDestroy => 1
                                                                   }
                             ); 1;
        } 
@@ -2168,6 +2236,16 @@ sub DbRep_dbConnect {
                Log3 ($name, 2, "DbRep $name - ERROR: $@");
                $ret = "$name|$err";
              };
+  if($utf8) {
+      if($dbmodel eq "MYSQL") {
+          $dbh->{mysql_enable_utf8} = 1;
+          $dbh->do('set names "UTF8"');
+      }
+      
+      if($dbmodel eq "SQLITE") {
+        $dbh->do('PRAGMA encoding="UTF-8"');
+      }
+  }    
 
 return ($ret, $dbh, $dbmodel);
 }
@@ -2285,7 +2363,8 @@ sub DbRep_Main {
 
      $params = {
          hash  => $hash,
-         name  => $name
+         name  => $name,
+         prop  => $prop
      };      
      
      $hash->{HELPER}{RUNNING_OPTIMIZE}           = BlockingCall("DbRep_optimizeTables", $params, "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
@@ -2343,12 +2422,15 @@ sub DbRep_Main {
  
  # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
  if(!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
-     my $dbname = $hash->{DATABASE};
+     my $dbname                 = $hash->{DATABASE};
      $hash->{HELPER}{IDRETRIES} = 3 if($hash->{HELPER}{IDRETRIES} < 0);
+     
      Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
+     
      $prop //= '';
      DbRep_firstconnect("$name|$opt|$prop|DbRep_Main") if($hash->{HELPER}{IDRETRIES} > 0);
      $hash->{HELPER}{IDRETRIES}--;
+     
  return;
  }
  
@@ -2362,9 +2444,10 @@ sub DbRep_Main {
  
  # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
- my $ts = "no_aggregation";                                                                  # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
+ 
  my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);
 
+ my $ts = "no_aggregation";                                                                  # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
  if($IsTimeSet || $IsAggrSet) {
      ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
  } 
@@ -2376,58 +2459,251 @@ sub DbRep_Main {
  Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries|^sql/x); 
  
  #####  Funktionsaufrufe #####
- ############################# 
- if ($opt eq "sumValue") {
+ #############################
+ if($dbrep_hmainf{$opt} && defined &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
          hash    => $hash,
          name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
+         opt     => $opt,
          prop    => $prop,
-         ts      => $ts,
+         table   => $dbrep_hmainf{$opt}{table} // $prop,
+         device  => $device,
+         reading => $reading
      };
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval", $params, "DbRep_sumvalDone", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "countEntries") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => $prop,
-         device  => $device,
-         reading => $reading,
-         ts      => $ts,
-     };
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count", $params, "DbRep_countDone", $to, "DbRep_ParseAborted", $hash);  
- } 
- elsif ($opt eq "averageValue") { 
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
-     };
+     if($dbrep_hmainf{$opt}{timeset}) {
+         $params->{ts}  = $ts;
+         $params->{rsf} = $runtime_string_first;
+         $params->{rsn} = $runtime_string_next;
+     }
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval", $params, "DbRep_avervalDone", $to, "DbRep_ParseAborted", $hash); 
- } 
- elsif ($opt eq "fetchrows") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => $prop,
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next
-     };
-            
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_fetchrows", $params, "DbRep_fetchrowsDone", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "delDoublets") {
+     if(exists $dbrep_hmainf{$opt}{renmode}) {
+         $params->{renmode} = $dbrep_hmainf{$opt}{renmode};
+     }
+      
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall ($dbrep_hmainf{$opt}{fn}, 
+                                                  $params, 
+                                                  $dbrep_hmainf{$opt}{fndone}, 
+                                                  $to, 
+                                                  $dbrep_hmainf{$opt}{fnabort}, 
+                                                  $hash
+                                                 );      
+ }
+  
+# if ($opt eq "sumValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval", $params, "DbRep_sumvalDone", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "countEntries") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+ #        table   => $prop,
+#         device  => $device,
+#         reading => $reading,
+#         ts      => $ts,
+#     };
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count", $params, "DbRep_countDone", $to, "DbRep_ParseAborted", $hash);  
+# } 
+# if ($opt eq "averageValue") { 
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval", $params, "DbRep_avervalDone", $to, "DbRep_ParseAborted", $hash); 
+# } 
+# if ($opt eq "fetchrows") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => $prop,
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         rsn     => $runtime_string_next
+#     };
+#            
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_fetchrows", $params, "DbRep_fetchrowsDone", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "exportToFile") {
+#     DbRep_beforeproc ($hash, "export");
+#     
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         file    => $prop,
+#         ts      => $ts,
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_expfile", $params, "DbRep_expfile_Done", $to, "DbRep_ParseAborted", $hash); 
+# } 
+# elsif ($opt eq "importFromFile") {     
+#     DbRep_beforeproc ($hash, "import");
+     
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         rsf     => $runtime_string_first,
+#         prop    => $prop,
+#     };    
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_impfile", $params, "DbRep_impfile_Done", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "maxValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval", $params, "DbRep_maxvalDone", $to, "DbRep_ParseAborted", $hash);      
+# } 
+# elsif ($opt eq "minValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts,
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval", $params, "DbRep_minvalDone", $to, "DbRep_ParseAborted", $hash);        
+# }
+# elsif ($opt eq "tableCurrentPurge") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "current",
+#         device  => $device,
+#         reading => $reading
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
+# } 
+# elsif ($opt eq "tableCurrentFillup") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "current",
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         rsn     => $runtime_string_next
+#     };
+     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillupDone", $to, "DbRep_ParseAborted", $hash);
+# }
+# elsif ($opt =~ /dbvars|dbstatus|tableinfo|procinfo|svrinfo/) {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         opt     => $opt
+#     }; 
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_dbmeta", $params, "DbRep_dbmeta_Done", $to, "DbRep_ParseAborted", $hash);    
+# }
+# elsif ($opt eq "diffValue") {  
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         device  => $device,
+#         reading => $reading,
+#         prop    => $prop,
+#         ts      => $ts
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_diffval", $params, "DbRep_diffvalDone", $to, "DbRep_ParseAborted", $hash);         
+# } 
+# elsif ($opt eq "deviceRename") { 
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         renmode => "devren",
+#         device  => $device,
+#         reading => $reading
+#     };
+#    
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
+# } 
+# elsif ($opt eq "readingRename") { 
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         renmode => "readren",
+#         device  => $device,
+#         reading => $reading
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
+# }
+# elsif ($opt eq "changeValue") {
+#     $params = {
+#         hash    => $hash,
+#         name    => $name,
+#         table   => "history",
+#         renmode => "changeval",
+#         device  => $device,
+#         reading => $reading,
+#         rsf     => $runtime_string_first,
+#         rsn     => $runtime_string_next,
+#         ts      => $ts
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeVal", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);    
+# }
+# elsif ($opt eq "insert") { 
+#      $params = {
+#         hash  => $hash,
+#         name  => $name,
+#         table => "history",
+#         prop  => $prop
+#     };
+#     
+#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_insert", $params, "DbRep_insertDone", $to, "DbRep_ParseAborted", $hash);           
+# } 
+# elsif ($opt eq "sqlCmd") {                                       # Execute a generic sql command   
+#    $params = {
+#        hash    => $hash,
+#        name    => $name,
+#        opt     => $opt,
+#        prop    => $prop,
+#        device  => $device,
+#        reading => $reading,
+#        rsf     => $runtime_string_first,
+#        rsn     => $runtime_string_next
+#    };    
+#    
+#    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
+# }
+ if ($opt eq "delDoublets") {
      $params = {
          hash    => $hash,
          name    => $name,
@@ -2453,59 +2729,6 @@ sub DbRep_Main {
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_delseqdoubl", $params, "DbRep_deldoubl_Done", $to, "DbRep_ParseAborted", $hash);   
  } 
- elsif ($opt eq "exportToFile") {
-     DbRep_beforeproc ($hash, "export");
-     
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         file    => $prop,
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_expfile", $params, "DbRep_expfile_Done", $to, "DbRep_ParseAborted", $hash); 
- } 
- elsif ($opt eq "importFromFile") {     
-     DbRep_beforeproc ($hash, "import");
-     
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         rsf     => $runtime_string_first,
-         file    => $prop,
-     };    
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_impfile", $params, "DbRep_impfile_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "maxValue") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval", $params, "DbRep_maxvalDone", $to, "DbRep_ParseAborted", $hash);      
- } 
- elsif ($opt eq "minValue") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval", $params, "DbRep_minvalDone", $to, "DbRep_ParseAborted", $hash);        
- } 
  elsif ($opt eq "delEntries") {
      delete $hash->{HELPER}{DELENTRIES};
      DbRep_beforeproc ($hash, "delEntries");
@@ -2526,115 +2749,6 @@ sub DbRep_Main {
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
  } 
- elsif ($opt eq "tableCurrentPurge") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "current",
-         device  => $device,
-         reading => $reading
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "tableCurrentFillup") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "current",
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillupDone", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "diffValue") {  
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_diffval", $params, "DbRep_diffvalDone", $to, "DbRep_ParseAborted", $hash);         
- } 
- elsif ($opt eq "insert") { 
-      $params = {
-         hash  => $hash,
-         name  => $name,
-         table => "history",
-         prop  => $prop
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_insert", $params, "DbRep_insertDone", $to, "DbRep_ParseAborted", $hash);           
- } 
- elsif ($opt eq "deviceRename") { 
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         renmode => "devren",
-         device  => $device,
-         reading => $reading
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevOrRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
- } 
- elsif ($opt eq "readingRename") { 
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         renmode => "readren",
-         device  => $device,
-         reading => $reading
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevOrRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
- }
- elsif ($opt eq "changeValue") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         renmode => "changeval",
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next,
-         ts      => $ts
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeVal", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);    
- }
- elsif ($opt =~ /dbvars|dbstatus|tableinfo|procinfo|svrinfo/) {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         opt     => $opt
-     }; 
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_dbmeta", $params, "DbRep_dbmeta_Done", $to, "DbRep_ParseAborted", $hash);    
- } 
- elsif ($opt eq "sqlCmd") {                                       # Execute a generic sql command   
-    $params = {
-        hash    => $hash,
-        name    => $name,
-        opt     => $opt,
-        prop    => $prop,
-        device  => $device,
-        reading => $reading,
-        rsf     => $runtime_string_first,
-        rsn     => $runtime_string_next
-    };    
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
- }
  elsif ($opt eq "sqlCmdHistory") {
     $params = {
         hash    => $hash,
@@ -5335,7 +5449,7 @@ return;
 ####################################################################################################
 #                    nichtblockierendes DB deviceRename / readingRename
 ####################################################################################################
-sub DbRep_changeDevOrRead {
+sub DbRep_changeDevRead {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -5718,7 +5832,7 @@ sub DbRep_fetchrows {
  
   s/\|/_E#S#C_/g for @row_array;                                                     # escape Pipe "|"
  
-  if ($utf8) {
+  if ($utf8 && $dbmodel ne "SQLITE") {
       $rowlist = Encode::encode_utf8(join('|', @row_array));
   } 
   else {
@@ -6352,10 +6466,11 @@ sub DbRep_expfile {
   my $paref   = shift;    
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
+  my $table   = $paref->{table};
   my $device  = $paref->{device};
   my $reading = $paref->{reading};
   my $rsf     = $paref->{rsf};
-  my $file    = $paref->{file};
+  my $file    = $paref->{prop};
   my $ts      = $paref->{ts};
 
   my ($sth,$sql);
@@ -6422,10 +6537,10 @@ sub DbRep_expfile {
       my $runtime_string_next  = $a[2];   
  
       if ($IsTimeSet || $IsAggrSet) {
-          $sql = DbRep_createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+          $sql = DbRep_createSelectSql($hash, $table, "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT", $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
       } 
       else {
-          $sql = DbRep_createSelectSql($hash,"history","TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT",$device,$reading,undef,undef,$addon);
+          $sql = DbRep_createSelectSql($hash, $table, "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT", $device, $reading, undef, undef, $addon);
       }
      
       Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
@@ -6535,8 +6650,9 @@ sub DbRep_impfile {
   my $paref  = shift;    
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $table  = $paref->{table};
   my $rsf    = $paref->{rsf};
-  my $infile = $paref->{file};
+  my $infile = $paref->{prop};
 
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
 
@@ -6579,16 +6695,16 @@ sub DbRep_impfile {
   # insert history mit/ohne primary key
   my $sql;
   if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
-      $sql = "INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      $sql = "INSERT IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
   } 
   elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
-      $sql = "INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      $sql = "INSERT OR IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
   } 
   elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-      $sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
+      $sql = "INSERT INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
   } 
   else {
-      $sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      $sql = "INSERT INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
   }
  
   my $sth;
@@ -7594,6 +7710,7 @@ sub DbRep_optimizeTables {
   my $paref  = shift;
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $prop   = $paref->{prop} // '';                     # default execute wenn nichts angegeben (wg. Kompatibilität)
  
   my $dbname = $hash->{DATABASE};
   my $value  = 0;
@@ -7642,11 +7759,16 @@ sub DbRep_optimizeTables {
       }
 
       $hash->{HELPER}{DBTABLES}      = \%db_tables;                                                         # Tabellen optimieren 
-      ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash, $dbh, @tablenames);
-      if ($err) {
-          $err = encode_base64($err,"");
-          return "$name|$err";
-      }
+      
+      my $opars = {
+          hash   => $hash,
+          dbh    => $dbh,
+          omode  => $prop,
+          tables => \@tablenames
+      };
+      
+      ($err, $db_MB_start, $db_MB_end) = _DbRep_mysqlOptimizeTables ($opars);
+      return $err if($err);
   }
  
   if ($dbmodel =~ /SQLITE/) {
@@ -7696,13 +7818,116 @@ sub DbRep_optimizeTables {
   $sth->finish;
   $dbh->disconnect;
   
+  $db_MB_start = encode_base64($db_MB_start,"");
+  $db_MB_end   = encode_base64($db_MB_end,  "");
+  
   my $rt  = tv_interval($st);                                               # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                              # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
  
-  Log3 ($name, 3, "DbRep $name - Optimize tables of database $dbname finished - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
+  Log3 ($name, 3, "DbRep $name - Optimize tables of $dbname finished - total time (hh:mm:ss): ".DbRep_sec2hms($brt));
  
 return "$name|''|$rt|$db_MB_start|$db_MB_end";
+}
+
+####################################################################################################
+#             Tabellenoptimierung MySQL
+####################################################################################################
+sub _DbRep_mysqlOptimizeTables {
+  my $opars  = shift;
+  my $hash   = $opars->{hash};
+  my $dbh    = $opars->{dbh};
+  my $omode  = $opars->{omode};
+  my $tables = $opars->{tables};
+  
+  my $name      = $hash->{NAME};
+  my $dbname    = $hash->{DATABASE};
+  my $db_tables = $hash->{HELPER}{DBTABLES};
+  my $result    = 0;
+  my $opttbl    = 0;
+  
+  my ($err,$sth,$db_MB_start,$db_MB_end);
+  
+  ($err, $db_MB_start) = _DbRep_mysqlOpdAndFreeSpace ($hash, $dbh);
+  
+  Log3 ($name, 3, "DbRep $name - Estimate of $dbname before optimize (MB): $db_MB_start");
+  
+  if($omode eq "showInfo") {                                                                     # nur Info, keine Ausführung
+      return ('',$db_MB_start,'');
+  }
+  
+  Log3 ($name, 3, "DbRep $name - Optimizing tables");
+  
+  for my $tablename (@{$tables}) {                                                                # optimize table if engine supports optimization
+      my $engine = '';
+      $engine    = uc($db_tables->{$tablename}{Engine}) if($db_tables->{$tablename}{Engine});
+
+      if ($engine =~ /(MYISAM|BDB|INNODB|ARIA)/xi) {
+          Log3($name, 3, "DbRep $name - Optimizing table `$tablename` ($engine). It may take a while ...");
+                    
+          ($err, $sth, $result) = DbRep_prepareExecuteQuery ($name, $dbh, "OPTIMIZE TABLE `$tablename`");
+           
+          if ($result) {
+              Log3($name, 3, "DbRep $name - Table ".($opttbl+1)." `$tablename` optimized successfully.");
+              $opttbl++;
+          } 
+          else {
+              Log3($name, 2, "DbRep $name - Error while optimizing table $tablename. Continue with next table or backup.");
+          }
+      }
+  }
+
+  Log3($name, 3, "DbRep $name - $opttbl tables have been optimized.") if($opttbl > 0);
+     
+  ($err, $db_MB_end) = _DbRep_mysqlOpdAndFreeSpace ($hash, $dbh);
+  
+  Log3 ($name, 3, "DbRep $name - Estimate of $dbname after optimize (MB): $db_MB_end");
+  
+return ('',$db_MB_start,$db_MB_end);
+}
+
+####################################################################################################
+#             MySQL Datenbank belegten und freien Speicher ermitteln
+####################################################################################################
+sub _DbRep_mysqlOpdAndFreeSpace  {
+  my $hash   = shift;
+  my $dbh    = shift;
+  
+  my $name   = $hash->{NAME};
+  my $dbname = $hash->{DATABASE};
+
+  my $query = qq{SELECT table_name, };                                                                         # SQL zur Größenermittlung
+  $query   .= qq{round (data_length / 1024 / 1024, 2) "data size in MB", }; 
+  $query   .= qq{round (index_length / 1024 / 1024, 2) "index size in MB", };
+  $query   .= qq{round (data_free / 1024 / 1024, 2) "free space in MB" };
+  $query   .= qq{FROM information_schema.TABLES where table_schema = '$dbname'; };
+  
+  my ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);                               # Anfangsgröße ermitteln
+  return $err if ($err);
+  
+  my ($dl,$il,$fs) = (0,0,0);
+  my $tn           = '';
+  
+  while (my @line = $sth->fetchrow_array()) {
+      $tn  = $line[0] // '';
+      $dl += $line[1] // 0;
+      $il += $line[2] // 0;
+      $fs += $line[3] // 0;      
+      
+      # Log3 ($name, 5, "DbRep $name - Size details: table name -> $line[0], data size -> $line[1] MB, index size -> $line[2] MB, Space free -> $line[3] MB");
+  }
+  
+  $query  = qq{SELECT round ((COUNT(*) * 300 * 1024)/1048576 + 150, 2) "overhead in MB" };
+  $query .= qq{FROM information_schema.TABLES where table_schema = '$dbname'; };
+  
+  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);                               # Overhead ermitteln
+  return $err if ($err);
+  
+  my $ovh = $sth->fetchrow_array();
+  
+  my $db_MB_size = "Data size: $dl, Index size: $il, Space free: $fs, Overhead: $ovh";
+  
+return ($err, $db_MB_size);
 }
 
 ####################################################################################################
@@ -7712,10 +7937,10 @@ sub DbRep_OptimizeDone {
   my $string       = shift;
   my @a            = split("\\|",$string);
   my $name         = $a[0];
-  my $err          = $a[1] ? decode_base64($a[1]) : undef;
+  my $err          = $a[1] ? decode_base64($a[1]) : '';
   my $bt           = $a[2];
-  my $db_MB_start  = $a[3];
-  my $db_MB_end    = $a[4];
+  my $db_MB_start  = $a[3] ? decode_base64($a[3]) : '';
+  my $db_MB_end    = $a[4] ? decode_base64($a[4]) : '';
   
   my $hash         = $defs{$name};
   
@@ -7751,22 +7976,18 @@ sub DbRep_mysql_DumpClientSide {
  my $paref                      = shift;
  my $hash                       = $paref->{hash};
  my $name                       = $paref->{name};
-  
- my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn                     = $dbloghash->{dbconn};
- my $dbuser                     = $dbloghash->{dbuser};
- my $dblogname                  = $dbloghash->{NAME};
- my $dbpassword                 = $attr{"sec$dblogname"}{secret};
  
  my $dbname                     = $hash->{DATABASE};
  my $dump_path                  = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
  $dump_path                     = $dump_path."/" unless($dump_path =~ m/\/$/);
+ 
  my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
- my $memory_limit               = AttrVal($name, "dumpMemlimit", 100000);
- my $my_comment                 = AttrVal($name, "dumpComment", "");
- my $dumpspeed                  = AttrVal($name, "dumpSpeed", 10000);
- my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
- my $ead                        = AttrVal($name, "executeAfterProc", undef);
+ my $memory_limit               = AttrVal($name, "dumpMemlimit",        100000);
+ my $my_comment                 = AttrVal($name, "dumpComment",             "");
+ my $dumpspeed                  = AttrVal($name, "dumpSpeed",            10000);
+ my $ebd                        = AttrVal($name, "executeBeforeProc",    undef);
+ my $ead                        = AttrVal($name, "executeAfterProc",     undef);
+ 
  my $mysql_commentstring        = "-- ";
  my $character_set              = "utf8";
  my $repver                     = $hash->{HELPER}{VERSION};
@@ -7775,12 +7996,11 @@ sub DbRep_mysql_DumpClientSide {
  my $dbpraefix                  = "";
  
  my ($sth,$tablename,$sql_create,$rct,$insert,$first_insert,$backupfile,$drc,$drh,$e,
-     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end,$db_MB_start,$db_MB_end);
+     $sql_daten,$inhalt,$filesize,$totalrecords,$status_start,$status_end);
  my (@ar,@tablerecords,@tablenames,@tables,@ergebnis);
  my (%db_tables);
  
- # Background-Startzeit
- my $bst = [gettimeofday];
+ my $bst = [gettimeofday];                                                        # Background-Startzeit
  
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
 
@@ -7801,8 +8021,10 @@ sub DbRep_mysql_DumpClientSide {
     
  my $fieldlist = "";
     
- my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
  return $err if ($err);
+ 
+ $dbh->{mysql_enable_utf8} = 0;                                                    # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
  
  my $st = [gettimeofday];                                                          # SQL-Startzeit
  
@@ -7812,22 +8034,20 @@ sub DbRep_mysql_DumpClientSide {
  my @mysql_version = $sth->fetchrow;
  my @v             = split(/\./,$mysql_version[0]);
 
- if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                   # mysql Version >= 4.1
-     $sth = $dbh->prepare("SET NAMES '".$character_set."'");
-     $sth->execute;
+ if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                                # mysql Version >= 4.1
+     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SET NAMES '".$character_set."'");  # get standard encoding of MySQl-Server
      
-     $sth = $dbh->prepare("SHOW VARIABLES LIKE 'character_set_connection'");       # get standard encoding of MySQl-Server
-     $sth->execute;
-     @ar = $sth->fetchrow; 
+     ($err, $sth)   = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
+     @ar            = $sth->fetchrow; 
      $character_set = $ar[1];
  } 
- else {
-     # mysql Version < 4.1 -> no SET NAMES available
-     # get standard encoding of MySQl-Server
-     $sth = $dbh->prepare("SHOW VARIABLES LIKE 'character_set'");
-     $sth->execute;
-     @ar = $sth->fetchrow; 
-     if (defined($ar[1])) { $character_set=$ar[1]; }
+ else {                                                                                                # mysql Version < 4.1 -> no SET NAMES available
+     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set'");    # get standard encoding of MySQl-Server   
+     @ar          = $sth->fetchrow; 
+     
+     if (defined($ar[1])) { 
+         $character_set = $ar[1]; 
+     }
  }
  
  Log3 ($name, 3, "DbRep $name - Characterset of collection and backup file set to $character_set. ");
@@ -7867,17 +8087,16 @@ sub DbRep_mysql_DumpClientSide {
      # decide if we need to skip the data while dumping (VIEWs and MEMORY)
      # check for old MySQL3-Syntax Type=xxx 
      
-     if (defined $value->{Type}) {                                         # port old index type to index engine, so we can use the index Engine in the rest of the script
+     if (defined $value->{Type}) {                                                         # port old index type to index engine, so we can use the index Engine in the rest of the script
          $value->{Engine} = $value->{Type}; 
-         $engine = uc($value->{Type});
+         $engine          = uc($value->{Type});
          
          if ($engine eq "MEMORY") {
              $value->{skip_data} = 1;
          }
      }
 
-     # check for > MySQL3 Engine = xxx 
-     if (defined $value->{Engine}) {
+     if (defined $value->{Engine}) {                                                       # check for > MySQL3 Engine = xxx 
          $engine = uc($value->{Engine});
          
          if ($engine eq "MEMORY") {
@@ -7885,8 +8104,7 @@ sub DbRep_mysql_DumpClientSide {
          }
      }
 
-     # check for Views - if it is a view the comment starts with "VIEW" 
-     if (defined $value->{Comment} && uc(substr($value->{Comment},0,4)) eq 'VIEW') {
+     if (defined $value->{Comment} && uc(substr($value->{Comment},0,4)) eq 'VIEW') {       # check for Views - if it is a view the comment starts with "VIEW" 
          $value->{skip_data}   = 1;
          $value->{Engine}      = 'VIEW'; 
          $value->{Update_time} = '';
@@ -7896,11 +8114,11 @@ sub DbRep_mysql_DumpClientSide {
          $db_tables{$value->{Name}} = $value;
      }
          
-     # cast indexes to int, cause they are used for builing the statusline
-     $value->{Rows}         += 0;
+     $value->{Rows}         += 0;                                                         # cast indexes to int, cause they are used for builing the statusline
      $value->{Data_length}  += 0;
      $value->{Index_length} += 0;
  }
+ 
  $sth->finish;
 
  @tablenames = sort(keys(%db_tables));
@@ -7920,12 +8138,16 @@ sub DbRep_mysql_DumpClientSide {
 
  if($optimize_tables_beforedump) {                                             # Tabellen optimieren vor dem Dump
      $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
      
-     if ($err) {
-         $err = encode_base64($err,"");
-         return "$name|$err";
-     }
+     my $opars = {
+         hash   => $hash,
+         dbh    => $dbh,
+         omode  => "execute",
+         tables => \@tablenames
+     };
+     
+     ($err) = _DbRep_mysqlOptimizeTables ($opars);
+     return $err if($err);
  }
     
  $st_e .= "-- TABLE-INFO\n";                                                   # Tabelleneigenschaften für SQL-File ermitteln
@@ -7934,8 +8156,7 @@ sub DbRep_mysql_DumpClientSide {
      my $dump_table = 1;
      
      if ($dbpraefix ne "") {
-         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {
-             # exclude table from backup because it doesn't fit to praefix
+         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {         # exclude table from backup because it doesn't fit to praefix
              $dump_table = 0;
          }
      }
@@ -7958,6 +8179,7 @@ sub DbRep_mysql_DumpClientSide {
          }
             
          $st_e .= $mysql_commentstring."TABLE: $db_tables{$tablename}{Name} | Rows: $db_tables{$tablename}{Rows} | Length: ".($db_tables{$tablename}{Data_length}+$db_tables{$tablename}{Index_length})." | Engine: $db_tables{$tablename}{Engine}\n";
+         
          if($db_tables{$tablename}{Name} eq "current") {
              $drc = $db_tables{$tablename}{Rows};
          }
@@ -7967,6 +8189,7 @@ sub DbRep_mysql_DumpClientSide {
          }
      }
  }
+ 
  $st_e .= "-- EOF TABLE-INFO";
     
  Log3 ($name, 3, "DbRep $name - Found ".(@tables)." tables with $r records.");
@@ -8044,6 +8267,7 @@ sub DbRep_mysql_DumpClientSide {
              while (@ar = $sth->fetchrow) {
                  $fieldlist .= "`".$ar[0]."`,";
              }
+             
              $sth->finish;
              
              Log3 ($name, 5, "DbRep $name - Fieldlist found: $fieldlist");
@@ -8089,7 +8313,7 @@ sub DbRep_mysql_DumpClientSide {
              $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
          }
 
-         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, , $character_set);        # write sql commands to file
+         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);        # write sql commands to file
          $sql_text = "";
 
          if ($db_tables{$tablename}{skip_data} == 0) {
@@ -8170,7 +8394,7 @@ sub DbRep_mysql_DumpServerSide {
  my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  
- my ($sth,$db_MB_start,$db_MB_end,$drh);
+ my ($sth,$drh);
  my (%db_tables,@tablenames);
  
  my $bst = [gettimeofday];                                              # Background-Startzeit
@@ -8216,11 +8440,16 @@ sub DbRep_mysql_DumpServerSide {
  
  if($optimize_tables_beforedump) {                                                       # Tabellen optimieren vor dem Dump
      $hash->{HELPER}{DBTABLES} = \%db_tables;
-     ($err,$db_MB_start,$db_MB_end) = DbRep_mysqlOptimizeTables($hash,$dbh,@tablenames);
-     if ($err) {
-         $err = encode_base64($err,"");
-         return "$name|$err"; 
-     }
+     
+     my $opars = {
+         hash   => $hash,
+         dbh    => $dbh,
+         omode  => "execute",
+         tables => \@tablenames
+     };
+     
+     ($err) = _DbRep_mysqlOptimizeTables($opars);
+     return $err if($err);
  }
  
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname', table '$table'");
@@ -10412,12 +10641,12 @@ sub DbRep_prepareExecuteQuery {
   
   my $ret  = q{};
   
-  my ($sth,$err,$r);
-  
+  my ($sth,$err,$result);
+
   Log3 ($name, 4, "DbRep $name - $info");
   
-  eval{ $sth = $dbh->prepare($sql);
-        $r   = $sth->execute();
+  eval{ $sth    = $dbh->prepare($sql);
+        $result = $sth->execute();
       } 
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -10426,7 +10655,7 @@ sub DbRep_prepareExecuteQuery {
               $ret = "$name|$err";
             };
 
-return ($ret, $sth, $r);
+return ($ret, $sth, $result);
 }
 
 ####################################################################################################
@@ -11255,7 +11484,7 @@ sub DbRep_WriteToDumpFile {
             $filesize = (stat($sql_file))[7];
         }
     }
-
+    
 return ($filesize,undef);
 }
 
@@ -11353,15 +11582,32 @@ return ($success, $username, $passwd);
 }
 
 ####################################################################################################
+#                           anlegen Keyvalue-File für DbRep wenn nicht vorhanden
+####################################################################################################
+sub DbRep_createCmdFile {
+  my $hash   = shift;
+  
+  my $param = {
+               FileName   => $dbrep_fName,
+               #ForceType  => "file",
+              };
+  my @new;
+  push(@new, "# This file is auto generated from 93_DbRep.pm",
+             "# Please do not modify, move or delete it.",
+             "");
+
+return FileWrite($param, @new);
+}
+
+####################################################################################################
 #                      Schreibroutine in DbRep Keyvalue-File
 ####################################################################################################
 sub DbRep_setCmdFile {
   my ($key,$value,$hash) = @_;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
   
   my $param = {
-               FileName   => $fName,
-               ForceType  => "file",
+               FileName   => $dbrep_fName,
+               #ForceType  => "file",
               };
               
   my ($err, @old) = FileRead($param);
@@ -11382,40 +11628,67 @@ sub DbRep_setCmdFile {
   }
   
   push @new, "$key:$value" if(!$fnd && defined($value));
+  
+  $err = FileWrite($param, @new);
 
-return FileWrite($param, @new);
+return $err;
 }
 
 ####################################################################################################
-#                           anlegen Keyvalue-File für DbRep wenn nicht vorhanden
+#                       Leseroutine aus DbRep Keyvalue-File
 ####################################################################################################
-sub DbRep_createCmdFile {
-  my $hash   = shift;
-  my $fName  = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
+sub DbRep_getCmdFile {
+  my $key   = shift;
   
   my $param = {
-               FileName   => $fName,
-               ForceType  => "file",
+               FileName   => $dbrep_fName,
+               #ForceType  => "file",
               };
-  my @new;
-  push(@new, "# This file is auto generated from 93_DbRep.pm",
-             "# Please do not modify, move or delete it.",
-             "");
+              
+  my ($err, @l) = FileRead($param);
+  return ($err, '') if($err);
+  
+  for my $line (@l) {
+      return ('', $line) if($line =~ m/^$key:(.*)/);
+  }
 
-return FileWrite($param, @new);
+return;
 }
 
 ####################################################################################################
-#          SQL Cache für sqlCmd History löschen
+#          SQL Cache für sqlCmd History aus RAM löschen
 ####################################################################################################
 sub DbRep_deleteSQLcmdCache {
   my $name = shift; 
-  my $hash = $defs{$name};
   
   delete $data{DbRep}{$name}{sqlcache};
   $data{DbRep}{$name}{sqlcache}{index} = 0;                              # SQL-CommandHistory CacheIndex
 
-  DbRep_setCmdFile($name."_sqlCmdList", "", $hash);                      # Löschen der sql History Liste im DbRep-Keyfile
+return;
+}
+
+####################################################################################################
+#          SQL Cache für sqlCmd History aus File löschen
+####################################################################################################
+sub DbRep_deleteSQLhistFromFile {
+  my $name = shift; 
+  
+  my $key         = $name."_sqlCmdList";
+  my ($err, @old) = FileRead($dbrep_fName);
+  my @new;
+  
+  if(!$err) {
+      for my $l (@old) {
+          if($l =~ m/^$key:/) {
+              next;
+          } 
+          else {
+              push @new, $l;
+          }
+      }
+
+      FileWrite($dbrep_fName, @new);
+  }
 
 return;
 }
@@ -11424,7 +11697,8 @@ return;
 #          SQL Cache für sqlCmd History initialisieren
 ####################################################################################################
 sub DbRep_initSQLcmdCache {
-  my $name = shift; 
+  my $name = shift;
+  
   my $hash = $defs{$name};
   
   RemoveInternalTimer ($name, "DbRep_initSQLcmdCache");
@@ -11433,15 +11707,15 @@ sub DbRep_initSQLcmdCache {
       return;
   }
   
-  $data{DbRep}{$name}{sqlcache}{index} = 0;                              # SQL-CommandHistory CacheIndex
+  DbRep_deleteSQLcmdCache ($name);
   
   my ($err,$hl) = DbRep_getCmdFile($name."_sqlCmdList");
+  my $count     = 0;
   
   if($hl) {
       $hl = (split ":", $hl, 2)[1];
   
       my @cmds  = split ",", $hl;
-      my $count = 0;
       
       for my $elem (@cmds) {
           $elem = _DbRep_deconvertSQL ($elem);     
@@ -11452,7 +11726,7 @@ sub DbRep_initSQLcmdCache {
       Log3 ($name, 4, qq{DbRep $name - SQL history restored from Cache file - count: $count}) if($count);
   }
     
-return;
+return $count;
 }
 
 ####################################################################################################
@@ -11479,9 +11753,6 @@ sub DbRep_addSQLcmdCache {
   
   if($doIns) {
       _DbRep_insertSQLtoCache ($name, $tmpsql);
-      
-      my (undef, $cstr) = DbRep_listSQLcmdCache ($name, 1);
-      DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash) if($cstr);
   }  
   
 return;
@@ -11549,6 +11820,20 @@ return;
 }
 
 ####################################################################################################
+#             SQL Cache History speichern
+####################################################################################################
+sub DbRep_writeSQLcmdCache {                
+  my $hash = shift;
+
+  my $name = $hash->{NAME};  
+       
+  my (undef, $cstr) = DbRep_listSQLcmdCache ($name, 1);
+  my $err           = DbRep_setCmdFile($name."_sqlCmdList", $cstr, $hash);  
+  
+return $err;
+}
+
+####################################################################################################
 #          SQL Statement konvertieren 
 #    $write - setzen für Schreiben Cache File
 ####################################################################################################
@@ -11579,101 +11864,6 @@ sub _DbRep_deconvertSQL {
   $cmd =~ s/&#65292;/,/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
    
 return $cmd;
-}
-
-####################################################################################################
-#                       Leseroutine aus DbRep Keyvalue-File
-####################################################################################################
-sub DbRep_getCmdFile {
-  my $key   = shift;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
-  
-  my $param = {
-               FileName   => $fName,
-               ForceType  => "file",
-              };
-              
-  my ($err, @l) = FileRead($param);
-  return ($err, '') if($err);
-  
-  for my $line (@l) {
-      return ('', $line) if($line =~ m/^$key:(.*)/);
-  }
-
-return;
-}
-
-####################################################################################################
-#             Tabellenoptimierung MySQL
-####################################################################################################
-sub DbRep_mysqlOptimizeTables {
-  my ($hash,$dbh,@tablenames) = @_;
-  my $name   = $hash->{NAME};
-  my $dbname = $hash->{DATABASE};
-  my $ret    = 0;
-  my $opttbl = 0;
-  my $db_tables = $hash->{HELPER}{DBTABLES};
-  
-  my ($engine,$tablename,$query,$sth,$value,$db_MB_start,$db_MB_end);
-
-  # Anfangsgröße ermitteln
-  $query = "SELECT sum( data_length + index_length ) / 1024 / 1024 FROM information_schema.TABLES where table_schema='$dbname' "; 
-  Log3 ($name, 5, "DbRep $name - current query: $query ");
-  eval { $sth = $dbh->prepare($query);
-         $sth->execute;
-       };
-  if ($@) {
-      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-      $sth->finish;
-      $dbh->disconnect;
-      return ($@,undef,undef);
-  }
-  
-  $value = $sth->fetchrow();
-     
-  $db_MB_start = sprintf("%.2f",$value);
-  Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
-     
-  Log3($name, 3, "DbRep $name - Optimizing tables");
-  
-  foreach $tablename (@tablenames) {
-      #optimize table if engine supports optimization
-      $engine = '';
-      $engine = uc($db_tables->{$tablename}{Engine}) if($db_tables->{$tablename}{Engine});
-
-      if ($engine =~ /(MYISAM|BDB|INNODB|ARIA)/) {
-          Log3($name, 3, "DbRep $name - Optimizing table `$tablename` ($engine). It will take a while.");
-          my $sth_to = $dbh->prepare("OPTIMIZE TABLE `$tablename`");
-          $ret = $sth_to->execute; 
-           
-          if ($ret) {
-              Log3($name, 3, "DbRep $name - Table ".($opttbl+1)." `$tablename` optimized successfully.");
-              $opttbl++;
-          } 
-          else {
-              Log3($name, 2, "DbRep $name - Error while optimizing table $tablename. Continue with next table or backup.");
-          }
-      }
-  }
-
-  Log3($name, 3, "DbRep $name - $opttbl tables have been optimized.") if($opttbl > 0);
-     
-  # Endgröße ermitteln
-  eval { $sth->execute; };
-  if ($@) {
-      Log3 ($name, 2, "DbRep $name - Error executing: '".$query."' ! MySQL-Error: ".$@);
-      $sth->finish;
-      $dbh->disconnect;
-      return ($@,undef,undef);
-  }
-  
-  $value = $sth->fetchrow();
-  $db_MB_end = sprintf("%.2f",$value);
-  Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB_end");
-     
-  $sth->finish;
-  
-return (undef,$db_MB_start,$db_MB_end);
 }
 
 ####################################################################################################
@@ -13954,20 +14144,18 @@ return;
                                </li> <br>
      
     <a name="insert"></a>     
-    <li><b> insert </b>       -  data are inserted into table "history" manually. Input values for Date, Time and Value are 
-                                 mandatory. The database fields for Type and Event will be filled in with "manual" automatically. 
-                                 The values of <a href="#device">device</a>, <a href="#reading">reading</a> use the 
-                                 attribute settings .  <br><br>
+    <li><b> insert &lt;Datum,Zeit,Value,[Unit]&gt; </b>      
+                                 -  Manual insertion of a record into the "history" table. Mandatory are input values for Date, Time and Value. 
+                                 The values for the DB fields TYPE and EVENT are filled with "manual", and the values for 
+                                 DEVICE, READING are taken from the set attributes 
+                                 <a href="#device">device</a> bzw. <a href="#reading">reading</a>.
+                                 <br><br>
                                  
                                  <ul>
-                                 <b>input format: </b>   Date,Time,Value,[Unit]    <br>
-                                 # Unit is optional, attributes <a href="#device">device</a>, <a href="#reading">reading</a> must be set ! <br>
-                                 # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br>
-                                 <br>
+                                 <b>Example: </b> <br>
+                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW          <br>
+                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space  <br>
                                  </ul>
-                                 
-                                 <b>example:</b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>
-                                 # Spaces are NOT allowed in fieldvalues ! <br>
                                  <br>
                                  
                                  <b>Note: </b><br>
@@ -14113,9 +14301,20 @@ return;
                                  
                                  </li><br>   
 
-    <li><b> optimizeTables </b> - optimize tables in the connected database (MySQL). <br>
+    <li><b> optimizeTables [showInfo | execute]</b> 
+                                  - optimize tables in the connected database (MySQL). <br><br>
+                                  
+                                  <ul>
+                                  <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>showInfo</b>  </td><td>: shows information about the used / free space within the database   </td></tr>
+                                      <tr><td> <b>execute</b>   </td><td>: performs optimization of all tables in the database                 </td></tr>
+                                   </table>
+                                  </ul>
+                                  <br> 
+                                  
                                   Before and after an optimization it is possible to execute a FHEM command. 
-                                  (please see <a href="#DbRepattr">attributes</a>  "executeBeforeProc", "executeAfterProc") 
+                                  (please see attributes <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>) 
                                   <br><br>
                                 
                                  <ul>
@@ -14342,7 +14541,7 @@ return;
                                  the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
                                  <b>§timestamp_end§</b> can be used for this purpose. <br>
                                  It should be noted that the placeholders §device§ and §reading§ complex are resolved and 
-								 should be applied accordingly as in the example below.                                  
+                                 should be applied accordingly as in the example below.                                  
                                  <br><br>
                                  
                                  If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
@@ -14433,12 +14632,24 @@ return;
                                  </li><br>
                                  </ul>  
 
-    <li><b> sqlCmdHistory </b>   - If history is activated with attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a>, an already
-                                   successfully executed sqlCmd-command can be repeated from a drop-down list. <br>
-                                   With execution of "___purge_sqlhistory___" the history can be deleted. 
-                                   <br><br>                                   
+    <li><b> sqlCmdHistory </b>   - If activated with the attribute <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
+                                   a stored SQL statement can be selected from a list and executed.
+                                   The SQL cache is automatically saved when FHEM is closed and restored when the system is started.
+                                   The following entries execute special functions:  
+                                   <br><br>
+
+                                   <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>___purge_sqlhistory___</b>   </td><td>: deletes the history cache                                                         </td></tr>
+                                      <tr><td> <b>___list_sqlhistory___ </b>   </td><td>: shows the SQL statements currently in the cache, including their cache key (ckey) </td></tr>
+                                      <tr><td> <b>___save_sqlhistory___</b>    </td><td>: backs up the history cache manually                                               </td></tr>
+                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: restores the last backup of the history cache                                     </td></tr>
+                                   </table>
+                                   </ul>
+                                   <br>                                    
                              
-                                   For a better overview the relevant attributes for this command are listed in a table: <br><br>
+                                   The attributes relevant to controlling this function are: <br><br>
 
                                    <ul>
                                    <table>  
@@ -14463,17 +14674,16 @@ return;
                                  The following predefined reportings are selectable: <br><br>
                                    <ul>
                                    <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>:       reports the 50 most occuring log entries of the last 2 days </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>:       all devices occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>:       all device/reading combinations occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>recentReadingsOfDevice </b>  </td><td>:       determines the newest records of a device available in the database. The
-                                                                                                device must be defined in attribute <a href="#device">device</a>. 
-                                                                                                Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
-                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: determines the value difference of successive data records of a reading. The
-                                                                                                device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>. 
-                                                                                                Only <b>one</b> device to be evaluated and only <b>one</b> reading to be evaluated can be specified. 
-                                                                                                The time limits of the evaluation are defined by the time.*-attributes. </td></tr>
+                                   <colgroup> <col width=30%> <col width=70%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b>       </td><td> reports the 50 most occuring log entries of the last 2 days                         </td></tr>
+                                      <tr><td> <b>allDevCount </b>                   </td><td> all devices occuring in database and their quantity                                 </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>               </td><td> all device/reading combinations occuring in database and their quantity             </td></tr>
+                                      <tr><td> <b>50DevReadCount </b>                </td><td> the 50 most frequently included device/reading combinations in the database         </td></tr>
+                                      <tr><td> <b>recentReadingsOfDevice </b>        </td><td> determines the newest records of a device available in the database. The            </td></tr>
+                                      <tr><td>                                       </td><td> device must be defined in attribute <a href="#device">device</a>.                   </td></tr>                                 
+                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td> determines the value difference of successive data records of a reading. The        </td></tr>
+                                      <tr><td>                                       </td><td> device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>.  </td></tr>
+                                      <tr><td>                                       </td><td> The time limits of the evaluation are defined by the time.*-attributes.                                              </td></tr>
                                    </table>
                                    </ul>
                                    <br>
@@ -16736,20 +16946,19 @@ return;
                                    
                                </li> <br>                                
     <a name="insert"></a>   
-    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
-                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für 
-                                 <a href="#device">Device</a>, <a href="#reading">Reading</a> aus den gesetzten Attributen 
-                                 genommen.  <br><br>
+    <li><b> insert &lt;Datum,Zeit,Value,[Unit]&gt; </b>       
+                                 -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
+                                 Die Werte für die DB-Felder TYPE bzw. EVENT werden mit "manual" gefüllt, sowie die Werte für 
+                                 DEVICE, READING aus den gesetzten Attributen <a href="#device">device</a> bzw. <a href="#reading">reading</a>
+                                 genommen.  
+                                 <br><br>
                                  
                                  <ul>
-                                 <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
-                                 # Unit ist optional, Attribute <a href="#device">device</a>, <a href="#reading">reading</a> müssen gesetzt sein  <br>
-                                 # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
-                                 
-                                 <b>Beispiel: </b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>
-                                 # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
-                                 <br>
+                                 <b>Beispiel: </b> <br>
+                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW          <br>
+                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space  <br>
                                  </ul>
+                                 <br>
                                  
                                  <b>Hinweis: </b><br>
                                  Bei der Eingabe ist darauf zu achten dass im beabsichtigten Aggregationszeitraum (Tag, Woche, Monat, etc.) MINDESTENS zwei 
@@ -16903,17 +17112,29 @@ return;
                                  
                                  </li> <br>                                 
                                  
-    <li><b> optimizeTables </b> - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br>
-                                  Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
-                                  (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
-                                  <br><br>
+    <li><b> optimizeTables [showInfo | execute]</b> 
+                                - optimiert die Tabellen in der angeschlossenen Datenbank (MySQL). <br><br>
+                                
+                                <ul>
+                                <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                    <tr><td> <b>showInfo</b>  </td><td>: zeigt Informationen zum belegten / freien Speicherplatz innerhalb der Datenbank   </td></tr>
+                                    <tr><td> <b>execute</b>   </td><td>: führt die Optimierung aller Tabellen in der Datenbank aus                         </td></tr>
+                                 </table>
+                                </ul>
+                                <br>                                
+                                
+                                Vor und nach der Optimierung kann ein FHEM-Kommando ausgeführt werden. 
+                                (siehe Attribute <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>)
+                                <br><br>
                                  
                                 <ul>
-                                <b>Hinweis:</b> <br>
-                                Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
-                                im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
+                                  <b>Hinweis:</b> <br>
+                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, muß das zugeordnete DbLog-Device
+                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden. <br><br>           
                                 </li>
-                                </ul><br>
+                                </ul>
+                                <br>
                                                                          
     <li><b> readingRename &lt;[Device:]alterReadingname&gt;,&lt;neuerReadingname&gt; </b>  <br>
                                  Benennt den Namen eines Readings innerhalb der angeschlossenen Datenbank (siehe Internal DATABASE) um.
@@ -17232,12 +17453,23 @@ return;
                                  </ul>
                                  
     <li><b> sqlCmdHistory </b>   - Wenn mit dem Attribut <a href="#sqlCmdHistoryLength">sqlCmdHistoryLength</a> aktiviert, kann
-                                   aus einer Liste ein bereits erfolgreich ausgeführtes sqlCmd-Kommando wiederholt werden. <br>
-                                   Mit Ausführung von "___purge_sqlhistory___" kann die Historie gelöscht 
-                                   werden. <br><br>
+                                   ein gespeichertes SQL-Statement aus einer Liste ausgewählt und ausgeführt werden.
+                                   Der SQL Cache wird beim Beenden von FHEM automatisch gesichert und beim Start des Systems wiederhergestellt.
+                                   Mit den nachfolgenden Einträgen werden spezielle Funktionen ausgeführt: 
+                                   <br><br>
                                    
-                                   Zur besseren Übersicht sind die zur Steuerung dieser Funktion von relevanten Attribute 
-                                   hier noch einmal zusammenstellt: <br><br>
+                                   <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>___purge_sqlhistory___</b>   </td><td>: löscht den History Cache                                                           </td></tr>
+                                      <tr><td> <b>___list_sqlhistory___ </b>   </td><td>: zeigt die aktuell im Cache vorhandenen SQL-Statements incl. ihrem Cache Key (ckey) </td></tr>
+                                      <tr><td> <b>___save_sqlhistory___</b>    </td><td>: sichert den History Cache manuell                                                  </td></tr>
+                                      <tr><td> <b>___restore_sqlhistory___</b> </td><td>: stellt die letzte Sicherung des History Cache wieder her                           </td></tr>
+                                   </table>
+                                   </ul>
+                                   <br> 
+                                   
+                                   Die zur Steuerung dieser Funktion relevante Attribute sind: <br><br>
 
                                    <ul>
                                    <table>  
@@ -17264,17 +17496,16 @@ return;
                                  Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
                                    <ul>
                                    <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b>    </td><td>:    ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
-                                      <tr><td> <b>allDevCount </b>                </td><td>:    alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>            </td><td>:    alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
-                                      <tr><td> <b>recentReadingsOfDevice </b>     </td><td>:    ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
-                                                                                                Device muß im Attribut <a href="#device">device</a> definiert sein. 
-                                                                                                Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
-                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende
-                                                                                                Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. 
-                                                                                                Es kann nur <b>ein</b> auszuwertendes Device und nur <b>ein</b> auszuwertendes Reading angegeben werden. 
-                                                                                                Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt. </td></tr>                        
+                                   <colgroup> <col width=27%> <col width=73%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b>       </td><td> ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage                   </td></tr>
+                                      <tr><td> <b>allDevCount </b>                   </td><td> alle in der Datenbank vorkommenden Devices und deren Anzahl                                      </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>               </td><td> alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl                 </td></tr>
+                                      <tr><td> <b>50DevReadCount </b>                </td><td> die 50 am häufigsten in der Datenbank enthaltenen Device/Reading-Kombinationen                   </td></tr>
+                                      <tr><td> <b>recentReadingsOfDevice </b>        </td><td> ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende  </td></tr>
+                                      <tr><td>                                       </td><td> Device muß im Attribut <a href="#device">device</a> definiert sein.                              </td></tr>
+                                      <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td> ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende   </td></tr>
+                                      <tr><td>                                       </td><td> Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. </td></tr>
+                                      <tr><td>                                       </td><td> Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt.                                        </td></tr>                        
                                    </table>
                                    </ul>
                                    <br>
