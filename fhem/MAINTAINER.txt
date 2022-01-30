@@ -342,6 +342,7 @@ FHEM/70_CanOverEthernet.pm   delmar               Sonstige Systeme
 FHEM/70_DENON_AVR.pm         delmar               Multimedia
 FHEM/70_EGPM.pm              alexus               Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               Multimedia
+FHEM/70_ESCVP21net.pm        hapege               Multimedia
 FHEM/70_HYDRAWISE.pm         xasher               Hydrawise irrigation
 FHEM/70_Jabber.pm            BioS                 Unterstützende Dienste
 FHEM/70_JSONMETER.pm         tupol                Sonstiges (Link als PM an tupol)
