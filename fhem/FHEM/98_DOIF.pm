@@ -2744,52 +2744,39 @@ sub DOIF_Trigger
 sub DOIF_Set_Filter 
 {
   my ($hash) = @_;
-  $hash->{helper}{NOTIFYDEV}="global";
-  $hash->{helper}{DEVFILTER}="\^global\$";
+  my @ndev=();
+#  my @ddev=();
+  push(@ndev,"global");
+#  push(@ddev,"\^global\$");
   foreach my $type (keys %{$hash->{Regex}}) {
     foreach my $device (keys %{$hash->{Regex}{$type}}) {
       foreach my $id (keys %{$hash->{Regex}{$type}{$device}}) {
         foreach my $reading (keys %{$hash->{Regex}{$type}{$device}{$id}}) {
           my $devreg=$hash->{Regex}{$type}{$device}{$id}{$reading};
           my($regdev)=split(/:/,$devreg);
-          my $devfilter=$regdev;
-          if ($regdev eq "") {
-            $regdev='.*';
+          my $item;
+          if ($regdev =~  /^\^([\w.]*)\$$/) {
+            $item=$1;
           } else {
-            if ($regdev=~/^\^/) {
-              $regdev=~s/^\^//;
-            } else {
-              $regdev="\.\*".$regdev;
-            }
-            if ($regdev=~/\$$/) {
-              $regdev=~s/\$$//;
-            } else {
-              $regdev.='.*';
-            }
+            $item='.*('.$regdev.').*';
           }
-          my $found=0;
-          foreach my $item (split(/\|/,$hash->{helper}{NOTIFYDEV})) {
-            if ($regdev eq $item) {
-              $found=1;
-              last;
-            }
-          }
-          if (!$found) {
-            $hash->{helper}{NOTIFYDEV}.="\|$regdev" ;
-            $hash->{helper}{DEVFILTER}.="\|$devfilter" ;
-          }
-          #$hash->{helper}{NOTIFYDEV}.="\|$regdev" if ($hash->{helper}{NOTIFYDEV}!~/\|$regdev(\||$)/);
-          #$hash->{helper}{DEVFILTER}.="\|$devfilterori" if ($hash->{helper}{DEVFILTER}!~/\|$devfilter(\||$)/);
+          push (@ndev,$item);
+ #         push (@ddev,$regdev);
         }
       }
     }
   }
-  notifyRegexpChanged($hash,$hash->{helper}{NOTIFYDEV});
-  if (defined ($hash->{NOTIFYDEV})) {
-    delete ($hash->{DOIFDEV});
-  } else {
-    $hash->{DOIFDEV}=$hash->{helper}{DEVFILTER};
-  }
+  my %h;
+  %h = map { $_ => 1 } @ndev;
+  @ndev = keys %h; # remove duplicates
+  $hash->{helper}{NOTIFYDEV} = join(",", @ndev);
+  setNotifyDev ($hash,$hash->{helper}{NOTIFYDEV});
+  
+
+ # %h = map { $_ => 1 } @ddev;
+ # @ddev = keys %h; # remove duplicates
+ # $hash->{helper}{DEVFILTER} = join("|", @ddev);
+ # $hash->{DOIFDEV}=$hash->{helper}{DEVFILTER};
 }
 
 sub
@@ -2797,8 +2784,8 @@ DOIF_Notify($$)
 {
   my ($hash, $dev) = @_;
   my $pn = $hash->{NAME};
-  return "" if($attr{$pn} && $attr{$pn}{disable});
-  return "" if (!$dev->{NAME});
+  #return "" if($attr{$pn} && $attr{$pn}{disable});
+  #return "" if (!$dev->{NAME});
   my $device;
   my $reading;
   my $internal;
@@ -2807,12 +2794,14 @@ DOIF_Notify($$)
   my $eventa;
   my $eventas;
   
- 
-  if (!defined($hash->{helper}{DEVFILTER})) {
-    return "";
-  } elsif ($dev->{NAME} !~ /$hash->{helper}{DEVFILTER}/) {
-    return "";
-  }
+ ## print("DOIF $pn aufgerufen $dev->{NAME}\n");
+ # if (!defined($hash->{helper}{DEVFILTER})) {
+ # if (!defined($hash->{helper}{NOTIFYDEV})) {
+ #   return "";
+ # }
+ #   elsif ($dev->{NAME} !~ /$hash->{helper}{DEVFILTER}/) {
+ #   return "";
+ # }
   
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
@@ -3775,7 +3764,7 @@ DOIF_Attr(@)
     my $cmd = $defs{$hash->{NAME}}{DEF};
     my $msg;
     my $err;
-    
+    setDisableNotifyFn($hash,0);
     if (!$cmd) {
       $cmd="";
       $defs{$hash->{NAME}}{DEF}="##";
@@ -3800,6 +3789,7 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
+    setDisableNotifyFn($hash,1);
     readingsBeginUpdate($hash);
     #if ($hash->{MODEL} ne "Perl") {
     #  readingsBulkUpdate ($hash, "state", "deactivated");
