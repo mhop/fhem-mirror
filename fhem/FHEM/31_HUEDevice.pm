@@ -1520,7 +1520,7 @@ HUEDevice_Parse($$)
   #Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
 
   if( !defined($hash->{has_events})                          # only if not already checked
-      && ($result->{v2_service} || $result->{v2_service}{t}) # only for updates from events
+      && ($result->{v2_service} || $result->{t}) # only for updates from events
       && defined($hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge') ) {
     $hash->{has_events} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
     $hash->{has_events} = 1 if( $hash->{IODev}{is_DECONZ} );
@@ -1894,9 +1894,9 @@ HUEDevice_Parse($$)
          if( defined($readings{$key}) ) {
            if( $lastupdated ) {
              my $rut = ReadingsTimestamp($name,$key,undef);
-             if( !$hash->{helper}{forceUpdate}
-                 && !defined($result->{v2_service}) && !defined($result->{t})
-                 && $ts && defined($rut) && $ts <= time_str2num($rut) ) {
+             if( !$hash->{helper}{forceUpdate}                                # not from queryAfterEvent
+                 && !defined($result->{v2_service}) && !defined($result->{t}) # not v2 event and not deconz event
+                 && $ts && defined($rut) && $ts <= time_str2num($rut) ) {     # lastupdated older than or equal to reading
                Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, current reading timestamp is $rut";
                next;
              }
