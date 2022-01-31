@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 220061807';
+my $HMCCU_VERSION = '5.0 220301356';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -143,6 +143,9 @@ my $HMCCU_DEF_HMSTATE = '^0\.UNREACH!(1|true):unreachable;^[0-9]\.LOW_?BAT!(1|tr
 # Placeholder for external addresses (i.e. HVL)
 my $HMCCU_EXT_ADDR = 'ZZZ0000000';
 
+# Regular expression for channel roles, which sould be ignored during automatic device detection
+# For testing purpose only
+my $HMCCU_IGNORE_ROLES = '';
 
 # Declare functions
 
@@ -213,7 +216,7 @@ sub HMCCU_GetRPCServerInfo ($$$);
 sub HMCCU_IsRPCServerRunning ($;$);
 sub HMCCU_IsRPCType ($$$);
 sub HMCCU_IsRPCStateBlocking ($);
-sub HMCCU_RPCRequest ($$$$;$$);
+sub HMCCU_RPCParamsetRequest ($$$;$$);
 sub HMCCU_StartExtRPCServer ($);
 sub HMCCU_StopExtRPCServer ($;$);
 
@@ -479,6 +482,7 @@ sub HMCCU_Define ($$$)
 	$hash->{RPCState}        = 'inactive';
 	$hash->{NOTIFYDEV}       = 'global';
 	$hash->{hmccu}{rpcports} = undef;
+	$hash->{hmccu}{postInit} = 0;
 
 	HMCCU_Log ($hash, 1, "Initialized version $HMCCU_VERSION");
 	
@@ -577,23 +581,31 @@ sub HMCCU_PostInit ($)
 	my ($hash) = @_;
 	
 	my $host = $hash->{host};
+	$hash->{hmccu}{postInit} = 1;
 
 	if (HMCCU_IsDelayedInit ($hash)) {
-		return if (HMCCU_InitDevice ($hash) > 0);
+		if (HMCCU_InitDevice ($hash) > 0) {
+			$hash->{hmccu}{postInit} = 0;
+			return;
+		}
 	}
 
 	if ($hash->{ccustate} eq 'active') {
 		my $rpcServer = AttrVal ($hash->{NAME}, 'rpcserver', 'off');
 
 		HMCCU_Log ($hash, 1, 'Reading device config from CCU. This may take a couple of seconds ...');
+		my $ts = time();
 		my ($cDev, $cPar, $cLnk) = HMCCU_GetDeviceConfig ($hash);
-		HMCCU_Log ($hash, 2, "Read device configuration: devices/channels=$cDev parametersets=$cPar links=$cLnk");
+		$ts = time()-$ts;
+		HMCCU_Log ($hash, 2, "Read device configuration in $ts seconds: devices/channels=$cDev parametersets=$cPar links=$cLnk");
 		
 		HMCCU_StartExtRPCServer ($hash) if ($rpcServer eq 'on');
 	}
 	else {
 		HMCCU_Log ($hash, 1, 'CCU not active. Post FHEM start initialization failed');
 	}
+
+	$hash->{hmccu}{postInit} = 0;
 }
 
 ######################################################################
@@ -2712,6 +2724,7 @@ sub HMCCU_Log ($$$;$)
 	else {
 		Log3 $logname, $level, "$type [$name] $msg";
 	}
+
 	return $rc;
 }
 
@@ -2762,7 +2775,9 @@ sub HMCCU_SetError ($@)
 	   -18 => 'Type of system variable not supported',
 	   -19 => 'Device not initialized',
 	   -20 => 'Invalid or unknown device interface',
-	   -21 => 'Device disabled'
+	   -21 => 'Device disabled',
+	   -22 => 'Invalid RPC method',
+	   -23 => 'Invalid parameter in RPC request'
 	);
 
 	if ($text ne 'OK' && $text ne '0') {
@@ -3887,6 +3902,7 @@ sub HMCCU_GetDeviceConfig ($)
 		my ($rpcdev, $save) = HMCCU_GetRPCDevice ($ioHash, 1, $iface);
 		if ($rpcdev ne '') {
 			my $rpcHash = $defs{$rpcdev};
+			HMCCURPCPROC_Connect ($rpcHash, $ioHash);
 			HMCCU_Log ($ioHash, 2, "Reading Device Descriptions for interface $iface");
 			$c = HMCCURPCPROC_GetDeviceDesc ($rpcHash);
 			HMCCU_Log ($ioHash, 2, "Read $c Device Descriptions for interface $iface");
@@ -3899,6 +3915,7 @@ sub HMCCU_GetDeviceConfig ($)
 			$c = HMCCURPCPROC_GetPeers ($rpcHash);
 			HMCCU_Log ($ioHash, 2, "Read $c Peer Descriptions for interface $iface");
 			$cLnk += $c;
+			HMCCURPCPROC_Disconnect ($rpcHash, $ioHash);
 		}
 		else {
 			HMCCU_Log ($ioHash, 2, "No RPC device found for interface $iface. Can't read device config.");
@@ -6047,12 +6064,13 @@ sub HMCCU_GetCCUDeviceParam ($$)
 }
 
 ######################################################################
-# Get list of valid datapoints for device type.
-# hash = hash of client or IO device
-# devtype = Homematic device type
-# chn = Channel number, -1=all channels
-# oper = Valid operation, combination of 1=Read, 2=Write, 4=Event
-# dplistref = Reference for array with datapoints (optional)
+# Get list of valid datapoints for device type
+# Parameters:
+#   hash = hash of client or IO device
+#   devtype = Homematic device type
+#   chn = Channel number, -1=all channels
+#   oper = Valid operation, combination of 1=Read, 2=Write, 4=Event
+#   dplistref = Reference for array with datapoints (optional)
 # Return number of datapoints.
 ######################################################################
 
@@ -6114,11 +6132,12 @@ sub HMCCU_GetDatapointAttr ($$$$$)
 
 ######################################################################
 # Find a datapoint for device type.
-# hash = hash of client or IO device
-# devtype = Homematic device type
-# chn = Channel number, -1=all channels
-# oper = Valid operation: 1=Read, 2=Write, 4=Event
-# Return channel of first match or -1.
+# Parameters:
+#   hash = hash of client or IO device
+#   devtype = Homematic device type
+#   chn = Channel number, -1=all channels
+#   oper = Valid operation: 1=Read, 2=Write, 4=Event
+#   Return channel of first match or -1.
 ######################################################################
 
 sub HMCCU_FindDatapoint ($$$$$)
@@ -6226,7 +6245,8 @@ sub HMCCU_GetMatchingDevices ($$$$)
 		next if (
 			$name !~/$regexp/ ||
 			$hash->{hmccu}{adr}{$name}{addtype} ne $mode ||
-		   $hash->{hmccu}{adr}{$name}{valid} == 0);
+			$hash->{hmccu}{adr}{$name}{valid} == 0
+		);
 		push (@$listref, $hash->{hmccu}{adr}{$name}{address});
 		$c++;
 	}
@@ -7692,7 +7712,7 @@ sub HMCCU_ExecuteSetParameterCommand ($@)
 
 		return HMCCU_SetError ($clHash, "$receiver is not a link receiver of $clHash->{NAME}")
 			if (!HMCCU_IsValidReceiver ($ioHash, $ccuobj, $clHash->{ccuif}, $receiver));
-		($rc, $result) = HMCCU_RPCRequest ($clHash, 'putParamset', $ccuobj, $receiver, $h);
+		($rc, $result) = HMCCU_RPCParamsetRequest ($clHash, 'putParamset', $ccuobj, $receiver, $h);
 	}
 
 	return HMCCU_SetError ($clHash, HMCCU_Min(0, $rc), $result);
@@ -7817,22 +7837,18 @@ sub HMCCU_ExecuteGetParameterCommand ($@)
 	
 	my %objects;
 	foreach my $a (@$addList) {
-		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $clHash->{ccuif});
-		if (!defined($devDesc)) {
-			HMCCU_Log ($clHash, 2, "Can't get device description");
-			return undef;
-		}
+		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $clHash->{ccuif}) // return HMCCU_Log (
+			$clHash, 2, "Can't get device description", undef);
 		
 		my $paramset = $defParamset eq '' ? $devDesc->{PARAMSETS} : $defParamset;
-		my ($da, $dc) = HMCCU_SplitChnAddr ($a);
-		$dc = 'd' if ($dc eq '');
+		my ($da, $dc) = HMCCU_SplitChnAddr ($a, 'd');
 
 		foreach my $ps (split (',', $paramset)) {
 			next if ($devDesc->{PARAMSETS} !~ /$ps/);
 
 			if ($ps eq 'LINK') {
 				foreach my $rcv (HMCCU_GetReceivers ($ioHash, $a, $clHash->{ccuif})) {
-					my ($rc, $result) = HMCCU_RPCRequest ($clHash, 'getRawParamset', $a, $rcv);
+					my ($rc, $result) = HMCCU_RPCParamsetRequest ($clHash, 'getParamset', $a, $rcv);
 					next if ($rc < 0);
 					foreach my $p (keys %$result) {
 						$objects{$da}{$dc}{"LINK.$rcv"}{$p} = $result->{$p} if ($p =~ /$filter/);
@@ -7840,7 +7856,7 @@ sub HMCCU_ExecuteGetParameterCommand ($@)
 				}
 			}
 			else {
-				my ($rc, $result) = HMCCU_RPCRequest ($clHash, 'getRawParamset', $a, $ps);
+				my ($rc, $result) = HMCCU_RPCParamsetRequest ($clHash, 'getParamset', $a, $ps);
 				if ($rc < 0) {
 					HMCCU_Log ($clHash, 2, "Can't get parameterset $ps for address $a");
 					next;
@@ -8486,7 +8502,7 @@ sub HMCCU_DetectSCDev ($;$$$$)
 #   int defSDP: Default state datapoint with channel
 #   int defCDP: Default control datapoint with channel
 #   int level: Detection level
-#     0 = device type not detected
+#     0 = device type not detected or error during detection
 #     1 = device type detected with single known role => HMCCUCHN
 #     2 = device detected with multiple identical channels (i.e. switch
 #         or remote with more than 1 button) => Multiple HMCCUCHNs
@@ -8495,6 +8511,7 @@ sub HMCCU_DetectSCDev ($;$$$$)
 #     4 = device type detected with different state and control role
 #         (>=2 different channels) => HMCCUDEV
 #     5 = device type detected with one or more 4-channel-groups (1xState,3xControl)
+#     6 = device type not detected, but readable and/or writeable roles found
 #
 # Structure of stateRole / controlRole hashes:
 #   int <channel>: Channel number (key)
@@ -8517,6 +8534,8 @@ sub HMCCU_DetectDevice ($$$)
 	my @allRoles = ();
 	my @stateRoles = ();
 	my @controlRoles = ();
+	my @unknownStateRoles = ();		# State roles not known by HMCCU
+	my @unknownControlRoles = ();	# Control roles not known by HMCCU
 	my ($prioState, $prioControl) = (-1, -1);
 
 	if (!defined($address)) {
@@ -8537,16 +8556,20 @@ sub HMCCU_DetectDevice ($$$)
 		foreach my $child (split(',', $devDesc->{CHILDREN})) {
 			my $chnDesc = HMCCU_GetDeviceDesc ($ioHash, $child, $devDesc->{_interface}) // next;
 			push @allRoles, $chnDesc->{TYPE};
-			HMCCU_IdentifyRole ($ioHash, $chnDesc, $iface, \@stateRoles, \@controlRoles);
+			my $known = HMCCU_IdentifyRole ($ioHash, $chnDesc, $iface, \@stateRoles, \@controlRoles);
+#			HMCCU_DetectUnknownRoles ($ioHash, $chnDesc, \@unknownStateRoles, \@unknownControlRoles) if (!$known);
 		}
 	}
 	elsif ($devDesc->{_addtype} eq 'chn') {
-		HMCCU_IdentifyRole ($ioHash, $devDesc, $iface, \@stateRoles, \@controlRoles);
+		my $known = HMCCU_IdentifyRole ($ioHash, $devDesc, $iface, \@stateRoles, \@controlRoles);
+#		HMCCU_DetectUnknownRoles ($ioHash, $devDesc, \@unknownStateRoles, \@unknownControlRoles) if (!$known);
 	}
-
+	
 	# Count roles and unique roles
 	my $stateRoleCnt = scalar(@stateRoles);
 	my $ctrlRoleCnt  = scalar(@controlRoles);
+	my $unknownStateRoleCnt = scalar(@unknownStateRoles);
+	my $unknownCtrlRoleCnt = scalar(@unknownControlRoles);
 	my %uniqStateRoles;
 	my %uniqCtrlRoles;
 	$uniqStateRoles{$_->{role}}++ for @stateRoles;
@@ -8558,6 +8581,7 @@ sub HMCCU_DetectDevice ($$$)
 	my %di = (
 		stateRoleCount => $stateRoleCnt, controlRoleCount => $ctrlRoleCnt,
 		uniqueStateRoleCount => $cntUniqStateRoles, uniqueControlRoleCount => $cntUniqCtrlRoles,
+		rolePatternCount => 0,
 		defMod => '', defSCh => -1, defCCh => -1, defSDP => '', defCDP => '',
 		level => 0
 	);
@@ -8566,7 +8590,7 @@ sub HMCCU_DetectDevice ($$$)
 		$di{stateRole}{$sr->{channel}}{role}      = $sr->{role};
 		$di{stateRole}{$sr->{channel}}{datapoint} = $sr->{datapoint};
 		$di{stateRole}{$sr->{channel}}{priority}  = $sr->{priority};
-		if ($sr->{priority} > $p) {
+		if (defined($sr->{priority}) && $sr->{priority} > $p) {
 			$di{defSCh} = $sr->{channel};
 			$p = $sr->{priority};
 		}
@@ -8576,7 +8600,7 @@ sub HMCCU_DetectDevice ($$$)
 		$di{controlRole}{$cr->{channel}}{role}      = $cr->{role};
 		$di{controlRole}{$cr->{channel}}{datapoint} = $cr->{datapoint};
 		$di{controlRole}{$cr->{channel}}{priority}  = $cr->{priority};
-		if ($cr->{priority} > $p) {
+		if (defined($cr->{priority}) && $cr->{priority} > $p) {
 			$di{defCCh} = $cr->{channel};
 			$p = $cr->{priority};
 		}
@@ -8692,6 +8716,8 @@ sub HMCCU_DetectDevice ($$$)
 			}
 		}
 	}
+	elsif ($stateRoleCnt == 0 && $ctrlRoleCnt == 0 && ($unknownStateRoleCnt > 0 || $unknownCtrlRoleCnt > 0)) {
+	}
 
 	if ($di{defSCh} != -1 && exists($di{stateRole}{$di{defSCh}})) {
 		my $dpn = $di{stateRole}{$di{defSCh}}{datapoint} // '';
@@ -8713,23 +8739,54 @@ sub HMCCU_DetectDevice ($$$)
 
 sub HMCCU_IdentifyRole ($$$$$)
 {
-	my ($ioHash, $devDesc, $iface, $stateRoles, $controlRoles) = @_;
+	my ($ioHash, $chnDesc, $iface, $stateRoles, $controlRoles) = @_;
 	
-	my $t = $devDesc->{TYPE};		# Channel role
+	my $t = $chnDesc->{TYPE};		# Channel role
+
+	return 0 if ($HMCCU_IGNORE_ROLES ne '' && $t =~ /$HMCCU_IGNORE_ROLES/);
 
 	if (exists($HMCCU_STATECONTROL->{$t})) {
-		my ($a, $c) = HMCCU_SplitChnAddr ($devDesc->{ADDRESS});
+		my ($a, $c) = HMCCU_SplitChnAddr ($chnDesc->{ADDRESS});
 		my $p = $HMCCU_STATECONTROL->{$t}{P};
 
 		# State datapoint must be of type readable and/or event
 		my $sDP = HMCCU_DetectSCDatapoint ($HMCCU_STATECONTROL->{$t}{S}, $iface);
 		push @$stateRoles, { 'channel' => $c, 'role' => $t, 'datapoint' => $sDP, 'priority' => $p }
-			if (HMCCU_IsValidParameter ($ioHash, $devDesc, 'VALUES', $sDP, 5));
+			if (HMCCU_IsValidParameter ($ioHash, $chnDesc, 'VALUES', $sDP, 5));
 
 		# Control datapoint must be writeable
 		my $cDP = HMCCU_DetectSCDatapoint ($HMCCU_STATECONTROL->{$t}{C}, $iface);
 		push @$controlRoles, { 'channel' => $c, 'role' => $t, 'datapoint' => $cDP, 'priority' => $p }
-			if (HMCCU_IsValidParameter ($ioHash, $devDesc, 'VALUES', $cDP, 2));
+			if (HMCCU_IsValidParameter ($ioHash, $chnDesc, 'VALUES', $cDP, 2));
+
+		return 1;
+	}
+	else {
+		# Role not supported by HMCCU
+		return 0;
+	}
+}
+
+######################################################################
+# Check if unknown roles can be used as state and/or control role
+######################################################################
+
+sub HMCCU_DetectUnknownRoles ($$$$)
+{
+	my ($ioHash, $chnDesc, $stateRoles, $controlRoles) = @_;
+
+	my $model = HMCCU_GetDeviceModel ($ioHash, $chnDesc->{_model}, $chnDesc->{_fw_ver}, $chnDesc->{INDEX});
+	if (defined($model) && exists($model->{VALUES})) {
+		my $sdp = '';
+		my $cdp = '';
+		foreach my $p (keys %{$model->{VALUES}}) {
+			$sdp = $p if (($p->{OPERATIONS} & 5) && $sdp eq '' && $sdp ne 'STATE' && $sdp ne 'LEVEL');
+			$cdp = $p if (($p->{OPERATIONS} & 2) && $cdp eq '' && $cdp ne 'STATE' && $cdp ne 'LEVEL');
+		}
+		push @$stateRoles, { 'channel' => $chnDesc->{INDEX}, 'role' => $chnDesc->{TYPE}, 'datapoint' => $sdp, 'priority' => 1 }
+			if ($sdp ne '');
+		push @$controlRoles, { 'channel' => $chnDesc->{INDEX}, 'role' => $chnDesc->{TYPE}, 'datapoint' => $cdp, 'priority' => 1 }
+			if ($cdp ne '');
 	}
 }
 
@@ -9249,7 +9306,7 @@ sub HMCCU_SetMultipleParameters ($$$;$)
 		}
 	}
 
-	return HMCCU_RPCRequest ($clHash, 'putParamset', $address, $paramSet, $params);
+	return HMCCU_RPCParamsetRequest ($clHash, 'putParamset', $address, $paramSet, $params);
 }
 
 ######################################################################
@@ -9712,31 +9769,25 @@ sub HMCCU_UpdateCB ($$$)
 # Parameters:
 #  $method - RPC request method. Use listParamset or listRawParamset
 #     as an alias for getParamset if readings should not be updated.
-#  $address  - Device address.
-#  $paramset - paramset name: VALUE, MASTER, LINK, ... If not defined
-#              request does not affect a parameter set
-#  $parref   - Hash reference with parameter/value pairs or array
-#              reference with parameter values (optional).
-#  $filter   - Regular expression for filtering response (default = .*).
+#  $address  - Device or channel address.
+#  $paramset - paramset name (VALUE, MASTER) or LINK receiver address.
+#  $parref   - Hash reference with parameter/value pairs (optional).
 # Return (retCode, result).
 #  retCode = 0 - Success
 #  retCode < 0 - Error, result contains error message
 ######################################################################
 
-sub HMCCU_RPCRequest ($$$$;$$)
+sub HMCCU_RPCParamsetRequest ($$$;$$)
 {
-	my ($clHash, $method, $address, $paramset, $parref, $filter) = @_;
-	$filter //= '.*';
+	my ($clHash, $method, $address, $paramset, $parref) = @_;
+	$paramset //= 'VALUES';
 	my $name = $clHash->{NAME};
 	my $type = $clHash->{TYPE};
-
-	my $reqMethod = $method eq 'listParamset' || $method eq 'listRawParamset' ||
-		$method eq 'getRawParamset' ? 'getParamset' : $method;
 	my $addr = '';
-	my $result = '';
 	
-	my $ioHash = HMCCU_GetHash ($clHash) // return (-3, $result);
-	return (-4, $result) if ($type ne 'HMCCU' && $clHash->{ccudevstate} eq 'deleted');
+	my $ioHash = HMCCU_GetHash ($clHash) // return (-3, '');
+	return (-4, '') if ($type ne 'HMCCU' && $clHash->{ccudevstate} eq 'deleted');
+	return (-22, '') if ($method ne 'putParamset' && $method ne 'getParamset');
 
 	# Get flags and attributes
 	my $ioFlags = HMCCU_GetFlags ($ioHash->{NAME});
@@ -9748,25 +9799,21 @@ sub HMCCU_RPCRequest ($$$$;$$)
 	# Parse address, complete address information
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($ioHash, $address,
 		$HMCCU_FLAG_FULLADDR);
-	return (-1, $result) if (!($flags & $HMCCU_FLAG_ADDRESS));
+	return (-1, '') if (!($flags & $HMCCU_FLAG_ADDRESS));
 	$addr = $flags & $HMCCU_FLAG_CHANNEL ? "$add:$chn" : $add;
-
-	# Get RPC type and port for interface of device address
-	my ($rpcType, $rpcPort) = HMCCU_GetRPCServerInfo ($ioHash, $int, 'type,port');
-	return (-9, '') if (!defined($rpcType) || !defined($rpcPort));
 
 	# Search RPC device, do not create one
 	my ($rpcDevice, $save) = HMCCU_GetRPCDevice ($ioHash, 0, $int);
-	return (-17, $result) if ($rpcDevice eq '');
+	return (-17, '') if ($rpcDevice eq '');
 	my $rpcHash = $defs{$rpcDevice};
 	
 	# Build parameter array: (Address, Paramset [, Parameter ...])
-	# Paramset := VALUE | MASTER | LINK or any paramset supported by device
+	# Paramset := VALUE | MASTER | LINK receiver address
 	# Parameter := Name=Value[:Type]
-	my @parArray = ($addr);
-	push (@parArray, $paramset) if (defined($paramset));
+	my @parArray = ($addr, $paramset);
 	if (defined($parref)) {
 		if (ref($parref) eq 'HASH') {
+			my %struct = ();
 			foreach my $k (keys %{$parref}) {
 				my ($pv, $pt) = split (':', $parref->{$k});
 				if (!defined($pt)) {
@@ -9774,73 +9821,24 @@ sub HMCCU_RPCRequest ($$$$;$$)
 					$pt = defined($paramDef) && defined($paramDef->{TYPE}) && $paramDef->{TYPE} ne '' ?
 						$paramDef->{TYPE} : 'STRING';
 				}
-				$pv .= ":$pt";
-				push @parArray, "$k=$pv";
+				$struct{$k} = "$pv:$pt";
 			}
+			push @parArray,\%struct;
 		}
-		elsif (ref($parref) eq 'ARRAY') {
-			push @parArray, @$parref;
+		else {
+			return (-23, 'Hash reference required');
 		}
 	}
 	
 	# Submit RPC request
-	my $reqResult = HMCCURPCPROC_SendRequest ($rpcHash, $reqMethod, @parArray) //
-		return (-5, 'RPC function not available');
+	my ($resp, $err) = HMCCURPCPROC_SendRequest ($rpcHash, $method, @parArray);
+		return (-2, "RPC request $method failed: $err") if (!defined($resp));
 	
 	HMCCU_Trace ($clHash, 2, 
-		"Dump of RPC request $method $paramset $addr. Result type=".ref($reqResult)."<br>".
-		HMCCU_RefToString ($reqResult));	
-
-	my $parCount = 0;
-	if (ref($reqResult) eq 'HASH') {
-		if (exists($reqResult->{faultString})) {
-			HMCCU_Log ($rpcHash, 1, "Error in request $reqMethod ".join(' ', @parArray).': '.
-				$reqResult->{faultString});
-			return (-2, $reqResult->{faultString});
-		}
-		else {
-			$parCount = keys %{$reqResult};
-		}
-	}
-#	else {
-#		return (-2, defined ($RPC::XML::ERROR) ? $RPC::XML::ERROR : 'RPC request failed');
-#	}	
-
-	if ($method eq 'listParamset') {
-		$result = join ("\n", map { $_ =~ /$filter/ ? $_.'='.$reqResult->{$_} : () } keys %$reqResult);
-	}
-	elsif ($method eq 'listRawParamset' || $method eq 'getRawParamset') {
-		$result = $reqResult;
-	}
-	elsif ($method eq 'getDeviceDescription') {
-		$result = '';
-		foreach my $k (sort keys %$reqResult) {
-			if (ref($reqResult->{$k}) eq 'ARRAY') {
-				$result .= "$k=".join(',', @{$reqResult->{$k}})."\n";
-			}
-			else {
-				$result .= "$k=".$reqResult->{$k}."\n";
-			}
-		}
-	}
-	elsif ($method eq 'getParamsetDescription') {
-		my %operFlags = ( 1 => 'R', 2 => 'W', 4 => 'E' );
-		$result = join ("\n", 
-			map {
-				$_.': '.
-				$reqResult->{$_}->{TYPE}.
-				" [".HMCCU_BitsToStr(\%operFlags,$reqResult->{$_}->{OPERATIONS})."]".
-				" FLAGS=".sprintf("%#b", $reqResult->{$_}->{FLAGS}).
-				" RANGE=".$reqResult->{$_}->{MIN}."-".$reqResult->{$_}->{MAX}.
-				" DFLT=".$reqResult->{$_}->{DEFAULT}.
-				" UNIT=".$reqResult->{$_}->{UNIT}
-			} sort keys %$reqResult);		
-	}
-	else {
-		$result = $reqResult;
-	}
+		"Dump of RPC request $method $paramset $addr. Result type=".ref($resp)."<br>".
+		HMCCU_RefToString ($resp));	
 	
-	return (0, $result);
+	return (0, $resp);
 }
 
 ######################################################################
@@ -10150,7 +10148,6 @@ sub HMCCU_BuildURL ($$)
 		}
 	}
 	
-	HMCCU_Log ($hash, 4, "Build URL = $url");
 	return $url;
 }
 

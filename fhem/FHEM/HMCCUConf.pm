@@ -110,10 +110,10 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		F => 3, S => 'WEEK_PROGRAM_CHANNEL_LOCKS', C => 'WEEK_PROGRAM_TARGET_CHANNEL_LOCK', V => '', P => 2 
 	},
 	'DOOR_LOCK_STATE_TRANSMITTER' => {
-		F => 3, S => 'LOCK_STATE', C => 'LOCK_TARGET_LEVEL', V => 'open:2,unlocked:1,locked:0'
+		F => 3, S => 'LOCK_STATE', C => 'LOCK_TARGET_LEVEL', V => 'open:2,unlocked:1,locked:0', P => 2
 	},
 	'DOOR_RECEIVER' => {
-		F => 3, S => 'DOOR_STATE', C => 'DOOR_COMMAND', V => 'open:1,stop:2,close:3,ventilate:4'
+		F => 3, S => 'DOOR_STATE', C => 'DOOR_COMMAND', V => 'open:1,stop:2,close:3,ventilate:4', P => 2
 	},
 	'ENERGIE_METER_TRANSMITTER' => {
 		F => 3, S => 'CURRENT', C => '', V => '', P => 1
@@ -792,7 +792,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'SETPOINT' => { '4.5' => 'off', '30.5' => 'on' }		
 	},
 	'WATER_DETECTION_TRANSMITTER' => {
-		'ALARMSTATE' => { '0' => 'noAlarm', '1' => 'Alarm', 'false' => 'noAlarm', 'true' => 'alarm' }
+		'ALARMSTATE' => { '0' => 'noAlarm', '1' => 'alarm', 'false' => 'noAlarm', 'true' => 'alarm' }
 	},
 	'WINMATIC' => {
 		'LEVEL' => { '0' => 'closed', '100' => 'open', '-0.5' => 'locked' }
