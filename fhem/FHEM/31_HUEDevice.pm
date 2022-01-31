@@ -1862,16 +1862,16 @@ HUEDevice_Parse($$)
             $readings{eventtype} = $hash->{helper}{events}[$input-1]{$state->{buttonevent}};
 
           } elsif( my $type = substr($state->{buttonevent}, 2, 2) ) {
-            if( $type eq 00 ) {
+            if( $type eq '00' ) {
               $readings{eventtype} = 'initial_press';
 
-            } elsif( $type eq 00 ) {
+            } elsif( $type eq '01' ) {
               $readings{eventtype} = 'repeat';
 
-            } elsif( $type eq 00 ) {
+            } elsif( $type eq '02' ) {
               $readings{eventtype} = 'short_release';
 
-            } elsif( $type eq 00 ) {
+            } elsif( $type eq '03' ) {
               $readings{eventtype} = 'long_release';
 
             } 
