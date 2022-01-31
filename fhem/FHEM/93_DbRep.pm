@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.48.1"  => "31.01.2022  minor fixes e.g. in file size determination, dump routines ",
   "8.48.0"  => "29.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ".
                             "change _DbRep_mysqlOptimizeTables, revise insert command ",
   "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
@@ -785,7 +786,6 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        
-       # Befehl vor Procedure ausführen
        DbRep_beforeproc ($hash, "index");
        DbRep_Main       ($hash,$opt,$prop);
        return;
@@ -797,9 +797,29 @@ sub DbRep_Set {
       
       if($success) {
           return "Username and password for database root access saved successfully";
-      } else {
+      } 
+      else {
           return "Error while saving username / password - see logfile for details";
       }     
+  }
+  
+  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop ? "$opt $prop " : "$opt";
+      my $table        = $prop // "history";
+      
+      DbRep_beforeproc ($hash, $hash->{LASTCMD});
+      DbRep_Main       ($hash,$opt,$table);
+      
+      return;      
+  } 
+  elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+      my $table        = $prop // "history";
+      
+      DbRep_beforeproc ($hash, $hash->{LASTCMD});
+      DbRep_Main       ($hash,$opt,$table);    
+      
+      return;
   }
   
   #######################################################################################################
@@ -812,22 +832,8 @@ sub DbRep_Set {
       return;
   }
   #######################################################################################################
-  
-  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop " : "$opt";
-      my $table        = $prop // "history";
-      
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash,$opt,$table);  
-  } 
-  elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      my $table        = $prop // "history";
-      
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash,$opt,$table);    
-  } 
-  elsif ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
+   
+  if ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
@@ -1941,20 +1947,27 @@ sub DbRep_getInitData {
   $paref->{dbh} = $dbh;
   my $mints     = _DbRep_getInitData_mints ($paref);
   
-  # Encoding der Datenbank ermitteln
-  ####################################
-  my $enc = qq{undefined};
-  my @se;
+  # Encoding der Datenbank und Verbindung ermitteln
+  ##################################################
+  my $enc  = qq{};
+  my $encc = qq{};
+  my (@se,@sec);
   
   if($dbmodel =~ /MYSQL/) {
-      eval { @se = $dbh->selectrow_array("SHOW VARIABLES LIKE 'character_set_database';") };
-      $enc = @se ? uc($se[1]) : $enc;
+      eval { @se = $dbh->selectrow_array("SELECT default_character_set_name FROM information_schema.SCHEMATA WHERE schema_name = '$database'") };
+      $enc = $se[0] // $enc;
+      eval { @sec = $dbh->selectrow_array("SHOW VARIABLES LIKE 'character_set_connection'") };
+      $encc = $sec[1] // $encc;
   } 
   elsif($dbmodel =~ /SQLITE/) {
-      eval { $enc = $dbh->selectrow_array("PRAGMA encoding;") };
+      eval { @se = $dbh->selectrow_array("PRAGMA encoding;") };
+      $enc = $se[0] // $enc;
   } 
   elsif($dbmodel =~ /POSTGRESQL/) {
-      eval { $enc = $dbh->selectrow_array("select character_set_name from information_schema.character_sets;") };
+      eval { @se = $dbh->selectrow_array("SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = '$database'") };
+      $enc = $se[0] // $enc;
+      eval { @sec = $dbh->selectrow_array("SHOW CLIENT_ENCODING") };
+      $encc = $sec[0] // $encc;
   } 
   
   Log3 ($name, 4, "DbRep $name - Encoding of database determined: $enc");
@@ -2006,6 +2019,7 @@ sub DbRep_getInitData {
   my $rt = tv_interval($st);                                  # SQL-Laufzeit ermitteln
   
   $enc      = encode_base64($enc,      "");
+  $encc     = encode_base64($encc,     "");
   $mints    = encode_base64($mints,    "");
   $idxstate = encode_base64($idxstate, "");
   $grants   = encode_base64($grants,   "");
@@ -2018,7 +2032,7 @@ sub DbRep_getInitData {
   $prop = DbRep_trim ($prop) if($prop);
   $err  = q{};
  
-return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc";
+return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc|$encc";
 }
 
 ####################################################################################################
@@ -2110,8 +2124,9 @@ sub DbRep_getInitDataDone {
   my $prop      = $a[5];
   my $fret      = $a[6] ? \&{$a[6]} : '';
   my $idxstate  = decode_base64($a[7]);
-  my $grants    = $a[8] ? decode_base64($a[8]) : '';
-  my $enc       = decode_base64($a[9]);
+  my $grants    = $a[8]  ? decode_base64($a[8])  : '';
+  my $enc       = $a[9]  ? decode_base64($a[9])  : '';
+  my $encc      = $a[10] ? decode_base64($a[10]) : '';
   
   my $hash      = $defs{$name};
   
@@ -2145,6 +2160,7 @@ sub DbRep_getInitDataDone {
       }
       else {
           ReadingsBulkUpdateValue ($hash, "dbEncoding",                    $enc);
+          ReadingsBulkUpdateValue ($hash, "connectionEncoding",           $encc) if($encc); 
           ReadingsBulkUpdateValue ($hash, "indexState",               $idxstate);
           ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset",    $mints);
           ReadingsBulkUpdateValue ($hash, "userRights",                 $grants) if($grants);        
@@ -2157,7 +2173,7 @@ sub DbRep_getInitDataDone {
       
       $hash->{HELPER}{MINTS}  = $mints;
       $hash->{HELPER}{GRANTS} = $grants if($grants);
-      $hash->{UTF8}           = $enc =~ /UTF-?8/x ? 1 : 0;
+      $hash->{UTF8}           = $enc =~ /utf-?8/xi ? 1 : 0;
   }
 
 return if(!$fret);
@@ -2236,6 +2252,7 @@ sub DbRep_dbConnect {
                Log3 ($name, 2, "DbRep $name - ERROR: $@");
                $ret = "$name|$err";
              };
+  
   if($utf8) {
       if($dbmodel eq "MYSQL") {
           $dbh->{mysql_enable_utf8} = 1;
@@ -8005,7 +8022,7 @@ sub DbRep_mysql_DumpClientSide {
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
 
  #####################  Beginn Dump  ######################## 
- ##############################################################
+ ############################################################
      
  undef(%db_tables);
 
@@ -8034,8 +8051,8 @@ sub DbRep_mysql_DumpClientSide {
  my @mysql_version = $sth->fetchrow;
  my @v             = split(/\./,$mysql_version[0]);
 
- if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                                # mysql Version >= 4.1
-     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SET NAMES '".$character_set."'");  # get standard encoding of MySQl-Server
+ if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                                       # mysql Version >= 4.1
+     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SET NAMES '".$character_set."'");         # get standard encoding of MySQl-Server
      
      ($err, $sth)   = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
      @ar            = $sth->fetchrow; 
@@ -8050,7 +8067,7 @@ sub DbRep_mysql_DumpClientSide {
      }
  }
  
- Log3 ($name, 3, "DbRep $name - Characterset of collection and backup file set to $character_set. ");
+ Log3 ($name, 3, "DbRep $name - Characterset of collection set to $character_set. ");
     
  undef(@tables);                     
  undef(@tablerecords);
@@ -8123,8 +8140,7 @@ sub DbRep_mysql_DumpClientSide {
 
  @tablenames = sort(keys(%db_tables));
  
- # add VIEW at the end as they need all tables to be created before
- @tablenames = (@tablenames,sort(keys(%db_tables_views)));
+ @tablenames = (@tablenames,sort(keys(%db_tables_views)));                                # add VIEW at the end as they need all tables to be created before
  %db_tables  = (%db_tables,%db_tables_views);
  $tablename  = '';
  
@@ -8136,7 +8152,7 @@ sub DbRep_mysql_DumpClientSide {
      return "$name|$err";
  }
 
- if($optimize_tables_beforedump) {                                             # Tabellen optimieren vor dem Dump
+ if($optimize_tables_beforedump) {                                                        # Tabellen optimieren vor dem Dump
      $hash->{HELPER}{DBTABLES} = \%db_tables;
      
      my $opars = {
@@ -8150,18 +8166,18 @@ sub DbRep_mysql_DumpClientSide {
      return $err if($err);
  }
     
- $st_e .= "-- TABLE-INFO\n";                                                   # Tabelleneigenschaften für SQL-File ermitteln
+ $st_e .= "-- TABLE-INFO\n";                                                             # Tabelleneigenschaften für SQL-File ermitteln
     
  for $tablename (@tablenames) {
      my $dump_table = 1;
      
      if ($dbpraefix ne "") {
-         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {         # exclude table from backup because it doesn't fit to praefix
+         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {                    # exclude table from backup because it doesn't fit to praefix
              $dump_table = 0;
          }
      }
                         
-     if ($dump_table == 1) {                                                  # how many rows
+     if ($dump_table == 1) {                                                             # how many rows
          $sql_create = "SELECT count(*) FROM `$tablename`";
 
          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_create);
@@ -8171,7 +8187,7 @@ sub DbRep_mysql_DumpClientSide {
          $sth->finish;  
          
          $r += $db_tables{$tablename}{Rows};
-         push(@tables,$db_tables{$tablename}{Name});                         # add tablename to backuped tables
+         push(@tables,$db_tables{$tablename}{Name});                                     # add tablename to backuped tables
          $t++;
          
          if (!defined $db_tables{$tablename}{Update_time}) {
@@ -8205,7 +8221,7 @@ sub DbRep_mysql_DumpClientSide {
  $sql_text = $status_start.$status_end;
  
  # neues SQL-Ausgabefile anlegen
- ($sql_text,$first_insert,$sql_file,$backupfile,$err) = DbRep_NewDumpFilename($sql_text, $dump_path, $dbname, $time_stamp, $character_set);
+ ($err, $sql_text, $first_insert, $sql_file, $backupfile) = DbRep_NewDumpFilename($sql_text, $dump_path, $dbname, $time_stamp, $character_set);
  if ($err) {
      Log3 ($name, 2, "DbRep $name - $err");
      $err = encode_base64($err,"");
@@ -8255,7 +8271,7 @@ sub DbRep_mysql_DumpClientSide {
              $sql_text .= "\n$mysql_commentstring\n$mysql_commentstring"."Dumping data for table `$tablename`\n$mysql_commentstring\n";
              $sql_text .= "/*!40000 ALTER TABLE `$tablename` DISABLE KEYS */;";
 
-             DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);
+             DbRep_WriteToDumpFile($sql_text, $sql_file);
              $sql_text = "";
 
              $fieldlist  = "(";
@@ -8303,8 +8319,8 @@ sub DbRep_mysql_DumpClientSide {
                      $sql_text .= $a;
                         
                      if($memory_limit > 0 && length($sql_text) > $memory_limit) {
-                         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);
-                         # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '".DbRep_byteOutput($filesize)."'");
+                         ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);
+                         # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '"._DbRep_byteOutput($filesize)."'");
                          $sql_text = "";
                      }
                  }
@@ -8313,22 +8329,22 @@ sub DbRep_mysql_DumpClientSide {
              $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
          }
 
-         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);        # write sql commands to file
+         ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);                        # write sql commands to file
          $sql_text = "";
 
          if ($db_tables{$tablename}{skip_data} == 0) {
-             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: ".DbRep_byteOutput($filesize).")") if($filesize);
+             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: "._DbRep_byteOutput($filesize).")") if($filesize);
              $totalrecords += $rct;
          } 
          else {
-             Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: ".DbRep_byteOutput($filesize).")");
+             Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: "._DbRep_byteOutput($filesize).")");
          }     
      }
  }
    
  # end
- DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file, $character_set);
- ($filesize,$err) = DbRep_WriteToDumpFile($mysql_commentstring."EOB\n", $sql_file, $character_set);
+ DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file);
+ ($err, $filesize) = DbRep_WriteToDumpFile($mysql_commentstring."EOB\n", $sql_file);
  
  # Datenbankverbindung schliessen
  $sth->finish();
@@ -8338,16 +8354,7 @@ sub DbRep_mysql_DumpClientSide {
  
  my $compress = AttrVal($name, "dumpCompress", 0);                                                # Dumpfile komprimieren wenn dumpCompress=1
  if($compress) {
-     ($err,$backupfile) = DbRep_dumpCompress($hash,$backupfile);                                  # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
-         
-     my $fref = stat("$dump_path$backupfile");  
-     
-     if ($fref =~ /ARRAY/) {
-         $filesize = (@{stat("$dump_path$backupfile")})[7];
-     } 
-     else {
-         $filesize = (stat("$dump_path$backupfile"))[7];
-     }
+     ($err, $backupfile, $filesize) = DbRep_dumpCompress($hash, $backupfile);
  }
  
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$backupfile);                         # Dumpfile per FTP senden und versionieren
@@ -8355,23 +8362,19 @@ sub DbRep_mysql_DumpClientSide {
            $ftpmsg ? encode_base64($ftpmsg,"") : 
            0;
            
- my $ffd = join ", ", @ftpfd;
- $ffd    = $ffd ? encode_base64($ffd,"") : 0;
+ my $ffd   = join ", ", @ftpfd;
+ $ffd      = $ffd ? encode_base64($ffd,"") : 0;
  
- my @fd  = DbRep_deldumpfiles($hash,$backupfile);                                        # alte Dumpfiles löschen
- my $bfd = join ", ", @fd;
- $bfd    = $bfd ? encode_base64($bfd,"") : 0;
+ my @fd    = DbRep_deldumpfiles($hash,$backupfile);                                        # alte Dumpfiles löschen
+ my $bfd   = join ", ", @fd;
+ $bfd      = $bfd ? encode_base64($bfd,"") : 0;
 
- my $brt = tv_interval($bst);                                                            # Background-Laufzeit ermitteln
- $rt     = $rt.",".$brt;
+ my $brt   = tv_interval($bst);                                                            # Background-Laufzeit ermitteln
+ $rt       = $rt.",".$brt;
  
- my $fsize = '';
- if($filesize) {
-    $fsize = DbRep_byteOutput($filesize);
-    $fsize = encode_base64($fsize,"");
- }
- 
- $err = q{};
+ my $fsize = _DbRep_byteOutput($filesize);
+ $fsize    = encode_base64    ($fsize,"");
+ $err      = q{};
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
@@ -8391,6 +8394,10 @@ sub DbRep_mysql_DumpServerSide {
  my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
  my $dump_path_rem              = AttrVal($name, "dumpDirRemote", $dbrep_dump_remotepath_def);
  $dump_path_rem                 = $dump_path_rem."/" unless($dump_path_rem =~ m/\/$/);
+ 
+ my $dump_path_loc              = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
+ $dump_path_loc                 = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
+ 
  my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  
@@ -8465,7 +8472,7 @@ sub DbRep_mysql_DumpServerSide {
  
  Log3 ($name, 5, "DbRep $name - Use Outfile: $dump_path_rem$bfile");
 
- my $st = [gettimeofday];                                                                     # SQL-Startzeit
+ my $st  = [gettimeofday];                                                                     # SQL-Startzeit
 
  my $sql = "SELECT * FROM $table INTO OUTFILE '$dump_path_rem$bfile' FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\n'; ";
 
@@ -8475,50 +8482,38 @@ sub DbRep_mysql_DumpServerSide {
  $sth->finish;
  $dbh->disconnect;
   
- my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
+ my $rt       = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
- my $compress = AttrVal($name,"dumpCompress",0);                                    # Dumpfile komprimieren wenn dumpCompress=1
- if($compress) {                                                                    # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
-     ($err,$bfile) = DbRep_dumpCompress($hash,$bfile);
- }
+ my $fsBytes  = _DbRep_fsizeInBytes ($dump_path_loc.$bfile);                            # Größe Dumpfile ermitteln
+ my $fsize    = _DbRep_byteOutput   ($fsBytes);
  
- my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dbrep_dump_path_def);           # Größe Dumpfile ermitteln ("dumpDirRemote" muß auf "dumpDirLocal" gemountet sein) 
- $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
+ Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
  
- my $filesize;
- my $fref = stat($dump_path_loc.$bfile); 
- if($fref) {
-     if($fref =~ /ARRAY/) {
-         $filesize = (@{stat($dump_path_loc.$bfile)})[7];
-     } 
-     else {
-         $filesize = (stat($dump_path_loc.$bfile))[7];
-     }
+ my $compress = AttrVal($name, "dumpCompress", 0);                                      # Dumpfile komprimieren wenn dumpCompress=1
+ 
+ if($compress) {                                                                        # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
+     ($err, $bfile, $fsBytes) = DbRep_dumpCompress ($hash, $bfile);
+     $fsize                   = _DbRep_byteOutput  ($fsBytes);
  }
  
  Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
- Log3 ($name, 3, "DbRep $name - Size of backupfile: ".DbRep_byteOutput($filesize)) if($filesize);
  
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile);                             # Dumpfile per FTP senden und versionieren
  my $ftp = $ftperr ? encode_base64($ftperr,"") : 
            $ftpmsg ? encode_base64($ftpmsg,"") : 
            0;
            
- my $ffd = join(", ", @ftpfd);
- $ffd    = $ffd?encode_base64($ffd,""):0;
+ my $ffd   = join(", ", @ftpfd);
+ $ffd      = $ffd ? encode_base64($ffd,"") : 0;
  
- my @fd  = DbRep_deldumpfiles($hash,$bfile);                                            # alte Dumpfiles löschen
- my $bfd = join(", ", @fd );
- $bfd    = $bfd?encode_base64($bfd,""):0;
+ my @fd    = DbRep_deldumpfiles($hash,$bfile);                                            # alte Dumpfiles löschen
+ my $bfd   = join(", ", @fd );
+ $bfd      = $bfd ? encode_base64($bfd,"") : 0;
  
- my $brt = tv_interval($bst);                                                           # Background-Laufzeit ermitteln
+ my $brt   = tv_interval($bst);                                                           # Background-Laufzeit ermitteln
  
- my $fsize = '';
- if($filesize) {
-     $fsize = DbRep_byteOutput($filesize);
-     $fsize = encode_base64   ($fsize,"");
- }
-
+ $fsize    = encode_base64    ($fsize,"");
+ 
  $rt  = $rt.",".$brt;
  $err = q{};
  
@@ -8542,7 +8537,7 @@ sub DbRep_sqlite_Dump {
  my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  
- my ($db_MB,$r,$query,$sth);
+ my ($db_MB,$r,$query,$sth,$fsBytes);
  
  my $bst = [gettimeofday];                                                                   # Background-Startzeit
  
@@ -8550,7 +8545,8 @@ sub DbRep_sqlite_Dump {
  return $err if ($err);
   
  if($optimize_tables_beforedump) {                                                           # Vacuum vor Dump  # Anfangsgröße ermitteln
-     $db_MB = (split(' ',qx(du -m $dbname)))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+     $fsBytes  = _DbRep_fsizeInBytes ($dbname);
+     $db_MB    = _DbRep_byteOutput   ($fsBytes);
      
      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB");
      
@@ -8561,7 +8557,9 @@ sub DbRep_sqlite_Dump {
      ($err, $sth, $r) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
      return $err if ($err);
      
-     $db_MB = (split(' ',qx(du -m $dbname)))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);     # Endgröße ermitteln
+     $fsBytes  = _DbRep_fsizeInBytes ($dbname);
+     $db_MB    = _DbRep_byteOutput   ($fsBytes);
+     
      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB");
  } 
  
@@ -8594,38 +8592,36 @@ sub DbRep_sqlite_Dump {
   
  $dbh->disconnect;
   
- my $rt = tv_interval($st);                                                            # SQL-Laufzeit ermitteln
+ my $rt    = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
  
- my $compress = AttrVal($name,"dumpCompress",0);                                       # Dumpfile komprimieren
- if($compress) {                                                                       # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
-     ($err,$bfile) = DbRep_dumpCompress($hash,$bfile);
- }
-
- my @a;                                                                                # Größe Dumpfile ermitteln
- @a = split(' ',qx(du $dump_path$bfile)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
- 
- my $filesize = ($a[0]) ? ($a[0]*1024) : "n.a.";
- my $fsize    = DbRep_byteOutput($filesize);
+ $fsBytes  = _DbRep_fsizeInBytes ($dump_path.$bfile);                                  # Größe Dumpfile ermitteln
+ my $fsize = _DbRep_byteOutput   ($fsBytes);
  
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
  
+ my $compress = AttrVal($name, "dumpCompress", 0);                                     # Dumpfile komprimieren
+ if($compress) {                                                                       # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
+     ($err, $bfile, $fsBytes) = DbRep_dumpCompress ($hash, $bfile);
+     $fsize                   = _DbRep_byteOutput  ($fsBytes);
+ }
+  
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile);                            # Dumpfile per FTP senden und versionieren
  my $ftp = $ftperr ? encode_base64($ftperr,"") : 
            $ftpmsg ? encode_base64($ftpmsg,"") : 
            0;
            
- my $ffd = join ", ", @ftpfd;
- $ffd    = $ffd ? encode_base64($ffd,"") : 0;
+ my $ffd   = join ", ", @ftpfd;
+ $ffd      = $ffd ? encode_base64($ffd,"") : 0;
  
- my @fd  = DbRep_deldumpfiles($hash,$bfile);                                           # alte Dumpfiles löschen
- my $bfd = join ", ", @fd;
- $bfd    = $bfd ? encode_base64($bfd,"") : 0;
+ my @fd    = DbRep_deldumpfiles($hash,$bfile);                                           # alte Dumpfiles löschen
+ my $bfd   = join ", ", @fd;
+ $bfd      = $bfd ? encode_base64($bfd,"") : 0;
  
- my $brt = tv_interval($bst);                                                          # Background-Laufzeit ermitteln
+ my $brt   = tv_interval($bst);                                                          # Background-Laufzeit ermitteln
  
- $fsize  = encode_base64($fsize,"");
- $rt     = $rt.",".$brt;
- $err    = q{};
+ $fsize    = encode_base64($fsize,"");
+ $rt       = $rt.",".$brt;
+ $err      = q{};
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
@@ -8936,6 +8932,8 @@ sub DbRep_mysql_RestoreClientSide {
  
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return $err if ($err);
+  
+  $dbh->{mysql_enable_utf8} = 0;                                              # identisch zu DbRep_mysql_DumpClientSide setzen !
  
  my @row_ary;
  my $sql         = "show variables like 'max_allowed_packet'";                # maximal mögliche Packetgröße ermitteln (in Bits) -> Umrechnen in max. Zeichen
@@ -9093,6 +9091,7 @@ sub DbRep_mysql_RestoreClientSide {
  my $rt  = tv_interval($st);                                  # SQL-Laufzeit ermitteln
  my $brt = tv_interval($bst);                                 # Background-Laufzeit ermitteln
  $rt     = $rt.",".$brt;
+ $err    = q{};
  
  Log3 ($name, 3, "DbRep $name - Restore of '$dbname' finished - inserted history: $nh, inserted curent: $nc, time used: ".sprintf("%.0f",$brt)." seconds.");
  
@@ -11425,87 +11424,59 @@ return;
 #                          erstellen neues SQL-File für Dumproutine
 ####################################################################################################
 sub DbRep_NewDumpFilename {
-    my ($sql_text,$dump_path,$dbname,$time_stamp,$character_set) = @_;
-    my $part       = "";
-    my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
-    my $backupfile = $dbname."_".$time_stamp.$part.".sql";
+  my ($sql_text,$dump_path,$dbname,$time_stamp,$character_set) = @_;
+  my $part       = "";
+  my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
+  my $backupfile = $dbname."_".$time_stamp.$part.".sql";
     
-    $sql_text .= "/*!40101 SET NAMES '".$character_set."' */;\n";
-    $sql_text .= "SET FOREIGN_KEY_CHECKS=0;\n";
+  $sql_text .= "/*!40101 SET NAMES '".$character_set."' */;\n";
+  $sql_text .= "SET FOREIGN_KEY_CHECKS=0;\n";
     
-    my ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);
+  my ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);
+  return $err if($err);
     
-    if($err) {
-        return (undef,undef,undef,undef,$err);
-    }
+  chmod(0777, $sql_file);
     
-    chmod(0777,$sql_file);
-    $sql_text        = "";
-    my $first_insert = 0;
+  $sql_text        = "";
+  my $first_insert = 0;
     
-return ($sql_text,$first_insert,$sql_file,$backupfile,undef);
+return ($err, $sql_text, $first_insert, $sql_file, $backupfile);
 }
 
 ####################################################################################################
 #                          Schreiben DB-Dumps in SQL-File
 ####################################################################################################
 sub DbRep_WriteToDumpFile {
-    my $inh           = shift;
-    my $sql_file      = shift;
-    my $character_set = shift // q{};
+  my $inh      = shift;
+  my $sql_file = shift;
     
-    my $filesize;
+  my $filesize;
     
-    my $err = 0;
+  my $err = '';
     
-    if(length($inh) > 0) {
-        my $fh;
-        unless (open $fh,">>$sql_file") {
-            $err = "Can't open file '$sql_file' for write access";
-            return (undef,$err);
-        }
+  if(length($inh) > 0) {
+      my $fh;
+      unless (open $fh,">>$sql_file") {
+          $err = "Can't open file '$sql_file' for write access";
+          return ($err);
+      }
 
-        if ($character_set =~ /utf8/i) {
-            binmode($fh, "encoding(UTF-8)");
-        }
-        else {
-            binmode($fh);
-        }
+      binmode($fh);
         
-        print $fh $inh;
-        close $fh;
+      print $fh $inh;
+      close $fh;
         
-        my $fref = stat($sql_file);    
+      my $fref = stat($sql_file);    
         
-        if ($fref =~ /ARRAY/) {
-            $filesize = (@{stat($sql_file)})[7];
-        } 
-        else {
-            $filesize = (stat($sql_file))[7];
-        }
-    }
+      if ($fref =~ /ARRAY/) {
+          $filesize = (@{stat($sql_file)})[7];
+      } 
+      else {
+          $filesize = (stat($sql_file))[7];
+      }
+  }
     
-return ($filesize,undef);
-}
-
-####################################################################################################
-#             Filesize (Byte) umwandeln in KB bzw. MB
-####################################################################################################
-sub DbRep_byteOutput {
-    my $bytes = shift;
-    
-    return if(!defined($bytes));
-    return $bytes if(!looks_like_number($bytes));
-    
-    my $suffix = "Bytes";
-    
-    if ($bytes >= 1024) { $suffix = "KB"; $bytes = sprintf("%.2f",($bytes/1024));};
-    if ($bytes >= 1024) { $suffix = "MB"; $bytes = sprintf("%.2f",($bytes/1024));};
-    
-    my $ret = sprintf "%.2f",$bytes;
-    $ret   .=' '.$suffix;
-
-return $ret;
+return ($err, $filesize);
 }
 
 ######################################################################################
@@ -11915,29 +11886,43 @@ return @fd;
 }
 
 ####################################################################################################
-#                                  Dumpfile  komprimieren  
+#                                  Dumpfile  komprimieren
+#         Rückgabe        $GzipError: zip-Fehler
+#                         <Ergebnisfile> 
+#                         $fsBytes:   Filegröße in Bytes
 ####################################################################################################
 sub DbRep_dumpCompress {
-  my ($hash,$bfile) = @_; 
+  my $hash          = shift;
+  my $bfile         = shift; 
   my $name          = $hash->{NAME};
   my $dump_path_loc = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
   $dump_path_loc    =~ s/(\/$|\\$)//;
   my $input         = $dump_path_loc."/".$bfile;
   my $output        = $dump_path_loc."/".$bfile.".gzip";
+  
+  my $fsBytes = '';
 
   Log3($name, 3, "DbRep $name - compress file $input");
   
   my $stat = gzip $input => $output ,BinModeIn => 1;
   if($GzipError) {
       Log3($name, 2, "DbRep $name - gzip of $input failed: $GzipError");
-      return ($GzipError,$input);
+      $fsBytes = _DbRep_fsizeInBytes ($input);
+      return ($GzipError, $input, $fsBytes);
   }
   
   Log3($name, 3, "DbRep $name - file compressed to output file: $output");
+  
+  $fsBytes  = _DbRep_fsizeInBytes ($output);
+  my $fsize = _DbRep_byteOutput   ($fsBytes);
+  
+  Log3 ($name, 3, "DbRep $name - Size of compressed file: ".$fsize);
+  
   unlink("$input");
+  
   Log3($name, 3, "DbRep $name - input file deleted: $input");
 
-return (undef,$bfile.".gzip");
+return ('', $bfile.".gzip", $fsBytes);
 }
 
 ####################################################################################################
@@ -11963,15 +11948,64 @@ sub DbRep_dumpUnCompress {
   
   Log3($name, 3, "DbRep $name - file uncompressed to output file: $output");
   
-  # Größe dekomprimiertes File ermitteln
-  my @a;
-  @a = split(' ',qx(du $output)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
- 
-  my $filesize = ($a[0])?($a[0]*1024):undef;
-  my $fsize    = DbRep_byteOutput($filesize);
+  my $fsBytes = _DbRep_fsizeInBytes ($output);
+  my $fsize   = _DbRep_byteOutput   ($fsBytes);
+  
   Log3 ($name, 3, "DbRep $name - Size of uncompressed file: ".$fsize);
 
 return (undef,$outfile);
+}
+
+####################################################################################################
+#                      Größe File in Bytes ermitteln
+####################################################################################################
+sub _DbRep_fsizeInBytes {
+  my $file = shift // return;
+  
+  my $fs;
+  my $fref = stat($file); 
+
+  return '' if(!$fref);  
+     
+  if ($fref =~ /ARRAY/) {
+      $fs = (@{stat($file)})[7];
+  } 
+  else {
+      $fs = (stat($file))[7];
+  }
+  
+  $fs //= '';
+
+return ($fs);
+}
+
+####################################################################################################
+#             Filesize (Byte) umwandeln in KB bzw. MB
+####################################################################################################
+sub _DbRep_byteOutput {
+  my $bytes = shift;
+    
+  return ''     if(!defined($bytes));
+  return $bytes if(!looks_like_number($bytes));
+    
+  my $suffix = q{};
+  
+  if ($bytes >= 1048576) { 
+      $suffix = "MB"; 
+      $bytes  = $bytes/1048576;
+  }    
+  elsif ($bytes >= 1024) { 
+      $suffix = "KB"; 
+      $bytes  = $bytes/1024;
+  }
+  else {
+      $suffix = "Bytes";
+  }
+    
+  my $ret = sprintf "%.2f", $bytes;
+  $ret   .=' '.$suffix;
+
+return $ret;
 }
 
 ####################################################################################################
