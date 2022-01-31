@@ -800,10 +800,10 @@ HUEDevice_SetParam($$@)
 
   } elsif( $cmd eq 'v2effect' ) {
     my $hash = $defs{$name};
-    my $shash = $hash->{IODev};
-    my $id = HUEBridge_V2IdOfV1Id( $shash, 'light', "/lights/$hash->{ID}" );
+    my $iohash = $hash->{IODev};
+    my $id = HUEBridge_V2IdOfV1Id( $iohash, 'light', "/lights/$hash->{ID}" );
 
-    HUEBridge_Set( $shash, $shash->{NAME}, $cmd, $id, $value );
+    HUEBridge_Set( $iohash, $iohash->{NAME}, $cmd, $id, $value );
 
     $obj->{'on'}  = JSON::true;
 
@@ -863,7 +863,7 @@ HUEDevice_Set($@)
       return fhem( "set $hash->{IODev}{NAME} deletescene $aa[1]" );
 
     } elsif( $cmd eq 'scene' ) {
-      return "usage: scene <id>|<name>" if( !@args );
+      return "usage: $cmd <id>|<name>" if( !@args || $args[0] eq '?' );
       my $arg = join( ' ', @args );
       my $deConz;
       if( $hash->{IODev} ) {
@@ -898,10 +898,30 @@ HUEDevice_Set($@)
         HUEDevice_GetUpdate( $hash );
       }
       return undef;
+
+    } elsif( $cmd eq 'v2scene' ) {
+      return "<$name has no IODEV>" if( !$hash->{IODev} );
+      return "$name: v2 api not supported" if( !$hash->{IODev} || !$hash->{IODev}{has_v2_api} );
+      return "usage: $cmd <v2 scene id>" if( !@args || $args[0] eq '?' );
+
+      my $arg = join( ' ', @args );
+
+      my $v2id;
+      if( $arg =~ /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/ ) {
+        $v2id = $1;
+
+        return "no v2 scene with id $v2id found" if( !HUEBridge_nameOfResource( $hash->{IODev}, $v2id ) );
+
+      } else {
+        return "$arg is not a v2 scene id";
+
+      }
+
+      return CommandSet( $hash->{IODev}, "$hash->{IODev}->{NAME} v2scene $v2id" );
     }
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
-    my $shash = $hash->{IODev};
+    my $iohash = $hash->{IODev};
 
     my $id = $hash->{ID};
     $id = $1 if( $id =~ m/^S(\d.*)/ );
@@ -919,12 +939,12 @@ HUEDevice_Set($@)
       if( $args[0] eq 'setsensor' || $args[0] eq 'configsensor' ) {
         $type = shift @args;
        }
-      return HUEBridge_Set( $shash, $shash->{NAME}, $type, $id, @args );
+      return HUEBridge_Set( $iohash, $iohash->{NAME}, $type, $id, @args );
 
       return undef;
 
     } elsif( @match = grep { $cmd eq $_ } keys %{($hash->{helper}{setList}{cmds}?$hash->{helper}{setList}{cmds}:{})} ) {
-      return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $hash->{helper}{setList}{cmds}{$match[0]} );
+      return HUEBridge_Set( $iohash, $iohash->{NAME}, 'setsensor', $id, $hash->{helper}{setList}{cmds}{$match[0]} );
 
     } elsif( $entries = $hash->{helper}{setList}{regex} ) {
       foreach my $entry (@{$entries}) {
@@ -944,13 +964,13 @@ HUEDevice_Set($@)
             $json =~ s/\$2/$VALUE2/;
             $json =~ s/\$3/$VALUE3/;
           }
-          return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $json );
+          return HUEBridge_Set( $iohash, $iohash->{NAME}, 'setsensor', $id, $json );
 
         }
       }
 
     } elsif( @match = grep { $cmd eq $_ } keys %{($hash->{helper}{configList}{cmds}?$hash->{helper}{configList}{cmds}:{})} ) {
-      return HUEBridge_Set( $shash, $shash->{NAME}, 'configsensor', $id, $hash->{helper}{configList}{cmds}{$match[0]} );
+      return HUEBridge_Set( $iohash, $iohash->{NAME}, 'configsensor', $id, $hash->{helper}{configList}{cmds}{$match[0]} );
 
     } elsif( $entries = $hash->{helper}{configList}{regex} ) {
       foreach my $entry (@{$entries}) {
@@ -970,7 +990,7 @@ HUEDevice_Set($@)
             $json =~ s/\$2/$VALUE2/;
             $json =~ s/\$3/$VALUE3/;
           }
-          return HUEBridge_Set( $shash, $shash->{NAME}, 'configsensor', $id, $json );
+          return HUEBridge_Set( $iohash, $iohash->{NAME}, 'configsensor', $id, $json );
 
         }
       }
@@ -1215,6 +1235,48 @@ HUEDevice_Set($@)
 
   }
 
+  if( $hash->{IODev} && $hash->{IODev}{has_v2_api} ) {
+    my $iohash = $hash->{IODev};
+    my $id = $hash->{ID}; $id = $1 if( $id =~ m/^G(\d.*)/ );
+    my $v2id = HUEBridge_V2IdOfV1Id( $iohash, 'room', "/groups/$id" );
+       $v2id = HUEBridge_V2IdOfV1Id( $iohash, 'zone', "/groups/$id" ) if( !$v2id );
+       $v2id = HUEBridge_V2IdOfV1Id( $iohash, 'group', "/groups/$id" ) if( !$v2id );
+       #$v2id = HUEBridge_V2IdOfV1Id( $iohash, 'grouped_light', "/groups/$id" ) if( !$v2id );
+
+    my $scenes = '';
+    if( my $resources = $iohash->{helper}{resource}{by_id} ) {
+      foreach my $scene ( values %{$resources} ) {
+        next if( !$scene->{type} );
+        next if( $scene->{type} ne 'scene' );
+        local *containsOneOfMyLights = sub($) {
+          return 1 if( !defined($hash->{helper}{lights}) );
+
+          my( $scene ) = @_;
+
+
+          foreach my $light (keys %{$hash->{helper}{lights}}) {
+            my $id = HUEBridge_V2IdOfV1Id( $iohash, 'light', "/lights/$light" );
+            foreach my $action (@{$scene->{actions}}) {
+              return 1 if( $id eq $action->{target}{rid}  );
+            }
+          }
+          return 0;
+        };
+
+        next if( !$v2id ); #fixme: optimize!
+        next if( $v2id ne $scene->{group}{rid} );
+        #next if( !containsOneOfMyLights($scene) );
+
+        $scenes .= ',' if( $scenes );
+        $scenes .= $scene->{metadata}{name};
+        $scenes .= " [$scene->{id}]";
+
+      }
+      $scenes =~ s/ /#/g;
+      $list .= " v2scene:$scenes" if( $scenes );
+    }
+  }
+
   return SetExtensions($hash, $list, $name, @aa);
 }
 
@@ -1364,12 +1426,21 @@ HUEDevice_Get($@)
       ($r,$g,$b) = HUEDevice_xyYtorgb($x,$y,$Y);
     }
     return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
+
   } elsif ( $cmd eq "startup" ) {
     my $result = IOWrite($hash,undef,$hash->{NAME},$hash->{ID});
     return $result->{error}{description} if( $result->{error} );
     return "not supported" if( !$result->{config} || !$result->{config}{startup} );
     return "$result->{config}{startup}{mode}\t$result->{config}{startup}{configured}";
     return Dumper $result->{config}{startup};
+
+  } elsif ( $cmd eq "v2effects" ) {
+    return "<$name has no IODEV>" if( !$hash->{IODev} );
+    return "$name: v2 api not supported" if( !$hash->{IODev} || !$hash->{IODev}{has_v2_api} );
+
+    my $v2id = HUEBridge_V2IdOfV1Id( $hash->{IODev}, 'light', "/lights/$hash->{ID}" );
+    return '<none>' if( !$v2id );
+    return CommandGet( $hash, "$hash->{IODev}->{NAME} v2effects $v2id" );
 
   } elsif ( $cmd eq "devStateIcon" ) {
     return HUEDevice_devStateIcon($hash);
@@ -1387,6 +1458,8 @@ HUEDevice_Get($@)
       && $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
     $list .= " startup:noArg";
   }
+
+  $list .= " v2effects" if( !$hash->{helper}->{devtype} && $hash->{IODev} && $hash->{IODev}{has_v2_api} );
 
   return "Unknown argument $cmd" if( !$list );
 
@@ -1874,7 +1947,7 @@ HUEDevice_Parse($$)
             } elsif( $type eq '03' ) {
               $readings{eventtype} = 'long_release';
 
-            } 
+            }
           }
 
         }
@@ -2080,8 +2153,8 @@ HUEDevice_Parse($$)
     if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
   }
 
-  $readings{dynamics_status} = 'none' if( !$on && defined($hash->{helper}{dynamics_status}) && !defined($readings{dynamics_status}) );
-  $readings{v2effect} = 'no_effect' if( !$on && defined($hash->{helper}{v2effect}) && !defined($readings{v2effect}) );
+  $readings{dynamics_status} = 'none' if( !$on && $hash->{helper}{dynamics_status} && !defined($readings{dynamics_status}) );
+  $readings{v2effect} = 'no_effect' if( !$on && $hash->{helper}{v2effect} && !defined($readings{v2effect}) );
 
   if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"pct", $pct);}
   #if( $pct != $hash->{helper}{pct} ) {readingsBulkUpdate($hash,"level", $pct . ' %');}
