@@ -347,6 +347,8 @@ my %dbrep_hmainf = (
     sumValue           => { fn => "DbRep_sumval",        fndone => "DbRep_sumvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
     countEntries       => { fn => "DbRep_count",         fndone => "DbRep_countDone",         fnabort => "DbRep_ParseAborted", timeset => 1                     },   
     sqlCmd             => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted", timeset => 1                     },
+    sqlCmdHistory      => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted", timeset => 1                     },
+    sqlSpecial         => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted", timeset => 1                     },
     averageValue       => { fn => "DbRep_averval",       fndone => "DbRep_avervalDone",       fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" }, 
     fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted", timeset => 1                     },
     maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },     
@@ -2720,6 +2722,34 @@ sub DbRep_Main {
 #    
 #    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
 # }
+# elsif ($opt eq "sqlCmdHistory") {
+#    $params = {
+#        hash    => $hash,
+#        name    => $name,
+#        opt     => $opt,
+#        prop    => $prop,
+#        device  => $device,
+#        reading => $reading,
+#        rsf     => $runtime_string_first,
+#        rsn     => $runtime_string_next
+#    };    
+#    
+#    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
+# }
+# elsif ($opt eq "sqlSpecial") {                                       # Execute a special sql command   
+#    $params = {
+#        hash    => $hash,
+#        name    => $name,
+#        opt     => $opt,
+#        prop    => $prop,
+#        device  => $device,
+#        reading => $reading,
+#        rsf     => $runtime_string_first,
+#        rsn     => $runtime_string_next
+#    };    
+#    
+#    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
+# } 
  if ($opt eq "delDoublets") {
      $params = {
          hash    => $hash,
@@ -2765,34 +2795,6 @@ sub DbRep_Main {
      }
      
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "sqlCmdHistory") {
-    $params = {
-        hash    => $hash,
-        name    => $name,
-        opt     => $opt,
-        prop    => $prop,
-        device  => $device,
-        reading => $reading,
-        rsf     => $runtime_string_first,
-        rsn     => $runtime_string_next
-    };    
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
- }
- elsif ($opt eq "sqlSpecial") {                                       # Execute a special sql command   
-    $params = {
-        hash    => $hash,
-        name    => $name,
-        opt     => $opt,
-        prop    => $prop,
-        device  => $device,
-        reading => $reading,
-        rsf     => $runtime_string_first,
-        rsn     => $runtime_string_next
-    };    
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
  } 
  elsif ($opt =~ /syncStandby/ ) {
     DbRep_beforeproc($hash, "syncStandby");                           # Befehl vor Procedure ausführen
