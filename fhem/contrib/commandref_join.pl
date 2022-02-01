@@ -224,7 +224,7 @@ generateModuleCommandref($$;$$)
 EOF
       }
     }
-    print "*** $lang $fPath: No a-tag with name=\"$mod\" \n"
+    print "*** $lang $fPath: No a-tag with id=\"$mod\" \n"
         if(!$jsFile && !$suffix && $docCount && !$hasLink && !$noWarnings);
 
     foreach $tag (TAGS) {
