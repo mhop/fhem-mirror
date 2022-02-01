@@ -269,7 +269,7 @@ FHZ_Get($@)
   Log3 $name, 2, "FHZ get $v";
 
   FHZ_ReadAnswer($hash, "Flush", 0);
-  FHZ_Write($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
+  FHZ_DirectWrite($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
 
   my $msg = FHZ_ReadAnswer($hash, $a[1], 1.0);
   Log3 $name, 5, "GET Got: $msg" if(defined($msg));
@@ -587,6 +587,23 @@ FHZ_XmitLimitCheck($$)
   }
   $hash->{XMIT_TIME} = \@b;
   $hash->{NR_CMD_LAST_H} = int(@b);
+}
+
+#####################################
+# Skip the QUEUE
+sub
+FHZ_DirectWrite($$$)
+{
+  my ($hash,$fn,$msg) = @_;
+
+  if(!$hash || !defined($hash->{PortObj})) {
+    Log3 $hash, 5, "FHZ device $hash->{NAME} is not active, cannot send";
+    return;
+  }
+
+  my $bstring = FHZ_CompleteMsg($fn, $msg);
+  Log3 $hash, 5, "Sending " . unpack('H*', $bstring);
+  $hash->{PortObj}->write($bstring) if($hash->{PortObj});
 }
 
 #####################################
