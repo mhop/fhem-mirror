@@ -15,6 +15,7 @@
 #    1.01.02  supporting multiple devices (store set and result in device hash)
 #             adding debug attr
 #    1.01.03  rename to 70_ESCVP21net, clean up and prepare for fhem trunk
+#    1.01.04  small bug fix, DevIo log messages moved to loglevel 5
 #
 #
 ########################################################################################
@@ -845,7 +846,7 @@ sub ESCVP21net_setValueDone {
     ( $name, $cmd, $result ) = split( "\\|", $resultarr[$count] );
     if ($result =~ "ERROR"){
       $getcmds .=$cmd." (error),";
-      #$rv = $result;
+      $rv = $result;
     }
     else{
       $rv = readingsBulkUpdate($hash, $cmd, $result, 1);
@@ -1005,14 +1006,14 @@ sub ESCVP21net_checkConnection ($) {
     # no internal timer needed
     delete $hash->{helper}{nextConnectionCheck}
       if ( defined( $hash->{helper}{nextConnectionCheck} ) );    
-    main::Log3 $name, 3, "[$name]: DevIo_Open has no FD, NEXT_OPEN is $hash->{NEXT_OPEN}, no timer set";  
+    main::Log3 $name, 5, "[$name]: DevIo_Open has no FD, NEXT_OPEN is $hash->{NEXT_OPEN}, no timer set";  
   }
   elsif (!($hash->{FD}) && !$hash->{NEXT_OPEN}){
     # not connected, DevIo not active, so device won't open again automatically
     # should never happen, since we called DevIo_Open above!
     # no internal timer needed, but should we ask DevIo again for opening the connection?
     #DevIo_OpenDev($hash, 1, "ESCVP21net_Init", "ESCVP21net_Callback");
-    main::Log3 $name, 3, "[$name]: DevIo_Open has no FD, no NEXT_OPEN, should not happen!";
+    main::Log3 $name, 5, "[$name]: DevIo_Open has no FD, no NEXT_OPEN, should not happen!";
   }
   elsif ($hash->{FD} && $hash->{NEXT_OPEN}){
     # not connected - device was connected, but is not reachable currently
@@ -1023,7 +1024,7 @@ sub ESCVP21net_checkConnection ($) {
     #DevIo_OpenDev($hash, 1, "ESCVP21net_Init", "ESCVP21net_Callback");
     delete $hash->{helper}{nextConnectionCheck}
       if ( defined( $hash->{helper}{nextConnectionCheck} ) );
-    main::Log3 $name, 3, "[$name]: DevIo_Open has FD and NEXT_OPEN, try to reconnect periodically";
+    main::Log3 $name, 5, "[$name]: DevIo_Open has FD and NEXT_OPEN, try to reconnect periodically";
   }
   elsif ($hash->{FD} && !$hash->{NEXT_OPEN}){
     # device is connectd, or seems to be (since broken connection is not detected by DevIo!)
@@ -1033,7 +1034,7 @@ sub ESCVP21net_checkConnection ($) {
     my $next = gettimeofday() + $checkInterval; # if checkInterval is off, we won't reach this line
     $hash->{helper}{nextConnectionCheck} = $next;
     InternalTimer( $next, "ESCVP21net_checkConnection", $hash);
-    main::Log3 $name, 3, "[$name]: DevIo_Open has FD but no NEXT_OPEN, next timer set";
+    main::Log3 $name, 5, "[$name]: DevIo_Open has FD but no NEXT_OPEN, next timer set";
   }  
 }
 
