@@ -142,6 +142,14 @@ HUEBridge_Read($)
           return;
         }
 
+        if( $id == 0xfff0 ) {
+          $code = $name .'-G0';
+
+        } elsif( $id >= 0xff00 ) {
+          $hash->{helper}{ignored}{$code} = 1;
+          return;
+        }
+
         if( $obj->{t} eq 'event' && $obj->{e} eq 'changed' ) {
           if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
             HUEDevice_Parse($chash, $obj);
