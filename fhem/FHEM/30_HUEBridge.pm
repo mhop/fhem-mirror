@@ -3061,14 +3061,14 @@ __END__
 =item tag cloudfree
 =item tag publicAPI
 =item tag protocol:zigbee
-=item summary    module for the phillips hue bridge
+=item summary    module for the philips hue bridge
 =item summary_DE Modul f&uuml;r die Philips HUE Bridge
 =begin html
 
-<a name="HUEBridge"></a>
+<a id="HUEBridge"></a>
 <h3>HUEBridge</h3>
 <ul>
-  Module to access the bridge of the phillips hue lighting system.<br><br>
+  Module to access the bridge of the philips hue lighting system.<br><br>
 
   The actual hue bulbs, living colors or living whites devices are defined as <a href="#HUEDevice">HUEDevice</a> devices.
 
@@ -3084,7 +3084,7 @@ __END__
 
 
   <br><br>
-  <a name="HUEBridge_Define"></a>
+  <a id="HUEBridge-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; HUEBridge [&lt;host&gt;] [&lt;interval&gt;]</code><br>
@@ -3104,130 +3104,144 @@ __END__
     </ul>
   </ul><br>
 
-  <a name="HUEBridge_Get"></a>
+  <a id="HUEBridge-get"></a>
   <b>Get</b>
   <ul>
+    <a id="HUEBridge-get-lights"></a>
     <li>lights<br>
       list the lights known to the bridge.</li>
+    <a id="HUEBridge-get-groups"></a>
     <li>groups<br>
       list the groups known to the bridge.</li>
+    <a id="HUEBridge-get-scenes"></a>
     <li>scenes [detail]<br>
       list the scenes known to the bridge.</li>
+    <a id="HUEBridge-get-schedules"></a>
     <li>schedules [detail]<br>
       list the schedules known to the bridge.</li>
+    <a id="HUEBridge-get-startup"></a>
     <li>startup<br>
       show startup behavior of all known lights</li>
+    <a id="HUEBridge-get-rule"></a>
     <li>rule &lt;id&gt; <br>
       list the rule with &lt;id&gt;.</li>
+    <a id="HUEBridge-get-rules"></a>
     <li>rules [detail] <br>
       list the rules known to the bridge.</li>
+    <a id="HUEBridge-get-sensors"></a>
     <li>sensors [detail] <br>
       list the sensors known to the bridge.</li>
+    <a id="HUEBridge-get-whitelist"></a>
     <li>whitelist<br>
       list the whitlist of the bridge.</li>
   </ul><br>
 
-  <a name="HUEBridge_Set"></a>
+  <a id="HUEBridge-set"></a>
   <b>Set</b>
   <ul>
-    <li>autocreate [sensors]<br>
+    <a id="HUEBridge-set-autocreate"></a><li>autocreate [sensors]<br>
       Create fhem devices for all light and group devices. sensors are autocreated only if sensors parameter is given.</li>
-    <li>autodetect<br>
+    <a id="HUEBridge-set-autodetect"></a><li>autodetect<br>
       Initiate the detection of new ZigBee devices. After aproximately one minute any newly detected
       devices can be listed with <code>get &lt;bridge&gt; devices</code> and the corresponding fhem devices
       can be created by <code>set &lt;bridge&gt; autocreate</code>.</li>
-    <li>delete &lt;name&gt;|&lt;id&gt;<br>
+    <a id="HUEBridge-set-delete"></a><li>delete &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given device in the bridge and deletes the associated fhem device.</li>
-    <li>creategroup &lt;name&gt; &lt;lights&gt;<br>
+    <a id="HUEBridge-set-creategroup"></a><li>creategroup &lt;name&gt; &lt;lights&gt;<br>
       Create a group out of &lt;lights&gt; in the bridge.
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
-    <li>deletegroup &lt;name&gt;|&lt;id&gt;<br>
+    <a id="HUEBridge-set-deletegroup"></a><li>deletegroup &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given group in the bridge and deletes the associated fhem device.</li>
-    <li>savescene &lt;name&gt; &lt;lights&gt;<br>
+    <a id="HUEBridge-set-savescene"></a><li>savescene &lt;name&gt; &lt;lights&gt;<br>
       Create a scene from the current state of &lt;lights&gt; in the bridge.
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
-    <li>modifyscene &lt;id&gt; &lt;light&gt; &lt;light-args&gt;<br>
+    <a id="HUEBridge-set-modifyscene"></a><li>modifyscene &lt;id&gt; &lt;light&gt; &lt;light-args&gt;<br>
       Modifys the given scene in the bridge.</li>
-    <li>scene &lt;id&gt;|&lr;name&gt;<br>
+    <a id="HUEBridge-set-scene"></a><li>scene &lt;id&gt;|&lr;name&gt;<br>
       Recalls the scene with the given id.</li>
-    <li>updateschedule &lt;id&gt; &lt;attributes json&gt;<br>
+    <a id="HUEBridge-set-deletescene"></a><li>deletescene &lt;id&gt;|&lr;name&gt;<br>
+      Deletes the scene with the given id.</li>
+    <a id="HUEBridge-set-updateschedule"></a><li>updateschedule &lt;id&gt; &lt;attributes json&gt;<br>
       updates the given schedule in the bridge with &lt;attributes json&gt; </li>
-    <li>enableschedule &lt;id&gt;<br>
+    <a id="HUEBridge-set-enableschedule"></a><li>enableschedule &lt;id&gt;<br>
       enables the given schedule</li>
-    <li>disableschedule &lt;id&gt;<br>
+    <a id="HUEBridge-set-disableschedule"></a><li>disableschedule &lt;id&gt;<br>
       disables the given schedule</li>
-    <li>createrule &lt;name&gt; &lt;conditions&amp;actions json&gt;<br>
+    <a id="HUEBridge-set-createrule"></a><li>createrule &lt;name&gt; &lt;conditions&amp;actions json&gt;<br>
       Creates a new rule in the bridge.</li>
-    <li>deleterule &lt;id&gt;<br>
+    <a id="HUEBridge-set-deleterule"></a><li>deleterule &lt;id&gt;<br>
       Deletes the given rule in the bridge.</li>
-    <li>createsensor &lt;name&gt; &lt;type&gt; &lt;uniqueid&gt; &lt;swversion&gt; &lt;modelid&gt;<br>
+    <a id="HUEBridge-set-updaterule"></a><li>updaterule &lt;id&gt; &lt;json&gt;<br>
+      Write specified rule's toplevel data.</li>
+    <a id="HUEBridge-set-createsensor"></a><li>createsensor &lt;name&gt; &lt;type&gt; &lt;uniqueid&gt; &lt;swversion&gt; &lt;modelid&gt;<br>
       Creates a new CLIP (IP) sensor in the bridge.</li>
-    <li>deletesensor &lt;id&gt;<br>
+    <a id="HUEBridge-set-deletesensor"></a><li>deletesensor &lt;id&gt;<br>
       Deletes the given sensor in the bridge and deletes the associated fhem device.</li>
-    <li>configsensor &lt;id&gt; &lt;json&gt;<br>
+    <a id="HUEBridge-set-configsensor"></a><li>configsensor &lt;id&gt; &lt;json&gt;<br>
       Write sensor config data.</li>
-    <li>setsensor &lt;id&gt; &lt;json&gt;<br>
+    <a id="HUEBridge-set-setsensor"></a><li>setsensor &lt;id&gt; &lt;json&gt;<br>
       Write CLIP sensor status data.</li>
-    <li>updatesensor &lt;id&gt; &lt;json&gt;<br>
+    <a id="HUEBridge-set-updatesensor"></a><li>updatesensor &lt;id&gt; &lt;json&gt;<br>
       Write sensor toplevel data.</li>
-    <li>deletewhitelist &lt;key&gt;<br>
+    <a id="HUEBridge-set-deletewhitelist"></a><li>deletewhitelist &lt;key&gt;<br>
       Deletes the given key from the whitelist in the bridge.</li>
-    <li>touchlink<br>
+    <a id="HUEBridge-set-touchlink"></a><li>touchlink<br>
       perform touchlink action</li>
-    <li>checkforupdate<br>
+    <a id="HUEBridge-set-checkforupdate"></a><li>checkforupdate<br>
       perform checkforupdate action</li>
-    <li>statusRequest<br>
+    <a id="HUEBridge-set-statusRequest"></a><li>statusRequest<br>
       Update bridge status.</li>
-    <li>swupdate<br>
+    <a id="HUEBridge-set-swupdate"></a><li>swupdate<br>
       Update bridge firmware. This command is only available if a new firmware is
       available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
       A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code>
       can be used to be informed about available firmware updates.<br></li>
-    <li>inactive<br>
+    <a id="HUEBridge-set-inactive"></a><li>inactive<br>
       inactivates the current device. note the slight difference to the
       disable attribute: using set inactive the state is automatically saved
       to the statefile on shutdown, there is no explicit save necesary.<br>
       this command is intended to be used by scripts to temporarily
       deactivate the harmony device.<br>
       the concurrent setting of the disable attribute is not recommended.</li>
-    <li>active<br>
+    <a id="HUEBridge-set-active"></a><li>active<br>
       activates the current device (see inactive).</li>
   </ul><br>
 
-  <a name="HUEBridge_Attr"></a>
+  <a id="HUEBridge-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <a id="HUEBridge-attr-httpUtils"></a>
     <li>httpUtils<br>
       0 -> use HttpUtils_BlockingGet<br>
       1 -> use HttpUtils_NonblockingGet<br>
       not set -> use old module specific implementation</li>
-    <li>pollDevices<br>
+    <a id="HUEBridge-attr-pollDevices"></a><li>pollDevices<br>
       1 -> the bridge will poll all lights in one go instead of each light polling itself independently<br>
       2 -> the bridge will poll all devices in one go instead of each device polling itself independently<br>
       default is 2. will be deleted if v2 api is detected and eventstream connects.</li>
-    <li>createEventTimestampReading<br>
+    <a id="HUEBridge-attr-createEventTimestampReading"></a><li>createEventTimestampReading<br>
       timestamp reading for every event received<br>
       0 -> update reading without fhem event<br>
-      1 -> update reading with fhem event
+      1 -> update reading with fhem event<br>
       undef -> don't create reading</li>
-    <li>createGroupReadings<br>
+    <a id="HUEBridge-attr-createGroupReadings"></a><li>createGroupReadings<br>
       create 'artificial' readings for group devices.<br>
       0 -> create readings only for group devices where createGroupReadings ist set to 1<br>
       1 -> create readings for all group devices where createGroupReadings ist not set or set to 1<br>
       undef -> do nothing</li>
-    <li>forceAutocreate<br>
+    <a id="HUEBridge-attr-forceAutocreate"></a><li>forceAutocreate<br>
       try to create devices even if autocreate is disabled.</li>
-    <li>ignoreUnknown<br>
+    <a id="HUEBridge-attr-ignoreUnknown"></a><li>ignoreUnknown<br>
       don't try to create devices after data or events with unknown references are received.</li>
-    <li>queryAfterEvent<br>
+    <a id="HUEBridge-attr-queryAfterEvent"></a><li>queryAfterEvent<br>
       the bridge will request the real button state 1 sec after the final event in a quick series. default is 0.</li>
-    <li>queryAfterSet<br>
+    <a id="HUEBridge-attr-queryAfterSet"></a><li>queryAfterSet<br>
       the bridge will request the real device state after a set command. default is 1.</li>
-    <li>noshutdown<br>
+    <a id="HUEBridge-attr-noshutdown"></a><li>noshutdown<br>
       Some bridge devcies require a different type of connection handling. raspbee/deconz only works if the connection
-      is not immediately closed, the phillips hue bridge now shows the same behavior. so this is now the default.  </li>
+      is not immediately closed, the philips hue bridge now shows the same behavior. so this is now the default.  </li>
   </ul><br>
 </ul><br>
 
@@ -3236,7 +3250,7 @@ __END__
 =encoding utf8
 =for :application/json;q=META.json 30_HUEBridge.pm
 {
-  "abstract": "module for the phillips hue bridge",
+  "abstract": "module for the philips hue bridge",
   "x_lang": {
     "de": {
       "abstract": "Modul für die Philips HUE Bridge"
