@@ -488,6 +488,46 @@ HttpUtils_Connect($)
 }
 
 sub
+HttpUtils_Connect2NonblockingSSL($$)
+{
+  my ($hash, $par) = @_;
+
+  $hash->{conn}->blocking(0);
+  $par->{SSL_startHandshake} = 0;
+  IO::Socket::SSL->start_SSL($hash->{conn}, $par);
+  if($hash->{conn}->connect_SSL && $! != EWOULDBLOCK) {
+    HttpUtils_Close($hash);
+    return $hash->{callback}($hash, $!);
+  }
+
+  $hash->{FD} = $hash->{conn}->fileno();
+  $selectlist{$hash} = $hash;
+  my %timerHash = (hash=>$hash, sts=>$selectTimestamp, msg=>"start_SSL");
+  InternalTimer(gettimeofday()+$hash->{timeout},
+                    "HttpUtils_TimeoutErr", \%timerHash);
+
+  $hash->{directReadFn} = sub() {
+    return if(!$hash->{conn}->connect_SSL);
+
+    RemoveInternalTimer(\%timerHash);
+    delete($hash->{FD});
+    delete($hash->{directReadFn});
+    delete($selectlist{$hash});
+
+    if($!) {
+      HttpUtils_Close($hash);
+      return $hash->{callback}($hash, $!);
+    }
+
+    $hash->{hu_sslAdded} = 1;
+    return HttpUtils_Connect2($hash); # Continue with HTTP
+  };
+
+  return undef;
+}
+
+
+sub
 HttpUtils_Connect2($)
 {
   my ($hash) = @_;
@@ -532,6 +572,8 @@ HttpUtils_Connect2($)
       $par{SSL_verify_mode} = 0
         if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
 
+      return HttpUtils_Connect2NonblockingSSL($hash,\%par) if($hash->{callback});
+      
       eval {
         IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
       };
@@ -628,7 +670,7 @@ HttpUtils_Connect2($)
     delete($hash->{httpdatalen});
     delete($hash->{httpheader});
     $hash->{NAME} = "" if(!defined($hash->{NAME})); 
-    my %timerHash = (hash=>$hash, checkSTS=>$selectTimestamp, msg=>"write to");
+    my %timerHash = (hash=>$hash, sts=>$selectTimestamp, msg=>"write to");
     $hash->{conn}->blocking(0);
     $hash->{directReadFn} = sub() {
       my $buf;
