@@ -125,10 +125,15 @@ HUEBridge_Read($)
       } elsif( $op == 0x01 ) {
         my $obj = eval { JSON->new->utf8(0)->decode($data) };
 
-        if( $obj ) {
-          Log3 $name, 5, "$name: websocket data: ". Dumper $obj;
-        } else {
-          Log3 $name, 2, "$name: unhandled websocket text $data";
+        if( !$obj ) {
+          Log3 $name, 2, "$name: websocket: unhandled text $data";
+          return;
+        }
+        Log3 $name, 5, "$name: websocket data: ". Dumper $obj;
+
+        if( $obj->{t} ne 'event' ) {
+          Log3 $name, 2, "$name: websocket: unhandled message type: $data";
+          return;
         }
 
         my $code;
@@ -142,15 +147,17 @@ HUEBridge_Read($)
           return;
         }
 
-        if( $id == 0xfff0 ) {
+        if( $id == 0xfff0 && $obj->{r} eq 'groups' ) {
           $code = $name .'-G0';
+          Log3 $name, 5, "$name: websocket: assuming group 0 for id $id in event";
 
-        } elsif( $id >= 0xff00 ) {
+        } elsif( $id >= 0xff00 && $obj->{r} eq 'groups' ) {
+          Log3 $name, 4, "$name: websocket: ignoring event for id $id";
           $hash->{helper}{ignored}{$code} = 1;
           return;
         }
 
-        if( $obj->{t} eq 'event' && $obj->{e} eq 'changed' ) {
+        if( $obj->{e} eq 'changed' ) {
           if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
             HUEDevice_Parse($chash, $obj);
             HUEBridge_updateGroups($hash, $chash->{ID}) if( !$chash->{helper}{devtype} );
@@ -168,14 +175,14 @@ HUEBridge_Read($)
             Log3 $name, 2, "$name: websocket: event for unknown device received: $code";
           }
 
-        } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'scene-called' ) {
+        } elsif( $obj->{e} eq 'scene-called' ) {
           if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
             #HUEDevice_Parse($chash, $obj);
             HUEDevice_Parse($chash, { state => { scene => $obj->{scid} } } );
             #readingsSingleUpdate($hash, 'scene',  $obj->{scid}, 1 );
           }
 
-        } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'added' ) {
+        } elsif( $obj->{e} eq 'added' ) {
           Log3 $name, 5, "$name: websocket add: $data";
           if( !HUEDevice_moveToBridge( $obj->{uniqueid}, $name, $obj->{id} ) ) {
             HUEBridge_Autocreate($hash);
@@ -186,23 +193,29 @@ HUEBridge_Read($)
               $obj = $obj->{light};
             } elsif( $obj->{r} eq 'sensors' ) {
               $obj = $obj->{sensor};
-            } elsif( $obj->{r} eq 'goups' ) {
+            } elsif( $obj->{r} eq 'groups' ) {
               $obj = $obj->{group};
             }
+            #maybe this instead?
+            #given( $obj->{r} ){
+            #   when('lights'){ $obj = $obj->{light}; }
+            #  when('sensors'){ $obj = $obj->{sensor}; }
+            #   when('groups'){ $obj = $obj->{group}; }
+            #}
 
             HUEDevice_Parse($chash, $obj);
           }
 
-        } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'deleted' ) {
+        } elsif( $obj->{e} eq 'deleted' ) {
           Log3 $name, 5, "$name: todo: handle websocket delete $data";
           # do what ?
 
         } else {
-          Log3 $name, 5, "$name: unknown websocket data: $data";
+          Log3 $name, 2, "$name: websocket: unhandled event type: $data";
         }
 
       } else {
-        Log3 $name, 2, "$name: unhandled websocket data: $data";
+        Log3 $name, 2, "$name: websocket: unhandled opcode: $data";
 
       }
     } while( $hash->{buf} && !$close );
