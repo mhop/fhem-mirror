@@ -520,12 +520,13 @@ sub powerMap_Initialize($) {
       . "_eventChainWarnOnly:1,0 "
       . $readingFnAttributes;
 
-    addToAttrList( $TYPE . "_noEnergy:1,0" );
-    addToAttrList( $TYPE . "_noPower:1,0" );
-    addToAttrList( $TYPE . "_interval" );
-    addToAttrList( $TYPE . "_rname_P:textField" );
-    addToAttrList( $TYPE . "_rname_E:textField" );
-    addToAttrList( $TYPE . ":textField-long" );
+    addToAttrList( $TYPE . "_noEnergy:1,0", 'powerMap' );
+    addToAttrList( $TYPE . "_noPower:1,0" , 'powerMap' );
+    addToAttrList( $TYPE . "_interval" , 'powerMap' );
+    addToAttrList( $TYPE . "_rname_P:textField" , 'powerMap' );
+    addToAttrList( $TYPE . "_rname_E:textField" , 'powerMap' );
+    addToAttrList( $TYPE . ":textField-long" , 'powerMap' );
+    $hash->{NotifyOrderPrefix} = '30-';
 }
 
 # regular Fn ##################################################################
@@ -1541,111 +1542,119 @@ sub powerMap_update($;$) {
 
 1;
 
+__END__
+
 # commandref ##################################################################
 
 =pod
+=encoding utf8
 =item helper
 =item summary    maps power and calculates energy (as Readings)
 =item summary_DE leitet Leistung ab und berechnet Energie (als Readings)
 
 =begin html
 
-<a name="powerMap"></a>
+<a id="powerMap"></a>
 <h3>powerMap</h3>
-(en | <a href="commandref_DE.html#powerMap">de</a>)
 <div>
   <ul>
     powerMap will help to determine current power consumption and calculates
     energy consumption either when power changes or within regular interval.<br>
     These new values may be used to collect energy consumption for devices w/o
     power meter (e.g. fridge, lighting or FHEM server) and for further processing
-    using module <a href="#ElectricityCalculator">ElectricityCalculator</a>.
+    using module <a href="#ElectricityCalculator">ElectricityCalculator</a>.<br>
+    Note: As this module will derive some additional readings when readings are changed 
+    (with event) in the supervised FHEM devices to prepare for further processing with
+    other event handlers, this will happen on a rather early stage of the entire event 
+    processing. So do not expect powerMap to work properly when setting own values 
+    (e.g. using notify or DOIF in combination with "setreading" commands).
     <br>
-    <a name="powerMapdefine"></a>
-    <b>Define</b>
+    <a id="powerMap-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>define &lt;name&gt; powerMap</code><br>
       You may only define one single instance of powerMap.
     </ul><br>
-    <a name="powerMapset"></a>
-    <b>Set</b>
+    <a id="powerMap-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="powerMap-set-assign"></a><li>
         <code>assign <a href="#devspec">&lt;devspec&gt;</a></code><br>
         Adds pre-defined powerMap attributes to one or more devices
         for further customization.
       </li>
     </ul><br>
-    <a name="powerMapget"></a>
-    <b>Get</b>
+    <a id="powerMap-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="powerMap-get-devices"></a><li>
         <code>devices</code><br>
         Lists all devices having set an attribute named 'powerMap'.
       </li>
     </ul><br>
-    <a name="powerMapreadings"></a>
-    <b>Readings</b><br>
+    <a id="powerMap-readings"></a>
+    <h4>Readings</h4><br>
     <ul>
       Device specific readings:
       <ul>
-        <li>
+        <a id="powerMap-readings-pM_energy"></a><li>
           <code>pM_energy</code><br>
           A counter for consumed energy in Wh.<br>
           Hint: In order to have the calculation working, attribute
           <code>timestamp-on-change-reading</code> may not be set for
           reading pM_energy!
         </li><br>
-        <li>
+        <a id="powerMap-readings-pM_energy_begin"></a><li>
           <code>pM_energy_begin</code><br>
           Unix timestamp when collection started and device started to consume
           energy for the very first time.
         </li><br>
-        <li>
+        <a id="powerMap-readings-pM_consumption"></a><li>
           <code>pM_consumption</code><br>
           Current power consumption of device in W.
         </li>
       </ul><br>
     </ul>
-    <a name="powerMapattr"></a>
-    <b>Attribute</b>
+    <a id="powerMap-attr"></a>
+    <h4>Attributes</h4>
     <ul>
-      <li>
+      <a id="powerMap-attr-disable"></a><li>
         <code>disable 1</code><br>
         No readings will be created or calculated by this module.
       </li><br>
-      <li>
+      <li><a href="#do_not_notify">do_not_notify</a></li>
+      <a id="powerMap-attr-powerMap_eventChainWarnOnly"></a><li>
         <code>powerMap_eventChainWarnOnly &lt;1&gt;</code><br>
         When set, event chain will NOT be repaired automatically if readings
         were found to be required for powerMap but their events are currently
         suppressed because they are either missing from attributes event-on-change-reading
         or event-on-update-reading. Instead, manual intervention is required.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_interval"></a><li>
         <code>powerMap_interval &lt;seconds&gt;</code><br>
         Interval in seconds to calculate energy.<br>
         Default value is 900 seconds.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_noEnergy"></a><li>
         <code>powerMap_noEnergy 1</code><br>
         No energy consumption will be calculated for that device.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_noPower"></a><li>
         <code>powerMap_noPower 1</code><br>
         No power consumption will be determined for that device and
         consequently no energy consumption at all.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_rname_E"></a><li>
         <code>powerMap_rname_E</code><br>
         Sets reading name for energy consumption.<br>
         Default value is 'pM_energy'.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_rname_P"></a><li>
         <code>powerMap_rname_P</code><br>
         Sets reading name for power consumption.<br>
         Default value is 'pM_consumption'.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap"></a><li>
         <code>powerMap<pre>
         {
           '&lt;reading&gt;' =&gt; {
@@ -1718,9 +1727,8 @@ sub powerMap_update($;$) {
 
 =begin html_DE
 
-<a name="powerMap"></a>
+<a id="powerMap"></a>
 <h3>powerMap</h3>
-(<a href="commandref.html#powerMap">en</a> | de)
 <div>
   <ul>
     powerMap ermittelt die aktuelle Leistungsaufnahme eines Ger&auml;ts und
@@ -1730,32 +1738,37 @@ sub powerMap_update($;$) {
     Ger&auml;te ohne Z&auml;hler (z.B. K&uuml;hlschrank, Beleuchtung oder
     FHEM-Server) zu erfassen und mit dem Modul ElectricityCalculator weiter
     zu verarbeiten.<br>
+    Zur Beachtung: Da powerMap dazu gedacht ist, zusätzliche Readings zu erzeugen,
+    greift es zu einem frühen Zeitpunkt in der gesamten Eventverarbeitung auf 
+    (triggernde) Änderungen zu. Dies ist v.a. dann zu beachten, wenn versucht
+    werden sollte, eigene Readings oder Werte mit anderen Eventhandlern 
+    (z.B. notify oder DOIF, per "setreading" Kommando) zu setzen.
     <br>
-    <a name="powerMapdefine"></a>
-    <b>Define</b>
+    <a id="powerMapdefine"></a>
+    <h4>Define</h4>
     <ul>
       <code>define &lt;name&gt; powerMap</code><br>
       Es kann immer nur eine powerMap Instanz definiert sein.
     </ul><br>
-    <a name="powerMapset"></a>
+    <a id="powerMap-set"></a>
     <b>Set</b>
     <ul>
-      <li>
+      <a id="powerMap-set-assign"></a><li>
         <code>assign <a href="#devspec">&lt;devspec&gt;</a></code><br>
         Weist einem oder mehreren Ger&auml;ten vordefinierte powerMap Attribute zu,
         um diese anschlie&szlig;end anpassen zu k&ouml;nnen.
       </li>
     </ul><br>
-    <a name="powerMapget"></a>
-    <b>Get</b>
-    <ul>
-      <li>
+    <a id="powerMap-get"></a>
+    <h4>Get</h4>
+      <ul>
+      <a id="powerMap-get-devices"></a><li>
         <code>devices</code><br>
         Listet alle Ger&auml;te auf, die das Attribut 'powerMap' gesetzt haben.
       </li>
     </ul><br>
-    <a name="powerMapreadings"></a>
-    <b>Readings</b><br>
+    <a id="powerMap-readings"></a>
+    <h4>Readings</h4><br>
     <ul>
       Ger&auml;tespezifische Readings:
       <ul>
@@ -1777,49 +1790,49 @@ sub powerMap_update($;$) {
         </li>
       </ul><br>
     </ul>
-    <a name="powerMapattr"></a>
-    <b>Attribute</b>
+    <a id="powerMap-attr"></a>
+    <h4>Attribute</h4>
     <ul>
-      <li>
+      <a id="powerMap-attr-disable"></a><li>
         <code>disable 1</code><br>
         Es werden keine Readings mehr durch das Modul erzeugt oder berechnet.
       </li><br>
-      <li>
-        <code>powerMap_eventChainWarnOnly &lt;1&gt;</code><br>
+      <li><a href="#do_not_notify">do_not_notify</a></li>
+      <a id="powerMap-attr-powerMap_eventChainWarnOnly"></a><li>
         Sofern gesetzt, wird die Ereigniskette NICHT automatisch repariert, falls
         Readings zwar als f&uuml;r powerMap notwendig identifiziert wurden, ihre
         Events jedoch derzeit dadurch unterdr&uuml;ckt werden, weil sie nicht in
         einem der Attribute event-on-change-reading oder event-on-update-reading
         enthalten sind. Stattdessen ist ein manueller Eingriff erforderlich.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_interval"></a><li>
         <code>powerMap_interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden, in dem neue Werte f&uuml;r die Energie berechnet
         werden.<br>
         Der Vorgabewert ist 900 Sekunden.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_noEnergy"></a><li>
         <code>powerMap_noEnergy 1</code><br>
         F&uuml;r das Ger&auml;t wird kein Energieverbrauch berechnet.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_noPower"></a><li>
         <code>powerMap_noPower 1</code><br>
         F&uuml;r das Ger&auml;t wird keine Leistungsaufnahme abgeleitet und
         daher auch kein Energieverbrauch berechnet.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_rname_E"></a><li>
         <code>powerMap_rname_E</code><br>
         Definiert den Reading Namen, in dem der Z&auml;hler f&uuml;r die bisher
         bezogene Energie gespeichert wird.<br>
         Der Vorgabewert ist 'pM_energy'.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap_rname_P"></a><li>
         <code>powerMap_rname_P</code><br>
         Definiert den Reading Namen, in dem die aktuelle Leistungsaufnahme
         des Ger&auml;tes gespeichert wird.<br>
         Der Vorgabewert ist 'pM_consumption'.
       </li><br>
-      <li>
+      <a id="powerMap-attr-powerMap"></a><li>
         <code>powerMap<pre>
         {
           '&lt;reading&gt;' =&gt; {
