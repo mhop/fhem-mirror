@@ -16,6 +16,9 @@
 #             adding debug attr
 #    1.01.03  rename to 70_ESCVP21net, clean up and prepare for fhem trunk
 #    1.01.04  small bug fix, DevIo log messages moved to loglevel 5
+#    1.01.05  socket log messages moved to loglevel 5
+#             prevent DevIO from overwriting STATE ($hash->{devioNoSTATE} = 1)
+#             set port 3629 as default
 #
 #
 ########################################################################################
@@ -228,24 +231,38 @@ sub ESCVP21net_Define {
   my ($hash, $def) = @_;
   my @param = split('[ \t]+', $def);
  
-  if(int(@param) < 4) {
-    return "too few parameters: define <name> ESCVP21net <IP_Address> <port>";
+  if(int(@param) < 3) {
+    return "too few parameters: define <name> ESCVP21net <IP_Address> [<port>] [<model>]";
   }
-  
+  my $port = "3629";
+  my $model = "default";
   $hash->{NAME}       = $param[0];
   $hash->{IP_Address} = $param[2];
-  $hash->{port}       = $param[3];
-  if (!$param[4]) {
-    $param[4] = "default";
+  if ($param[3]){
+    if ($param[3] =~ m/^\d+$/){
+      # param3 is number
+      $port = $param[3];
+    }
+    else{
+      # param3 is not a number, so must be "model"
+      $model = $param[3];
+    }
   }
-  $hash->{model}      = $param[4];
-  $hash->{DeviceName} = $param[2].":".$param[3];
+  if ($param[4]) {
+    # 4 params given, last is model
+    $model = $param[4];
+  }
+  $hash->{port} = $port;
+  $hash->{model} = $model;
+  $hash->{DeviceName} = $param[2].":".$port;
 
 return "Cannot define device. Please install perl modules $missingModul (e.g. sudo apt-get install libjson-perl or sudo cpan install JSON)."
         if ($missingModul);
   
   # prevent "reappeared" messages in loglevel 1
-  $hash->{devioLoglevel} = 3;
+  $hash->{devioLoglevel} = 5;
+  # prevent DevIO from setting "STATE" at connect/disconnect
+  $hash->{devioNoSTATE} = 1;
   # subscribe only to notify from global and self
   $hash->{NOTIFYDEV} = "global,TYPE=ESCVP21net";
   
@@ -321,7 +338,7 @@ sub ESCVP21net_Notify($$) {
   my $next;
 
   if(IsDisabled($name)){
-    main::Log3 $name, 5, "[$name]: Notify: $name is disabled by framework!";
+    main::Log3 $name, 3, "[$name]: Notify: $name has been set to disabled!";
     return;
   }
 
@@ -629,7 +646,7 @@ sub ESCVP21net_Set {
   }
 
   if(IsDisabled($name)){
-    main::Log3 $name, 5, "[$name]: Set: $name is disabled by framework!";
+    main::Log3 $name, 3, "[$name]: Set: $name is disabled by framework!";
     return;
   }
 
@@ -755,7 +772,7 @@ sub ESCVP21net_setValue($){
         else {
           # calcResult will get nicer text from ESCVP21net_calcResult
           $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
-          main::Log3 $name, 5, "[$name]: result of $cmd is $result";
+          main::Log3 $name, 3, "[$name]: result of $cmd is $result";
         
           # constructing returnval string - triples separated by ":";
           if ($returnval eq ""){
@@ -811,6 +828,7 @@ sub ESCVP21net_setValue($){
       else {
         # we got neither "ERR" nor ":" but an interpretable value
         $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
+        main::Log3 $name, 3, "[$name]: result of $cmd is $result";
       }
       $returnval = "$name|$cmd|$result";
     }
@@ -933,7 +951,7 @@ sub ESCVP21net_openSocket($){
           Timout => 5
         );
   if (defined ($sock)){
-    main::Log3 $name, 3, "[$name]: Socket opened to $remote on port $port";
+    main::Log3 $name, 5, "[$name]: Socket opened to $remote on port $port";
   }
   else{
 	  main::Log3 $name, 3, "[$name]: NO socket opened to $remote on port $port";
@@ -963,7 +981,7 @@ sub ESCVP21net_initialize ($$) {
       $status = "init_ok";
     }
     else{
-      main::Log3 $name, 5, "[$name]: initializate gave wrong answer $result, expected $initans";
+      main::Log3 $name, 3, "[$name]: initializate gave wrong answer $result, expected $initans";
       $status = "init_error";
     }
   }
@@ -1148,7 +1166,7 @@ sub ESCVP21net_restoreJson {
   <a id="ESCVP21net-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ESCVP21net &lt;IP_Address&gt &lt;port&gt; &lt;[model]&gt</code>
+    <code>define &lt;name&gt; ESCVP21net &lt;IP_Address&gt &lt;[port]&gt; &lt;[model]&gt</code>
     <br>
     <br>This module controls Epson Seiko Devices via TCP, using VP.net and ESC/VP21 commands.
     <br>For the time being, only Epson initilization is implemented (needs a special initialization string "ESC/VP.net").
@@ -1156,7 +1174,7 @@ sub ESCVP21net_restoreJson {
     <ul>
       <li><b>IP_Address</b> - the IP Address of the projector
       </li>
-      <li><b>port</b> - ... guess? Yes, the port (Epson standard is 3629)
+      <li><b>port</b> - ... guess? Yes, the port. If not given, Epson standard port 3629 is used.
       </li>
       <li><b>model</b> - defines your type of projector. It is used for loading a suitable pre-defined command set.
         <br>No parameter or <i>default</i> will provide you with a limit "set" (PWR, MUTE, LMP, KEY, GetAll).
