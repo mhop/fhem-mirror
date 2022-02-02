@@ -1,11 +1,11 @@
-# Id ##########################################################################
+##########################################################################
 # $Id$
 
 # copyright ###################################################################
 #
 # 98_archetype.pm
 #
-# Copyright by igami
+# Originally initiated by igami
 #
 # This file is part of FHEM.
 #
@@ -840,17 +840,19 @@ sub CommandClean($$) {
 
 1;
 
+__END__
+
 # commandref ##################################################################
 =pod
 =item helper
 =item summary    inheritance attributes and defines devices
 =item summary_DE vererbt Attribute und definiert Geräte
+=encoding utf8
 
 =begin html
 
-<a name="archetype"></a>
+<a id="archetype"></a>
 <h3>archetype</h3>
-( en | <a href="commandref_DE.html#archetype">de</a> )
 <div>
   <ul>
     With an archetype, attributes are transferred to inheritors, other devices.
@@ -877,9 +879,10 @@ sub CommandClean($$) {
       </li>
     </ul>
     <br>
-    <a name="archetypecommand"></a>
-    <b>Commands</b>
+    <a id="archetype-command"></a>
+    <h4>Commands</h4>
     <ul>
+    <a id="archetype-command-clean"></a>
       <code>clean [check]</code><br>
       Defines all inheritors for all relations und inheritance all inheritors
       with the attributes specified under the attribute attribute.<br>
@@ -887,8 +890,8 @@ sub CommandClean($$) {
       inheritors are displayed.
     </ul>
     <br>
-    <a name="archetypedefine"></a>
-    <b>Define</b>
+    <a id="archetype-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>
         define &lt;name&gt; archetype [&lt;devspec&gt;] [&lt;devspec&gt;] [...]
@@ -910,10 +913,10 @@ sub CommandClean($$) {
       inheritors.
     </ul>
     <br>
-    <a name="archetypeset"></a>
-    <b>Set</b>
+    <a id="archetype-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="archetype-set-addToAttrList"></a><li>
         <code>addToAttrList &lt;attribute&gt;</code><br>
         The command is only possible for an archetype with DEF
         "derive attributes".<br>
@@ -922,7 +925,7 @@ sub CommandClean($$) {
         This can be useful to derive the alias according to a pattern.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-define"></a><li>
         <code>define inheritors</code><br>
         Defines an inheritor for all relations according to the pattern:<br>
         <ul>
@@ -937,7 +940,7 @@ sub CommandClean($$) {
         the attributes.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-derive"></a><li>
         <code>derive attributes</code><br>
         This command is only possible for an archetype with DEF
         "derive attributes".<br>
@@ -945,63 +948,67 @@ sub CommandClean($$) {
         inheritors.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-inheritance"></a><li>
         <code>inheritance</code><br>
         Inheritance all attributes specified under the attributes attribute for
         all inheritors.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-initialize"></a><li>
         <code>initialize inheritors</code><br>
         Executes all commands specified under the attributes initialize for all
         inheritors.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-raw"></a><li>
         <code>raw &lt;command&gt;</code><br>
         Executes the command for all inheritors.
       </li>
     </ul>
     <br>
-    <a name="archetypeget"></a>
-    <b>Get</b>
+    <a id="archetype-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="archetype-get-inheritors"></a><li>
         <code>inheritors</code><br>
         Displays all inheritors.
       </li>
       <br>
-      <li>
+      <a id="archetype-get-relations"></a><li>
         <code>relations</code><br>
         Displays all relations.
       </li>
       <br>
-      <li>
-        <code>pending attributes</code><br>
-        Displays all outstanding attributes specified under the attributes
-        attributes for all inheritors, which do not match the attributes of the
-        archetype.
-      </li>
-      <br>
-      <li>
-        <code>pending inheritors</code><br>
-        Displays all outstanding inheritors, which should be defined on the
-        basis of the relations
+      <a id="archetype-get-pending"></a><li>
+       <ul>
+          <li>
+            <code>pending attributes</code><br>
+            Displays all outstanding attributes specified under the attributes
+            attributes for all inheritors, which do not match the attributes of the
+            archetype.
+          </li>
+          <br>
+          <li>
+            <code>pending inheritors</code><br>
+            Displays all outstanding inheritors, which should be defined on the
+            basis of the relations
+          </li>
+       </ul>
       </li>
     </ul>
     <br>
-    <a name="archetypeattr"></a>
-    <b>Attribute</b>
+    <a id="archetype-attr"></a>
+    <h4>Attributes</h4>
     <ul>
       Notes:<br>
       All attributes that can be inherited can be pre-modified with a modifier.
       <ul>
-        <li>
+        <a id="archetype-attr-undef"></a><li>
           <code>attr archetype &lt;attribute&gt; undef:&lt;...&gt;</code><br>
           If <code>undef:</code>  preceded, the attribute is inherited only if
           the inheritors does not already have this attribute.
         </li><br>
-        <li>
+        <a id="archetype-attr-least"></a><li>
           <code>
             attr archetype &lt;attribute&gt;
             least[(&lt;seperator&gt;)]:&lt;...&gt;
@@ -1013,7 +1020,7 @@ sub CommandClean($$) {
         </li>
       </ul>
       <br>
-      <li>
+      <a id="archetype-attr-actual_attribute" data-pattern="actual_.*"></a><li>
         <code>actual_&lt;attribute&gt; &lt;value&gt;</code><br>
         &lt;value&gt; can be specified as &lt;text&gt; or {perl code}.<br>
         If the attribute &lt;attribute&gt; becomes inheritance the return
@@ -1031,17 +1038,17 @@ sub CommandClean($$) {
         by addToAttrList.<br>
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-actualTYPE"></a><li>
         <code>actualTYPE &lt;TYPE&gt;</code><br>
         Sets the TYPE of the inheritor. The default value is dummy.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-attributes"></a><li>
         <code>attributes &lt;attribute&gt; [&lt;attribute&gt;] [...]</code><br>
         Space-separated list of attributes to be inherited.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-attributesExclude"></a><li>
         <code>
           attributesExclude &lt;attribute&gt; [&lt;attribute&gt;] [...]
         </code><br>
@@ -1049,32 +1056,32 @@ sub CommandClean($$) {
         inheritors.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-autocreate"></a><li>
         <code>autocreate 0</code><br>
         The archetype does not automatically inherit attributes to new devices,
         and inheritors are not created automatically for new relations.<br>
         The default value is 1.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-defined_by"></a><li>
         <code>defined_by &lt;...&gt;</code><br>
         Auxiliary attribute to recognize by which archetype the inheritor was
         defined.
       </li>
       <br>
-      <li>
-        <code>delteAttributes 1</code><br>
+      <a id="archetype-attr-deleteAttributes"></a><li>
+        <code>deleteAttributes 1</code><br>
         If an attribute is deleted in the archetype, it is also deleted for all
         inheritors.<br>
         The default value is 0.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-disable"></a><li>
         <code>disable 1</code><br>
         No attributes are inherited and no inheritors are defined.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-initialize"></a><li>
         <code>initialize &lt;initialize&gt;</code><br>
         &lt;initialize&gt; can be specified as &lt;text&gt; or {perl code}.<br>
         The &lt;text&gt; or the return of {perl code} must be a list of FHEM
@@ -1082,23 +1089,23 @@ sub CommandClean($$) {
         inheritors when they are defined.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-metaDEF"></a><li>
         <code>metaDEF &lt;metaDEF&gt;</code><br>
         &lt;metaDEF&gt; can be specified as &lt;text&gt; or {perl code} and
         describes the structure of the DEF for the inheritors.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-metaNAME"></a><li>
         <code>metaNAME &lt;metaNAME&gt;</code><br>
         &lt;metaNAME&gt; can be specified as &lt;text&gt; or {perl code} and
         describes the structure of the name for the inheritors.
       </li>
       <br>
       <li>
-        <code><a href="#readingList">readingList</a></code>
+        <code><a href="#dummy-attr-readingList">readingList</a></code>
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-relations"></a><li>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
         The relations describes all the relations that exist for this
         archetype.<br>
@@ -1108,17 +1115,17 @@ sub CommandClean($$) {
       </li>
       <br>
       <li>
-        <code><a href="#setList">setList</a></code>
+        <code><a href="#dummy-attr-setList">setList</a></code>
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-splitRooms"></a><li>
         <code>splitRooms 1</code><br>
         Returns every room seperatly for each relation in $room.
       </li>
       <br>
     </ul>
     <br>
-    <a name="archetypeexamples"></a>
+    <a id="archetype-examples"></a>
     <b>Examples</b>
     <ul>
       <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
@@ -1159,9 +1166,8 @@ attr SVG_link_archetype attributes group</pre>
 
 =begin html_DE
 
-<a name="archetype"></a>
+<a id="archetype"></a>
 <h3>archetype</h3>
-( <a href="commandref.html#archetype">en</a> | de )
 <div>
   <ul>
     Mit einem archetype werden Attribute auf Erben (inheritors), andere
@@ -1189,9 +1195,10 @@ attr SVG_link_archetype attributes group</pre>
       </li>
     </ul>
     <br>
-    <a name="archetypecommand"></a>
-    <b>Befehle</b>
+    <a id="archetype-command"></a>
+    <h4>Befehle</h4>
     <ul>
+    <a id="archetype-command-clean"></a>
       <code>clean [check]</code><br>
       Definiert für alle Beziehungen aller archetype die Erben, vererbt für
       alle archetype die unter dem Attribut attributes angegeben Attribute auf
@@ -1200,8 +1207,8 @@ attr SVG_link_archetype attributes group</pre>
       Attribute und Erben angezeigt.
     </ul>
     <br>
-    <a name="archetypedefine"></a>
-    <b>Define</b>
+    <a id="archetype-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>
         define &lt;name&gt; archetype [&lt;devspec&gt;] [&lt;devspec&gt;] [...]
@@ -1224,10 +1231,10 @@ attr SVG_link_archetype attributes group</pre>
       Attribute eines Musters besitzen.
     </ul>
     <br>
-    <a name="archetypeset"></a>
-    <b>Set</b>
+    <a id="archetype-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="archetype-set-addToAttrList"></a><li>
         <code>addToAttrList &lt;attribute&gt;</code><br>
         Der Befehl ist nur bei einem archetype mit der DEF "derive attributes"
         m&ouml;glich.<br>
@@ -1236,7 +1243,7 @@ attr SVG_link_archetype attributes group</pre>
         Dies kann sinnvoll sein um den alias nach einem Muster abzuleiten.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-define"></a><li>
         <code>define inheritors</code><br>
         Definiert f&uuml;r alle Beziehungen einen Erben nach dem Muster:<br>
         <ul>
@@ -1251,7 +1258,7 @@ attr SVG_link_archetype attributes group</pre>
         beschrieben.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-derive"></a><li>
         <code>derive attributes</code><br>
         Der Befehl ist nur bei einem archetype mit der DEF "derive attributes"
         m&ouml;glich.<br>
@@ -1259,13 +1266,13 @@ attr SVG_link_archetype attributes group</pre>
         Attribute ab.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-inheritance"></a><li>
         <code>inheritance</code><br>
         Vererbt die eigenen unter dem Attribut attributes angegeben Attribute
         auf alle Erben.
       </li>
       <br>
-      <li>
+      <a id="archetype-set-initialize"></a><li>
         <code>initialize inheritors</code><br>
         F&uuml;hrt f&uuml;r alle Erben die unter dem Attribut initialize
         angegebenen Befehle aus.
@@ -1277,46 +1284,49 @@ attr SVG_link_archetype attributes group</pre>
       </li>
     </ul>
     <br>
-    <a name="archetypeget"></a>
-    <b>Get</b>
+    <a id="archetype-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="archetype-get-inheritors"></a><li>
         <code>inheritors</code><br>
         Listet alle Erben auf.
       </li>
       <br>
-      <li>
+      <a id="archetype-get-relations"></a><li>
         <code>relations</code><br>
         Listet alle Beziehungen auf.
       </li>
       <br>
-      <li>
-        <code>pending attributes</code><br>
-        Listet f&uuml;r jeden Erben die unter dem Attribut attributes angegeben
-        Attribute auf, die nicht mit den Attributen des archetype
-        &uuml;bereinstimmen.
-      </li>
-      <br>
-      <li>
-        <code>pending inheritors</code><br>
-        Listet alle Erben auf die aufgrund der Beziehungen noch definiert
-        werden sollen.
+      <a id="archetype-get-pending"></a><li>
+          <ul><li>
+            <code>pending attributes</code><br>
+            Listet f&uuml;r jeden Erben die unter dem Attribut attributes angegeben
+            Attribute auf, die nicht mit den Attributen des archetype
+            &uuml;bereinstimmen.
+          </li>
+          <br>
+          <li>
+            <code>pending inheritors</code><br>
+            Listet alle Erben auf die aufgrund der Beziehungen noch definiert
+            werden sollen.
+          </li>
+        </ul>
       </li>
     </ul>
     <br>
-    <a name="archetypeattr"></a>
-    <b>Attribute</b>
+    <a id="archetype-attr"></a>
+    <h4>Attribute</h4>
     <ul>
       Hinweise:
       <ul>
-        Alle Attribute die vererbt werden k&ouml;nnen, k&ouml;nnen vorab mit
+        Alle Attribute, die vererbt werden k&ouml;nnen, k&ouml;nnen vorab mit
         einem Modifikator versehen werden.
-        <li>
+        <a id="archetype-attr-undef"></a><li>
           <code>attr archetype &lt;attribute&gt; undef:&lt;...&gt;</code><br>
           Wird <code>undef:</code> vorangestellt wird das Attribut nur vererbt,
           sofern der Erbe dieses Attribut noch nicht besitzt.
         </li><br>
-        <li>
+        <a id="archetype-attr-least"></a><li>
           <code>
             attr archetype &lt;attribute&gt;
             least[(&lt;Trennzeichen&gt;)]:&lt;...&gt;
@@ -1330,7 +1340,7 @@ attr SVG_link_archetype attributes group</pre>
         </li>
       </ul>
       <br>
-      <li>
+      <a id="archetype-attr-actual_attribute" data-pattern="actual_.*"></a><li>
         <code>actual_&lt;attribute&gt; &lt;value&gt;</code><br>
         &lt;value&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden.<br>
@@ -1349,17 +1359,17 @@ attr SVG_link_archetype attributes group</pre>
         durch addToAttrList hinzugefügte Attribute.<br>
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-actualTYPE"></a><li>
         <code>actualTYPE &lt;TYPE&gt;</code><br>
         Legt den TYPE des Erben fest. Der Standardwert ist dummy.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-attributes"></a><li>
         <code>attributes &lt;attribute&gt; [&lt;attribute&gt;] [...]</code><br>
         Leerzeichen-getrennte Liste der zu vererbenden Attribute.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-attributesExclude"></a><li>
         <code>
           attributesExclude &lt;attribute&gt; [&lt;attribute&gt;] [...]
         </code><br>
@@ -1367,7 +1377,7 @@ attr SVG_link_archetype attributes group</pre>
         vererbt werden.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-autocreate"></a><li>
         <code>autocreate 0</code><br>
         Durch das archetype werden Attribute auf neue devices nicht automatisch
         vererbt und Erben werden nicht automatisch für neue Beziehungen
@@ -1375,25 +1385,25 @@ attr SVG_link_archetype attributes group</pre>
         Der Standardwert ist 1.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-defined_by"></a><li>
         <code>defined_by &lt;...&gt;</code><br>
         Hilfsattribut um zu erkennen, durch welchen archetype der Erbe
         definiert wurde.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-deleteAttributes"></a><li>
         <code>delteAttributes 1</code><br>
         Wird ein Attribut im archetype gelöscht, wird es auch bei allen Erben
         gelöscht.<br>
         Der Standardwert ist 0.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-disable"></a><li>
         <code>disable 1</code><br>
         Es werden keine Attribute mehr vererbt und keine Erben definiert.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-initialize"></a><li>
         <code>initialize &lt;initialize&gt;</code><br>
         &lt;initialize&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden.<br>
@@ -1402,23 +1412,21 @@ attr SVG_link_archetype attributes group</pre>
         werden die Erben initialisiert, wenn sie definiert werden.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-metaDEF"></a><li>
         <code>metaDEF &lt;metaDEF&gt;</code><br>
         &lt;metaDEF&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden und beschreibt den Aufbau der DEF f&uuml;r die Erben.
       </li>
       <br>
-      <li>
+      <a id="archetype-attr-metaNAME"></a><li>
         <code>metaNAME &lt;metaNAME&gt;</code><br>
         &lt;metaNAME&gt; kann als &lt;Text&gt; oder als {perl code} angegeben
         werden und beschreibt den Aufbau des Namen f&uuml;r die Erben.
       </li>
       <br>
-      <li>
-        <code><a href="#readingList">readingList</a></code>
-      </li>
+      <li><a href="#dummy-attr-readingList">readingList</a></li>
       <br>
-      <li>
+      <a id="archetype-attr-relations"></a><li>
         <code>relations &lt;devspec&gt; [&lt;devspec&gt;] [...]</code><br>
         In den &lt;relations&gt; werden alle Beziehungen beschrieben die es für
         dieses archetype gibt.<br>
@@ -1427,19 +1435,17 @@ attr SVG_link_archetype attributes group</pre>
         f&uuml;r Details der &lt;devspec&gt;.
       </li>
       <br>
-      <li>
-        <code><a href="#setList">setList</a></code>
-      </li>
+      <li><a href="#dummy-attr-setList">setList</a></li>
       <br>
-      <li>
+      <a id="archetype-attr-splitRooms"></a><li>
         <code>splitRooms 1</code><br>
         Gibt für jede Beziehung jeden Raum separat in $room zurück.
       </li>
       <br>
     </ul>
     <br>
-    <a name="archetypeexamples"></a>
-    <b>Beispiele</b>
+    <a id="archetype-examples"></a>
+    <h4>Beispiele</h4>
     <ul>
       <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
         <u>
