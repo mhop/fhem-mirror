@@ -1022,7 +1022,7 @@ sub _cfgDB_Recover {
 #			Inform user about restart or rereadcfg needed
 			$ret  = "Version 0 deleted.\n";
 			$ret .= "Version $version copied to version 0\n\n";
-			$ret .= "Please use rereadcfg or restart to activate configuration.";
+			$ret .= "Please restart FHEM to activate configuration.";
 		} else {
 			$fhem_dbh->disconnect();
 			$ret = "No entries found in version $version.\nNo changes committed to database.";
