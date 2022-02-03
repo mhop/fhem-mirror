@@ -572,7 +572,8 @@ HttpUtils_Connect2($)
       $par{SSL_verify_mode} = 0
         if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
 
-      return HttpUtils_Connect2NonblockingSSL($hash,\%par) if($hash->{callback});
+      return HttpUtils_Connect2NonblockingSSL($hash,\%par)
+        if($hash->{callback} && IO::Socket::SSL->can('connect_SSL'));
       
       eval {
         IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
