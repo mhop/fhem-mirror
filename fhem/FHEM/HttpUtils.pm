@@ -494,10 +494,12 @@ HttpUtils_Connect2NonblockingSSL($$)
 
   $hash->{conn}->blocking(0);
   $par->{SSL_startHandshake} = 0;
-  IO::Socket::SSL->start_SSL($hash->{conn}, $par);
-  if($hash->{conn}->connect_SSL && $! != EWOULDBLOCK) {
+  if(!IO::Socket::SSL->start_SSL($hash->{conn}, $par) ||
+     $hash->{conn}->connect_SSL() ||
+     $! != EWOULDBLOCK) {
     HttpUtils_Close($hash);
-    return $hash->{callback}($hash, $!);
+    return $hash->{callback}($hash,
+                "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
   }
 
   $hash->{FD} = $hash->{conn}->fileno();
@@ -507,20 +509,21 @@ HttpUtils_Connect2NonblockingSSL($$)
                     "HttpUtils_TimeoutErr", \%timerHash);
 
   $hash->{directReadFn} = sub() {
-    return if(!$hash->{conn}->connect_SSL);
+    return if(!$hash->{conn}->connect_SSL() && $! == EWOULDBLOCK);
 
     RemoveInternalTimer(\%timerHash);
     delete($hash->{FD});
     delete($hash->{directReadFn});
     delete($selectlist{$hash});
 
-    if($!) {
+    if($! || $SSL_ERROR) {
       HttpUtils_Close($hash);
-      return $hash->{callback}($hash, $!);
+      return $hash->{callback}($hash,
+                 "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
     }
 
     $hash->{hu_sslAdded} = 1;
-    return HttpUtils_Connect2($hash); # Continue with HTTP
+    return HttpUtils_Connect2($hash); # Continue with HTML-Processing
   };
 
   return undef;
@@ -573,7 +576,7 @@ HttpUtils_Connect2($)
         if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
 
       return HttpUtils_Connect2NonblockingSSL($hash,\%par)
-        if($hash->{callback} && IO::Socket::SSL->can('connect_SSL'));
+        if($hash->{callback});
       
       eval {
         IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
