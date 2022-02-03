@@ -522,7 +522,7 @@ HttpUtils_Connect2NonblockingSSL($$)
                  "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
     }
 
-    $hash->{hu_sslAdded} = 1;
+    $hash->{hu_sslAdded} = $hash->{keepalive} ? 1 : 2;
     return HttpUtils_Connect2($hash); # Continue with HTML-Processing
   };
 
@@ -590,6 +590,9 @@ HttpUtils_Connect2($)
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
   }
+
+  delete($hash->{hu_sslAdded}) # Coming from HttpUtils_Connect2NonblockingSSL
+    if($hash->{hu_sslAdded} && $hash->{hu_sslAdded} == 2);
 
   if(!$hash->{conn}) {
     undef $hash->{conn};
