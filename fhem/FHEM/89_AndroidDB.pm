@@ -4,7 +4,7 @@
 #
 # 89_AndroidDB
 #
-# Version 0.3
+# Version 0.4
 #
 # FHEM Integration for Android Devices
 #
@@ -36,7 +36,7 @@ sub AndroidDB_Initialize ($)
    $hash->{ShutdownFn} = "AndroidDB::Shutdown";
 
 	$hash->{parseParams} = 1;
-   $hash->{AttrList} = 'macros:textField-long preset:MagentaTVStick,SonyTV';
+   $hash->{AttrList} = 'macros:textField-long preset:MagentaTVStick,SonyTV presetFile';
 }
 
 package AndroidDB;
@@ -195,9 +195,10 @@ sub Attr ($@)
 				$PRESET{_custom_}{$macroName} = $macroKeycodes;
 			}
 		}
-		elsif ($attrName eq 'preset' && $attrVal =~ /^\@(.+)$/) {
-			if (!LoadPreset ($hash, $1)) {
-				Log3 $hash, 2, "Can't load preset from file $1";
+		elsif ($attrName eq 'presetFile') {
+			if (!LoadPreset ($hash, $attrVal)) {
+				Log3 $hash, 2, "Can't load preset from file $attrVal";
+				return "Cannot load preset from file $attrVal";
 			}
 		}
 	}
@@ -306,9 +307,13 @@ sub LoadPreset ($$)
 		Several macro definitions can be specified by seperating them using a blank character.
 	</li><br/>
 	<a name="preset"></a>
-	<li><b>preset {&lt;PresetName&gt;|@&lt;PresetFileName&gt;}</b><br/>
-		Select a preset of keycode macros or load a set of macros from a preset defintion
-		file. If the same macro name is defined in the selected
+	<li><b>preset &lt;PresetName&gt;</b><br/>
+		Select a preset of keycode macros.
+	</li><br/>
+	<a name="presetFile"></a>
+	<li><b>presetFile &lt;Filename&gt;</b><br/>
+	   Load a set of macros from a preset defintion file.
+		If the same macro name is defined in the selected
 		preset and in attribute 'macros', the definition in the 'macros' attribute overwrites
 		the definition in the preset.<br/>
 		A preset defintion file is using the following format:<br/>
