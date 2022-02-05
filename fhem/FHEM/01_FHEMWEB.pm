@@ -715,6 +715,7 @@ FW_addToWritebuffer($$@)
 {
   my ($hash, $txt, $callback, $nolimit) = @_;
 
+  utf8::encode($txt) if(utf8::is_utf8($txt) && $txt =~ m/[^\x00-\xFF]/ );
   if( $hash->{websocket} ) {
     my $len = length($txt);
     if( $len < 126 ) {
