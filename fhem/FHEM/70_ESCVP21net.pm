@@ -19,6 +19,7 @@
 #    1.01.05  socket log messages moved to loglevel 5
 #             prevent DevIO from overwriting STATE ($hash->{devioNoSTATE} = 1)
 #             set port 3629 as default
+#    1.01.06  added toggle, added TW7400, extended Scotty capabililties         
 #
 #
 ########################################################################################
@@ -63,13 +64,14 @@ eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS
 my %ESCVP21net_debugsets = (
   "reRead"  => ":noArg",
   "encode"  => ":noArg",
-  "decode"  => ":noArg"
+  "decode"  => ":noArg",
+  "PWSTATUS" => ":get"
 );
 
 my %ESCVP21net_defaultsets = (  
   "GetAll"  => ":noArg",
-  "PWR"     => ":get,on,off",
-  "MUTE"    => ":get,ON,OFF",
+  "PWR"     => ":get,on,off,toggle",
+  "MUTE"    => ":get,on,off,toggle",
   "LAMP"    => ":get",
   "KEY"     => "",
   "SOURCE"  => ":get,HDMI1,PC",
@@ -82,15 +84,34 @@ my %ESCVP21net_Miscsets = (
 
 # TW5650 sets
 my %ESCVP21net_TW5650sets = (
-  "BTAUDIO" => ":get,on,off",
-  "SOURCE"	=> ":get,HDMI1,HDMI2,ScreenMirror,PC,USB,LAN",
+  "AUTOKEYSTONE" => ":get,on,off",
+  "BTAUDIO" => ":get,on,off,toggle",
+  "SOURCE"	=> ":get,HDMI1,HDMI2,ScreenMirror,Input1,USB,LAN",
   "VOLset"  => ":slider,0,1,20",
   "VOL"     => ":get",
   "ASPECT"  => ":get,Auto,Auto20,Normal,Full,Zoom",
-  "ILLUM"   => ":get,on,off"
+  "ILLUM"   => ":get,on,off,toggle",
+  "LUMINANCE" => ":get,high,low,toggle",
+  "MSEL"     => ":get,black,blue,user",
+  "HREVERSE" => ":get,Flip,Normal",
+  "VREVERSE" => ":get,Flip,Normal",
+  "OVSCAN"  => ":get,off,4%,8%,auto",
+  "CMODE"   => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
+  "MCFI"    => ":get,off,low,normal,high",
+  "SIGNAL"  => ":get,none,2D,3D",
+  "SNO"     => ":get"
 );
 
-my %ESCVP21net_TW5650result;
+my %ESCVP21net_TW5650result = (
+  "CMODE:06"     => "Dynamic",
+  "CMODE:07"     => "Natural",
+  "CMODE:0C"     => "Living",
+  "CMODE:15"     => "Cinema",
+  "CMODE:17"     => "3D_Cinema",
+  "CMODE:18"     => "3D_Dynamic",
+  "LUMINANCE:00" => "high",
+  "LUMINANCE:01" => "low"
+);
 
 # EB2250 sets
 my %ESCVP21net_EB2250Usets = (
@@ -103,6 +124,7 @@ my %ESCVP21net_EB2250result;
 my %ESCVP21net_TW6100sets = (
   "SOURCE"	=> ":get,Input1,Input2,HDMI1,HDMI2,Video,Video(RCA),WirelessHD",
   "ASPECT"  => ":get,Normal,Auto,Full,Zoom,Wide",
+  "OVSCAN"  => ":get,off,4%,8%,auto"
 );
 
 # TW6100 has slightly different input identifiers. PWR is standard, just added for test
@@ -122,104 +144,272 @@ my %ESCVP21net_TW6100result = (
   "SOURCE:41"  => "Video(RCA)",
   "SOURCE:A0"  => "HDMI2",
   "SOURCE:D0"  => "WirelessHD",
-  "SOURCE:F0"  => "Chance cyclic"
+  "SOURCE:F0"  => "ChangeCyclic"
 );
+
+my %ESCVP21net_TW7400sets = (
+  "ASPECT"    => ":get,Normal,Auto,Full,Zoom",
+  "LUMINANCE" => ":get,normal,eco,medium",
+  "SOURCE"  	=> ":get,Dsub,HDMI1,HDMI2,LAN,ChangeCyclic",
+  "CMODE"     => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,DigitalCinema",
+  "4KENHANCE" => ":get,off,FullHD",
+  "MCFI"      => ":get,off,low,normal,high",
+  "HREVERSE"  => ":get,Flip,Normal",
+  "VREVERSE"  => ":get,Flip,Normal",
+  "MSEL"      => ":get,black,blue,user",
+  "ILLUM"     => ":get,on,off,toggle",
+  "PRODUCT"   => ":get,ModelName_on,ModelName_off",
+  "WLPWR"     => ":get,WLAN_on,WLAN_off",
+  "SIGNAL"    => ":get,none,2D,3D",
+  "SNO"       => ":get"
+);
+
+my %ESCVP21net_TW7400result = (
+  "LUMINANCE:00" => "normal",
+  "LUMINANCE:01" => "eco",
+  "LUMINANCE:02" => "medium",
+  "SOURCE:20"  => "Dsub",
+  "SOURCE:30"  => "HDMI1",
+  "SOURCE:53"  => "LAN",
+  "SOURCE:A0"  => "HDMI2",
+  "SOURCE:D0"  => "WirelessHD",
+  "SOURCE:F0"  => "ChangeCyclic",
+  "CMODE:06"   => "Dynamic",
+  "CMODE:07"   => "Natural",
+  "CMODE:0C"   => "BrightCinema",
+  "CMODE:15"   => "Cinema",
+  "CMODE:17"   => "3D_Cinema",
+  "CMODE:18"   => "3D_Dynamic",
+  "CMODE:22"   => "DigitalCinema"
+);
+
 
 # scotty sets - sort of godmode, gives you enhanced set possibilities
 my %ESCVP21net_Scottysets = (
-  "BTAUDIO" => ":get,on,off",
-  "SOURCE"	=> ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
-  "VOLset"  => ":slider,0,1,20",
-  "VOL"     => ":get",
-  "ASPECT"  => ":get,Auto,Auto20,Normal,Full,Zoom,Wide",
-  "ILLUM"   => ":get,on,off"
+  "4KENHANCE" => ":get,off,FullHD",
+  "ASPECT"    => ":get,Auto,Auto20,Normal,Full,Zoom,Wide",
+  "AUTOKEYSTONE" => ":get,on,off",
+  "AUDIO"     => ":get,Audio1,Audio2,USB",
+  "AVOUT"     => ":get,projection,constantly",
+  "BTAUDIO"   => ":get,on,off,toggle",
+  "CMODE"     => ":get,sRGB,Normal,Meeting,Presentation,Theatre,Game/LivingRoom,Natural,Dynamic/Sports,09,Custom,Living,BlackBoard,WhiteBoard,14,Photo,Cinema,3D_Cinema,3D_Dynamic",
+  "FREEZE"    => ":get,on,off,toggle",
+  "HREVERSE"  => ":get,Flip,Normal",
+  "ILLUM"     => ":get,on,off,toggle",
+  "LUMINANCE" => ":get,high,low,toggle",
+  "MSEL"      => ":get,black,blus,user",
+  "OVSCAN"    => ":get,off,4%,8%,auto",
+  "PRODUCT"   => ":get,ModelName_on,ModelName_off",
+  "PWSTATUS"  => ":get",
+  "SIGNAL"    => ":get,none,2D,3D",
+  "SNO"       => ":get",
+  "SOURCE"    => ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
+  "VOL"       => ":get",
+  "VOLset"    => ":slider,-1,1,20",
+  "VREVERSE"  => ":get,Flip,Normal",
+  "WLPWR"     => ":get,WLAN_on,WLAN_off"
 );
 
 my %ESCVP21net_Scottyresult = (
-  "PWR:00"     => "Standby (Net off)", 
-  "PWR:01"     => "Lamp on", 
-  "PWR:02"     => "Warmup", 
-  "PWR:03"     => "Cooldown", 
-  "PWR:04"     => "Standby (Net on)",
-  "PWR:05"     => "abnormal Standby",
-  "PWR:05"     => "unknown (05)",
-  "PWR:07"     => "WirelessHD Standby",  
-  "SOURCE:10"  => "Input1",
-  "SOURCE:20"  => "Input2",
-  "SOURCE:30"  => "HDMI1",
-  "SOURCE:40"  => "Video",
-  "SOURCE:41"  => "Video(RCA)",
-  "SOURCE:52"     => "USB",
-  "SOURCE:53"     => "LAN",
-  "SOURCE:56"  => "ScreenMirror",
-  "SOURCE:1F"     => "PC1",
-  "SOURCE:2F"     => "PC2",
-  "SOURCE:A0"  => "HDMI2",
-  "SOURCE:D0"  => "WirelessHD",
-  "SOURCE:F0"  => "Chance cyclic"
+  "CMODE:01"     => "sRGB",
+  "CMODE:02"     => "Normal",
+  "CMODE:03"     => "Meeting",
+  "CMODE:04"     => "Presentation",
+  "CMODE:05"     => "Theatre",
+  "CMODE:06"     => "Game/LivingRoom",
+  "CMODE:07"     => "Natural",
+  "CMODE:08"     => "Dynamic/Sports",
+  "CMODE:09"     => "09",
+  "CMODE:10"     => "Custom",
+  "CMODE:0C"     => "Living",
+  "CMODE:11"     => "BlackBoard",
+  "CMODE:12"     => "WhiteBoard",
+  "CMODE:13"     => "13",
+  "CMODE:14"     => "Photo",
+  "CMODE:15"     => "Cinema",
+  "CMODE:17"     => "3D_Cinema",
+  "CMODE:18"     => "3D_Dynamic",
+  "LUMINANCE:00" => "normal",
+  "LUMINANCE:01" => "eco",
+  "LUMINANCE:02" => "medium"
 );
 
 # data for sets - needed to tranlate the "nice" commands to raw values
 my %ESCVP21net_data = (
-  "PWR:on"        => "ON",
-  "PWR:off"       => "OFF",
-  "ILLUM:on"      => "01",
-  "ILLUM:off"     => "00",
-  "BTAUDIO:on"    => "01",
-  "BTAUDIO:off"   => "00",
-  "SOURCE:HDMI1"  => "30",
-  "SOURCE:HDMI2"  => "A0",
-  "SOURCE:ScreenMirror" => "56",
-  "SOURCE:PC"     => "10",
-  "SOURCE:Input1" => "10",  
-  "SOURCE:Input2" => "20",  
-  "SOURCE:Video"  => "40",  
-  "SOURCE:Video(RCA)"  => "41",  
-  "SOURCE:PC1"     => "1F",
-  "SOURCE:PC2"     => "2F",
-  "SOURCE:USB"     => "52",
-  "SOURCE:LAN"     => "53",
-  "SOURCE:WirelessHD"     => "D0",  
-  "ASPECT:Normal" => "00",
-  "ASPECT:Auto20" => "20",
-  "ASPECT:Auto"   => "30",
-  "ASPECT:Full"   => "40",
-  "ASPECT:Zoom"   => "50"
+  "4KENHANCE:off"    => "00",
+  "4KENHANCE:FullHD" => "01",
+  "ASPECT:Normal"    => "00",
+  "ASPECT:Auto20"    => "20",
+  "ASPECT:Auto"      => "30",
+  "ASPECT:Full"      => "40",
+  "ASPECT:Zoom"      => "50",
+  "AUDIO:Audio1"     => "01",
+  "AUDIO:Audio2"     => "02",
+  "AUDIO:USB"        => "03",
+  "AUTOKEYSTONE:on"  => "ON",
+  "AUTOKEYSTONE:off" => "OFF",
+  "AVOUT:projection" => "00",
+  "AVOUT:constantly" => "01",
+  "BTAUDIO:on"       => "01",
+  "BTAUDIO:off"      => "00",
+  "CMODE:sRGB"            => "01",
+  "CMODE:Normal"          => "02",
+  "CMODE:Meeting"         => "03",
+  "CMODE:Presentation"    => "04",
+  "CMODE:Theatre"         => "05",
+  "CMODE:Game/LivingRoom" => "06",
+  "CMODE:Dynamic"         => "06",
+  "CMODE:Natural"         => "07",
+  "CMODE:Dynamic/Sports"  => "08",
+  "CMODE:09"              => "09",
+  "CMODE:Custom"          => "10",
+  "CMODE:Living"          => "0C",
+  "CMODE:BrightCinema"    => "0C",
+  "CMODE:BlackBoard"      => "11",
+  "CMODE:WhiteBoard"      => "12",
+  "CMODE:13"              => "13",
+  "CMODE:Photo"           => "14",
+  "CMODE:Cinema"          => "15",
+  "CMODE:3D_Cinema"       => "17",
+  "CMODE:3D_Dynamic"      => "18",
+  "CMODE:DigitalCinema"   => "22",  
+  "FREEZE:on"        => "ON",
+  "FREEZE:off"       => "OFF",
+  "HREVERSE:Flip"    => "ON",
+  "HREVERSE:Normal"  => "OFF",
+  "ILLUM:on"         => "01",
+  "ILLUM:off"        => "00",
+  "LUMINANCE:high"   => "00",
+  "LUMINANCE:low"    => "01",
+  "LUMINANCE:normal" => "00",
+  "LUMINANCE:eco"    => "01",
+  "LUMINANCE:medium" => "02",
+  "MCFI:off"         => "00",
+  "MCFI:low"         => "01",
+  "MCFI:normal"      => "02",
+  "MCFI:high"        => "03",
+  "MSEL:black"       => "00",
+  "MSEL:blue"        => "01",
+  "MSEL:user"        => "02",
+  "MUTE:on"         => "ON",
+  "MUTE:off"        => "OFF",
+  "OVSCAN:off"      => "00",
+  "OVSCAN:4%"       => "02",
+  "OVSCAN:8%"       => "04",
+  "OVSCAN:auto"     => "A0",
+  "PRODUCT:ModelName_off" => "00",
+  "PRODUCT:ModelName_on"  => "01",
+  "PWR:on"          => "ON",
+  "PWR:off"         => "OFF",
+  "SIGNAL:none"          => "00",
+  "SIGNAL:2D"            => "01",
+  "SIGNAL:3D"            => "02",
+  "SIGNAL:not_supported" => "03",
+  "SOURCE:HDMI1"         => "30",
+  "SOURCE:HDMI2"         => "A0",
+  "SOURCE:ScreenMirror"  => "56",
+  "SOURCE:PC"            => "10",
+  "SOURCE:Input1"        => "10",  
+  "SOURCE:Input2"        => "20",  
+  "SOURCE:Video"         => "40",  
+  "SOURCE:Video(RCA)"    => "41",  
+  "SOURCE:PC1"           => "1F",
+  "SOURCE:PC2"           => "2F",
+  "SOURCE:USB"           => "52",
+  "SOURCE:LAN"           => "53",
+  "SOURCE:Dsub"          => "20",
+  "SOURCE:WirelessHD"    => "D0",  
+  "VREVERSE:Flip"        => "ON",
+  "VREVERSE:Normal"      => "OFF",
+  "WLPWR:WLAN_off"       => "00",
+  "WLPWR:WLAN_on"        => "01"
 );
 
 # hash for results from device, to transtale to nice readings
 # e.g answer "POW 04" will be shown als "Standby (Net on)" in GUI
 # will be enhanced at runtime with %<type>result
 my %ESCVP21net_defaultresults = (
-  "PWR:00"     => "Standby (Net off)", 
-  "PWR:01"     => "Lamp on", 
-  "PWR:02"     => "Warmup", 
-  "PWR:03"     => "Cooldown", 
-  "PWR:04"     => "Standby (Net on)", 
-  "PWR:05"     => "abnormal Standby",
-  "PWR:07"     => "WirelessHD Standby",  
-  "ILLUM:01"   => "on", 
-  "ILLUM:00"   => "off",
-  "BTAUDIO:01" => "on",
-  "BTAUDIO:00" => "off",
-  "SOURCE:30"  => "HDMI1",
-  "SOURCE:A0"  => "HDMI2",
-  "SOURCE:40"  => "Video",
-  "SOURCE:41"  => "Video(RCA)",
-  "SOURCE:56"  => "ScreenMirror",
-  "SOURCE:10"  => "PC",
-  "SOURCE:20"  => "Input2",
-  "SOURCE:1F"     => "PC1",
-  "SOURCE:2F"     => "PC2",
-  "SOURCE:52"     => "USB",
-  "SOURCE:53"     => "LAN",
-  "SOURCE:D0"     => "WirelessHD",  
-  "ASPECT:00"  => "Normal",
-  "ASPECT:20"  => "Auto20",
-  "ASPECT:30"  => "Auto",
-  "ASPECT:40"  => "Full",
-  "ASPECT:50"  => "Zoom",
-  "ASPECT:70"  => "Wide"
+  "4KENHANCE:00" => "off",
+  "4KENHANCE:01" => "FullHD",
+  "ASPECT:00"    => "Normal",
+  "ASPECT:20"    => "Auto20",
+  "ASPECT:30"    => "Auto",
+  "ASPECT:40"    => "Full",
+  "ASPECT:50"    => "Zoom",
+  "ASPECT:70"    => "Wide",
+  "AUDIO:01"     => "Audio1",
+  "AUDIO:02"     => "Audio2",
+  "AUDIO:03"     => "USB",
+  "AVOUT:00"     => "projection",
+  "AVOUT:01"     => "constantly",
+  "AUTOKEYSTONE:ON"  => "on",
+  "AUTOKEYSTONE:OFF" => "off",
+  "BTAUDIO:01"   => "on",
+  "BTAUDIO:00"   => "off",
+  "FREEZE:ON"    => "on",
+  "FREEZE:OFF"   => "off",
+  "HREVERSE:ON"  => "Flip",
+  "HREVERSE:OFF" => "Normal",
+  "ILLUM:01"     => "on", 
+  "ILLUM:00"     => "off",
+  "MCFI:00"      => "off",
+  "MCFI:01"      => "low",
+  "MCFI:02"      => "normal",
+  "MCFI:03"      => "high",
+  "MSEL:00"      => "black",
+  "MSEL:01"      => "blue",
+  "MSEL:02"      => "user",
+  "MUTE:ON"      => "on",
+  "MUTE:OFF"     => "off",
+  "OVSCAN:00"    => "off",
+  "OVSCAN:02"    => "4%",
+  "OVSCAN:04"    => "8%",
+  "OVSCAN:A0"    => "auto",
+  "PRODUCT:00"   => "ModelName_off",
+  "PRODUCT:01"   => "ModelName_on",
+  "PWR:00"       => "Standby (Net off)", 
+  "PWR:01"       => "Lamp on", 
+  "PWR:02"       => "Warmup", 
+  "PWR:03"       => "Cooldown", 
+  "PWR:04"       => "Standby (Net on)", 
+  "PWR:05"       => "abnormal Standby",
+  "PWR:07"       => "WirelessHD Standby",  
+  "SIGNAL:00"    => "none",
+  "SIGNAL:01"    => "2D",
+  "SIGNAL:02"    => "3D",
+  "SIGNAL:03"    => "not_supported",
+  "SOURCE:10"    => "Input1",
+  "SOURCE:1F"    => "PC1",
+  "SOURCE:20"    => "Input2",
+  "SOURCE:2F"    => "PC2",
+  "SOURCE:30"    => "HDMI1",
+  "SOURCE:40"    => "Video",
+  "SOURCE:41"    => "Video(RCA)",
+  "SOURCE:52"    => "USB",
+  "SOURCE:53"    => "LAN",
+  "SOURCE:56"    => "ScreenMirror",
+  "SOURCE:A0"    => "HDMI2",
+  "SOURCE:D0"    => "WirelessHD",
+  "SOURCE:F0"    => "ChangeCyclic",    
+  "VREVERSE:ON"  => "Flip",
+  "VREVERSE:OFF" => "Normal",
+  "WLPWR:00"     => "WLAN_off",
+  "WLPWR:01"     => "WLAN_on"
+);
+
+# mapping for toggle commands. if PWR is 01, toggle command is off etc
+my %ESCVP21net_togglemap = (
+  "BTAUDIO:00"     => "on",
+  "BTAUDIO:01"     => "off",
+  "ILLUM:00"       => "on",
+  "ILLUM:01"       => "off",
+  "LUMINANCE:00"   => "low",
+  "LUMINANCE:01"   => "high",
+  "MUTE:ON"        => "off",
+  "MUTE:OFF"       => "on",
+  "PWR:01"         => "off",
+  "PWR:04"         => "on",
+  "PWR:07"         => "on"
 );
 
 # setting to default, will be enhanced at runtime
@@ -711,12 +901,19 @@ sub ESCVP21net_setValue($){
   my $encdata = "";
   my $volfactor = 12;
   my $initstatus = "";
+  my $toggle = 0;
+  my $sendloop = "1";
   my $hash = $defs{$name};
 
   # add ? if comd is get
   if ($val eq "get"){
     $data = "$cmd?\r\n";
     $encdata = encode("utf8",$data);
+  }
+  elsif($val eq "toggle"){
+    $data = "$cmd?\r\n";
+    $encdata = encode("utf8",$data);
+    $toggle = 1;
   }
   # else get the correct raw command from data hash
   else {
@@ -747,6 +944,7 @@ sub ESCVP21net_setValue($){
   	main::Log3 $name, 3, "[$name]: setValue: no socket";
     $returnval = "$name|$cmd|no socket";
   }
+
   if (defined ($sock) && $initstatus eq "init_ok"){  
     # GetAll will query all set values which have a "get" defined
     # result of each single command will be formatted as $name|$cmd|$result
@@ -790,48 +988,76 @@ sub ESCVP21net_setValue($){
     }
     
     # continue here if not "GetAll"; $returnval will finally contain only one triple $name|$cmd|$result
-    # command to send is either "$cmd?" (for "get") or "$cmd $value" (if we want to set an value) 
-    else{
-      my $error = "ERR";
-      # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
-      my $encdatastripped = $encdata;
-      $encdatastripped =~ s/[\r\n\x00-\x19]//g;
-      main::Log3 $name, 5, "[$name]: setValue: sending raw data: $encdatastripped";
-      # finally, send command and receive result
-      send($sock , $encdata , 0);
-      recv($sock, $result, 1024, 0);
-
-      # replace \r\n from result by space (don't delete the space, it is needed!)
-      $result =~ s/[\r\n]/ /g;
-      #$result =~ s/[\r\n\x00-\x19]//g; # might work too, since \x20 is kept
-      
-      # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
-      my $resultstripped = $result;
-      $resultstripped =~ s/[\r\n\x00-\x19]//g;
-      main::Log3 $name, 5, "[$name]: setValue: received raw data: $resultstripped";
-      
-      # just another form of checking, if result contains an erorr string "ERR"
-      if (index($result, $error) != -1) {
-        $result = "ERROR!";
-      }
-      # return of ":" means OK, no value returned, i.e. we have tried to set an value
-      elsif ($result eq ":") {
-        # after set done, read current value
-        $data = "$cmd?\r\n";
-        $encdata = encode("utf8",$data);
+    # command to send is either "$cmd?" (for "get") or "$cmd $value" (if we want to set an value)
+    # run do loop at least once 
+    else {
+      do {
+        my $error = "ERR";
+        # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+        my $encdatastripped = $encdata;
+        $encdatastripped =~ s/[\r\n\x00-\x19]//g;
+        main::Log3 $name, 5, "[$name]: setValue: sending raw data: $encdatastripped";
+        # finally, send command and receive result
         send($sock , $encdata , 0);
         recv($sock, $result, 1024, 0);
+
+        # replace \r\n from result by space (don't delete the space, it is needed!)
         $result =~ s/[\r\n]/ /g;
-        # calcResult will get nicer text from ESCVP21net_calcResult
-        $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
-      }  
-      else {
-        # we got neither "ERR" nor ":" but an interpretable value
-        $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
-        main::Log3 $name, 3, "[$name]: result of $cmd is $result";
-      }
-      $returnval = "$name|$cmd|$result";
-    }
+        #$result =~ s/[\r\n\x00-\x19]//g; # might work too, since \x20 is kept
+        
+        # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+        my $resultstripped = $result;
+        $resultstripped =~ s/[\r\n\x00-\x19]//g;
+        main::Log3 $name, 5, "[$name]: setValue: received raw data: $resultstripped";
+        
+        # just another form of checking, if result contains an erorr string "ERR"
+        if (index($result, $error) != -1) {
+          $result = "ERROR!";
+        }
+        # return of ":" means OK, no value returned, i.e. we have tried to set an value
+        elsif ($result eq ":") {
+          # after set done, read current value
+          $data = "$cmd?\r\n";
+          $encdata = encode("utf8",$data);
+          send($sock , $encdata , 0);
+          recv($sock, $result, 1024, 0);
+          $result =~ s/[\r\n]/ /g;
+          # calcResult will get nicer text from ESCVP21net_calcResult
+          $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
+        }  
+        else {
+          # we got neither "ERR" nor ":" but an interpretable value
+          if ($toggle > 0){
+            my $nextcmd;
+            # result is of the form "LAMP=1234 :"
+            # so we strip first before " " to "LAMP=1234", then after "=" to "1234"	
+            my $toggleresult = (split / /, (split /=/, $result, 2)[1], 2)[0];
+            # get correct nextcmd from togglemap
+            $datakey = $cmd.":".$toggleresult;
+            if (exists($ESCVP21net_togglemap{$datakey})){
+              $nextcmd = $ESCVP21net_togglemap{$datakey};
+            }
+            Log3 $name, 5, "[$name] setValue: call Set for toggle $cmd with $nextcmd";
+            # translate "nice" nextcmd to raw value data
+            $datakey = $cmd.":".$nextcmd;
+            if (exists($ESCVP21net_data{$datakey})){
+              $nextcmd = $ESCVP21net_data{$datakey};
+            }
+            # encode raw command
+            $data = "$cmd $nextcmd\r\n";
+            $encdata = encode("utf8",$data);
+            # run do loop once more  
+            $sendloop++;
+            # don't run in toggle area during next do loop  
+            $toggle--; 
+          }
+          $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
+          main::Log3 $name, 3, "[$name]: result of $cmd is $result";
+        }
+        $sendloop--;
+        $returnval = "$name|$cmd|$result";
+      } while ($sendloop > 0);
+    } 
     # returnval now contains one or more triples, we can close the socket
     close($sock);    
   }
@@ -895,8 +1121,18 @@ sub ESCVP21net_setValueError {
 sub ESCVP21net_calcResult {
   my ($hash, $result, $cmd, $datakey, $volfactor) = @_;
   # result is of the form "LAMP=1234 :"
-  # so we strip first before " " to "LAMP=1234", then after "=" to "1234"	
-  $result = (split / /, (split /=/, $result, 2)[1], 2)[0];
+  # or something like IMEVENT=0001 03 00000002 00000000 T1 F1 : (happens sometimes at PWR off, 03 is the relevant value then)
+  if ($result =~ "IMEVENT"){
+    $result = (split / /, $result, 3)[1];
+  }
+  elsif ($result =~ "PWSTATUS"){
+    # result is something like PWSTATUS=01 00000000 00000000 T1 F1 :
+    $result = (split / /, (split /=/, $result, 2)[1], 2)[0];
+  }  
+  else{
+    # so we strip first before " " to "LAMP=1234", then after "=" to "1234"	
+    $result = (split / /, (split /=/, $result, 2)[1], 2)[0];
+  }
   
   # translate result to a nice wording, collect available results first
   my %ESCVP21net_typeresults = ESCVP21net_restoreJson($hash,".Results");
@@ -1103,11 +1339,16 @@ sub ESCVP21net_setTypeCmds ($){
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW6100result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW6100 sets and result";
   } 
+  elsif ($hash->{model} eq "TW7400"){
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW7400sets, %VP21addattrs);
+    %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW7400result);
+    main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW7400 sets and result";
+  }
   elsif ($hash->{model} eq "Scotty"){
     %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Scottysets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_Scottyresult);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded Scotty sets and result";
-  }
+  }  
   else{
     %ESCVP21net_typesets = (%ESCVP21net_defaultsets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults);
@@ -1124,7 +1365,7 @@ sub ESCVP21net_setTypeCmds ($){
 }
 
 sub ESCVP21net_rescheduleSet($){
-   # set command give too fast will be buffered and rescheduled
+   # set command give too fast or toggle required, will be buffered and rescheduled
    my ($arg) = @_;
    my ( $name, $cmd, $result ) = split( "\\|", $arg );
    my $hash = $defs{$name};
@@ -1133,6 +1374,18 @@ sub ESCVP21net_rescheduleSet($){
    RemoveInternalTimer($arg, "ESCVP21net_rescheduleSet");
    ESCVP21net_Set($hash, $name, $cmd, $result);
    main::Log3 $name, 5, "[$name]: rescheduleSet: send rescheduled command $cmd $result";
+}
+
+sub ESCVP21net_scheduleToggle($){
+   # set command for toggle required
+   my ($arg) = @_;
+   my ( $name, $cmd, $result ) = split( "\\|", $arg );
+   my $hash = $defs{$name};
+
+   main::Log3 $name, 5, "[$name]: scheduleToggle: got arg: $arg, hash: $hash, cmd: $cmd, result: $result";
+   RemoveInternalTimer($arg, "ESCVP21net_rescheduleSet");
+   ESCVP21net_Set($hash, $name, $cmd, $result);
+   main::Log3 $name, 5, "[$name]: scheduleToggle: send rescheduled command $cmd $result";
 }
 
 sub ESCVP21net_restoreJson {
@@ -1179,7 +1432,7 @@ sub ESCVP21net_restoreJson {
       <li><b>model</b> - defines your type of projector. It is used for loading a suitable pre-defined command set.
         <br>No parameter or <i>default</i> will provide you with a limit "set" (PWR, MUTE, LMP, KEY, GetAll).
         <br>You can try <i>TW5650</i> to get a typical set of implemented commands. Providing the maintainer with a suitable set for your projector will extend the module's capabilities ;-)
-        <br>Individually supported by now: TW5650, EB2250U, TW6100
+        <br>Individually supported by now: TW5650, EB2250U, TW6100, TW7400
         <br>"Hidden Feature:" Type <i>Scotty</i> will give you everything (as he does always ;) ). Not every command will work for you. You are the Captain, so decide wisely what to choose...
       </li>
       <li>Example: <code>define EPSON ESCVP21net 10.10.0.1 3629 TW5650</code>
