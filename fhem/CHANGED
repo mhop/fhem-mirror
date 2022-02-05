@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_ESCVP21net.pm: toggle, TW7400, new Readings
  - new:     lib/FHEM/Text/Unicode: apply text styles in Unicode
  - feature: 66_EseraMulti: added support for solar sensor Esera 11112
  - feature: new module 74_UnifiProtect.pm
