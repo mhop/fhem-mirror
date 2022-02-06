@@ -2898,6 +2898,11 @@ sub Calendar_UpdateCalendar($$) {
   my $t= $hash->{".fhem"}{t};
   my $removeall= $hash->{".fhem"}{removeall};
 
+  if(!defined($ical->{entries})) {
+    Log3 $hash, 1, "Calendar $name: no ical entries";
+    readingsSingleUpdate($hash, "state", "error (no ical entries)", 1);
+    return 0;
+  }
   my @entries= @{$ical->{entries}};
   my $root= @{$ical->{entries}}[0];
   my $calname= "?";
@@ -4009,7 +4014,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOn  notify MyCalendar:start:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor on")
                 } \<br>
@@ -4017,7 +4022,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOff  notify MyCalendar:end:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor off")
                 } \<br>
@@ -4027,7 +4032,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>
     define LogActors notify MyCalendar:(start|end):.*
     { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; \<br>
-      my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+      my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
      Log3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
@@ -4668,7 +4673,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOn  notify MyCalendar:start:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor on")
                 } \<br>
@@ -4676,7 +4681,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOff  notify MyCalendar:end:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor off")
                 } \<br>
@@ -4686,7 +4691,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>
     define LogActors notify MyCalendar:(start|end):.*
     { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; \<br>
-      my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+      my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
      Log3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
