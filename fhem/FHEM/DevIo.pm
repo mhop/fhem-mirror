@@ -79,6 +79,13 @@ DevIo_SimpleRead($)
   my ($hash) = @_;
   my $buf = DevIo_DoSimpleRead($hash);
 
+  if(length($buf) == 0 && $! == EWOULDBLOCK && $hash->{SSL} && $hash->{TCPDev}) {
+    my $es = $hash->{TCPDev}->errstr;
+    $hash->{wantWrite} = 1 if($es == &IO::Socket::SSL::SSL_WANT_WRITE);
+    $hash->{wantRead}  = 1 if($es == &IO::Socket::SSL::SSL_WANT_READ);
+    return "";
+  }
+
   ###########
   # Lets' try again: Some drivers return len(0) on the first read...
   if(defined($buf) && length($buf) == 0) {
