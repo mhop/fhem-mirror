@@ -5363,7 +5363,7 @@ json2nameValue($;$$$$)
       foreach my $k (keys %r2) {
         setVal($ret, $prefix, $firstLevel ? $k : "${name}_$k", $r2{$k});
       }
-      return ("error parsing '$in2'", undef) if($in2 !~ m/^\s*$/);
+      return ("error parsing (#1) '$in2'", undef) if($in2 !~ m/^\s*$/);
 
     } elsif($val =~ m/^\[/) {
       ($err, $val, $in) = lObj($val, '[', ']');
@@ -5379,7 +5379,7 @@ json2nameValue($;$$$$)
         $idx++;
       }
 
-    } elsif($val =~ m/^((-?[0-9.]+)([eE][+-]?[0-9]+)?)(.*)$/ && # 125340
+    } elsif($val =~ m/^((-?[0-9.]+)([eE][+-]?[0-9]+)?)(.*)$/s && # 125340
             looks_like_number($1)) {
       setVal($ret, $prefix, $name, $1);
       $in = $4;
@@ -5393,7 +5393,7 @@ json2nameValue($;$$$$)
       $in = $2;
 
     } else {
-      return ("error parsing '$val'", undef);
+      return ("error parsing (#2) '$val'", undef);
 
     }
     return (undef, $in);
