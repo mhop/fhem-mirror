@@ -271,6 +271,16 @@ sub ParseHttpResponse($$$) {
       readingsEndUpdate($hash, 1);      
   } elsif($data ne "") {
     my $keyValues = json2nameValue($data);
+    my $j2nvErr = $keyValues->{json2nameValueErrorText};
+    if (defined $j2nvErr) {
+      Log3 $name, 1, "TA_CMI_JSON ($name) - JSON problem: $j2nvErr. Skipping. Can be ignored if not occurring too often.";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, 'state', 'ERROR', 0);
+      readingsBulkUpdate($hash, 'error', $j2nvErr, 0);
+      readingsEndUpdate($hash, 1);      
+
+      return undef;
+    }
 
     my $canDevice = extractDeviceName($keyValues->{Header_Device});
     $hash->{CAN_DEVICE} = $canDevice;
