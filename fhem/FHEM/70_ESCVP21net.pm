@@ -1,4 +1,4 @@
-########################################################################################
+################################################################################
 # $Id$
 #
 # ESCVP21net 
@@ -8,7 +8,8 @@
 # version history
 #    0.1      first released versin for goo-willing testers
 #    0.3      bug fixes, improved handling of disconnect status
-#    1.01.01  reschedule get call if blockingFn still running (don't loose command if timeout)
+#    1.01.01  reschedule get call if blockingFn still running
+#             (don't loose command if timeout)
 #             adding TW6100
 #             handle model specific result values
 #    1.01.01  code cleanup
@@ -19,10 +20,13 @@
 #    1.01.05  socket log messages moved to loglevel 5
 #             prevent DevIO from overwriting STATE ($hash->{devioNoSTATE} = 1)
 #             set port 3629 as default
-#    1.01.06  added toggle, added TW7400, extended Scotty capabililties         
+#    1.01.06  added toggle, added TW7400, extended Scotty capabililties
+#    1.01.07  multiple checkStatusCmds, added GetStatus to set list
+#             set PWR to statusOfflineMsg if init fails
+#             force PWR check after CONNECTED from Dev_Io, some clean-up
 #
 #
-########################################################################################
+################################################################################
 #
 #  This programm is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -69,13 +73,13 @@ my %ESCVP21net_debugsets = (
 );
 
 my %ESCVP21net_defaultsets = (  
-  "GetAll"  => ":noArg",
-  "PWR"     => ":get,on,off,toggle",
-  "MUTE"    => ":get,on,off,toggle",
-  "LAMP"    => ":get",
-  "KEY"     => "",
-  "SOURCE"  => ":get,HDMI1,PC",
-  "ASPECT"  => ":get,HDMI,PC"
+  "GetAll"    => ":noArg",
+  "GetStatus" => ":noArg",
+  "ASPECT"    => ":get,HDMI,PC",
+  "KEY"       => ":get,HDMI1,PC",
+  "LAMP"      => ":get",
+  "MUTE"      => ":get,on,off,toggle",
+  "PWR"       => ":get,on,off,toggle"
 );
 
 my %ESCVP21net_Miscsets = (
@@ -84,22 +88,22 @@ my %ESCVP21net_Miscsets = (
 
 # TW5650 sets
 my %ESCVP21net_TW5650sets = (
+  "ASPECT"  => ":get,Auto,Auto20,Normal,Full,Zoom",
   "AUTOKEYSTONE" => ":get,on,off",
   "BTAUDIO" => ":get,on,off,toggle",
+  "CMODE"   => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
+  "HREVERSE" => ":get,Flip,Normal",
+  "ILLUM"   => ":get,on,off,toggle",
+  "LUMINANCE" => ":get,high,low,toggle",
+  "MCFI"    => ":get,off,low,normal,high",
+  "MSEL"     => ":get,black,blue,user",
+  "OVSCAN"  => ":get,off,4%,8%,auto",
+  "SIGNAL"  => ":get,none,2D,3D",
+  "SNO"     => ":get",
   "SOURCE"	=> ":get,HDMI1,HDMI2,ScreenMirror,Input1,USB,LAN",
   "VOLset"  => ":slider,0,1,20",
   "VOL"     => ":get",
-  "ASPECT"  => ":get,Auto,Auto20,Normal,Full,Zoom",
-  "ILLUM"   => ":get,on,off,toggle",
-  "LUMINANCE" => ":get,high,low,toggle",
-  "MSEL"     => ":get,black,blue,user",
-  "HREVERSE" => ":get,Flip,Normal",
-  "VREVERSE" => ":get,Flip,Normal",
-  "OVSCAN"  => ":get,off,4%,8%,auto",
-  "CMODE"   => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
-  "MCFI"    => ":get,off,low,normal,high",
-  "SIGNAL"  => ":get,none,2D,3D",
-  "SNO"     => ":get"
+  "VREVERSE" => ":get,Flip,Normal"
 );
 
 my %ESCVP21net_TW5650result = (
@@ -122,8 +126,8 @@ my %ESCVP21net_EB2250result;
 
 # TW6100 sets
 my %ESCVP21net_TW6100sets = (
-  "SOURCE"	=> ":get,Input1,Input2,HDMI1,HDMI2,Video,Video(RCA),WirelessHD",
   "ASPECT"  => ":get,Normal,Auto,Full,Zoom,Wide",
+  "SOURCE"	=> ":get,Input1,Input2,HDMI1,HDMI2,Video,Video(RCA),WirelessHD",
   "OVSCAN"  => ":get,off,4%,8%,auto"
 );
 
@@ -148,23 +152,30 @@ my %ESCVP21net_TW6100result = (
 );
 
 my %ESCVP21net_TW7400sets = (
-  "ASPECT"    => ":get,Normal,Auto,Full,Zoom",
-  "LUMINANCE" => ":get,normal,eco,medium",
-  "SOURCE"  	=> ":get,Dsub,HDMI1,HDMI2,LAN,ChangeCyclic",
-  "CMODE"     => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,DigitalCinema",
   "4KENHANCE" => ":get,off,FullHD",
-  "MCFI"      => ":get,off,low,normal,high",
+  "ASPECT"    => ":get,Normal,Auto,Full,Zoom",
+  "CMODE"     => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,DigitalCinema",
   "HREVERSE"  => ":get,Flip,Normal",
-  "VREVERSE"  => ":get,Flip,Normal",
-  "MSEL"      => ":get,black,blue,user",
   "ILLUM"     => ":get,on,off,toggle",
+  "LUMINANCE" => ":get,normal,eco,medium",
+  "MCFI"      => ":get,off,low,normal,high",
+  "MSEL"      => ":get,black,blue,user",
   "PRODUCT"   => ":get,ModelName_on,ModelName_off",
-  "WLPWR"     => ":get,WLAN_on,WLAN_off",
   "SIGNAL"    => ":get,none,2D,3D",
-  "SNO"       => ":get"
+  "SNO"       => ":get",
+  "SOURCE"  	=> ":get,Dsub,HDMI1,HDMI2,LAN,ChangeCyclic",
+  "VREVERSE"  => ":get,Flip,Normal",
+  "WLPWR"     => ":get,WLAN_on,WLAN_off"
 );
 
 my %ESCVP21net_TW7400result = (
+  "CMODE:06"   => "Dynamic",
+  "CMODE:07"   => "Natural",
+  "CMODE:0C"   => "BrightCinema",
+  "CMODE:15"   => "Cinema",
+  "CMODE:17"   => "3D_Cinema",
+  "CMODE:18"   => "3D_Dynamic",
+  "CMODE:22"   => "DigitalCinema",
   "LUMINANCE:00" => "normal",
   "LUMINANCE:01" => "eco",
   "LUMINANCE:02" => "medium",
@@ -173,14 +184,7 @@ my %ESCVP21net_TW7400result = (
   "SOURCE:53"  => "LAN",
   "SOURCE:A0"  => "HDMI2",
   "SOURCE:D0"  => "WirelessHD",
-  "SOURCE:F0"  => "ChangeCyclic",
-  "CMODE:06"   => "Dynamic",
-  "CMODE:07"   => "Natural",
-  "CMODE:0C"   => "BrightCinema",
-  "CMODE:15"   => "Cinema",
-  "CMODE:17"   => "3D_Cinema",
-  "CMODE:18"   => "3D_Dynamic",
-  "CMODE:22"   => "DigitalCinema"
+  "SOURCE:F0"  => "ChangeCyclic"
 );
 
 
@@ -291,16 +295,16 @@ my %ESCVP21net_data = (
   "MSEL:black"       => "00",
   "MSEL:blue"        => "01",
   "MSEL:user"        => "02",
-  "MUTE:on"         => "ON",
-  "MUTE:off"        => "OFF",
-  "OVSCAN:off"      => "00",
-  "OVSCAN:4%"       => "02",
-  "OVSCAN:8%"       => "04",
-  "OVSCAN:auto"     => "A0",
+  "MUTE:on"          => "ON",
+  "MUTE:off"         => "OFF",
+  "OVSCAN:off"       => "00",
+  "OVSCAN:4%"        => "02",
+  "OVSCAN:8%"        => "04",
+  "OVSCAN:auto"      => "A0",
   "PRODUCT:ModelName_off" => "00",
   "PRODUCT:ModelName_on"  => "01",
-  "PWR:on"          => "ON",
-  "PWR:off"         => "OFF",
+  "PWR:on"           => "ON",
+  "PWR:off"          => "OFF",
   "SIGNAL:none"          => "00",
   "SIGNAL:2D"            => "01",
   "SIGNAL:3D"            => "02",
@@ -579,7 +583,8 @@ sub ESCVP21net_Notify($$) {
       $next = gettimeofday() + $checkInterval;
       InternalTimer($next , "ESCVP21net_checkStatus", $hash);
     }
-    
+    # force first PWR check after CONNECT
+    ESCVP21net_Set($hash, $name, "PWR", "get");
   }
   if($devName eq $name && grep(m/^DISCONNECTED$/, @{$events})){
     main::Log3 $name, 5, "[$name]: Notify: got @{$events}, deleting timers";
@@ -596,6 +601,7 @@ sub ESCVP21net_Attr {
   my $checkInterval;
   my $next;
   my %ESCVP21net_typesets;
+  $attr_value = $cmd if (!$attr_value);
   main::Log3 $name, 5,"[$name]: Attr: executing $cmd $attr_name to $attr_value";
 
 	if($cmd eq "set") {
@@ -761,8 +767,12 @@ sub ESCVP21net_Callback($){
   # will be executed if connection establishment fails (see DevIo_OpenDev())
   my ($hash, $error) = @_;
   my $name = $hash->{NAME};
+  my $rv;
+  my $offlineMsg;
 
   main::Log3 $name, 3, "[$name] DevIo callback error: $error" if ($error);
+  $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
+  $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
 
   my $status = $hash->{STATE};
   if ($status eq "disconnected"){
@@ -779,11 +789,11 @@ sub ESCVP21net_Callback($){
     # check if we should update statusCheck
     my $checkInterval = AttrVal($name, "statusCheckInterval", "300");
     my $checkcmd = AttrVal($name, "statusCheckCmd", "PWR");
-    my $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
+    $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
 
     if ($checkInterval ne "off"){
       # update reading for $checkcmd with $offlineMsg
-      my $rv = readingsSingleUpdate($hash, $checkcmd, $offlineMsg, 1);
+      #$rv = readingsSingleUpdate($hash, $checkcmd, $offlineMsg, 1);
       $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
       main::Log3 $name, 5,"[$name]: [$name] DevIo callback: $checkcmd set to $offlineMsg";
       return ;
@@ -829,7 +839,7 @@ sub ESCVP21net_Set {
     $list = $list.$key.$ESCVP21net_typesets{$key}." ";    
   }
   
-  main::Log3 $name, 5, "[$name]: Set: set list is $list";
+  #main::Log3 $name, 5, "[$name]: Set: set list is $list";
 
   if (!exists($ESCVP21net_typesets{$opt})){
     return "Unknown argument $opt, please choose one of $list";
@@ -870,7 +880,9 @@ sub ESCVP21net_Set {
 ##### end of debug options
   
   # everything fine so far, so contruct $arg to pass by blockingFn  
-  my $arg = $name."|".$opt."|".$value;  
+  my $arg = $name."|".$opt."|".$value;
+  # store latest command to helper
+  $hash->{helper}{lastCommand} = $opt;  
   
   if ( !( exists( $hash->{helper}{RUNNING_PID} ) ) ) {
     $hash->{helper}{RUNNING_PID} = BlockingCall( $blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash );
@@ -903,9 +915,10 @@ sub ESCVP21net_setValue($){
   my $initstatus = "";
   my $toggle = 0;
   my $sendloop = "1";
+  my @cmds2set;
   my $hash = $defs{$name};
 
-  # add ? if comd is get
+  # add ? if cmd is get
   if ($val eq "get"){
     $data = "$cmd?\r\n";
     $encdata = encode("utf8",$data);
@@ -915,6 +928,10 @@ sub ESCVP21net_setValue($){
     $encdata = encode("utf8",$data);
     $toggle = 1;
   }
+  elsif(!defined($val)){
+    # val is empty for GetAll, GetStatus
+    $val = "none";
+  }  
   # else get the correct raw command from data hash
   else {
     $datakey = $cmd.":".$val;
@@ -936,12 +953,13 @@ sub ESCVP21net_setValue($){
   
   if (defined ($sock)){
     # send Epson initialization string, returns "init_ok" or "init_error"
-    $initstatus = ESCVP21net_initialize($name,$sock);
+    $initstatus = ESCVP21net_VP21init($name,$sock);
     main::Log3 $name, 5, "[$name]: setValue: Init sequence gave $initstatus";
   }  
   else{
     # Ups, we got no socket, i.e. no connection to Projector!
   	main::Log3 $name, 3, "[$name]: setValue: no socket";
+    $initstatus = "no socket for init";
     $returnval = "$name|$cmd|no socket";
   }
 
@@ -949,10 +967,14 @@ sub ESCVP21net_setValue($){
     # GetAll will query all set values which have a "get" defined
     # result of each single command will be formatted as $name|$cmd|$result
     # results of all commands will then be separated by ":"
-    if ($cmd eq "GetAll"){
+    if ($cmd eq "GetAll" || $cmd eq "GetStatus"){
       # collect all commands which have a "get"
-      my @cmds2set = ESCVP21net_collectGetCmds($hash);
-
+      if ($cmd eq "GetStatus"){
+        @cmds2set = ESCVP21net_collectStatusCmds($hash);
+      }
+      else{
+        @cmds2set = ESCVP21net_collectGetCmds($hash);
+      }
       for (@cmds2set){
         $cmd = $_;
         $data = "$cmd?\r\n";
@@ -1063,7 +1085,7 @@ sub ESCVP21net_setValue($){
   }
   # Ups, initialization failed
   else{
-  	main::Log3 $name, 3, "[$name]: setValue: init failed: $initstatus!";
+  	main::Log3 $name, 3, "[$name]: setValue: init failed: $initstatus";
     $returnval = "$name|$cmd|init failed";
   }
   return $returnval;
@@ -1081,6 +1103,8 @@ sub ESCVP21net_setValueDone {
   my ( $name, $cmd, $result ) = split( "\\|", $resultarr[$count] );
   my $hash = $defs{$name};
   main::Log3 $name, 5, "[$name]: setValueDone says: result is: $result, resultarray: @resultarr";
+
+  my $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
   
   readingsBeginUpdate($hash);  
   
@@ -1091,6 +1115,12 @@ sub ESCVP21net_setValueDone {
     if ($result =~ "ERROR"){
       $getcmds .=$cmd." (error),";
       $rv = $result;
+    }
+    elsif($result =~"init failed"){
+      #$getcmds .=$cmd." (init failed),";
+      $getcmds .="init failed,";
+      $rv = $result;
+      readingsBulkUpdate($hash, "PWR", $offlineMsg, 1);
     }
     else{
       $rv = readingsBulkUpdate($hash, $cmd, $result, 1);
@@ -1106,7 +1136,12 @@ sub ESCVP21net_setValueDone {
   # strip last ","
   $getcmds = substr $getcmds, 0, -1;
 
-  readingsBulkUpdate($hash, "GetAll", $getcmds, 1);
+  if ($hash->{helper}{lastCommand} eq "GetStatus"){
+    readingsBulkUpdate($hash, "GetStatus", $getcmds, 1);
+  }
+  else{
+    readingsBulkUpdate($hash, "GetAll", $getcmds, 1);
+  } 
   readingsEndUpdate($hash, 1);
   delete($hash->{helper}{RUNNING_PID});
 }
@@ -1159,7 +1194,7 @@ sub ESCVP21net_collectGetCmds {
   
   # collect all commands which contain $keyword ("get")
   my%ESCVP21net_typesets = ESCVP21net_restoreJson($hash,".Sets");
-  foreach my $cmd (keys %ESCVP21net_typesets) {
+  foreach $cmd (keys %ESCVP21net_typesets) {
     if (defined($ESCVP21net_typesets{$cmd})){
       $gets[$count] = $ESCVP21net_typesets{$cmd};
     }
@@ -1172,6 +1207,37 @@ sub ESCVP21net_collectGetCmds {
     }
   }
   main::Log3 $name, 5, "[$name]: collectGetCmds: collected setcmds: @setcmds";
+  return @setcmds;
+}
+
+sub ESCVP21net_collectStatusCmds {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $count = 0;
+  my $cmd;
+  my $keyword = "get";
+  my @setcmds;
+  my @gets;
+  
+  # collect all commands from attr statusCheckCmd which contain $keyword ("get")
+  my%ESCVP21net_typesets = ESCVP21net_restoreJson($hash,".Sets");
+
+  my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
+  @setcmds = split (' ',$checkcmd);
+
+  foreach $cmd (@setcmds) {
+    if (defined($ESCVP21net_typesets{$cmd})){
+      $gets[$count] = $ESCVP21net_typesets{$cmd};
+    }
+    else{
+      $gets[$count] = "none";
+    }
+    
+    if ($gets[$count] =~ "$keyword") {      
+      $setcmds[$count++] = $cmd;
+    }
+  }
+  main::Log3 $name, 5, "[$name]: collectStatusCmds: collected statusChk cmds: @setcmds";
   return @setcmds;
 }
 
@@ -1195,7 +1261,7 @@ sub ESCVP21net_openSocket($){
   return ($sock);
 }
 
-sub ESCVP21net_initialize ($$) {
+sub ESCVP21net_VP21init ($$) {
   # initialize VP21 connection with hex sequence
   my ($name,$sock) = @_;
   #my $name = "ESCVP21net";
@@ -1260,14 +1326,14 @@ sub ESCVP21net_checkConnection ($) {
     # no internal timer needed
     delete $hash->{helper}{nextConnectionCheck}
       if ( defined( $hash->{helper}{nextConnectionCheck} ) );    
-    main::Log3 $name, 5, "[$name]: DevIo_Open has no FD, NEXT_OPEN is $hash->{NEXT_OPEN}, no timer set";  
+    main::Log3 $name, 5, "[$name]: connectionCheck: no FD, NEXT_OPEN is $hash->{NEXT_OPEN}, no timer set";  
   }
   elsif (!($hash->{FD}) && !$hash->{NEXT_OPEN}){
     # not connected, DevIo not active, so device won't open again automatically
     # should never happen, since we called DevIo_Open above!
     # no internal timer needed, but should we ask DevIo again for opening the connection?
     #DevIo_OpenDev($hash, 1, "ESCVP21net_Init", "ESCVP21net_Callback");
-    main::Log3 $name, 5, "[$name]: DevIo_Open has no FD, no NEXT_OPEN, should not happen!";
+    main::Log3 $name, 5, "[$name]: connectionCheck: no FD, no NEXT_OPEN, should not happen!";
   }
   elsif ($hash->{FD} && $hash->{NEXT_OPEN}){
     # not connected - device was connected, but is not reachable currently
@@ -1278,7 +1344,7 @@ sub ESCVP21net_checkConnection ($) {
     #DevIo_OpenDev($hash, 1, "ESCVP21net_Init", "ESCVP21net_Callback");
     delete $hash->{helper}{nextConnectionCheck}
       if ( defined( $hash->{helper}{nextConnectionCheck} ) );
-    main::Log3 $name, 5, "[$name]: DevIo_Open has FD and NEXT_OPEN, try to reconnect periodically";
+    main::Log3 $name, 5, "[$name]: connectionCheck: FD and NEXT_OPEN, Dev_Io will reconnect periodically";
   }
   elsif ($hash->{FD} && !$hash->{NEXT_OPEN}){
     # device is connectd, or seems to be (since broken connection is not detected by DevIo!)
@@ -1288,7 +1354,7 @@ sub ESCVP21net_checkConnection ($) {
     my $next = gettimeofday() + $checkInterval; # if checkInterval is off, we won't reach this line
     $hash->{helper}{nextConnectionCheck} = $next;
     InternalTimer( $next, "ESCVP21net_checkConnection", $hash);
-    main::Log3 $name, 5, "[$name]: DevIo_Open has FD but no NEXT_OPEN, next timer set";
+    main::Log3 $name, 5, "[$name]: connectionCheck: FD but no NEXT_OPEN, next connection timer set";
   }  
 }
 
@@ -1299,7 +1365,10 @@ sub ESCVP21net_checkStatus ($){
   my $name = $hash->{NAME};
   
   my $checkInterval = AttrVal( $name, "statusCheckInterval", "300" );
-  my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
+  # changed for multiple statusCheckCmds
+  #my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
+  my $checkcmd = "GetStatus";
+
   my $next;
   
   if ($checkInterval eq "off"){
@@ -1307,14 +1376,51 @@ sub ESCVP21net_checkStatus ($){
     main::Log3 $name, 5,"[$name]: checkStatus: status timer removed";
     return ;
   }
-  else{
+  # else{
+  #   my $value = "get";
+  #   ESCVP21net_Set($hash, $name, $checkcmd, $value);
+  #   $next = gettimeofday() + $checkInterval;
+  #   $hash->{helper}{nextStatusCheck} = $next;
+  #   InternalTimer( $next, "ESCVP21net_checkStatus", $hash);
+  #   main::Log3 $name, 5,"[$name]: checkStatus: next status timer set";
+  # }
+
+  #### check if timer is required, see connectionCheck
+  if (!($hash->{FD}) && $hash->{NEXT_OPEN}) {
+    # device was connected, but TCP timeout reached
+    # DevIo tries to re-open after NEXT_OPEN
+    # no internal timer needed
+    delete $hash->{helper}{nextStatusCheck}
+      if ( defined( $hash->{helper}{nextStatusCheck} ) );    
+    main::Log3 $name, 5, "[$name]: checkStatus: no FD, NEXT_OPEN is $hash->{NEXT_OPEN}, no timer set";  
+  }
+  elsif (!($hash->{FD}) && !$hash->{NEXT_OPEN}){
+    # not connected, DevIo not active, so device won't open again automatically
+    # should never happen, since we called DevIo_Open above!
+    # no internal timer needed, but should we ask DevIo again for opening the connection?
+    main::Log3 $name, 5, "[$name]: checkStatus:no FD, no NEXT_OPEN, should not happen!";
+  }
+  elsif ($hash->{FD} && $hash->{NEXT_OPEN}){
+    # not connected - device was connected, but is not reachable currently
+    # DevIo tries to connect again at NEXT_OPEN
+    # should we try to clean up by closing and reopening?
+    # no internal timer needed
+    delete $hash->{helper}{nextStatusCheck}
+      if ( defined( $hash->{helper}{nextStatusCheck} ) );
+    main::Log3 $name, 5, "[$name]: checkStatus: FD and NEXT_OPEN, Dev_Io will reconnect periodically";
+  }
+  elsif ($hash->{FD} && !$hash->{NEXT_OPEN}){
+    # device is connected, or seems to be (since broken connection is not detected by DevIo!)
+    # normal state when device is on and reachable
+    # or when it was on, turned off, but DevIo did not recognize (TCP timeout not reached)
+    # internal timer makes sense to check, if device is really reachable
     my $value = "get";
     ESCVP21net_Set($hash, $name, $checkcmd, $value);
-    $next = gettimeofday() + $checkInterval;
+    $next = gettimeofday() + $checkInterval; # if checkInterval is off, we won't reach this line
     $hash->{helper}{nextStatusCheck} = $next;
     InternalTimer( $next, "ESCVP21net_checkStatus", $hash);
-    main::Log3 $name, 5,"[$name]: checkStatus: next status timer set";
-  }  
+    main::Log3 $name, 5, "[$name]: checkStatus: FD but no NEXT_OPEN, next status timer set";
+  }
 }
 
 sub ESCVP21net_setTypeCmds ($){
@@ -1419,7 +1525,7 @@ sub ESCVP21net_restoreJson {
   <a id="ESCVP21net-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ESCVP21net &lt;IP_Address&gt &lt;[port]&gt; &lt;[model]&gt</code>
+    <code>define &lt;name&gt; ESCVP21net &lt;IP_Address&gt [&lt;port&gt;] [&lt;model&gt;]</code>
     <br>
     <br>This module controls Epson Seiko Devices via TCP, using VP.net and ESC/VP21 commands.
     <br>For the time being, only Epson initilization is implemented (needs a special initialization string "ESC/VP.net").
@@ -1430,7 +1536,7 @@ sub ESCVP21net_restoreJson {
       <li><b>port</b> - ... guess? Yes, the port. If not given, Epson standard port 3629 is used.
       </li>
       <li><b>model</b> - defines your type of projector. It is used for loading a suitable pre-defined command set.
-        <br>No parameter or <i>default</i> will provide you with a limit "set" (PWR, MUTE, LMP, KEY, GetAll).
+        <br>No parameter or <i>default</i> will provide you with a limit "set" (PWR, MUTE, LAMP, KEY, GetAll, GetStatus).
         <br>You can try <i>TW5650</i> to get a typical set of implemented commands. Providing the maintainer with a suitable set for your projector will extend the module's capabilities ;-)
         <br>Individually supported by now: TW5650, EB2250U, TW6100, TW7400
         <br>"Hidden Feature:" Type <i>Scotty</i> will give you everything (as he does always ;) ). Not every command will work for you. You are the Captain, so decide wisely what to choose...
@@ -1467,9 +1573,13 @@ sub ESCVP21net_restoreJson {
     </li>
     <br>
     <li>GetAll
-      <br>This is a little bit special - it does not send just one command to the projector, but will select <b>every</b> command defined which has a <b>get</b> option, send it to the projector and update the correspnding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
+      <br>This is a little bit special - it does not send just one command to the projector, but will select <b>every</b> command defined which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetAll is shown in the <b>GetAll</b> reading. It will either show the read commands, or inform if an error was received.
     </li>
+    <li>GetStatus
+      <br>Also special - also does not send just one command to the projector, but will select <b>every</b> command you defined in attr "statusCheckCmd" which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
+      <br>The status of GetStatus is shown in the <b>GetStatus</b> reading. It will either show the read commands, or inform if an error was received.
+    </li>    
   </ul>
   <br>
 
@@ -1503,8 +1613,9 @@ sub ESCVP21net_restoreJson {
     </li>
     <br>
     <li>statusCheckCmd
-      <br><i>(any command you set)</i>
-      <br>Defines the command used by statusCheckIntervall. Default: PWR to get power status.
+      <br><i>(any command(s) you set)</i>
+      <br>Defines the command(s) used by statusCheckIntervall. Multiple commands can specified, e.g. <i>PWR LAMP</i>. Default: PWR to get power status.
+      <br>Wrong commands or commands without a <i>get</i> will be ignored.
     </li>
     <br>            
     <li>statusOfflineMsg
