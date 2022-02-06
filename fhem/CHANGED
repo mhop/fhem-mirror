@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  70_DENON_AVR: added and fixed readings and commands (thx All-Ex)
  - bugfix:  72_TA_CMI_JSON: skipping invalid JSON
  - feature: 50_Signalbot: text formatting and emoticons via unicode
  - feature: 70_ESCVP21net.pm: toggle, TW7400, new Readings

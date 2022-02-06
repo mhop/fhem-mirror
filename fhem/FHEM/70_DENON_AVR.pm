@@ -71,7 +71,7 @@ my $DENON_db = {
 		'FDL'	=> 'Front-Dolby-Left',
 		'FDR'	=> 'Front-Dolby-Right',
 		'SDL'	=> 'Surround-Dolby-Left',
-		'SDR'	=> 'Surround,Dolby-Right',
+		'SDR'	=> 'Surround-Dolby-Right',
 		'BDL'	=> 'Back-Dolby-Left',
 		'BDR'	=> 'Back-Dolby-Right',
 		'SHL'	=> 'Surround-Height-Left',
@@ -184,11 +184,12 @@ my $DENON_db = {
 		'Virtual' 					=> 'VIRTUAL',
 		'Left' 						=> 'LEFT',
 		'Right' 					=> 'RIGHT',
-		'Quick1' 					=> 'QUICK1',
-		'Quick2' 					=> 'QUICK2',
-		'Quick3' 					=> 'QUICK3',
-		'Quick4' 					=> 'QUICK4',
-		'Quick5' 					=> 'QUICK5',
+		'Quick0' 					=> '0',
+		'Quick1' 					=> '1',
+		'Quick2' 					=> '2',
+		'Quick3' 					=> '3',
+		'Quick4' 					=> '4',
+		'Quick5' 					=> '5',
 		'Smart1' 					=> 'SMART1',
 		'Smart2' 					=> 'SMART2',
 		'Smart3' 					=> 'SMART3',
@@ -218,6 +219,8 @@ my $DENON_db = {
 		'Dolby_Audio_Digital-Neural:X'		=> 'DOLBY AUDIO-DD+NEURAL:X',
 		'Neural:X'					=> 'NEURAL:X',
 		'Virtual' 					=> 'VIRTUAL',
+		'Left'						=> 'LEFT',
+		'Right'						=> 'RIGHT',
 	},
 	 'MS-set_surroundMode' => {                    #to set surroundMode
 		'Movie' 						=> 'MOVIE',
@@ -275,6 +278,16 @@ my $DENON_db = {
 		'TONE CTRL' => 'toneControl',
 		'DRC'       => 'dynamicCompression',
 		'LFC'       => 'audysseyLFC',
+		'CNTAMT'	=> { 
+			'CNTAMT' => 'audysseyLFCAmount',
+			'1' => '1',
+			'2' => '2',
+			'3' => '3',
+			'4' => '4',
+			'5' => '5',
+			'6' => '6',
+			'7' => '7',
+		},	
 		'LFE'       => 'lowFrequencyEffects',
 		'BAS'       => 'bass',
 		'TRE'       => 'treble',
@@ -297,6 +310,13 @@ my $DENON_db = {
 			'OFF' => 'off',
 		},
 		'DYNEQ' 	=> 'dynamicEQ',
+		'REFLEV' 	=> {
+			'REFLEV' 	=> 'dynamicEQRefLevelOffset',
+			'0' 		=> '0',
+			'5' 		=> '5',
+			'10' 		=> '10',
+			'15' 		=> '15',
+		},				
 		'DYNVOL' 	=> {
 			'DYNVOL' 	=> 'dynamicVolume',
 			'HEV' 		=> 'heavy',
@@ -310,7 +330,13 @@ my $DENON_db = {
 		'BAL' 		=> 'balance',
 		'SDB' 		=> 'sdb',
 		'SDI' 		=> 'sourceDirect',
-		
+		'RSTR' 		=> { 
+			'RSTR' => 'audioRestorer',
+			'OFF' => 'off',
+			'LOW' => 'low',
+			'MED' => 'medium',
+			'HI' => 'high',
+		},
 	},
 	'PV' => {
 		'OFF' 		=> 'Off',
@@ -525,7 +551,13 @@ my $DENON_db = {
 					'27' => 'na 27',
 					'28' => 'na 28',
 					'29' => 'na 29',
-					'30' => 'na 30',				
+					'30' => 'na 30',		
+					'31' => 'na 31',		
+					'32' => 'DTS:X MSTR',		
+					'33' => 'na 33',		
+					'34' => 'na 34',		
+					'35' => 'na 35',		
+					'36' => 'na 36',		                    
 				},
 			},
 		},
@@ -681,7 +713,7 @@ my $DENON_db = {
 		'DOLBY AUDIO-DD+' => 'Dolby Audio - Dolby Digital Plus',
 		'DOLBY AUDIO-DD+DSUR' => 'Dolby Audio - Dolby Digital + DSur',
 		'DOLBY AUDIO-DD+NEURAL:X' => 'Dolby Audio - Dolby Digital + Neural:X',
-		'DOLBY AUDIO-DSUR' => 'Dolby Audio - Dolby Surround',
+		'DOLBY AUDIO-DSUR' => 'Dolby Audio + DSur',
 		'DOLBY AUDIO-TRUEHD' => 'Dolby Audio - Dolby TrueHD',
 		'DOLBY AUDIO-TRUEHD+DSUR' => 'Dolby Audio - TrueHD + DSur',
 		'DOLBY AUDIO-TRUEHD+NEURAL:X' => 'Dolby Audio - TrueHD + Neural:X',
@@ -737,10 +769,12 @@ my $DENON_db = {
 		'DTS HD TR' => 'DTS-HD TR',
 		'DTS HD' => 'DTS-HD',
 		'DTS HD+DS' => 'DTS-HD+DS',
+		'DTS HD+DSUR' => 'DTS-HD + DSur',
 		'DTS HD+NEO:6' => 'DTS-HD+Neo:6',
 		'DTS HD+NEO:X C' => 'DTS-HD+Neo:X C',
 		'DTS HD+NEO:X G' => 'DTS-HD+Neo:X G',
 		'DTS HD+NEO:X M' => 'DTS-HD+Neo:X M',
+		'DTS HD+NEURAL:X' => 'DTS-HD + Neural:X',
 		'DTS HD+PL2X C' => 'DTS-HD+PL2X C',
 		'DTS HD+PL2X M' => 'DTS-HD+PL2X M',
 		'DTS HD+PL2Z H' => 'DTS-HD+PL2Z H',
@@ -762,11 +796,15 @@ my $DENON_db = {
 		'DTS+PL2Z H' => 'DTS+PL2Z H',
 		'DTS96 ES MTRX' => 'DTS 96 ES MTRX',		
 		'DTS96/24' => 'DTS 96/24',
+		'DTS:X MSTR' => 'DTX:X MSTR',
+		'HD+NEURAL:X' => 'DTS-HD + Neural:X',
 		'M CH IN+DOLBY EX' => 'Multi Ch In',
 		'M CH IN+DS' => 'Multi Ch In+DS',
+		'M CH IN+DSUR' => 'Multi Ch In + DSur',
 		'M CH IN+NEO:X C' => 'Multi Ch In+Neo:X C',
 		'M CH IN+NEO:X G' => 'Multi Ch In+Neo:X G',
 		'M CH IN+NEO:X M' => 'Multi Ch In+Neo:X M',
+		'M CH IN+NEURAL:X' => 'Multi Ch In + Neural:X',
 		'M CH IN+PL2X C' => 'Multi Ch In+PL2X C',
 		'M CH IN+PL2X M' => 'Multi Ch In+PL2X M',
 		'M CH IN+PL2Z H' => 'Multi Ch In+PL2Z H',
@@ -776,7 +814,7 @@ my $DENON_db = {
 		'MULTI CH IN' => 'Multi Ch In',
 		'NEO:6 C DSX' => 'Neo:6 C DSX',
 		'NEO:6 M DSX' => 'Neo:6 M DSX',
-		'NEURAL:X'	=> 'DTS Neural:X',
+		'NEURAL:X'	=> 'DTS + Neural:X',
 		'PL DSX' => 'PL DSX',
 		'PL2 C DSX' => 'PL2 C DSX',
 		'PL2 G DSX' => 'PL2 G DSX',
@@ -1602,6 +1640,7 @@ DENON_AVR_Parse(@)
 		}
 		readingsBulkUpdate($hash, "power", $power);
 		readingsBulkUpdate($hash, "state", $power);
+		DENON_AVR_Write($hash, "TR?", "query");					#Query Trigger Control
 		DENON_AVR_GetStateAV($hash);
 
 		$return = $power;
@@ -1689,6 +1728,24 @@ DENON_AVR_Parse(@)
 		$return = "volume/volumeStraight ".($volume / 10)."/".($volume / 10 - 80);
 		$hash->{helper}{volume} = $volume / 10;
 	}
+    
+	#channel volume
+	elsif ($msg =~ /^CV(.+)\s(\d\d\d?)/)
+	{
+		my $speaker = $1;
+		my $level = $2;
+        if (length($level) == 2)
+		{
+			$level = $level."0";
+		}
+        if (defined($DENON_db->{"CV"}->{$speaker})) {
+            my $reading = "channelVolume" . $DENON_db->{"CV"}{$speaker};
+            my $value = $level / 10 - 50;
+            readingsBulkUpdate($hash, $reading, $value);
+            $return = $reading." ".$value;
+        }
+	}    
+    
 	#Sound Parameter
 	elsif ($msg =~ /^PS(.+)/)
 	{
@@ -1763,11 +1820,25 @@ DENON_AVR_Parse(@)
 			readingsBulkUpdate($hash, $name, $status) if($name ne "unknown" || $status ne "unknown");
 			$return = $name." ".$status;
 		}
+		elsif($parameter =~ /^(CNTAMT) 0(\d)/)
+		{
+			my $name = DENON_GetValue('PS', $1, $1);
+			my $status = DENON_GetValue('PS', $1, $2);
+			readingsBulkUpdate($hash, $name, $status) if($name ne "unknown" || $status ne "unknown");
+			$return = $name." ".$status;
+		}		
 		elsif($parameter =~ /^(DYNEQ) (.+)/)
 		{
 			my $name = DENON_GetValue('PS', $1);
 			readingsBulkUpdate($hash, $name, lc($2)) if($name ne "unknown");
 			$return = $name." ".lc($2);
+		}
+		elsif($parameter =~ /^(REFLEV) (\d\d?)/)
+		{
+			my $name = DENON_GetValue('PS', $1, $1);
+			my $status = DENON_GetValue('PS', $1, $2);
+			readingsBulkUpdate($hash, $name, $status) if($name ne "unknown" || $status ne "unknown");
+			$return = $name." ".$status;
 		}
 		elsif($parameter =~ /^(DYNVOL) (.+)/)
 		{
@@ -1776,6 +1847,13 @@ DENON_AVR_Parse(@)
 			readingsBulkUpdate($hash, $name, $status) if($name ne "unknown" || $status ne "unknown");
 			$return = $name." ".$status;
 		}
+		elsif($parameter =~ /^(RSTR) (.+)/)
+		{
+			my $name = DENON_GetValue('PS', $1, $1);
+			my $status = DENON_GetValue('PS', $1, $2);
+			readingsBulkUpdate($hash, $name, $status) if($name ne "unknown" || $status ne "unknown");
+			$return = $name." ".$status;
+		}		
 	}
 	#Input select
 	elsif ($msg =~ /^SI(.+)/)
@@ -1836,8 +1914,8 @@ DENON_AVR_Parse(@)
 	#quickselect
 	elsif ($msg =~ /^MSQUICK(.+)/)
 	{
-		my $quick = DENON_GetValue("MS", "QUICK".$1);
-		if ($1 =~ /^(1|2|3|4)/) {
+		my $quick = DENON_GetValue("MS", "Quick".$1);
+		if ($1 =~ /^(0|1|2|3|4)/) {
 			readingsBulkUpdate($hash, "quickselect", $quick) if($quick ne "unknown");
 			$return = "quickselect ".$quick;
 		}
@@ -2312,7 +2390,7 @@ DENON_AVR_Parse(@)
 	}
 	else 
 	{
-		if($msg eq "CV END")
+		if($msg eq "CVEND")
 		{
 			$return = "ignored";	
 		}
@@ -2452,8 +2530,11 @@ DENON_AVR_Set($@)
 	my @resolution = ();
 	my @resolutionHDMI = ();
 	my @tuner = ();
+	my @audysseyLFCAmount = ();
 	my @multiEQ = ();
+	my @dynamicEQRefLevelOffset = ();
 	my @dynvol = ();
+	my @audioRestorer = ();
 	my $select = "quick";
 	my $sliderSraight = "-80,0.5,18,1 ";
 	my $slider = "0,0.5,98,1 ";
@@ -2515,15 +2596,30 @@ DENON_AVR_Set($@)
 	foreach my $key (sort(keys %{$DENON_db->{'TM'}{'AN'}})) {
 		push(@tuner, $key);	
 	}
+
+	foreach my $key (sort(keys %{$DENON_db->{'PS'}{'CNTAMT'}})) {
+		my $value = $DENON_db->{'PS'}{'CNTAMT'}{$key};
+		push(@audysseyLFCAmount, $value) if ($key ne "CNTAMT");	
+	}
 	
 	foreach my $key (sort(keys %{$DENON_db->{'PS'}{'MULTEQ'}})) {
 		my $value = $DENON_db->{'PS'}{'MULTEQ'}{$key};
 		push(@multiEQ, $value) if ($key ne "MULTEQ");	
 	}
+
+	foreach my $key (sort(keys %{$DENON_db->{'PS'}{'REFLEV'}})) {
+		my $value = $DENON_db->{'PS'}{'REFLEV'}{$key};
+		push(@dynamicEQRefLevelOffset, $value) if ($key ne "REFLEV");	
+	}
 	
 	foreach my $key (sort(keys %{$DENON_db->{'PS'}{'DYNVOL'}})) {
 		my $value = $DENON_db->{'PS'}{'DYNVOL'}{$key};
 		push(@dynvol, $value) if ($key ne "DYNVOL");	
+	}
+
+	foreach my $key (sort(keys %{$DENON_db->{'PS'}{'RSTR'}})) {
+		my $value = $DENON_db->{'PS'}{'RSTR'}{$key};
+		push(@audioRestorer, $value) if ($key ne "RSTR");	
 	}
 	
 	if(AttrVal($name, "brand", "Denon") eq "Marantz")
@@ -2555,7 +2651,10 @@ DENON_AVR_Set($@)
 			"resolution:" . join(",", @resolution) . " " .
 			"resolutionHDMI:" . join(",", @resolutionHDMI) . " " .
 			"multiEQ:" . join(",", @multiEQ) . " " .
+			"audysseyLFCAmount:" . join(",", @audysseyLFCAmount) . " " .
+			"dynamicEQRefLevelOffset:" . join(",", @dynamicEQRefLevelOffset) . " " .
 			"dynamicVolume:" . join(",", @dynvol) . " " .
+			"audioRestorer:" . join(",", @audioRestorer) . " " .
 			"lowFrequencyEffects:slider,-10,1,0 " .
 	        "bass:slider,-6,1,6 treble:slider,-6,1,6 " .
 		    "channelVolume:" . join(",", @channel) . ",FactoryDefaults" . " " . 
@@ -3025,6 +3124,13 @@ DENON_AVR_Set($@)
 		readingsEndUpdate($hash, 1);
 		return undef;
 	}
+	elsif($a[1] eq "dynamicEQRefLevelOffset")
+	{
+		DENON_AVR_Write($hash, 'PSREFLEV '.uc($a[2]), "dynamicEQRefLevelOffset");
+		readingsBulkUpdate($hash, "dynamicEQRefLevelOffset", $a[2]);
+		readingsEndUpdate($hash, 1);
+		return undef;
+	}	
 	elsif($a[1] eq "dynamicVolume")
 	{
 		my $cmd = DENON_GetKey("PS", "DYNVOL", $a[2]);
@@ -3040,11 +3146,26 @@ DENON_AVR_Set($@)
 		readingsEndUpdate($hash, 1);
 		return undef;
 	}
+	elsif($a[1] eq "audysseyLFCAmount")
+	{
+		DENON_AVR_Write($hash, 'PSCNTAMT 0'.$a[2], "audysseyLFCAmount");
+		readingsBulkUpdate($hash, "audysseyLFCAmount", $a[2]);
+		readingsEndUpdate($hash, 1);
+		return undef;
+	}	
 	elsif($a[1] eq "lowFrequencyEffects")
 	{
 		my $volume = sprintf ('%02d', $a[2]);
 		DENON_AVR_Write($hash, "PSLFE ".$volume, "lowFrequencyEffects");
 		readingsBulkUpdate($hash, "lowFrequencyEffects", ($volume * -1).$dezibel);
+		readingsEndUpdate($hash, 1);
+		return undef;
+	}
+	elsif($a[1] eq "audioRestorer")
+	{
+		my $cmd = DENON_GetKey("PS", "RSTR", $a[2]);
+		DENON_AVR_Write($hash, "PSRSTR ".$cmd, "audioRestorer");
+		readingsBulkUpdate($hash, "audioRestorer", $cmd);
 		readingsEndUpdate($hash, 1);
 		return undef;
 	}
@@ -3491,7 +3612,7 @@ DENON_AVR_Command_StatusRequest($)
 	DENON_AVR_Write($hash, "MNMEN?", "query");				#menu
 	DENON_AVR_Write($hash, "MNZST?", "query");				#All Zone Stereo
 	DENON_AVR_Write($hash, "NSE", "query"); 				#Onscreen Display Information List
-	DENON_AVR_Write($hash, "CV ?", "query"); 				#channel volume
+	DENON_AVR_Write($hash, "CV?", "query"); 				#channel volume
 	DENON_AVR_Write($hash, "SSINFFRM ?", "query"); 				#Firmware-Infos
 #	DENON_AVR_Write($hash, "SR?", "query"); 				#record select - older models
   DENON_AVR_Write($hash, "SSVCTZMA ?", "query"); 				#channel volume new
@@ -3509,8 +3630,11 @@ DENON_AVR_Command_StatusRequest($)
 	DENON_AVR_Write($hash, "PSLOM ?", "query");				#Loudness Management
 	DENON_AVR_Write($hash, "PSMULTEQ: ?", "query");			#MULT EQ
 	DENON_AVR_Write($hash, "PSDYNEQ ?", "query");			#DYNAMIC EQ
+	DENON_AVR_Write($hash, "PSREFLEV ?", "query");			#DYNAMIC EQ Reference Level Offset
 	DENON_AVR_Write($hash, "PSDYNVOL ?", "query");			#Dynamic Volume
 	DENON_AVR_Write($hash, "PSLFC ?", "query");				#Audyssey LFC Status
+	DENON_AVR_Write($hash, "PSCNTAMT ?", "query");			#Audyssey LFC Containment Amount
+	DENON_AVR_Write($hash, "PSRSTR ?", "query");			#Audio Restorer
 	
 	return "StatusRequest finished!";
 }
@@ -3873,8 +3997,14 @@ sub DENON_AVR_RClayout() {
 					<b>allZoneStereo</b> &nbsp;&nbsp;-&nbsp;&nbsp; set allZoneStereo on/off
 				</li>
 				<li>
+					<b>audioRestorer</b> &nbsp;&nbsp;-&nbsp;&nbsp; set audioRestorer off/low/medium/high
+				</li>
+				<li>
 					<b>audysseyLFC</b> &nbsp;&nbsp;-&nbsp;&nbsp; set audysseyLFC on/off
 				</li>
+				<li>
+					<b>audysseyLFCAmount</b> &nbsp;&nbsp;-&nbsp;&nbsp; set audysseyLFCAmount (1 - 7)
+				</li>				
 				<li>
 					<b>autoStandby</b> &nbsp;&nbsp;-&nbsp;&nbsp; set auto standby (off, 15,30,60 min)
 				</li>
@@ -3896,6 +4026,9 @@ sub DENON_AVR_RClayout() {
 				<li>
 					<b>dynamicEQ</b> &nbsp;&nbsp;-&nbsp;&nbsp; set dynamicEQ on/off
 				</li>
+				<li>
+					<b>dynamicEQRefLevelOffset</b> &nbsp;&nbsp;-&nbsp;&nbsp; set dynamicEQRefLevelOffset (0, 5, 10, 15)
+				</li>				
 				<li>
 					<b>dynamicVolume</b> &nbsp;&nbsp;-&nbsp;&nbsp; set dynamicEQ off/light/medium/heavy
 				</li>
@@ -4052,6 +4185,9 @@ sub DENON_AVR_RClayout() {
 			<ul>
 				<li>
 					<b>ampAssign</b> &nbsp;&nbsp;-&nbsp;&nbsp; amplifier settings for AV receiver (5.1, 7.1, 9.1,...)
+				</li>
+				<li>
+					<b>audioRestorer</b> &nbsp;&nbsp;-&nbsp;&nbsp; audioRestorer Level (off, low, medium, high)
 				</li>
 				<li>
 					<b>autoStandby</b> &nbsp;&nbsp;-&nbsp;&nbsp; auto standby state
@@ -4242,8 +4378,14 @@ sub DENON_AVR_RClayout() {
 					<b>allZoneStereo</b> &nbsp;&nbsp;-&nbsp;&nbsp; allZoneStereo an/aus
 				</li>
 				<li>
+					<b>audioRestorer</b> &nbsp;&nbsp;-&nbsp;&nbsp; set audioRestorer off/low/medium/high
+				</li>
+				<li>
 					<b>audysseyLFC</b> &nbsp;&nbsp;-&nbsp;&nbsp; audysseyLFC an/aus
 				</li>			
+				<li>
+					<b>audysseyLFCAmount</b> &nbsp;&nbsp;-&nbsp;&nbsp; set audysseyLFCAmount (1 - 7)
+				</li>
 				<li>
 					<b>autoStandby</b> &nbsp;&nbsp;-&nbsp;&nbsp; Zeit f&uuml;r den Auto-Standby setzen
 				</li>
@@ -4265,6 +4407,9 @@ sub DENON_AVR_RClayout() {
 				<li>
 					<b>dynamicEQ</b> &nbsp;&nbsp;-&nbsp;&nbsp; dynamicEQ an/aus
 				</li>
+				<li>
+					<b>dynamicEQRefLevelOffset</b> &nbsp;&nbsp;-&nbsp;&nbsp; set dynamicEQRefLevelOffset (0, 5, 10, 15)
+				</li>					
 				<li>
 					<b>dynamicVolume</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wert f&uuml;r dynamicEQ setzen (off/light/medium/heavy)
 				</li>
@@ -4423,6 +4568,9 @@ sub DENON_AVR_RClayout() {
 				<li>
 					<b>ampAssign</b> &nbsp;&nbsp;-&nbsp;&nbsp; Endstufenzuweisung des AV-Receiver (5.1, 7.1, 9.1,...)
 				</li>
+				<li>
+					<b>audioRestorer</b> &nbsp;&nbsp;-&nbsp;&nbsp; audioRestorer Level (off, low, medium, high)
+				</li>				
 				<li>
 					<b>autoStandby</b> &nbsp;&nbsp;-&nbsp;&nbsp; Standbyzustand des AV-Recievers
 				</li>
