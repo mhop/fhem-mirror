@@ -617,7 +617,7 @@ FW_finishRead($$$)
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use{zlib}) {
     utf8::encode($FW_RET)
-        if(utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/ );
+        if(utf8::is_utf8($FW_RET) || $FW_RET =~ m/[^\x00-\xFF]/ );
     eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
     if($@) {
       Log 1, "memGzip: $@"; $FW_RET=""; #Forum #29939
@@ -715,7 +715,7 @@ FW_addToWritebuffer($$@)
 {
   my ($hash, $txt, $callback, $nolimit) = @_;
 
-  utf8::encode($txt) if(utf8::is_utf8($txt) && $txt =~ m/[^\x00-\xFF]/ );
+  utf8::encode($txt) if(utf8::is_utf8($txt) || $txt =~ m/[^\x00-\xFF]/ );
   if( $hash->{websocket} ) {
     my $len = length($txt);
     if( $len < 126 ) {
