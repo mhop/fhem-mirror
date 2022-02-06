@@ -74,8 +74,8 @@ my @mtags = (
 # markdown: Only apply Markdown formatting like __text__ and emoticon replacements
 # both: Apply both formatting styles
 #$msg: ASCII String that should be replaced
-#return: Unicode string with applied replacements
-#To display all replacements use the demoUnicode() pr demoUnicodeHTML() function
+#returns: Unicode string with applied replacements
+#To display all replacements use the demoUnicode() or demoUnicodeHTML() function
 sub formatTextUnicode($$) {
     my ($format,$msg) = @_;
 	my @tags;
@@ -147,7 +147,9 @@ sub formatStringUnicode($$) {
 
 	my $rep=chr($uc{$font}[0])."-".chr($uc{$font}[0]+25).chr($uc{$font}[1])."-".chr($uc{$font}[1]+25).chr($uc{$font}[2])."-".chr($uc{$font}[2]+9);
 	$_=$str;
-	eval "tr/a-zA-Z0-9/$rep/";
+	#"no warnings" to prevent a bug in older Perl versions (seen in 5.28) that warns about
+	#"Replacement list is longer than search list" when using ASCII->Unicode replacements
+	eval "{no warnings; tr/a-zA-Z0-9/$rep/}";
 	return undef if $@;
 #Special handling for characters missing in some fonts
 #	0x1d455 => 0x1d629, #italic h -> italic sans-serif h or 0x210e (planck constant)

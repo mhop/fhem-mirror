@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.6";
+my $Signalbot_VERSION="3.7";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -26,6 +26,9 @@ use HttpUtils;
 
 eval "use Protocol::DBus;1";
 eval "use Protocol::DBus::Client;1" or my $DBus_missing = "yes";
+
+require FHEM::Text::Unicode;
+use FHEM::Text::Unicode qw(:ALL);
 
 #maybe really get introspective here instead of handwritten list
  my %signatures = (
@@ -104,6 +107,7 @@ sub Signalbot_Initialize($) {
 												"cmdFavorite ".
 												"favorites:textField-long ".
 												"autoJoin:yes,no ".
+												"formatting:none,html,markdown,both ".
 												"registerMethod:SMS,Voice ".
 												"$readingFnAttributes";
 }
@@ -339,7 +343,7 @@ sub Signalbot_Set($@) {					#
 		eval { $fullstring=decode_utf8($fullstring); };
 			Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Error from decode" if $@;
 			
-		Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Before parse:" . encode_utf8($fullstring) . ":";
+		Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Before parse:" .$fullstring. ":";
 		my $tmpmessage = $fullstring =~ s/\\n/\x0a/rg;
 		my @args=parse_line(' ',0,$tmpmessage);
 		
@@ -401,7 +405,7 @@ sub Signalbot_Set($@) {					#
 			my @newatt;
 			foreach my $file (@attachments) {
 				if ( -e $file ) {
-					if (! $file =~ /tmp\/signalbot/) {
+					if ($file=~/^\/tmp\/signalbot.*/ ne 1) {
 						$file =~ /^.*?\.([^.]*)?$/;
 						my $type = $1;
 						my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
@@ -419,7 +423,11 @@ sub Signalbot_Set($@) {					#
 			}
 			@attachments=@newatt;
 		}
-
+		#Convert html or markdown to unicode
+		my $format=AttrVal($hash->{NAME},"formatting","none");
+		my $convmsg=formatTextUnicode($format,$message);
+		$message=$convmsg if defined $convmsg;
+		
 		#Send message to individuals (bulk)
 		if (@recipients > 0) {
 			Signalbot_sendMessage($hash,join(",",@recipients),join(",",@attachments),$message);
@@ -452,7 +460,7 @@ sub Signalbot_Get($@) {
 	my $account = ReadingsVal($name,"account","none");
 
 	if ($cmd eq "?") {
-		my $gets="favorites:noArg accounts:noArg ";
+		my $gets="favorites:noArg accounts:noArg helpUnicode:noArg ";
 		$gets.="contacts:all,nonblocked ".
 			"groups:all,active,nonblocked " if $account ne "none";
 		return "Signalbot_Get: Unknown argument $cmd, choose one of ".$gets;
@@ -464,6 +472,8 @@ sub Signalbot_Get($@) {
 	if ($cmd eq "introspective") {
 		my $reply=Signalbot_CallS($hash,"org.freedesktop.DBus.Introspectable.Introspect");
 		return undef;
+	} elsif ($cmd eq "helpUnicode") {
+		return demoUnicodeHTML();
 	} elsif ($cmd eq "accounts") {
 		my $num=Signalbot_getAccounts($hash);
 		return "Error in listAccounts" if $num<0;
@@ -825,7 +835,7 @@ sub Signalbot_MessageReceived ($@) {
 				}
 			}
 		}
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": Message from $sender : $message processed";
+		Log3 $hash->{NAME}, 4, $hash->{NAME}.": Message from $sender : ".decode_utf8($message)." processed";
 	} else {
 		Log3 $hash->{NAME}, 2, $hash->{NAME}.": Ignored message due to allowedPeer by $source:$message";
 		readingsSingleUpdate($hash, 'lastError', "Ignored message due to allowedPeer by $source:$message",1);
@@ -925,6 +935,8 @@ sub Signalbot_setup($@){
 	$hash->{STATE}="Connecting";
 	Signalbot_fetchFile($hash,"svn.fhem.de","/fhem/trunk/fhem/contrib/signal/signal_install.sh","www/signal/signal_install.sh");
 	chmod 0755, "www/signal/signal_install.sh";
+	#Make sure Logfile looks ok with Unicode characters and does not raise "Wide character"
+	binmode(LOG,"encoding(UTF-8)");
 	return undef;
 }
 
@@ -1424,7 +1436,7 @@ sub Signalbot_refreshGroups($@) {
 
 sub Signalbot_sendMessage($@) {
 	my ( $hash,$rec,$att,$mes ) = @_;
-	Log3 $hash->{NAME}, 4, $hash->{NAME}.": sendMessage called for $rec:$att:".encode_utf8($mes); 
+	Log3 $hash->{NAME}, 4, $hash->{NAME}.": sendMessage called for $rec:$att:".$mes; 
 
 	my @recorg= split(/,/,$rec);
 	my @attach=split(/,/,$att);
@@ -2098,7 +2110,6 @@ sub Signalbot_OSRel() {
 #   -2 for Audio
 #   -3 for other media
 # and extension without dot as 2nd list element
-
 sub Signalbot_IdentifyStream($$) {
 	my ($hash, $msg) = @_;
 
@@ -2286,6 +2297,11 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 			<a id="Signalbot-get-favorites"></a>
 			Lists the defined favorites in the attribute "favorites" in a readable format<br>
 		</li>
+		<li><b>get helpUnicode</b><br>
+			<a id="Signalbot-get-helpUnicode"></a>
+			Opens a cheat sheet for all supported replacements to format text or add emoticons using html-like tags or markdown.<br>
+			<b>Note:</b> This functionality needs to be enabled using the "formatting" attribute.<br>
+		</li>
 		<br>
 	</ul>
 
@@ -2366,6 +2382,17 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		<li><b>defaultPeer</b><br>
 		<a id="Signalbot-attr-defaultPeer"></a>
 			If <b>send</b> is used without a recipient, the message will send to this account or group(with #)<br>
+		</li>
+		<li><b>formatting</b><br>
+		<a id="Signalbot-attr-formatting"></a>
+			The "formatting" attribute has the following four options that allow highlighting in Unicode:
+		<ul>
+		<li>none - no replacements </li>
+		<li>html - replacements are enabled here with HTML-type tags (e.g. for bold &lt;b&gt; is bold &lt;/b&gt;)</li>
+		<li>markdown - replacements are enabled by markdown-like tags (e.g. __for italic__) as well as emotics</li>
+		<li>both - both methods are possible here</li>
+		</ul>
+		To learn about the syntax how to use tags and markdown, use the get helpUnicode method. You can still also simply copy&paste Unicode text from other sources.
 		</li>
 		<br>
 	</ul>

@@ -626,6 +626,7 @@ lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
 lib/FHEM/SynoModules/API.pm      DS_Starter       Sonstiges
 lib/FHEM/SynoModules/SMUtils.pm  DS_Starter       Sonstiges
 lib/FHEM/SynoModules/ErrCodes.pm DS_Starter       Sonstiges
+lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
 
 contrib/sacha_gloor/*        rudolfkoenig/orphan  Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
