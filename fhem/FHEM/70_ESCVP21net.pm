@@ -907,7 +907,7 @@ sub ESCVP21net_setValue($){
   my ($string) = @_;
   my ( $name, $cmd, $val ) = split( "\\|", $string );
   my $result = "none";
-  my $returnval = "$name|$cmd|error";
+  my $returnval = "$name|$cmd|error"; # just fir initialization
   my @resultarr;
   my $data = "";
   my $datakey = "none";
@@ -965,7 +965,9 @@ sub ESCVP21net_setValue($){
     $returnval = "$name|$cmd|no socket";
   }
 
-  if (defined ($sock) && $initstatus eq "init_ok"){  
+  if (defined ($sock) && $initstatus eq "init_ok"){
+    # re-init returnval to empty string
+    $returnval = "";  
     # GetAll will query all set values which have a "get" defined
     # result of each single command will be formatted as $name|$cmd|$result
     # results of all commands will then be separated by ":"
