@@ -567,17 +567,19 @@ sub Nmap_updateUptime($$;$) {
 
 1;
 
+__END__
+
 # commandref ##################################################################
 =pod
+=encoding utf8
 =item device
 =item summary    Interpret of an Nmap network scans
 =item summary_DE Auswertung eines Nmap Netzwerkscans
 
 =begin html
 
-<a name="Nmap"></a>
+<a id="Nmap"></a>
 <h3>Nmap</h3>
-( en | <a href="commandref_DE.html#Nmap"><u>de</u></a> )
 <div>
   <ul>
     Nmap is the FHEM module to perform a network scan with Nmap and to display information about the available network devices.<br>
@@ -596,8 +598,8 @@ sub Nmap_updateUptime($$;$) {
       .
     </ul>
     <br>
-    <a name="Nmapdefine"></a>
-    <b>Define</b>
+    <a id="Nmap-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>define &lt;name&gt; Nmap &lt;target specification&gt;</code><br>
       In the &lt;target specification&gt; are all target hosts, which are to be
@@ -616,29 +618,29 @@ sub Nmap_updateUptime($$;$) {
       <a href="https://nmap.org/man/de/man-target-specification.html">
         <u>Nmap Manpage (Specifying Destinations)</u>
       </a>.
-    </ul><br>
-    <a name="Nmapset"></a>
-    <b>Set</b>
+    </ul>
+    <a id="Nmap-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="Nmap-set-clear"></a><li>
         <code>clear readings</code><br>
         Deletes all readings except "state".
       </li>
-      <li>
+      <a id="Nmap-set-deleteOldReadings"></a><li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         Deletes all readings older than &lt;s&gt; seconds.
       </li>
-      <li>
+      <a id="Nmap-set-interrupt"></a><li>
         <code>interrupt</code><br>
         Cancels a running scan.
       </li>
-      <li>
+      <a id="Nmap-set-statusRequest"></a><li>
         <code>statusRequest</code><br>
         Starts a network scan.
       </li>
-    </ul><br>
-    <a name="Nmapreadings"></a>
-    <b>Readings</b><br>
+    </ul>
+    <a id="Nmap-readings"></a>
+    <h4>Readings</h4>
     <ul>
       General Readings:
       <ul>
@@ -733,11 +735,11 @@ sub Nmap_updateUptime($$;$) {
           device is reachable.
         </li>
       </ul>
-    </ul><br>
-    <a name="Nmapattr"></a>
-    <b>Attribute</b>
+    </ul>
+    <a id="Nmap-attr"></a>
+    <h4>Attributes</h4>
     <ul>
-      <li>
+      <a id="Nmap-attr-absenceThreshold"></a><li>
         <code>absenceThreshold &lt;n&gt;</code><br>
         The number of network cans that must result in "absent" before the
         state of a network device changes to "absent". With this function you
@@ -746,17 +748,17 @@ sub Nmap_updateUptime($$;$) {
         "&lt;metaReading&gt;_state" remains on "present" until the final status
         changes to "absent".
       </li>
-      <li>
+      <a id="Nmap-attr-args"></a><li>
         <code>args &lt;args&gt;</code><br>
         Arguments for the Nmap scan.<br>
         The default is "-sn".
       </li>
-      <li>
+      <a id="Nmap-attr-deleteOldReadings"></a><li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         After a network scan, all host-specific readings older than &lt;s&gt;
         seconds are deleted
       </li>
-      <li>
+      <a id="Nmap-attr-devAlias"></a><li>
         <code>
           devAlias &lt;ID&gt;:&lt;ALIAS&gt; &lt;ID2&gt;:&lt;ALIAS2&gt; ...
         </code><br>
@@ -779,35 +781,35 @@ sub Nmap_updateUptime($$;$) {
           </code><br>
         </ul>
       </li>
-      <li>
+      <a id="Nmap-attr-disable"></a><li>
         <code>disable 1</code><br>
         A running scan is canceled and no new scans are started.
       </li>
-      <li>
+      <a id="Nmap-attr-excludeHosts"></a><li>
         <code>excludeHosts &lt;target specification&gt;</code><br>
         All target hosts in the &lt;target specification&gt; are skipped during the scan.
       </li>
-      <li>
+      <a id="Nmap-attr-interval"></a><li>
         <code>interval &lt;seconds&gt;</code><br>
         Interval in seconds in which the scan is performed.<br>
         The default value is 900 seconds and the minimum value is 30 seconds.
       </li>
-      <li>
+      <a id="Nmap-attr-keepReadings"></a><li>
         <code>keepReadings 1</code><br>
         If a new IP address is recognized for a device with a known MAC
         address, the invalid readings are deleted unless this attribute is set.
       </li>
-      <li>
+      <a id="Nmap-attr-leadingZeros"></a><li>
         <code>leadingZeros 1</code><br>
         For the readings, the IPv4 addresses are displayed with leading zeros.
       </li>
-      <li>
+      <a id="Nmap-attr-metaReading"></a><li>
         <code>metaReading &lt;metaReading&gt;</code><br>
         You can specify "alias", "hostname", "ip" or "macAddress" as
         &lt;metaReading&gt; and is the identifier for the readings.<br>
         The default is "ip".
       </li>
-      <li>
+      <a id="Nmap-attr-path"></a><li>
         <code>path</code><br>
         Path under which the Nmap program is to be reached.<br>
         The default is "/urs/bin/nmap".
@@ -817,7 +819,7 @@ sub Nmap_updateUptime($$;$) {
           <u><code>readingFnAttributes</code></u>
         </a>
       </li>
-      <li>
+      <a id="Nmap-attr-sudo"></a><li>
         <code>sudo 1</code><br>
         The scan runs with root privileges.<br>
         The prerequisite is that the user has these rights under the FHEM. For
@@ -834,9 +836,8 @@ sub Nmap_updateUptime($$;$) {
 
 =begin html_DE
 
-<a name="Nmap"></a>
+<a id="Nmap"></a>
 <h3>Nmap</h3>
-( <a href="commandref.html#Nmap"><u>en</u></a> | de )
 <div>
   <ul>
     Nmap ist das FHEM Modul um einen Netzwerkscan mit Nmap durchzuf&uuml;hren
@@ -859,8 +860,8 @@ sub Nmap_updateUptime($$;$) {
       installiert werden.
     </ul>
     <br>
-    <a name="Nmapdefine"></a>
-    <b>Define</b>
+    <a id="Nmap-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>define &lt;name&gt; Nmap &lt;target specification&gt;</code><br>
       In der &lt;target specification&gt; stehen alle Zielhosts, die gescannet
@@ -881,29 +882,29 @@ sub Nmap_updateUptime($$;$) {
       <a href="https://nmap.org/man/de/man-target-specification.html">
         <u>Nmap Man Page (Angabe von Zielen)</u>
       </a>.
-    </ul><br>
-    <a name="Nmapset"></a>
-    <b>Set</b>
+    </ul>
+    <a id="Nmap-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="Nmap-set-clear"></a><li>
         <code>clear readings</code><br>
         L&ouml;scht alle Readings außer "state".
       </li>
-      <li>
+      <a id="Nmap-set-deleteOldReadings"></a><li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         Löscht alle Readings die älter sind als &lt;s&gt; Sekunden.
       </li>
-      <li>
+      <a id="Nmap-set-interrupt"></a><li>
         <code>interrupt</code><br>
         Bricht einen laufenden Scan ab.
       </li>
-      <li>
+      <a id="Nmap-set-statusRequest"></a><li>
         <code>statusRequest</code><br>
         Startet einen Netzwerkscan.
       </li>
-    </ul><br>
-    <a name="Nmapreadings"></a>
-    <b>Readings</b><br>
+    </ul>
+    <a id="Nmap-readings"></a>
+    <h4>Readings</h4>
     <ul>
       Allgemeine Readings:
       <ul>
@@ -1001,11 +1002,11 @@ sub Nmap_updateUptime($$;$) {
           Netzwerkger&auml;t erreichbar ist.
         </li>
       </ul>
-    </ul><br>
-    <a name="Nmapattr"></a>
-    <b>Attribute</b>
+    </ul>
+    <a id="Nmap-attr"></a>
+    <h4>Attribute</h4>
     <ul>
-      <li>
+      <a id="Nmap-attr-absenceThreshold"></a><li>
         <code>absenceThreshold &lt;n&gt;</code><br>
         Die Anzahl an Netzwerkscans, welche in "absent" resultieren
         m&uuml;ssen, bevor der Status eines Netzwerkger&auml;ts auf "absent"
@@ -1015,17 +1016,17 @@ sub Nmap_updateUptime($$;$) {
         ist, verbleibt das Reading "&lt;metaReading&gt;_state" auf "present",
         bis der Status final auf "absent" wechselt.
       </li>
-      <li>
+      <a id="Nmap-attr-args"></a><li>
         <code>args &lt;args&gt;</code><br>
         Argumente für den Nmap-Scan.<br>
         Die Vorgabe ist "-sn".
       </li>
-      <li>
+      <a id="Nmap-attr-deleteOldReadings"></a><li>
         <code>deleteOldReadings &lt;s&gt;</code><br>
         Nach einem Netzwerkscan werden alle hostspezifischen Readings, die
         älter sind als &lt;s&gt; Sekunden, gelöscht
       </li>
-      <li>
+      <a id="Nmap-attr-devAlias"></a><li>
         <code>
           devAlias &lt;ID&gt;:&lt;ALIAS&gt; &lt;ID2&gt;:&lt;ALIAS2&gt; ...
         </code><br>
@@ -1050,40 +1051,40 @@ sub Nmap_updateUptime($$;$) {
           </code><br>
         </ul>
       </li>
-      <li>
+      <a id="Nmap-attr-disable"></a><li>
         <code>disable 1</code><br>
         Ein laufender Scan wird abgebrochen und es werden keine neuen Scans
         gestartet.
       </li>
-      <li>
+      <a id="Nmap-attr-excludeHosts"></a><li>
         <code>excludeHosts &lt;target specification&gt;</code><br>
         In der &lt;target specification&gt; stehen alle Zielhosts, die beim
         Scan &uuml;bersprungen werden sollen.
       </li>
-      <li>
+      <a id="Nmap-attr-interval"></a><li>
         <code>interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden in dem der Scan durchgef&uuml;hrt wird.<br>
         Der Vorgabewert ist 900 Sekunden und der Mindestwert 30 Sekunden.
       </li>
-      <li>
+      <a id="Nmap-attr-keepReadings"></a><li>
         <code>keepReadings 1</code><br>
         Wird für ein Gertät mit bekannter MAC-Adresse eine neue IP-Adresse
         erkannt, werden die ungültig gewordenen Readings gelöscht es sei denn
         dieses Attribut ist gesetzt.
       </li>
-      <li>
+      <a id="Nmap-attr-leadingZeros"></a><li>
         <code>leadingZeros 1</code><br>
         Bei den Readings-Namen werden die IPv4-Adressen mit f&uuml;hrenden
         Nullen dargestellt.
       </li>
-      <li>
+      <a id="Nmap-attr-metaReading"></a><li>
         <code>metaReading &lt;metaReading&gt;</code><br>
         Als &lt;metaReading&gt; kann "alias", "hostname", "ip" oder
         "macAddress" angegeben werden und ist der Bezeichner für die
         Readings.<br>
         Die Vorgabe is "ip".
       </li>
-      <li>
+      <a id="Nmap-attr-path"></a><li>
         <code>path</code><br>
         Pfad unter dem das Nmap Programm zu erreichen ist.<br>
         Die Vorgabe ist "/urs/bin/nmap".
@@ -1093,7 +1094,7 @@ sub Nmap_updateUptime($$;$) {
           <u><code>readingFnAttributes</code></u>
         </a>
       </li>
-      <li>
+      <a id="Nmap-attr-sudo"></a><li>
         <code>sudo 1</code><br>
         Der Scan wird mit Root-Rechten ausgef&uuml;hrt.<br>
         Voraussetzung ist, dass der Benutzer unter dem FHEM ausgef&uuml;hrt

@@ -552,16 +552,18 @@ sub LuftdatenInfo_statusRequest($) {
 
 1;
 
+__END__
+
 # commandref ##################################################################
 =pod
+=encoding utf8
 =item summary    provides data from Luftdaten.info
 =item summary_DE stellt Daten von Luftdaten.info bereit
 
 =begin html
 
-<a name="LuftdatenInfo"></a>
+<a id="LuftdatenInfo"></a>
 <h3>LuftdatenInfo</h3>
-(en | <a href="commandref_DE.html#LuftdatenInfo"><u>de</u></a>)
 <div>
   <ul>
     LuftdatenInfo is the FHEM module to read particulate matter, temperature
@@ -580,9 +582,8 @@ sub LuftdatenInfo_statusRequest($) {
       Under Debian (based) system, this can be installed using
       <code>"apt-get install libjson-perl"</code>.
     </ul>
-    <br>
-    <a name="LuftdatenInfodefine"></a>
-    <b>Define</b>
+    <a id="LuftdatenInfo-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>
         define &lt;name&gt; LuftdatenInfo remote
@@ -603,28 +604,28 @@ sub LuftdatenInfo_statusRequest($) {
       specified.<br>
       If several similar sensors are used, the duplicate values can be written
       in another device.
-    </ul><br>
-    <a name="LuftdatenInfoset"></a>
-    <b>Set</b>
+    </ul>
+    <a id="LuftdatenInfo-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="LuftdatenInfo-set-statusRequest"></a><li>
         <code>statusRequest</code><br>
         Starts a status request.
       </li>
-    </ul><br>
-    <a name="LuftdatenInfoget"></a>
-    <b>Get</b>
+    </ul>
+    <a id="LuftdatenInfo-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="LuftdatenInfo-get-senors"></a><li>
         <code>sensors</code><br>
         Lists all senors.
       </li>
-    </ul><br>
-    <a name="LuftdatenInforeadings"></a>
-    <b>Readings</b><br>
+    </ul>
+    <a name="LuftdatenInfo-readings"></a>
+    <h4>Readings</h4><br>
     <ul>
       <li>
-        <code>airQuality</code>
+        <code>airQuality</code><br>
         1 => good<br>
         2 => moderate<br>
         3 => unhealthy for sensitive groups<br>
@@ -707,11 +708,11 @@ sub LuftdatenInfo_statusRequest($) {
         <code>UVRisk</code><br>
         UV risk from 1 to 5
       </li>
-    </ul><br>
-    <a name="LuftdatenInfoattr"></a>
-    <b>Attribute</b>
+    </ul>
+    <a id="LuftdatenInfo-attr"></a>
+    <h4>Attributes</h4>
     <ul>
-      <li>
+      <a id="LuftdatenInfo-attr-disable"></a><li>
         <code>disable 1</code><br>
         No queries are started.
       </li>
@@ -720,12 +721,12 @@ sub LuftdatenInfo_statusRequest($) {
           <u><code>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM ...</code></u>
         </a>
       </li>
-      <li>
+      <a id="LuftdatenInfo-attr-interval"></a><li>
         <code>interval &lt;seconds&gt;</code><br>
         Interval in seconds in which queries are performed.<br>
         The default and minimum value is 300 seconds for remote request and 30 seconds for local requests.
       </li>
-      <li>
+      <a id="LuftdatenInfo-attr-timeout"></a><li>
         <code>timeout &lt;seconds&gt;</code><br>
         Timeout in seconds for the queries.<br>
         The default and minimum value is 5 seconds.
@@ -738,9 +739,8 @@ sub LuftdatenInfo_statusRequest($) {
 
 =begin html_DE
 
-<a name="LuftdatenInfo"></a>
+<a id="LuftdatenInfo"></a>
 <h3>LuftdatenInfo</h3>
-(<a href="commandref.html#LuftdatenInfo"><u>en</u></a> | de)
 <div>
   <ul>
     LuftdatenInfo ist das FHEM Modul um Feinstaub-, Temperatur- und
@@ -761,8 +761,8 @@ sub LuftdatenInfo_statusRequest($) {
       <code>"apt-get install libjson-perl"</code> installiert werden.
     </ul>
     <br>
-    <a name="LuftdatenInfodefine"></a>
-    <b>Define</b>
+    <a id="LuftdatenInfo-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>
         define &lt;name&gt; LuftdatenInfo remote
@@ -783,28 +783,28 @@ sub LuftdatenInfo_statusRequest($) {
       Hostname angegeben werden.<br>
       Werden mehrere ähnliche Sensoren betrieben lassen sich die doppelten
       Werte in einem anderen Gerät geschrieben werden.
-    </ul><br>
-    <a name="LuftdatenInfoset"></a>
-    <b>Set</b>
+    </ul>
+    <a id="LuftdatenInfo-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="LuftdatenInfo-set-statusRequest"></a><li>
         <code>statusRequest</code><br>
         Startet eine Abfrage der Daten.
       </li>
-    </ul><br>
-    <a name="LuftdatenInfoget"></a>
-    <b>Get</b>
+    </ul>
+    <a id="LuftdatenInfo-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="LuftdatenInfo-get-senors"></a><li>
         <code>sensors</code><br>
         Listet alle Sensoren auf.
       </li>
     </ul><br>
-    <a name="LuftdatenInforeadings"></a>
-    <b>Readings</b><br>
+    <a id="LuftdatenInfo-readings"></a>
+    <h4>Readings</h4><br>
     <ul>
       <li>
-        <code>airQuality</code>
+        <code>airQuality</code><br>
         1 => gut<br>
         2 => mittelmä&suml;ig<br>
         3 => ungesund für empfindliche Menschen<br>
@@ -890,11 +890,11 @@ sub LuftdatenInfo_statusRequest($) {
         <code>UVRisk</code><br>
         UV Risiko von 1 bis 5
       </li>
-    </ul><br>
-    <a name="LuftdatenInfoattr"></a>
-    <b>Attribute</b>
+    </ul>
+    <a id="LuftdatenInfo-attr"></a>
+    <h4>Attribute</h4>
     <ul>
-      <li>
+      <a id="LuftdatenInfo-attr-disable"></a><li>
         <code>disable 1</code><br>
         Es werden keine Abfragen mehr gestartet.
       </li>
@@ -903,12 +903,12 @@ sub LuftdatenInfo_statusRequest($) {
           <u><code>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM ...</code></u>
         </a>
       </li>
-      <li>
+      <a id="LuftdatenInfo-attr-interval"></a><li>
         <code>interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden in dem Abfragen durchgef&uuml;hrt werden.<br>
         Der Vorgabe- und Mindestwert betr&auml;gt 300 Sekunden für remote Abfragen und 30 Sekunden für local Abfragen.
       </li>
-      <li>
+      <a id="LuftdatenInfo-attr-timeout"></a><li>
         <code>timeout &lt;seconds&gt;</code><br>
         Timeout in Sekunden für die Abfragen.<br>
         Der Vorgabe- und Mindestwert betr&auml;gt 5 Sekunden.
