@@ -1596,7 +1596,7 @@ HUEDevice_Parse($$)
       && ($result->{v2_service} || $result->{t}) # only for updates from events
       && defined($hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge') ) {
     $hash->{has_events} = $hash->{IODev}{has_v2_api} if( defined($hash->{IODev}{has_v2_api}) );
-    $hash->{has_events} = 1 if( $hash->{IODev}{is_DECONZ} );
+    $hash->{has_events} = 1 if( $hash->{IODev}{is_deCONZ} );
 
     Log3 $name, 4, "$name: bridge has events api: ". ($hash->{has_events} ? 1 : 0);
 
