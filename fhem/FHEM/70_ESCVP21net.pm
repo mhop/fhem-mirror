@@ -24,6 +24,8 @@
 #    1.01.07  multiple checkStatusCmds, added GetStatus to set list
 #             set PWR to statusOfflineMsg if init fails
 #             force PWR check after CONNECTED from Dev_Io, some clean-up
+#    1.01.08  small fix to handle GetAll as statusChckCmd
+#             editorial corrections in pod text
 #
 #
 ################################################################################
@@ -905,7 +907,7 @@ sub ESCVP21net_setValue($){
   my ($string) = @_;
   my ( $name, $cmd, $val ) = split( "\\|", $string );
   my $result = "none";
-  my $returnval = "";
+  my $returnval = "$name|$cmd|error";
   my @resultarr;
   my $data = "";
   my $datakey = "none";
@@ -1097,6 +1099,11 @@ sub ESCVP21net_setValueDone {
   my $rv;
   my $getcmds = "";
  
+  if (!$resultstring){
+    #delete($hash->{helper}{RUNNING_PID});
+    return;
+  }
+
   my @resultarr = split(':', $resultstring);
   
   # just get name from first result, count is 0
@@ -1363,11 +1370,14 @@ sub ESCVP21net_checkStatus ($){
   # Should we check if command is valid... but some users might want to use a non implemented one?
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  
+
   my $checkInterval = AttrVal( $name, "statusCheckInterval", "300" );
   # changed for multiple statusCheckCmds
-  #my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
-  my $checkcmd = "GetStatus";
+  # if checkcmd is GetAll, just take it - otherwise set it to GetStatus
+  my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
+  if ($checkcmd ne "GetAll"){
+    $checkcmd = "GetStatus";
+  }
 
   my $next;
   
@@ -1576,6 +1586,7 @@ sub ESCVP21net_restoreJson {
       <br>This is a little bit special - it does not send just one command to the projector, but will select <b>every</b> command defined which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetAll is shown in the <b>GetAll</b> reading. It will either show the read commands, or inform if an error was received.
     </li>
+    <br>
     <li>GetStatus
       <br>Also special - also does not send just one command to the projector, but will select <b>every</b> command you defined in attr "statusCheckCmd" which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetStatus is shown in the <b>GetStatus</b> reading. It will either show the read commands, or inform if an error was received.
