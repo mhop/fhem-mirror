@@ -566,20 +566,22 @@ sub monitoring_setInactive($) {
 
 1;
 
+__END__
+
 # commandref ##################################################################
 =pod
 =item helper
+=encoding utf8
 =item summary    monitors devices towards events and stores them in two lists
 =item summary_DE überwacht Geräte auf Events und speichert diese in zwei Listen
 
 =begin html
 
-<a name="monitoring"></a>
+<a id="monitoring"></a>
 <h3>monitoring</h3>
-( en | <a href="commandref_DE.html#monitoring"><u>de</u></a> )
 <div>
   <ul>
-    Each monitoring has a warning and an error list, which are stored
+    Each <i>monitoring</i> has a <i>warning</i>- and an <i>error</i> list, which are stored
     as readings. <br>
     When a defined add-event occurs, the device is set to the warning
     list after a predefined time.<br>
@@ -591,7 +593,7 @@ sub monitoring_setInactive($) {
     formatted by two attributes.<br>
     <br>
     The following applications are possible and are described
-    <a href="#monitoringexamples"><u>below</u></a>:<br>
+    <a href="#monitoring-examples"><u>below</u></a>:<br>
     <ul>
       <li>opened windows</li>
       <li>battery warnings</li>
@@ -606,14 +608,14 @@ sub monitoring_setInactive($) {
       </li>
     </ul>
     <br>
-    The monitor does not send a message by itself, a notify or DOIF is
+    The monitor does not send a message by itself, a <a href="#notify"><u>notify</u></a>
+    or <a href="#DOIF"><u>DOIF</u></a> is
     necessary, which responds to the event "&lt;monitoring-name&gt; error
     add: &lt;name&gt;" and then sends the return value of "get
     &lt;monitoring-name&gt; default".
     <br>
-    <br>
-    <a name="monitoringdefine"></a>
-    <b>Define</b>
+    <a id="monitoring-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>
         define &lt;name&gt; monitoring  &lt;add-event&gt; [&lt;remove-event&gt;]
@@ -626,32 +628,31 @@ sub monitoring_setInactive($) {
       both lists as it occurs and the timers for warning and error are
       started.<br>
     </ul>
-    <br>
-    <a name="monitoringset"></a>
-    <b>Set</b>
+    <a id="monitoring-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="monitoring-set-active"></a><li>
         <code>active</code><br>
         Two things will happen:<br>
         1. Restores pending timers, or sets the devices immediately to the
         corresponding list if the time is in the past.<br>
         2. Executes the commands specified under the "setActiveFunc" attribute.
       </li>
-      <li>
+      <a id="monitoring-set-clear"></a><li>
         <code>clear (warning|error|all)</code><br>
         Removes all devices from the specified list and aborts timers for this
         list. With "all", all devices are removed from both lists and all
         running timers are aborted.
       </li>
-      <li>
+      <a id="monitoring-set-errorAdd"></a><li>
         <code>errorAdd &lt;name&gt;</code><br>
         Add &lt;name&gt; to the error list.
       </li>
-      <li>
+      <a id="monitoring-set-errorRemove"></a><li>
         <code>errorRemove &lt;name&gt;</code><br>
         Removes &lt;name&gt; from the error list.
       </li>
-      <li>
+      <a id="monitoring-set-inactive"></a><li>
         <code>inactive</code><br>
         Two things will happen:<br>
         1. Executes the commands specified under the "setInactiveFunc" attribute.<br>
@@ -659,45 +660,43 @@ sub monitoring_setInactive($) {
         disable attribute: using set inactive the state is automatically saved
         to the statefile on shutdown, there is no explicit save necesary.
       </li>
-      <li>
+      <a id="monitoring-set-warningAdd"></a><li>
         <code>warningAdd &lt;name&gt;</code><br>
         Add &lt;name&gt; to the warning list.
       </li>
-      <li>
+      <a id="monitoring-set-warningRemove"></a><li>
         <code>warningRemove &lt;name&gt;</code><br>
         Removes &lt;name&gt; from the warning list.
       </li>
     </ul>
-    <br>
-    <a name="monitoringget"></a>
-    <b>Get</b>
+    <a id="monitoring-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="monitoring-get-all"></a><li>
         <code>all</code><br>
         Returns the error and warning list, separated by a blank line.<br>
         The formatting can be set with the attributes "errorReturn" and
         "warningReturn".
       </li>
-      <li>
+      <a id="monitoring-get-default"></a><li>
         <code>default</code><br>
         The "default" value can be set in the attribute "getDefault" and is
         intended to leave the configuration for the return value in the
         monitoring device. If nothing is specified "all" is used.
       </li>
-      <li>
+      <a id="monitoring-get-error"></a><li>
         <code>error</code><br>
         Returns the error list.<br>
         The formatting can be set with the attribute "errorReturn".
       </li>
-      <li>
+      <a id="monitoring-get-warning"></a><li>
         <code>warning</code><br>
         Returns the warning list.<br>
         The formatting can be set with the attribute "warningReturn".
       </li>
     </ul>
-    <br>
-    <a name="monitoringreadings"></a>
-    <b>Readings</b><br>
+    <a id="monitoring-readings"></a>
+    <h4>Readings</h4><br>
     <ul>
       <li>
         <code>allCount</code><br>
@@ -734,33 +733,32 @@ sub monitoring_setInactive($) {
         Displays the amount of devices on the warning list.
       </li>
     </ul>
-    <br>
-    <a name="monitoringattr"></a>
-    <b>Attribute</b>
+    <a id="monitoring-attr"></a>
+    <h4>Attributes</h4>
     <ul>
       <li>
         <a href="#addStateEvent">
           <u><code>addStateEvent</code></u>
         </a>
       </li>
-      <li>
+      <a id="monitoring-attr-blacklist"></a><li>
         <code>blacklist</code><br>
         Space-separated list of devspecs which will be ignored.<br>
         If the attribute is set all devices which are specified by the devspecs
         are removed from both lists.
       </li>
-      <li>
+      <a id="monitoring-attr-disable"></a><li>
         <code>disable (1|0)</code><br>
         1: Executes the commands specified under the "setInactiveFunc" attribute
         and disables the monitoring.<br>
-        0: see "set active"
+        0: see "set active"
       </li>
       <li>
         <a href="#disabledForIntervals">
           <u><code>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM ...</code></u>
         </a>
       </li>
-      <li>
+      <a id="monitoring-attr-errorFuncAdd"></a><li>
         <code>errorFuncAdd {&lt;perl code&gt;}</code><br>
         The following variables are available in this function:
         <br>
@@ -792,7 +790,7 @@ sub monitoring_setInactive($) {
         If the attribute is not set, it will be checked for
         <code>$addMatch</code>.
       </li>
-      <li>
+      <a id="monitoring-attr-errorFuncAdded"></a><li>
         <code>errorFuncAdded {&lt;perl code&gt;}</code><br>
         The following variables are available in this function:
         <br>
@@ -808,7 +806,7 @@ sub monitoring_setInactive($) {
         </ul>
         This function will be executed when a device is added to the error list.
       </li>
-      <li>
+      <a id="monitoring-attr-errorFuncRemove"></a><li>
         <code>errorFuncRemove {&lt;perl code&gt;}</code><br>
         This function provides the same variables as for "errorFuncAdd".<br>
         If the function returns a 1, the device is removed from the error list
@@ -818,11 +816,11 @@ sub monitoring_setInactive($) {
         <code>&lt;remove-event&gt;</code> in the DEF, otherwise it will be
         checked for <code>errorFuncAdd</code>.
       </li>
-      <li>
+      <a id="monitoring-attr-errorWait"></a><li>
         <code>errorWait &lt;perl code&gt;</code><br>
-        Wait until the device is set to the error list.
+        Code returning waiting time (in seconds) until the device is set to the error list.
       </li>
-      <li>
+      <a id="monitoring-attr-errorReturn"></a><li>
         <code>errorReturn {&lt;perl code&gt;}</code><br>
         The following variables are available in this attribute:
         <ul>
@@ -842,41 +840,46 @@ sub monitoring_setInactive($) {
         With this attribute the output created with "get &lt;name&gt; error"
         can be formatted.
       </li>
-      <li>
+      <a id="monitoring-attr-getDefault"></a><li>
         <code>getDefault (all|error|warning)</code><br>
         This attribute can be used to specify which list(s) are / are returned
         by "get &lt;name&gt; default". If the attribute is not set, "all" will
         be used.
       </li>
-      <li>
-        <code>setActiveFunc &lt;Anweisung&gt;</code><br>
+      <a id="monitoring-attr-setActiveFunc"></a><li>
+        <code>setActiveFunc &lt;statement&gt;</code><br>
         The statement is one of the FHEM command types and is executed when you
         define the monitoring or "set active".<br>
         For a battery message <code>"trigger battery=low battery: low"</code>
         can be useful.
       </li>
-      <li>
+      <a id="monitoring-attr-setInactiveFunc"></a><li>
+        <code>setInactiveFunc &lt;statement&gt;</code><br>
+        The statement is one of the FHEM command types and is executed when you
+        define the monitoring or "set inactive".
+      </li>
+      <a id="monitoring-attr-warningFuncAdd"></a><li>
         <code>warningFuncAdd {&lt;perl code&gt;}</code><br>
         Like errorFuncAdd, just for the warning list.
       </li>
-      <li>
-        <code>warningFuncAdd {&lt;perl code&gt;}</code><br>
+      <a id="monitoring-attr-warningFuncAdded"></a><li>
+        <code>warningFuncAdded {&lt;perl code&gt;}</code><br>
         Like errorFuncAdded, just for the warning list.
       </li>
-      <li>
+      <a id="monitoring-attr-warningFuncRemove"></a><li>
         <code>warningFuncRemove {&lt;perl code&gt;}</code><br>
         Like errorFuncRemove, just for the warning list.
       </li>
-      <li>
+      <a id="monitoring-attr-warningWait"></a><li>
         <code>warningWait &lt;perl code&gt;</code><br>
         Like errorWait, just for the warning list.
       </li>
-      <li>
+      <a id="monitoring-attr-warningReturn"></a><li>
         <code>warningReturn {&lt;perl code&gt;}</code><br>
         Like errorReturn, just for the warning list.
       </li>
-      <li>
-        <code>whitelist {&lt;perl code&gt;}</code><br>
+      <a id="monitoring-attr-whitelist"></a><li>
+        <code>whitelist {&lt;devspec list&gt;}</code><br>
         Space-separated list of devspecs which are allowed.<br>
         If the attribute is set all devices which are not specified by the
         devspecs are removed from both lists.
@@ -887,9 +890,8 @@ sub monitoring_setInactive($) {
         </a>
       </li>
     </ul>
-    <br>
-    <a name="monitoringexamples"></a>
-    <b>Examples</b>
+    <a id="monitoring-examples"></a>
+    <h4>Examples</h4>
     <ul>
       <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
         <u>The following sample codes can be imported via "Raw definition".</u>
@@ -1073,24 +1075,23 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
 
 =begin html_DE
 
-<a name="monitoring"></a>
+<a id="monitoring"></a>
 <h3>monitoring</h3>
-( <a href="commandref.html#monitoring"><u>en</u></a> | de )
 <div>
   <ul>
-    Jedes monitoring verf&uuml;gt &uuml;ber eine warning- und eine error-Liste,
+    Jedes <i>monitoring</i> verfügt über eine <i>warning</i>- und eine <i>error</i>-Liste,
     welche als Readings gespeichert werden.<br>
-    Beim auftreten eines definierten add-events wird das Ger&auml;t nach einer
+    Beim Auftreten eines definierten add-events wird das Ger&auml;t nach einer
     vorgegeben Zeit auf die warning-Liste gesetzt.<br>
     Nach einer weiteren vorgegeben Zeit wird das Ger&auml;t von der
     warning-Liste gel&ouml;scht und auf die error-Liste gesetzt.<br>
-    Beim auftreten eines definierten remove-events wird das Ger&auml;t von
+    Beim Auftreten eines definierten remove-events wird das Ger&auml;t von
     beiden Listen gel&ouml;scht und noch laufende Timer abgebrochen.<br>
     Hiermit lassen sich auf einfache Weise Sammelmeldungen erstellen und durch
     zwei Attribute formatiert ausgeben.<br>
     <br>
     Folgende Anwendungen sind m&ouml;glich und werden
-    <a href="#monitoringexamples"><u>unten</u></a> beschrieben:<br>
+    <a href="#monitoring-examples"><u>unten</u></a> beschrieben:<br>
     <ul>
       <li>ge&ouml;ffnete Fenster</li>
       <li>Batterie Warnungen</li>
@@ -1105,14 +1106,13 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
       </li>
     </ul>
     <br>
-    Das monitor sendet selbst keine Benachrichtung, hierf&uuml;r ist ein notify
-    oder DOIF notwendig, welches auf das Event "&lt;monitoring-name&gt; error
+    Das monitor sendet selbst keine Benachrichtung, hierf&uuml;r ist ein <a href="#notify"><u>notify</u></a>
+    oder <a href="#DOIF"><u>DOIF</u></a> notwendig, welches auf das Event "&lt;monitoring-name&gt; error
     add: &lt;name&gt;" reagiert und dann den R&uuml;ckgabewert von
     "get &lt;monitoring-name&gt; default" versendet.
     <br>
-    <br>
-    <a name="monitoringdefine"></a>
-    <b>Define</b>
+    <a id="monitoring-define"></a>
+    <h4>Define</h4>
     <ul>
       <code>
         define &lt;name&gt; monitoring &lt;add-event&gt; [&lt;remove-event&gt;]
@@ -1120,17 +1120,16 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
       <br>
       Die Syntax f&uuml;r &lt;add-event&gt; und &lt;remove-event&gt; ist die
       gleiche wie f&uuml;r das Suchmuster von
-      <a href="commandref_DE.html#notify"><u>notify</u></a> (Ger&auml;tename
+      <a href="#notify"><u>notify</u></a> (Ger&auml;tename
       oder Ger&auml;tename:Event).<br>
       Ist nur ein &lt;add-event&gt; definiert wird beim auftreten das
       Ger&auml;t von beiden Listen gel&ouml;scht und die Timer f&uuml;r warning
       und error werden gestartet.<br>
     </ul>
-    <br>
-    <a name="monitoringset"></a>
-    <b>Set</b>
+    <a id="monitoring-set"></a>
+    <h4>Set</h4>
     <ul>
-      <li>
+      <a id="monitoring-set-active"></a><li>
         <code>active</code><br>
         Es passieren zwei Dinge:<br>
         1. Stellt noch ausstehende Timer wieder her, bzw. setzt die Ger&auml;te
@@ -1139,70 +1138,68 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         2. F&uuml;hrt die unter dem Attribut "setActiveFunc" angegeben Befehle
         aus.
       </li>
-      <li>
+      <a id="monitoring-set-clear"></a><li>
         <code>clear (warning|error|all)</code><br>
         Entfernt alle Ger&auml;te von der angegeben Liste und bricht f&uuml;r
         diese Liste laufende Timer ab. Bei "all" werden alle Ger&auml;te von
         beiden Listen entfernt und alle laufenden Timer abgebrochen.
       </li>
-      <li>
+      <a id="monitoring-set-errorAdd"></a><li>
         <code>errorAdd &lt;name&gt;</code><br>
         F&uuml;gt &lt;name&gt; zu der error-Liste hinzu.
       </li>
-      <li>
+      <a id="monitoring-set-errorRemove"></a><li>
         <code>errorRemove &lt;name&gt;</code><br>
         Entfernt &lt;name&gt; von der error-Liste.
       </li>
-      <li>
+      <a id="monitoring-set-inactive"></a><li>
         <code>inactive</code><br>
         Deaktiviert das monitoring. Beachte den leichten semantischen
         Unterschied zum disable Attribut: "set inactive" wird bei einem
         shutdown automatisch in fhem.state gespeichert, es ist kein save
         notwendig.
       </li>
-      <li>
+      <a id="monitoring-set-warningAdd"></a><li>
         <code>warningAdd &lt;name&gt;</code><br>
         F&uuml;gt &lt;name&gt; zu der warning-Liste hinzu.
       </li>
-      <li>
+      <a id="monitoring-set-warningRemove"></a><li>
         <code>warningRemove &lt;name&gt;</code><br>
         Entfernt &lt;name&gt; von der warning-Liste.
       </li>
     </ul>
-    <br>
-    <a name="monitoringget"></a>
-    <b>Get</b>
+    <a id="monitoring-get"></a>
+    <h4>Get</h4>
     <ul>
-      <li>
+      <a id="monitoring-get-all"></a><li>
         <code>all</code><br>
         Gibt, durch eine Leerzeile getrennt, die error- und warning-Liste
         zur&uuml;ck.<br>
         Die Formatierung kann dabei mit den Attributen "errorReturn" und
         "warningReturn" eingestellt werden.
       </li>
-      <li>
+      <a id="monitoring-get-default"></a><li>
         <code>default</code><br>
         Der "default" Wert kann in dem Attribut "getDefault" festgelegt werden
         und ist dazu gedacht um die Konfiguration f&uuml;r den
         R&uuml;ckgabewert im monitoring Ger&auml;t zu belassen. Wird nichts
         angegeben wird "all" verwendent.
       </li>
-      <li>
+      <a id="monitoring-get-error"></a><li>
         <code>error</code><br>
         Gibt die error-Liste zur&uuml;ck.<br>
         Die Formatierung kann dabei mit dem Attribut "errorReturn" eingestellt
         werden.
       </li>
-      <li>
+      <a id="monitoring-get-warning"></a><li>
         <code>warning</code><br>
         Gibt die warning-Liste zur&uuml;ck.<br>
         Die Formatierung kann dabei mit dem Attribut "warningReturn"
         eingestellt werden.
       </li>
     </ul>
-    <br>
-    <a name="monitoringreadings"></a>
-    <b>Readings</b><br>
+    <a id="monitoring-readings"></a>
+    <h4>Readings</h4>
     <ul>
       <li>
         <code>allCount</code><br>
@@ -1241,22 +1238,21 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         Zeigt die Anzahl der Geräte in der warning-Liste an.
       </li>
     </ul>
-    <br>
-    <a name="monitoringattr"></a>
-    <b>Attribute</b>
+    <a id="monitoring-attr"></a>
+    <h4>Attribute</h4>
     <ul>
       <li>
         <a href="#addStateEvent">
           <u><code>addStateEvent</code></u>
         </a>
       </li>
-      <li>
+      <a id="monitoring-attr-blacklist"></a><li>
         <code>blacklist</code><br>
         Durch Leerzeichen getrennte Liste von devspecs die ignoriert werden.<br>
         Wenn das Attribut gesetzt wird werden alle Geräte die durch die
         devspecs definiert sind von beiden Listen gelöscht.
       </li>
-      <li>
+      <a id="monitoring-attr-disable"></a><li>
         <code>disable (1|0)</code><br>
         1: Deaktiviert das monitoring.<br>
         0: siehe "set active"
@@ -1266,7 +1262,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
           <u><code>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM ...</code></u>
         </a>
       </li>
-      <li>
+      <a id="monitoring-attr-errorFuncAdd"></a><li>
         <code>errorFuncAdd {&lt;perl code&gt;}</code><br>
         In dieser Funktion stehen die folgende Variablen zur Verf&uuml;gung:
         <br>
@@ -1298,7 +1294,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         Wenn das Attribut nicht gesetzt ist wird auf <code>$addMatch</code>
         gepr&uuml;ft.
       </li>
-      <li>
+      <a id="monitoring-attr-errorFuncAdded"></a><li>
         <code>errorFuncAdded {&lt;perl code&gt;}</code><br>
         In dieser Funktion stehen die folgende Variablen zur Verf&uuml;gung:
         <br>
@@ -1314,7 +1310,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         </ul>
         Diese Funktion wird ausgeführt, wenn ein Gerät in die Fehlerliste aufgenommen wird.
       </li>
-      <li>
+      <a id="monitoring-attr-errorFuncRemove"></a><li>
         <code>errorFuncRemove {&lt;perl code&gt;}</code><br>
         In dieser Funktion stehen die selben Variablen wie bei "errorFuncAdd"
         zur Verf&uuml;gung.<br>
@@ -1325,11 +1321,11 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         gepr&uuml;ft und bei einer DEF ohne <code>&lt;remove-event&gt;</code>
         auf <code>errorFuncAdd</code>.
       </li>
-      <li>
+      <a id="monitoring-attr-errorWait"></a><li>
         <code>errorWait &lt;perl code&gt;</code><br>
-        Wartezeit bis das Ger&auml;t auf die error-Liste gesetzt wird.
+        Wartezeit (Rückgabe in Sekunden) bis das Ger&auml;t auf die error-Liste gesetzt wird.
       </li>
-      <li>
+      <a id="monitoring-attr-errorReturn"></a><li>
         <code>errorReturn {&lt;perl code&gt;}</code><br>
         In diesem Attribut stehen folgende Variablen zur Verf&uuml;gung:
         <ul>
@@ -1349,41 +1345,48 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         Mit diesem Attribut kann die Ausgabe die mit "get &lt;name&gt; error"
         erzeugt wird angepasst werden.
       </li>
-      <li>
+      <a id="monitoring-attr-getDefault"></a><li>
         <code>getDefault (all|error|warning)</code><br>
         Mit diesem Attribut kann festgelegt werden welche Liste/n mit "get
         &lt;name&gt; default" zur&uuml;ck gegeben wird/werden. Wenn das
         Attribut nicht gesetzt ist wird "all" verwendet.
       </li>
-      <li>
+      <a id="monitoring-attr-setActiveFunc"></a><li>
         <code>setActiveFunc &lt;Anweisung&gt;</code><br>
         Die Anweisung ist einer der FHEM
-        <a href="#command"><u>Befehlstypen</u></a> und wird beim definieren des
+        <a href="#command"><u>Befehlstypen</u></a> und wird beim Definieren des
         monitoring oder bei "set active" ausgef&uuml;hrt.<br>
         F&uuml;r eine Batterie Meldung kann <code>"trigger battery=low
         battery:low"</code> sinnvoll sein.
       </li>
-      <li>
+      <a id="monitoring-attr-setInactiveFunc"></a><li>
+        <code>setInactiveFunc &lt;Anweisung&gt;</code><br>
+        Die Anweisung ist einer der FHEM
+        <a href="#command"><u>Befehlstypen</u></a> und wird beim Definieren des
+        monitoring oder bei "set inactive" ausgeführt.
+      </li>
+
+      <a id="monitoring-attr-warningFuncAdd"></a><li>
         <code>warningFuncAdd {&lt;perl code&gt;}</code><br>
         Wie errorFuncAdd, nur f&uuml;r die warning-Liste.
       </li>
-      <li>
+      <a id="monitoring-attr-warningFuncAdded"></a><li>
         <code>warningFuncAdded {&lt;perl code&gt;}</code><br>
         Wie errorFuncAdded, nur f&uuml;r die warning-Liste.
       </li>
-      <li>
+      <a id="monitoring-attr-warningFuncRemove"></a><li>
         <code>warningFuncRemove {&lt;perl code&gt;}</code><br>
         Wie errorFuncRemove, nur f&uuml;r die warning-Liste.
       </li>
-      <li>
+      <a id="monitoring-attr-warningWait"></a><li>
         <code>warningWait &lt;perl code&gt;</code><br>
         Wie errorWait, nur f&uuml;r die warning-Liste.
       </li>
-      <li>
+      <a id="monitoring-attr-warningReturn"></a><li>
         <code>warningReturn {&lt;perl code&gt;}</code><br>
         Wie errorReturn, nur f&uuml;r die warning-Liste.
       </li>
-      <li>
+      <a id="monitoring-attr-whitelist"></a><li>
         <code>whitelist {&lt;perl code&gt;}</code><br>
         Durch Leerzeichen getrennte Liste von devspecs die erlaubt sind
         werden.<br>
@@ -1396,9 +1399,8 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
         </a>
       </li>
     </ul>
-    <br>
-    <a name="monitoringexamples"></a>
-    <b>Beispiele</b>
+    <a id="monitoring-examples"></a>
+    <h4>Beispiele</h4>
     <ul>
       <a href="https://wiki.fhem.de/wiki/Import_von_Code_Snippets">
         <u>
