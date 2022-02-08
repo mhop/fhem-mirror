@@ -14,8 +14,11 @@ my $main_setReadingsVal;
 sub
 fhemdebug_Initialize($){
   $cmds{"fhemdebug"}{Fn} = "fhemdebug_Fn";
-  $cmds{"fhemdebug"}{Hlp} = "{enable|disable|status|timerList}";
+  $cmds{"fhemdebug"}{Hlp} = "{enable|disable|status|timerList|utf8check}";
 }
+
+sub fhemdebug_utf8check($$$$);
+
 
 sub
 fhemdebug_Fn($$)
@@ -69,11 +72,48 @@ fhemdebug_Fn($$)
       *setReadingsVal = $main_setReadingsVal;
     }
 
+  } elsif($param =~ m/^utf8check/) { #125866
+    my (@ret, %visited, $ret);
+    fhemdebug_utf8check("def", \%defs, \@ret, \%visited);
+    fhemdebug_utf8check("attr", \%attr, \@ret, \%visited);
+    fhemdebug_utf8check("modules", \%modules, \@ret, \%visited);
+    return "Checked ".int(keys %visited)." elements\n".
+           (int(@ret) ?  "Strings with utf8-flag set:\n".join("\n", @ret) :
+                         "Found no strings with utf8-flag");
+
   } else {
     return "Usage: fhemdebug {enable | disable | status | ".
               "timerList | addTimerStacktrace {0|1} | forceEvents {0|1} }";
   }
   return;
+}
+
+sub
+fhemdebug_utf8check($$$$)
+{
+  my ($prefix, $hp, $rp, $vp) = @_;
+
+  if(ref($rp) ne "ARRAY") {
+    Log 1, "utf8check problems at $prefix";
+    return;
+  }
+  for my $key (sort keys %{$hp}) {
+    my $path = $prefix."::".$key;
+    next if($vp->{$path} || index($prefix,"::$key") > 0);
+    $vp->{$path} = 1;
+    my $val = $hp->{$key};
+
+    my $rv = ref($val);
+    if($rv eq "HASH") {
+      fhemdebug_utf8check($path, $val, $rp, $vp);
+
+    } elsif($rv eq "ARRAY") {
+
+    } elsif(utf8::is_utf8($val)) {
+      push @{$rp}, $path . " => " . $hp->{$key};
+
+    }
+  }
 }
 
 sub
@@ -187,6 +227,12 @@ fhemdebug_timerList($)
       enable or disable the registering the stacktrace of each InternalTimer
       call. This stacktrace will be shown in the timerList command.
       </li>
+
+    <li>utf8check<br>
+      returns the list of strings with the internal utf8-bit set.
+      Such strings may cause various problems.
+      </li>
+
 
   </ul>
 </ul>
