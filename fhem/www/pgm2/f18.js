@@ -515,9 +515,13 @@ f18_addDragger(el)
   save()
   {
     var nep = $(el).position();
+    var cw = $(comp).width();
+    var svg = $(comp).find(">svg");
+    if($(svg).length==1 && $(svg).attr("id").indexOf("SVGPLOT")==0) // Forum #126070
+      cw = $(svg).width();
     f18_setAttr("Pos."+$(el).attr("data-name"), {
       left:nep.left, top:nep.top,
-      width:$(comp).width(), height:$(comp).height(), 
+      width:cw, height:$(comp).height(), 
       oTop:cp.top-ep.top, oLeft:cp.left-ep.left
     });
   }
