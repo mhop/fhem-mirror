@@ -103,14 +103,17 @@ fhemdebug_utf8check($$$$)
     $vp->{$path} = 1;
     my $val = $hp->{$key};
 
+    push( @{$rp}, "Key: ".$prefix."::".$key)
+      if(utf8::is_utf8($key) || $key =~ m/[^\x00-\xFF]/);
+
     my $rv = ref($val);
     if($rv eq "HASH") {
       fhemdebug_utf8check($path, $val, $rp, $vp);
 
-    } elsif($rv eq "ARRAY") {
+    } elsif(!defined($val) || $rv eq "ARRAY") {
 
-    } elsif(utf8::is_utf8($val)) {
-      push @{$rp}, $path . " => " . $hp->{$key};
+    } elsif(utf8::is_utf8($val) || $val =~ m/[^\x00-\xFF]/) {
+      push @{$rp}, "Key: ".$path." Value:".$hp->{$key};
 
     }
   }
