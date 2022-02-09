@@ -2830,13 +2830,15 @@ DOIF_Notify($$)
       readingsEndUpdate($hash, 0);
     }
      
-    if (defined $hash->{perlblock}{init}) {
-      if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
-        if ($err) {
-          Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
-          readingsSingleUpdate ($hash, "block_init", $err,0);
-        } else {
-          readingsSingleUpdate ($hash, "block_init", "executed",0);
+    for (my $i=0; $i < keys %{$hash->{perlblock}};$i++) {  
+      if ($hash->{perlblock}{$i} eq "init" or $hash->{perlblock}{$i} =~ "^init_" ) {
+        if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
+          if ($err) {
+            Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block $hash->{perlblock}{$i}" if ($ret != -1);
+            readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", $err,0);
+          } else {
+            readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", "executed",0);
+          }
         }
       }
     }
@@ -3452,9 +3454,9 @@ sub DOIF_Perlblock
       return ($perlblock,$err) if ($err);
       $hash->{condition}{$i}=$perlblock;
       $hash->{perlblock}{$i}=$blockname ? $blockname:sprintf("block_%02d",($i+1));
-      if ($blockname eq "init") {
-        $hash->{perlblock}{init}=$i;
-      }
+      #if ($blockname eq "init") {
+      #  $hash->{perlblock}{init}=$i;
+      #}
       $i++;
     }
   }
@@ -3555,14 +3557,16 @@ CmdDoIfPerl($$)
 #    }
 #    $i++;
 #  }
-  if (defined $hash->{perlblock}{init}) {
-    if ($init_done) {
-      if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
-        if ($err) {
-          Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block init" if ($ret != -1);
-          readingsSingleUpdate ($hash, "block_init", $err,0);
-        } else {
-          readingsSingleUpdate ($hash, "block_init", "executed",0);
+  if ($init_done) {
+    for (my $i=0; $i < keys %{$hash->{perlblock}};$i++) {  
+      if ($hash->{perlblock}{$i} eq "init" or $hash->{perlblock}{$i} =~ "^init_" ) {
+        if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
+          if ($err) {
+            Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block $hash->{perlblock}{$i}" if ($ret != -1);
+            readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", $err,0);
+          } else {
+            readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", "executed",0);
+          }
         }
       }
     }
