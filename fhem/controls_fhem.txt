@@ -1,4 +1,4 @@
-REV 25654
+REV 25658
 DIR unused
 UPD 2022-02-08_07:45:02 376863 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -531,7 +531,7 @@ UPD 2019-03-11_07:45:02 35510 FHEM/98_dewpoint.pm
 UPD 2022-02-02_07:45:02 5875 FHEM/98_dummy.pm
 UPD 2018-09-12_07:45:02 11093 FHEM/98_expandJSON.pm
 UPD 2018-07-17_07:45:04 49521 FHEM/98_feels_like.pm
-UPD 2021-11-04_07:45:03 4974 FHEM/98_fhemdebug.pm
+UPD 2022-02-09_07:45:02 6336 FHEM/98_fhemdebug.pm
 UPD 2021-10-17_07:45:03 11518 FHEM/98_fheminfo.pm
 UPD 2021-10-29_07:45:03 73956 FHEM/98_freezemon.pm
 UPD 2021-09-24_07:45:12 9349 FHEM/98_help.pm
@@ -737,12 +737,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-02-08_07:45:06 4638993 docs/commandref.html
+UPD 2022-02-09_07:45:07 4639142 docs/commandref.html
 UPD 2022-02-08_07:45:08 2830251 docs/commandref_DE.html
 UPD 2021-12-22_07:45:04 82825 docs/commandref_frame.html
 UPD 2021-12-22_07:45:04 92782 docs/commandref_frame_DE.html
-UPD 2022-02-08_07:45:10 269004 docs/commandref_modular.html
-UPD 2022-02-08_07:45:11 280074 docs/commandref_modular_DE.html
+UPD 2022-02-09_07:45:10 269004 docs/commandref_modular.html
+UPD 2022-02-09_07:45:12 280074 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2379,7 +2379,7 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2020-01-27_07:45:02 5941 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
-UPD 2021-06-03_12:07:37 31282 www/pgm2/f18.js
+UPD 2022-02-09_07:45:02 31447 www/pgm2/f18.js
 UPD 2021-09-17_07:45:02 10103 www/pgm2/f18style.css
 UPD 2021-06-03_12:07:37 8559 www/pgm2/fhemdoc_modular.js
 UPD 2022-01-21_07:45:03 66034 www/pgm2/fhemweb.js
