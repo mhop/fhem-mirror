@@ -112,6 +112,9 @@ $winService
   - TYPE: name of the corresponding module or global
   - NR: number of this definition, used when saving
   - STATE: the "general" state of the device
+           Note: this entry ist set by the framework from the developer
+           supplied state Reading, if the user does not override it by the
+           stateFormat attribute.
   - DEF: additional parameters at definition
 
   Optional entries
