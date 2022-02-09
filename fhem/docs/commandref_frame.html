@@ -474,7 +474,9 @@ attribute list if you want to know if a device supports these attributes.  <br>
     reading if such a reading for the current device exists. If the value of
     this attribute is enclosed in {}, then it is evaluated. This attribute is
     evaluated each time a reading is updated.<br>
-    The "set magic" described <a href="#set">here</a> is also applied.
+    The "set magic" described <a href="#set">here</a> is also applied.<br>
+    Note: some FHEM modules are setting STATE directly (against the guidelines),
+    in this case the attribute may not work as expected.
     </li>
     <p>
 
