@@ -26,6 +26,8 @@
 #             force PWR check after CONNECTED from Dev_Io, some clean-up
 #    1.01.08  small fix to handle GetAll as statusChckCmd
 #             editorial corrections in pod text
+#    1.08.09  fixes, optimized logging in loglevel 5
+#             fixed sporadic not-deleting of RUNNING_PID
 #
 #
 ################################################################################
@@ -499,6 +501,7 @@ sub ESCVP21net_Shutdown {
   my $name = $hash->{NAME}; 
   RemoveInternalTimer($hash);
   DevIo_CloseDev($hash);
+  BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
   delete $hash->{helper}{nextConnectionCheck} if ( defined( $hash->{helper}{nextConnectionCheck} ) );
   delete $hash->{helper}{nextStatusCheck} if ( defined( $hash->{helper}{nextStatusCheck} ) );
   main::Log3 $name, 5, "[$name]: deleting timer";  
@@ -813,13 +816,23 @@ sub ESCVP21net_Read($){
 
 sub ESCVP21net_Set {
   my ($hash, @param) = @_;
+  my $value;
 	return '"set ESCVP21net" needs at least one argument'
     if (int(@param) < 2);
-
   my $name = shift @param;
   my $opt = shift @param;
-  my $value = join("", @param);
-  #my $value = shift @param;
+  if (int(@param) > 0){
+    $value = join("", @param);
+    #my $value = shift @param;    
+  }
+  else{
+    $value = "none";
+  }
+  # add LF to log for better overview...
+  if ($opt ne "?"){
+    main::Log3 $name, 5, "\n";
+    main::Log3 $name, 5, "[$name]: Set: called with $name $opt $value";
+  }
   
   $hash = $defs{$name};
   my $list = "";
@@ -890,7 +903,7 @@ sub ESCVP21net_Set {
     $hash->{helper}{RUNNING_PID} = BlockingCall( $blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash );
     $hash->{helper}{RUNNING_PID}{loglevel} = 4;
     # next line is required, otherwise fhem will return with "4" from last line - bug?
-    main::Log3 $name, 5, "[$name]: Set: $blockingFn called with $arg";
+    main::Log3 $name, 5, "[$name]: Set: calling $blockingFn with $arg";
   }
   else {
     # reschedule
@@ -983,14 +996,35 @@ sub ESCVP21net_setValue($){
         $cmd = $_;
         $data = "$cmd?\r\n";
         $encdata = encode("utf8",$data);
+        
+        # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+        my $encdatastripped = $encdata;
+        $encdatastripped =~ s/[\r\n\x00-\x19]//g;
+        main::Log3 $name, 5, "[$name]: setValue: GetAll or GetStatus: sending raw data: $encdatastripped";        
+
         send($sock , $encdata , 0);
         recv($sock, $result, 1024, 0);
+        
+        # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+        my $resultstripped = $result;
+        $resultstripped =~ s/[\r\n\x00-\x19]//g;
+        main::Log3 $name, 5, "[$name]: setValue: GetAll or GetStatus: received raw data: $resultstripped";        
+
         # replace CR and LF in result by space
         $result =~ s/[\r\n]/ /g;
         
         # check for error
         if ($result =~ "ERR") {
           $result = "ERROR!";
+          main::Log3 $name, 5, "[$name]: ERR - result of $cmd is $result";
+        }
+        elsif (!$result){
+          $result = "ERROR!";
+          main::Log3 $name, 5, "[$name]: result undef - result of $cmd is $result";
+        }
+        elsif ($result eq ""){
+          $result = "no_answer";
+          main::Log3 $name, 5, "[$name]: result empty - result of $cmd is $result";          
         }
         # no error, so run calcResult to get "nice" value
         else {
@@ -1010,7 +1044,7 @@ sub ESCVP21net_setValue($){
         }
       }
     # so, we return the string $returnval, containing multiple triples separated by ":"
-    main::Log3 $name, 5, "[$name]: resultstring is $returnval";
+    main::Log3 $name, 5, "[$name]: GetAll or GetStatus: resultstring is $returnval";
     }
     
     # continue here if not "GetAll"; $returnval will finally contain only one triple $name|$cmd|$result
@@ -1063,7 +1097,7 @@ sub ESCVP21net_setValue($){
             if (exists($ESCVP21net_togglemap{$datakey})){
               $nextcmd = $ESCVP21net_togglemap{$datakey};
             }
-            Log3 $name, 5, "[$name] setValue: call Set for toggle $cmd with $nextcmd";
+            Log3 $name, 5, "[$name]: setValue: prepare to call Set for toggle $cmd with $nextcmd";
             # translate "nice" nextcmd to raw value data
             $datakey = $cmd.":".$nextcmd;
             if (exists($ESCVP21net_data{$datakey})){
@@ -1092,6 +1126,13 @@ sub ESCVP21net_setValue($){
   	main::Log3 $name, 3, "[$name]: setValue: init failed: $initstatus";
     $returnval = "$name|$cmd|init failed";
   }
+  if ($returnval eq ""){
+    # error handling on empty result
+    $returnval = "$name|$cmd|no_result";
+    main::Log3 $name, 5, "[$name]: result empty - result of $cmd is $result";
+  }
+  # to prevent not-deleting of RUNNIG_PID on errors in finishFn setValueDone:
+  delete($hash->{helper}{RUNNING_PID}) if ( defined( $hash->{helper}{RUNNING_PID} ) );    
   return $returnval;
 }
 
@@ -1101,13 +1142,12 @@ sub ESCVP21net_setValueDone {
   my $rv;
   my $getcmds = "";
  
-  if (!$resultstring){
-    #delete($hash->{helper}{RUNNING_PID});
+  if (!$resultstring || $resultstring eq ""){
+    main::Log3 "ESCVP21net", 5, "[ESCVP21net]: setValueDone says: resultstring is empty!";
     return;
   }
-
   my @resultarr = split(':', $resultstring);
-  
+
   # just get name from first result, count is 0
   my ( $name, $cmd, $result ) = split( "\\|", $resultarr[$count] );
   my $hash = $defs{$name};
@@ -1119,7 +1159,7 @@ sub ESCVP21net_setValueDone {
   
   # resultarr might contain one or more triples $name|$cmd|$result, separated by ":"
   foreach (@resultarr){
-    main::Log3 $name, 5, "[$name]: setValueDone: resultarray loop: $resultarr[$count]";
+    main::Log3 $name, 5, "[$name]: setValueDone: resultarray loop begin: $resultarr[$count]";
     ( $name, $cmd, $result ) = split( "\\|", $resultarr[$count] );
     if ($result =~ "ERROR"){
       $getcmds .=$cmd." (error),";
@@ -1138,21 +1178,24 @@ sub ESCVP21net_setValueDone {
         if ($cmd eq "VOL");
       $getcmds .= $cmd.",";     
     }
-    main::Log3 $name, 5, "[$name]: setValueDone: resultarray loop: $cmd set to $rv";
+    main::Log3 $name, 5, "[$name]: setValueDone: resultarray loop end: $cmd set to $rv";
     $count++;
   }
   
   # strip last ","
   $getcmds = substr $getcmds, 0, -1;
 
+  # additinally, set GetStatus or GestAll to the command set
   if ($hash->{helper}{lastCommand} eq "GetStatus"){
     readingsBulkUpdate($hash, "GetStatus", $getcmds, 1);
+    main::Log3 $name, 5, "[$name]: setValueDone: additionally, set GetStatus to $getcmds";
   }
   else{
     readingsBulkUpdate($hash, "GetAll", $getcmds, 1);
+    main::Log3 $name, 5, "[$name]: setValueDone: additionally, set GetAll to $getcmds";
   } 
   readingsEndUpdate($hash, 1);
-  delete($hash->{helper}{RUNNING_PID});
+  delete($hash->{helper}{RUNNING_PID}) if ( defined( $hash->{helper}{RUNNING_PID} ) );
 }
 
 sub ESCVP21net_setValueError {
@@ -1166,7 +1209,11 @@ sub ESCVP21net_calcResult {
   my ($hash, $result, $cmd, $datakey, $volfactor) = @_;
   # result is of the form "LAMP=1234 :"
   # or something like IMEVENT=0001 03 00000002 00000000 T1 F1 : (happens sometimes at PWR off, 03 is the relevant value then)
-  if ($result =~ "IMEVENT"){
+  if (!$result){
+    $result = "none";
+    return $result;
+  }
+  elsif ($result =~ "IMEVENT"){
     $result = (split / /, $result, 3)[1];
   }
   elsif ($result =~ "PWSTATUS"){
@@ -1516,6 +1563,14 @@ sub ESCVP21net_restoreJson {
   #main::Log3 $name, 5, "[$name]: restore: ". keys(%decode);
 
   return %$decode;
+}
+
+sub ESCVP21net_cleanup {
+  my ($hash) = @_; 
+  #RemoveInternalTimer($hash);
+  BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
+  #DevIo_CloseDev($hash);
+  return ;
 }
 ###################################################
 #                   done                          #
