@@ -4,7 +4,7 @@
 #
 # Copyright (C) 2014 Norbert Truchsess
 # Copyright (C) 2019 Hauswart@forum.fhem.de
-# Copyright (C) 2010 Beta-User@forum.fhem.de
+# Copyright (C) 2022 Beta-User@forum.fhem.de
 #
 #     This file is part of fhem.
 #
@@ -230,7 +230,7 @@ my %static_mappings = (
 sub Define {
     my $hash = shift;
     my $def  = shift // return;
-    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    return $@ if !FHEM::Meta::SetInternals($hash);
     my ($name, $type, $radioId) = split m{\s+}xms, $def;
     return 'requires 1 parameter!' if (!defined $radioId || $radioId eq '');
     $hash->{radioId} = $radioId;
@@ -554,9 +554,9 @@ sub onStreamMessage {
                               payload => $payload
                               );
           }
-          readingsSingleUpdate($hash, "state", "updating", 1) if ($hash->{STATE} ne "updating");
-          readingsSingleUpdate($hash, "state", "update done", 1) if ($block == 0);
-          if ($block == 0 && $blType ne "Optiboot") {
+          readingsSingleUpdate($hash, 'state', 'updating', 1) if !ReadingsVal($hash->{NAME},'state',0) eq 'updating';
+          readingsSingleUpdate($hash, 'state', 'update done', 1) if $block == 0;
+          if ($block == 0 && $blType ne 'Optiboot') {
             readingsSingleUpdate($hash, 'FW_VERSION', $version, 1);
             delete $hash->{OTA_requested} if (defined $hash->{OTA_requested});
           }
@@ -700,7 +700,7 @@ sub Attr {
         for my $type (keys %$readingsForId) {
           if (($readingsForId->{$type}->{name} // "") eq $1) {
             delete $readingsForId->{$type};
-            unless (keys %$readingsForId) {
+            if (!keys %$readingsForId) {
               delete $readingMappings->{$id};
             }
           last FIND;
@@ -787,8 +787,8 @@ sub onPresentationMessage {
     my @ret = ();
     for my $type (@{$sensorMappings->{sends}}) {
         if (defined $readingMappings->{$id}->{$type}) {
-          next unless defined $hash->{getCommentReadings};
-          next unless $hash->{getCommentReadings} eq "2";
+          next if !defined $hash->{getCommentReadings};
+          next if $hash->{getCommentReadings} ne '2';
         }
         my $typeStr = $typeMappings->{$type}->{type};
         if ($hash->{IODev}->{'inclusion-mode'}) {
@@ -821,7 +821,7 @@ sub onPresentationMessage {
           $idStr =~ s/[^A-Za-z\d_\.-]+/_/gx;
         }
         if (defined $hash->{sets}->{"$typeStr$idStr"}) {
-          next unless (defined ($hash->{getCommentReadings}) && $hash->{getCommentReadings} eq "2");
+          next if !defined ($hash->{getCommentReadings}) || $hash->{getCommentReadings} ne '2';
         }
         if ($hash->{IODev}->{'inclusion-mode'}) {
           my @values = ();
@@ -926,8 +926,8 @@ sub onInternalMessage {
     }
     
     if ($type == I_SKETCH_NAME) {
-        readingsSingleUpdate($hash, "state", "received presentation", 1) unless ($hash->{STATE} eq "received presentation");
-        readingsSingleUpdate($hash, "SKETCH_NAME", $msg->{payload}, 1);
+        readingsSingleUpdate($hash, 'state', 'received presentation', 1) if !ReadingsVal($hash->{NAME},'state',0) eq 'received presentation';
+        readingsSingleUpdate($hash, 'SKETCH_NAME', $msg->{payload}, 1);
         delete $hash->{FW_DATA} if (defined $hash->{FW_DATA});
         $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
         if (defined $hash->{getCommentReadings}){
@@ -1099,9 +1099,9 @@ sub sendClientMessage {
     my ($hash,%msg) = @_;
     $msg{radioId} = $hash->{radioId};
     my $name = $hash->{NAME};
-    $msg{ack} = $hash->{ack} unless defined $msg{ack};
+    $msg{ack} = $hash->{ack} if !defined $msg{ack};
     my $messages = $hash->{retainedMessagesForRadioId}->{messages};
-    unless ($hash->{nowSleeping}) {
+    if (!$hash->{nowSleeping}) {
       sendMessage($hash->{IODev},%msg);
       refreshInternalMySTimer($hash,"Ack") if (($msg{ack} or $hash->{IODev}->{ack}) and $hash->{timeoutAck});
       Log3 ($name,5,"$name is not sleeping, sending message!");
@@ -1113,7 +1113,7 @@ sub sendClientMessage {
     } else {
       Log3 ($name,5,"$name is sleeping, enqueing message! ");
       #write to queue if node is asleep
-      unless (defined $hash->{retainedMessages}) {
+      if (!defined $hash->{retainedMessages}) {
         $messages = {messages => [%msg]};
         $hash->{retainedMessages}=1;
         Log3 ($name,5,"$name: No array yet for enqueued messages, building it!");
@@ -1187,7 +1187,7 @@ sub flashFirmware {
       my $start = 0;
       my $end = 0;
       my @fwdata = ();
-      readingsSingleUpdate($hash, "state", "updating", 1) unless ($hash->{STATE} eq "updating");
+      readingsSingleUpdate($hash, 'state', 'updating', 1) if !ReadingsVal($hash->{NAME},'state',0) eq 'updating';
       for (my $i = 0; $i < @lines ; $i++) {
         chomp(my $row = $lines[$i]);
         if (length($row) > 0) {
@@ -1292,7 +1292,7 @@ sub refreshInternalMySTimer {
 sub timeoutAlive {
     my $hash = shift // return;
     Log3 $hash->{NAME}, 5, "$hash->{NAME}: timeoutAlive called";
-    readingsSingleUpdate($hash,"heartbeat","dead",1) unless (ReadingsVal($hash,"heartbeat","dead") eq "NACK");
+    readingsSingleUpdate($hash,'heartbeat','dead',1) if ReadingsVal($hash,'heartbeat','dead') ne 'NACK';
     return;
 }
 
