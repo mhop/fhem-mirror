@@ -26,8 +26,9 @@
 #             force PWR check after CONNECTED from Dev_Io, some clean-up
 #    1.01.08  small fix to handle GetAll as statusChckCmd
 #             editorial corrections in pod text
-#    1.08.09  fixes, optimized logging in loglevel 5
+#    1.01.09  fixes, optimized logging in loglevel 5
 #             fixed sporadic not-deleting of RUNNING_PID
+#    1.01.10  fix sporadic offline message
 #
 #
 ################################################################################
@@ -62,7 +63,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.01";
+my $version = "1.01.10";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -454,7 +455,7 @@ sub ESCVP21net_Define {
   $hash->{model} = $model;
   $hash->{DeviceName} = $param[2].":".$port;
 
-return "Cannot define device. Please install perl modules $missingModul (e.g. sudo apt-get install libjson-perl or sudo cpan install JSON)."
+  return "Cannot define device. Please install perl modules $missingModul (e.g. sudo apt-get install libjson-perl or sudo cpan install JSON)."
         if ($missingModul);
   
   # prevent "reappeared" messages in loglevel 1
@@ -597,6 +598,7 @@ sub ESCVP21net_Notify($$) {
     delete $hash->{helper}{nextConnectionCheck} if ( defined( $hash->{helper}{nextConnectionCheck} ) );
     delete $hash->{helper}{nextStatusCheck} if ( defined( $hash->{helper}{nextStatusCheck} ) );
     readingsSingleUpdate( $hash, "PWR", "offline", 1);
+    main::Log3 $name, 5, "[$name]: Notify: got DISCONNECTED, force PWR to offline";
   }
 }
 
@@ -769,16 +771,18 @@ sub ESCVP21net_ReInit($){
 }
 
 sub ESCVP21net_Callback($){
-  # will be executed if connection establishment fails (see DevIo_OpenDev())
+  # will be executed after connection establishment (see DevIo_OpenDev())
   my ($hash, $error) = @_;
   my $name = $hash->{NAME};
   my $rv;
   my $offlineMsg;
-
-  main::Log3 $name, 3, "[$name] DevIo callback error: $error" if ($error);
-  $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
-  $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
-
+  
+  if ($error){
+    main::Log3 $name, 3, "[$name] DevIo callback error: $error";
+    $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
+    $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
+    main::Log3 $name, 3, "[$name] DevIo callback: force PWR to $offlineMsg";
+  }
   my $status = $hash->{STATE};
   if ($status eq "disconnected"){
     # remove timers and pending setValue calls if device is disconnected
@@ -920,7 +924,7 @@ sub ESCVP21net_setValue($){
   my ($string) = @_;
   my ( $name, $cmd, $val ) = split( "\\|", $string );
   my $result = "none";
-  my $returnval = "$name|$cmd|error"; # just fir initialization
+  my $returnval = "$name|$cmd|error"; # just for initialization
   my @resultarr;
   my $data = "";
   my $datakey = "none";
@@ -1077,11 +1081,28 @@ sub ESCVP21net_setValue($){
         # return of ":" means OK, no value returned, i.e. we have tried to set an value
         elsif ($result eq ":") {
           # after set done, read current value
+          # PWR needs 4s before value can be read after setting it
+          if ($cmd eq "PWR"){
+            sleep (6);
+          }
           $data = "$cmd?\r\n";
           $encdata = encode("utf8",$data);
+
+          # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+          my $encdatastripped = $encdata;
+          $encdatastripped =~ s/[\r\n\x00-\x19]//g;
+          main::Log3 $name, 5, "[$name]: setValue: get after set: sending raw data: $encdatastripped";
+
+          # finally, send command and receive result          
           send($sock , $encdata , 0);
           recv($sock, $result, 1024, 0);
+
+          # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
           $result =~ s/[\r\n]/ /g;
+          my $resultstripped = $result;
+          $resultstripped =~ s/[\r\n\x00-\x19]//g;
+          main::Log3 $name, 5, "[$name]: setValue: get after set: received raw data: $resultstripped";
+
           # calcResult will get nicer text from ESCVP21net_calcResult
           $result = ESCVP21net_calcResult($hash, $result, $cmd, $datakey, $volfactor);
         }  
@@ -1170,6 +1191,7 @@ sub ESCVP21net_setValueDone {
       $getcmds .="init failed,";
       $rv = $result;
       readingsBulkUpdate($hash, "PWR", $offlineMsg, 1);
+      main::Log3 $name, 5, "[$name]: setValueDone says: force PWR to $offlineMsg since init failed";
     }
     else{
       $rv = readingsBulkUpdate($hash, $cmd, $result, 1);
@@ -1419,11 +1441,13 @@ sub ESCVP21net_checkStatus ($){
   # Should we check if command is valid... but some users might want to use a non implemented one?
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $checkcmd;
 
   my $checkInterval = AttrVal( $name, "statusCheckInterval", "300" );
   # changed for multiple statusCheckCmds
   # if checkcmd is GetAll, just take it - otherwise set it to GetStatus
-  my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
+  # effective cmds for GetStatus will be evaluated in setValue subroutine
+  $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
   if ($checkcmd ne "GetAll"){
     $checkcmd = "GetStatus";
   }
@@ -1473,7 +1497,7 @@ sub ESCVP21net_checkStatus ($){
     # normal state when device is on and reachable
     # or when it was on, turned off, but DevIo did not recognize (TCP timeout not reached)
     # internal timer makes sense to check, if device is really reachable
-    my $value = "get";
+    my $value = "none";
     ESCVP21net_Set($hash, $name, $checkcmd, $value);
     $next = gettimeofday() + $checkInterval; # if checkInterval is off, we won't reach this line
     $hash->{helper}{nextStatusCheck} = $next;
