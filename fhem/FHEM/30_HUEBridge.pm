@@ -56,6 +56,8 @@ HUEBridge_Initialize($)
 
   HUEBridge_loadHUEDevice();
 
+  # reopen connections if bridge module is reloaded.
+  # without this already running code might not be overwritten as it is not garbage collected due to strong references
   if( $init_done ) {
     foreach my $chash ( values %defs ) {
       next if( !$chash );
@@ -136,22 +138,27 @@ HUEBridge_Read($)
           return;
         }
 
+        $obj->{source} = 'event';
+
         my $code;
         my $id = $obj->{id};
+           $id = $obj->{gid} if( $obj->{gid} && $obj->{r} eq 'scenes' );
         $code = $name ."-". $id if( $obj->{r} eq 'lights' );
         $code = $name ."-S". $id if( $obj->{r} eq 'sensors' );
         $code = $name ."-G". $id if( $obj->{r} eq 'groups' );
-        $code = $name ."-G". $obj->{gid} if( $obj->{r} eq 'scenes' && $obj->{gid} );
+        $code = $name ."-G". $obj->{gid} if( $obj->{gid} && $obj->{r} eq 'scenes' );
         if( !$code ) {
           Log3 $name, 5, "$name: ignoring event: $data";
           return;
         }
 
-        if( $id == 0xfff0 && $obj->{r} eq 'groups' ) {
+        if( $id == 0xfff0
+            && ($obj->{r} eq 'groups' || ($obj->{gid} && $obj->{r} eq 'scenes') ) ) {
           $code = $name .'-G0';
           Log3 $name, 5, "$name: websocket: assuming group 0 for id $id in event";
 
-        } elsif( $id >= 0xff00 && $obj->{r} eq 'groups' ) {
+        } elsif( $id >= 0xff00
+                 && ($obj->{r} eq 'groups' || ($obj->{gid} && $obj->{r} eq 'scenes') ) )  {
           Log3 $name, 4, "$name: websocket: ignoring event for id $id";
           $hash->{helper}{ignored}{$code} = 1;
           return;
@@ -261,7 +268,7 @@ HUEBridge_Detect($)
 
   my ($err,$ret) = HttpUtils_BlockingGet({
     url => "https://discovery.meethue.com/",
-    method => "GET",
+    #method => "GET",
   });
 
   if( defined($err) && $err ) {
@@ -345,9 +352,9 @@ HUEBridge_Rename($$$)
 
   foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
     next if( !$chash->{IODev} );
-    next if( $chash->{IODev}{NAME} ne $new );
+    next if( $chash->{IODev}{NAME} ne $new );   # IODev already points to the renamed device!
 
-    HUEDevice_IODevChanged($chash, $old, $new);
+    HUEDevice_IODevChanged($chash, $old, $new); # updete DEF & defptr key
   }
 }
 sub
@@ -597,15 +604,12 @@ HUEBridge_OpenDev($)
   }
   Log3 $name, 5, "HUEBridge_OpenDev: got config " . Dumper $result;
 
+  HUEBridge_fillBridgeInfo($hash, $result);
   if( !defined($result->{'linkbutton'}) || !AttrVal($name, 'key', undef) )
     {
-      HUEBridge_fillBridgeInfo($hash, $result);
-
       HUEBridge_Pair($hash);
       return;
 
-    } else {
-      HUEBridge_fillBridgeInfo($hash, $result);
     }
 
   $hash->{mac} = $result->{mac};
@@ -2009,18 +2013,19 @@ HUEBridge_Autocreate($;$$)
 
     my $devname = "HUEDevice" . $id;
     $devname = $name ."_". $devname if( $hash->{helper}{count} );
-    my $define= "$devname HUEDevice $id IODev=$name";
+    my $define = "$devname HUEDevice $id IODev=$name";
 
     Log3 $name, 4, "$name: create new device '$devname' for address '$id'";
 
-    my $cmdret= CommandDefine(undef,$define);
+    my $cmdret = CommandDefine(undef,$define);
     if($cmdret) {
       Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+
     } else {
-      $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
-      $cmdret= CommandAttr(undef,"$devname room HUEDevice");
-      $cmdret= CommandAttr(undef,"$devname group HUEDevice");
-      $cmdret= CommandAttr(undef,"$devname IODev $name");
+      $cmdret .= CommandAttr(undef,"$devname IODev $name");
+      $cmdret .= CommandAttr(undef,"$devname group HUEDevice");
+      $cmdret .= CommandAttr(undef,"$devname alias ". $result->{$id}{name});
+      $cmdret .= CommandAttr(undef,"$devname room ". AttrVal( $name, 'room', 'HUEDevice') );
 
       HUEDeviceSetIcon($devname);
       $defs{$devname}{helper}{fromAutocreate} = 1 ;
@@ -2046,20 +2051,21 @@ HUEBridge_Autocreate($;$$)
       next;
     }
 
-    my $devname= "HUEGroup" . $id;
+    my $devname = "HUEGroup" . $id;
     $devname = $name ."_". $devname if( $hash->{helper}{count} );
-    my $define= "$devname HUEDevice group $id IODev=$name";
+    my $define = "$devname HUEDevice group $id IODev=$name";
 
     Log3 $name, 4, "$name: create new group '$devname' for address '$id'";
 
-    my $cmdret= CommandDefine(undef,$define);
+    my $cmdret = CommandDefine(undef,$define);
     if($cmdret) {
       Log3 $name, 1, "$name: Autocreate: An error occurred while creating group for id '$id': $cmdret";
+
     } else {
-      $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
-      $cmdret= CommandAttr(undef,"$devname room HUEDevice");
-      $cmdret= CommandAttr(undef,"$devname group HUEGroup");
-      $cmdret= CommandAttr(undef,"$devname IODev $name");
+      $cmdret .= CommandAttr(undef,"$devname IODev $name");
+      $cmdret .= CommandAttr(undef,"$devname group HUEGroup");
+      $cmdret .= CommandAttr(undef,"$devname alias ". $result->{$id}{name});
+      $cmdret .= CommandAttr(undef,"$devname room ". AttrVal( $name, 'room', 'HUEDevice') );
 
       HUEDeviceSetIcon($devname);
       $defs{$devname}{helper}{fromAutocreate} = 1 ;
@@ -2085,20 +2091,21 @@ HUEBridge_Autocreate($;$$)
         next;
       }
 
-      my $devname= "HUESensor" . $id;
+      my $devname = "HUESensor" . $id;
       $devname = $name ."_". $devname if( $hash->{helper}{count} );
-      my $define= "$devname HUEDevice sensor $id IODev=$name";
+      my $define = "$devname HUEDevice sensor $id IODev=$name";
 
       Log3 $name, 4, "$name: create new sensor '$devname' for address '$id'";
 
-      my $cmdret= CommandDefine(undef,$define);
+      my $cmdret = CommandDefine(undef,$define);
       if($cmdret) {
         Log3 $name, 1, "$name: Autocreate: An error occurred while creating sensor for id '$id': $cmdret";
+
       } else {
-        $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
-        $cmdret= CommandAttr(undef,"$devname room HUEDevice");
-        $cmdret= CommandAttr(undef,"$devname group HUESensor");
-        $cmdret= CommandAttr(undef,"$devname IODev $name");
+        $cmdret .= CommandAttr(undef,"$devname IODev $name");
+        $cmdret .= CommandAttr(undef,"$devname group HUESensor");
+        $cmdret .= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
+        $cmdret .= CommandAttr(undef,"$devname room ". AttrVal( $name, 'room', 'HUEDevice') );
 
         HUEDeviceSetIcon($devname);
         $defs{$devname}{helper}{fromAutocreate} = 1 ;
@@ -2581,6 +2588,7 @@ HUEBridge_dispatch($$$;$)
                    #$creationtime = FmtDateTime( SVG_time_to_sec($creationtime) + $hash->{helper}{offsetUTC}  ) if( defined($hash->{helper}{offsetUTC}) );
                    #substr( $creationtime, 10, 1, 'T' );
                 my $obj = {      state => { lastupdated => $creationtime },
+                                source =>  'event',
                                  v2_id => $data->{owner}{rid},
                             v2_service => $data->{id} };
                    $obj->{v2_id} = $obj->{v2_service} if( $t eq 'groups' );
@@ -3074,8 +3082,8 @@ __END__
 =item tag cloudfree
 =item tag publicAPI
 =item tag protocol:zigbee
-=item summary    module for the philips hue bridge
-=item summary_DE Modul f&uuml;r die Philips HUE Bridge
+=item summary    module for Philips HUE Bridges (and deCONZ)
+=item summary_DE Modul f&uuml;r die Philips HUE Bridge (und deCONZ)
 =begin html
 
 <a id="HUEBridge"></a>
