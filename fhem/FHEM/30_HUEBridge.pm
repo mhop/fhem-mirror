@@ -1126,6 +1126,36 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'configlight' || $cmd eq 'setlight' || $cmd eq 'updatelight') {
+    return "usage: $cmd <id> <json>" if( @args < 2 );
+
+    if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue light" if( $defs{$arg}{ID} );
+    }
+    return "$arg is not a hue sensor number" if( $arg !~ m/^\d+$/ );
+
+    my $json = join( ' ', @args[1..@args-1]);
+    my $decoded = eval { JSON->new->utf8(0)->decode($json) };
+    if( $@ ) {
+      Log3 $name, 2, "$name: json error: $@ in $json";
+      return undef;
+    }
+    $json = $decoded;
+
+    my $endpoint = '';
+    $endpoint = 'state' if( $cmd eq 'setlight' );
+    $endpoint = 'config' if( $cmd eq 'configlight' );
+
+    my $result = HUEBridge_Call($hash, undef, "lights/$arg/$endpoint", $json, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    my $code = $name ."-". $arg;
+    if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+      HUEDevice_GetUpdate($chash);
+    }
+
+    return undef;
+
   } elsif($cmd eq 'deletewhitelist') {
     return "usage: deletewhitelist <key>" if( @args != 1 );
 
@@ -1314,7 +1344,7 @@ HUEBridge_Set($@)
       $list .= " scene";
     }
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
-    $list .= " createrule updaterule updateschedule enableschedule disableschedule deleterule createsensor deletesensor configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    $list .= " createrule updaterule updateschedule enableschedule disableschedule deleterule createsensor deletesensor configlight configsensor setsensor updatesensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
 
     if( $hash->{has_v2_api} ) {
       $list .= " refreshv2resources v2json v2scene ";
@@ -3198,6 +3228,8 @@ __END__
       Creates a new CLIP (IP) sensor in the bridge.</li>
     <a id="HUEBridge-set-deletesensor"></a><li>deletesensor &lt;id&gt;<br>
       Deletes the given sensor in the bridge and deletes the associated fhem device.</li>
+    <a id="HUEBridge-set-configlight"></a><li>configlight &lt;id&gt; &lt;json&gt;<br>
+      Write light config data.</li>
     <a id="HUEBridge-set-configsensor"></a><li>configsensor &lt;id&gt; &lt;json&gt;<br>
       Write sensor config data.</li>
     <a id="HUEBridge-set-setsensor"></a><li>setsensor &lt;id&gt; &lt;json&gt;<br>
