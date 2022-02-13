@@ -12,7 +12,7 @@
 #  CCU group devices, HomeGear, CUxD, Osram Lightify, Homematic Virtual Layer
 #  and Philips Hue (not tested)
 #
-#  (c) 2021 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2022 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 220301356';
+my $HMCCU_VERSION = '5.0 220431743';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -2485,15 +2485,15 @@ sub HMCCU_ModifyReadingName ($$)
 	my $f = 0;
 
 	foreach my $rr (@$srl) {
-		my ($rold, $rnew) = split (':', $rr);
-		if (!defined ($rnew) || $rnew eq '') {
-			# Suppress reading
-			$f = 1;
-			next;
-		}
-		my @rnewList = split (',', $rnew);
+		my ($rold, $rnw) = split (':', $rr);
+		next if (!defined($rold) || $rold eq '');
 		if ($rn =~ /$rold/) {
-			foreach my $rnew (@rnewList) {
+			if (!defined ($rnw) || $rnw eq '') {
+				# Suppress reading
+				$f = 1;
+				next;
+			}
+			foreach my $rnew (split (',', $rnw)) {
 				my $radd = $rn;
 				if ($rnew =~ /^\+(.+)$/) {
 					# Add new reading
@@ -2718,10 +2718,14 @@ sub HMCCU_Log ($$$;$)
 
 	if (ref($msg) eq 'ARRAY') {
 		foreach my $m (@$msg) {
+			# Remove credentials from URLs
+			$m =~ s/(https?:\/\/)[^\@]+\@/$1/g;
 			Log3 $logname, $level, "$type [$name] $m";
 		}
 	}
 	else {
+		# Remove credentials from URLs
+		$msg =~ s/(https?:\/\/)[^\@]+\@/$1/g;
 		Log3 $logname, $level, "$type [$name] $msg";
 	}
 
@@ -7837,8 +7841,11 @@ sub HMCCU_ExecuteGetParameterCommand ($@)
 	
 	my %objects;
 	foreach my $a (@$addList) {
-		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $clHash->{ccuif}) // return HMCCU_Log (
-			$clHash, 2, "Can't get device description", undef);
+		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $clHash->{ccuif});
+		if (!defined($devDesc)) {
+			HMCCU_Log ($clHash, 2, "Can't get device description");
+			return undef;
+		}
 		
 		my $paramset = $defParamset eq '' ? $devDesc->{PARAMSETS} : $defParamset;
 		my ($da, $dc) = HMCCU_SplitChnAddr ($a, 'd');
@@ -10088,6 +10095,15 @@ sub HMCCU_Min ($$)
 {
 	my ($a, $b) = @_;
 	
+	if (!defined($a) || !defined($b)) {
+		HMCCU_Log (undef, 2, "Argument not defined in HMCCU_Min ".stacktraceAsString(undef));
+		return 0;
+	}
+	if (!HMCCU_IsFltNum($a) || !HMCCU_IsFltNum($b)) {
+		HMCCU_Log (undef, 2, "Argument $a or $b isn't numeric in HMCCU_Min ".stacktraceAsString(undef));
+		return 0;
+	}
+	
 	return $a < $b ? $a : $b;
 }
 
@@ -10095,6 +10111,15 @@ sub HMCCU_Max ($$)
 {
 	my ($a, $b) = @_;
 	
+	if (!defined($a) || !defined($b)) {
+		HMCCU_Log (undef, 2, "Argument not defined in HMCCU_Min ".stacktraceAsString(undef));
+		return 0;
+	}
+	if (!HMCCU_IsFltNum($a) || !HMCCU_IsFltNum($b)) {
+		HMCCU_Log (undef, 2, "Argument $a or $b isn't numeric in HMCCU_Max ".stacktraceAsString(undef));
+		return 0;
+	}
+
 	return $a > $b ? $a : $b;
 }
 
@@ -10537,7 +10562,7 @@ sub HMCCU_BitsToStr ($$)
 
 sub HMCCU_AdjustValue ($$$)
 {
-	my ($value, $low, $high);
+	my ($value, $low, $high) = @_;;
 	
 	return $low if ($value < $low);
 	return $high if ($value > $high);

@@ -17,7 +17,7 @@
 #    RPC::XML::Client
 #    RPC::XML::Server
 #
-# ND deaktiviert in Read und Write!!
+# ND deactivated in Read and Write!!
 ##############################################################################
 
 
@@ -31,7 +31,7 @@ use RPC::XML::Client;
 use RPC::XML::Server;
 use SetExtensions;
 
-require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
+# require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 
 
 ######################################################################
@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '5.0 220301356';
+my $HMCCURPCPROC_VERSION = '5.0 220431743';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -1001,17 +1001,23 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 
 	# Detect event type and clkey
 	my ($et, $clkey, $evdata) = split (/\|/, $event, 3);
-	return HMCCU_Log ($hash, 2, "Syntax error in RPC event data $event", undef)
-		if (!defined($evdata));
+
+	if (!defined($evdata)) {
+		HMCCU_Log ($hash, 2, "Syntax error in RPC event data $event");
+		return undef;
+	}	
 
 	# Check for valid server
-	return HMCCU_Log ($hash, 2, "Received $et event for unknown RPC server $clkey", undef)
-		if ($clkey ne $rpcname);
+	if ($clkey ne $rpcname) {
+		HMCCU_Log ($hash, 2, "Received $et event for unknown RPC server $clkey");
+		return undef;
+	}
 
 	# Check event type
 	if (!exists ($rpceventargs{$et})) {
 		$et =~ s/([\x00-\xFF])/sprintf("0x%X ",ord($1))/eg;
-		return HMCCU_Log ($hash, 2, "Received unknown event from CCU: $et", undef);
+		HMCCU_Log ($hash, 2, "Received unknown event from CCU: $et");
+		return undef;
 	}
 
 	# Parse event
@@ -1019,8 +1025,10 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 	my $tc = scalar(@t);
 	
 	# Check event parameters
-	return HMCCU_Log ($hash, 2, "Wrong number of $tc parameters in event $event. Expected ". 
-		$rpceventargs{$et}, undef) if ($tc != $rpceventargs{$et});
+	if ($tc != $rpceventargs{$et}) {
+		HMCCU_Log ($hash, 2, "Wrong number of $tc parameters in event $event. Expected ".$rpceventargs{$et});
+		return undef;
+	}
 
 	# Update statistic counters
 	$rh->{rec}{$et}++;
@@ -1061,7 +1069,8 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 			return ($et, $clkey, ($srun == 0 ? 1 : 0), $srun);
 		}
 		else {
-			return HMCCU_Log ($hash, 0, "Received SL event. Wrong PID=".$t[0]." for RPC server $clkey", undef);
+			HMCCU_Log ($hash, 0, "Received SL event. Wrong PID=".$t[0]." for RPC server $clkey");
+			return undef;
 		}
 	}
 	elsif ($et eq 'IN') {
@@ -1454,15 +1463,19 @@ sub HMCCURPCPROC_InitRPCServer ($$$$)
 	if ($prot eq 'B') {
 		$server->{__daemon} = IO::Socket::INET->new (LocalPort => $cbPort,
 			Type => SOCK_STREAM, Reuse => 1, Listen => SOMAXCONN);
-		return HMCCU_Log ($name, 1, "Can't create RPC callback server $clkey. Port $cbPort in use?", undef)
-			if (!($server->{__daemon}));
+		if (!($server->{__daemon})) {
+			HMCCU_Log ($name, 1, "Can't create RPC callback server $clkey. Port $cbPort in use?");
+			return undef;
+		}
 		return $server;
 	}
 	
 	# Create XML RPC server
 	$server = RPC::XML::Server->new (port => $cbPort);
-	return HMCCU_Log ($name, 1, "Can't create RPC callback server $clkey. Port $cbPort in use?", undef)
-		if (!ref($server));
+	if (!ref($server)) {
+		HMCCU_Log ($name, 1, "Can't create RPC callback server $clkey. Port $cbPort in use?");
+		return undef;
+	}
 	HMCCU_Log ($name, 2, "Callback server $clkey created. Listening on port $cbPort");
 
 	# Callback for events

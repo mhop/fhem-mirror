@@ -8,7 +8,7 @@
 #
 #  Configuration parameters for HomeMatic devices.
 #
-#  (c) 2021 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2022 by zap (zap01 <at> t-online <dot> de)
 #
 #########################################################################
 
@@ -207,6 +207,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
+	},
+	'TILT_SENSOR' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 1
 	},
 	'VIRTUAL_KEY' => {
 		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1

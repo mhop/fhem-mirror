@@ -6,7 +6,7 @@
 #
 #  Version 5.0
 #
-#  (c) 2021 zap (zap01 <at> t-online <dot> de)
+#  (c) 2022 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #  Client device for Homematic channels.
@@ -19,7 +19,7 @@ use strict;
 use warnings;
 use SetExtensions;
 
-require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
+# require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 
 sub HMCCUCHN_Initialize ($);
 sub HMCCUCHN_Define ($@);
@@ -30,7 +30,7 @@ sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
 
-my $HMCCUCHN_VERSION = '5.0 220301356';
+my $HMCCUCHN_VERSION = '5.0 220431743';
 
 ######################################################################
 # Initialize module

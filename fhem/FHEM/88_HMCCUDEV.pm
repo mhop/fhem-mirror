@@ -6,7 +6,7 @@
 #
 #  Version 5.0
 #
-#  (c) 2021 zap (zap01 <at> t-online <dot> de)
+#  (c) 2022 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #  Client device for Homematic devices.
@@ -20,7 +20,7 @@ use warnings;
 # use Data::Dumper;
 use SetExtensions;
 
-require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
+# require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 
 sub HMCCUDEV_Initialize ($);
 sub HMCCUDEV_Define ($@);
@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 220301356';
+my $HMCCUDEV_VERSION = '5.0 220431743';
 
 ######################################################################
 # Initialize module
@@ -719,12 +719,12 @@ sub HMCCUDEV_Get ($@)
       commands are allowed:
       <br/><br/>
       <ul>
-      <li>text1-3=Text - Content of display line 2-4</li>
-      <li>icon1-3=IconCode - Icons of display line 2-4</li>
-      <li>sound=SoundCode - Sound</li>
-      <li>signal=SignalCode - Optical signal</li>
-      <li>pause=Seconds - Pause between signals (1-160)</li>
-      <li>repeat=Count - Repeat count for sound (0-15)</li>
+      <li>text1-3:Text - Content of display line 2-4</li>
+      <li>icon1-3:IconCode - Icons of display line 2-4</li>
+      <li>sound:SoundCode - Sound</li>
+      <li>signal:SignalCode - Optical signal</li>
+      <li>pause:Seconds - Pause between signals (1-160)</li>
+      <li>repeat:Count - Repeat count for sound (0-15)</li>
       </ul>
       <br/>
       IconCode := ico_off, ico_on, ico_open, ico_closed, ico_error, ico_ok, ico_info,
@@ -734,7 +734,7 @@ sub HMCCUDEV_Get ($@)
       snd_long<br/><br/>
       Example:<br/>
       <code>
-      set HM_EPDISP datapoint 3.SUBMIT "text1:Line2,text2:Has Blank,text3:10:05:21,sound:snd_short,signal:sig_red
+      set HM_EPDISP datapoint 3.SUBMIT text1:Line2,text2:Has Blank,text3:10:05:21,sound:snd_short,signal:sig_red
       </code>
       </li>
    </ul>
