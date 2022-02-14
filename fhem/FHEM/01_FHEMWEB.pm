@@ -358,6 +358,8 @@ FW_Read($$)
     # Data from HTTP Client
     my $buf;
     my $ret = sysread($c, $buf, 1024);
+    $buf = Encode::decode($hash->{encoding}, $buf)
+                if($unicodeEncoding && $hash->{encoding});
 
     if(!defined($ret) && $! == EWOULDBLOCK ){
       $hash->{wantWrite} = 1
@@ -461,6 +463,10 @@ FW_Read($$)
                          $k =~ s/(\w+)/\u$1/g; #39203
                          $k=>(defined($v) ? $v : 1);
                        } @FW_httpheader;
+  if(!$hash->{encoding}) {
+    my $ct = $FW_httpheader{"Content-Type"};
+    $hash->{encoding} = ($ct && $ct =~ m/charset\s*=\s*(\S*)/i ? $1 : $FW_encoding);
+  }
   delete($hash->{HDR});
 
   my @origin = grep /Origin/i, @FW_httpheader;
@@ -612,12 +618,14 @@ FW_finishRead($$$)
   my $name = $hash->{NAME};
 
   my $compressed = "";
+  my $encoded = "";
   if($FW_RETTYPE =~ m/(text|xml|json|svg|script)/i &&
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use{zlib}) {
-    utf8::encode($FW_RET)
-        if(utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/ );
+    $FW_RET = Encode::encode($hash->{encoding}, $FW_RET)
+        if($unicodeEncoding || (utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/));
+    $encoded = 1;
     eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
     if($@) {
       Log 1, "memGzip: $@"; $FW_RET=""; #Forum #29939
@@ -637,8 +645,8 @@ FW_finishRead($$$)
            "HTTP/1.1 $FW_httpRetCode\r\n" .
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
-           "Content-Type: $FW_RETTYPE\r\n\r\n" .
-           $FW_RET, "FW_closeConn", 1) ){
+           "Content-Type: text/html; charset=$FW_RETTYPE\r\n\r\n" .
+           $FW_RET, "FW_closeConn", 1, $encoded) ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
       if(!$hash->{isChild});
     FW_closeConn($hash);
@@ -713,9 +721,11 @@ FW_initInform($$)
 sub
 FW_addToWritebuffer($$@)
 {
-  my ($hash, $txt, $callback, $nolimit) = @_;
+  my ($hash, $txt, $callback, $nolimit, $encoded) = @_;
 
-  utf8::encode($txt) if(utf8::is_utf8($txt) && $txt =~ m/[^\x00-\xFF]/ );
+  $txt = Encode::encode($hash->{encoding}, $txt)
+          if(!$encoded && ($unicodeEncoding ||
+                            (utf8::is_utf8($txt) && $txt =~ m/[^\x00-\xFF]/)));
   if( $hash->{websocket} ) {
     my $len = length($txt);
     if( $len < 126 ) {

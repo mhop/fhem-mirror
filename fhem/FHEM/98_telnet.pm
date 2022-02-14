@@ -193,6 +193,7 @@ telnet_Read($)
 
   my $buf;
   my $ret = sysread($hash->{CD}, $buf, 256);
+
   if(!defined($ret) || $ret <= 0) {
     if($hash->{isClient}) {
       telnet_ClientDisconnect($hash, 0);
@@ -217,6 +218,8 @@ telnet_Read($)
       syswrite($hash->{CD}, sprintf("%c%c%c", 0xff, 0xfc, ord($1)))
     }
   }
+
+  $buf = Encode::decode('UTF-8', $buf) if($unicodeEncoding);
   $hash->{BUF} .= $buf;
   my @ret;
   my $gotCmd;
@@ -300,7 +303,8 @@ telnet_Output($$$)
       $ret = "$ret\n"                   if(!$hash->{showPrompt});
     }
     for(;;) {
-      utf8::encode($ret) if(utf8::is_utf8($ret) && $ret =~ m/[^\x00-\xFF]/);
+      $ret = Encode::encode('UTF-8', $ret) if($unicodeEncoding ||
+                            utf8::is_utf8($ret) && $ret =~ m/[^\x00-\xFF]/);
       my $l = syswrite($hash->{CD}, $ret);
       last if(!$l || $l == length($ret));
       $ret = substr($ret, $l);

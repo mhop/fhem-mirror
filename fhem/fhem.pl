@@ -31,6 +31,7 @@ use Time::HiRes qw(gettimeofday);
 use Scalar::Util qw(looks_like_number);
 use POSIX;
 use File::Copy qw(copy);
+use Encode;
 
 ##################################################
 # Forward declarations
@@ -235,6 +236,7 @@ use vars qw($addTimerStacktrace);# set to 1 by fhemdebug
 use vars qw($auth_refresh);
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw($unicodeEncoding);  # internal encoding is unicode (wide character)
 use vars qw($featurelevel); 
 use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
 use vars qw($fhemTestFile);     # file to include if -t is specified
@@ -245,6 +247,7 @@ use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
 use vars qw($lastDefChange);    # number of last def/attr change
 use vars qw($lastWarningMsg);   # set by the warnings-sub
 use vars qw($nextat);           # Time when next timer will be triggered.
+use vars qw($numCPUs);          # Number of CPUs on Linux, else 1
 use vars qw($reread_active);
 use vars qw($selectTimestamp);  # used to check last select exit timestamp
 use vars qw($winService);       # the Windows Service object
@@ -266,7 +269,6 @@ use vars qw(%value);            # Current values, see commandref.html
 
 use vars qw(@intAtA);           # Internal timer array
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
-use vars qw($numCPUs);          # Number of CPUs on Linux, else 1
 
 use constant {
   DAYSECONDS    => 86400,
@@ -302,6 +304,7 @@ my %sleepers;                   # list of sleepers
 my %delayedShutdowns;           # definitions needing delayed shutdown
 my %fuuidHash;                  # for duplicate checking
 my $globalUniqueID;             # cache it
+my $LOG;                        # Log file handle, formerly LOG
 
 my $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
@@ -336,6 +339,7 @@ my @globalAttrList = qw(
   dnsServer
   dupTimeout
   exclude_from_update
+  encoding:utf8,unicode
   hideExcludedUpdates:1,0
   featurelevel:6.1,6.0,5.9,5.8,5.7,5.6,5.5,99.99
   genericDisplayType:switch,outlet,light,blind,speaker,thermostat
@@ -1006,7 +1010,7 @@ Log3($$$)
   }
 
   if($logopened) {
-    print LOG "$tim $loglevel: $text\n";
+    print $LOG "$tim $loglevel: $text\n";
   } else {
     print "$tim $loglevel: $text\n";
   }
@@ -1377,9 +1381,11 @@ CommandInclude($$)
   my @ret;
   my $oldcfgfile;
 
-  if(!open($fh, $arg)) {
+  my $type = ($unicodeEncoding ? "< :encoding(UTF-8)" : "<");
+  if(!open($fh, $type, $arg)) {
     return "Can't open $arg: $!";
   }
+  
   Log 1, "Including $arg";
   my @t = localtime(gettimeofday());
   my $gcfg = ResolveDateWildcards(AttrVal("global", "configfile", ""), @t);
@@ -1426,28 +1432,29 @@ OpenLogfile($)
 {
   my $param = shift;
 
-  close(LOG);
+  close($LOG) if($LOG);
   $logopened=0;
   $currlogfile = $param;
 
   # STDOUT is closed in windows services per default
+
   if(!$winService->{AsAService} && $currlogfile eq "-") {
-    open LOG, '>&STDOUT' || die "Can't dup stdout: $!";
+    open($LOG, '>&STDOUT') || die "Can't dup stdout: $!";
 
   } else {
-
     HandleArchiving($defs{global}) if($defs{global}{currentlogfile});
     $defs{global}{currentlogfile} = $param;
     $defs{global}{logfile} = $attr{global}{logfile};
 
     restoreDir_mkDir($currlogfile=~m,^/,? "":".", $currlogfile, 1);
-    open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
+    open($LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
     redirectStdinStdErr();
     
   }
-  LOG->autoflush(1);
+  binmode($LOG, ":encoding(UTF-8)") if($unicodeEncoding);
+  $LOG->autoflush(1);
   $logopened = 1;
-  $defs{global}{FD} = LOG->fileno();
+  $defs{global}{FD} = $LOG->fileno(); # ??
   return undef;
 }
 
@@ -1609,28 +1616,30 @@ WriteStatefile()
   my @t = localtime($now);
   $stateFile = ResolveDateWildcards($stateFile, @t);
 
-  if(!open(SFH, ">$stateFile")) {
+  my $SFH;
+  if(!open($SFH, ">$stateFile")) {
     my $msg = "WriteStatefile: Cannot open $stateFile: $!";
     Log 1, $msg;
     return $msg;
   }
+  binmode($SFH, ":encoding(UTF-8)") if($unicodeEncoding);
 
   my $t = localtime($now);
-  print SFH "#$t\n";
+  print $SFH "#$t\n";
 
   foreach my $d (sort keys %defs) {
     next if($defs{$d}{TEMPORARY});
     if($defs{$d}{VOLATILE}) {
       my $def = $defs{$d}{DEF};
       $def =~ s/;/;;/g; # follow-on-for-timer at
-      print SFH "define $d $defs{$d}{TYPE} $def\n";
+      print $SFH "define $d $defs{$d}{TYPE} $def\n";
     }
 
     my @arr = GetAllReadings($d);
-    print SFH join("\n", @arr)."\n" if(@arr);
+    print $SFH join("\n", @arr)."\n" if(@arr);
   }
 
-  return "$attr{global}{statefile}: $!" if(!close(SFH));
+  return "$attr{global}{statefile}: $!" if(!close($SFH));
   return "";
 }
 
@@ -1721,10 +1730,12 @@ CommandSave($$)
   $param = $attr{global}{configfile} if(!$param);
   return "No configfile attribute set and no argument specified" if(!$param);
   restoreDir_saveFile($restoreDir, $param);
-  if(!open(SFH, ">$param")) {
+  my $SFH;
+  if(!open($SFH, ">$param")) {
     return "Cannot open $param: $!";
   }
-  my %fh = ("configfile" => *SFH);
+  binmode($SFH, ":encoding(UTF-8)") if($unicodeEncoding);
+  my %fh = ("configfile" => $SFH);
   my %skip;
 
   my %devByNr;
@@ -1756,6 +1767,7 @@ CommandSave($$)
       } else {
         $fh{$cfgfile} = $fh;
       }
+      binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
     }
     next if($skip{$cfgfile});
 
@@ -1769,7 +1781,7 @@ CommandSave($$)
 
   }
 
-  print SFH "include $attr{global}{lastinclude}\n"
+  print $SFH "include $attr{global}{lastinclude}\n"
         if($attr{global}{lastinclude} && $featurelevel <= 5.6);
 
   foreach my $key (keys %fh) {
@@ -2869,6 +2881,7 @@ GlobalAttr($$$$)
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 6.1 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
+    $unicodeEncoding = undef if($name eq "encoding");
     delete($defs{global}{ignoreRegexpObj}) if($name eq "ignoreRegexp");
     return undef;
   }
@@ -2876,6 +2889,7 @@ GlobalAttr($$$$)
   my $ev = $globalAttrFromEnv->{$name};
   return "$name is readonly, it is set in the FHEM_GLOBALATTR environment"
     if(defined($ev) && defined($val) && $ev ne $val);
+
 
   ################
   if($name eq "logfile") {
@@ -2885,6 +2899,13 @@ GlobalAttr($$$$)
       return $ret if($init_done);
       die($ret);
     }
+  }
+
+  if($name eq "encoding") {     # Should be called from fhem.cfg/configDB
+    return "bad encoding parameter $val, good values are utf8 or unicode"
+      if($val ne "unicode" && $val ne "utf8");
+    $unicodeEncoding = ($val eq "unicode");
+    $currlogfile = "";
   }
 
   ################
