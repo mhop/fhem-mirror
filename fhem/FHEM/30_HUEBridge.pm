@@ -2764,6 +2764,8 @@ HUEBridge_dispatch($$$;$)
               } elsif( !$hash->{helper}{ignored}{$code} && !AttrVal($name, 'ignoreUnknown', undef) ) {
                 Log3 $name, 3, "$name: EventStream: update for unknown device received: $code";
 
+                HUEBridge_schedule($hash,'HUEBridge_Autocreate');
+
               }
             }
 
