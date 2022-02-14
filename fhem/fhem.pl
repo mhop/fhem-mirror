@@ -5679,13 +5679,16 @@ FileRead($)
     ($err, @ret) = cfgDB_FileRead($fileName);
 
   } else {
-    if(open(FH, $fileName)) {
-      @ret = <FH>;
-      close(FH);
+    my $FH;
+    if(open($FH, $fileName)) {
+      binmode($FH, ":encoding(UTF-8)") if($unicodeEncoding);
+      @ret = <$FH>;
+      close($FH);
       chomp(@ret);
     } else {
       $err = "Can't open $fileName: $!";
     }
+
   }
 
   return ($err, @ret);
@@ -5711,12 +5714,14 @@ FileWrite($@)
     return cfgDB_FileWrite($fileName, @rows);
 
   } else {
-    if(open(FH, ">$fileName")) {
-      binmode (FH);
+    my $FH;
+    if(open($FH, ">$fileName")) {
+      binmode($FH);
+      binmode($FH, ":encoding(UTF-8)") if($unicodeEncoding);
       foreach my $l (@rows) {
-        print FH $l,$nl;
+        print $FH $l,$nl;
       }
-      close(FH);
+      close($FH);
       return undef;
 
     } else {
