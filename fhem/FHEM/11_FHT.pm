@@ -140,6 +140,7 @@ my %warnings = (
 );
 
 my %priority = (
+  "minute"      => 0,
   "desired-temp"=> 1,
   "mode"	=> 2,
   "report1"     => 3,
