@@ -596,8 +596,11 @@ FHT_Parse($$)
       my $h = $io->{SOFTBUFFER}{$key};
       my $hcmd = $h->{CMD};
       my $hname = $h->{HASH}->{NAME};
-      Log3 $name, 4, "FHT softbuffer check: $hname / $hcmd";
-      if($hname eq $name && $hcmd =~ m/^$cmd $val/) {
+      my $val2 = ($val eq "30.5" ? "on" :
+                  $val eq  "5.5" ? "off" : "");
+      Log3 $name, 4, "FHT softbuffer check: $hname / $hcmd / $val / $val2";
+      if($hname eq $name && ($hcmd =~ m/^$cmd $val/ ||
+                             $hcmd =~ m/^$cmd $val2/) {
         $found = $key;
         Log3 $name, 4, "FHT softbuffer found";
         last;
