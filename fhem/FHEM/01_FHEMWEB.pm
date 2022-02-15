@@ -645,7 +645,7 @@ FW_finishRead($$$)
            "HTTP/1.1 $FW_httpRetCode\r\n" .
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
-           "Content-Type: text/html; charset=$FW_RETTYPE\r\n\r\n" .
+           "Content-Type: $FW_RETTYPE\r\n\r\n" .
            $FW_RET, "FW_closeConn", 1, $encoded) ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
       if(!$hash->{isChild});
