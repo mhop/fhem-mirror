@@ -1445,7 +1445,7 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state\
-  STATTOPIC/RESULT:.* { $EVENT =~ m,\A..NSPanel.+id...(\d+).+params..(.+)..\z, ? json2nameValue($2,"Pan_${1}_",$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }
+  TELETOPIC/RESULT:.* { $EVENT =~ m,\A..NSPanel.+id...(\d+).+params..(.+)..\z, ? json2nameValue($2,"Pan_${1}_",$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -1461,7 +1461,7 @@ state
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
 attr DEVICE,DEVICE_CH2 webCmd :
 attr DEVICE,DEVICE_CH2 model tasmota_NSPanel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220128
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220215
 
 
 #contributed by 87insane
@@ -4337,7 +4337,7 @@ setreading DEVICE attrTemplateVersion 20211207
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.
 order:X_02a
