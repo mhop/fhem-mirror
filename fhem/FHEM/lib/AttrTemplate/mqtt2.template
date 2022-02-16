@@ -1620,7 +1620,7 @@ attr DEVICE readingList \
    STATTOPIC/POWER1:.* {{'state' => 'opening'} if $EVENT eq 'on'}\
    STATTOPIC/POWER2:.* {{'state' => 'closing'} if $EVENT eq 'on'}\
    STATTOPIC/SHUTTER1:.* state
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','Offline') eq 'Offline' ? 'rot' : 'gruen'; $onl = FW_makeImage("10px-kreis-$onl"); my $ip = ReadingsVal($name,'IPAddress','none'); my $pct = maxNum(int((109 - ReadingsNum($name,'pct',0))/10)*10, 1); my $open = ReadingsVal($name,'state',''); my $lvicon = $open eq 'opening' ? 'fts_shutter_up@red' : $open eq 'closing' ? 'fts_shutter_down@red' : "fts_shutter_$pct"; $lvicon = FW_makeImage($lvicon); my $lvcmd = ($open eq 'opening' || $open eq 'closing') ? 'stop' : $pct > 50 ? 'open' : 'close'; my $slt = ReadingsNum($name,'tiltSlat',90); my $slticon = 'fts_blade_arc_close_'; $slticon .= $slt > 0 ? '00' : $slt > -45 ? '50' : '100'; $slticon = FW_makeImage($slticon); my $sltcmd = $slt > 0 ? 'closeSlat' : $slt > -45 ? 'openSlat' : 'halfSlat'; qq(<a href="http://$ip" target="_blank">$onl</a> <div><a href="/fhem?cmd.dummy=set $name $lvcmd&XHR=1">$lvicon</a></div> <div><a href="/fhem?cmd.dummy=set $name $sltcmd&XHR=1">$slticon $slt</a>) }
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','Offline') eq 'Offline' ? 'rot' : 'gruen'; $onl = FW_makeImage("10px-kreis-$onl"); my $ip = ReadingsVal($name,'IPAddress','none'); my $pct = maxNum(int((109 - ReadingsNum($name,'pct',0))/10)*10, 1); my $open = ReadingsVal($name,'state',''); my $lvicon = $open eq 'opening' ? 'fts_shutter_up@red' : $open eq 'closing' ? 'fts_shutter_down@red' : "fts_shutter_$pct"; $lvicon = FW_makeImage($lvicon); my $lvcmd = ($open eq 'opening' || $open eq 'closing') ? 'stop' : $pct > 50 ? 'close' : 'open'; my $slt = ReadingsNum($name,'tiltSlat',90); my $slticon = 'fts_blade_arc_close_'; $slticon .= $slt > 0 ? '00' : $slt > -45 ? '50' : '100'; $slticon = FW_makeImage($slticon); my $sltcmd = $slt > 0 ? 'closeSlat' : $slt > -45 ? 'openSlat' : 'halfSlat'; qq(<a href="http://$ip" target="_blank">$onl</a> <div><a href="/fhem?cmd.dummy=set $name $lvcmd&XHR=1">$lvicon</a></div> <div><a href="/fhem?cmd.dummy=set $name $sltcmd&XHR=1">$slticon $slt</a>) }
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd pct:tiltSlat
 #attr DEVICE eventMap open:opens close:closes
@@ -1636,7 +1636,7 @@ This is for a tilt range from -90 to 90 degrees, if you have different tilt opti
 For calibration, tilt range settings, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
-setreading DEVICE attrTemplateVersion 20220214
+setreading DEVICE attrTemplateVersion 20220216
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 
