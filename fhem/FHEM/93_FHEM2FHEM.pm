@@ -138,14 +138,14 @@ sub
 FHEM2FHEM_Read($)
 {
   my ($hash) = @_;
+  my $buf;
+  my $res = sysread($hash->{TCPDev}, $buf, 256);
 
-  my $buf = FHEM2FHEM_SimpleRead($hash);
-  my $name = $hash->{NAME};
-
-  ###########
-  # Lets' try again: Some drivers return len(0) on the first read...
-  if(defined($buf) && length($buf) == 0) {
-    $buf = FHEM2FHEM_SimpleRead($hash);
+  if($hash->{SSL} && !defined($res) && $! == EWOULDBLOCK) {
+    my $es = $hash->{TCPDev}->errstr;
+    $hash->{wantWrite} = 1 if($es == &IO::Socket::SSL::SSL_WANT_WRITE);
+    $hash->{wantRead}  = 1 if($es == &IO::Socket::SSL::SSL_WANT_READ);
+    return "";
   }
 
   if(!defined($buf) || length($buf) == 0) {
@@ -153,6 +153,7 @@ FHEM2FHEM_Read($)
     return;
   }
 
+  my $name = $hash->{NAME};
   return if(IsDisabled($name));
   my $excl = AttrVal($name, "excludeEvents", undef);
   my $threshold = AttrVal($name, "loopThreshold", 0); # 122300
@@ -350,19 +351,6 @@ FHEM2FHEM_Disconnected($)
   sleep(5);
 
   DoTrigger($name, "DISCONNECTED");
-}
-
-########################
-sub
-FHEM2FHEM_SimpleRead($)
-{
-  my ($hash) = @_;
-  my $buf;
-  if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
-    FHEM2FHEM_Disconnected($hash);
-    return undef;
-  }
-  return $buf;
 }
 
 sub
