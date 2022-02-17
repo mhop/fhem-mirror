@@ -29,6 +29,7 @@
 #    1.01.09  fixes, optimized logging in loglevel 5
 #             fixed sporadic not-deleting of RUNNING_PID
 #    1.01.10  fix sporadic offline message
+#    1.01.11  fix receiving unexpected IMEVENT messages, fixed typos in help
 #
 #
 ################################################################################
@@ -63,7 +64,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.10";
+my $version = "1.01.11";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -543,9 +544,9 @@ sub ESCVP21net_Notify($$) {
   }
 
   my $events = deviceEvents($devHash,1);
-  #return if( !$events );
+  return if( !$events );
 
-  main::Log3 $name, 5, "[$name]: running notify from $devName for $name, event is @{$events}";
+  #main::Log3 $name, 5, "[$name]: running notify from $devName for $name, event is @{$events}";
   
   if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events})){    
     ESCVP21net_setTypeCmds($hash);
@@ -1057,10 +1058,11 @@ sub ESCVP21net_setValue($){
     else {
       do {
         my $error = "ERR";
-        # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+        # just for logging: strip CR, LF, non-ASCII - there might be a more elegant way to do this...
         my $encdatastripped = $encdata;
         $encdatastripped =~ s/[\r\n\x00-\x19]//g;
         main::Log3 $name, 5, "[$name]: setValue: sending raw data: $encdatastripped";
+        
         # finally, send command and receive result
         send($sock , $encdata , 0);
         recv($sock, $result, 1024, 0);
@@ -1069,7 +1071,7 @@ sub ESCVP21net_setValue($){
         $result =~ s/[\r\n]/ /g;
         #$result =~ s/[\r\n\x00-\x19]//g; # might work too, since \x20 is kept
         
-        # strip CR, LF, non-ASCII just for logging - there might be a more elegant way to do this...
+        # just for logging: strip CR, LF, non-ASCII - there might be a more elegant way to do this...
         my $resultstripped = $result;
         $resultstripped =~ s/[\r\n\x00-\x19]//g;
         main::Log3 $name, 5, "[$name]: setValue: received raw data: $resultstripped";
@@ -1081,9 +1083,12 @@ sub ESCVP21net_setValue($){
         # return of ":" means OK, no value returned, i.e. we have tried to set an value
         elsif ($result eq ":") {
           # after set done, read current value
-          # PWR needs 4s before value can be read after setting it
+          # does not work fpr PWR!
           if ($cmd eq "PWR"){
-            sleep (6);
+            # need error handling - not critical, will just run in non-blocking timeout
+            # seems to happen on toggle PWR only, i.e. PWR get - set - get
+            # OK for all other toggles
+            # OK for PWR on, i.e. PWR set - get
           }
           $data = "$cmd?\r\n";
           $encdata = encode("utf8",$data);
@@ -1093,7 +1098,7 @@ sub ESCVP21net_setValue($){
           $encdatastripped =~ s/[\r\n\x00-\x19]//g;
           main::Log3 $name, 5, "[$name]: setValue: get after set: sending raw data: $encdatastripped";
 
-          # finally, send command and receive result          
+          # finally, get after set = send command and receive result          
           send($sock , $encdata , 0);
           recv($sock, $result, 1024, 0);
 
@@ -1117,18 +1122,23 @@ sub ESCVP21net_setValue($){
             $datakey = $cmd.":".$toggleresult;
             if (exists($ESCVP21net_togglemap{$datakey})){
               $nextcmd = $ESCVP21net_togglemap{$datakey};
+            #}
+              Log3 $name, 5, "[$name]: setValue: toggleloop: prepare to call Set for toggle $cmd with $nextcmd";
+              # translate "nice" nextcmd to raw value data
+              $datakey = $cmd.":".$nextcmd;
+              if (exists($ESCVP21net_data{$datakey})){
+                $nextcmd = $ESCVP21net_data{$datakey};
+              }
+              # encode raw command
+              $data = "$cmd $nextcmd\r\n";
+              $encdata = encode("utf8",$data);
+              # run do loop once more  
+              $sendloop++;
             }
-            Log3 $name, 5, "[$name]: setValue: prepare to call Set for toggle $cmd with $nextcmd";
-            # translate "nice" nextcmd to raw value data
-            $datakey = $cmd.":".$nextcmd;
-            if (exists($ESCVP21net_data{$datakey})){
-              $nextcmd = $ESCVP21net_data{$datakey};
+            else{
+              # no mapping toggle command found
+              Log3 $name, 5, "[$name]: setValue: toggleloop: no mapping toggle command found for $cmd:$toggleresult";
             }
-            # encode raw command
-            $data = "$cmd $nextcmd\r\n";
-            $encdata = encode("utf8",$data);
-            # run do loop once more  
-            $sendloop++;
             # don't run in toggle area during next do loop  
             $toggle--; 
           }
@@ -1611,7 +1621,7 @@ sub ESCVP21net_cleanup {
 <h3>ESCVP21net</h3>
 
 <ul>
-  <i>ESCVP21net</i> implements Epson VP21 controlvia (W)LAN, uses VP.net.
+  <i>ESCVP21net</i> implements Epson VP21 control via (W)LAN, uses VP.net.
   <br><br>
   <a id="ESCVP21net-define"></a>
   <b>Define</b>
