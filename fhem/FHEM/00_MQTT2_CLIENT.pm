@@ -500,6 +500,7 @@ MQTT2_CLIENT_Read($@)
       $off += 2;
     }
     $val = substr($pl, $off);
+    $val = Encode::decode('UTF-8', $val) if($unicodeEncoding);
     MQTT2_CLIENT_send($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
     MQTT2_CLIENT_updateDisconnectTimer($hash);
 
@@ -564,6 +565,11 @@ MQTT2_CLIENT_doPublish($@)
     $hdr += 2; # QoS:1
     push(@{$hash->{qosQueue}}, [$topic,$val,$retain]);
     $pi = pack("n",1+($hash->{qosCnt}++%65535)); # Packet Identifier, if QoS > 0
+  }
+
+  if($unicodeEncoding) {
+    $topic = Encode::encode('UTF-8', $topic);
+    $val   = Encode::encode('UTF-8', $val);
   }
   my $msg = pack("C", $hdr).
             MQTT2_CLIENT_calcRemainingLength(2+length($topic)+length($val)+
@@ -660,7 +666,9 @@ MQTT2_CLIENT_getStr($$)
 {
   my ($in, $off) = @_;
   my $l = unpack("n", substr($in, $off, 2));
-  return (substr($in, $off+2, $l), $off+2+$l);
+  my $r = substr($in, $off+2, $l);
+  $r = Encode::decode('UTF-8', $r) if($unicodeEncoding);
+  return ($r, $off+2+$l);
 }
 
 1;

@@ -3862,8 +3862,12 @@ DoTrigger($$@)
           my $event = $events->[$i];
           my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
           next if($re && !($dev =~ m/$re/ || "$dev:$event" =~ m/$re/));
-          addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$t " : "").
-                                "$hash->{TYPE} $dev $event\n");
+
+          my $txt = ($inform{$c}{type} eq "timer" ? "$t " : "").
+                        "$hash->{TYPE} $dev $event\n";
+          my $enc = $dc->{encoding} && $dc->{encoding} eq "latin1" ? "Latin1":"UTF-8";
+          $txt = Encode::encode($enc, $txt);
+          addToWritebuffer($dc, $txt);
         }
       }
     }
