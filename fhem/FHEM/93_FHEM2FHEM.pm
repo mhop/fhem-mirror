@@ -124,12 +124,12 @@ FHEM2FHEM_Write($$)
     }
     return if(!$conn);  # Hopefuly it is reported elsewhere
     $hash->{TCPDev2} = $conn;
-    syswrite($hash->{TCPDev2}, $hash->{portpassword} . "\n")
+    F2F_sw($hash->{TCPDev2}, $hash->{portpassword} . "\n")
         if($hash->{portpassword});
   }
 
   my $rdev = $hash->{rawDevice};
-  syswrite($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
+  F2F_sw($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
 }
 
 #####################################
@@ -152,6 +152,8 @@ FHEM2FHEM_Read($)
     FHEM2FHEM_Disconnected($hash);
     return;
   }
+
+  $buf = Encode::decode('UTF-8', $buf) if($unicodeEncoding);
 
   my $name = $hash->{NAME};
   return if(IsDisabled($name));
@@ -310,13 +312,13 @@ FHEM2FHEM_OpenDev($$)
 
     $hash->{STATE}= "connected";
     DoTrigger($name, "CONNECTED") if($reopen);
-    syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
+    F2F_sw($hash->{TCPDev}, $hash->{portpassword} . "\n")
           if($hash->{portpassword});
     my $type = AttrVal($hash->{NAME},"addStateEvent",0) ? "onWithState" : "on";
     my $msg = $hash->{informType} eq "LOG" ? 
                   "inform $type $hash->{regexp}" : "inform raw";
-    syswrite($hash->{TCPDev}, $msg . "\n");
-    syswrite($hash->{TCPDev}, "trigger global CONNECTED $name\n")
+    F2F_sw($hash->{TCPDev}, $msg . "\n");
+    F2F_sw($hash->{TCPDev}, "trigger global CONNECTED $name\n")
       if(AttrVal($name, "reportConnected", 0));
 
     my $ki = AttrVal($hash->{NAME}, "keepaliveInterval", 0);
@@ -353,6 +355,15 @@ FHEM2FHEM_Disconnected($)
   DoTrigger($name, "DISCONNECTED");
 }
 
+
+sub
+F2F_sw($$)
+{
+  my ($io, $buf) = @_;
+  $buf = Encode::encode('UTF-8', $buf) if($unicodeEncoding);
+  return syswrite($io, $buf);
+}
+
 sub
 FHEM2FHEM_Set($@)
 {
@@ -374,7 +385,7 @@ FHEM2FHEM_Set($@)
     return "Not connected" if(!$hash->{TCPDev});
     my $cmd = join(" ",@a[2..$#a]);
     $cmd = '{my $r=fhem("'.$cmd.'");; defined($r) ? "\\0$r\\0" : $r}'."\n";
-    syswrite($hash->{TCPDev}, $cmd);
+    F2F_sw($hash->{TCPDev}, $cmd);
     $hash->{".lcmd"} = $hash->{CL};
   }
   return undef;

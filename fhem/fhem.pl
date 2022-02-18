@@ -3866,7 +3866,7 @@ DoTrigger($$@)
           my $txt = ($inform{$c}{type} eq "timer" ? "$t " : "").
                         "$hash->{TYPE} $dev $event\n";
           my $enc = $dc->{encoding} && $dc->{encoding} eq "latin1" ? "Latin1":"UTF-8";
-          $txt = Encode::encode($enc, $txt);
+          $txt = Encode::encode($enc, $txt) if($unicodeEncoding);
           addToWritebuffer($dc, $txt);
         }
       }
