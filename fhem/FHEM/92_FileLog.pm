@@ -190,6 +190,7 @@ FileLog_Define($@)
     return "Can't open $f: $!" if(!defined($fh));
   }
 
+  binmode($fh, ":encoding(UTF-8)") if($fh && $unicodeEncoding);
   $hash->{FH} = $fh;
   $hash->{FD} = $fh->fileno() if($fh);
   $hash->{REGEXP} = $a[3];
@@ -247,6 +248,7 @@ FileLog_Switch($)
       Log3 $log, 0, "Can't open $cn";
       return 0;
     }
+    binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
     $log->{FH} = $fh;
     $log->{FD} = $fh->fileno();
     setReadingsVal($log, "linesInTheFile", 0, TimeNow());
@@ -447,6 +449,7 @@ FileLog_Set($@)
         $fh = new IO::File(">>$cn");
       }
       return "Can't open $cn" if(!defined($fh));
+      binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
       $hash->{FH} = $fh;
       $hash->{FD} = $fh->fileno();
     }
@@ -509,6 +512,7 @@ FileLog_Set($@)
     close(FH1); close(FH2); close(FH3);
     rename("$mylogfile.new", $mylogfile);
     $fh = new IO::File(">>$mylogfile");
+    binmode($fh, ":encoding(UTF-8)") if($fh && $unicodeEncoding);
     $hash->{FH} = $fh;
     $hash->{FD} = $fh->fileno();
 
@@ -847,6 +851,7 @@ FileLog_Get($@)
 
   my $ifh;
   $ifh = new IO::File $inf if($inf);
+  binmode($ifh, ":encoding(UTF-8)") if($ifh && $unicodeEncoding);
   FileLog_seekTo($inf, $ifh, $hash, $from, $reformatFn) if($ifh);
 
   $to .= "z"; # return the 23:59:59 line too (Forum #118858)
@@ -879,6 +884,7 @@ FileLog_Get($@)
     if($outf ne "-") {
       $fname[$i] = "$outf.$i";
       $h{fh} = new IO::File "> $fname[$i]";
+      binmode($h{fh}, ":encoding(UTF-8)") if($h{fh} && $unicodeEncoding);
     }
     $h{re} = $fld[1];                                   # Filter: regexp
     $h{df} = defined($fld[2]) ? $fld[2] : "";           # default value
@@ -1032,6 +1038,8 @@ RESCAN:
     $rescanNum = 0;
     map { $rescanNum++ if(!$d[$_]->{count} && $d[$_]->{df} eq "") } (0..$#a);
     if($rescanNum) {
+      
+      binmode($ifh) if($unicodeEncoding);
       $rescan=1;
       my $buf;
       my $end = $hash->{pos}{"$inf:$from"};
@@ -1046,6 +1054,7 @@ RESCAN:
       sysread($ifh, $buf, $end-$start);
       @rescanArr = split("\n", $buf);
       $rescanIdx = $#rescanArr;
+      binmode($ifh, ":encoding(UTF-8)") if($ifh && $unicodeEncoding);
       goto RESCAN;
     }
   }
@@ -1215,6 +1224,7 @@ FileLog_sampleDataFn($$$$$)
     Log3 $wName, 1, "FileLog get sample data: $fName: $!";
     return ($desc, \@htmlArr, "");
   }
+  binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
   $fh->seek(0, 2); # Go to the end
   my $sz = $fh->tell;
   $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
