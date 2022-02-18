@@ -219,7 +219,10 @@ telnet_Read($)
     }
   }
 
-  $buf = Encode::decode('UTF-8', $buf) if($unicodeEncoding);
+  if($unicodeEncoding) {
+    my $enc = $hash->{encoding} eq "latin1" ? "Latin1" : "UTF-8";
+    $buf = Encode::decode($enc, $buf);
+  }
   $hash->{BUF} .= $buf;
   my @ret;
   my $gotCmd;
@@ -255,7 +258,8 @@ telnet_Read($)
           $cmd = $hash->{prevlines} . $cmd;
           undef($hash->{prevlines});
         }
-        $cmd = latin1ToUtf8($cmd) if( $hash->{encoding} eq "latin1" );
+        $cmd = latin1ToUtf8($cmd)
+                if(!$unicodeEncoding && $hash->{encoding} eq "latin1");
         $ret = AnalyzeCommandChain($hash, $cmd);
         push @ret, $ret if(defined($ret));
       }
@@ -297,14 +301,20 @@ telnet_Output($$$)
   my ($hash,$ret,$nonl) = @_;
 
   if($ret && defined($hash->{CD})) {
-    $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
+    if($unicodeEncoding) {
+      $ret = Encode::encode($hash->{encoding} eq "latin1" ? "Latin1" : "UTF-8", $ret);
+
+    } else {
+      $ret = utf8ToLatin1($ret) if($hash->{encoding} eq "latin1");
+      $ret = Encode::encode('UTF-8', $ret)
+                if(utf8::is_utf8($ret) && $ret =~ m/[^\x00-\xFF]/);
+    }
+
     if(!$nonl) {        # AsyncOutput stuff
       $ret = "\n$ret\n$hash->{prompt} " if( $hash->{showPrompt});
       $ret = "$ret\n"                   if(!$hash->{showPrompt});
     }
     for(;;) {
-      $ret = Encode::encode('UTF-8', $ret) if($unicodeEncoding ||
-                            utf8::is_utf8($ret) && $ret =~ m/[^\x00-\xFF]/);
       my $l = syswrite($hash->{CD}, $ret);
       last if(!$l || $l == length($ret));
       $ret = substr($ret, $l);
