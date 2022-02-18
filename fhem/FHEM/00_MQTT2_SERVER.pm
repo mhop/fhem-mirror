@@ -387,6 +387,7 @@ MQTT2_SERVER_Read($@)
       $off += 2;
     }
     $val = (length($pl)>$off ? substr($pl, $off) : "");
+    $val = Encode::decode('UTF-8', $val) if($unicodeEncoding);
     Log3 $sname, 4, "  $cname $hash->{cid} $cpt $tp:$val";
     # PUBACK
     MQTT2_SERVER_out($hash, pack("CCnC*", 0x40, 2, $pid), $dump) if($qos);
@@ -524,6 +525,14 @@ MQTT2_SERVER_sendto($$$$)
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
   my $dump = (AttrVal($shash->{NAME},"verbose",1)>=5) ? $shash->{NAME} :undef;
+
+  my $ltopic = $topic;
+  my $lval = $val;
+  if($unicodeEncoding) {
+    $ltopic = Encode::encode('UTF-8', $topic);
+    $lval   = Encode::encode('UTF-8', $val);
+  }
+
   foreach my $s (keys %{$hash->{subscriptions}}) {
     my $re = $s;
     $re =~ s,^#$,.*,g;
@@ -533,9 +542,9 @@ MQTT2_SERVER_sendto($$$$)
       Log3 $shash, 5, "  $hash->{NAME} $hash->{cid} => $topic:$val";
       MQTT2_SERVER_out($hash,                  # PUBLISH
         pack("C",0x30).
-        MQTT2_SERVER_calcRemainingLength(2+length($topic)+length($val)).
-        pack("n", length($topic)).
-        $topic.$val, $dump);
+        MQTT2_SERVER_calcRemainingLength(2+length($ltopic)+length($lval)).
+        pack("n", length($ltopic)).
+        $ltopic.$lval, $dump);
       last;       # send a message only once
     }
   }
@@ -602,6 +611,7 @@ MQTT2_SERVER_getStr($$$)
   my $l = unpack("n", substr($in, $off, 2));
   my $r = substr($in, $off+2, $l);
   $hash->{stringError} = 1 if(index($r, "\0") >= 0);
+  $r = Encode::decode('UTF-8', $r) if($unicodeEncoding);
   return ($r, $off+2+$l);
 }
 
