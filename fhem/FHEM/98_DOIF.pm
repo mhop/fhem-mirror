@@ -5023,9 +5023,9 @@ sub card
       }
     }
   } else {
-    for (my $i=0;$i<2;$i++) {
-      my $x=int((($i+1)*($chart_dim/3)-1)*10)/10;
-      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1" />',$x,0,$x,50);
+    for (my $i=0;$i<=6;$i++) {
+      my $x=int((($i)*($chart_dim/6)+1)*10)/10;
+      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0 and $x <= $chart_dim);
     }
     for (my $i=0;$i<=3;$i++) {
       my $x=int(($i*($chart_dim/3)-1)*10)/10;
