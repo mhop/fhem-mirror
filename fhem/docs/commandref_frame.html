@@ -1605,6 +1605,14 @@ The following local attributes are used by a wider range of devices:
         OS implementation (inet_aton and gethostbyname) will be used.
     </li><br>
 
+    <a name="encoding"></a>
+    <li>encoding<br>
+        Set the internal encoding used for storing strings.
+        Possible values: bytestream (default) and unicode.<br>
+        Note: Since not all modules were checked, if they work correctly with
+        the internal unicode encoding, this feature is experimental.
+    </li><br>
+
     <a name="featurelevel"></a>
     <li>featurelevel<br>
         Enable/disable old or new features, based on FHEM version.
