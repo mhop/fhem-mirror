@@ -1714,8 +1714,12 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <li>encoding<br>
         W&auml;hlt das perl-interne Format, mit dem Strings kodiert sind.
         M&ouml;gliche Werte sind: bytestream (Voreinstellung) und unicode.<br>
-        Achtung: der Wert unicode ist experimentell, da nicht alle FHEM-Module
-        mit dieser Variante gepr&uuml;ft wurden.
+        Achtung:
+        <ul>
+        <li>der Wert unicode ist experimentell, da nicht alle FHEM-Module
+          mit dieser Variante gepr&uuml;ft wurden.</li>
+        <li>&auml;ndern des Wertes bewirkt ein save und ein shutdown restart.</li>
+        </ul>
     </li><br>
 
     <a name="featurelevel"></a>

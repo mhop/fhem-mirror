@@ -2877,11 +2877,10 @@ GlobalAttr($$$$)
   my ($type, $me, $name, $val) = @_;
 
   if($type eq "del") {
-    my %noDel = ( modpath=>1, verbose=>1, logfile=>1, configfile=>1 );
+    my %noDel = ( modpath=>1, verbose=>1, logfile=>1, configfile=>1, encoding=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 6.1 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
-    $unicodeEncoding = undef if($name eq "encoding");
     delete($defs{global}{ignoreRegexpObj}) if($name eq "ignoreRegexp");
     return undef;
   }
@@ -2904,6 +2903,13 @@ GlobalAttr($$$$)
   if($name eq "encoding") {     # Should be called from fhem.cfg/configDB
     return "bad encoding parameter $val, good values are bytestream or unicode"
       if($val ne "unicode" && $val ne "bytestream");
+    if($init_done) {
+      InternalTimer(0, sub {
+        CommandSave(undef, undef);
+        CommandShutdown(undef, "restart");
+      }, undef);
+      return;
+    }
     $unicodeEncoding = ($val eq "unicode");
     $currlogfile = "";
   }

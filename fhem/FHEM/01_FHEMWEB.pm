@@ -1280,6 +1280,7 @@ FW_digestCgi($)
     next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
     $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
+    $pv = Encode::decode('UTF-8', $pv) if($unicodeEncoding);
     my ($p,$v) = split("=",$pv, 2);
     $v = "" if(!defined($v));
 

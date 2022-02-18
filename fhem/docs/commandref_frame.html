@@ -1609,8 +1609,12 @@ The following local attributes are used by a wider range of devices:
     <li>encoding<br>
         Set the internal encoding used for storing strings.
         Possible values: bytestream (default) and unicode.<br>
-        Note: Since not all modules were checked, if they work correctly with
-        the internal unicode encoding, this feature is experimental.
+        Notes:
+        <ul>
+          <li>Since not all modules were checked, if they work correctly with
+              the internal unicode encoding, this feature is experimental.</li>
+          <li>Changing the attribute value triggers a save and a shutdown restart</li>
+        </ul>
     </li><br>
 
     <a name="featurelevel"></a>
