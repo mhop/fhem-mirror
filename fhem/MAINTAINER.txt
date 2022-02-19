@@ -385,6 +385,8 @@ FHEM/72_FB_CALLLIST.pm       markusbloch          Frontends
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          Unterstützende Dienste
 FHEM/72_FRITZBOX.pm          tupol                FRITZ!Box (link als PM an tupol)
 FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
+FHEM/72_UBUS_CALL.pm         xenos1984            Sonstige Systeme
+FHEM/72_UBUS_CLIENT.pm       xenos1984            Sonstige Systeme
 FHEM/72_XiaomiDevice.pm      markus-m             Sonstige Systeme
 FHEM/73_AMADCommBridge.pm    CoolTux              Sonstige Systeme
 FHEM/73_AutoShuttersControl.pm CoolTux            Automatisierung
