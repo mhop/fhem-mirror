@@ -91,9 +91,10 @@ sub Define
 
 sub Undef
 {
-	my $hash = shift // return;
+	my $hash = shift;
 
-	Disconnect($hash);
+	# Clean up possible previous / stale call IDs.
+	RemoveInternalTimer($hash, \&GetUpdate);
 
 	return;
 }
