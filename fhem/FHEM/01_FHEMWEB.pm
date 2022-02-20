@@ -727,7 +727,7 @@ FW_addToWritebuffer($$@)
   my ($hash, $txt, $callback, $nolimit, $encoded) = @_;
 
   $txt = Encode::encode($hash->{encoding}, $txt)
-          if(!$encoded && ($unicodeEncoding ||
+          if($hash->{encoding} && !$encoded && ($unicodeEncoding ||
                             (utf8::is_utf8($txt) && $txt =~ m/[^\x00-\xFF]/)));
   if( $hash->{websocket} ) {
     my $len = length($txt);
@@ -1283,7 +1283,10 @@ FW_digestCgi($)
     next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
     $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
-    $pv = Encode::decode('UTF-8', $pv) if($unicodeEncoding);
+    if($unicodeEncoding) {
+      $pv = Encode::decode('UTF-8', $pv);
+      $pv =~ s/\x{2424}/\n/g; # revert fhemweb.js hack
+    }
     my ($p,$v) = split("=",$pv, 2);
     $v = "" if(!defined($v));
 
