@@ -341,7 +341,7 @@ sub Signalbot_Set($@) {					#
 			Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Extra UTF8 encoding of:$fullstring:\n";
 		}
 		eval { $fullstring=decode_utf8($fullstring); };
-			Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Error from decode" if $@;
+		#	Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Error from decode" if $@;
 			
 		Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Before parse:" .$fullstring. ":";
 		my $tmpmessage = $fullstring =~ s/\\n/\x0a/rg;
@@ -384,8 +384,6 @@ sub Signalbot_Set($@) {					#
 		($err, @attachments) = Signalbot_replaceCommands($hash,@attachments);
 		if ($err) { return $err; }
 		
-		#Am Schluss eine Schleife über die Attachments und alle die mit /tmp/signalbot anfangen löschen (unlink)
-
 		if ((defined $defaultPeer) && (@recipients==0) && (@groups==0)) {
 
 			my @peers = split(/,/,$defaultPeer);
@@ -935,8 +933,6 @@ sub Signalbot_setup($@){
 	$hash->{STATE}="Connecting";
 	Signalbot_fetchFile($hash,"svn.fhem.de","/fhem/trunk/fhem/contrib/signal/signal_install.sh","www/signal/signal_install.sh");
 	chmod 0755, "www/signal/signal_install.sh";
-	#Make sure Logfile looks ok with Unicode characters and does not raise "Wide character"
-	binmode(LOG,"encoding(UTF-8)");
 	return undef;
 }
 
