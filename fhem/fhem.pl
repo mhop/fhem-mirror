@@ -1716,7 +1716,8 @@ CommandSave($$)
   @structChangeHist = ();
   DoTrigger("global", "SAVE", 1);
 
-  restoreDir_saveFile($restoreDir, $attr{global}{statefile});
+  restoreDir_saveFile($restoreDir, $attr{global}{statefile}) if(!configDBUsed());
+  $data{saveID} = createUniqueId(); # for configDB, #126323
   my $ret = WriteStatefile();
 
   return $ret if($ret);
