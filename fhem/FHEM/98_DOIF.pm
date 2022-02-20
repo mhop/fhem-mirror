@@ -4768,18 +4768,18 @@ sub plot {
   if ($footerPos) {
     if (defined $maxValTime) {
       if ($hours > 168) {
-        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:8px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:8px">&#x25B2<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($maxValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:9px">▲<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:9px">&#x25B2<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($maxValTime)));
         $footer.= sprintf('<text text-anchor="start" x="35" y="%s" style="fill:#CCCCCC;font-size:9px">%s</text>',$footerPos,::strftime("%H:%M",localtime($maxValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:9px;%s">%s</text>',$bwidth/2+7,$footerPos,color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
     }
     if (defined $minValTime) {
       if ($hours > 168) {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">&#x2022<tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">•<tspan style="fill:%s">▼</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">&#x2022<tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+9,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($minValTime)));
         $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:9px">%s</text>',$bwidth/2+35,$footerPos,::strftime("%H:%M",localtime($minValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:9px;%s">%s</text>', $bwidth+7,$footerPos,color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
