@@ -231,7 +231,10 @@ DevIo_DecodeWS($$)
 
   # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
   Log3 $hash, 5, "Websocket msg: OP:$op LEN:$len MASK:$mask FIN:$fin";
-  if($op == 8) {         # Close
+  if($op == 1) {              # Text
+    $data = Encode::decode('UTF-8', $data) if($unicodeEncoding);
+
+  } elsif($op == 8) {         # Close
     my $clCode = unpack("n", substr($data,0,2));
     $clCode = "$clCode ($wsCloseCode{$clCode})" if($wsCloseCode{$clCode});
     $clCode .= " ".substr($data, 2) if($len > 2);
@@ -276,7 +279,10 @@ DevIo_SimpleWrite($$$;$)
     $hash->{USBDev}->write($msg);
 
   } elsif($hash->{TCPDev}) {
-    $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg) if($hash->{WEBSOCKET});
+    if($hash->{WEBSOCKET}) {
+      $msg = Encode::encode('UTF-8', $msg) if($unicodeEncoding && !$hash->{binary});
+      $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg)
+    }
     syswrite($hash->{TCPDev}, $msg);
 
   } elsif($hash->{DIODev}) { 

@@ -425,6 +425,8 @@ FW_Read($$)
       $data = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $data));
     }
 
+    $data = Encode::decode('UTF-8', $data) if($unicodeEncoding && $op == 1);
+
     my $ret = FW_fC($data);
     FW_addToWritebuffer($hash,
                        FW_longpollInfo("JSON", defined($ret) ? $ret : "")."\n");
@@ -562,6 +564,7 @@ FW_Read($$)
       $FW_headerlines.
        "\r\n" );
     $FW_chash->{websocket} = 1;
+    delete($FW_chash->{encoding}); # WS specifies its own encoding
 
     my $me = $FW_chash;
     my ($cmd, $cmddev) = FW_digestCgi($arg);
