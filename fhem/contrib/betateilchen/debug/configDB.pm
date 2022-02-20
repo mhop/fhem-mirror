@@ -574,14 +574,15 @@ sub cfgDB_SaveState {
 				}
 				$val = $rd->{VAL};
 				$val =~ s/;/;;/g;
-				$val =~ s/\n/\\\n/g;
+#				$val =~ s/\n/\\\n/g;
+                $val =~ s/\n/\$xyz\$/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
-				if (length($out) > 65530) {
-                  my $uid = createUniqueId();
-				  FileWrite($uid,$val);
-				  $out = "setstate $d $rd->{TIME} $c cfgDBkey:$uid";
-                  Log 4, "configDB: r:$c d:$d key:$uid";
-				}
+#				if (length($out) > 65530) {
+#                  my $uid = createUniqueId();
+#				  FileWrite($uid,$val);
+#				  $out = "setstate $d $rd->{TIME} $c cfgDBkey:$uid";
+#                  Log 4, "configDB: r:$c d:$d key:$uid";
+#				}
                 push @rowList, $out; 
 			}
 		}
@@ -818,7 +819,7 @@ sub _cfgDB_ReadState {
     my ($err,@state) = cfgDB_FileRead($stateFileName);
     if ($err eq "") {
       Log 1, "configDB read state  ".$stateFileName;
-      push @dbconfig,@state;
+      map { my $a = $_; $a =~ s/\$xyz\$/\\n/g; push @dbconfig, $a } @state;
     } else {
       Log 1, "configDB read state from table fhemstate";
 	  my $fhem_dbh = _cfgDB_Connect;
