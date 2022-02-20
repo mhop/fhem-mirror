@@ -221,7 +221,7 @@ sub CommandConfigdb {
 		}
 
 		when ('uuid') {
-			$param1 = _cfgDB_Uuid;
+			$param1 = createUniqueId();
 			Log3('configdb', 4, "configdb: uuid requested: $param1");
 			$ret = $param1;
 		}
