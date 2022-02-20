@@ -77,7 +77,7 @@ sub DOIF_delAll($)
   delete ($hash->{perlblock});
   delete ($hash->{var});
   delete ($hash->{accu});
-  delete ($hash->{collect});
+  #delete ($hash->{collect});
   delete ($hash->{Regex});
   delete ($hash->{defs});
 
@@ -3624,78 +3624,76 @@ CmdDoIf($$)
   $hash->{helper}{sleeptimer}=-1;
   
 
-  return("","") if ($tail =~ /^ *$/);
-  
-  $tail =~ s/\n/ /g;
-  
-  while ($tail ne "") {
-    return($tail, "no left bracket of condition") if ($tail !~ /^ *\(/);
-    #condition
-    ($beginning,$cond,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-    return ($cond,$err) if ($err);
-    ($cond,$err)=ReplaceAllReadingsDoIf($hash,$cond,$i,0);
-    return ($cond,$err) if ($err);
-    return ($tail,"no condition") if ($cond eq "");
-    $hash->{condition}{$i}=$cond;
-    #DOIF
-    $if_cmd_ori="";
-    $j=0;
-    while ($tail =~ /^\s*(\(|\{)/) {
-	  if ($tail =~ /^\s*\(/) {
-        ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-        return ($if_cmd_ori,$err) if ($err);
-	  } elsif ($tail =~ /^\s*\{/) {
-	    ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
-        return ($if_cmd_ori,$err) if ($err);
-		$if_cmd_ori="{".$if_cmd_ori."}";
-	  }
-      ($if_cmd,$err)=ParseCommandsDoIf($hash,$if_cmd_ori,0);
-      return ($if_cmd,$err) if ($err);
-      #return ($tail,"no commands") if ($if_cmd eq "");
-      $hash->{do}{$i}{$j++}=$if_cmd_ori;
+  if ($tail !~ /^ *$/) {
+    $tail =~ s/\n/ /g;
+    while ($tail ne "") {
+      return($tail, "no left bracket of condition") if ($tail !~ /^ *\(/);
+      #condition
+      ($beginning,$cond,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+      return ($cond,$err) if ($err);
+      ($cond,$err)=ReplaceAllReadingsDoIf($hash,$cond,$i,0);
+      return ($cond,$err) if ($err);
+      return ($tail,"no condition") if ($cond eq "");
+      $hash->{condition}{$i}=$cond;
+      #DOIF
+      $if_cmd_ori="";
+      $j=0;
+      while ($tail =~ /^\s*(\(|\{)/) {
+      if ($tail =~ /^\s*\(/) {
+          ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+          return ($if_cmd_ori,$err) if ($err);
+      } elsif ($tail =~ /^\s*\{/) {
+        ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
+          return ($if_cmd_ori,$err) if ($err);
+      $if_cmd_ori="{".$if_cmd_ori."}";
+      }
+        ($if_cmd,$err)=ParseCommandsDoIf($hash,$if_cmd_ori,0);
+        return ($if_cmd,$err) if ($err);
+        #return ($tail,"no commands") if ($if_cmd eq "");
+        $hash->{do}{$i}{$j++}=$if_cmd_ori;
+      }
+      $hash->{do}{$i}{0}=$if_cmd_ori if ($j==0); #do without brackets
+      $last_do=$i;
+      $tail =~ s/^\s*$//g;
+      if (length($tail)) {
+        $tail =~ /^\s*DOELSEIF/g;
+        if (pos($tail)) {
+          $tail=substr($tail,pos($tail));
+          if (!length($tail)) {
+            return ($tail,"no DOELSEIF block");
+          }
+        } else {
+          last if ($tail =~ /^\s*DOELSE/);
+          return ($tail,"expected DOELSEIF or DOELSE");
+        }
+      }
+      $i++;
     }
-    $hash->{do}{$i}{0}=$if_cmd_ori if ($j==0); #do without brackets
-    $last_do=$i;
-    $tail =~ s/^\s*$//g;
+    #DOELSE
     if (length($tail)) {
-      $tail =~ /^\s*DOELSEIF/g;
+      $tail =~ /^\s*DOELSE/g;
       if (pos($tail)) {
         $tail=substr($tail,pos($tail));
-        if (!length($tail)) {
-          return ($tail,"no DOELSEIF block");
-        }
       } else {
-        last if ($tail =~ /^\s*DOELSE/);
-        return ($tail,"expected DOELSEIF or DOELSE");
+        return ($tail,"expected DOELSE");
       }
+      $j=0;
+      while ($tail =~ /^\s*(\(|\{)/) {
+        if ($tail =~ /^\s*\(/) {
+          ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+           return ($else_cmd_ori,$err) if ($err);
+        } elsif ($tail =~ /^\s*\{/) { 
+          ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
+           return ($else_cmd_ori,$err) if ($err);
+           $else_cmd_ori="{".$else_cmd_ori."}";
+        }  
+        ($else_cmd,$err)=ParseCommandsDoIf($hash,$else_cmd_ori,0);
+        return ($else_cmd,$err) if ($err);
+        $hash->{do}{$last_do+1}{$j++}=$else_cmd_ori;
+      }
+      $hash->{do}{$last_do+1}{0}=$else_cmd_ori if ($j==0); #doelse without brackets
     }
-    $i++;
   }
-  #DOELSE
-  if (length($tail)) {
-    $tail =~ /^\s*DOELSE/g;
-    if (pos($tail)) {
-      $tail=substr($tail,pos($tail));
-    } else {
-      return ($tail,"expected DOELSE");
-    }
-    $j=0;
-    while ($tail =~ /^\s*(\(|\{)/) {
-      if ($tail =~ /^\s*\(/) {
-        ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-         return ($else_cmd_ori,$err) if ($err);
-      } elsif ($tail =~ /^\s*\{/) { 
-        ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
-         return ($else_cmd_ori,$err) if ($err);
-         $else_cmd_ori="{".$else_cmd_ori."}";
-      }  
-      ($else_cmd,$err)=ParseCommandsDoIf($hash,$else_cmd_ori,0);
-      return ($else_cmd,$err) if ($err);
-      $hash->{do}{$last_do+1}{$j++}=$else_cmd_ori;
-    }
-    $hash->{do}{$last_do+1}{0}=$else_cmd_ori if ($j==0); #doelse without brackets
-  }
-  
   if ($init_done) {
     foreach my $key (keys %{$attr{$hash->{NAME}}}) {
       if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
