@@ -1531,7 +1531,7 @@ DENON_AVR_Read($)
 	my $state = ReadingsVal( $name, "power", "off" );
 	my $buf = '';
 	my $zone = 0;
-	my $return;
+	my $return = '';
 	
 	if(defined($hash->{helper}{PARTIAL}) && $hash->{helper}{PARTIAL}) {
 	$buf = $hash->{helper}{PARTIAL} . DevIo_SimpleRead($hash);
@@ -1761,6 +1761,7 @@ DENON_AVR_Parse(@)
 			if($2 eq 'ON' || $2 eq 'OFF')
 			{
 				my $status = DENON_GetValue('PS', $1);
+                                $status = "unknown" unless defined($status);
 				readingsBulkUpdate($hash, $status, lc($2)) if($status ne "unknown");
 				$return = $status." ".lc($2);
 			}

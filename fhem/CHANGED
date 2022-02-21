@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_DENON_AVR: handled some uninitialized values
  - new:     72_UBUS_CALL: module to send call requests via uBus client
  - new:     72_UBUS_CLIENT: module to communicate with uBus devices
  - bugfix:  88_HMCCU: bugfixes and improvements
