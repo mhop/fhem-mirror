@@ -124,6 +124,7 @@ my $FW_headerlines; #
 my $FW_encoding="UTF-8";
 my $FW_styleStamp=time();
 my %FW_svgData;
+my $FW_encodedByPlugin; # unicodeEncoding: data is encoded by plugin
 
 
 #####################################
@@ -564,7 +565,7 @@ FW_Read($$)
       $FW_headerlines.
        "\r\n" );
     $FW_chash->{websocket} = 1;
-    delete($FW_chash->{encoding}); # WS specifies its own encoding
+    $FW_chash->{encoding} = 'UTF-8'; # WS specifies its own encoding
 
     my $me = $FW_chash;
     my ($cmd, $cmddev) = FW_digestCgi($arg);
@@ -621,14 +622,15 @@ FW_finishRead($$$)
   my $name = $hash->{NAME};
 
   my $compressed = "";
-  my $encoded = "";
   if($FW_RETTYPE =~ m/(text|xml|json|svg|script)/i &&
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use{zlib}) {
     $FW_RET = Encode::encode($hash->{encoding}, $FW_RET)
-        if($unicodeEncoding || (utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/));
-    $encoded = 1;
+        if(!$FW_encodedByPlugin &&
+           ($unicodeEncoding ||
+           (utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/)));
+
     eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
     if($@) {
       Log 1, "memGzip: $@"; $FW_RET=""; #Forum #29939
@@ -649,7 +651,7 @@ FW_finishRead($$$)
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
-           $FW_RET, "FW_closeConn", 1, $encoded) ){
+           $FW_RET, "FW_closeConn", "nolimit", "encoded") ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
       if(!$hash->{isChild});
     FW_closeConn($hash);
@@ -831,6 +833,7 @@ FW_answerCall($)
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
+  $FW_encodedByPlugin = undef;
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
   FW_setStylesheet();
@@ -999,6 +1002,7 @@ FW_answerCall($)
     foreach my $k (reverse sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($arg !~ m/^$k/);
+      $FW_encodedByPlugin = 1;
       $FW_contentFunc = $h->{CONTENTFUNC};
       next if($h !~ m/HASH/ || !$h->{FUNC});
       #Returns undef as FW_RETTYPE if it already sent a HTTP header
