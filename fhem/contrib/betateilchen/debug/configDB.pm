@@ -1288,7 +1288,8 @@ sub _cfgDB_deleteStatefiles {
    $sth->execute();
    while ($filename = $sth->fetchrow_array()) {
        my $uuid  = substr($filename,0,32);
-       my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
+       my $found = "";
+       $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
        unless ($uuid eq $found) {
          $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
        }
