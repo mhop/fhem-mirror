@@ -33,6 +33,7 @@ MQTT2_CLIENT_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     autocreate:no,simple,complex
+    binaryTopicRegexp
     clientId
     clientOrder
     connectTimeout
@@ -360,6 +361,17 @@ MQTT2_CLIENT_Attr(@)
     }
   }
 
+  if($attrName eq "binaryTopicRegexp") {
+    if($type eq "set") {
+      return "Bad regexp $param[0]: starting with *" if($param[0] =~ m/^\*/);
+      eval { "hallo" =~ m/^$param[0]$/ };
+      return "Bad regexp $param[0]: $@" if($@);
+      $hash->{binaryTopicRegexp} = $param[0];
+    } else {
+      delete($hash->{binaryTopicRegexp});
+    }
+  }
+
   return undef;
 }
 
@@ -500,7 +512,11 @@ MQTT2_CLIENT_Read($@)
       $off += 2;
     }
     $val = substr($pl, $off);
-    $val = Encode::decode('UTF-8', $val) if($unicodeEncoding);
+    if($unicodeEncoding) {
+      if(!$hash->{binaryTopicRegexp} || $tp !~ m/^$hash->{binaryTopicRegexp}$/) {
+        $val = Encode::decode('UTF-8', $val);
+      }
+    }
     MQTT2_CLIENT_send($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
     MQTT2_CLIENT_updateDisconnectTimer($hash);
 
@@ -744,6 +760,17 @@ MQTT2_CLIENT_getStr($$)
       Default is no, as in absence of an MQTT2_DEVICE with a bridgeRegexp
       attribute it is not really useful.
       </li></br>
+
+    <a id="MQTT2_CLIENT-attr-binaryTopicRegexp"></a>
+    <li>binaryTopicRegexp &lt;regular-expression&gt;<br>
+      this attribute is only relevant, if the global attribute "encoding
+      unicode" is set.<br>
+      In this case the MQTT payload is automatically assumed to be UTF-8, which
+      may cause conversion-problems if the payload is binary. This conversion
+      wont take place, if the topic matches the regular expression specified.
+      Note: as is the case with other modules, ^ and $ is added to the regular
+      expression.
+    </li><br>
 
     <a id="MQTT2_CLIENT-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>

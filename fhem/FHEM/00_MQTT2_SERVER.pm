@@ -35,6 +35,7 @@ MQTT2_SERVER_Initialize($)
     SSL:0,1
     allowfrom
     autocreate:no,simple,complex
+    binaryTopicRegexp
     clientId
     clientOrder
     disable:1,0
@@ -173,6 +174,17 @@ MQTT2_SERVER_Attr(@)
     }
   }
 
+  if($attrName eq "binaryTopicRegexp") {
+    if($type eq "set") {
+      return "Bad regexp $param[0]: starting with *" if($param[0] =~ m/^\*/);
+      eval { "hallo" =~ m/^$param[0]$/ };
+      return "Error checking regexp $param[0]:$@" if($@);
+      $hash->{binaryTopicRegexp} = $param[0];
+    } else {
+      delete($hash->{binaryTopicRegexp});
+    }
+  }
+
   return undef;
 } 
 
@@ -264,6 +276,7 @@ MQTT2_SERVER_Read($@)
   }
 
   my $sname = $hash->{SNAME};
+  my $shash = $defs{$sname};
   my $cname = $hash->{NAME};
   my $c = $hash->{CD};
 
@@ -370,7 +383,7 @@ MQTT2_SERVER_Read($@)
     }
 
     $hash->{subscriptions} = {};
-    $defs{$sname}{clients}{$cname} = 1;
+    $shash->{clients}{$cname} = 1;
     $hash->{cid} = $cid; #124699
 
     Log3 $sname, 4, "  $cname cid:$hash->{cid} $cpt V:$hash->{protoNum} $desc";
@@ -387,11 +400,15 @@ MQTT2_SERVER_Read($@)
       $off += 2;
     }
     $val = (length($pl)>$off ? substr($pl, $off) : "");
-    $val = Encode::decode('UTF-8', $val) if($unicodeEncoding);
+    if($unicodeEncoding) {
+      if(!$shash->{binaryTopicRegexp} || $tp !~ m/^$shash->{binaryTopicRegexp}$/) {
+        $val = Encode::decode('UTF-8', $val);
+      }
+    }
     Log3 $sname, 4, "  $cname $hash->{cid} $cpt $tp:$val";
     # PUBACK
     MQTT2_SERVER_out($hash, pack("CCnC*", 0x40, 2, $pid), $dump) if($qos);
-    MQTT2_SERVER_doPublish($hash, $defs{$sname}, $tp, $val, $cf & 0x01);
+    MQTT2_SERVER_doPublish($hash, $shash, $tp, $val, $cf & 0x01);
 
   ####################################
   } elsif($cpt eq "PUBACK") { # ignore it
@@ -417,9 +434,9 @@ MQTT2_SERVER_Read($@)
       InternalTimer($hash->{lastMsgTime}+1, sub(){
         return if(!$hash->{FD}); # Closed in the meantime, #114425
         delete($hash->{answerScheduled});
-        my $r = $defs{$sname}{retain};
+        my $r = $shash->{retain};
         foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
-          MQTT2_SERVER_sendto($defs{$sname}, $hash, $tp, $r->{$tp}{val});
+          MQTT2_SERVER_sendto($shash, $hash, $tp, $r->{$tp}{val});
         }
       }, undef, 0);
     }
@@ -699,6 +716,18 @@ MQTT2_SERVER_ReadDebug($$)
       relevant for json payload. For non-json payload there is no difference
       between simple and complex.
       </li><br>
+
+    <a id="MQTT2_SERVER-attr-binaryTopicRegexp"></a>
+    <li>binaryTopicRegexp &lt;regular-expression&gt;<br>
+      this attribute is only relevant, if the global attribute "encoding
+      unicode" is set.<br>
+      In this case the MQTT payload is automatically assumed to be UTF-8, which
+      may cause conversion-problems if the payload is binary. This conversion
+      wont take place, if the topic matches the regular expression specified.
+      Note: as is the case with other modules, ^ and $ is added to the regular
+      expression.
+    </li><br>
+
 
     <a id="MQTT2_SERVER-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>
