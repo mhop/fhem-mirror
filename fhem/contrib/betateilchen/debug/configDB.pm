@@ -177,8 +177,8 @@
 #       done - this ID must be used for statefile 
 #       done - manual statfile creation must use existing ID for version 0
 #       done - table fhemstate no longer needed
-#              configdb reorg must delete old statefiles
-#              remove special handling for large readings
+#       done - configdb reorg must delete old statefiles
+#       done - remove special handling for large readings
 #              check recovery
 #
 ##############################################################################
@@ -1069,6 +1069,7 @@ sub _cfgDB_Reorg {
 	_cfgDB_InsertLine($fhem_dbh,$configDB{loaded},"attr configdb lastReorg $ts",-1); 
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+	_cfgDB_deleteStatefiles();
 	eval { qx(sqlite3 $cfgDB_filename vacuum) } if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
 	return " Result after database reorg:\n"._cfgDB_Info(undef);
@@ -1278,6 +1279,22 @@ sub _cfgDB_deleteRF {
    }
    $fhem_dbh2->commit();
    $fhem_dbh2->disconnect();
+}
+
+sub _cfgDB_deleteStatefiles {
+   my $filename;
+   my $fhem_dbh = _cfgDB_Connect;
+   my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
+   $sth->execute();
+   while ($filename = $sth->fetchrow_array()) {
+       my $uuid  = substr($filename,0,32);
+       my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
+       unless ($uuid eq $found) {
+         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+       }
+   }
+   $fhem_dbh->commit();
+   $fhem_dbh->disconnect();
 }
 
 ##################################################
