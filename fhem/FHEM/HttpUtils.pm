@@ -976,9 +976,10 @@ HttpUtils_ParseAnswer($)
       return ($@, $ret) if($@);
     }
   }
-  my $encoding = ($hash->{httpheader} =~ m/^Content-Type.*charset=(\S*)/im ?
-                        $1 : 'UTF-8');
-  $ret = Encode::decode($encoding, $ret) if($unicodeEncoding);
+  my $encoding = defined($hash->{forceEncoding}) ? $hash->{forceEncoding} :
+                 $hash->{httpheader} =~ m/^Content-Type.*charset=(\S*)/im ? $1 :
+                'UTF-8';
+  $ret = Encode::decode($encoding, $ret) if($unicodeEncoding && $encoding);
 
   # Debug
   Log3 $hash, $hash->{loglevel}+1,
@@ -995,7 +996,7 @@ HttpUtils_ParseAnswer($)
 #    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
-#    compress(1), incrementalTimeout(0)
+#    compress(1), incrementalTimeout(0), forceEncoding(undef)
 # Example:
 #   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }

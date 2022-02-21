@@ -520,6 +520,7 @@ upd_getUrl($)
   $url =~ s/%/%25/g;
   $upd_connecthash{url} = $url;
   $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
+  $upd_connecthash{forceEncoding} = "" if($unicodeEncoding);
   my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
   if($err) {
     uLog 1, $err;
