@@ -638,6 +638,7 @@ FW_finishRead($$$)
       $compressed = "Content-Encoding: gzip\r\n";
     }
   }
+  $FW_encodedByPlugin = undef;
 
   my $length = length($FW_RET);
   my $expires = ($cacheable ?
@@ -1002,10 +1003,10 @@ FW_answerCall($)
     foreach my $k (reverse sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($arg !~ m/^$k/);
-      $FW_encodedByPlugin = 1;
       $FW_contentFunc = $h->{CONTENTFUNC};
       next if($h !~ m/HASH/ || !$h->{FUNC});
       #Returns undef as FW_RETTYPE if it already sent a HTTP header
+      $FW_encodedByPlugin = 1;
       no strict "refs";
       ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
       if(defined($FW_RETTYPE) && $FW_RETTYPE =~ m,text/html,) {

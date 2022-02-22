@@ -554,7 +554,7 @@ EOF
     $ret .= 
     "FW_cmd('$sl', function(arg){" .<<"EOF";
       FW_okDialog(arg);
-    });
+    }); // {
   });
   setTimeout(function(){
     \$("table.internals div[informid=$gpfEsc-GPLOTFILE]")
@@ -1219,6 +1219,7 @@ SVG_doShowLog($$$$;$)
     }
 
   }
+  $FW_RET = Encode::encode('UTF-8', $FW_RET) if($unicodeEncoding);
   return ($FW_RETTYPE, $FW_RET);
 
 }
