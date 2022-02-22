@@ -428,11 +428,11 @@ telnet_ActivateInform($)
 =item summary_DE FHEM telnet Server
 =begin html
 
-<a name="telnet"></a>
+<a id="telnet"></a>
 <h3>telnet</h3>
 <ul>
   <br>
-  <a name="telnetdefine"></a>
+  <a id="telnet-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; telnet &lt;portNumber&gt;
@@ -487,25 +487,26 @@ telnet_ActivateInform($)
   <br>
 
 
-  <a name="telnetset"></a>
+  <a id="telnet-set"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="telnetget"></a>
+  <a id="telnet-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="telnetattr"></a>
+  <a id="telnet-attr"></a>
   <b>Attributes:</b>
   <ul>
-    <a name="prompt"></a>
+    <a id="telnet-attr-prompt"></a>
     <li>prompt<br>
         Sets the string for the telnet prompt, the default is fhem&gt;
         </li><br>
 
-    <a name="SSL"></a>
+    <a id="telnet-attr-SSL"></a>
     <li>SSL<br>
         Enable SSL encryption of the connection, see the description <a
-        href="#HTTPS">here</a> on generating the needed SSL certificates. To
-        connect to such a port use one of the following commands:
+        href="#HTTPS">here</a> on generating the needed SSL certificates.
+        If the attribute is set, the telnet program wont work as a client
+        anymore, and a replacement is needed, like one of the following:
         <ul>
           socat openssl:fhemhost:fhemport,verify=0 readline<br>
           ncat --ssl fhemhost fhemport<br>
@@ -513,7 +514,7 @@ telnet_ActivateInform($)
         </ul>
         </li><br>
 
-    <a name="allowfrom"></a>
+    <a id="telnet-attr-allowfrom"></a>
     <li>allowfrom<br>
         Regexp of allowed ip-addresses or hostnames. If set, only connections
         from these addresses are allowed.<br>
@@ -527,27 +528,30 @@ telnet_ActivateInform($)
         </ul>
         </li><br>
 
-    <a name="connectTimeout"></a>
+    <a id="telnet-attr-connectTimeout"></a>
     <li>connectTimeout<br>
         Wait at maximum this many seconds for the connection to be established.
         Default is 2.
         </li><br>
 
-    <a name="connectInterval"></a>
+    <a id="telnet-attr-connectInterval"></a>
     <li>connectInterval<br>
         After closing a connection, or if a connection cannot be estblished,
         try to connect again after this many seconds. Default is 60.
         </li><br>
 
-    <a name="encoding"></a>
+    <a id="telnet-attr-encoding"></a>
     <li>encoding<br>
         Sets the encoding for the data send to the client. Possible values are
         latin1 and utf8. Default is utf8.
         </li><br>
 
+    <a id="telnet-attr-sslVersion"></a>
      <li>sslVersion<br>
         See the global attribute sslVersion.
         </li><br>
+
+    <a id="telnet-attr-sslCertPrefix"></a>
      <li>sslCertPrefix<br>
         Set the prefix for the SSL certificate, default is certs/server-, see
         also the SSL attribute.
@@ -561,11 +565,11 @@ telnet_ActivateInform($)
 
 =begin html_DE
 
-<a name="telnet"></a>
+<a id="telnet"></a>
 <h3>telnet</h3>
 <ul>
   <br>
-  <a name="telnetdefine"></a>
+  <a id="telnet-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; telnet &lt;portNumber&gt;
@@ -625,27 +629,28 @@ telnet_ActivateInform($)
   <br>
 
 
-  <a name="telnetset"></a>
+  <a id="telnet-set"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="telnetget"></a>
+  <a id="telnet-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="telnetattr"></a>
+  <a id="telnet-attr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="prompt"></a>
+    <a id="telnet-attr-prompt"></a>
     <li>prompt<br>
         Gibt die Zeichenkette an, welche in der Telnet-Sitzung als
         Kommandoprompt ausgegeben wird. Die Voreinstellung ist fhem&gt;
         </li><br>
 
-    <a name="SSL"></a>
+    <a id="telnet-attr-SSL"></a>
     <li>SSL<br>
         SSL-Verschl&uuml;sselung f&uuml;r eine Verbindung aktivieren. <a
         href="#HTTPS">Hier</a> gibt es eine Beschreibung, wie das erforderliche
-        SSL-Zertifikat generiert werden kann. Um eine Verbindung mit solch
-        einem Port herzustellen, sind folgende Befehle m&ouml;glich:
+        SSL-Zertifikat generiert werden kann. Beim gesetzten Attribut kann man
+        den telnet Befehl nicht mehr zum Verbinden werwenden, m&ouml;gliche
+        Alternetiven sind folgende Programme:
         <ul>
         <code>
           socat openssl:fhemhost:fhemport,verify=0 readline<br>
@@ -655,7 +660,7 @@ telnet_ActivateInform($)
         </ul>		
 	</li><br>
 
-    <a name="allowfrom"></a>
+    <a id="telnet-attr-allowfrom"></a>
     <li>allowfrom<br>
         Regexp der erlaubten IP-Adressen oder Hostnamen. Wenn dieses Attribut
         gesetzt wurde, werden ausschlie&szlig;lich Verbindungen von diesen
@@ -670,13 +675,13 @@ telnet_ActivateInform($)
         </ul>
         </li><br>
 
-    <a name="connectTimeout"></a>
+    <a id="telnet-attr-connectTimeout"></a>
     <li>connectTimeout<br>
         Gibt die maximale Wartezeit in Sekunden an, in der die Verbindung
         aufgebaut sein muss. Standardwert ist 2.
     </li><br>
 
-    <a name="connectInterval"></a>
+    <a id="telnet-attr-connectInterval"></a>
     <li>connectInterval<br>
         Gibt die Dauer an, die entweder nach Schlie&szlig;en einer Verbindung
         oder f&uuml;r den Fall, dass die Verbindung nicht zustande kommt,
@@ -684,7 +689,7 @@ telnet_ActivateInform($)
         werden soll. Standardwert ist 60.
         </li><br>
 
-    <a name="encoding"></a>
+    <a id="telnet-attr-encoding"></a>
     <li>encoding<br>
         Bezeichnet die Zeichentabelle f&uuml;r die zum Client gesendeten Daten.
         M&ouml;gliche Werte sind utf8 und latin1. Standardwert ist utf8. 
