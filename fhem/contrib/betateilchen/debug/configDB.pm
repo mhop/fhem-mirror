@@ -519,12 +519,14 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 			push @rowList, "attr $c $a $val";
 		}
 
-# Insert @rowList into database table
-	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = _cfgDB_Rotate($fhem_dbh,$internal);
 	$t = localtime;
 	$out = "#created $t";
 	push @rowList, $out;
+    return @rowList if defined($data{cfgDB_rawList});
+
+# Insert @rowList into database table
+	my $fhem_dbh = _cfgDB_Connect;
+	my $uuid = _cfgDB_Rotate($fhem_dbh,$internal);
 	my $counter = 0;
 	foreach (@rowList) { 
 		_cfgDB_InsertLine($fhem_dbh, $uuid, $_, $counter); 
