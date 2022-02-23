@@ -1,4 +1,4 @@
-# $Id: configDB.pm 25615 2022-02-02 12:36:27Z betateilchen $
+# $Id$
 
 =for comment (License)
 
@@ -170,6 +170,9 @@
 =for comment
 ##############################################################################
 #
+# 2022-02-20 - changed   use createUniqueId() for uuids
+#                        remove _cfgDB_Uuid()
+#
 # 2022-02-20 - added     begin of statefile versioning
 # todo:
 #       done - fhem.pl must deliver ID in CommandSave
@@ -180,6 +183,7 @@
 #       done - configdb reorg must delete old statefiles
 #       done - remove special handling for large readings
 #              check recovery
+#              change loglevel 1 to 4
 #
 ##############################################################################
 =cut
@@ -239,6 +243,7 @@ sub _cfgDB_table_exists;
 sub _cfgDB_dump;
 sub _cfgDB_knownAttr;
 sub _cfgDB_deleteRF;
+sub _cfgDB_deleteStatefiles;
 
 ##################################################
 # Read configuration file for DB connection
@@ -556,8 +561,10 @@ sub cfgDB_SaveState {
 			$val ne "" &&
 			$val ne "???") {
 			$val =~ s/;/;;/g;
-			$val =~ s/\n/\\\n/g;
+#			$val =~ s/\n/\\\n/g;
+            $val =~ s/\n/\$xyz\$/g;
 			$out = "setstate $d $val";
+			Log 4, "configDB: $out";
 			push @rowList, $out;
 		}
 		$r = $defs{$d}{READINGS};
@@ -577,6 +584,7 @@ sub cfgDB_SaveState {
 #				$val =~ s/\n/\\\n/g;
                 $val =~ s/\n/\$xyz\$/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
+				Log 4, "configDB: $out"; 
 #				if (length($out) > 65530) {
 #                  my $uid = createUniqueId();
 #				  FileWrite($uid,$val);
@@ -593,12 +601,12 @@ sub cfgDB_SaveState {
     Log 1, "configDB save state  $fileName";
     cfgDB_FileWrite($fileName,@rowList);
 
-	my $fhem_dbh = _cfgDB_Connect;
-	$fhem_dbh->do("DELETE FROM fhemstate");
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhemstate values ( ? )');
-	foreach (@rowList) { $sth->execute( $_ ); }
-	$fhem_dbh->commit();
-	$fhem_dbh->disconnect();
+#	my $fhem_dbh = _cfgDB_Connect;
+#	$fhem_dbh->do("DELETE FROM fhemstate");
+#	my $sth = $fhem_dbh->prepare('INSERT INTO fhemstate values ( ? )');
+#	foreach (@rowList) { $sth->execute( $_ ); }
+#	$fhem_dbh->commit();
+#	$fhem_dbh->disconnect();
 	return;
 }
 
@@ -697,7 +705,7 @@ sub cfgDB_MigrationImport {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId { 
-	return "# ".'$Id: configDB.pm 25615 2022-02-02 12:36:27Z betateilchen $' 
+	return "# ".'$Id$' 
 }
 
 # return filelist depending on directory and regexp
