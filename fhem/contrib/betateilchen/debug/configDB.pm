@@ -479,7 +479,7 @@ sub cfgDB_ReadAll {  ## prototype used in fhem.pl
 
 # save running configuration to version 0
 sub cfgDB_SaveCfg { ## prototype used in fhem.pl
-    Log 1, "configDB save config ".$data{saveID};
+    Log 1, "configDB save config ".$data{saveID} if(defined($data{saveID}));
 	my ($internal) = shift;
 	$internal = defined($internal) ? $internal : 0;
 	my $c = "configdb";
@@ -1297,9 +1297,10 @@ sub _cfgDB_deleteStatefiles {
    my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
    $sth->execute();
    while ($filename = $sth->fetchrow_array()) {
-       my $uuid  = substr($filename,0,32);
-       my $found = "";
-       $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
+       my $uuid  = "";
+       $uuid = substr($filename,0,32);
+       my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
+       $found //= -1; # to prevent perl warning
        unless ($uuid eq $found) {
          $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
        }
