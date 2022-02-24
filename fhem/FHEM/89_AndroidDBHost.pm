@@ -4,7 +4,7 @@
 #
 # 89_AndroidDBHost
 #
-# Version 0.4
+# Version 0.6
 #
 # FHEM Integration for Android Debug Bridge
 #
@@ -18,8 +18,6 @@
 #   Raspbian/Debian: apt-get install android-sdk-platform-tools
 #   Windows/MacOSX/Linux x86: https://developer.android.com/studio/releases/platform-tools
 #
-
-
 
 package main;
 
@@ -86,7 +84,7 @@ sub Define ($$$)
 	$hash->{adb}{port} = $port // 5037;
 	$hash->{adb}{cmd}  = $h->{adb} // '/usr/bin/adb';
 	$hash->{Clients}   = ':AndroidDB:';
-	$hash->{NOTIFYDEV} = 'global,TYPE=(AndroidDBHost|AndroidDB)';
+	$hash->{NOTIFYDEV} = 'global,TYPE=AndroidDBHost';
 	
 	# Check path and rights of platform tools
 	return "ADB command not found or is not executable in $hash->{adb}{pt}" if (! -x "$hash->{adb}{cmd}");
@@ -132,7 +130,15 @@ sub Notify ($$)
 	return if (!$events);
 	
 	if ($devhash->{NAME} eq 'global' && grep (/INITIALIZED/, @$events)) {
-		InternalTimer (gettimeofday()+60, 'AndroidDBHost::CheckADBServerTimer', $hash, 0);
+		foreach my $clName (keys %defs) {
+			my $clHash = $defs{$clName};
+			if ($clHash->{TYPE} eq 'AndroidDB') {
+				AndroidDB::InitAfterStart ($clHash);
+			}
+		} 
+		
+		# First refresh of client connection state after 10 seconds
+		InternalTimer (gettimeofday()+10, 'AndroidDBHost::CheckADBServerTimer', $hash, 0);
 	}
 }
 
@@ -194,7 +200,8 @@ sub UpdateClientStates ($)
 
 	foreach my $d (keys %defs) {
 		my $clHash = $defs{$d};
-		if ($clHash->{TYPE} eq 'AndroidDB') {
+		next if (!defined($clHash->{TYPE}) || !defined($clHash->{IODev}));
+		if ($clHash->{TYPE} eq 'AndroidDB' && $clHash->{IODev} == $hash) {
 			my $clState = $device->{$clHash->{ADBDevice}} // 'disconnected';
 			$clState =~ s/device/connected/;
 			readingsSingleUpdate ($clHash, 'state', $clState, 1);
@@ -253,10 +260,9 @@ sub Set ($@)
 		my ($rc, $result, $error) = Execute ($hash, $command, '.*', @$a);
 		return $result.$error;
 	}
-	elsif ($opt eq 'disconnect') {
-		my ($rc, $result, $error) = Execute ($hash, 'disconnect', 'disconnected');
-		UpdateClientStates ($hash);
-		return "Disconnecting all devices failed $result $error" if ($rc == 0);
+	elsif ($opt eq 'disconnectall') {
+		my ($rc, $error) = DisconnectAll ($hash);
+		return "Disconnecting all devices failed: $error" if ($rc == 0);
 	}
 	else {
 		return "Unknown argument $opt, choose one of $options";
@@ -311,8 +317,8 @@ sub Get ($@)
 # Return value:
 #   (returncode, stdout, stderr)
 # Return codes:
-#   0 - error
-#   1 - success
+#   0 = error
+#   1 = success
 ##############################################################################
 
 sub Execute ($@)
@@ -324,6 +330,8 @@ sub Execute ($@)
 		Log3 $ioHash->{NAME}, 2, 'Execute: ADB server not running';
 		return (0, '', 'ADB server not running');
 	}
+	
+	Log3 $ioHash->{NAME}, 5, "Executing $ioHash->{adb}{cmd} $command ".join(' ',@args);
 
 	# Execute ADB command	
 	local (*CHILDIN, *CHILDOUT, *CHILDERR);
@@ -370,13 +378,13 @@ sub Execute ($@)
 
 sub IsConnected ($)
 {
-	my $clHash = shift // return 0;
+	my $clHash = shift // return -1;
 
 	my $ioHash = $clHash->{IODev} // return -1;
 	
 	# Get active connections
 	my $device = GetDeviceList ($ioHash) // return -1;
-	my $devCount = keys %$device;
+	my $devCount = scalar(keys %$device);
 
 	if ($devCount == 1) {
 		return exists($device->{$clHash->{ADBDevice}}) ? 1 : 2;
@@ -403,13 +411,13 @@ sub Connect ($)
 	my $ioHash = $clHash->{IODev} // return -1;
 	
 	my $connect = IsConnected ($clHash);
+#	Log3 $clHash->{NAME}, 2, "Connection state is $connect"; 
 	if ($connect == 1) {
 		return 1;
 	}
 	elsif ($connect == 2) {
 		# Disconnect all devices
-		my ($rc, $result, $error) = Execute ($ioHash, 'disconnect', 'disconnected');
-		return -1 if ($rc == 0);
+		DisconnectAll ($ioHash);
 	}
 	elsif ($connect == -1) {
 		Log3 $clHash->{NAME}, 2, 'Cannot detect connection state';
@@ -424,11 +432,11 @@ sub Connect ($)
 }
 
 ##############################################################################
-# Connect to Android device
+# Disconnect Android device
 #
 # Return value:
-#  0 = error
-#  1 = connected
+#  -1, 0 = error
+#  1 = success
 ##############################################################################
 
 sub Disconnect ($)
@@ -441,6 +449,21 @@ sub Disconnect ($)
 	readingsSingleUpdate ($clHash, 'state', 'disconnected', 1) if ($rc == 1);
 
 	return $rc;
+}
+
+##############################################################################
+# Disconnect all Android devices
+##############################################################################
+
+sub DisconnectAll ($)
+{
+	my ($hash) = @_;
+
+	my ($rc, $result, $error) = Execute ($hash, 'disconnect', 'disconnected');
+	UpdateClientStates ($hash);
+	return (0, $error) if ($rc == 0);
+	
+	return (1, 'ok');
 }
 
 ##############################################################################
@@ -482,12 +505,9 @@ sub Run ($@)
 	my $ioHash = $clHash->{IODev} // return (0, '', 'Cannot detect IO device');
 
 	if (!Connect ($clHash)) {
-		readingsSingleUpdate ($clHash, 'state', 'connected', 1);
 		return (0, '', 'Cannot connect to device');
 	}
 	
-	readingsSingleUpdate ($clHash, 'state', 'connected', 1);
-
 	return Execute ($ioHash, $command, $succExp, @args);
 }
 
@@ -545,6 +565,9 @@ sub TCPConnect ($$$)
 <ul>
 	<li><b>set &lt;name&gt; command &lt;Command&gt; [&lt;Args&gt;]</b><br/>
 		Execute ADB command.
+	</li><br/>
+	<li><b>set &lt;name&gt; disconnectAll</b><br/>
+		Disconnect all devices.
 	</li><br/>
 	<li><b>set &lt;name&gt; start</b><br/>
 		Start ADB server.
