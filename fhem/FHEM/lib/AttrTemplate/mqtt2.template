@@ -2001,15 +2001,16 @@ attr DEVICE setList\
   off:noArg CMNDTOPIC/POWER1 0\
   on:noArg CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
-  Color:colorpicker,RGB CMNDTOPIC/COLOR\
-  Dimmer:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
+  rgb:colorpicker,RGB CMNDTOPIC/COLOR\
+  pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE autocreate 0
-attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","state")}
-attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
+attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","rgb","pct","state")}
+attr DEVICE webCmd rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off
+attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 HSBColor:0 Color:rgb
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_rgb_led_controller
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220225
 
 name:tasmota_rgbw_led
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -2026,7 +2027,7 @@ attr DEVICE setList\
   off:noArg CMNDTOPIC/POWER1 0\
   on:noArg CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
-  Color:colorpicker,RGB CMNDTOPIC/COLOR\
+  rgb:colorpicker,RGB CMNDTOPIC/COLOR\
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
   dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {CMNDTOPIC/Dimmer $num}; }\
   dimdown:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {CMNDTOPIC/Dimmer $num}; }\
@@ -2044,16 +2045,16 @@ attr DEVICE readingList \
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? return : { "saturation"=>$2 } : return }\
   STATTOPIC/POWER1:.* state
-attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
-attr DEVICE webCmd pct:white:Color
+attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 Color:rgb
+attr DEVICE webCmd pct:white:rgb
 attr DEVICE webCmdLabel Helligkeit\
 :Weiss\
 :Farbe:
-attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","state")}
+attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","rgb","pct","state")}
 attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_rgbw_led
-setreading DEVICE attrTemplateVersion 20210515
+setreading DEVICE attrTemplateVersion 20220225
 
 name:tasmota_rgbcct_light
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -2134,16 +2135,17 @@ attr DEVICE setList\
   off:noArg CMNDTOPIC/POWER1 0\
   on:noArg CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
-  Dimmer:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
+  pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE autocreate 0
 attr DEVICE devStateIcon off:light_light_dim_00:on on:light_light_dim_90:off
-attr DEVICE webCmd Dimmer
+attr DEVICE webCmd pct
+attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 Color:rgb
 attr DEVICE comment After applying the template, the device to be controlled needs further configuration. For the necessary steps see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
 farewell:template has been applied successfully. Now it's recommended to do some configruation, see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_TuyaMCU_dimmer
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220225
 
 # tasmota battery powered window sensor MC400A
 # contributed by OppiM, source post https://forum.fhem.de/index.php/topic,94495.msg1084052.html#msg1084052
