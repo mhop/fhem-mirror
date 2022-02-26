@@ -27,7 +27,7 @@ TcpServer_Open($$$)
   my $lh = ($global ? ($global eq "global"? undef : $global) :
                       ($hash->{IPV6} ? "::1" : "127.0.0.1"));
   my @opts = (
-    Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
+    Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug / #126448
     LocalHost => $lh,
     LocalPort => $port,
     Listen    => 32,    # For Windows
