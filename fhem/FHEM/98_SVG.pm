@@ -82,6 +82,7 @@ SVG_Initialize($)
     plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
     plotsize
     plotReplace:textField-long
+    plotAsPngFix:1,0
     startDate
     title
   );
@@ -2453,19 +2454,22 @@ plotAsPng(@)
     }
   }
 
+  my $svgName = $plotName[0];
   $FW_RET                 = undef;
-  $FW_webArgs{dev}        = $plotName[0];
-  $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
-  $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
-  $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
+  $FW_webArgs{dev}        = $svgName;
+  $FW_webArgs{logdev}     = InternalVal($svgName, "LOGDEVICE", "");
+  $FW_webArgs{gplotfile}  = InternalVal($svgName, "GPLOTFILE", "");
+  $FW_webArgs{logfile}    = InternalVal($svgName, "LOGFILE", "CURRENT"); 
   $FW_pos{zoom}           = $plotName[1] if $plotName[1];
   $FW_pos{off}            = $plotName[2] if $plotName[2];
 
   ($mimetype, $svgdata)   = SVG_showLog("unused");
 
-  my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+  my ($w, $h) = split(",", AttrVal($svgName,"plotsize","800,160"));
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
-  # $svgdata =~ s/\.SVGplot\./\./g; # Forum #116138 / "corrupt" CSS: why?
+
+  # Forum #32791,#116138: some lib versions cannot parse complex CSS selectors
+  $svgdata =~ s/\.SVGplot\./\./g if(AttrVal($svgName, "plotAsPngFix", 0));
 
   eval {
     require Image::LibRSVG;
@@ -2636,6 +2640,14 @@ plotAsPng(@)
         on each side, separated by comma: left,right[,useLeft,useRight].  You
         can set individual numbers by setting the nrAxis of the SVG. Default is
         1,1.
+        </li><br>
+
+    <a id="SVG-attr-plotAsPngFix"></a>
+    <li>plotAsPngFix [0|1]<br>
+        Affects only the plotAsPng function: Some LibRSVG versions cannot cope
+        with complex CSS selectors, so the resulting PNG is black and white
+        only. If this attribute is set to 1, the CSS selector complexity will
+        be reduced.
         </li><br>
 
     <a id="SVG-attr-plotfunction"></a>
@@ -2915,6 +2927,13 @@ plotAsPng(@)
         Achse links, 1 Achse rechts).
         </li><br>
 
+    <a id="SVG-attr-plotAsPngFix"></a>
+    <li>plotAsPngFix [0|1]<br>
+        Betrifft nur die plotAsPng Funktion: Bestimmte LibRSVG Versionen
+        k&ouml;nnen nicht mit komplexen CSS Selektoren umgehen, und das
+        Ergebnis ist ein schwarz/wei&szlig; Bild. Falls dieses Attribut auf 1
+        gesetzt wird, werden die CSS Anweisungen vereinfacht.
+        </li><br>
 
     <a id="SVG-attr-plotfunction"></a>
     <li>plotfunction<br>
