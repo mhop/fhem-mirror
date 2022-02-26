@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_mssDialog: Add option to define dialogues by file
+ - change:  76_mssDialog: PBP code restructured
  - feature: 89_AndroidDB: Added new features
  - bugfix:  89_AndroidDBHost: Bug fixes
  - bugfix:  70_DENON_AVR: handled some uninitialized values
