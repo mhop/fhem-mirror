@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.14';
+    $hash->{MODULE_VERSION} = '0.5.15';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2590,13 +2590,13 @@ sub notifySTT {
     my @events = @{deviceEvents($dev_hash, 1)};
 
     return if !@events;
-    return if $hash->{helper}->{STT}->{config}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
 
     for my $event (@events){
         next if $event !~ m{(?:receiveVoiceCommand):.(.+)}xms;
-        my $client = ReadingsVal($device,'receiveVoiceDevice',undef) // return;
-
         my $msgtext = trim($1);
+        my $client = ReadingsVal($device,'receiveVoiceDevice',undef) // return;
+        return if $hash->{helper}->{STT}->{config}->{allowed} !~ m{\b(?:$client|everyone)(?:\b|\z)}xms;
+
         Log3($name, 4 , qq($name received $msgtext from $client (triggered by $device) ));
 
         my $tocheck = $hash->{helper}->{STT}->{config}->{filterFromBabble};
