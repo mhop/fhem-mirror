@@ -16,13 +16,26 @@ class Arlo:
             'mobile': False
         }
         self._session = cloudscraper.create_scraper(browser=browser)
-        self._headers = {
-            "Accept": "application/json, text/plain, */*",
+        self._baseUrl = "https://ocapi-app.arlo.com/api/"
+
+        self._headers  = {
+            'Access-Control-Request-Headers': 'content-type,source,x-user-device-id,x-user-device-name,x-user-device-type',
+            'Access-Control-Request-Method': 'POST',
             "Referer": "https://my.arlo.com",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36",
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
+        }
+        self._session.options(self._baseUrl + "auth", headers=self._headers)
+
+        self._headers = {
+            "DNT": "1",
+            "schemaVersion": "1",
+            "Auth-Version": "2",
+            "Content-Type": "application/json; charset=UTF-8",
+            "Origin": "https://my.arlo.com",
+            "Referer": "https://my.arlo.com/",
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)',
             "Source": "arloCamWeb"
         }
-        self._baseUrl = "https://ocapi-app.arlo.com/api/"
         self._token = None
 
     def login(self, username, password):

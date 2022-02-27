@@ -423,7 +423,7 @@ sub Arlo_PrepareRequest($$;$$$$) {
   $headers = $headers."Authorization: $token\r\n" if (defined($token)); 
   $headers = $headers."Cookie: $cookies\r\n" if (defined($cookies)); 
   $headers = $headers."Content-Type: application/json; charset=utf-8\r\nOrigin: https://myapi.arlo.com\r\nReferer: https://myapi.arlo.com\r\nschemaVersion: 1\r\n";
-  $headers = $headers."User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36";
+  $headers = $headers."User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)";
   $headers = $headers."\r\n".$additionalHeader if (defined($additionalHeader));
   Log3 $name, 5, "Arlo header: $headers";
   
@@ -1230,7 +1230,7 @@ sub Arlo_EventQueue($) {
 
   my $headers = {'Auth-Version' => 2, Authorization => $token, Accept => 'text/event-stream', 'Access-Control-Request-Headers' => 'auth-version,authorization',
     'Access-Control-Request-Method' => 'GET', Cookie => $cookies, Origin => 'https://my.arlo.com', Referer => 'https://myapi.arlo.com',
-    'User-Agent' => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36' };
+    'User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_2 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B202 NETGEAR/v1 (iOS Vuezone)' };
   my $con = {url => 'https://myapi.arlo.com/hmsweb/client/subscribe', method => "GET", header => $headers, keepalive => 1, host => 'myapi.arlo.com', httpversion => '1.1', loglevel => 4};
   my $err = HttpUtils_Connect($con);
   if ($err) {
