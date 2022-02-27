@@ -32,8 +32,9 @@ package RHASSPY; ##no critic qw(Package)
 use strict;
 use warnings;
 use Carp qw(carp);
-use GPUtils qw(:all);
-use JSON qw(decode_json);
+use GPUtils qw(GP_Import);
+#use JSON qw(decode_json);
+use JSON (); # qw(decode_json encode_json);
 use Encode;
 use HttpUtils;
 use utf8;
@@ -43,6 +44,7 @@ use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
 #use Data::Dumper;
 use FHEM::Core::Timer::Register qw(:ALL);
+#use FHEM::Meta;
 
 sub ::RHASSPY_Initialize { goto &Initialize }
 
@@ -219,10 +221,8 @@ my $internal_mappings = {
 BEGIN {
 
   GP_Import( qw(
-    addToAttrList
-    addToDevAttrList
-    delFromDevAttrList
-    delFromAttrList
+    addToAttrList delFromDevAttrList
+    addToDevAttrList delFromAttrList
     readingsSingleUpdate
     readingsBeginUpdate
     readingsBulkUpdate
@@ -261,7 +261,7 @@ BEGIN {
     makeReadingName
     FileRead
     getAllSets
-    notifyRegexpChanged
+    notifyRegexpChanged setNotifyDev
     deviceEvents
     trim
   ) )
@@ -289,7 +289,7 @@ sub Initialize {
     #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{AttrFn}      = \&Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long rhasspyTTS:textField-long rhasspySTT:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&Parse;
     $hash->{NotifyFn}    = \&Notify;
@@ -312,7 +312,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble|autoTraining)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.10';
+    $hash->{MODULE_VERSION} = '0.5.14';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -333,7 +333,7 @@ sub Define {
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
 
-    for my $key (qw( experimental handleHotword sessionTimeout Babble)) {
+    for my $key (qw( experimental handleHotword sessionTimeout Babble autoTraining)) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -355,7 +355,7 @@ sub firstInit {
     my $hash = shift // return;
 
     my $name = $hash->{NAME};
-    notifyRegexpChanged($hash,'',1);
+    notifyRegexpChanged($hash,'',1) if !$hash->{autoTraining};
 
     # IO
     AssignIoPort($hash);
@@ -379,7 +379,9 @@ sub firstInit {
         && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
     initialize_msgDialog($hash);
-    if ($hash->{Babble}) {
+    initialize_TTS($hash);
+    initialize_STT($hash);
+    if ( 0 && $hash->{Babble} ) { #deactivate
         InternalVal($hash->{Babble},'TYPE','none') eq 'Babble' ? $sets{Babble} = [qw( optionA optionB )] 
         : Log3($name, 1, "[$name] error: No Babble device available with name $hash->{Babble}!");
     }
@@ -401,8 +403,9 @@ sub initialize_Language {
     return $ret if $ret;
 
     my $decoded;
-    if ( !eval { $decoded  = decode_json(encode($cp,$content)) ; 1 } ) {
-        Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg:  $@");
+    #if ( !eval { $decoded  = decode_json(encode($cp,$content)) ; 1 } ) {
+    if ( !eval { $decoded  = JSON->new->decode($content) ; 1 } ) {
+        Log3($hash->{NAME}, 1, "JSON decoding error in languagefile $cfg: $@");
         return "languagefile $cfg seems not to contain valid JSON!";
     }
 
@@ -418,8 +421,8 @@ sub initialize_Language {
     for my $key (keys %{$slots}) {
         updateSingleSlot($hash, $key, $slots->{$key});
     }
-
-    return;
+    return if !$hash->{autoTraining};
+    return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0);
 }
 
 sub initialize_prefix {
@@ -568,6 +571,7 @@ sub Set {
         if ($values[0] eq 'devicemap') {
             initialize_devicemap($hash);
             $hash->{'.needTraining'} = 1;
+            deleteSingleRegIntTimer('autoTraining', $hash, 1);
             return updateSlots($hash);
         }
         if ($values[0] eq 'devicemap_only') {
@@ -575,6 +579,7 @@ sub Set {
         }
         if ($values[0] eq 'slots') {
             $hash->{'.needTraining'} = 1;
+            deleteSingleRegIntTimer('autoTraining', $hash, 1);
             return updateSlots($hash);
         }
         if ($values[0] eq 'slots_no_training') {
@@ -587,6 +592,7 @@ sub Set {
         if ($values[0] eq 'all') {
             initialize_Language($hash, $hash->{LANGUAGE});
             initialize_devicemap($hash);
+            deleteSingleRegIntTimer('autoTraining', $hash, 1);
             $hash->{'.needTraining'} = 1;
             updateSlots($hash);
             return fetchIntents($hash);
@@ -608,6 +614,13 @@ sub Set {
         if ($values[0] eq 'optionB') {
             return "rhasspy command Babble B called";
         }
+    }
+
+    if ($command eq 'sayFinished') {
+        my $data;
+        $data->{id}     = $h->{id}     // shift @values // return;
+        my $siteId = $h->{siteId} // shift @values;
+        return sayFinished($hash,$data,$siteId);
     }
 
     return;
@@ -677,6 +690,18 @@ sub Attr {
         delete $hash->{helper}{msgDialog};
         return if !$init_done;
         return initialize_msgDialog($hash, $value, $command);
+    }
+
+    if ( $attribute eq 'rhasspyTTS' ) {
+        delete $hash->{helper}{TTS};
+        return if !$init_done;
+        return initialize_TTS($hash, $value, $command);
+    }
+
+    if ( $attribute eq 'rhasspySTT' ) {
+        delete $hash->{helper}{STT};
+        return if !$init_done;
+        return initialize_STT($hash, $value, $command);
     }
 
     return;
@@ -907,7 +932,7 @@ sub initialize_devicemap {
 
     # when called with just one keyword, devspec2array may return the keyword, even if the device doesn't exist...
     return if !@devices;
-    
+
     for (@devices) {
         _analyze_genDevType($hash, $_) if $hash->{useGenericAttrs};
         _analyze_rhassypAttr($hash, $_);
@@ -916,6 +941,13 @@ sub initialize_devicemap {
     return;
 }
 
+sub RHASSPY_autoTraining {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+
+    return updateSlots($hash, 1);
+}
 
 sub _analyze_rhassypAttr {
     my $hash   = shift // return;
@@ -1353,6 +1385,93 @@ sub initialize_rhasspyHotwords {
     return;
 }
 
+sub initialize_TTS {
+    my $hash    = shift // return;
+    my $attrVal = shift // AttrVal($hash->{NAME},'rhasspyTTS',undef) // return;
+    my $mode    = shift // 'set';
+
+    for my $line (split m{\n}x, $attrVal) {
+        next if !length $line;
+        my ($keywd, $values) = split m{=}x, $line, 2;
+        $values = trim($values);
+        next if !$values;
+        $keywd  = trim($keywd);
+        if ( !defined $defs{$keywd} ) {
+            return "$keywd is no valid FHEM device!" if $init_done;
+            Log3($hash, 2, "[RHASSPY] $keywd in rhasspyTTS is no valid FHEM device!");
+        }
+
+        my($unnamedParams, $namedParams) = parseParams($values);
+
+        if ( InternalVal($keywd,'TYPE','unknown') eq 'AMADDevice' ) {
+            $hash->{helper}->{TTS}->{config}->{$keywd}->{ttsCommand} //= q{set $DEVICE ttsMsg $message};
+            my $siteId = $namedParams->{siteId} // shift @{$unnamedParams }// $keywd;
+            $hash->{helper}->{TTS}->{$siteId} = $keywd;
+            $hash->{helper}->{TTS}->{config}->{$keywd} = $namedParams;
+        }
+    }
+    if ( keys %{$hash->{helper}->{TTS}} ) {
+        $sets{sayFinished} = [] ;
+    }
+
+    return;
+}
+
+sub initialize_STT {
+    my $hash    = shift // return;
+    my $attrVal = shift // AttrVal($hash->{NAME},'rhasspySTT',undef) // return;
+    my $mode    = shift // 'set';
+
+    for my $line (split m{\n}x, $attrVal) {
+        next if !length $line;
+        my ($keywd, $values) = split m{=}x, $line, 2;
+        $keywd  = trim($keywd);
+        $values = trim($values);
+        next if !$values;
+
+        if ( $keywd =~ m{\Aallowed\z}xms ) {
+            for my $amads (split m{[\b]*,[\b]*},$values) {
+                if ( InternalVal($amads,'TYPE','unknown') ne 'AMADDevice' ) {
+                    return "$amads is not an AMADDevice!" if $init_done;
+                    Log3($hash, 2, "[RHASSPY] $amads in rhasspySTT is not an AMADDevice!");
+                }
+            }
+            $hash->{helper}->{STT}->{config}->{$keywd} = $values;
+            next;
+        }
+
+        if ( $keywd =~ m{\AAMADCommBridge\z}xms ) {
+            for my $bridge (split m{,}, $values) {
+                if ( InternalVal($bridge,'TYPE','unknown') ne 'AMADCommBridge' ) {
+                    return "$bridge is not an AMADCommBridge!" if $init_done;
+                    Log3($hash, 2, "[RHASSPY] $bridge in rhasspySTT is not an AMADCommBridge!");
+                }
+            }
+            $hash->{helper}->{STT}->{config}->{$keywd} = $values;
+            disable_msgDialog( $hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
+            next;
+        }
+
+        if ( $keywd =~ m{\AfilterFromBabble\z}xms ) {
+            if ( !defined $hash->{Babble} ) {
+                return "Babble useage has to be activated in DEF first!" if $init_done;
+                Log3($hash, 2, "[RHASSPY] filterFromBabble in rhasspySTT not activated, Babble useage has to be activated in DEF first!");
+            }
+            $hash->{helper}->{STT}->{config}->{$keywd} = _toregex($values);
+            next;
+        }
+    }
+
+    if ( !defined $hash->{helper}->{STT}->{config}->{allowed} ) {
+        delete $hash->{helper}->{STT};
+        return 'Setting the allowed key in rhasspySTT is mandatory!' ;
+    }
+
+    return;
+}
+
+
+
 sub initialize_msgDialog {
     my $hash    = shift // return;
     my $attrVal = shift // AttrVal($hash->{NAME},'rhasspyMsgDialog',undef) // return;
@@ -1393,19 +1512,39 @@ sub initialize_msgDialog {
         $hash->{helper}->{msgDialog}->{config}->{msgCommand}
                 = AttrVal($msgConfig, "$hash->{prefix}MsgCommand", q{msg push \@$recipients $message});
     }
-    my $monitored = join q{|}, devspec2array('TYPE=(ROOMMATE|GUEST)');
-    notifyRegexpChanged($hash,$monitored,0) if $monitored;
-    return;
+    return disable_msgDialog($hash, 1, 1)
 
 }
 
 sub disable_msgDialog {
-    my $hash   = shift // return;
-    my $enable = shift // 0;
-    readingsSingleUpdate($hash,"enableMsgDialog",$enable,1);
-    return initialize_msgDialog($hash) if $enable;
-    notifyRegexpChanged($hash,'',1);
-    delete $hash->{helper}{msgDialog};
+    my $hash    = shift // return;
+    my $enable  = shift // 0;
+    my $fromSST = shift;
+    readingsSingleUpdate($hash,'enableMsgDialog',$enable,1) if !$fromSST;
+    return initialize_msgDialog($hash) if $enable && !$fromSST;
+
+    my $devsp;
+    if ( defined $hash->{helper}->{STT} 
+        && defined $hash->{helper}->{STT}->{config}
+        && defined $hash->{helper}->{STT}->{config}->{AMADCommBridge} ) {
+            $devsp = qq($hash->{helper}->{STT}->{config}->{AMADCommBridge});
+    }
+    if ($enable) { 
+        $devsp .= $devsp ? ',TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
+    }
+    if ($hash->{autoTraining}) {
+        $devsp .= $devsp ? ',global' : 'global';
+    }
+
+    my @ntfdevs = devspec2array($devsp);
+    if (@ntfdevs) {
+        setNotifyDev($hash,$devsp);
+        delete $hash->{disableNotifyFn};
+    } else {
+        notifyRegexpChanged($hash,'',1);
+    }
+
+    delete $hash->{helper}{msgDialog} if !$enable;
     return;
 }
 
@@ -1441,7 +1580,7 @@ sub RHASSPY_DialogTimeout {
     my $data     = shift // $hash->{helper}{'.delayed'}->{$identiy};
     my $siteId = $data->{siteId};
 
-    deleteSingleRegIntTimer($identiy, $hash, 1); 
+    deleteSingleRegIntTimer($identiy, $hash, 1);
 
     respond( $hash, $data, getResponse( $hash, 'DefaultConfirmationTimeout' ) );
     delete $hash->{helper}{'.delayed'}{$identiy};
@@ -1719,7 +1858,7 @@ sub getRoomName {
 
     #Beta-User: This might be the right place to check, if there's additional logic implemented...
 
-    my $siteId = $data->{siteId};
+    my $siteId = $data->{siteId} // return $hash->{defaultRoom};
 
     my $rreading = makeReadingName("siteId2room_$siteId");
     $siteId =~ s{\A([^.]+).*}{$1}xms;
@@ -2270,7 +2409,8 @@ sub parseJSONPayload {
 
     # JSON Decode und Fehlerüberprüfung
     my $decoded;
-    if ( !eval { $decoded  = decode_json(encode($cp,$json)) ; 1 } ) {
+    #if ( !eval { $decoded  = decode_json(encode($cp,$json)) ; 1 } ) {
+    if ( !eval { $decoded  = JSON->new->decode($json) ; 1 } ) {
         return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
     }
 
@@ -2351,6 +2491,74 @@ sub Notify {
 
     Log3($name, 5, "[$name] NotifyFn called with event in $device");
 
+    return notifySTT($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'AMADCommBridge';
+
+    if ( $name eq 'global' ) {
+        return if !$hash->{autoTraining};
+
+        my $events = $dev_hash->{CHANGED};
+        return if !$events;
+        my @devs = devspec2array("$hash->{devspec}");
+        for my $evnt(@{$events}){
+            next if $evnt !~ m{\A(?:ATTR|DELETEATTR|DELETED|RENAMED)\s+(\w+)(?:\s+)(.*)};
+            my $dev = $1;
+            my $rest = $2;
+            next if !grep { $_ eq $dev } @devs;
+
+            return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0) if $evnt =~ m{\A(?:DELETED|RENAMED)\s+\w+};
+            return resetRegIntTimer( 'autoTraining', time + $hash->{autoTraining}, \&RHASSPY_autoTraining, $hash, 0) if $rest =~ m{\A(alias|$hash->{prefix}|genericDeviceType|(alexa|siri|gassistant)Name|group)}xms;
+        }
+        return;
+    }
+
+
+=pod
+        if ($values[0] eq 'all') {
+            initialize_Language($hash, $hash->{LANGUAGE});
+            initialize_devicemap($hash);
+            $hash->{'.needTraining'} = 1;
+            updateSlots($hash);
+            return fetchIntents($hash);
+            
+                if ( $attribute eq 'rhasspyShortcuts' ) {
+        for ( keys %{ $hash->{helper}{shortcuts} } ) {
+            delete $hash->{helper}{shortcuts}{$_};
+        }
+        if ($command eq 'set') {
+            return init_shortcuts($hash, $value); 
+        }
+    }
+
+    if ( $attribute eq 'rhasspyIntents' ) {
+        for ( keys %{ $hash->{helper}{custom} } ) {
+            delete $hash->{helper}{custom}{$_};
+        }
+        if ($command eq 'set') {
+            return init_custom_intents($hash, $value); 
+        }
+    }
+
+    if ( $attribute eq 'rhasspyTweaks' ) {
+        for ( keys %{ $hash->{helper}{tweaks} } ) {
+            delete $hash->{helper}{tweaks}{$_};
+        }
+        if ($command eq 'set') {
+            return initialize_rhasspyTweaks($hash, $value) if $init_done;
+        } 
+    }
+
+
+    if ( $attribute eq 'languageFile' ) {
+        if ($command ne 'set') {
+            delete $hash->{CONFIGFILE};
+            delete $attr{$name}{languageFile};
+            delete $hash->{helper}{lng};
+            $value = undef;
+        }
+        return initialize_Language($hash, $hash->{LANGUAGE}, $value);
+    }
+=cut
+
     return if !ReadingsVal($name,'enableMsgDialog',1) || !defined $hash->{helper}->{msgDialog};
     my @events = @{deviceEvents($dev_hash, 1)};
 
@@ -2368,6 +2576,35 @@ sub Notify {
         $tocheck = $hash->{helper}->{msgDialog}->{config}->{open};
         return msgDialog_open($hash, $device, $msgtext) if $msgtext =~ m{\A[\b]*$tocheck}i;
         return msgDialog_progress($hash, $device, $msgtext);
+    }
+
+    return;
+}
+
+sub notifySTT {
+    my $hash     = shift // return;
+    my $dev_hash = shift // return;
+    my $name = $hash->{NAME} // return;
+    my $device = $dev_hash->{NAME} // return;
+
+    my @events = @{deviceEvents($dev_hash, 1)};
+
+    return if !@events;
+    return if $hash->{helper}->{STT}->{config}->{allowed} !~ m{\b(?:$device|everyone)(?:\b|\z)}xms;
+
+    for my $event (@events){
+        next if $event !~ m{(?:receiveVoiceCommand):.(.+)}xms;
+        my $client = ReadingsVal($device,'receiveVoiceDevice',undef) // return;
+
+        my $msgtext = trim($1);
+        Log3($name, 4 , qq($name received $msgtext from $client (triggered by $device) ));
+
+        my $tocheck = $hash->{helper}->{STT}->{config}->{filterFromBabble};
+        if ( $tocheck ) {
+            return AnalyzePerlCommand( undef, Babble_DoIt($hash->{Babble},$msgtext) ) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}i;
+            $msgtext =~ s{\A[\b]*$tocheck}{}i;
+        }
+        return msgDialog_open($hash, $client, $msgtext);
     }
 
     return;
@@ -2401,6 +2638,45 @@ sub activateVoiceInput {
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
 }
+
+=pod
+    #source: https://rhasspy.readthedocs.io/en/latest/reference/#tts_say
+    hermes/tts/say (JSON)
+
+    Generate spoken audio for a sentence using the configured text to speech system
+    Automatically sends playBytes
+        playBytes.requestId = say.id
+    text: string - sentence to speak (required)
+    lang: string? = null - override language for TTS system
+    id: string? = null - unique ID for request (copied to sayFinished)
+    volume: float? = null - volume level to speak with (0 = off, 1 = full volume)
+    siteId: string = "default" - Hermes site ID
+    sessionId: string? = null - current session ID
+    Response(s)
+        hermes/tts/sayFinished (JSON)
+
+    hermes/tts/sayFinished (JSON)
+
+    Indicates that the text to speech system has finished speaking
+    id: string? = null - unique ID for request (copied from say)
+    siteId: string = "default" - Hermes site ID
+    Response to hermes/tts/say
+
+
+=cut
+sub sayFinished {
+    my $hash    = shift // return;
+    my $data    = shift // return;
+    my $siteId  = shift // $hash->{siteId};
+
+    my $sendData =  { 
+        id           => $data->{id},
+        siteId       => $siteId
+    };
+    my $json = _toCleanJSON($sendData);
+    return IOWrite($hash, 'publish', qq{hermes/tts/sayFinished $json});
+}
+
 
 sub RHASSPY_msgDialogTimeout {
     my $fnHash = shift // return;
@@ -2512,53 +2788,6 @@ sub msgDialog_respond {
     return $recipients;
 }
 
-#handle tts/say messages from MQTT side
-=pod
-    #source: https://rhasspy.readthedocs.io/en/latest/reference/#tts_say
-    hermes/tts/say (JSON)
-
-    Generate spoken audio for a sentence using the configured text to speech system
-    Automatically sends playBytes
-        playBytes.requestId = say.id
-    text: string - sentence to speak (required)
-    lang: string? = null - override language for TTS system
-    id: string? = null - unique ID for request (copied to sayFinished)
-    volume: float? = null - volume level to speak with (0 = off, 1 = full volume)
-    siteId: string = "default" - Hermes site ID
-    sessionId: string? = null - current session ID
-    Response(s)
-        hermes/tts/sayFinished (JSON)
-
-    hermes/tts/sayFinished (JSON)
-
-    Indicates that the text to speech system has finished speaking
-    id: string? = null - unique ID for request (copied from say)
-    siteId: string = "default" - Hermes site ID
-    Response to hermes/tts/say
-
-
-=cut
-sub handleTtsMsgDialog {
-    my $hash = shift // return;
-    my $data = shift // return;
-
-    my $recipients = $data->{sessionId} // return;
-    my $message    = $data->{text}      // return;
-    $recipients = (split m{_$hash->{siteId}_}, $recipients,3)[0] // return;
-
-    Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipients and text $message");
-    msgDialog_respond($hash,$recipients,$message) if defined $hash->{helper}->{msgDialog} 
-        && defined $hash->{helper}->{msgDialog}->{$recipients};
-
-    my $sendData =  { 
-        id           => $data->{id},
-        siteId       => $hash->{siteId}
-    };
-    my $json = _toCleanJSON($sendData);
-    IOWrite($hash, 'publish', qq{hermes/tts/sayFinished $json});
-    return $recipients;
-}
-
 #handle return messages from MQTT side
 sub handleIntentMsgDialog {
     my $hash = shift // return;
@@ -2569,6 +2798,128 @@ sub handleIntentMsgDialog {
     Log3($hash, 5, "[$name] handleIntentMsgDialog called");
 
     return $name;
+}
+
+#handle tts/say messages from MQTT side
+sub handleTtsMsgDialog {
+    my $hash = shift // return;
+    my $data = shift // return;
+
+    my $recipient = $data->{sessionId} // return;
+    my $message    = $data->{text}      // return;
+    $recipient = (split m{_$hash->{siteId}_}, $recipient,3)[0] // return;
+
+    Log3($hash, 5, "handleTtsMsgDialog for $hash->{NAME} called with $recipient and text $message");
+    if ( defined $hash->{helper}->{msgDialog} 
+        && defined $hash->{helper}->{msgDialog}->{$recipient} ) {
+        msgDialog_respond($hash,$recipient,$message);
+        sayFinished($hash, $data->{id}, $hash->{siteId});
+    } elsif (defined $hash->{helper}->{STT} 
+        && defined $hash->{helper}->{STT}->{config}->{$recipient} ) {
+        ttsDialog_respond($hash,$recipient,$message);
+        sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
+    }
+
+    return $recipient;
+}
+
+sub RHASSPY_ttsDialogTimeout {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+    my $identiy = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identiy, $hash, 1); 
+    return ttsDialog_close($hash, $identiy);
+}
+
+sub setTtsDialogTimeout {
+    my $hash     = shift // return;
+    my $data     = shift // return;
+    my $timeout  = shift // _getDialogueTimeout($hash);
+
+    my $siteId = $data->{siteId};
+    my $identiy = (split m{_${siteId}_}, $data->{sessionId},3)[0] // return;
+    $hash->{helper}{ttsDialog}->{$identiy}->{data} = $data;
+
+    resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
+    return;
+}
+
+sub ttsDialog_close {
+    my $hash     = shift // return;
+    my $device   = shift // return;
+    Log3($hash, 5, "ttsDialog_close called with $device");
+
+    deleteSingleRegIntTimer($device, $hash);
+
+    delete $hash->{helper}{ttsDialog}->{$device};
+    return;
+}
+
+sub ttsDialog_open {
+    my $hash    = shift // return;
+    my $device  = shift // return;
+    my $msgtext = shift // return;
+
+    Log3($hash, 5, "ttsDialog_open called with $device and $msgtext");
+
+    my $siteId   = $hash->{siteId};
+    my $id       = "${device}_${siteId}_" . time;
+    my $sendData =  {
+        sessionId    => $id,
+        siteId       => $siteId,
+        customData   => $device
+    };
+
+    setTtsDialogTimeout($hash, $sendData, $hash->{helper}->{TTS}->{config}->{$device}->{sessionTimeout});
+    return ttsDialog_progress($hash, $device, $msgtext, $sendData);
+}
+
+#handle messages from FHEM/messenger side
+sub ttsDialog_progress {
+    my $hash    = shift // return;
+    my $device  = shift // return;
+    my $msgtext = shift // return;
+    my $data    = shift // $hash->{helper}->{ttsDialog}->{$device}->{data};
+
+    #atm. this just hands over incoming text to Rhasspy without any additional logic. 
+    #This is the place to add additional logics and decission making...
+    #my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
+    Log3($hash, 5, "ttsDialog_progress called with $device and text $msgtext");
+    Log3($hash, 5, 'ttsDialog_progress called without DATA') if !defined $data;
+
+    return if !defined $data;
+
+    my $sendData =  { 
+        input        => $msgtext,
+        sessionId    => $data->{sessionId},
+        id           => $data->{id},
+        siteId       => $data->{siteId}
+    };
+    #asrConfidence: float? = null - confidence from ASR system for input text, https://rhasspy.readthedocs.io/en/latest/reference/#nlu_query
+    $sendData->{intentFilter} = $data->{intentFilter} if defined $data->{intentFilter};
+
+    my $json = _toCleanJSON($sendData);
+    return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
+    return;
+}
+
+sub ttsDialog_respond {
+    my $hash       = shift // return;
+    my $DEVICE     = shift // return;
+    my $message    = shift // return;
+    my $keepopen   = shift // 1;
+
+    Log3($hash, 5, "ttsDialog_respond called with $DEVICE and text $message");
+    trim($message);
+    return if !$message; # empty?
+
+    my $msgCommand = $hash->{helper}->{TTS}->{config}->{$DEVICE}->{ttsCommand} // return;
+    $msgCommand =~ s{\\[\@]}{@}x;
+    $msgCommand =~ s{(\$\w+)}{$1}eegx;
+    AnalyzeCommand($hash, $msgCommand);
+    resetRegIntTimer( $DEVICE, time + $hash->{helper}->{TTS}->{config}->{$DEVICE}->{sessionTimeout}, \&RHASSPY_msgDialogTimeout, $hash, 0) if $keepopen;
+    return $DEVICE;
 }
 
 # Update the readings lastIntentPayload and lastIntentTopic
@@ -2689,8 +3040,17 @@ sub analyzeMQTTmessage {
     }
 
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
-        return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $hotword = $1;
+        my $siteId = $data->{siteId};
+        if ( $siteId ) {
+            my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
+            $device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
+            if ($device) {
+                analyzeAndRunCmd($hash, $device, "set $device activateVoiceInput");
+                push @updatedList, $device;
+            }
+        }
+        return \@updatedList if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $ret = handleHotwordDetection($hash, $hotword, $data);
         push @updatedList, $ret if $ret && $defs{$ret};
         push @updatedList, $hash->{NAME};
@@ -2892,10 +3252,13 @@ sub msgDialog {
 
 # Send all devices, rooms, etc. to Rhasspy HTTP-API to update the slots
 sub updateSlots {
-    my $hash = shift // return;
+    my $hash      = shift // return;
+    my $checkdiff = shift;
+
     my $language = $hash->{LANGUAGE};
     my $fhemId   = $hash->{fhemId};
     my $method   = q{POST};
+    my $changed;
 
     initialize_devicemap($hash);
     my $tweaks = $hash->{helper}{tweaks}->{updateSlots};
@@ -2936,10 +3299,15 @@ sub updateSlots {
         $deviceData = $deviceData . '"}';
         Log3($hash->{NAME}, 5, "Updating Rhasspy Sentences with data: $deviceData");
         _sendToApi($hash, $url, $method, $deviceData);
+        $changed = 1 if ReadingsVal($hash->{NAME},'.Shortcuts.ini','') ne $deviceData;
+        readingsSingleUpdate($hash,'.Shortcuts.ini',$deviceData,0);
     }
 
     # If there are any devices, rooms, etc. found, create JSON structure and send it the the API
-    return if !@devices && !@rooms && !@channels && !@types && !@groups;
+    if ( !@devices && !@rooms && !@channels && !@types && !@groups ) {
+        $hash->{'.needTraining'} = 1 if $checkdiff && $changed && $hash->{autoTraining};
+        return;
+    }
 
     my $json;
     $deviceData = {};
@@ -3010,6 +3378,9 @@ sub updateSlots {
 
     Log3($hash->{NAME}, 5, "Updating Rhasspy Slots with data ($language): $json");
 
+    $changed = 1 if ReadingsVal($hash->{NAME},'.slots','') ne $json;
+    readingsSingleUpdate($hash,'.slots',$json,0);
+    $hash->{'.needTraining'} = 1 if $checkdiff && $changed && $hash->{autoTraining};
     _sendToApi($hash, $url, $method, $json);
     return;
 }
@@ -3139,7 +3510,7 @@ sub RHASSPY_ParseHttpResponse {
 
     if ( defined $urls->{$url} ) {
         readingsBulkUpdate($hash, $urls->{$url}, $data);
-        if ( $urls->{$url} eq 'updateSlots' && $hash->{'.needTraining'} ) {
+        if ( ( $urls->{$url} eq 'updateSlots' || $urls->{$url} eq 'updateSentences' ) && $hash->{'.needTraining'} ) {
             trainRhasspy($hash);
             delete $hash->{'.needTraining'};
         }
@@ -3149,7 +3520,8 @@ sub RHASSPY_ParseHttpResponse {
     }
     elsif ( $url =~ m{api/profile}ix ) {
         my $ref; 
-        if ( !eval { $ref = decode_json($data) ; 1 } ) {
+        #if ( !eval { $ref = decode_json($data) ; 1 } ) {
+        if ( !eval { $ref = JSON->new->decode($data) ; 1 } ) {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
@@ -3157,9 +3529,9 @@ sub RHASSPY_ParseHttpResponse {
         for (keys %{$ref}) {
             next if !defined $ref->{$_}{satellite_site_ids};
             if ($siteIds) {
-                $siteIds .= ',' . encode($cp,$ref->{$_}{satellite_site_ids});
+                $siteIds .= ',' . $ref->{$_}{satellite_site_ids}; #encode($cp,$ref->{$_}{satellite_site_ids});
             } else {
-                $siteIds = encode($cp,$ref->{$_}{satellite_site_ids});
+                $siteIds = $ref->{$_}{satellite_site_ids}; #encode($cp,$ref->{$_}{satellite_site_ids});
             }
         }
         if ( $siteIds ) {
@@ -3169,11 +3541,12 @@ sub RHASSPY_ParseHttpResponse {
     }
     elsif ( $url =~ m{api/intents}ix ) {
         my $refb; 
-        if ( !eval { $refb = decode_json($data) ; 1 } ) {
+        #if ( !eval { $refb = decode_json($data) ; 1 } ) {
+        if ( !eval { $refb = JSON->new->decode($data) ; 1 } ) {
             readingsEndUpdate($hash, 1);
             return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
         }
-        my $intents = encode($cp,join q{,}, keys %{$refb});
+        my $intents = join q{,}, keys %{$refb}; #encode($cp,join q{,}, keys %{$refb});
         readingsBulkUpdate($hash, 'intents', $intents);
         configure_DialogManager($hash);
     }
@@ -4963,7 +5336,7 @@ https://svn.fhem.de/trac/browser/trunk/fhem/contrib/RHASSPY">svn contrib</a>.<br
 
 <a id="RHASSPY-define"></a>
 <h4>Define</h4>
-<p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;handleHotword&gt; &lt;encoding&gt;</code></p>
+<p><code>define &lt;name&gt; RHASSPY &lt;baseUrl&gt; &lt;devspec&gt; &lt;defaultRoom&gt; &lt;language&gt; &lt;fhemId&gt; &lt;prefix&gt; &lt;useGenericAttrs&gt; &lt;handleHotword&gt; &lt;Babble&gt; &lt;encoding&gt;</code></p>
 <p><b>All parameters in define are optional, most will not be needed (!)</b>, but keep in mind: changing them later might lead to confusing results for some of them! Especially when starting with RHASSPY, do not set any other than the first three (or four if your language is neither english nor german) of these at all!</p>
 <p><b>Remark:</b><br><a id="RHASSPY-parseParams"></a>
 RHASSPY uses <a href="https://wiki.fhem.de/wiki/DevelopmentModuleAPI#parseParams"><b>parseParams</b></a> at quite a lot places, not only in define, but also to parse attribute values.<br>
@@ -4982,9 +5355,12 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <a id="RHASSPY-genericDeviceType"></a>
   <li><b>useGenericAttrs</b>: Formerly, RHASSPY only used it's own attributes (see list below) to identifiy options for the subordinated devices you want to control. Today, it is capable to deal with a couple of commonly used <code>genericDeviceType</code> (<i>switch</i>, <i>light</i>, <i>thermostat</i>, <i>thermometer</i>, <i>blind</i> and <i>media</i>), so it will add <code>genericDeviceType</code> to the global attribute list and activate RHASSPY's feature to estimate appropriate settings - similar to rhasspyMapping. <code>useGenericAttrs=0</code> will deactivate this. (do not set this unless you know what you are doing!). Note: <code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
-  <li><b>encoding</b>: May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
+  <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a> for details.</li>
+  <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
+  <li><b>sessionTimeout</b> <a href="#RHASSPY-experimental"><b>experimental!</b></a> timout limit in seconds. By default, RHASSPY will close a sessions immediately once a command could be executed. Setting a timeout will keep session open until timeout expires. NOTE: Setting this key may result in confusing behaviour. Atm not recommended for regular useage, <b>testing only!</b> May require some non-default settings on the Rhasspy side to prevent endless self triggering.</li>
+  <li><b>autoTraining</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
+ activated by setting a timeout (in seconds). RHASSPY then will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. If something ist changed at runtime, training will be initiated if timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
-
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
 <ul>
@@ -5032,7 +5408,7 @@ After changing something relevant within FHEM for either the data structure in</
     <p>Various options to update settings and data structures used by RHASSPY and/or Rhasspy. Choose between one of the following:</p>
     <ul>
       <li><b>devicemap</b><br>
-      When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is mandatory, to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
+      When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is mandatory (unless the "autoTraining" feature is enabled), to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
       </li>
       <li><b>devicemap_only</b><br>
       This may be helpfull to make an intermediate check, whether attribute changes have found their way to the data structure. This will neither update slots nor initiate any training towards Rhasspy.
@@ -5285,7 +5661,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </li>
     </ul>
   </li>
-    <li>
+  <li>
     <a id="RHASSPY-attr-rhasspyHotwords"></a><b>rhasspyHotwords</b>
     <p>Define custom reactions as soon as a specific hotword is detected. This does not require any specific configuration on any other FHEM device.<br>
     One hotword per line, syntax is either a simple and an extended version.</p>
@@ -5294,9 +5670,9 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         porcupine_linux = livingroom="set amplifier mute on" default={Log3($DEVICE,3,"device $DEVICE - room $ROOM - value $VALUE")}</code></p>
     <p>First example will execute the command for all incoming messages for the respective hotword, second will decide based on the given <i>siteId</i> keyword; $DEVICE is evaluated to RHASSPY name, $ROOM to siteId and $VALUE to the hotword.<br>
     <i>default</i> is optional. If set, this action will be executed for all <i>siteIds</i> without match to other keywords.<br>
-    Additionally, if either <i>rhasspyHotwords</i> ia set or key <i>handleHotword</i> in DEF is activated, the reading <i>hotword</i> will be filled with <i>hotword</i> plus <i>siteId</i> to also allow arbitrary event handling.<br>NOTE: As all hotword messages are sent to a common topic structure, you may need additional measures to distinguish between several <i>RHASSPY</i> instances, e.g. by restricting subscriptions and/or using different entries in this attribute.</p>
+    Additionally, if either <i>rhasspyHotwords</i> ia set or key <i>handleHotword</i> in <a href="#RHASSPY-define">DEF</a> is activated, the reading <i>hotword</i> will be filled with <i>hotword</i> plus <i>siteId</i> to also allow arbitrary event handling.<br>NOTE: As all hotword messages are sent to a common topic structure, you may need additional measures to distinguish between several <i>RHASSPY</i> instances, e.g. by restricting subscriptions and/or using different entries in this attribute.</p>
   </li>
-    <li>
+  <li>
     <a id="RHASSPY-attr-rhasspyMsgDialog"></a><b>rhasspyMsgDialog</b>
     <p>If some key in this attribute are set, RHASSPY will react somehow like a <a href="#msgDialog">msgDialog</a> device. This needs some configuration in the central <a href="#msgConfig">msgConfig</a> device first, and additionally for each RHASSPY instance a siteId has to be added to the intent recognition service.</p>
     Keys that may be set in this attribute:
@@ -5309,7 +5685,39 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
         <li><i>siteId</i> the siteId to be used by this RHASSPY instance to identify it as satellite in the Rhasspy ecosystem</li>
         <li><i>querymark</i> Text pattern that shall be used to distinguish the queries done in intent MsgDialog from others (for the future: will be added to all requests towards Rhasspy intent recognition system automatically; not functional atm.)</li>
+        <br>
       </ul>
+  </li>
+  <p><b>Remarks on rhasspySTT, rhasspyTTS and Babble:</b><br><a id="RHASSPY-experimental"></a>
+    Interaction with Babble and AMAD.*-Devices is not approved to be propperly working yet. Further tests
+    may be needed and functionality may be subject to changes!
+  </p>
+  <li>
+    <a id="RHASSPY-attr-rhasspySTT"></a><b>rhasspySTT</b>
+    <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
+    <p>Optionally, you may want not to use the internal Rhasspy speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature, and most likely you also want to set values to <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a> as well. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
+    Keys that may be set in this attribute:
+     <ul>
+        <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
+        <li><i>AMADCommBridge</i> A list of <a href="#AMADCommBridge">AMADCommBridge</a> devices RHASSPY shall be notified on incoming messages (comma-separated device names).</li>
+        <li><i>filterFromBabble</i> 
+        By default, all incoming messages from AMADDevice/AMADCommBridge will be forwarded to Rhasspy. For better interaction with <a href="#Babble ">Babble</a> you may opt to ignore all messages not matching the <i>filterFromBabble</i> by their starting words (case-agnostic, will be converted to a regex compatible notation). You additionally have to set a <i>Babble</i> key in <a href="#RHASSPY-define">DEF</a> pointing to the Babble device. All regular messages (start sequence not matching filter) then will be forwarded to Babble using <code>Babble_DoIt()</code> function.</li>
+      </ul>
+      Example:<br>
+        <p><code>filterFromBabble=tell rhasspy <br>
+                 AMADCommBridge=AMADBridge<br>
+                 allowed=AMADDev_A</code></p>
+  </li>
+  <li>
+  <a id="RHASSPY-attr-rhasspyTTS"></a><b>rhasspyTTS</b>
+    <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
+    <p>In addition to <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, this attributes adds some options to manipulate the text-to-speech processing. Any AMADDevice to be adressed for own TTS processing has to be listed here with it's link to it's siteId. If RHASSPY detects a link between a siteId and an AMADDevice type FHEM device, it will not forward any text to be spoken to Rhasspy but use other synthetisation methods instead (defaulting to <code>set &lt;AMADDevice&gt; ttsMsg $message</code>).
+      Example:<br>
+    <p><code>AMADDev_A=siteId=android_livingroom ttsCommand={fhem("set $DEVICE ttsMsg $message")}</code><br>Notes: 
+    <ul>
+        <li>This ttsCommand is just an example for an arbitrary Perl command! For AMADDevice's this should work ootb also without setting this optional key...</li>
+        <li>There's also a Reading-based logic to make a siteId linked to an AMADDevice also allowing changes at runtime with higher priority. In this case, the TTS entry is just needed to makr the device for TTS processing at all.</li>
+    </ul></p>
   </li>
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
@@ -5497,7 +5905,8 @@ yellow=rgb FFFF00</code></p>
   <li>SetScene</li> {Device} and {Scene} (it's recommended to use the $lng.fhemId.Scenes slot to get that generated automatically!).
   <li>GetTime</li>
   <li>GetDate</li>
-  <li>SetTimer</li> Timer info as described in SetTimedOnOff is mandatory, {Room} and/or {Label} are optional to distinguish between different timers.
+  <li>SetTimer</li> Timer info as described in SetTimedOnOff is mandatory, {Room} and/or {Label} are optional to distinguish between different timers. {CancelTimer} key will force RHASSPY to try to remove a running timer (using optional {Room} and/or {Label} key to identify the respective timer).
+  Required tags to set a timer: at least one of {Hour}, {Hourabs}, {Min} or {Sec}. {Label} and {Room} are optional to distinguish between different timers. If {Hourabs} is provided, all timer info will be regarded as absolute time of day info, otherwise everything is calculated using a "from now" logic.
   <li>ConfirmAction</li>
   {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
   <li>CancelAction</li>{Mode} is recommended.
@@ -5517,7 +5926,8 @@ yellow=rgb FFFF00</code></p>
   RHASSPY will always respond via the satellite where the dialogue was initiated from. In some cases, you may want additional output to other satellites - e.g. if they don't have (always on) sound output options. Setting this type of reading will lead to (additional!) responses to the given second satellite; naming scheme is the same as for site2room.
   <li>sessionTimeout_&lt;siteId&gt;</li>
   RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
+  <li>siteId2ttsDevice_&lt;siteId&gt;</li>
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
 </ul>
-
 =end html
 =cut
