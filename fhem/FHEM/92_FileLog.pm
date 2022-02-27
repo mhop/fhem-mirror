@@ -335,11 +335,13 @@ FileLog_Log($$)
       if($ar) {
         my $doSkip=0;
         my @sa = split(" ", $s);
-        for my $col (keys %{$ar}) {
+        for my $p (@{$ar}) {
+          my $col = $p->{col};
           next if($col > int(@sa));
           my $val = $sa[$col];
           next if(!looks_like_number($val));
-          $doSkip = 1 if($val < $ar->{$col}{min} || $val > $ar->{$col}{max});
+          next if($p->{re} && $s !~ m/$p->{re}/);
+          $doSkip = 1 if($val < $p->{min} || $val > $p->{max});
         }
         next if($doSkip);
       }
@@ -396,12 +398,12 @@ FileLog_Attr(@)
       return;
     }
 
-    my %ar; # colX:min:max
+    my @ar; # colX:min:max:regexp
     my $in = $a[3];
-    $in =~ s/\b(\d+):([0-9.-]+):([0-9.-]+)\b/
-                $ar{$1}{min}=$2; $ar{$1}{max}=$3; ""/ge;
-    return "Bad argument $in" if($in !~ m/^ *$/);
-    $defs{$a[1]}{".acceptedRange"} = \%ar;
+    $in =~ s/\b(\d+):([0-9.-]+):([0-9.-]+)(:([^ ]+))?/
+        push(@ar, { col=>$1, min=>$2, max=>$3, re=>$5 } ); ""/ge;
+    return "attr $a[1] accepedRange: bad argument >$in<" if($in !~ m/^ *$/);
+    $defs{$a[1]}{".acceptedRange"} = \@ar;
   }
 
   if($a[0] eq "set" && $a[2] eq "ignoreRegexp") {
@@ -1494,10 +1496,12 @@ FileLog_regexpFn($$)
     <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
 
     <a id="FileLog-attr-acceptedRange"></a>
-    <li>acceptedRange col1:min:max ...<br>
+    <li>acceptedRange col1:min:max[:regexp] ...<br>
         This attribute takes a space separated list of ranges. An event wont
         be logged, if the column of the event (counted from 0) is a number, and
-        it is outside of the specified range.
+        it is outside of the specified range. The optional regexp will check
+        the event only, without the usual ^ and $ added to it. Example:<br>
+        <code>attr fl acceptedRange 1:5:35:[Tt]emperature 1:-90:-40:RSSI</code>
         </li><br>
 
     <a id="FileLog-attr-addLog"></a>
@@ -1816,11 +1820,13 @@ FileLog_regexpFn($$)
     <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
 
     <a id="FileLog-attr-acceptedRange"></a>
-    <li>acceptedRange col1:min:max ...<br>
+    <li>acceptedRange col1:min:max[:regexp] ...<br>
         Dieses Attribut spezifiert eine durch Leerzeichen getrennte Liste von
         Bereichen. Falls die Spalte (gerechnet ab 0) eines Events eine Zahl
         ist, und ausserhalb dieses Bereiches liegt, wird das Event nicht
-        geloggt.
+        geloggt. regexp ist optional, und pr&uuml;ft nur das Event, ohne die
+        Ergauml;nzung durch die &uuml;blichen ^ und $. Beispiel:<br>
+        <code>attr fl acceptedRange 1:5:35:[Tt]emperature 1:-90:-40:RSSI</code>
         </li><br>
 
     <a id="FileLog-attr-addLog"></a>
