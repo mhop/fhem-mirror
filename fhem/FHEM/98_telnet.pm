@@ -22,7 +22,7 @@ telnet_Initialize($)
   $hash->{AttrFn}  = "telnet_Attr";
   no warnings 'qw';
   my @attrList = qw(
-    SSL
+    SSL:1,0
     allowedCommands
     allowfrom
     connectInterval
@@ -334,7 +334,7 @@ telnet_Attr(@)
   my @a = @_;
   my $hash = $defs{$devName};
 
-  if($type eq "set" && $attrName eq "SSL") {
+  if($type eq "set" && $attrName eq "SSL" && $param[0]) {
     InternalTimer(1, sub($) { # Wait for sslCertPrefix
       my ($hash) = @_;
       TcpServer_SetSSL($hash);
@@ -505,6 +505,8 @@ telnet_ActivateInform($)
     <li>SSL<br>
         Enable SSL encryption of the connection, see the description <a
         href="#HTTPS">here</a> on generating the needed SSL certificates.
+        Valid values are 0 and 1, 0 being the default. A change requires a FHEM
+        restart.<br>
         If the attribute is set, the telnet program wont work as a client
         anymore, and a replacement is needed, like one of the following:
         <ul>
@@ -646,11 +648,13 @@ telnet_ActivateInform($)
 
     <a id="telnet-attr-SSL"></a>
     <li>SSL<br>
-        SSL-Verschl&uuml;sselung f&uuml;r eine Verbindung aktivieren. <a
-        href="#HTTPS">Hier</a> gibt es eine Beschreibung, wie das erforderliche
-        SSL-Zertifikat generiert werden kann. Beim gesetzten Attribut kann man
-        den telnet Befehl nicht mehr zum Verbinden werwenden, m&ouml;gliche
-        Alternetiven sind folgende Programme:
+        SSL-Verschl&uuml;sselung f&uuml;r eine Verbindung aktivieren.
+        G&uuml;ltige Werte sind 0 und 1, 0 ist die Voreinstellung.  Nach
+        &auml;ndern des Wertes ein FHEM Neustart ist erforderlich.
+        <a href="#HTTPS">Hier</a> gibt es eine Beschreibung, wie das
+        erforderliche SSL-Zertifikat generiert werden kann. Beim gesetzten
+        Attribut kann man den telnet Befehl nicht mehr zum Verbinden werwenden,
+        m&ouml;gliche Alternetiven sind folgende Programme:
         <ul>
         <code>
           socat openssl:fhemhost:fhemport,verify=0 readline<br>
