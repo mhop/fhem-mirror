@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_ESCVP21net: added cyclicConnect
  - feature: 76_mssDialog: Add option to define dialogues by file
  - change:  76_mssDialog: PBP code restructured
  - feature: 89_AndroidDB: Added new features

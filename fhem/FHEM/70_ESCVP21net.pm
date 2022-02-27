@@ -30,7 +30,11 @@
 #             fixed sporadic not-deleting of RUNNING_PID
 #    1.01.10  fix sporadic offline message
 #    1.01.11  fix receiving unexpected IMEVENT messages, fixed typos in help
-#
+#    1.01.12  improved state check
+#    1.01.13  improved cleanup, fixed empty val in AdditionalSettings
+#    1.01.14  fixed problem with DevIo "No route" sending fhem to 100% CPU
+#    1.01.15  add debug options
+#    1.01.16  add cyclicConnect to mitigate lost TCP connection issue
 #
 ################################################################################
 #
@@ -64,7 +68,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.11";
+my $version = "1.01.16";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -72,10 +76,17 @@ eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS
 # key(s) in defaultsets and defaultresults will be overwritten,
 # if <type>sets/<type>result defines the same key(s)
 my %ESCVP21net_debugsets = (
-  "reRead"  => ":noArg",
-  "encode"  => ":noArg",
-  "decode"  => ":noArg",
-  "PWSTATUS" => ":get"
+  "reRead"   => ":noArg",
+  "encode"   => ":noArg",
+  "decode"   => ":noArg",
+  "PWSTATUS" => ":get",
+  "cleanup"  => ":noArg",
+  "connect"  => ":noArg",
+  "removeTimer"     => ":noArg",
+  "closeDevice"     => ":noArg",
+  "deleteNextOpen"  => ":noArg",
+  "openDevice"      => ":noArg",
+  "isOpen"          => ":noArg"
 );
 
 my %ESCVP21net_defaultsets = (  
@@ -246,22 +257,22 @@ my %ESCVP21net_Scottyresult = (
 
 # data for sets - needed to tranlate the "nice" commands to raw values
 my %ESCVP21net_data = (
-  "4KENHANCE:off"    => "00",
-  "4KENHANCE:FullHD" => "01",
-  "ASPECT:Normal"    => "00",
-  "ASPECT:Auto20"    => "20",
-  "ASPECT:Auto"      => "30",
-  "ASPECT:Full"      => "40",
-  "ASPECT:Zoom"      => "50",
-  "AUDIO:Audio1"     => "01",
-  "AUDIO:Audio2"     => "02",
-  "AUDIO:USB"        => "03",
-  "AUTOKEYSTONE:on"  => "ON",
-  "AUTOKEYSTONE:off" => "OFF",
-  "AVOUT:projection" => "00",
-  "AVOUT:constantly" => "01",
-  "BTAUDIO:on"       => "01",
-  "BTAUDIO:off"      => "00",
+  "4KENHANCE:off"         => "00",
+  "4KENHANCE:FullHD"      => "01",
+  "ASPECT:Normal"         => "00",
+  "ASPECT:Auto20"         => "20",
+  "ASPECT:Auto"           => "30",
+  "ASPECT:Full"           => "40",
+  "ASPECT:Zoom"           => "50",
+  "AUDIO:Audio1"          => "01",
+  "AUDIO:Audio2"          => "02",
+  "AUDIO:USB"             => "03",
+  "AUTOKEYSTONE:on"       => "ON",
+  "AUTOKEYSTONE:off"      => "OFF",
+  "AVOUT:projection"      => "00",
+  "AVOUT:constantly"      => "01",
+  "BTAUDIO:on"            => "01",
+  "BTAUDIO:off"           => "00",
   "CMODE:sRGB"            => "01",
   "CMODE:Normal"          => "02",
   "CMODE:Meeting"         => "03",
@@ -283,128 +294,128 @@ my %ESCVP21net_data = (
   "CMODE:3D_Cinema"       => "17",
   "CMODE:3D_Dynamic"      => "18",
   "CMODE:DigitalCinema"   => "22",  
-  "FREEZE:on"        => "ON",
-  "FREEZE:off"       => "OFF",
-  "HREVERSE:Flip"    => "ON",
-  "HREVERSE:Normal"  => "OFF",
-  "ILLUM:on"         => "01",
-  "ILLUM:off"        => "00",
-  "LUMINANCE:high"   => "00",
-  "LUMINANCE:low"    => "01",
-  "LUMINANCE:normal" => "00",
-  "LUMINANCE:eco"    => "01",
-  "LUMINANCE:medium" => "02",
-  "MCFI:off"         => "00",
-  "MCFI:low"         => "01",
-  "MCFI:normal"      => "02",
-  "MCFI:high"        => "03",
-  "MSEL:black"       => "00",
-  "MSEL:blue"        => "01",
-  "MSEL:user"        => "02",
-  "MUTE:on"          => "ON",
-  "MUTE:off"         => "OFF",
-  "OVSCAN:off"       => "00",
-  "OVSCAN:4%"        => "02",
-  "OVSCAN:8%"        => "04",
-  "OVSCAN:auto"      => "A0",
+  "FREEZE:on"             => "ON",
+  "FREEZE:off"            => "OFF",
+  "HREVERSE:Flip"         => "ON",
+  "HREVERSE:Normal"       => "OFF",
+  "ILLUM:on"              => "01",
+  "ILLUM:off"             => "00",
+  "LUMINANCE:high"        => "00",
+  "LUMINANCE:low"         => "01",
+  "LUMINANCE:normal"      => "00",
+  "LUMINANCE:eco"         => "01",
+  "LUMINANCE:medium"      => "02",
+  "MCFI:off"              => "00",
+  "MCFI:low"              => "01",
+  "MCFI:normal"           => "02",
+  "MCFI:high"             => "03",
+  "MSEL:black"            => "00",
+  "MSEL:blue"             => "01",
+  "MSEL:user"             => "02",
+  "MUTE:on"               => "ON",
+  "MUTE:off"              => "OFF",
+  "OVSCAN:off"            => "00",
+  "OVSCAN:4%"             => "02",
+  "OVSCAN:8%"             => "04",
+  "OVSCAN:auto"           => "A0",
   "PRODUCT:ModelName_off" => "00",
   "PRODUCT:ModelName_on"  => "01",
-  "PWR:on"           => "ON",
-  "PWR:off"          => "OFF",
-  "SIGNAL:none"          => "00",
-  "SIGNAL:2D"            => "01",
-  "SIGNAL:3D"            => "02",
-  "SIGNAL:not_supported" => "03",
-  "SOURCE:HDMI1"         => "30",
-  "SOURCE:HDMI2"         => "A0",
-  "SOURCE:ScreenMirror"  => "56",
-  "SOURCE:PC"            => "10",
-  "SOURCE:Input1"        => "10",  
-  "SOURCE:Input2"        => "20",  
-  "SOURCE:Video"         => "40",  
-  "SOURCE:Video(RCA)"    => "41",  
-  "SOURCE:PC1"           => "1F",
-  "SOURCE:PC2"           => "2F",
-  "SOURCE:USB"           => "52",
-  "SOURCE:LAN"           => "53",
-  "SOURCE:Dsub"          => "20",
-  "SOURCE:WirelessHD"    => "D0",  
-  "VREVERSE:Flip"        => "ON",
-  "VREVERSE:Normal"      => "OFF",
-  "WLPWR:WLAN_off"       => "00",
-  "WLPWR:WLAN_on"        => "01"
+  "PWR:on"                => "ON",
+  "PWR:off"               => "OFF",
+  "SIGNAL:none"           => "00",
+  "SIGNAL:2D"             => "01",
+  "SIGNAL:3D"             => "02",
+  "SIGNAL:not_supported"  => "03",
+  "SOURCE:HDMI1"          => "30",
+  "SOURCE:HDMI2"          => "A0",
+  "SOURCE:ScreenMirror"   => "56",
+  "SOURCE:PC"             => "10",
+  "SOURCE:Input1"         => "10",  
+  "SOURCE:Input2"         => "20",  
+  "SOURCE:Video"          => "40",  
+  "SOURCE:Video(RCA)"     => "41",  
+  "SOURCE:PC1"            => "1F",
+  "SOURCE:PC2"            => "2F",
+  "SOURCE:USB"            => "52",
+  "SOURCE:LAN"            => "53",
+  "SOURCE:Dsub"           => "20",
+  "SOURCE:WirelessHD"     => "D0",  
+  "VREVERSE:Flip"         => "ON",
+  "VREVERSE:Normal"       => "OFF",
+  "WLPWR:WLAN_off"        => "00",
+  "WLPWR:WLAN_on"         => "01"
 );
 
 # hash for results from device, to transtale to nice readings
 # e.g answer "POW 04" will be shown als "Standby (Net on)" in GUI
 # will be enhanced at runtime with %<type>result
 my %ESCVP21net_defaultresults = (
-  "4KENHANCE:00" => "off",
-  "4KENHANCE:01" => "FullHD",
-  "ASPECT:00"    => "Normal",
-  "ASPECT:20"    => "Auto20",
-  "ASPECT:30"    => "Auto",
-  "ASPECT:40"    => "Full",
-  "ASPECT:50"    => "Zoom",
-  "ASPECT:70"    => "Wide",
-  "AUDIO:01"     => "Audio1",
-  "AUDIO:02"     => "Audio2",
-  "AUDIO:03"     => "USB",
-  "AVOUT:00"     => "projection",
-  "AVOUT:01"     => "constantly",
+  "4KENHANCE:00"     => "off",
+  "4KENHANCE:01"     => "FullHD",
+  "ASPECT:00"        => "Normal",
+  "ASPECT:20"        => "Auto20",
+  "ASPECT:30"        => "Auto",
+  "ASPECT:40"        => "Full",
+  "ASPECT:50"        => "Zoom",
+  "ASPECT:70"        => "Wide",
+  "AUDIO:01"         => "Audio1",
+  "AUDIO:02"         => "Audio2",
+  "AUDIO:03"         => "USB",
+  "AVOUT:00"         => "projection",
+  "AVOUT:01"         => "constantly",
   "AUTOKEYSTONE:ON"  => "on",
   "AUTOKEYSTONE:OFF" => "off",
-  "BTAUDIO:01"   => "on",
-  "BTAUDIO:00"   => "off",
-  "FREEZE:ON"    => "on",
-  "FREEZE:OFF"   => "off",
-  "HREVERSE:ON"  => "Flip",
-  "HREVERSE:OFF" => "Normal",
-  "ILLUM:01"     => "on", 
-  "ILLUM:00"     => "off",
-  "MCFI:00"      => "off",
-  "MCFI:01"      => "low",
-  "MCFI:02"      => "normal",
-  "MCFI:03"      => "high",
-  "MSEL:00"      => "black",
-  "MSEL:01"      => "blue",
-  "MSEL:02"      => "user",
-  "MUTE:ON"      => "on",
-  "MUTE:OFF"     => "off",
-  "OVSCAN:00"    => "off",
-  "OVSCAN:02"    => "4%",
-  "OVSCAN:04"    => "8%",
-  "OVSCAN:A0"    => "auto",
-  "PRODUCT:00"   => "ModelName_off",
-  "PRODUCT:01"   => "ModelName_on",
-  "PWR:00"       => "Standby (Net off)", 
-  "PWR:01"       => "Lamp on", 
-  "PWR:02"       => "Warmup", 
-  "PWR:03"       => "Cooldown", 
-  "PWR:04"       => "Standby (Net on)", 
-  "PWR:05"       => "abnormal Standby",
-  "PWR:07"       => "WirelessHD Standby",  
-  "SIGNAL:00"    => "none",
-  "SIGNAL:01"    => "2D",
-  "SIGNAL:02"    => "3D",
-  "SIGNAL:03"    => "not_supported",
-  "SOURCE:10"    => "Input1",
-  "SOURCE:1F"    => "PC1",
-  "SOURCE:20"    => "Input2",
-  "SOURCE:2F"    => "PC2",
-  "SOURCE:30"    => "HDMI1",
-  "SOURCE:40"    => "Video",
-  "SOURCE:41"    => "Video(RCA)",
-  "SOURCE:52"    => "USB",
-  "SOURCE:53"    => "LAN",
-  "SOURCE:56"    => "ScreenMirror",
-  "SOURCE:A0"    => "HDMI2",
-  "SOURCE:D0"    => "WirelessHD",
-  "SOURCE:F0"    => "ChangeCyclic",    
-  "VREVERSE:ON"  => "Flip",
-  "VREVERSE:OFF" => "Normal",
-  "WLPWR:00"     => "WLAN_off",
-  "WLPWR:01"     => "WLAN_on"
+  "BTAUDIO:01"       => "on",
+  "BTAUDIO:00"       => "off",
+  "FREEZE:ON"        => "on",
+  "FREEZE:OFF"       => "off",
+  "HREVERSE:ON"      => "Flip",
+  "HREVERSE:OFF"     => "Normal",
+  "ILLUM:01"         => "on", 
+  "ILLUM:00"         => "off",
+  "MCFI:00"          => "off",
+  "MCFI:01"          => "low",
+  "MCFI:02"          => "normal",
+  "MCFI:03"          => "high",
+  "MSEL:00"          => "black",
+  "MSEL:01"          => "blue",
+  "MSEL:02"          => "user",
+  "MUTE:ON"          => "on",
+  "MUTE:OFF"         => "off",
+  "OVSCAN:00"        => "off",
+  "OVSCAN:02"        => "4%",
+  "OVSCAN:04"        => "8%",
+  "OVSCAN:A0"        => "auto",
+  "PRODUCT:00"       => "ModelName_off",
+  "PRODUCT:01"       => "ModelName_on",
+  "PWR:00"           => "Standby (Net off)", 
+  "PWR:01"           => "Lamp on", 
+  "PWR:02"           => "Warmup", 
+  "PWR:03"           => "Cooldown", 
+  "PWR:04"           => "Standby (Net on)", 
+  "PWR:05"           => "abnormal Standby",
+  "PWR:07"           => "WirelessHD Standby",  
+  "SIGNAL:00"        => "none",
+  "SIGNAL:01"        => "2D",
+  "SIGNAL:02"        => "3D",
+  "SIGNAL:03"        => "not_supported",
+  "SOURCE:10"        => "Input1",
+  "SOURCE:1F"        => "PC1",
+  "SOURCE:20"        => "Input2",
+  "SOURCE:2F"        => "PC2",
+  "SOURCE:30"        => "HDMI1",
+  "SOURCE:40"        => "Video",
+  "SOURCE:41"        => "Video(RCA)",
+  "SOURCE:52"        => "USB",
+  "SOURCE:53"        => "LAN",
+  "SOURCE:56"        => "ScreenMirror",
+  "SOURCE:A0"        => "HDMI2",
+  "SOURCE:D0"        => "WirelessHD",
+  "SOURCE:F0"        => "ChangeCyclic",    
+  "VREVERSE:ON"      => "Flip",
+  "VREVERSE:OFF"     => "Normal",
+  "WLPWR:00"         => "WLAN_off",
+  "WLPWR:01"         => "WLAN_on"
 );
 
 # mapping for toggle commands. if PWR is 01, toggle command is off etc
@@ -465,12 +476,14 @@ sub ESCVP21net_Define {
   $hash->{devioNoSTATE} = 1;
   # subscribe only to notify from global and self
   $hash->{NOTIFYDEV} = "global,TYPE=ESCVP21net";
+  # set version
+  $hash->{version} = $version;
   
   my $name = $hash->{NAME}; 
   
   # clean up
   RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
-  DevIo_CloseDev($hash);
+  DevIo_CloseDev($hash) if(DevIo_IsOpen($hash));
   
   # force immediate reconnect
   delete $hash->{NEXT_OPEN} if ( defined( $hash->{NEXT_OPEN} ) );
@@ -479,10 +492,10 @@ sub ESCVP21net_Define {
   # enhance default set hashes with type specific keys
   ESCVP21net_setTypeCmds($hash);
   
-	# prüfen, ob eine neue Definition angelegt wird 
+	# check if definition is new or existing 
 	if($init_done && !defined($hash->{OLDDEF}))
 	{
-		# setzen von stateFormat
+		# set stateFormat
     $attr{$name}{"stateFormat"} = "PWR";
  	}
   main::Log3 $name, 5, "[$name]: Define: device $name defined";
@@ -506,7 +519,8 @@ sub ESCVP21net_Shutdown {
   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
   delete $hash->{helper}{nextConnectionCheck} if ( defined( $hash->{helper}{nextConnectionCheck} ) );
   delete $hash->{helper}{nextStatusCheck} if ( defined( $hash->{helper}{nextStatusCheck} ) );
-  main::Log3 $name, 5, "[$name]: deleting timer";  
+  delete $hash->{helper}{nextCyclicConnect} if ( defined( $hash->{helper}{nextCyclicConnect} ) );
+  main::Log3 $name, 5, "[$name]: Shutdown: deleting timers & RUNNING_PID, close Device";  
 }
 
 sub ESCVP21net_Initialize {
@@ -519,7 +533,7 @@ sub ESCVP21net_Initialize {
     $hash->{ReadFn}     = \&ESCVP21net_Read;
     $hash->{ReadyFn}    = \&ESCVP21net_Ready;
     $hash->{NotifyFn}   = \&ESCVP21net_Notify;
-    $hash->{StateFn}    = \&ESCVP21net_SetState;
+    #$hash->{StateFn}    = \&ESCVP21net_State;
     $hash->{ShutdownFn} = \&ESCVP21net_Shutdown;
     #$hash->{GetFn}      = \&ESCVP21net_Get;
     #$hash->{DeleteFn}   = \&ESCVP21net_Delete;
@@ -527,7 +541,7 @@ sub ESCVP21net_Initialize {
     #$hash->{DelayedShutdownFn} = \&ESCVP21net_DelayedShutdown;
     
     $hash->{AttrList} =
-          "Manufacturer:Epson,other connectionCheck:off,1,15,30,60,120,300,600,3600 AdditionalSettings statusCheckCmd statusCheckInterval:off,1,5,10,15,30,60,300,600,3600 statusOfflineMsg debug:0,1 disable:0,1 "
+          "Manufacturer:Epson,other connectionCheck:off,1,15,30,60,120,300,600,3600 AdditionalSettings statusCheckCmd statusCheckInterval:off,1,5,10,15,30,60,300,600,3600 statusOfflineMsg debug:0,1 disable:0,1 cyclicConnect:off,10,15,30,60,120,300,600,3600 "
         . $readingFnAttributes;
 }
 
@@ -574,6 +588,7 @@ sub ESCVP21net_Notify($$) {
       if ($checkInterval eq "off"){$checkInterval = 60;}
       RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
       $next = gettimeofday() + $checkInterval;
+      $hash->{helper}{nextConnectionCheck} = $next;
       InternalTimer($next , "ESCVP21net_checkConnection", $hash);
     }
 
@@ -584,15 +599,33 @@ sub ESCVP21net_Notify($$) {
     else{
       # no timer, so create one for first check
       main::Log3 $name, 5, "[$name]: Notify: got @{$events}, no status timer exists, create one";
-      # force check after 5 seconds; ToDo: rethink, is that a good enough solution?
+      # force check after 5 seconds
       $checkInterval = 5;
       RemoveInternalTimer($hash, "ESCVP21net_checkStatus");
       $next = gettimeofday() + $checkInterval;
+      $hash->{helper}{nextStatusCheck} = $next;
       InternalTimer($next , "ESCVP21net_checkStatus", $hash);
     }
+
+    if ( defined( $hash->{helper}{nextCyclicConnect} )){
+      # i.e. timer exists, do nothing
+      main::Log3 $name, 5, "[$name]: Notify: got @{$events}, cyclicConnect timer exists, do nothing";
+    }
+    else{
+      # no timer, so create one for first check
+      main::Log3 $name, 5, "[$name]: Notify: got @{$events}, no cyclicConnect timer exists, create one";
+      # force check after 5 seconds
+      $checkInterval = 60;
+      RemoveInternalTimer($hash, "ESCVP21net_cyclicConnect");
+      $next = gettimeofday() + $checkInterval;
+      $hash->{helper}{nextCyclicConnect} = $next;
+      InternalTimer($next , "ESCVP21net_cyclicConnect", $hash);
+    }
+
     # force first PWR check after CONNECT
     ESCVP21net_Set($hash, $name, "PWR", "get");
   }
+
   if($devName eq $name && grep(m/^DISCONNECTED$/, @{$events})){
     main::Log3 $name, 5, "[$name]: Notify: got @{$events}, deleting timers";
     RemoveInternalTimer($hash);
@@ -600,6 +633,7 @@ sub ESCVP21net_Notify($$) {
     delete $hash->{helper}{nextStatusCheck} if ( defined( $hash->{helper}{nextStatusCheck} ) );
     readingsSingleUpdate( $hash, "PWR", "offline", 1);
     main::Log3 $name, 5, "[$name]: Notify: got DISCONNECTED, force PWR to offline";
+    BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );        
   }
 }
 
@@ -624,12 +658,16 @@ sub ESCVP21net_Attr {
       my @valarray = split / /, $attr_value;
       my $key;
       my $newkey;
-      my $newkeyval;
+      my $newkeyval = "";
       %VP21addattrs = ();
       $hash->{AdditionalSettings} = $attr_value;
       foreach $key (@valarray) {
         $newkey = (split /:/, $key, 2)[0];
-        $newkeyval = ":".(split /:/, $key, 2)[1];
+        # check if AdditionalSetting is only cmd (e.g. "ILLUM") without parameter (e.g. ":0,1")
+        # otherwise take it as ""
+        if (defined ((split /:/, $key, 2)[1])){
+          $newkeyval = ":".(split /:/, $key, 2)[1];
+        }
         main::Log3 $name, 5,"[$name]: Attr: setting $attr_name, key  is $newkey, val is $newkeyval";
         $VP21addattrs{$newkey} = $newkeyval;
         #%ESCVP21net_typesets = (%ESCVP21net_typesets, %VP21addattrs);
@@ -673,6 +711,27 @@ sub ESCVP21net_Attr {
         main::Log3 $name, 5,"[$name]: Attr: set $attr_name interval to $attr_value";        
       }
     }
+
+    elsif ($attr_name eq "cyclicConnect"){
+      # timer to check status of device
+      if ($attr_value eq "0") {
+        # 0 means off
+        return "0 not allowed for $attr_name!";
+      } 
+      elsif ($attr_value eq "off"){
+        RemoveInternalTimer($hash, "ESCVP21net_cyclicConnect");
+        $hash->{helper}{nextCyclicConnect} = "off";
+      }
+      else{
+        RemoveInternalTimer($hash, "ESCVP21net_cyclicConnect");
+        $checkInterval = $attr_value;
+        $next = gettimeofday() + $checkInterval;
+        $hash->{helper}{nextCyclicConnect} = $next;
+        InternalTimer( $next, "ESCVP21net_cyclicConnect", $hash);
+        main::Log3 $name, 5,"[$name]: Attr: set $attr_name interval to $attr_value";        
+      }
+    }
+
     elsif ($attr_name eq "StatusCheckCmd"){
       # ToDo: check for allowed commands
     }
@@ -703,7 +762,7 @@ sub ESCVP21net_Attr {
     }
     elsif($attr_name eq "connectionCheck") {
       RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
-      # set default value 600, timer running ech 600s
+      # set default value 600, timer running each 600s
       my $next = gettimeofday() + "600";
       $hash->{helper}{nextConnectionCheck} = $next;
       InternalTimer( $next, "ESCVP21net_checkConnection", $hash);
@@ -711,14 +770,19 @@ sub ESCVP21net_Attr {
     }
     elsif($attr_name eq "statusCheckInterval") {
       RemoveInternalTimer($hash, "ESCVP21net_checkStatus");
-      # set default value 600, timer running ech 600s
+      # set default value 600, timer running each 600s
       my $next = gettimeofday() + "600";
       $hash->{helper}{nextStatusCheck} = $next;
       InternalTimer( $next, "ESCVP21net_checkStatus", $hash);
       main::Log3 $name, 5,"[$name]: Attr: $attr_name removed, timer set to +600";
     }
-    elsif($attr_name eq "statusCheckInterval") {
-      # do nothing
+    elsif($attr_name eq "cyclicConnect") {
+      RemoveInternalTimer($hash, "ESCVP21net_cyclicConnect");
+      # set default value 3600, timer running each 3600s
+      my $next = gettimeofday() + "3600";
+      $hash->{helper}{nextCyclicConnect} = $next;
+      InternalTimer( $next, "ESCVP21net_cyclicConnect", $hash);
+      main::Log3 $name, 5,"[$name]: Attr: $attr_name removed, timer set to +3600";
     }
     elsif ($attr_name eq "debug"){
       delete $hash->{debug};
@@ -731,12 +795,18 @@ sub ESCVP21net_Attr {
 
 sub ESCVP21net_Ready($){
   my ($hash) = @_;
-  
+  my $name = $hash->{NAME};
   # try to reopen the connection in case the connection is lost
-  return DevIo_OpenDev($hash, 1, undef );
+  my $status = DevIo_getState($hash);
+  if ($status eq "disconnected"){
+    RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
+    DevIo_CloseDev($hash) if(DevIo_IsOpen($hash));
+    DevIo_OpenDev($hash, 1, "ESCVP21net_ReInit", "ESCVP21net_CallbackReady");
+  }
 }
 
-sub ESCVP21net_SetState($$$$){
+sub ESCVP21net_State($$$$){
+  # not really needed
   my ($hash, $time, $readingName, $value) = @_;
   my $name = $hash->{NAME};
   # just logging subroutine call
@@ -752,14 +822,28 @@ sub ESCVP21net_Get {
 sub ESCVP21net_Init($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $checkInterval;
+  my $next;
   main::Log3 $name, 5,"[$name]: Init: DevIo successful, initialize connectionCheck";
-  my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
-  if ($checkInterval eq "off"){$checkInterval = 60;}
-  
+ 
   # set initial connection check, if "off" it will only run once  
+  $checkInterval = AttrVal( $name, "connectionCheck", "60" );
+  if ($checkInterval eq "off"){$checkInterval = 60;}
   RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
-  my $next = gettimeofday() + $checkInterval;
-  InternalTimer($next , "ESCVP21net_checkConnection", $hash);  
+  #delete $hash->{helper}{nextConnectionCheck} if (defined($hash->{helper}{nextConnectionCheck}));
+  $next = gettimeofday() + $checkInterval;
+  $hash->{helper}{nextConnectionCheck} = $next;
+  InternalTimer($next , "ESCVP21net_checkConnection", $hash);
+
+  # set initial cyclic check, if "off" it will only run once
+  $checkInterval = AttrVal( $name, "cyclicConnect", "3600" );
+  if ($checkInterval eq "off"){$checkInterval = 60;} 
+  RemoveInternalTimer($hash, "ESCVP21net_cyclicConnect");
+  #delete $hash->{helper}{nextCyclicConnect} if (defined($hash->{helper}{nextCyclicConnect}));
+  $next = gettimeofday() + $checkInterval;
+  $hash->{helper}{nextCyclicConnect} = $next;
+  InternalTimer( $next, "ESCVP21net_cyclicConnect", $hash);  
+
   return undef; 
 }
 
@@ -782,12 +866,12 @@ sub ESCVP21net_Callback($){
     main::Log3 $name, 3, "[$name] DevIo callback error: $error";
     $offlineMsg = AttrVal($name, "statusOfflineMsg", "offline");
     $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
-    main::Log3 $name, 3, "[$name] DevIo callback: force PWR to $offlineMsg";
+    main::Log3 $name, 3, "[$name] DevIo callback error: force PWR to $offlineMsg";
   }
-  my $status = $hash->{STATE};
+  my $status = DevIo_getState($hash);
   if ($status eq "disconnected"){
     # remove timers and pending setValue calls if device is disconnected
-    main::Log3 $name, 3, "[$name] DevIo callback error: STATE is $status";
+    main::Log3 $name, 3, "[$name] DevIo callback: STATE is $status, delete timers & RUNNING_PID";
     RemoveInternalTimer($hash);
     delete $hash->{helper}{nextConnectionCheck}
       if (defined($hash->{helper}{nextConnectionCheck}));
@@ -805,17 +889,33 @@ sub ESCVP21net_Callback($){
       # update reading for $checkcmd with $offlineMsg
       #$rv = readingsSingleUpdate($hash, $checkcmd, $offlineMsg, 1);
       $rv = readingsSingleUpdate($hash, "PWR", $offlineMsg, 1);
-      main::Log3 $name, 5,"[$name]: [$name] DevIo callback: $checkcmd set to $offlineMsg";
+      main::Log3 $name, 5,"[$name]: DevIo callback: $checkcmd set to $offlineMsg";
       return ;
     }      
   }    
   return undef; 
 }
 
+sub ESCVP21net_CallbackReady() {
+    my ( $hash, $err ) = @_;
+    my $name = $hash->{NAME};
+    main::Log3 $name, 5, "[$name]: CallbackReady error: $err" if ($err);
+    if ($err && $err =~ /\(113\)/){
+      # seems that DevIo sends fhem into 100% CPU after TCP timeout
+      # empirically, this seems to be the case when err is "No route to host (113)"
+      # (normally, DevIo returns with "timed out")
+      # so we reconnect then...
+      ESCVP21net_connect($hash);
+    }
+}
+
 sub ESCVP21net_Read($){
   # I could not yet get Read data from DevIo, so I use send/recv socket
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  # we dont really expect data here. Its just to gracefully close the device if the connection was closed
+  my $buf = DevIo_SimpleRead($hash);
+  main::Log3 $name, 5,"[$name]: Read: received $buf"; 
   return;
 }
 
@@ -885,7 +985,7 @@ sub ESCVP21net_Set {
 
   if ($opt eq "decode"){
     # restores set commands from .Set
-    main::Log3 $name, 5, "[$name]: Set: decode: running decode ";
+    main::Log3 $name, 5, "[$name]: Set: decode: calling decode ";
     %ESCVP21net_typesets = ESCVP21net_restoreJson($hash,".Sets");
     return undef;
     
@@ -896,7 +996,57 @@ sub ESCVP21net_Set {
     #my %decode = %$decode;
     #main::Log3 $name, 5, "[$name]: Set: decode: keys(%decode) ";
     #return undef;
-  }  
+  }
+
+  if ($opt eq "cleanup"){
+    # cleanup everything... (like shutdown)
+    main::Log3 $name, 5, "[$name]: Set: cleanup: calling cleanup ";
+    ESCVP21net_cleanup($hash);
+    return undef;
+  }
+
+  if ($opt eq "connect"){
+    # connecting via Dev_Io
+    main::Log3 $name, 5, "[$name]: Set: connect: calling connect";
+    ESCVP21net_connect($hash);
+    return undef;
+  }
+
+  if ($opt eq "removeTimer"){
+    # connecting via Dev_Io
+    main::Log3 $name, 5, "[$name]: Set: removeTimer: calling removeTimer";
+    ESCVP21net_removeTimer($hash);
+    return undef;
+  }
+
+  if ($opt eq "closeDevice"){
+    # connecting via Dev_Io
+    main::Log3 $name, 5, "[$name]: Set: closeDevice: calling closeDevice";
+    ESCVP21net_closeDevice($hash);
+    return undef;
+  }
+
+  if ($opt eq "deleteNextOpen"){
+    # connecting via Dev_Io
+    main::Log3 $name, 5, "[$name]: Set: deleteNextOpen: calling deleteNextOpen";
+    ESCVP21net_deleteNextOpen($hash);
+    return undef;
+  }
+
+  if ($opt eq "openDevice"){
+    # connecting via Dev_Io
+    main::Log3 $name, 5, "[$name]: Set: openDevice: calling openDevice";
+    ESCVP21net_openDevice($hash);
+    return undef;
+  }
+
+  if ($opt eq "isOpen"){
+    # connecting via Dev_Io
+    #main::Log3 $name, 5, "[$name]: Set: isOpen: calling isOpen";
+    my $status = DevIo_IsOpen($hash);
+    main::Log3 $name, 5, "[$name]: Set: isOpen: status is $status, TCPDev: $hash->{TCPDev}";
+    return undef;
+  }
 ##### end of debug options
   
   # everything fine so far, so contruct $arg to pass by blockingFn  
@@ -1420,7 +1570,6 @@ sub ESCVP21net_checkConnection ($) {
     # not connected, DevIo not active, so device won't open again automatically
     # should never happen, since we called DevIo_Open above!
     # no internal timer needed, but should we ask DevIo again for opening the connection?
-    #DevIo_OpenDev($hash, 1, "ESCVP21net_Init", "ESCVP21net_Callback");
     main::Log3 $name, 5, "[$name]: connectionCheck: no FD, no NEXT_OPEN, should not happen!";
   }
   elsif ($hash->{FD} && $hash->{NEXT_OPEN}){
@@ -1428,14 +1577,12 @@ sub ESCVP21net_checkConnection ($) {
     # DevIo tries to connect again at NEXT_OPEN
     # should we try to clean up by closing and reopening?
     # no internal timer needed
-    #DevIo_CloseDev($hash);
-    #DevIo_OpenDev($hash, 1, "ESCVP21net_Init", "ESCVP21net_Callback");
     delete $hash->{helper}{nextConnectionCheck}
       if ( defined( $hash->{helper}{nextConnectionCheck} ) );
     main::Log3 $name, 5, "[$name]: connectionCheck: FD and NEXT_OPEN, Dev_Io will reconnect periodically";
   }
   elsif ($hash->{FD} && !$hash->{NEXT_OPEN}){
-    # device is connectd, or seems to be (since broken connection is not detected by DevIo!)
+    # device is connected, or seems to be (since broken connection is not detected by DevIo!)
     # normal state when device is on and reachable
     # or when it was on, turned off, but DevIo did not recognize (TCP timeout not reached)
     # internal timer makes sense to check, if device is really reachable
@@ -1595,17 +1742,88 @@ sub ESCVP21net_restoreJson {
   # just for logging
   #my %decode = %$decode;
   #main::Log3 $name, 5, "[$name]: restore: ". keys(%decode);
-
   return %$decode;
 }
 
 sub ESCVP21net_cleanup {
-  my ($hash) = @_; 
-  #RemoveInternalTimer($hash);
+  my ($hash) = @_;
+  my $name = $hash->{NAME};  
+  RemoveInternalTimer($hash);
+  DevIo_CloseDev($hash);
   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
-  #DevIo_CloseDev($hash);
+  delete $hash->{helper}{nextConnectionCheck} if ( defined( $hash->{helper}{nextConnectionCheck} ) );
+  delete $hash->{helper}{nextStatusCheck} if ( defined( $hash->{helper}{nextStatusCheck} ) );
+  main::Log3 $name, 5, "[$name]: cleanup: deleting timers & RUNNING_PID, close Device";
+  return ;  
+}
+
+sub ESCVP21net_connect{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};  
+  # clean up
+  RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
+  DevIo_CloseDev($hash) if(DevIo_IsOpen($hash));
+  
+  # force immediate reconnect
+  delete $hash->{NEXT_OPEN} if ( defined( $hash->{NEXT_OPEN} ) );
+  DevIo_OpenDev($hash, 0, "ESCVP21net_Init", "ESCVP21net_Callback");
+  main::Log3 $name, 5, "[$name]: connect: opening device via Dev_Io";
   return ;
 }
+
+sub ESCVP21net_cyclicConnect{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  main::Log3 $name, 5, "[$name]: cyclicConnect: cyclic reconnect...";
+  
+  RemoveInternalTimer($hash, "ESCVP21net_cyclicConnect");
+  #delete $hash->{helper}{nextCyclicConnect} if (defined($hash->{helper}{nextCyclicConnect}));
+
+  my $checkInterval = AttrVal( $name, "cyclicConnect", "3600" );
+  
+  if ($checkInterval eq "off"){
+    $hash->{helper}{nextCyclicConnect} = "off";
+    return ;
+  }
+
+  ESCVP21net_connect($hash);
+  my $next = gettimeofday() + $checkInterval; # if checkInterval is off, we won't reach this line
+  $hash->{helper}{nextCyclicConnect} = $next;
+  InternalTimer( $next, "ESCVP21net_cyclicConnect", $hash);
+}
+
+sub ESCVP21net_removeTimer{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};  
+  RemoveInternalTimer($hash, "ESCVP21net_checkConnection");
+  main::Log3 $name, 5, "[$name]: (debug): removeTimer";
+  return ;
+}
+
+sub ESCVP21net_closeDevice{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};  
+  DevIo_CloseDev($hash) if(DevIo_IsOpen($hash));
+  main::Log3 $name, 5, "[$name]: (debug): closeDevice";
+  return ;
+}
+
+sub ESCVP21net_deleteNextOpen{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};  
+  delete $hash->{NEXT_OPEN} if ( defined( $hash->{NEXT_OPEN} ) );
+  main::Log3 $name, 5, "[$name]: (debug): deleteNextOpen";
+  return ;
+}
+
+sub ESCVP21net_openDevice{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};  
+  DevIo_OpenDev($hash, 0, "ESCVP21net_Init", "ESCVP21net_Callback");
+  main::Log3 $name, 5, "[$name]: (debug): openDevice";
+  return ;
+}
+
 ###################################################
 #                   done                          #
 ###################################################
@@ -1725,9 +1943,15 @@ sub ESCVP21net_cleanup {
       <br>Defines the message to set in the Reading related to <i>statusCheckCmd</i> when the device goes offline. Status of device will be checked after each <i>statusCheckIntervall</i> (default: 60s), querying the <i>statusCheckCmd</i> command (default: PWR), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: offline.
     </li>
     <br>
+    <li>cyclicReconnectg
+      <br><i>off|(value in seconds)</i>
+      <br><i>value</i> defines the intervall in seconds to perform an periodic reconnect. Each <i>interval</i> we try to re-open the TCP connectionto the projector. Implemented to work around DevIo not recognizing a server-side broken connection, which can lead to a unnecessary, however non-blocking, system load.
+      <br>Default value is 3600 seconds.
+    </li>
+    <br>
     <li>debug
       <br>You won't need it. But ok, if you insist...
-      <br>debug will reveal some more set commands, namely <i>encode, decode, reread</i>. They will store the currents sets and results in json format to hidden readings <i>(encode)</i> or restore them <i>(decode)</i>. <i>reread</i> will just restore the available set commands for your projector type in case they got "lost".
+      <br>debug will reveal some more set commands, namely <i>encode, decode, reread</i>. They will store the currents sets and results in json format to hidden readings <i>(encode)</i> or restore them <i>(decode)</i>. <i>reread</i> will just restore the available set commands for your projector type in case they got "lost". Don't use the other debug commands - unnless you know what you do...
       <br>Default is 0, of course.
     </li>
   </ul>
