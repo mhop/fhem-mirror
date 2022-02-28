@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.15';
+    $hash->{MODULE_VERSION} = '0.5.16';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -342,7 +342,6 @@ sub Define {
 
     if ($hash->{useGenericAttrs}) {
         addToAttrList(q{genericDeviceType});
-        #addToAttrList(q{homebridgeMapping});
     }
     notifyRegexpChanged($hash,'',1);
 
@@ -1404,10 +1403,10 @@ sub initialize_TTS {
         my($unnamedParams, $namedParams) = parseParams($values);
 
         if ( InternalVal($keywd,'TYPE','unknown') eq 'AMADDevice' ) {
-            $hash->{helper}->{TTS}->{config}->{$keywd}->{ttsCommand} //= q{set $DEVICE ttsMsg $message};
             my $siteId = $namedParams->{siteId} // shift @{$unnamedParams }// $keywd;
             $hash->{helper}->{TTS}->{$siteId} = $keywd;
             $hash->{helper}->{TTS}->{config}->{$keywd} = $namedParams;
+            $hash->{helper}->{TTS}->{config}->{$keywd}->{ttsCommand} //= 'set $DEVICE ttsMsg $message';
         }
     }
     if ( keys %{$hash->{helper}->{TTS}} ) {
@@ -1464,7 +1463,8 @@ sub initialize_STT {
 
     if ( !defined $hash->{helper}->{STT}->{config}->{allowed} ) {
         delete $hash->{helper}->{STT};
-        return 'Setting the allowed key in rhasspySTT is mandatory!' ;
+        disable_msgDialog($hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
+        return 'Setting the allowed key in rhasspySTT is mandatory!' if $init_done;
     }
 
     return;
@@ -1512,7 +1512,7 @@ sub initialize_msgDialog {
         $hash->{helper}->{msgDialog}->{config}->{msgCommand}
                 = AttrVal($msgConfig, "$hash->{prefix}MsgCommand", q{msg push \@$recipients $message});
     }
-    return disable_msgDialog($hash, 1, 1)
+    return disable_msgDialog($hash, 1, 1);
 
 }
 
@@ -1527,19 +1527,18 @@ sub disable_msgDialog {
     if ( defined $hash->{helper}->{STT} 
         && defined $hash->{helper}->{STT}->{config}
         && defined $hash->{helper}->{STT}->{config}->{AMADCommBridge} ) {
-            $devsp = qq($hash->{helper}->{STT}->{config}->{AMADCommBridge});
+            $devsp = 'TYPE=AMADCommBridge';
     }
     if ($enable) { 
-        $devsp .= $devsp ? ',TYPE=(ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
+        $devsp = $devsp ? 'TYPE=(AMADCommBridge|ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
     }
     if ($hash->{autoTraining}) {
         $devsp .= $devsp ? ',global' : 'global';
     }
 
-    my @ntfdevs = devspec2array($devsp);
-    if (@ntfdevs) {
-        setNotifyDev($hash,$devsp);
+    if ( $devsp && devspec2array($devsp) ) {
         delete $hash->{disableNotifyFn};
+        setNotifyDev($hash,$devsp);
     } else {
         notifyRegexpChanged($hash,'',1);
     }
@@ -2228,7 +2227,7 @@ sub getMapping {
     my $hash       = shift // return;
     my $device     = shift // return;
     my $intent     = shift // return;
-    my $type       = shift // $intent; #Beta-User: seems first three parameters are obligatory...?
+    my $type       = shift // $intent;
     my $disableLog = shift // 0;
 
     my $subType = $type;
@@ -2511,54 +2510,6 @@ sub Notify {
         return;
     }
 
-
-=pod
-        if ($values[0] eq 'all') {
-            initialize_Language($hash, $hash->{LANGUAGE});
-            initialize_devicemap($hash);
-            $hash->{'.needTraining'} = 1;
-            updateSlots($hash);
-            return fetchIntents($hash);
-            
-                if ( $attribute eq 'rhasspyShortcuts' ) {
-        for ( keys %{ $hash->{helper}{shortcuts} } ) {
-            delete $hash->{helper}{shortcuts}{$_};
-        }
-        if ($command eq 'set') {
-            return init_shortcuts($hash, $value); 
-        }
-    }
-
-    if ( $attribute eq 'rhasspyIntents' ) {
-        for ( keys %{ $hash->{helper}{custom} } ) {
-            delete $hash->{helper}{custom}{$_};
-        }
-        if ($command eq 'set') {
-            return init_custom_intents($hash, $value); 
-        }
-    }
-
-    if ( $attribute eq 'rhasspyTweaks' ) {
-        for ( keys %{ $hash->{helper}{tweaks} } ) {
-            delete $hash->{helper}{tweaks}{$_};
-        }
-        if ($command eq 'set') {
-            return initialize_rhasspyTweaks($hash, $value) if $init_done;
-        } 
-    }
-
-
-    if ( $attribute eq 'languageFile' ) {
-        if ($command ne 'set') {
-            delete $hash->{CONFIGFILE};
-            delete $attr{$name}{languageFile};
-            delete $hash->{helper}{lng};
-            $value = undef;
-        }
-        return initialize_Language($hash, $hash->{LANGUAGE}, $value);
-    }
-=cut
-
     return if !ReadingsVal($name,'enableMsgDialog',1) || !defined $hash->{helper}->{msgDialog};
     my @events = @{deviceEvents($dev_hash, 1)};
 
@@ -2639,31 +2590,7 @@ sub activateVoiceInput {
     return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
 }
 
-=pod
-    #source: https://rhasspy.readthedocs.io/en/latest/reference/#tts_say
-    hermes/tts/say (JSON)
-
-    Generate spoken audio for a sentence using the configured text to speech system
-    Automatically sends playBytes
-        playBytes.requestId = say.id
-    text: string - sentence to speak (required)
-    lang: string? = null - override language for TTS system
-    id: string? = null - unique ID for request (copied to sayFinished)
-    volume: float? = null - volume level to speak with (0 = off, 1 = full volume)
-    siteId: string = "default" - Hermes site ID
-    sessionId: string? = null - current session ID
-    Response(s)
-        hermes/tts/sayFinished (JSON)
-
-    hermes/tts/sayFinished (JSON)
-
-    Indicates that the text to speech system has finished speaking
-    id: string? = null - unique ID for request (copied from say)
-    siteId: string = "default" - Hermes site ID
-    Response to hermes/tts/say
-
-
-=cut
+#source: https://rhasspy.readthedocs.io/en/latest/reference/#tts_say
 sub sayFinished {
     my $hash    = shift // return;
     my $data    = shift // return;
@@ -2710,7 +2637,6 @@ sub msgDialog_close {
     return if !defined $hash->{helper}{msgDialog}->{$device};;
 
     msgDialog_respond( $hash, $device, $response, 0 );
-    #delete $hash->{helper}{'.delayed'}->{$device};
     delete $hash->{helper}{msgDialog}->{$device};
     return;
 }
@@ -2816,7 +2742,7 @@ sub handleTtsMsgDialog {
         sayFinished($hash, $data->{id}, $hash->{siteId});
     } elsif (defined $hash->{helper}->{STT} 
         && defined $hash->{helper}->{STT}->{config}->{$recipient} ) {
-        ttsDialog_respond($hash,$recipient,$message);
+        ttsDialog_respond($hash,$recipient,$message,0);
         sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
     }
 
@@ -3024,6 +2950,9 @@ sub analyzeMQTTmessage {
         my $siteId = $data->{siteId} // return;
         $active = $data->{reason} if $active && defined $data->{reason};
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
+
+        my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off');
+        push @updatedList, $ret if $ret && $defs{$ret};
         push @updatedList, $hash->{NAME};
         return \@updatedList;
     }
@@ -3042,7 +2971,7 @@ sub analyzeMQTTmessage {
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
         my $hotword = $1;
         my $siteId = $data->{siteId};
-        if ( $siteId ) {
+        if ( 0 && $siteId ) { #Beta-User: deactivated
             my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
             $device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
             if ($device) {
@@ -3052,6 +2981,8 @@ sub analyzeMQTTmessage {
         }
         return \@updatedList if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $ret = handleHotwordDetection($hash, $hotword, $data);
+        push @updatedList, $ret if $ret && $defs{$ret};
+        $ret = handleHotwordGlobal($hash, $hotword, $data, 'detected');
         push @updatedList, $ret if $ret && $defs{$ret};
         push @updatedList, $hash->{NAME};
         return \@updatedList;
@@ -3225,7 +3156,7 @@ sub sendSpeakCommand {
         return 'speak with explicite params needs siteId and text as arguments!' if !defined $cmd->{siteId} || !defined $cmd->{text};
         $sendData->{siteId} =  $cmd->{siteId};
         $sendData->{init}->{text} =  $cmd->{text};
-    } else {    #Beta-User: might need review, as parseParams is used by default...!
+    } else {
         my($unnamedParams, $namedParams) = parseParams($cmd);
 
         if (defined $namedParams->{siteId} && defined $namedParams->{text}) {
@@ -3570,6 +3501,25 @@ sub handleHotwordDetection {
     return if !defined $hash->{helper}{hotwords} || !defined $hash->{helper}{hotwords}->{$hotword};
     my $command = $hash->{helper}{hotwords}->{$hotword}->{$siteId} // $hash->{helper}{hotwords}->{$hotword}->{default} // return;
     return analyzeAndRunCmd($hash, $hash->{NAME}, $command, $hotword, $siteId);
+}
+
+sub handleHotwordGlobal {
+    my $hash       = shift // return;
+    my $hotword    = shift // return;
+    my $data       = shift;
+    my $mode       = shift;
+
+    return if !defined $hash->{helper}{hotwords} || !defined $hash->{helper}{hotwords}->{global};
+    my $cmd = $hash->{helper}{hotwords}->{global}->{$mode} // $hash->{helper}{hotwords}->{global}->{default} // return;
+    my %specials = (
+         '$VALUE'  => $hotword,
+         '$MODE'   => $mode,
+         '$DEVICE' => $hash->{NAME},
+         '$ROOM'   => $data->{siteId},
+         '$DATA'   => toJSON($data)
+        );
+    $cmd  = EvalSpecials($cmd, %specials);
+    return AnalyzeCommandChain($hash, $cmd);
 }
 
 # Eingehender Custom-Intent
@@ -5663,14 +5613,15 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspyHotwords"></a><b>rhasspyHotwords</b>
-    <p>Define custom reactions as soon as a specific hotword is detected. This does not require any specific configuration on any other FHEM device.<br>
-    One hotword per line, syntax is either a simple and an extended version.</p>
+    <p>Define custom reactions as soon as a specific hotword is detected (or with "global": a toggle command is detected). This does not require any specific configuration on any other FHEM device.<br>
+    One hotword per line, syntax is either a simple and an extended version. The "hotword" <i>global</i> will be treated specially and can be used to also execute custom commands when a <toggle> event is indicated.</p>
     Examples:<br>
     <p><code>bumblebee_linux = set amplifier2 mute on<br>
-        porcupine_linux = livingroom="set amplifier mute on" default={Log3($DEVICE,3,"device $DEVICE - room $ROOM - value $VALUE")}</code></p>
-    <p>First example will execute the command for all incoming messages for the respective hotword, second will decide based on the given <i>siteId</i> keyword; $DEVICE is evaluated to RHASSPY name, $ROOM to siteId and $VALUE to the hotword.<br>
+        porcupine_linux = livingroom="set amplifier mute on" default={Log3($DEVICE,3,"device $DEVICE - room $ROOM - value $VALUE")}<br>
+        global = { rhasspyHotword($DEVICE,$VALUE,$DATA,$MODE) }</code></p>
+    <p>First example will execute the command for all incoming messages for the respective hotword, second will decide based on the given <i>siteId</i> keyword; $DEVICE is evaluated to RHASSPY name, $ROOM to siteId and $VALUE to the hotword. Additionally, in "global key", $DATA will contain entire JSON-$data (as parsed internally, encoded in JSON) and $MODE will be one of <i>on</i>, <i>off</i> or <i>detected</i><br>. You may assign different commands to <i>on</i>, <i>off</i> and <i>detected</i>.
     <i>default</i> is optional. If set, this action will be executed for all <i>siteIds</i> without match to other keywords.<br>
-    Additionally, if either <i>rhasspyHotwords</i> ia set or key <i>handleHotword</i> in <a href="#RHASSPY-define">DEF</a> is activated, the reading <i>hotword</i> will be filled with <i>hotword</i> plus <i>siteId</i> to also allow arbitrary event handling.<br>NOTE: As all hotword messages are sent to a common topic structure, you may need additional measures to distinguish between several <i>RHASSPY</i> instances, e.g. by restricting subscriptions and/or using different entries in this attribute.</p>
+    Additionally, if either <i>rhasspyHotwords</i> is set or key <i>handleHotword</i> in <a href="#RHASSPY-define">DEF</a> is activated, the reading <i>hotword</i> will be filled with <i>hotword</i> plus <i>siteId</i> to also allow arbitrary event handling.<br>NOTE: As all hotword messages are sent to a common topic structure, you may need additional measures to distinguish between several <i>RHASSPY</i> instances, e.g. by restricting subscriptions and/or using different entries in this attribute.</p>
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspyMsgDialog"></a><b>rhasspyMsgDialog</b>

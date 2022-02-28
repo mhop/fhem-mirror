@@ -534,7 +534,7 @@ FHEM/98_ModbusAttr.pm        StefanStrobel        Sonstiges
 FHEM/98_ModbusElsnerWS.pm    klaus.schauer        Sonstiges
 FHEM/98_ModbusSET.pm         StefanStrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
-FHEM/98_monitoring.pm        rudolfkoenig/orphan  Automatisierung
+FHEM/98_monitoring.pm        Beta-User            Automatisierung
 FHEM/98_notice.pm            mfr69bs              Sonstiges
 FHEM/98_PHC.pm               StefanStrobel        Sonstiges
 FHEM/98_PID20.pm             John                 Automatisierung
