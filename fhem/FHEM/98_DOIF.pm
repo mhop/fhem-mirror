@@ -1841,7 +1841,7 @@ sub setDOIF_Reading
 
 sub ReplaceAllReadingsDoIf
 {
-  my ($hash,$tailBlock,$condition,$eval,$id)= @_;
+  my ($hash,$tailBlock,$condition,$eval,$id,$event)= @_;
   my $block="";
   my $beginning;
   my $err;
@@ -1850,11 +1850,12 @@ sub ReplaceAllReadingsDoIf
   my $device="";
   my $nr;
   my $timer="";
-  my $event=0;
   my $definition=$tailBlock;
   my $reading;
   my $internal;
   my $trigger=1;
+  $event=0 if (!defined ($event));
+  
   if (!defined $tailBlock) {
     return ("","");
   }
@@ -1962,7 +1963,7 @@ sub ReplaceAllReadingsDoIf
             }
           }
         } else {
-          ($block,$err)=ReplaceAllReadingsDoIf($hash,$block,$condition,$eval,$id);
+          ($block,$err,$event)=ReplaceAllReadingsDoIf($hash,$block,$condition,$eval,$id,$event);
           return ($block,$err) if ($err);
           $block="[".$block."]";
         }
