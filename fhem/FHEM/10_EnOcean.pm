@@ -450,10 +450,12 @@ my %EnO_eepConfig = (
   "I5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_FUD14", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
+  "I5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_FRM60", sensorMode => 'pushbutton', teachMethod => "confirm", webCmd => "opens:stop:closes:position"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "O5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR14", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
+  "G6.02.01" => {attr => {subType => "switch", eep => "F6-02-01", manufID => "00D", model => "Eltako_F4CT55", sensorMode => 'pushbutton'}},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
   "ZZ.13.03" => {attr => {subType => "environmentApp", eep => "A5-13-03", devMode => "master", manufID => "7FF"}},
   "ZZ.13.04" => {attr => {subType => "environmentApp", eep => "A5-13-04", devMode => "master", manufID => "7FF"}},
@@ -490,6 +492,7 @@ my %EnO_models = (
   "Eltako_FBHF65SB" => {attr => {manufID => "00D"}},
   "Eltako_FHK14" => {attr => {manufID => "00D"}},
   "Eltako_FHK61" => {attr => {manufID => "00D"}},
+  "Eltako_FRM60" => {attr => {manufID => "00D"}},
   "Eltako_FSA12" => {attr => {manufID => "00D"}},
   "Eltako_FSB14" => {attr => {manufID => "00D"}},
   "Eltako_FSB61" => {attr => {manufID => "00D"}},
@@ -500,14 +503,20 @@ my %EnO_models = (
   "Eltako_FSM61" => {attr => {manufID => "00D"}},
   "Eltako_FT55" => {attr => {manufID => "00D"}},
   "Eltako_FTS12" => {attr => {manufID => "00D"}},
-  "Eltako_TF"=> {attr => {manufID => "00D"}},
-  "Eltako_TF_RWB"=> {attr => {manufID => "00D"}},
   "Eltako_FUD14" => {attr => {manufID => "00D"}},
   "Eltako_FUD61" => {attr => {manufID => "00D"}},
+  "Eltako_F4CT55"=> {attr => {manufID => "00D"}},
+  "Eltako_TF"=> {attr => {manufID => "00D"}},
+  "Eltako_TF_RWB"=> {attr => {manufID => "00D"}},
   "Holter_OEM" => {attr => {pidCtrl => "off"}},
   "Micropelt_MVA004" => {attr => {remoteCode => "FFFFFFFE", remoteEEP => "A5-20-01", remoteID => "getNextID", remoteManagement => "manager"}, xml => {productID => "0x004900000000", xmlDescrLocation => "/FHEM/lib/EnO_ReCom_Device_Descr.xml"}},
   other => {},
   tracker => {}
+);
+
+my %EnO_mscRefID = (
+  "0000045C" => {model => "Eltako_F4CT55", version => "0000", attr => {eep => "G6.02.01"}},
+  "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0000", attr => {eep => "I5.3F.7F"}}
 );
 
 my @EnO_defaultChannel = ("all", "input", 0..29);
@@ -822,7 +831,7 @@ sub EnOcean_Initialize($) {
                       "pollInterval postmasterID productID rampTime rcvRespAction:textField-long ".
                       "releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no remoteCode remoteEEP remoteID remoteManufID " .
                       "remoteManagement:client,manager,off rlcAlgo:no,2++,3++,4++ rlcRcv rlcSnd rlcTX:true,false " .
-                      "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
+                      "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS rotationSpeed:select,high,low " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sendTimePeriodic sensorMode:switch,pushbutton " .
                       "serviceOn:no,yes setCmdTrigger:man,refDev setpointRefDev setpointSummerMode:slider,0,5,100 settingAccuracy:high,low " .
@@ -1039,7 +1048,7 @@ sub EnOcean_Define($$) {
         my $packetType = hex $msg[1];
 
         if ($packetType == 1) {
-          my ($data, $rorg, $status);
+          my ($data, $rorg, $sourceID, $status);
           #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
           (undef, undef, $rorg, $data, undef, $status, undef) = @msg;
           $attr{$name}{subType} = $EnO_rorgname{$rorg};
@@ -1089,8 +1098,41 @@ sub EnOcean_Define($$) {
             readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name UTE teach-in is missing";
           } elsif ($attr{$name}{subType} eq "MSC") {
-            readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
-            Log3 $name, 2, "EnOcean $name MSC not supported";
+            $attr{$name}{manufID} = substr($data, 0, 3);
+            if ($attr{$name}{manufID} eq '00D') {
+              if (substr($data, 4, 2) eq 'FF') {
+                # Eltako MSC teachIn
+                my $refID = substr($data, 6, 8);
+                  if (exists $EnO_mscRefID{$refID}) {
+                    $hash->{helper}{teachInWait} = "MSC" if (exists $EnO_mscRefID{$refID}{teachIn});
+                    if (!exists $hash->{IODev}) {
+                      (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
+	              $attr{$name}{IODev} = $hash->{IODev}{NAME};
+                    }
+                    $hash->{DEF} = $def;
+                    $modules{EnOcean}{defptr}{$def} = $hash;
+                    $attr{$name}{modelVersion} = $EnO_mscRefID{$refID}{version};
+                    $attr{$name}{mscRefID} = $refID;
+                    $attr{$name}{room} = $autocreateDeviceRoom;
+                    $attr{$name}{subDef} = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000") if (!exists $attr{$name}{subDef});
+                    foreach my $attrCntr (keys %{$EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}}) {
+                      $attr{$name}{$attrCntr} = $EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}{$attrCntr} if ($attrCntr ne "subDef");
+                    }
+                    EnOcean_CreateSVG(undef, $hash, $attr{$name}{eep});
+                    readingsSingleUpdate($hash, "teach", "MSC teach-in EEP $attr{$name}{eep} requested Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+                    Log3 $name, 2, "EnOcean $name MSC teach-in EEP $attr{$name}{eep} requested Manufacturer " . $EnO_manuf{$attr{$name}{manufID}};
+                  } else {
+                    readingsSingleUpdate($hash, "teach", "MSC teach-in REF-ID $refID not supported Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+                    Log3 $name, 2, "EnOcean $name MSC teach-in REF-ID $refID not supported Manufacturer " . $EnO_manuf{$attr{$name}{manufID}};
+                  }
+              } else {
+                readingsSingleUpdate($hash, "teach", "MSC teach-in is missing Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+                Log3 $name, 2, "EnOcean $name MSC teach-in is missing Manufacturer " . $EnO_manuf{$attr{$name}{manufID}};
+              }
+            } else {
+              readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
+              Log3 $name, 2, "EnOcean $name MSC not supported";
+            }
           } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
             $hash->{helper}{teachInWait} = "STE";
             readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
@@ -2294,134 +2336,166 @@ sub EnOcean_Set($@) {
         return "Usage: $cmd arguments needed or wrong.";
       }
     } elsif ($st eq "switch") {
-      # Rocker Switch, simulate a PTM200 switch module
-      # separate first and second action
-      ($cmd1, $cmd2) = split(",", $cmd, 2);
-      # check values
-      if (!defined($EnO_ptm200btn{$cmd1}) || ($cmd2 && !defined($EnO_ptm200btn{$cmd2}))) {
-        $cmdList .= join(":noArg ", sort keys %EnO_ptm200btn) . ':noArg';
-        return SetExtensions($hash, $cmdList, $name, @a);
-      }
-      my $channelA = ReadingsVal($name, "channelA", undef);
-      my $channelB = ReadingsVal($name, "channelB", undef);
-      my $channelC = ReadingsVal($name, "channelC", undef);
-      my $channelD = ReadingsVal($name, "channelD", undef);
-      my $lastChannel = ReadingsVal($name, ".lastChannel", "A");
-      my $releasedChannel = AttrVal($name, "releasedChannel", "auto");
-      my $subDefA = AttrVal($name, "subDefA", $subDef);
-      my $subDefB = AttrVal($name, "subDefB", $subDef);
-      my $subDefC = AttrVal($name, "subDefC", $subDef);
-      my $subDefD = AttrVal($name, "subDefD", $subDef);
-      my $subDefI = AttrVal($name, "subDefI", $subDef);
-      my $subDef0 = AttrVal($name, "subDef0", $subDef);
-      my $switchType = AttrVal($name, "switchType", "direction");
-
-      # first action
-      if ($cmd1 eq "released") {
-        if ($switchType eq "central") {
-          if ($releasedChannel eq "auto") {
-            if ($lastChannel =~ m/0|I/) {
-              $releasedChannel = $lastChannel;
+      if ($model eq "Eltako_F4CT55") {
+        my %cmdList = ("colourA0" => "08", "colourAI" => "09","colourB0" => "0A","colourBI" => "0B","colourAll" => "0C");
+        if (!exists $cmdList{$cmd}) {
+          $cmdList .= join(":colorpicker,RGB ", sort keys %cmdList) . ':colorpicker,RGB';
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList;
+        }
+        if (defined $a[1]) {
+          if ($a[1] =~ m/^[\dA-Fa-f]{6}$/) {
+            readingsBeginUpdate($hash);
+            if ($cmd eq "colourAll") {
+              while (my ($key, undef) = each(%cmdList)) {
+                readingsBulkUpdate($hash, $key, uc($a[1]));
+              }
             } else {
+              readingsBulkUpdate($hash, $cmd, uc($a[1]));
+              #readingsDelete($hash, "colourAll");
+            }
+            #readingsBulkUpdate($hash, 'state', uc($a[1]));
+            readingsEndUpdate($hash, 1);
+            $data = uc($a[1]) . $cmdList{$cmd};
+            $rorg = "A5";
+            shift(@a);
+            $updateState = 0;
+            Log3 $name, 3, "EnOcean set $name $cmd";
+          } else {
+            return "Usage: $cmd value is not hexadecimal or out of range.";
+          }
+        } else {
+          return "Usage: $cmd values are missing";
+        }
+      } else {
+        # Rocker Switch, simulate a PTM200 switch module
+        # separate first and second action
+        ($cmd1, $cmd2) = split(",", $cmd, 2);
+        # check values
+        if (!defined($EnO_ptm200btn{$cmd1}) || ($cmd2 && !defined($EnO_ptm200btn{$cmd2}))) {
+          $cmdList .= join(":noArg ", sort keys %EnO_ptm200btn) . ':noArg';
+          return SetExtensions($hash, $cmdList, $name, @a);
+        }
+        my $channelA = ReadingsVal($name, "channelA", undef);
+        my $channelB = ReadingsVal($name, "channelB", undef);
+        my $channelC = ReadingsVal($name, "channelC", undef);
+        my $channelD = ReadingsVal($name, "channelD", undef);
+        my $lastChannel = ReadingsVal($name, ".lastChannel", "A");
+        my $releasedChannel = AttrVal($name, "releasedChannel", "auto");
+        my $subDefA = AttrVal($name, "subDefA", $subDef);
+        my $subDefB = AttrVal($name, "subDefB", $subDef);
+        my $subDefC = AttrVal($name, "subDefC", $subDef);
+        my $subDefD = AttrVal($name, "subDefD", $subDef);
+        my $subDefI = AttrVal($name, "subDefI", $subDef);
+        my $subDef0 = AttrVal($name, "subDef0", $subDef);
+        my $switchType = AttrVal($name, "switchType", "direction");
+
+        # first action
+        if ($cmd1 eq "released") {
+          if ($switchType eq "central") {
+            if ($releasedChannel eq "auto") {
+              if ($lastChannel =~ m/0|I/) {
+                $releasedChannel = $lastChannel;
+              } else {
+                $releasedChannel = 0;
+              }
+            } elsif ($releasedChannel !~ m/0|I/) {
               $releasedChannel = 0;
             }
-          } elsif ($releasedChannel !~ m/0|I/) {
-            $releasedChannel = 0;
-          }
-        } elsif ($switchType eq "channel") {
-          if ($releasedChannel eq "auto") {
-            if ($lastChannel =~ m/A|B|C|D/) {
-              $releasedChannel = $lastChannel;
-            } else {
+          } elsif ($switchType eq "channel") {
+            if ($releasedChannel eq "auto") {
+              if ($lastChannel =~ m/A|B|C|D/) {
+                $releasedChannel = $lastChannel;
+              } else {
+                $releasedChannel = "A";
+              }
+            } elsif ($releasedChannel !~ m/A|B|C|D/) {
               $releasedChannel = "A";
             }
-          } elsif ($releasedChannel !~ m/A|B|C|D/) {
-            $releasedChannel = "A";
+          }
+          $subDef = AttrVal($name, "subDef" . $releasedChannel, $subDef);
+        } elsif ($switchType eq "central") {
+          if ($cmd1 =~ m/.0/) {
+            $subDef = $subDef0;
+            $lastChannel = 0;
+          } elsif ($cmd1 =~ m/.I/) {
+            $subDef = $subDefI;
+            $lastChannel = "I";
+          }
+        } elsif ($switchType eq "channel") {
+          $lastChannel = substr($cmd1, 0, 1);
+          $subDef = AttrVal($name, "subDef" . $lastChannel, $subDefA);
+        } else {
+          $lastChannel = substr($cmd1, 0, 1);
+        }
+
+        if ($switchType eq "universal") {
+          if ($cmd1 =~ m/A./ && (!defined($channelA) || $cmd1 ne $channelA)) {
+            $cmd1 = "A0";
+          } elsif ($cmd1 =~ m/B./ && (!defined($channelB) || $cmd1 ne $channelB)) {
+            $cmd1 = "B0";
+          } elsif ($cmd1 =~ m/C./ && (!defined($channelC) || $cmd1 ne $channelC)) {
+            $cmd1 = "C0";
+          } elsif ($cmd1 =~ m/D./ && (!defined($channelD) || $cmd1 ne $channelD)) {
+            $cmd1 = "D0";
+          } elsif ($cmd1 eq "released") {
+
+          } else {
+            $sendCmd = undef;
           }
         }
-        $subDef = AttrVal($name, "subDef" . $releasedChannel, $subDef);
-      } elsif ($switchType eq "central") {
-        if ($cmd1 =~ m/.0/) {
-          $subDef = $subDef0;
-          $lastChannel = 0;
-        } elsif ($cmd1 =~ m/.I/) {
-          $subDef = $subDefI;
-          $lastChannel = "I";
+        # second action
+        if ($cmd2 && $switchType eq "universal") {
+          if ($cmd2 =~ m/A./ && (!defined($channelA) || $cmd2 ne $channelA)) {
+            $cmd2 = "A0";
+          } elsif ($cmd2 =~ m/B./ && (!defined($channelB) || $cmd2 ne $channelB)) {
+            $cmd2 = "B0";
+          } elsif ($cmd2 =~ m/C./ && (!defined($channelC) || $cmd2 ne $channelC)) {
+            $cmd2 = "C0";
+          } elsif ($cmd2 =~ m/D./ && (!defined($channelD) || $cmd2 ne $channelD)) {
+            $cmd2 = "D0";
+          } else {
+            $cmd2 = undef;
+          }
+          if ($cmd2 && undef($sendCmd)) {
+            # only second action has changed, send as first action
+            $cmd1 = $cmd2;
+            $cmd2 = undef;
+            $sendCmd = 1;
+          }
         }
-      } elsif ($switchType eq "channel") {
-        $lastChannel = substr($cmd1, 0, 1);
-        $subDef = AttrVal($name, "subDef" . $lastChannel, $subDefA);
-      } else {
-        $lastChannel = substr($cmd1, 0, 1);
-      }
-
-      if ($switchType eq "universal") {
-        if ($cmd1 =~ m/A./ && (!defined($channelA) || $cmd1 ne $channelA)) {
-          $cmd1 = "A0";
-        } elsif ($cmd1 =~ m/B./ && (!defined($channelB) || $cmd1 ne $channelB)) {
-          $cmd1 = "B0";
-        } elsif ($cmd1 =~ m/C./ && (!defined($channelC) || $cmd1 ne $channelC)) {
-          $cmd1 = "C0";
-        } elsif ($cmd1 =~ m/D./ && (!defined($channelD) || $cmd1 ne $channelD)) {
-          $cmd1 = "D0";
-        } elsif ($cmd1 eq "released") {
-
-        } else {
-          $sendCmd = undef;
+        # convert and send first and second command
+        my $switchCmd;
+        ($switchCmd, $status) = split(':', $EnO_ptm200btn{$cmd1}, 2);
+        # reset T21 status flag if 4 rocker
+        $status = '10' if ($switchCmd > 3);
+        $switchCmd <<= 5;
+        if ($cmd1 ne "released") {
+          # set the pressed flag
+          $switchCmd |= 0x10 ;
         }
-      }
-      # second action
-      if ($cmd2 && $switchType eq "universal") {
-        if ($cmd2 =~ m/A./ && (!defined($channelA) || $cmd2 ne $channelA)) {
-          $cmd2 = "A0";
-        } elsif ($cmd2 =~ m/B./ && (!defined($channelB) || $cmd2 ne $channelB)) {
-          $cmd2 = "B0";
-        } elsif ($cmd2 =~ m/C./ && (!defined($channelC) || $cmd2 ne $channelC)) {
-          $cmd2 = "C0";
-        } elsif ($cmd2 =~ m/D./ && (!defined($channelD) || $cmd2 ne $channelD)) {
-          $cmd2 = "D0";
-        } else {
-          $cmd2 = undef;
+        if($cmd2) {
+          # execute second action
+          if ($switchType =~ m/^central|channel$/) {
+            # second action not supported
+            $cmd = $cmd1;
+          } else {
+            my ($d2, undef) = split(':', $EnO_ptm200btn{$cmd2}, 2);
+            # reset T21 status flag if 4 rocker
+            $status = '10' if ($d2 > 3);
+            $switchCmd |= ($d2 << 1) | 0x01;
+          }
         }
-        if ($cmd2 && undef($sendCmd)) {
-          # only second action has changed, send as first action
-          $cmd1 = $cmd2;
-          $cmd2 = undef;
-          $sendCmd = 1;
+        if (defined $sendCmd) {
+          $data = sprintf "%02X", $switchCmd;
+          $rorg = "F6";
+          SetExtensionsCancel($hash);
+          Log3 $name, 3, "EnOcean set $name $cmd";
+          if ($updateState) {
+            readingsSingleUpdate($hash, "channel" . $1, $cmd1, 1) if ($cmd1 =~ m/^([A-D])./);
+            readingsSingleUpdate($hash, "channel" . $1, $cmd2, 1) if ($cmd2 && $cmd2 =~ m/^([A-D])./);
+          }
+          readingsSingleUpdate($hash, ".lastChannel", $lastChannel, 0);
         }
-      }
-      # convert and send first and second command
-      my $switchCmd;
-      ($switchCmd, $status) = split(':', $EnO_ptm200btn{$cmd1}, 2);
-      # reset T21 status flag if 4 rocker
-      $status = '10' if ($switchCmd > 3);
-      $switchCmd <<= 5;
-      if ($cmd1 ne "released") {
-        # set the pressed flag
-        $switchCmd |= 0x10 ;
-      }
-      if($cmd2) {
-        # execute second action
-        if ($switchType =~ m/^central|channel$/) {
-          # second action not supported
-          $cmd = $cmd1;
-        } else {
-          my ($d2, undef) = split(':', $EnO_ptm200btn{$cmd2}, 2);
-          # reset T21 status flag if 4 rocker
-          $status = '10' if ($d2 > 3);
-          $switchCmd |= ($d2 << 1) | 0x01;
-        }
-      }
-      if (defined $sendCmd) {
-        $data = sprintf "%02X", $switchCmd;
-        $rorg = "F6";
-        SetExtensionsCancel($hash);
-        Log3 $name, 3, "EnOcean set $name $cmd";
-        if ($updateState) {
-          readingsSingleUpdate($hash, "channel" . $1, $cmd1, 1) if ($cmd1 =~ m/^([A-D])./);
-          readingsSingleUpdate($hash, "channel" . $1, $cmd2, 1) if ($cmd2 && $cmd2 =~ m/^([A-D])./);
-        }
-        readingsSingleUpdate($hash, ".lastChannel", $lastChannel, 0);
       }
 
     } elsif ($st eq "switch.00") {
@@ -4435,6 +4509,68 @@ sub EnOcean_Set($@) {
 
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
+        if ($model eq "Eltako_FRM60") {
+        my $position = 0;
+        my $setCmd = ReadingsVal($name, 'block', 'unlook') eq 'look' ? 0x0C : 8;
+        my $shutCmd = AttrVal($name, 'rotationSpeed', 'high') eq 'low' ? 0x13 : 3;
+        $rorg = "A5";
+        if ($cmd =~ m/^\d+$/) {
+          # interpretive numeric value as position
+          unshift(@a, 'position');
+          $cmd = 'position';
+        }
+        if ($cmd eq "teach") {
+          # teach-in EEP A5-3F-7F, Manufacturer "Eltako"
+          $data = "FFF80D80";
+          $attr{$name}{eep} = "A5-3F-7F";
+          CommandDeleteReading(undef, "$name .*");
+          readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
+          $shutCmd = 0;
+          $updateState = 0;
+          ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
+        } elsif ($cmd eq "closes") {
+          $position = 0;
+        } elsif ($cmd eq "opens") {
+          $position = 100;
+        } elsif ($cmd eq "position") {
+          # closed: 100, open: 0
+          if (defined $a[1] && $a[1] =~ m/^\d+$/ && $a[1] <= 100) {
+             $position = $a[1] * 2;
+             shift (@a);
+             if (defined $a[1]) {
+               if ($a[1] =~ m/^high|low$/) {
+                 $shutCmd = $a[1] eq 'low' ? 0x13 : 3;
+                 shift (@a);
+                 if (defined $a[1]) {
+                   if ($a[1] =~ m/^lock|unlock$/) {
+                     $setCmd = $a[1] eq 'lock' ? 0x0C : 8;
+                     shift (@a);
+                   } else {
+                     return "Usage: $a[1] is wrong";
+                   }
+                 }
+               } else {
+                 return "Usage: $a[1] is wrong";
+               }
+             }
+          } else {
+            return "Usage: $a[1] is not numeric or out of range";
+          }
+        } elsif ($cmd eq "stop") {
+          # stop
+          $shutCmd = 0;
+        } else {
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "closes:noArg opens:noArg position:slider,0,5,100 stop:noArg teach:noArg"
+        }
+        if ($shutCmd || $cmd eq "stop") {
+          $updateState = 0;
+          # invert position
+          $data = sprintf "%02X00%02X%02X", 200 - $position, $shutCmd, $setCmd;
+        }
+        Log3 $name, 3, "EnOcean set $name $cmd";
+
+        } else {
         # Eltako Shutter
         my $angleMax = AttrVal($name, "angleMax", 90);
         my $angleMin = AttrVal($name, "angleMin", -90);
@@ -4753,6 +4889,7 @@ sub EnOcean_Set($@) {
           $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy), $shutCmd, $setCmd;
         }
         Log3 $name, 3, "EnOcean set $name $cmd";
+      }
       }
 
     } elsif ($st eq "actuator.01") {
@@ -6186,7 +6323,7 @@ sub EnOcean_Set($@) {
       $window = $window eq 'open' ? 0x10 : 0;
       $setpointShift = int(($setpointShift + $setpointShiftMax) * 255 / ($setpointShiftMax * 2));
       #$setpointShift = unpack('C', pack('c', $setpointShift));
-      my %fanSpeed = ('auto' => 0, 'off' =>1, 1 => 2, 2 => 3, 3 => 4);
+      my %fanSpeed = ('auto' => 0, 'off' => 1, 1 => 2, 2 => 3, 3 => 4);
       $occupancy = $occupancy eq 'occupied' ? 1 : 0;
       $data = sprintf "%02X%02X%02X%02X", $setpointType | $heating | $cooling | $window | 1,
                                           $setpointShift, $setpointBase,
@@ -7388,9 +7525,17 @@ sub EnOcean_Parse($$) {
         Log3 $name, 2, "EnOcean $name remote device with SenderID $senderID assigned";
         return '';
 
-      } elsif ($learningDev eq 'teachMsg' && ($rorgname =~ m/^VLD|MSC|SEC|ENC$/ || $rorgname eq '4BS' && (hex(substr($data, 6, 2))) & 8)) {
-        Log3 undef, 4, "EnOcean Received $rorgname telegram to the unknown device with SenderID $senderID.";
-        return '';
+      } elsif ($learningDev eq 'teachMsg' && ($rorgname =~ m/^VLD|SEC|ENC$/ || $rorgname eq '4BS' && (hex(substr($data, 6, 2))) & 8)) {
+          Log3 undef, 4, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram.";
+          return '';
+      } elsif ($learningDev eq 'teachMsg' && $rorgname eq "MSC") {
+          if ($teach && substr($data, 0, 3) eq '00D' && substr($data, 4, 2) eq 'FF') {
+            Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
+            return $ret;
+          } else {
+            Log3 undef, 4, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram.";
+            return '';
+          }
 
       } elsif ($rorg eq 'A5' &&
                hex(substr($data, 0, 2)) >> 2 == 0x3F &&
@@ -8147,6 +8292,17 @@ sub EnOcean_Parse($$) {
         Log3 $name, 4, "EnOcean $name teach-in with subType $st locked, set transceiver in teach mode.";
         return "";
       }
+
+    } elsif (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} eq 'MSC') {
+      # Eltako MSC teach-in response
+      my $ownSenderID = defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : $hash->{DEF};
+      if (substr($data, 0, 6) ne substr($ownSenderID, 2, 6)) {
+        # wrong response, device rejected, clear teach-in request
+        delete $hash->{helper}{teachInWait};
+        readingsSingleUpdate($hash, 'teach', '4BS teach-in response wrong, device rejected', 1);
+        Log3 $name, 2, "EnOcean $name 4BS teach-in rejected by SenderID $senderID";
+      }
+      return '';
 
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
@@ -9404,7 +9560,6 @@ sub EnOcean_Parse($$) {
 
     } elsif ($st eq "particlesSensor.01") {
       # Gas Sensor, Particles Sensor (EEP A5-09-07)
-      # [untested]
       # $db[3]_bit_7 ... $db[2]_bit_7 is the particle concentration < 10 µm
       # where 0 = 0 µg/m3 ... 511 = 511 µg/m3
       # $db[2]_bit_6 ... $db[1]_bit_6 is the particle concentration < 2.5 µm
@@ -9418,7 +9573,7 @@ sub EnOcean_Parse($$) {
       my $pm_2_5 = "inactive";
       my $pm_1 = "inactive";
       if ($db[0] & 4) {$pm_10 = $db[3] << 1 | $db[2] >> 7;}
-      if ($db[0] & 2) {$pm_2_5 = ($db[2] & 0x7F) << 1 | $db[1] >> 7;}
+      if ($db[0] & 2) {$pm_2_5 = ($db[2] & 0x7F) << 2 | $db[1] >> 6;}
       if ($db[0] & 1) {$pm_1 = ($db[1] & 0x3F) << 3 | $db[0] >> 5;}
       push @event, "3:particles_10:$pm_10";
       push @event, "3:particles_2_5:$pm_2_5";
@@ -10999,88 +11154,104 @@ sub EnOcean_Parse($$) {
         }
 
       } elsif ($manufID eq "00D") {
+        if ($model eq "Eltako_FRM60") {
+          my ($position, $state);
+          # invert position
+          $position = 200 - $db[3];
+          $position = $db[3] == 1 ? 1 : int($db[3] / 2);
+          if ($position == 100) {
+            push @event, "3:endPosition:closed";
+            $state = "closed";
+          } elsif ($position == 0) {
+            push @event, "3:endPosition:open";
+            $state = "open";
+          } else {
+            push @event, "3:endPosition:not_reached";
+            $state = $position;
+          }
+          push @event, "1:block:" . ($db[0] & 4 ? 'lock' : 'unlock');
+          push @event, "3:position:$position";
+          push @event, "3:state:$state";
+        } else {
         # [Eltako shutter]
-        my $angleMax = AttrVal($name, "angleMax", 90);
-	my $angleMin = AttrVal($name, "angleMin", -90);
-	my $anglePos = ReadingsVal($name, ".anglePosStart", undef);
-	my $angleTime = AttrVal($name, "angleTime", 0);
-	my $position = ReadingsVal($name, ".positionStart", undef);
-        my $shutTime = AttrVal($name, "shutTime", 255);
-        my $shutTimeStop = ($db[3] << 8 | $db[2]) * 0.1;
-        my $state;
-        $angleMax = 90 if ($angleMax !~ m/^[+-]?\d+$/);
-        $angleMax = 180 if ($angleMax > 180);
-        $angleMax = -180 if ($angleMax < -180);
-        $angleMin = -90 if ($angleMin !~ m/^[+-]?\d+$/);
-        $angleMin = 180 if ($angleMin > 180);
-        $angleMin = -180 if ($angleMin < -180);
-        ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
-        $angleMax ++ if ($angleMin == $angleMax);
-        $angleTime = 0 if ($angleTime !~ m/^[+-]?\d+$/);
-        $angleTime = 6 if ($angleTime > 6);
-        $angleTime = 0 if ($angleTime < 0);
-        $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
-        $shutTime = 255 if ($shutTime > 255);
-        $shutTime = 1 if ($shutTime < 1);
+          my $angleMax = AttrVal($name, "angleMax", 90);
+          my $angleMin = AttrVal($name, "angleMin", -90);
+	  my $anglePos = ReadingsVal($name, ".anglePosStart", undef);
+	  my $angleTime = AttrVal($name, "angleTime", 0);
+	  my $position = ReadingsVal($name, ".positionStart", undef);
+          my $shutTime = AttrVal($name, "shutTime", 255);
+          my $shutTimeStop = ($db[3] << 8 | $db[2]) * 0.1;
+          my $state;
+          $angleMax = 90 if ($angleMax !~ m/^[+-]?\d+$/);
+          $angleMax = 180 if ($angleMax > 180);
+          $angleMax = -180 if ($angleMax < -180);
+          $angleMin = -90 if ($angleMin !~ m/^[+-]?\d+$/);
+          $angleMin = 180 if ($angleMin > 180);
+          $angleMin = -180 if ($angleMin < -180);
+          ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
+          $angleMax ++ if ($angleMin == $angleMax);
+          $angleTime = 0 if ($angleTime !~ m/^[+-]?\d+$/);
+          $angleTime = 6 if ($angleTime > 6);
+          $angleTime = 0 if ($angleTime < 0);
+          $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
+          $shutTime = 255 if ($shutTime > 255);
+          $shutTime = 1 if ($shutTime < 1);
 
-        if ($db[0] == 0x0A) {
-          push @event, "3:block:unlock";
-        } elsif ($db[0] == 0x0E) {
-          push @event, "3:block:lock";
-        }
-        if (defined $position) {
-          if ($db[1] == 1) {
-            # up
-            $position -= $shutTimeStop / $shutTime * 100;
-            if ($angleTime) {
-              $anglePos -= ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
-              if ($anglePos < $angleMin) {
+          push @event, "1:block:" . ($db[0] & 4 ? 'lock' : 'unlock');
+          if (defined $position) {
+            if ($db[1] == 1) {
+              # up
+              $position -= $shutTimeStop / $shutTime * 100;
+              if ($angleTime) {
+                $anglePos -= ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
+                if ($anglePos < $angleMin) {
+                  $anglePos = $angleMin;
+                }
+              } else {
                 $anglePos = $angleMin;
               }
-            } else {
-              $anglePos = $angleMin;
-            }
-            if ($position <= 0) {
-              $anglePos = 0;
-              $position = 0;
-              push @event, "3:endPosition:open";
-              $state = "open";
-            } else {
-              push @event, "3:endPosition:not_reached";
-              $state = "stop";
-            }
-            push @event, "3:anglePos:" . sprintf("%d", $anglePos);
-            push @event, "3:position:" . sprintf("%d", $position);
-            push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
-            push @event, "3:.positionStart:" . sprintf("%d", $position);
-          } elsif ($db[1] == 2) {
-          # down
-            $position += $shutTimeStop / $shutTime * 100;
-            if ($angleTime) {
-              $anglePos += ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
-              if ($anglePos > $angleMax) {
+              if ($position <= 0) {
+                $anglePos = 0;
+                $position = 0;
+                push @event, "3:endPosition:open";
+                $state = "open";
+              } else {
+                push @event, "3:endPosition:not_reached";
+                $state = "stop";
+              }
+              push @event, "3:anglePos:" . sprintf("%d", $anglePos);
+              push @event, "3:position:" . sprintf("%d", $position);
+              push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
+              push @event, "3:.positionStart:" . sprintf("%d", $position);
+            } elsif ($db[1] == 2) {
+            # down
+              $position += $shutTimeStop / $shutTime * 100;
+              if ($angleTime) {
+                $anglePos += ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
+                if ($anglePos > $angleMax) {
+                  $anglePos = $angleMax;
+                }
+              } else {
                 $anglePos = $angleMax;
               }
+              if($position >= 100) {
+                $anglePos = $angleMax;
+                $position = 100;
+                push @event, "3:endPosition:closed";
+                $state = "closed";
+              } else {
+                push @event, "3:endPosition:not_reached";
+                $state = "stop";
+              }
+              push @event, "3:anglePos:" . sprintf("%d", $anglePos);
+              push @event, "3:position:" . sprintf("%d", $position);
+              push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
+              push @event, "3:.positionStart:" . sprintf("%d", $position);
             } else {
-              $anglePos = $angleMax;
+              $state = "not_reached";
             }
-            if($position >= 100) {
-              $anglePos = $angleMax;
-              $position = 100;
-              push @event, "3:endPosition:closed";
-              $state = "closed";
-            } else {
-              push @event, "3:endPosition:not_reached";
-              $state = "stop";
-            }
-            push @event, "3:anglePos:" . sprintf("%d", $anglePos);
-            push @event, "3:position:" . sprintf("%d", $position);
-            push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
-            push @event, "3:.positionStart:" . sprintf("%d", $position);
-          } else {
-            $state = "not_reached";
+            push @event, "3:state:$state";
           }
-        push @event, "3:state:$state";
         }
 
       } else {
@@ -12714,6 +12885,32 @@ sub EnOcean_Parse($$) {
           push @event, "3:taughtInDevID" . sprintf('%02d', $db[4]) . ":" . substr($data, 8, 8);
         }
       }
+    } elsif ($manufID eq "00D") {
+        if (substr($data, 4, 2) eq 'FE') {
+          # teachin states
+          if (substr($data, 6, 6) eq '030301') {
+            # teachin started
+            if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} eq "MSC" &&
+                exists($attr{$name}{mscRefID}) &&
+                exists($EnO_mscRefID{$attr{$name}{mscRefID}})) {
+              EnOcean_SndRadio(undef, $hash, $packetType, "A5", $EnO_mscRefID{$attr{$name}{mscRefID}}{teachIn}, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+              push @event, "3:teach:4BS teach-in response sent";
+              Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
+            } else {
+              delete $hash->{helper}{teachInWait};
+            }
+        } elsif (substr($data, 6, 6) eq '030300') {
+          delete $hash->{helper}{teachInWait};
+        } elsif (substr($data, 6, 6) eq '030400') {
+          delete $hash->{helper}{teachInWait};
+          push @event, "3:teach:4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: $EnO_manuf{$manufID}";
+          Log3 $name, 2, "EnOcean $name 4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: $EnO_manuf{$manufID}";
+        } elsif (substr($data, 6, 6) eq 'FC0100') {
+          delete $hash->{helper}{teachInWait};
+          push @event, "3:teach:4BS teach-in not accepted by $hash->{DEF}";
+          Log3 $name, 2, "EnOcean $name 4BS teach-in not accepted by $hash->{DEF}";
+        }
+      }
 
     } elsif ($st eq "raw") {
       # raw
@@ -12736,7 +12933,7 @@ sub EnOcean_Parse($$) {
     if ($signalMID == 1) {
       push @event, "3:smartAckMailbox:empty";
     } elsif ($signalMID == 2) {
-      push @event, "3:smartAckMailbox:not_exits";
+      push @event, "3:smartAckMailbox:not_exists";
     } elsif ($signalMID == 3) {
       push @event, "3:smartAckMailbox:reset";
     } elsif ($signalMID == 4) {
@@ -14499,6 +14696,13 @@ sub EnOcean_Attr(@) {
 
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/ || $attrVal eq "00000000" || uc($attrVal) eq "FFFFFFFF") {
       $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "rotationSpeed") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^high|low$/) {
+      $err = "attribute-value [$attrName] = $attrVal is not valid";
     }
 
   } elsif ($attrName eq "secLevel") {
@@ -18478,7 +18682,9 @@ sub EnOcean_Delete($$) {
   these devices to the correct profile.
   <br><br>
   4BS devices can also be taught in special cases by using of confirmation telegrams. This method
-  is used for the EnOcean Tipp-Funk devices. The function is activated via the attribute [<a href="#EnOcean-teachMethod">teachMethod</a>] = confirm.<br>
+  is used for the EnOcean Tipp-Funk devices. The function is activated via the attribute
+  [<a href="#EnOcean-teachMethod">teachMethod</a>] = confirm. Some Eltako devices are fully preconfigured via
+  <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> for this procedure.<br>
   For example the remote device Eltako TF100D can be learned as follows
   <ul><br>
   <code>define &lt;name&gt; EnOcean H5-38-08</code><br>
@@ -18488,6 +18694,15 @@ sub EnOcean_Delete($$) {
   <br>
   Some 4BS, VLD or MSC devices must be paired bidirectional,
   see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.
+  <br><br>
+  For some devices, Eltako uses a company-specific MSC teach-in process. These devices send special MSC telegrams
+  when switched on. With bidirectional actuators, the MSC telegrams are only sent as long as they are still in the
+  delivery state or the teach-in process is activated manually. See <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a>
+  for the supported devices. To teach-in the devices in Fhem,
+  <br>
+  <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code>
+  <br><br>
+  must be activated.
   <br><br>
   Devices that communicate encrypted, has to taught-in through specific procedures.
   <br><br>
@@ -18854,6 +19069,8 @@ sub EnOcean_Delete($$) {
      <li>O5-38-08 Gateway, Switching [Eltako FSR14] with teachMethod confirm<br></li>
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
      <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
+     <li>I5-3F-7F Shutter [Eltako FRM60] - MSC teach-in supported<br></li>
+     <li>G6-02-01 Pushbutton with controllable LEDs [Eltako F4CT55] - MSC teach-in supported<br></li>
      <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
      <li>G5-ZZ-ZZ Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
      <li>ZZ-13-03 Environmental Applications, Data Exchange (EEP A5-13-03)<br></li>
@@ -19105,6 +19322,33 @@ sub EnOcean_Delete($$) {
     off-delay timer is switched on when pressing "on" and the time will be started
     when pressing "released". "released" immediately after "on" is sent if
     the attr switchMode is set to "pushbutton".
+    </li>
+    <br><br>
+
+    <li>Wireless 4-way colour pushbuttons display (EEP F6-02-01)<br>
+       [Eltako F4CT55]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+    <li>colourAll RRGGBB<br>
+      set all colour displays to RGB value</li>
+    <li>colourAO RRGGBB<br>
+      set colour display A0 to RGB value</li>
+    <li>colourAI RRGGBB<br>
+      set colour display AI to RGB value</li>
+    <li>colourBO RRGGBB<br>
+      set colour display B0 to RGB value</li>
+    <li>colourBI RRGGBB<br>
+      set colour display BI to RGB value</li>
+    </ul><br>
+    [RR] = 00 ... FF red color intensity in HEX notation<br>
+    [GG] = 00 ... FF green color intensity in HEX notation<<br>
+    [BB] = 00 ... FF blue color intensity in HEX notation<<br>
+    The attr subType must be set to switch, manufID to 00D and attr model to Eltako_F4CT55. This is done if the device was
+    created by the <a href="#EnOcean-eltako-msc">Eltako MSC autocreate</a>. However, the device can also be created with the help
+    of the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> G6-02-01. If the released state is to be displayed after the end
+    of a keystroke, set attr sensorMode to pushbutton manually.
     </li>
     <br><br>
 
@@ -19922,7 +20166,7 @@ sub EnOcean_Delete($$) {
 
     <li><a id="EnOcean-Manufacturer Specific Applications">Manufacturer Specific Applications</a> (EEP A5-3F-7F)<br>
         Shutter<br>
-        [Eltako FSB12, FSB14, FSB61, FSB70, tested with Eltako devices only]<br>
+        [Eltako FSB12, FSB14, FSB61, FSB70]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -19960,6 +20204,37 @@ sub EnOcean_Delete($$) {
       If the attribute <a href="#EnOcean-attr-calAtEndpoints">calAtEndpoints</a> is to yes, the roller blind positions are calibrated when
       the endpoints are driven.<br>
       Use the sensor type "Szenentaster/PC" for Eltako devices.
+    </li>
+    <br><br>
+
+    <li><a id="EnOcean-Manufacturer Specific Applications">Manufacturer Specific Applications</a> (EEP A5-3F-7F)<br>
+        Shutter<br>
+        [Eltako FRM60]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>position/%<br>
+        drive blinds to position</li>
+      <li>closes<br>
+        issue blinds closes command</li>
+      <li>opens<br>
+        issue blinds opens command</li>
+      <li>position position/% [high|low [lock|unlock]]<br>
+        drive blinds to position with rotation speed and lock key option</li>
+      <li>stop<br>
+        issue stop command</li>
+     <li>teach<br>
+        initiate teach-in</li>
+    </ul><br>
+      [position] = 0 % ... 100 %<br>
+      The parameters rotation speed can be set permanently with the help of the attribute
+      <a href="#EnOcean-attr-rotationSpeed">rotationSpeed</a><br>.
+      The attr subType must be set to manufProfile, manufID to 00D and attr model to Eltako_FRM60. This is done if the device was
+      created by the <a href="#EnOcean-eltako-msc">Eltako MSC autocreate</a>. However, the device can also be created with the help
+      of the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> I5-3F-7F and then taught in the actuator.
+      To control the device, it must be bidirectional paired, see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
+    <br>
     </li>
     <br><br>
 
@@ -21126,6 +21401,10 @@ sub EnOcean_Delete($$) {
       [rltType] = 4BS is default.<br>
       Type of RLT MasterTest message
     </li>
+    <li><a id="EnOcean-attr-rotationSpeed">rotationSpeed</a> high|low,
+      [rotationSpeed] = high is default.<br>
+      Rotation Speed
+    </li>
     <li><a id="EnOcean-attr-scaleDecimals">scaleDecimals</a> 0 ... 9<br>
       Decimal rounding with x digits of the scaled reading setpoint
     </li>
@@ -21498,6 +21777,29 @@ sub EnOcean_Delete($$) {
      </ul><br>
          The status of the device may become "released", this is not the case for a normal switch.<br>
          Set attr model to Eltako_FT55|FSM12|FSM61|FTS12 or attr sensorMode to pushbutton manually.
+     </li>
+     <br><br>
+
+     <li>Wireless 4-way colour pushbuttons display (EEP F6-02-01)<br>
+       [Eltako F4CT55]<br>
+     <ul>
+         <li>A0</li>
+         <li>AI</li>
+         <li>B0</li>
+         <li>BI</li>
+         <li>&lt;BtnX,BtnY&gt; First and second action where BtnX and BtnY is
+             one of the above, e.g. A0,BI</li>
+         <li>released</li>
+         <li>buttons: pressed|released</li>
+         <li>colourAll: &lt;RRGGBBY&gt;</li>
+         <li>colourAI: &lt;RRGGBBY&gt;</li>
+         <li>colourAO: &lt;RRGGBBY&gt;</li>
+         <li>colourBI: &lt;RRGGBBY&gt;</li>
+         <li>colourBO: &lt;RRGGBBY&gt;</li>
+         <li>state: &lt;BtnX&gt;[,&lt;BtnY&gt;] [released]</li>
+     </ul><br>
+         The attr subType must be set to switch, manufID to 00D and attr model to Eltako_F4CT55.
+         If the released state is to be displayed after the end of a keystroke, set attr sensorMode to pushbutton manually.
      </li>
      <br><br>
 
@@ -23000,7 +23302,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
-         Shutter (EEP F6-02-01 ... F6-02-02)<br>
+         Shutter<br>
          [Eltako FSB12, FSB14, FSB61, FSB70]<br>
      <ul>
         <li>open|open_ack<br>
@@ -23022,10 +23324,23 @@ sub EnOcean_Delete($$) {
         The values of the reading position and anglePos are updated automatically,
         if the command position is sent or the reading state was changed
         manually to open or closed.<br>
-        Set attr subType manufProfile, attr manufID to 00D and attr model to
-        Eltako_FSB14|FSB61|FSB70|FSB_ACK manually.
-        If the attribute model is set to Eltako_FSB_ACK, with the status "open_ack" the readings position and anglePos are also updated.<br>
+     </li>
+     <br><br>
 
+     <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
+         Shutter<br>
+         [Eltako FRM60]<br>
+     <ul>
+        <li>&lt;pos/%&gt;</li>
+        <li>open<br>
+            The status of the device will become "open" after the TOP endpoint is reached.</li>
+        <li>closed<br>
+            The status of the device will become "closed" if the BOTTOM endpoint is reached</li>
+        <li>endPosition: open|closed|not_reached</li>
+        <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
+        <li>teach: &lt;result of teach procedure&gt;</li>
+        <li>state: open|closed|&lt;pos/%&gt;</li>
+     </ul><br>
      </li>
      <br><br>
 
