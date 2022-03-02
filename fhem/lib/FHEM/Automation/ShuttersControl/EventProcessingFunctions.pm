@@ -585,7 +585,7 @@ sub EventProcessingWindowRec {
                 $setLastDrive = 'ventilate - window open';
             }
 
-            if ( defined($posValue) && $posValue ) {
+            if ( defined($posValue) ) {
                 $FHEM::Automation::ShuttersControl::shutters->setLastDrive(
                     $setLastDrive);
                 $FHEM::Automation::ShuttersControl::shutters->setNoDelay(1);
