@@ -4479,7 +4479,6 @@ desc:use this with an OpenMQTTGateway for temp/hum sensors like LYWSD03MMC and L
 order:X_02d
 par:BT_ID;Pls. enter your bluetooth device ID; {undef}
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
-#par:READINGLISTOLD;copy readingList to new device for later resolving parameters;{ AttrVal("DEVICE","readingList","")}
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
 defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
 deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
@@ -4496,6 +4495,51 @@ attr OMG_BT_ID room NEWDEVROOM
 attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
 setreading OMG_BT_ID attrTemplateVersion 20220220
+
+name:OpenMQTTGateway_BT_scale
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
+desc:use this with an OpenMQTTGateway for scales like Xiaomi Mi Scale. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your scale. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
+order:X_02e
+par:BT_ID;Pls. enter your bluetooth device ID; {undef}
+par:BASE_ID;BASE_ID typically is home;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:NEWDEVROOM;Room of the calling device; {AttrVal('DEVICE','room','MQTT2_\DEVICE')}
+defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
+deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
+attr OMG_BT_ID autocreate 0
+attr OMG_BT_ID readingList\
+  BASE_ID/O[^/]*M[^/]*G[^/]*/BTtoMQTT/BT_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr OMG_BT_ID event-min-interval batteryPercent:7200,weight:1800
+attr OMG_BT_ID event-on-change-reading batteryPercent,weight:0.1,distance:5,impedance
+attr OMG_BT_ID icon message_medicine
+attr OMG_BT_ID jsonMap batt:batteryPercent tempc:temperature tem:0 tempf:0 hum:humidity servicedatauuid:0 servicedata:0
+attr OMG_BT_ID stateFormat weight kg
+attr OMG_BT_ID room NEWDEVROOM
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
+set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20220302
+
+name:OpenMQTTGateway_BT_unknown_gadget
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
+desc:use this with an OpenMQTTGateway to get an "empty" device for further adoptions to your needs. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>NOTE: You'll be asked to provide the HEX address of your gadget. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
+order:X_02x
+par:BT_ID;Pls. enter your bluetooth device ID; {undef}
+par:BASE_ID;BASE_ID typically is home;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:NEWDEVROOM;Room of the calling device; {AttrVal('DEVICE','room','MQTT2_\DEVICE')}
+defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
+deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
+attr OMG_BT_ID autocreate 0
+attr OMG_BT_ID readingList\
+  BASE_ID/O[^/]*M[^/]*G[^/]*/BTtoMQTT/BT_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr OMG_BT_ID icon bluetooth
+attr OMG_BT_ID jsonMap batt:batteryPercent tempc:temperature tem:0 tempf:0 hum:humidity servicedatauuid:0 servicedata:0
+attr OMG_BT_ID room NEWDEVROOM
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
+set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
+setreading OMG_BT_ID attrTemplateVersion 20220302
 
 
 ###############
