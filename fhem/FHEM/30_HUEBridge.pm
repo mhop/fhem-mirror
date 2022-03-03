@@ -279,7 +279,7 @@ HUEBridge_Detect($)
   my $host = '';
   if( defined($ret) && $ret ne '' && $ret =~ m/^[\[{].*[\]}]$/ ) {
     my $obj = eval { JSON->new->utf8(0)->decode($ret) };
-    Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
+    Log3 $name, 2, "$name: json error: $@ in $ret" && return if( $@ );
 
     if( defined($obj->[0])
         && defined($obj->[0]->{'internalipaddress'}) ) {
@@ -2743,7 +2743,7 @@ HUEBridge_dispatch($$$;$)
 		  }
 
                 } else {
-                 Log3 $name, 3, "$name: EventStream: update for unknown type $data->{type} received";
+                 Log3 $name, 3, "$name: EventStream: update for unknown type '$data->{type}' received";
                  $handled = 0;
 
                 }
@@ -3231,7 +3231,10 @@ __END__
     <a id="HUEBridge-set-deletesensor"></a><li>deletesensor &lt;id&gt;<br>
       Deletes the given sensor in the bridge and deletes the associated fhem device.</li>
     <a id="HUEBridge-set-configlight"></a><li>configlight &lt;id&gt; &lt;json&gt;<br>
-      Write light config data.</li>
+      Sends the specified json string as configuration to the light &lt;id&gt;. You can use this e.g. to modify the startup behaviour
+      of a light. For a full list of available options see:
+      <a href="https://developers.meethue.com/develop/hue-api/supported-devices/#archetype">Config object attributes</a>
+      (free Hue developer account needed, use wisely)</li>
     <a id="HUEBridge-set-configsensor"></a><li>configsensor &lt;id&gt; &lt;json&gt;<br>
       Write sensor config data.</li>
     <a id="HUEBridge-set-setsensor"></a><li>setsensor &lt;id&gt; &lt;json&gt;<br>
