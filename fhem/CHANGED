@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: configDB: statefile versioning added
  - bugfix:  73_AutoShuttersControl: fix Comfort drive then target pos 0
  - bugfix:  70_ESCVP21net: added cyclicConnect attr
  - feature: 76_mssDialog: Add option to define dialogues by file
