@@ -196,6 +196,13 @@ sub CommandConfigdb {
 			$ret = _cfgDB_Migrate;
 		}
 
+		when ('rawList'){
+			$data{cfgDB_rawList} = 1;
+			my @out = cfgDB_SaveCfg();
+			delete $data{cfgDB_rawList};
+			return join("\n",@out);
+		}
+
 		when ('recover') {
 			return "\n Syntax: configdb recover <version>" if @a != 2;
 			return "Invalid paramaeter '$param1' for recover. Must be a number."
@@ -240,6 +247,7 @@ sub CommandConfigdb {
 					"         configdb info\n".
 					"         configdb list [device] [version]\n".
 					"         configdb migrate\n".
+					"         configdb rawList\n".
 					"         configdb recover <version>\n".
 					"         configdb reorg [keepVersions]\n".
 					"         configdb search <searchTerm> [version]\n".
@@ -554,6 +562,11 @@ Ver 0 always indicates the currently running configuration.<br/>
 			<code>get configDB list global</code><br/>
 			<code>get configDB list '' 1</code><br/>
 			<code>get configDB list global 1</code><br/>
+		<br/>
+
+		<li><code>configdb rawList</code></li><br/>
+		    Lists the running configuration in the same order that <br/>
+		    would be written to a configuration file.<br/>
 		<br/>
 
 		<li><code>configdb recover &lt;version&gt;</code></li><br/>

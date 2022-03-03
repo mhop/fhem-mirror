@@ -1,6 +1,6 @@
 # $Id$
 
-=for comment
+=for comment (License)
 
 ##############################################################################
 #
@@ -29,6 +29,9 @@
 # along with fhem. If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+=cut
+
+=for comment (changelog before 2022)
 #
 # ChangeLog
 #
@@ -162,6 +165,17 @@
 #
 # 2021-10-24 - added     delete old files for large readings
 #
+=cut
+
+=for comment (changelog starting 2022)
+##############################################################################
+#
+# 2022-02-20 - changed   use createUniqueId() for uuids
+#                        remove _cfgDB_Uuid()
+#
+# 2022-02-20 - added     statefile versioning - begin
+# 2022-03-03             statefile versioning - completed
+#
 ##############################################################################
 =cut
 
@@ -179,7 +193,6 @@ use MIME::Base64;
 sub AnalyzeCommandChain($$;$);
 sub GetDefAndAttr($;$);
 sub Log($$);
-sub Log3($$$);
 sub createUniqueId();
 ## use critic
 
@@ -217,11 +230,11 @@ sub _cfgDB_Recover;
 sub _cfgDB_Reorg;
 sub _cfgDB_Rotate;
 sub _cfgDB_Search;
-sub _cfgDB_Uuid;
 sub _cfgDB_table_exists;
 sub _cfgDB_dump;
 sub _cfgDB_knownAttr;
 sub _cfgDB_deleteRF;
+sub _cfgDB_deleteStatefiles;
 
 ##################################################
 # Read configuration file for DB connection
@@ -322,7 +335,7 @@ sub cfgDB_Init {
 	if($count < 1) {
 #		insert default entries to get fhem running
 		$fhem_dbh->commit();
-		my $uuid = _cfgDB_Uuid;
+		my $uuid = createUniqueId();
 		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
 		_cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init',0);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logdir ./log',1);
@@ -337,7 +350,7 @@ sub cfgDB_Init {
 	}
 
 #	create TABLE fhemstate if nonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
+#	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
 #	create TABLE fhemb64filesave if nonexistent
 	if($cfgDB_dbtype eq "MYSQL") {
@@ -382,11 +395,10 @@ sub cfgDB_FileRead {
 	my ($filename,$fhem_dbh) = @_;
     my $internal_call = 1 if $fhem_dbh;
 
-	Log3(undef, 4, "configDB reading file: $filename");
+	Log 4, "configDB reading file: $filename";
 	my ($err, @ret, $counter);
 	$fhem_dbh = _cfgDB_Connect unless $fhem_dbh;
 	my $read_cmd  = "SELECT content FROM fhemb64filesave WHERE filename = '$filename'";
-#	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename LIKE '$filename'" );
 	my $sth = $fhem_dbh->prepare( $read_cmd );
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
@@ -406,7 +418,7 @@ sub cfgDB_FileRead {
 
 sub cfgDB_FileWrite {
 	my ($filename,@content) = @_;
-	Log3(undef, 4, "configDB writing file: $filename");
+	Log 4, "configDB writing file: $filename";
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhemb64filesave values (?, ?)');
@@ -425,7 +437,7 @@ sub cfgDB_FileUpdate {
 	if($id) {
 		my $filesize = -s $filename;
 		_cfgDB_binFileimport($filename,$filesize,1) if ($id) ;
-		Log(5, "file $filename updated in configDB");
+		Log 4, "file $filename updated in configDB";
 	}
 	return;
 }
@@ -436,13 +448,13 @@ sub cfgDB_ReadAll {  ## prototype used in fhem.pl
 	my ($ret, @dbconfig);
 
 	if ($configDB{attr}{rescue} == 1) {
-		Log (0, 'configDB starting in rescue mode!');
+		Log 0, 'configDB starting in rescue mode!';
 		push (@dbconfig, 'attr global modpath .');
 		push (@dbconfig, 'attr global verbose 3');
 		push (@dbconfig, 'define telnetPort telnet 7072 global');
 		push (@dbconfig, 'define web FHEMWEB 8083 global');
 		push (@dbconfig, 'attr web allowfrom .*');
-		push (@dbconfig, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
+		push (@dbconfig, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log Logfile');
 	} else {
 		# add Config Rows to commandfile
 		@dbconfig = _cfgDB_ReadCfg(@dbconfig);
@@ -458,12 +470,12 @@ sub cfgDB_ReadAll {  ## prototype used in fhem.pl
 
 # save running configuration to version 0
 sub cfgDB_SaveCfg { ## prototype used in fhem.pl
-
+    Log 4, "configDB save config ".$data{saveID} if(defined($data{saveID}));
 	my ($internal) = shift;
 	$internal = defined($internal) ? $internal : 0;
 	my $c = "configdb";
 	my @dontSave = qw(configdb:rescue configdb:nostate configdb:loadversion 
-	                  global:configfile global:version);
+	                  global:configfile global:statefile global:version);
 	my (%devByNr, @rowList, %comments, $t, $out);
 
 	map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
@@ -498,12 +510,14 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 			push @rowList, "attr $c $a $val";
 		}
 
-# Insert @rowList into database table
-	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = _cfgDB_Rotate($fhem_dbh,$internal);
 	$t = localtime;
 	$out = "#created $t";
 	push @rowList, $out;
+    return @rowList if defined($data{cfgDB_rawList});
+
+# Insert @rowList into database table
+	my $fhem_dbh = _cfgDB_Connect;
+	my $uuid = _cfgDB_Rotate($fhem_dbh,$internal);
 	my $counter = 0;
 	foreach (@rowList) { 
 		_cfgDB_InsertLine($fhem_dbh, $uuid, $_, $counter); 
@@ -540,8 +554,9 @@ sub cfgDB_SaveState {
 			$val ne "" &&
 			$val ne "???") {
 			$val =~ s/;/;;/g;
-			$val =~ s/\n/\\\n/g;
+            $val =~ s/\n/\$xyz\$/g;
 			$out = "setstate $d $val";
+			Log 4, "configDB: $out";
 			push @rowList, $out;
 		}
 		$r = $defs{$d}{READINGS};
@@ -549,34 +564,28 @@ sub cfgDB_SaveState {
 			foreach my $c (sort keys %{$r}) {
 				$rd = $r->{$c};
 				if(!defined($rd->{TIME})) {
-					Log3(undef, 4, "WriteStatefile $d $c: Missing TIME, using current time");
+					Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
 					$rd->{TIME} = TimeNow();
 				}
 				if(!defined($rd->{VAL})) {
-					Log3(undef, 4, "WriteStatefile $d $c: Missing VAL, setting it to 0");
+					Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
 					$rd->{VAL} = 0;
 				}
 				$val = $rd->{VAL};
 				$val =~ s/;/;;/g;
-				$val =~ s/\n/\\\n/g;
+                $val =~ s/\n/\$xyz\$/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
-				if (length($out) > 65530) {
-                  my $uid = _cfgDB_Uuid();
-				  FileWrite($uid,$val);
-				  $out = "setstate $d $rd->{TIME} $c cfgDBkey:$uid";
-                  Log 5, "configDB: r:$c d:$d key:$uid";
-				}
+				Log 4, "configDB: $out"; 
                 push @rowList, $out; 
 			}
 		}
 	}
 
-	my $fhem_dbh = _cfgDB_Connect;
-	$fhem_dbh->do("DELETE FROM fhemstate");
-	my $sth = $fhem_dbh->prepare('INSERT INTO fhemstate values ( ? )');
-	foreach (@rowList) { $sth->execute( $_ ); }
-	$fhem_dbh->commit();
-	$fhem_dbh->disconnect();
+    my $fileName = defined($data{saveID}) ? $data{saveID} : $configDB{loaded};
+       $fileName .= ".fhem.save";
+    Log 4, "configDB save state  $fileName";
+    cfgDB_FileWrite($fileName,@rowList);
+
 	return;
 }
 
@@ -587,7 +596,6 @@ sub cfgDB_MigrationImport {
 	my $modpath = AttrVal("global","modpath",".");
 
 # find eventTypes file
-#	$filename = '';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=eventTypes');
 	foreach my $fn (@def) {
@@ -606,7 +614,6 @@ sub cfgDB_MigrationImport {
 	push @files, $filename;
 
 # find used gplot files
-#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=SVG','GPLOTFILE');
 	foreach my $fn (@def) {
@@ -615,7 +622,6 @@ sub cfgDB_MigrationImport {
 	}
 
 # find DbLog configs
-#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=DbLog','CONFIGURATION');
 	foreach my $fn (@def) {
@@ -624,7 +630,6 @@ sub cfgDB_MigrationImport {
 	}
 
 # find RSS layouts
-#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=RSS','LAYOUTFILE');
 	foreach my $fn (@def) {
@@ -633,7 +638,6 @@ sub cfgDB_MigrationImport {
 	}
 
 # find InfoPanel layouts
-#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=InfoPanel','LAYOUTFILE');
 	foreach my $fn (@def) {
@@ -642,7 +646,6 @@ sub cfgDB_MigrationImport {
 	}
 
 # find weekprofile configurations
-#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=weekprofile','CONFIGFILE');
 	foreach my $fn (@def) {
@@ -651,7 +654,6 @@ sub cfgDB_MigrationImport {
 	}
 
 # find holiday files
-#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=holiday','NAME');
 	foreach my $fn (@def) {
@@ -669,7 +671,6 @@ sub cfgDB_MigrationImport {
 
 
 # do the import
-#	$filename = '';
 	foreach my $fn (@files) {
 		if ( -r $fn ) {
 			my $filesize = -s $fn;
@@ -782,6 +783,8 @@ sub _cfgDB_ReadCfg {
 
 # maybe this will be done with join later
 	my $uuid = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE version = '$version'");
+    $configDB{loaded} = $uuid;
+    Log 4, "configDB read config ".$configDB{loaded};
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb' order by version" );  
 
 	$sth->execute();
@@ -798,12 +801,23 @@ sub _cfgDB_ReadCfg {
 # and add them to command table for execution
 sub _cfgDB_ReadState {
 	my (@dbconfig) = @_;
-	my $fhem_dbh = _cfgDB_Connect;
-	my ($sth, $row,$f);
 
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate" );  
-	$sth->execute();
-	while ($row = $sth->fetchrow_array()) {
+	my $stateFileName = $configDB{loaded}.".fhem.save";
+    my ($err,@state) = cfgDB_FileRead($stateFileName);
+    if ($err eq "") {
+      Log 4, "configDB read state  ".$stateFileName;
+      map { my $a = $_; $a =~ s/\$xyz\$/\\n/g; push @dbconfig, $a } @state;
+	  my $fhem_dbh = _cfgDB_Connect;
+         $fhem_dbh->do("delete from fhemstate");
+         $fhem_dbh->commit();
+	     $fhem_dbh->disconnect();
+    } else {
+      Log 4, "configDB read state from table fhemstate";
+	  my $fhem_dbh = _cfgDB_Connect;
+	  my ($sth, $row,$f);
+	  $sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate" );  
+	  $sth->execute();
+	  while ($row = $sth->fetchrow_array()) {
 	    if($row =~ m/(cfgDBkey:)(.{32})/) {
           my $f = $2;
 	       my (undef, $content) = cfgDB_FileRead($f,$fhem_dbh);
@@ -811,8 +825,9 @@ sub _cfgDB_ReadState {
 	       _cfgDB_Filedelete($f,$fhem_dbh);
         }
 		push @dbconfig, $row;
-	}
-	$fhem_dbh->disconnect();
+	  }
+	  $fhem_dbh->disconnect();
+    }
 	return @dbconfig;
 }
 
@@ -820,15 +835,12 @@ sub _cfgDB_ReadState {
 # return uuid for new version 0
 sub _cfgDB_Rotate {
 	my ($fhem_dbh,$newversion) = @_;
-	my $uuid = _cfgDB_Uuid;
+    my $uuid = $data{saveID};
+    delete $data{saveID}; # no longer needed in memory
+	$configDB{loaded} = $uuid;
 	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
 	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid')");
 	return $uuid;
-}
-
-# 2015-01-12 use the fhem default function
-sub _cfgDB_Uuid {
-	return createUniqueId();
 }
 
 sub _cfgDB_filesize_str {
@@ -865,21 +877,21 @@ sub _cfgDB_filesize_str {
 sub _cfgDB_Migrate {
 	my $ret;
 	$ret = "Starting migration...\n";
-	Log3('configDB',4,'Starting migration');
+	Log 4, 'configDB: Starting migration';
 	$ret .= "Processing: database initialization\n";
-	Log3('configDB',4,'Processing: cfgDB_Init');
+	Log 4, 'configDB: Processing: cfgDB_Init';
 	cfgDB_Init;
 	$ret .= "Processing: save config\n";
-	Log3('configDB',4,'Processing: cfgDB_SaveCfg');
+	Log 4, 'configDB: Processing: cfgDB_SaveCfg';
 	cfgDB_SaveCfg;
 	$ret .= "Processing: save state\n";
-	Log3('configDB',4,'Processing: cfgDB_SaveState');
+	Log 4, 'configDB: Processing: cfgDB_SaveState';
 	cfgDB_SaveState;
 	$ret .= "Processing: fileimport\n";
-	Log3('configDB',4,'Processing: cfgDB_MigrationImport');
+	Log 4, 'configDB: Processing: cfgDB_MigrationImport';
 	$ret .= cfgDB_MigrationImport;
 	$ret .= "Migration completed\n\n";
-	Log3('configDB',4,'Migration completed.');
+	Log 4, 'configDB: Migration completed.';
 	$ret .= _cfgDB_Info(undef);
 	return $ret;
 }
@@ -941,18 +953,18 @@ sub _cfgDB_Info {
 	}
 	push @r, $l;
 
-# read state table statistics
-	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
-	$f = ($count>1) ? "s" : "";
-# read state table creation time
-	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
-	$sth->execute();
-	while ($row = $sth->fetchrow_array()) {
-		(undef,$row) = split(/#/,$row);
-		$row = " state: $count entrie$f saved: $row";
-		push @r, $row;
-	}
-	push @r, $l;
+## read state table statistics
+#	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
+#	$f = ($count>1) ? "s" : "";
+## read state table creation time
+#	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
+#	$sth->execute();
+#	while ($row = $sth->fetchrow_array()) {
+#		(undef,$row) = split(/#/,$row);
+#		$row = " state: $count entrie$f saved: $row";
+#		push @r, $row;
+#	}
+#	push @r, $l;
 
 	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemb64filesave group by filename");
 	$count = @$row;
@@ -1002,7 +1014,7 @@ sub _cfgDB_Recover {
 
 		if($count > 0) {
 			my $fromuuid = $fhem_dbh->selectrow_array("select versionuuid from fhemversions where version = $version");
-			my $touuid   = _cfgDB_Uuid;
+			my $touuid   = createUniqueId();
 #			Delete current version 0
 			$fhem_dbh->do("DELETE FROM fhemconfig WHERE VERSIONUUID in (select versionuuid from fhemversions where version = 0)");
 			$fhem_dbh->do("update fhemversions set versionuuid = '$touuid' where version = 0");
@@ -1019,7 +1031,13 @@ sub _cfgDB_Recover {
 			$fhem_dbh->commit();
 			$fhem_dbh->disconnect();
 
-#			Inform user about restart or rereadcfg needed
+#           Copy corresponding statefile
+            my $filename  = $fromuuid.".fhem.save";
+            my ($err,@statefile) = FileRead($filename);
+            $filename = $touuid.".fhem.save";
+            FileWrite($filename,@statefile);
+
+#			Inform user about restart required
 			$ret  = "Version 0 deleted.\n";
 			$ret .= "Version $version copied to version 0\n\n";
 			$ret .= "Please restart FHEM to activate configuration.";
@@ -1037,18 +1055,18 @@ sub _cfgDB_Recover {
 sub _cfgDB_Reorg {
 	my ($lastversion,$quiet) = @_;
 	$lastversion = (defined($lastversion)) ? $lastversion : 3;
-	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
+	Log 4, "configDB reorg started, keeping last $lastversion versions.";
 	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = $fhem_dbh->selectrow_array("select versionuuid from fhemversions where version = 0");
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version > $lastversion)");
 	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version = -1)");
 	$fhem_dbh->do("delete from fhemversions where version = -1");
 	my $ts = localtime(time);
 	$configDB{attr}{'lastReorg'} = $ts;
-	_cfgDB_InsertLine($fhem_dbh,$uuid,"attr configdb lastReorg $ts",-1); 
+	_cfgDB_InsertLine($fhem_dbh,$configDB{loaded},"attr configdb lastReorg $ts",-1); 
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
+	_cfgDB_deleteStatefiles();
 	eval { qx(sqlite3 $cfgDB_filename vacuum) } if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
 	return " Result after database reorg:\n"._cfgDB_Info(undef);
@@ -1056,7 +1074,7 @@ sub _cfgDB_Reorg {
 
 # delete temporary version
 sub _cfgDB_DeleteTemp {
-	Log3('configDB', 4, "configDB: delete temporary Version -1");
+	Log 4, "configDB: delete temporary Version -1";
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version = -1)");
 	$fhem_dbh->do("delete from fhemversions where version = -1");
@@ -1083,7 +1101,7 @@ sub _cfgDB_Search {
 	}
 	$sql .= "ORDER BY lower(device),command DESC";
 	$sth = $fhem_dbh->prepare( $sql);
-	Log 5,"configDB: $sql";
+	Log 4, "configDB: $sql";
 	$sth->execute();
 	$text = $dsearch ? " device" : "";
 	push @result, "search result for$text: $search in version: $searchversion";
@@ -1091,7 +1109,7 @@ sub _cfgDB_Search {
 	while (@line = $sth->fetchrow_array()) {
 		$row  = "$line[0] $line[1] $line[2]";
         $row .= " $line[3]" if defined($line[3]);
-		Log 5,"configDB: $row";
+		Log 4, "configDB: $row";
 		push @result, "$row" unless ($line[0] eq 'setuuid');
 	}
 	$fhem_dbh->disconnect();
@@ -1183,7 +1201,7 @@ sub _cfgDB_dump {
    if ($dbtype eq 'SQLITE') {
       (undef,$source) = split (/=/, $dbconn);
       my $dumpcmd = "echo '.dump fhem%' | sqlite3 $source $gzip > $target";
-      Log 4,"configDB: $dumpcmd";
+      Log 4, "configDB: $dumpcmd";
       $ret        = qx($dumpcmd);
       return $ret if $ret; # return error message if available
 
@@ -1196,7 +1214,7 @@ sub _cfgDB_dump {
       my $xparam = defined($configDB{attr}{mysqldump}) ? $configDB{attr}{mysqldump} : '';
       my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
       my $dumpcmd = "mysqldump $xparam --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
-      Log 4,"configDB: $dumpcmd";
+      Log 4, "configDB: $dumpcmd";
       $ret        = qx($dumpcmd);
       return $ret if $ret;
       $source = $dbname;
@@ -1209,7 +1227,7 @@ sub _cfgDB_dump {
       (undef,$dbport)     = split (/=/,$dbport);
       my $dbtables = "-t fhemversions -t fhemconfig -t fhemstate -t fhemb64filesave";
       my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $dbtables $gzip > $target";
-      Log 4,"configDB: $dumpcmd";
+      Log 4, "configDB: $dumpcmd";
       $ret        = qx($dumpcmd);
       return $ret if $ret;
       $source     = $dbname;
@@ -1252,12 +1270,30 @@ sub _cfgDB_deleteRF {
    $sth->execute();
    while ($filename = $sth->fetchrow_array()) {
      if ($filename =~ m/^[0-9A-F]+$/i) {
-       Log 5, "configDB delete file: $filename";
+       Log 4, "configDB delete file: $filename";
        $fhem_dbh2->do("delete from fhemb64filesave where filename = '$filename'");
      }
    }
    $fhem_dbh2->commit();
    $fhem_dbh2->disconnect();
+}
+
+sub _cfgDB_deleteStatefiles {
+   my $filename;
+   my $fhem_dbh = _cfgDB_Connect;
+   my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
+   $sth->execute();
+   while ($filename = $sth->fetchrow_array()) {
+       my $uuid  = "";
+       $uuid = substr($filename,0,32);
+       my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
+       $found //= -1; # to prevent perl warning
+       unless ($uuid eq $found) {
+         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+       }
+   }
+   $fhem_dbh->commit();
+   $fhem_dbh->disconnect();
 }
 
 ##################################################
