@@ -51,6 +51,7 @@ tradfri_Initialize($)
                       "tradfriFHEM-securityCode ".
                       "tradfriFHEM-sshHost tradfriFHEM-sshUser ".
                       "disable:1 disabledForIntervals ".
+                      "createEventTimestampReading:1,0 ".
                       "createGroupReadings:1,0 ".
                       $readingFnAttributes;
 
@@ -190,6 +191,10 @@ sub
 tradfri_processEvent($$) {
   my ($hash,$decoded) = @_;
   my $name = $hash->{NAME};
+
+  if( defined(my $create = AttrVal($name,'createEventTimestampReading',undef )) ) {
+    readingsSingleUpdate($hash, 'event', 'timestamp', $create ) if( $create );
+  }
 
   my $id = $decoded->{id} ;
 
@@ -720,6 +725,16 @@ tradfri_Attr($$$)
       The command to use as tradfri-fhem</li>
     <li>tradfriFHEM-params<br>
       Additional tradfri-fhem cmdline params.</li>
+    <a id="tradfri-attr-createEventTimestampReading"></a><li>createEventTimestampReading<br>
+      timestamp reading for every event received<br>
+      0 -> update reading without fhem event<br>
+      1 -> update reading with fhem event<br>
+      undef -> don't create reading</li>
+    <a id="tradfri-attr-createGroupReadings"></a><li>createGroupReadings<br>
+      create 'artificial' readings for group devices.<br>
+      0 -> create readings only for group devices where createGroupReadings ist set to 1<br>
+      1 -> create readings for all group devices where createGroupReadings ist not set or set to 1<br>
+      undef -> do nothing</li>
   </ul>
 </ul><br>
 
