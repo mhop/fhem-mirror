@@ -1,6 +1,6 @@
-REV 25759
+REV 25763
 DIR unused
-UPD 2022-02-28_07:45:03 377549 ./CHANGED
+UPD 2022-03-03_07:45:02 377621 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-03-01_07:45:02 45415 ./MAINTAINER.txt
 UPD 2022-02-03_07:45:02 42975 ./configDB.pm
@@ -647,7 +647,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-03-01_07:45:02 367816 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-03-03_07:45:02 371244 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -743,8 +743,8 @@ UPD 2022-03-02_07:45:07 4662832 docs/commandref.html
 UPD 2022-02-28_07:45:10 2833467 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-03-02_07:45:11 271061 docs/commandref_modular.html
-UPD 2022-03-02_07:45:12 282135 docs/commandref_modular_DE.html
+UPD 2022-03-03_07:45:10 271061 docs/commandref_modular.html
+UPD 2022-03-03_07:45:11 282135 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -754,7 +754,7 @@ UPD 2022-01-16_07:45:06 75873 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2022-01-15_07:45:03 2735 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2022-01-15_07:45:03 11902 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2022-01-15_07:45:03 7314 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
-UPD 2022-01-15_07:45:03 112187 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
+UPD 2022-03-03_07:45:02 112174 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
 UPD 2022-01-15_07:45:03 40650 lib/FHEM/Automation/ShuttersControl/Helper.pm
 UPD 2022-01-15_07:45:03 7168 lib/FHEM/Automation/ShuttersControl/Rainprotection.pm
 UPD 2022-01-15_07:45:03 2726 lib/FHEM/Automation/ShuttersControl/Roommate.pm
@@ -1487,6 +1487,7 @@ UPD 2016-04-27_07:45:12 551 www/images/fhemSVG/hue_filled_entity.svg
 UPD 2022-01-07_07:45:02 2659 www/images/fhemSVG/hue_filled_filament.svg
 UPD 2022-01-07_07:45:02 942 www/images/fhemSVG/hue_filled_foh.svg
 UPD 2017-11-14_07:45:02 1816 www/images/fhemSVG/hue_filled_go.svg
+UPD 2022-03-03_07:45:02 1437 www/images/fhemSVG/hue_filled_gu10.svg
 UPD 2017-11-14_07:45:02 1605 www/images/fhemSVG/hue_filled_gu10_par16.svg
 UPD 2017-11-14_07:45:02 686 www/images/fhemSVG/hue_filled_hds.svg
 UPD 2016-04-27_07:45:12 569 www/images/fhemSVG/hue_filled_impulse.svg
