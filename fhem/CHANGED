@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  73_AutoShuttersControl:  change ShuttersInformation fn
+                add table frame and whitespace-character to ShuttersInformation
  - feature: configDB: statefile versioning added
  - bugfix:  73_AutoShuttersControl: fix Comfort drive then target pos 0
  - bugfix:  70_ESCVP21net: added cyclicConnect attr
