@@ -144,6 +144,7 @@ SVG_Set($@)
 
   my ($err,@rows) = FileRead($srcName);
   return $err if($err);
+  @rows = grep { $_ !~ m/^set readonly/ } @rows;
   $err = FileWrite($dstName, @rows);
 
   if($err) {
