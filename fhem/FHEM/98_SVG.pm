@@ -531,8 +531,8 @@ SVG_PEdit($$$$)
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
   $ret .= (exists($conf{readonly}) ?
-              '<span>.gplot file is "set readonly"</span>' :
-              FW_submit("submit", "Write .gplot file")."&nbsp;").
+              FW_submit("readonly", '.gplot file is set readonly'):
+              FW_submit("submit", "Write .gplot file"))."&nbsp;".
           FW_submit("showFileLogData", "Show preprocessed input").
           "</td></tr>";
 
@@ -664,6 +664,13 @@ SVG_WriteGplot($)
   FW_digestCgi($arg);
 
   return if($FW_hiddenroom{detail});
+  if($FW_webArgs{readonly}) {
+    $FW_RET .=
+      '<div id="errmsg">'.
+        "gplot file marked as readonly: won't write!".
+      '</div>';
+    return 0;
+  }
   return SVG_showData() if($FW_webArgs{showFileLogData});
 
   if(!defined($FW_webArgs{par_0_0})) {
