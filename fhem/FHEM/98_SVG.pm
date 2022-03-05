@@ -531,7 +531,7 @@ SVG_PEdit($$$$)
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
   $ret .= (exists($conf{readonly}) ?
-              FW_submit("readonly", '.gplot file is set readonly'):
+              '<span>.gplot file is "set readonly"</span>' :
               FW_submit("submit", "Write .gplot file"))."&nbsp;".
           FW_submit("showFileLogData", "Show preprocessed input").
           "</td></tr>";
@@ -541,6 +541,12 @@ SVG_PEdit($$$$)
   my $sl = "$FW_ME/SVG_WriteGplot?detail=$d&showFileLogData=1";
   if(defined($FW_pos{zoom}) && defined($FW_pos{off})) {
     $sl .= "&pos=zoom=$FW_pos{zoom};off=$FW_pos{off}";
+  }
+  my $ro="";
+  if(exists($conf{readonly})) {
+    $ro = '$("table.plotEditor input").prop("readonly", true);
+           $("table.plotEditor input[type=checkbox]").prop("disabled", true);
+           $("table.plotEditor select").prop("disabled", true);';
   }
 
   $ret .= <<'EOF';
@@ -564,6 +570,7 @@ EOF
     \$("table.internals div[informid=$gpfEsc-GPLOTFILE]")
       .html("<a href='$link'>$gpf</a>");
     }, 10);
+  $ro
 </script>
 EOF
   return $ret;
@@ -664,13 +671,6 @@ SVG_WriteGplot($)
   FW_digestCgi($arg);
 
   return if($FW_hiddenroom{detail});
-  if($FW_webArgs{readonly}) {
-    $FW_RET .=
-      '<div id="errmsg">'.
-        "gplot file marked as readonly: won't write!".
-      '</div>';
-    return 0;
-  }
   return SVG_showData() if($FW_webArgs{showFileLogData});
 
   if(!defined($FW_webArgs{par_0_0})) {
