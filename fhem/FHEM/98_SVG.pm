@@ -529,7 +529,9 @@ SVG_PEdit($$$$)
   }
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
-  $ret .= FW_submit("submit", "Write .gplot file")."&nbsp;".
+  $ret .= (exists($conf{readonly}) ?
+              '<span>.gplot file is "set readonly"</span>' :
+              FW_submit("submit", "Write .gplot file")."&nbsp;").
           FW_submit("showFileLogData", "Show preprocessed input").
           "</td></tr>";
 
