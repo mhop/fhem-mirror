@@ -3431,7 +3431,7 @@ attr DEVICE readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT, 'sys_', $JSONMAP) }\
   $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT, 'switch_', $JSONMAP) }\
   $\DEVICETOPIC/status/cloud:.* {}\
-  $\DEVICETOPIC/rpc:.* { json2nameValue($EVENT, 'req_', $JSONMAP, 'in_mode')\
+  $\DEVICETOPIC/rpc:.* { json2nameValue($EVENT, 'req_', $JSONMAP, 'in_mode')}\
   $\DEVICETOPIC/status/input_0:.* { json2nameValue($EVENT, 'input_', $JSONMAP) }\
   fhem2shelly/rpc:.* {}
 attr DEVICE getList in_mode:noArg in_mode $\DEVICETOPIC/rpc {"id": 1,"src":"$\DEVICETOPIC", "method": "Switch.GetConfig", "params": {"id": 0}}
