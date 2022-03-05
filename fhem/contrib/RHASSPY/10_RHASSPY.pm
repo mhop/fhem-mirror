@@ -289,7 +289,7 @@ sub Initialize {
     #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{AttrFn}      = \&Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long rhasspyTTS:textField-long rhasspySTT:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes;
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long rhasspySTT:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes; #rhasspyTTS:textField-long 
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&Parse;
     $hash->{NotifyFn}    = \&Notify;
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.18';
+    $hash->{MODULE_VERSION} = '0.5.19';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -378,7 +378,7 @@ sub firstInit {
         && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
     initialize_msgDialog($hash);
-    initialize_TTS($hash);
+    #initialize_TTS($hash);
     initialize_STT($hash);
     if ( 0 && $hash->{Babble} ) { #deactivate
         InternalVal($hash->{Babble},'TYPE','none') eq 'Babble' ? $sets{Babble} = [qw( optionA optionB )] 
@@ -1404,9 +1404,11 @@ sub initialize_STT {
                 }
             }
             $hash->{helper}->{STT}->{config}->{$keywd} = $values;
+            $hash->{helper}->{STT}->{config}->{AMADCommBridge} = 1;
+            disable_msgDialog( $hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
             next;
         }
-
+=pod
         if ( $keywd =~ m{\AAMADCommBridge\z}xms ) {
             for my $bridge (split m{,}, $values) {
                 if ( InternalVal($bridge,'TYPE','unknown') ne 'AMADCommBridge' ) {
@@ -1418,6 +1420,7 @@ sub initialize_STT {
             disable_msgDialog( $hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
             next;
         }
+=cut
 
         if ( $keywd =~ m{\AfilterFromBabble\z}xms ) {
             if ( !defined $hash->{Babble} ) {
@@ -1426,6 +1429,15 @@ sub initialize_STT {
             }
             $hash->{helper}->{STT}->{config}->{$keywd} = _toregex($values);
             next;
+        }
+
+        if ( $keywd =~ m{\b$hash->{helper}->{STT}->{config}->{allowed}(?:[\b:\s]|\Z)}xms ) {
+            my($unnamedParams, $namedParams) = parseParams($values);
+            #my $siteId = $namedParams->{siteId} // shift @{$unnamedParams }// $keywd;
+            $hash->{helper}->{STT}->{config}->{$keywd} = $namedParams;
+            #$hash->{helper}->{STT}->{config}->{$keywd}->{ttsCommand} //= 'set $DEVICE ttsMsg $message';
+            $hash->{helper}->{STT}->{config}->{wakeword}->{$namedParams->{wakeword}} = $keywd if defined $namedParams->{wakeword};
+            $sets{sayFinished} = [];
         }
     }
 
@@ -2766,7 +2778,7 @@ sub ttsDialog_open {
         customData   => $device
     };
 
-    my $tout = $hash->{helper}->{TTS}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+    my $tout = $hash->{helper}->{STT}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
     setTtsDialogTimeout($hash, $sendData, $tout);
     return ttsDialog_progress($hash, $device, $msgtext, $sendData);
 }
@@ -2810,7 +2822,9 @@ sub ttsDialog_respond {
     trim($message);
     return if !$message; # empty?
 
-    my $msgCommand = $hash->{helper}->{TTS}->{config}->{$device}->{ttsCommand} // return;
+    my $msgCommand = $hash->{helper}->{STT}->{config}->{$device}->{ttsCommand};
+    $msgCommand //= 'set $DEVICE ttsMsg $message' if InternalVal($device, 'TYPE', '') eq 'AMADDevice';
+    return if !$msgCommand;
     my %specials = (
          '$DEVICE'  => $device,
          '$message' => $message,
@@ -2819,7 +2833,7 @@ sub ttsDialog_respond {
     $msgCommand  = EvalSpecials($msgCommand, %specials);
     AnalyzeCommandChain($hash, $msgCommand);
     if ( $keepopen ) {
-        my $tout = $hash->{helper}->{TTS}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+        my $tout = $hash->{helper}->{STT}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
         resetRegIntTimer( $device, time + $tout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
         readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'open', 1);
     } else {
@@ -2955,9 +2969,10 @@ sub analyzeMQTTmessage {
         my $siteId = $data->{siteId};
         if ( 0 && $siteId ) { #Beta-User: deactivated
             my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
-            $device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
+            #$device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
+            $device //= $hash->{helper}->{STT}->{config}->{wakeword}->{$hotword} if defined $hash->{helper}->{STT} && defined $hash->{helper}->{STT}->{config} && defined $hash->{helper}->{STT}->{config}->{wakeword};
             if ($device) {
-                analyzeAndRunCmd($hash, $device, "set $device activateVoiceInput");
+                AnalyzeCommand( $hash, "set $device activateVoiceInput" );
                 push @updatedList, $device;
             }
         }
@@ -3071,15 +3086,9 @@ sub respond {
       && defined $hash->{helper}->{msgDialog}->{$identity} ){
         Log3($hash, 5, "respond deviated to msgDialog_respond for $identity.");
         return msgDialog_respond($hash, $identity, $response);
-    } elsif (defined $hash->{helper}->{TTS} 
-        && defined $hash->{helper}->{TTS}->{config}->{$identity} ) {
+    } elsif (defined $hash->{helper}->{STT} 
+        && defined $hash->{helper}->{STT}->{config}->{$identity} ) {
         Log3($hash, 5, "respond deviated to ttsDialog_respond for $identity.");
-        $hash->{helper}->{ttsDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
-        return ttsDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
-    } elsif (defined $hash->{helper}->{TTS} 
-        && defined $hash->{helper}->{TTS}->{$identity} ) {
-        $identity = $hash->{helper}->{TTS}->{$identity};
-        Log3($hash, 5, "respond deviated to ttsDialog_respond for $identity by siteId.");
         $hash->{helper}->{ttsDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
         return ttsDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
     }
@@ -5631,36 +5640,31 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <br>
       </ul>
   </li>
-  <p><b>Remarks on rhasspySTT, rhasspyTTS and Babble:</b><br><a id="RHASSPY-experimental"></a>
+  <p><b>Remarks on rhasspySTT and Babble:</b><br><a id="RHASSPY-experimental"></a>
     Interaction with Babble and AMAD.*-Devices is not approved to be propperly working yet. Further tests
     may be needed and functionality may be subject to changes!
   </p>
   <li>
     <a id="RHASSPY-attr-rhasspySTT"></a><b>rhasspySTT</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>Optionally, you may want not to use the internal Rhasspy speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature, and most likely you also want to set values to <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a> as well. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
+    <p>Optionally, you may want not to use the internal Rhasspy speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
     Keys that may be set in this attribute:
      <ul>
         <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
-        <li><i>AMADCommBridge</i> A list of <a href="#AMADCommBridge">AMADCommBridge</a> devices RHASSPY shall be notified on incoming messages (comma-separated device names).</li>
         <li><i>filterFromBabble</i> 
         By default, all incoming messages from AMADDevice/AMADCommBridge will be forwarded to Rhasspy. For better interaction with <a href="#Babble ">Babble</a> you may opt to ignore all messages not matching the <i>filterFromBabble</i> by their starting words (case-agnostic, will be converted to a regex compatible notation). You additionally have to set a <i>Babble</i> key in <a href="#RHASSPY-define">DEF</a> pointing to the Babble device. All regular messages (start sequence not matching filter) then will be forwarded to Babble using <code>Babble_DoIt()</code> function.</li>
+        <li><i>&lt;allowed AMAD-device&gt;</i> A list of key=value pairs to tweak default behaviours:
+        <ul>
+         <li><i>wakeword</i> If set, a wakeword detected message for this wakeword will lead to an 
+         "activateVoiceInput" command towards this AMADDevice</li>
+         <li><i>sessionTimeout</i> timeout (in seconds) used if a request (e.g. for confirmation) is open for this AMADDevice (if not set, global default value is used)</li>
+         <li> Remark: This may contain additional keys in the future, e.g., to restrict wakeword effect to a specific siteId.</li>
+        </ul>
       </ul>
       Example:<br>
-        <p><code>filterFromBabble=tell rhasspy <br>
-                 AMADCommBridge=AMADBridge<br>
-                 allowed=AMADDev_A</code></p>
-  </li>
-  <li>
-  <a id="RHASSPY-attr-rhasspyTTS"></a><b>rhasspyTTS</b>
-    <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>In addition to <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, this attributes adds some options to manipulate the text-to-speech processing. Any AMADDevice to be adressed for own TTS processing has to be listed here with it's link to it's siteId (development remark: this is missleading atm!). If RHASSPY detects a link between a siteId and an AMADDevice type FHEM device, it will not forward any text to be spoken to Rhasspy but use other synthetisation methods instead (defaulting to <code>set &lt;AMADDevice&gt; ttsMsg $message</code>).
-      Example:<br>
-    <p><code>AMADDev_A=siteId=android_livingroom ttsCommand={fhem("set $DEVICE ttsMsg $message")}</code><br>Notes: 
-    <ul>
-        <li>This ttsCommand is just an example for an arbitrary Perl command! For AMADDevice's this should work ootb also without setting this optional key...</li>
-        <li>There's also a Reading-based logic to make a siteId linked to an AMADDevice also allowing changes at runtime with higher priority. In this case, the TTS entry is just needed to makr the device for TTS processing at all.</li>
-    </ul></p>
+        <p><code>allowed=AMADDev_A <br>
+                 filterFromBabble=tell rhasspy <br>
+                 &lt;AMAD-device&gt;=wakeword=alexa sessionTimeout=20</code></p>
   </li>
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
