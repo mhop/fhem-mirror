@@ -509,6 +509,14 @@ HttpUtils_Connect2NonblockingSSL($$)
                     "HttpUtils_TimeoutErr", \%timerHash);
 
   $hash->{directReadFn} = sub() {
+    if(!$hash->{conn}->can('connect_SSL')) { # 126593
+      my $err = "HttpUtils_Connect2NonblockingSSL: connection handle in ".
+                "$hash->{NAME} was replaced, terminating connection";
+      HttpUtils_Close($hash);
+      Log 1, $err;
+      return $hash->{callback}($hash, $err);
+    }
+
     return if(!$hash->{conn}->connect_SSL() && $! == EWOULDBLOCK);
 
     RemoveInternalTimer(\%timerHash);
