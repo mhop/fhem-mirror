@@ -656,7 +656,7 @@ sub Text2Speech_PrepareSpeech($$) {
 
   # bei Angabe direkter MP3-Files wird hier ein temporäres Template vergeben
   for(my $i=0; $i<(@text); $i++) {
-    @FileTplPc = ($text[$i] =~ /:(\w+?\.(?:mp3|ogg|wav)):/g);
+    @FileTplPc = ($text[$i] =~ /:([\w-]+?\.(?:mp3|ogg|wav)):/g);
     for(my $j=0; $j<(@FileTplPc); $j++) {
       my $tpl = "FileTpl_#".$i."_".$j; #eindeutige Templatedefinition schaffen
       Log3 $hash, 4, "$me: Angabe einer direkten MP3-Datei gefunden:  $FileTplPc[$j] => $tpl";
