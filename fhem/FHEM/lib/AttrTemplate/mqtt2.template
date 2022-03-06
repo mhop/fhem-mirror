@@ -4358,9 +4358,8 @@ attr DEVICE setList\
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith|attrTemplateVersion).* 86400"}
 attr DEVICE periodicCmd deleteReadings:1440
 attr DEVICE comment For syntax wrt. update and BT commands see https://github.com/1technophile/OpenMQTTGateway/releases/tag/v0.9.7
-attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
-setreading DEVICE attrTemplateVersion 20220218
+setreading DEVICE attrTemplateVersion 20220306
 
 name:OpenMQTTGateway_BT_gtag
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
@@ -4376,8 +4375,7 @@ defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
 deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; json2nameValue($EVENT, "${1}_") }\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; {"last_IO"=>"$1"}}
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,home/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT, "${1}_"); $rets->{last_IO} = $1; return $rets}
 attr OMG_BT_ID event-min-interval .*:300
 attr OMG_BT_ID icon ICON
 attr OMG_BT_ID stateFormat Last IO: last_IO
@@ -4385,7 +4383,7 @@ attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220220
+setreading OMG_BT_ID attrTemplateVersion 20220306
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
@@ -4520,9 +4518,9 @@ attr OMG_BT_ID jsonMap batt:batteryPercent tempc:temperature tem:0 tempf:0 hum:h
 attr OMG_BT_ID stateFormat weight kg
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
-attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
+attr OMG_BT_ID model OpenMQTTGateway_BT_scale
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220302
+setreading OMG_BT_ID attrTemplateVersion 20220306
 
 name:OpenMQTTGateway_BT_unknown_gadget
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
@@ -4541,9 +4539,9 @@ attr OMG_BT_ID icon bluetooth
 attr OMG_BT_ID jsonMap batt:batteryPercent tempc:temperature tem:0 tempf:0 hum:humidity servicedatauuid:0 servicedata:0
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
-attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
+attr OMG_BT_ID model OpenMQTTGateway_BT_unknown_gadget
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220302
+setreading OMG_BT_ID attrTemplateVersion 20220306
 
 
 ###############
