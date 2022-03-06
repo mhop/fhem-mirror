@@ -1040,8 +1040,9 @@ DENON_GetKey($$;$) {
 sub DENON_AVR_RequestDeviceinfo {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-
-    my $url = "http://$hash->{IP}/goform/Deviceinfo.xml";
+    
+    my $port = AttrVal($hash, 'deviceInfoPort', 80);
+    my $url = "http://$hash->{IP}:$port/goform/Deviceinfo.xml";
     Log3 $name, 4, "DENON_AVR ($name) - requesting $url";
     my $param = {
                     url        => "$url",
@@ -1151,7 +1152,7 @@ DENON_AVR_Initialize($)
 	$hash->{NotifyFn}   = "DENON_AVR_Notify";
 	$hash->{ShutdownFn} = "DENON_AVR_Shutdown";
 	
-	$hash->{AttrList}  = "brand:Denon,Marantz disable:0,1 do_not_notify:1,0 connectionCheck:off,30,45,60,75,90,105,120,240,300 dlnaName favorites maxFavorites maxPreset inputs playTime:off,1,2,3,4,5,10,15,20,30,40,50,60 sleep timeout:1,2,3,4,5 presetMode:numeric,alphanumeric type:AVR,Ceol unit:off,on ".$readingFnAttributes;
+	$hash->{AttrList}  = "brand:Denon,Marantz disable:0,1 do_not_notify:1,0 connectionCheck:off,30,45,60,75,90,105,120,240,300 dlnaName favorites maxFavorites maxPreset inputs playTime:off,1,2,3,4,5,10,15,20,30,40,50,60 sleep timeout:1,2,3,4,5 presetMode:numeric,alphanumeric type:AVR,Ceol unit:off,on deviceInfoPort:80,8080 ".$readingFnAttributes;
 	
 	$data{RC_makenotify}{DENON_AVR} = "DENON_AVR_RCmakenotify";
 	$data{RC_layout}{DENON_AVR_RC}  = "DENON_AVR_RClayout";
@@ -1204,9 +1205,9 @@ DENON_AVR_Define($$)
 	unless ( exists( $attr{$name}{devStateIcon} ) ) {
 		$attr{$name}{devStateIcon} = 'on:rc_GREEN:main_off main_off:rc_YELLOW:main_on off:rc_STOP:main_on absent:rc_RED:main_on muted:rc_MUTE@green:muteT playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play disconnected:rc_RED';
 	}
-	unless (exists($attr{$name}{stateFormat})){
-		$attr{$name}{stateFormat} = 'stateAV';
-	}
+#	unless (exists($attr{$name}{stateFormat})){
+#		$attr{$name}{stateFormat} = 'state';
+#	}
 	
 		
 	# connect using TCP connection (non-blocking style)
@@ -1528,10 +1529,10 @@ DENON_AVR_Read($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $state = ReadingsVal( $name, "power", "off" );
+	my $state = $hash->{NAME};
 	my $buf = '';
 	my $zone = 0;
-	my $return = '';
+	my $return;
 	
 	if(defined($hash->{helper}{PARTIAL}) && $hash->{helper}{PARTIAL}) {
 	$buf = $hash->{helper}{PARTIAL} . DevIo_SimpleRead($hash);
@@ -1639,7 +1640,7 @@ DENON_AVR_Parse(@)
 			$power = "off";
 		}
 		readingsBulkUpdate($hash, "power", $power);
-		readingsBulkUpdate($hash, "state", $power);
+#		readingsBulkUpdate($hash, "state", $power);
 		DENON_AVR_Write($hash, "TR?", "query");					#Query Trigger Control
 		DENON_AVR_GetStateAV($hash);
 
@@ -1761,7 +1762,6 @@ DENON_AVR_Parse(@)
 			if($2 eq 'ON' || $2 eq 'OFF')
 			{
 				my $status = DENON_GetValue('PS', $1);
-                                $status = "unknown" unless defined($status);
 				readingsBulkUpdate($hash, $status, lc($2)) if($status ne "unknown");
 				$return = $status." ".lc($2);
 			}
@@ -2462,17 +2462,17 @@ DENON_AVR_Get($@)
 				return "Disconnect device first!";
 			}
 		}
-		elsif ($a[1] eq "zone")
-		{
-			my $return = DENON_AVR_Make_Zone($name, $name."_Zone_".$a[2], $a[2]);
-			DENON_AVR_Command_StatusRequest($hash);
-			return $return;
-		}
+	#	elsif ($a[1] eq "zone")
+	#	{
+	#		my $return = DENON_AVR_Make_Zone($name, $name."_Zone_".$a[2], $a[2]);
+	#		DENON_AVR_Command_StatusRequest($hash);
+	#		return $return;
+	#	}
 		elsif ($a[1] eq "disconnect")
 		{
 			RemoveInternalTimer($hash);
 			DevIo_CloseDev($hash);
-			$hash->{STATE} = "disconnected";
+#			$hash->{STATE} = "disconnected";
 			
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "presence", "absent");
@@ -3436,7 +3436,7 @@ DENON_AVR_ConnectionCheck($)
 	
 	if ($connectionCheck ne "off") {
 	
-		$hash->{STATE} = "opened";
+#		$hash->{STATE} = "opened";
 	
 		RemoveInternalTimer($hash, "DENON_AVR_ConnectionCheck");
 	
