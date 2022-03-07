@@ -675,9 +675,10 @@ logProxy_array2Data($$)
 
   my $min = 999999;
   my $max = -999999;
+  my $first;
   my $last;
 
-  return ($ret,$min,$max,$last) if( !ref($array) eq "ARRAY" );
+  return ($ret,$min,$max,$last,$first) if( !ref($array) eq "ARRAY" );
 
   foreach my $point ( @{$array} ) {
     my @t = localtime($point->[0]);
@@ -686,6 +687,7 @@ logProxy_array2Data($$)
     my $value = $point->[1];
     $min = $value if( $value < $min );
     $max = $value if( $value > $max );
+    $first = $value if( !defined($first) );
     $last = $value;
 
     $ret .= $timestamp . " " . $value ."\n";
@@ -693,7 +695,7 @@ logProxy_array2Data($$)
 
   $ret .= $comment;
 
-  return (\$ret,$min,$max,$last);
+  return (\$ret,$min,$max,$last,$first);
 }
 #create plot data from xy-array
 sub
@@ -796,7 +798,9 @@ logProxy_Get($@)
     $data{"avg$j"} = undef;
     $data{"sum$j"} = 0;
     $data{"cnt$j"} = undef;
+    $data{"firstval$j"} = 0;
     $data{"currval$j"} = 0;
+    $data{"firstdate$j"} = undef;
     $data{"currdate$j"} = undef;
     $data{"mindate$j"} = undef;
     $data{"maxdate$j"} = undef;
@@ -934,6 +938,7 @@ logProxy_Get($@)
 
       # shift data and specials back
       logProxy_shiftData($internal_data,$offset.$offset_scale) if( $offset );
+      $main::data{"firstdate1"} = logProxy_shiftTime($main::data{"firstdate1"},$offset.$offset_scale) if( $offset );
       $main::data{"currdate1"} = logProxy_shiftTime($main::data{"currdate1"},$offset.$offset_scale) if( $offset );
 
       # clip extended query range to plot range
@@ -948,6 +953,7 @@ logProxy_Get($@)
         $main::data{"avg1"} = undef;
         $main::data{"sum1"} = undef;
         $main::data{"cnt1"} = int(@{$data});
+        $main::data{"firstdate1"} = undef;
         $main::data{"currdate1"} = undef;
         $main::data{"mindate1"} = undef;
         $main::data{"maxdate1"} = undef;
@@ -964,7 +970,7 @@ logProxy_Get($@)
         $data = $d;
 
         $comment = "#$a[$i]\n";
-        ($internal_data,$main::data{"min1"},$main::data{"max1"},$main::data{"currval1"}) = logProxy_array2Data($data,$comment);
+        ($internal_data,$main::data{"min1"},$main::data{"max1"},$main::data{"currval1"},$main::data{"firstval1"}) = logProxy_array2Data($data,$comment);
       }
 
       if( ref($internal_data) eq "SCALAR" && $$internal_data ) {
@@ -975,7 +981,9 @@ logProxy_Get($@)
         $data{"avg$j"} = $main::data{"avg1"};
         $data{"sum$j"} = $main::data{"sum1"};
         $data{"cnt$j"} = $main::data{"cnt1"};
+        $data{"firstval$j"} = $main::data{"firstval1"};
         $data{"currval$j"} = $main::data{"currval1"};
+        $data{"firstdate$j"} = $main::data{"firstdate1"};
         $data{"currdate$j"} = $main::data{"currdate1"};
         $data{"mindate$j"} = $main::data{"mindate1"};
         $data{"maxdate$j"} = $main::data{"maxdate1"};
@@ -1046,7 +1054,9 @@ logProxy_Get($@)
       $data{"max$j"} = $y;
       $data{"avg$j"} = $y;
       $data{"cnt$j"} = 2;
+      $data{"firstval$j"} = $y;
       $data{"currval$j"} = $y;
+      $data{"firstdate$j"} = $from;
       $data{"currdate$j"} = $to;
       $data{"maxdate$j"} = $to;
       $data{"mindate$j"} = $to;
@@ -1060,7 +1070,7 @@ logProxy_Get($@)
       $fld[1] = join( ':', @fld[1..@fld-1]);
       #my $fromsec = SVG_time_to_sec($from);
       #my $tosec   = SVG_time_to_sec($to);
-      my ($r,$min,$max,$last,$xmin,$xmax,$avg,$sum) = eval $fld[1];
+      my ($r,$min,$max,$last,$xmin,$xmax,$avg,$sum,$first) = eval $fld[1];
       if( $@ ) {
         Log3 $hash->{NAME}, 1, "$hash->{NAME}: $fld[1]: $@";
         next;
@@ -1068,6 +1078,7 @@ logProxy_Get($@)
 
       $data{"min$j"} = $min;
       $data{"max$j"} = $max;
+      $data{"firstval$j"} = $first;
       $data{"currval$j"} = $last;
       $data{"xmin$j"} = $xmin;
       $data{"xmax$j"} = $xmax;
@@ -1227,7 +1238,9 @@ logProxy_Get($@)
     $main::data{"avg$j"} = $data{"avg$j"};
     $main::data{"sum$j"} = $data{"sum$j"};
     $main::data{"cnt$j"} = $data{"cnt$j"};
+    $main::data{"firstval$j"} = $data{"firstval$j"};
     $main::data{"currval$j"} = $data{"currval$j"};
+    $main::data{"firstdate$j"} = $data{"firstdate$j"};
     $main::data{"currdate$j"} = $data{"currdate$j"};
     $main::data{"mindate$j"} = $data{"mindate$j"};
     $main::data{"maxdate$j"} = $data{"maxdate$j"};
@@ -1424,8 +1437,8 @@ logProxy_Get($@)
         <li>logProxy_values2Plot(\@xyArray) is a sample implementation of a function that will accept a ref to an array
           of date-y-cordinate pairs as the data to be plotted.</li>
         <li>The perl expressions have access to $from and $to for the begining and end of the plot range and also to the
-          SVG specials min, max, avg, cnt, sum, currval (last value) and currdate (last date) values of the individual curves
-          already plotted are available as $data{&lt;special-n&gt;}.<br>
+          SVG specials min, max, avg, cnt, sum, firstval (first value), lastval (last value), currval (last value) and
+          currdate (last date) values of the individual curves already plotted are available as $data{&lt;special-n&gt;}.<br>
         <li>logProxy_Range2Zoom($seconds) can be used to get the approximate zoom step for a plot range of $seconds.</li>
         <li>SVG_time_to_sec($timestamp) can be used to convert the timestamp strings to epoch times for calculation.</li>
         </ul>
