@@ -1040,7 +1040,8 @@ sub _cfgDB_Recover {
 #			Inform user about restart required
 			$ret  = "Version 0 deleted.\n";
 			$ret .= "Version $version copied to version 0\n\n";
-			$ret .= "Please restart FHEM to activate configuration.";
+            $ret .= "FHEM will exit in 3 seconds.";
+            InternalTimer(gettimeofday()+3, sub {exit 0}, 0);
 		} else {
 			$fhem_dbh->disconnect();
 			$ret = "No entries found in version $version.\nNo changes committed to database.";
