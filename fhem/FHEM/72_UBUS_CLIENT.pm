@@ -517,8 +517,14 @@ sub Decode
 
 	my $method = $1;
 
-	my $error = $data->{result}[0];
-	my $result = $data->{result}[1];
+	my $error = 0;
+	my $result = $data->{result};
+
+	if(ref $result eq 'ARRAY')
+	{
+		$error = $result->[0];
+		$result = $result->[1];
+	}
 
 	if($method eq 'call')
 	{
