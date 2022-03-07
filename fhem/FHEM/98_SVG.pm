@@ -2613,7 +2613,8 @@ plotAsPng(@)
 
     <a id="SVG-attr-fixedoffset"></a>
     <li>fixedoffset &lt;nDays&gt;<br>
-        Set an fixed offset (in days) for the plot.
+        Set an fixed offset for the plot. The resolution is the currently
+        chosen zoom-level.
         </li><br>
 
     <a id="SVG-attr-label"></a>
@@ -2871,7 +2872,8 @@ plotAsPng(@)
 
     <a id="SVG-attr-fixedoffset"></a>
     <li>fixedoffset &lt;nTage&gt;<br>
-      Verschiebt den Plot-Offset um einen festen Wert (in Tagen). 
+      Verschiebt den Plot-Offset um einen festen Wert, die Einheit h&auml;ngt
+      vom aktuellen Zoom-Level ab.
       </li><br>
 
     <a id="SVG-attr-fixedrange"></a>
