@@ -3,6 +3,7 @@
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set title '<TL>'

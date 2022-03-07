@@ -6,6 +6,7 @@
 # 2013-11-19_21:51:41 sysmon ram: Total: 485 MB, Used: 118 MB, 24.33 %, Free: 366 MB
 #
 
+set readonly
 set terminal png transparent size <SIZE> crop
 
 set output '<OUT>.png'

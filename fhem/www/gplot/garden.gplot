@@ -3,6 +3,7 @@
 # 2008-04-29_19:00:06 GVent5 365 365 187
 # 2008-04-29_19:00:06 Total time is 365
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

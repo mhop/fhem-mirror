@@ -3,6 +3,7 @@
 # FileLog definition:
 # define fs20log FileLog /var/log/fhem/fs20dev-%Y-%U.log fs20dev
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

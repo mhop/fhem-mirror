@@ -3,6 +3,7 @@
 # Corresponding FileLog definition:
 # define avglog FileLog /var/log/fhem/ks300-%Y.log ks300:.*avg.*
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

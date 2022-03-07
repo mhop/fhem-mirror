@@ -3,6 +3,7 @@
 # Corresponding FileLog definition:
 # define <filelogname> FileLog /var/log/fhem/em-%Y.log <emdevname>:CNT:.*
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

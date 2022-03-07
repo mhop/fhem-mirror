@@ -7,6 +7,7 @@
 # 2013-11-16_23:06:05 sysmon cpu_temp: 49.77
 #
 
+set readonly
 set terminal png transparent size <SIZE> crop
 
 set output '<OUT>.png'

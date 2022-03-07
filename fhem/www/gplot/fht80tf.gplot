@@ -3,6 +3,7 @@
 # FileLog definition:
 # define fht80tflog FileLog /var/log/fhem/fht80tf-%Y-%U.log fht80tfdev
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

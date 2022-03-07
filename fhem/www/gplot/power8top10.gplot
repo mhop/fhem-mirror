@@ -2,6 +2,7 @@
 # Display the power reported by the EM1000FM received bei CUL
 
 #set terminal png transparent size <SIZE> crop
+set readonly
 set terminal png size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

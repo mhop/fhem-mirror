@@ -8,6 +8,7 @@
 # 2015-10-17_08:38:08 device error|event|heartbeat
 # 2015-10-17_08:38:08 device voltage 2.9
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set title '<TL>'
