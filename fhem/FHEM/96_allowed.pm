@@ -341,7 +341,8 @@ allowed_Attr(@)
            $attrName eq "password" || $attrName eq "globalpassword") &&
           $type eq "set") {
     foreach my $d (devspec2array("TYPE=(FHEMWEB|telnet)")) {
-      delete $defs{$d}{Authenticated} if($defs{$d});
+      my $sname = $defs{$d}{SNAME};
+      delete $defs{$d}{Authenticated} if($sname && $hash->{".validFor"}{$sname});
     }
     InternalTimer(1, "SecurityCheck", 0) if($init_done);
   
