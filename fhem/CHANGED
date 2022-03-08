@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbLog: $data{firstvalX} now usable, forum:#126631
  - change:  70_DENON_AVR: applied STATE changes (thx Shadow3561)
  - change:  73_AutoShuttersControl:  change ShuttersInformation fn
                 add table frame and whitespace-character to ShuttersInformation

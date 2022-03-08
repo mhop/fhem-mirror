@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.12.7"  => "08.03.2022 \$data{firstvalX} doesn't work, forum: https://forum.fhem.de/index.php/topic,126631.0.html ",
   "4.12.6"  => "17.01.2022 change log message deprecated to outdated, forum:#topic,41089.msg1201261.html#msg1201261 ",
   "4.12.5"  => "31.12.2021 standard unit assignment for readings beginning with 'temperature' and removed, forum:#125087 ",
   "4.12.4"  => "27.12.2021 change ParseEvent for FBDECT, warning messages for deprecated commands added ",
@@ -3510,7 +3511,7 @@ sub DbLog_Get {
   my ($retval,$retvaldummy,$hour,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
   my @ReturnArray;
   my $writeout = 0;
-  my (@min, @max, @sum, @cnt, @lastv, @lastd, @mind, @maxd);
+  my (@min, @max, @sum, @cnt, @firstv, @firstd, @lastv, @lastd, @mind, @maxd);
   my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval, $deltacalc);   # fuer delta-h/d Berechnung
 
   # extract the Device:Reading arguments into @readings array
@@ -3608,17 +3609,19 @@ sub DbLog_Get {
   for(my $i=0; $i<int(@readings); $i++) {
       # ueber alle Readings
       # Variablen initialisieren
-      $min[$i]   =  (~0 >> 1);
-      $max[$i]   = -(~0 >> 1);
-      $sum[$i]   = 0;
-      $cnt[$i]   = 0;
-      $lastv[$i] = 0;
-      $lastd[$i] = "undef";                                          
-      $mind[$i]  = "undef";
-      $maxd[$i]  = "undef";
-      $minval    =  (~0 >> 1);                               # ist "9223372036854775807"
-      $maxval    = -(~0 >> 1);                               # ist "-9223372036854775807"
-      $deltacalc = 0;
+      $min[$i]    =  (~0 >> 1);
+      $max[$i]    = -(~0 >> 1);
+      $sum[$i]    = 0;
+      $cnt[$i]    = 0;
+      $firstv[$i] = 0;
+      $firstd[$i] = "undef";
+      $lastv[$i]  = 0;
+      $lastd[$i]  = "undef";                                          
+      $mind[$i]   = "undef";
+      $maxd[$i]   = "undef";
+      $minval     =  (~0 >> 1);                               # ist "9223372036854775807"
+      $maxval     = -(~0 >> 1);                               # ist "-9223372036854775807"
+      $deltacalc  = 0;
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
@@ -3779,20 +3782,22 @@ sub DbLog_Get {
                   $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
-
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
                   $out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
-
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
                   # Berechung der vergangen Sekunden seit dem letzten Logeintrag
                   # zb. die Zeit zwischen on/off
                   my @a = split("[- :]", $sql_timestamp);
                   my $akt_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+                  
                   if($lastd[$i] ne "undef") {
                       @a = split("[- :]", $lastd[$i]);
                   }
+                  
                   my $last_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
                   $out_tstamp = $sql_timestamp;
                   $out_value  = sprintf("%02d", $akt_ts - $last_ts);
@@ -3803,8 +3808,8 @@ sub DbLog_Get {
                   else {
                       $writeout = 1;
                   }
-
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
                   if($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
@@ -3871,8 +3876,8 @@ sub DbLog_Get {
                       $minval     = $maxval;               
                       Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
-            
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {          # Berechnung eines Tages-Deltas
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {          # Berechnung eines Tages-Deltas
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
                 
                   if($lastd[$i] eq "undef") {
@@ -3909,7 +3914,8 @@ sub DbLog_Get {
                       $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
                       $retval .= $retvaldummy;
                 
-                  } elsif ($outf =~ m/(array)/) {
+                  } 
+                  elsif ($outf =~ m/(array)/) {
                       push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                   } 
                   else {                                                         # generating plots
@@ -3935,14 +3941,21 @@ sub DbLog_Get {
                       $maxval = $sql_value;
                   } 
                   else {
+                      if($firstd[$i] eq "undef") {
+                          $firstv[$i] = $sql_value;
+                          $firstd[$i] = $sql_timestamp;
+                      }
+                      
                       if($sql_value < $min[$i]) {
                           $min[$i] = $sql_value;
                           $mind[$i] = $sql_timestamp;
                       }
+                      
                       if($sql_value > $max[$i]) {
                           $max[$i] = $sql_value;
                           $maxd[$i] = $sql_timestamp;
                       }
+                      
                       $sum[$i] += $sql_value;
                       $minval = $sql_value if($sql_value < $minval);
                       $maxval = $sql_value if($sql_value > $maxval);
@@ -3963,6 +3976,7 @@ sub DbLog_Get {
               else {
                   $lastv[$i] = $out_value if($out_value);
               }
+              
               $lastd[$i] = $sql_timestamp;
           }
       } 
@@ -3985,6 +3999,7 @@ sub DbLog_Get {
           }  
           $sum[$i] += $out_value;
           $cnt[$i]++;
+          
           if($outf =~ m/(all)/) {
               $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
           } 
@@ -4016,15 +4031,17 @@ sub DbLog_Get {
   # Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
       my $k = $j+1;
-      $data{"min$k"}      = $min[$j];
-      $data{"max$k"}      = $max[$j];
-      $data{"avg$k"}      = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
-      $data{"sum$k"}      = $sum[$j];
-      $data{"cnt$k"}      = $cnt[$j];
-      $data{"currval$k"}  = $lastv[$j];
-      $data{"currdate$k"} = $lastd[$j];
-      $data{"mindate$k"}  = $mind[$j];
-      $data{"maxdate$k"}  = $maxd[$j];
+      $data{"min$k"}       = $min[$j];
+      $data{"max$k"}       = $max[$j];
+      $data{"avg$k"}       = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
+      $data{"sum$k"}       = $sum[$j];
+      $data{"cnt$k"}       = $cnt[$j];
+      $data{"firstval$k"}  = $firstv[$j];
+      $data{"firstdate$k"} = $firstd[$j];
+      $data{"currval$k"}   = $lastv[$j];
+      $data{"currdate$k"}  = $lastd[$j];
+      $data{"mindate$k"}   = $mind[$j];
+      $data{"maxdate$k"}   = $maxd[$j];
   }
 
   # cleanup (plotfork) connection
@@ -4035,8 +4052,8 @@ sub DbLog_Get {
   if($internal) {
       $internal_data = \$retval;
       return undef;
-
-  } elsif($outf =~ m/(array)/) {
+  } 
+  elsif($outf =~ m/(array)/) {
       return @ReturnArray;
   } 
   else {
