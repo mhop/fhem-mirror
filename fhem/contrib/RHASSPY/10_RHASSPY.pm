@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.19';
+    $hash->{MODULE_VERSION} = '0.5.20';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -3100,11 +3100,11 @@ sub respond {
     #no audio output in msgDialog session
     #return if defined $hash->{helper}->{msgDialog} 
     #    && defined $hash->{helper}->{msgDialog}->{(split m{_$hash->{siteId}_}, $data->{sessionId},3)[0]};
-    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return;
+    my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return $hash->{NAME};
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
             text   => $response} );
-    return;
+    return $hash->{NAME};
 }
 
 
@@ -3459,7 +3459,7 @@ sub RHASSPY_ParseHttpResponse {
         }
         my $siteIds;
         for (keys %{$ref}) {
-            next if !defined $ref->{$_}{satellite_site_ids};
+            next if ref $ref->{$_} ne 'HASH' || !defined $ref->{$_}{satellite_site_ids};
             if ($siteIds) {
                 $siteIds .= ',' . $ref->{$_}{satellite_site_ids}; #encode($cp,$ref->{$_}{satellite_site_ids});
             } else {
