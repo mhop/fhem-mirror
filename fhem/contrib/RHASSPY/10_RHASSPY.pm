@@ -4562,7 +4562,7 @@ sub _runSetColorCmd {
             return respond( $hash, $data, $error ) if $error;
             return getResponse($hash, 'DefaultConfirmation');
         } elsif ( defined $data->{$kw} && defined $mapping->{$_} ) {
-            my $value = _round( ( $mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal} ) * $data->{$kw} / $kw eq 'Hue' ? 360 : 100 ) ;
+            my $value = _round( ( $mapping->{$_}->{maxVal} - $mapping->{$_}->{minVal} ) * $data->{$kw} / ( $kw eq 'Hue' ? 360 : 100 ) ) ;
             $value = min(max($mapping->{$_}->{minVal}, $value), $mapping->{$_}->{maxVal});
             $error = AnalyzeCommand($hash, "set $device $mapping->{$_}->{cmd} $value");
             return if $inBulk;
