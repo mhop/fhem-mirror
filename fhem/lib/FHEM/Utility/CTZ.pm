@@ -34,7 +34,7 @@ use strict;
 use warnings;
 use utf8;
 
-# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/Utility/CTZ.pm
+ use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/Utility/CTZ.pm
 
 use GPUtils qw( GP_Import GP_Export );
 use DateTime;
@@ -89,7 +89,10 @@ sub convertTimeZone {
   my $writelog  = $paref->{writelog}  // 0;
   my $ms        = q{};
   
-  if ($dtstring =~ m/\.(\d+)/xs) {                       # datetime enthält Millisekunden                            
+  return "no valid timezone $tzcurrent" if(!checkValidName($tzcurrent));
+  return "no valid timezone $tzconv"    if(!checkValidName($tzconv)   );
+  
+  if ($dtstring =~ m/\.(\d+)/xs) {                                        # datetime enthält Millisekunden                            
       $ms = '.'.$1; 
   }
   
@@ -110,6 +113,14 @@ sub convertTimeZone {
   Log3 ($name, 1, "$pkg - converted timestring: ".$date->strftime("%Y-%m-%d %H:%M:%S$ms %Z")) if($writelog);
           
 return ($err, $dtconv.$ms);
+}
+
+sub checkValidName {
+  my $tz = shift;
+  
+  my $valid = DateTime::TimeZone->is_valid_name($tz);
+          
+return $valid;
 }
 
 ###############################################################################
