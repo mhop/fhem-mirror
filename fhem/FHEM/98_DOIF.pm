@@ -109,7 +109,7 @@ sub DOIF_Initialize($)
 
   $data{FWEXT}{DOIF}{SCRIPT} = "doif.js";
 
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait:textField-long do:always,resetwait cmdState startup:textField-long state:textField-long initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:0,1 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long event_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait:textField-long do:always,resetwait cmdState startup:textField-long state:textField-long initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait:1,0 notexist selftrigger:wait,all timerevent:1,0 checkReadingEvent:0,1 addStateEvent:1,0 checkall:event,timer,all weekdays setList:textField-long readingList DOIF_Readings:textField-long event_Readings:textField-long uiState:textField-long uiTable:textField-long ".$readingFnAttributes;
 }
 
 # uiTable
