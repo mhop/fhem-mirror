@@ -1112,6 +1112,10 @@ FW_doUpdate(evt)
   var retryTime = 5000;
   var now = new Date()/1000;
 
+  // d: array
+  // d[0]: informid
+  // d[1]: if the informid Widget has setValueFn, arg for this
+  // d[2]: else replace the html with this
   function
   setValue(d) // is Callable from eval below
   {
@@ -1124,12 +1128,18 @@ FW_doUpdate(evt)
           d[2] = '<html><pre>'+d[2]+'</pre></html>';
 
         var ma = /^<html>([\s\S]*)<\/html>/.exec(d[2]);
-        if(!d[0].match("-")) // not a reading
+        if(!d[0].match("-")) { // not a reading
           $(this).html(d[2]);
-        else if(ma)
+          FW_replaceWidgets($(this));
+
+        } else if(ma) {
           $(this).html(ma[1]);
-        else
+          FW_replaceWidgets($(this));
+
+        } else {
           $(this).text(d[2]);
+
+        }
 
         if(d[0].match(/-ts$/))  // timestamps
           $(this).addClass('changed');
@@ -1206,6 +1216,7 @@ FW_doUpdate(evt)
 
     } else {
       setValue(d);
+
     }
 
     // updateLine is deprecated, use setValueFn
