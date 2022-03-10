@@ -34,7 +34,7 @@ use strict;
 use warnings;
 use utf8;
 
- use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/Utility/CTZ.pm
+# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/Utility/CTZ.pm
 
 use GPUtils qw( GP_Import GP_Export );
 use DateTime;
