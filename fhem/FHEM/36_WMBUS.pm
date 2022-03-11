@@ -94,7 +94,7 @@ WMBUS_Define($$)
     my $minSize = ($mb->getCRCsize() + WMBus::TL_BLOCK_SIZE) * 2;
     my $reMinSize = qr/b[a-zA-Z0-9]{${minSize},}/;
     
-    return "a WMBus message must be a least $minSize bytes long, $msg" if $msg !~ m/${reMinSize}/;
+    return "a WMBus message must match the pattern b[<MessageEncoding>]<HexMessage> and <HexMessage> must be a least $minSize bytes long: $msg" if $msg !~ m/${reMinSize}/;
     
     if ($mb->parseLinkLayer(pack('H*',substr($msg,1)))) {
       $hash->{Manufacturer} = $mb->{manufacturer};
@@ -498,7 +498,7 @@ WMBUS_Attr(@)
 =item summary_DE Empfang von Wireless M-Bus Nachrichten z. B. von Stromzählern
 =begin html
 
-<a name="WMBUS"></a>
+<a id="WMBUS"></a>
 <h3>WMBUS - Wireless M-Bus</h3>
 <ul>
   This module supports Wireless M-Bus meters for e.g. water, heat, gas or electricity.
@@ -524,7 +524,7 @@ WMBUS_Attr(@)
   sudo cpan -i Crypt::Mode::CBC Crypt::Mode:CTR Digest::CMAC
   </code>
   <br><br>
-  <a name="WMBUSdefine"></a>
+  <a id="WMBUS-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;b[&lt;MessageEncoding&gt;]HexCode&gt;</code> <br>
@@ -551,49 +551,50 @@ WMBUS_Attr(@)
   </ul>
   <br>
 
-  <a name="WMBUSset"></a>
+  <a id="WMBUS-set"></a>
   <b>Set</b> 
   <ul>
+  <a id="WMBUS-set-rawmsg"></a>
   <li>
   rawmsg hexadecimal contents of a raw message (without the leading b)<br>
   Will be parsed as if the message has been received by the IODev. Mainly useful for debugging.
   </li>
   </ul><br>
-  <a name="WMBUSget"></a>
+  <a id="WMBUS-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
   
-  <a name="WMBUSattr"></a>
+  <a id="WMBUS-attr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="IODev"></a>
+    <a id="WMBUS-attr-IODev"></a>
     <li><a href="#IODev">IODev</a><br>
-        Set the IO or physical device which should be used for receiving signals
-        for this "logical" device. An example for the physical device is a CUL.
+    Set the IO or physical device which should be used for receiving signals
+    for this "logical" device. An example for the physical device is a CUL.
    </li><br>
-   <a name="AESkey"></a>
+   <a id="WMBUS-attr-AESkey"></a>
    <li>AESkey<br>
-      A 16 byte AES-Key in hexadecimal digits. Used to decrypt messages from meters which have encryption enabled.
-  </li><br>
-  <li>
-    <a name="ignore"></a>  
-    <a href="#ignore">ignore</a>
-  </li><br>
-  <a name="rawmsg_as_reading"></a>  
-  <li>rawmsg_as_reading<br>
+   A 16 byte AES-Key in hexadecimal digits. Used to decrypt messages from meters which have encryption enabled.
+   </li><br>
+   <li>
+     <a id="WMBUS-attr-ignore"></a>  
+     <a href="#ignore">ignore</a>
+   </li><br>
+   <a id="WMBUS-attr-rawmsg_as_reading"></a>  
+   <li>rawmsg_as_reading<br>
      If set to 1, received raw messages will be stored in the reading rawmsg. This can be used to log raw messages to help with debugging.
-  </li><br>
-  <a name="ignoreUnknownDataBlocks"></a>
-  <li>ignoreUnknownDataBlocks<br>
+   </li><br>
+   <a id="WMBUS-attr-ignoreUnknownDataBlocks"></a>
+   <li>ignoreUnknownDataBlocks<br>
      If set to 1, datablocks containing unknown/manufacturer specific data will be ignored. This is useful if a meter sends data in different
      formats of which some can be interpreted and some not. This prevents the unknown data overwriting the readings of the data that can be
      interpreted.
   </li><br>
-  <a name="ignoreMasterMessages"></a>
+  <a id="WMBUS-attr-ignoreMasterMessages"></a>
   <li>ignoreMasterMessages<br>
      Some devices (e.g. Letrika solar inverters) only send data if they have received a special message from a master device.
      The messages sent by the master are ignored unless explictly enabled by this attribute.
   </li><br>
-  <a name="useVIFasReadingName"></a>
+  <a id="WMBUS-attr-useVIFasReadingName"></a>
   <li>useVIFasReadingName<br>
      Some devices send several types of messages with different logical content. As the readings are normally numbered consecutively they will be overwitten
      by blocks with a different semantic meaning.
@@ -614,7 +615,7 @@ WMBUS_Attr(@)
   </li>
   </ul>
   <br>
-  <a name="WMBUSreadings"></a>
+  <a id="WMBUS-readings"></a>
   <b>Readings</b><br>
   <ul>
   Meters can send a lot of different information depending on their type. An electricity meter will send other data than a water meter.
@@ -645,7 +646,7 @@ WMBUS_Attr(@)
 
 =begin html_DE
 
-<a name="WMBUS"></a>
+<a id="WMBUS"></a>
 <h3>WMBUS - Wireless M-Bus</h3>
 <ul>
   Dieses Modul unterst&uuml;tzt Z&auml;hler mit Wireless M-Bus, z. B. f&uuml;r Wasser, Gas oder Elektrizit&auml;t.
@@ -671,7 +672,7 @@ WMBUS_Attr(@)
   sudo cpan -i Crypt::Mode::CBC Crypt::Mode::CTR Digest::CMAC
   </code>
   <br><br>
-  <a name="WMBUSdefine"></a>
+  <a id="WMBUS-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;b[<MessageEncoding>]HexCode&gt;</code> <br>
@@ -700,7 +701,7 @@ WMBUS_Attr(@)
   </ul>
   <br>
 
-  <a name="WMBUSset"></a>
+  <a id="WMBUS-set"></a>
   <b>Set</b> 
   <ul>
   <li>
@@ -708,40 +709,43 @@ WMBUS_Attr(@)
   Wird interpretiert als ob die Nachricht von einem IODev empfangen worden w&auml;re. Haupts&auml;chlich n&uuml;tzlich zum debuggen.
   </li>
   </ul><br>
-  <a name="WMBUSget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <a id="WMBUS-get"></a>
+  <b>Get</b> 
+  <ul>N/A</ul><br>
   
-  <a name="WMBUSattr"></a>
+  <a id="WMBUS-attr"></a>
   <b>Attributes</b>
   <ul>
-   <a name="IODev"></a>
+    <a id="WMBUS-attr-IODev"></a>
     <li><a href="#IODev">IODev</a><br>
-        Setzt den IO oder physisches Ger&auml;t welches f&uuml;r den Empfang der Signale f&uuml;r dieses 'logische' Ger&auml;t verwendet werden soll.
-        Ein Beispiel f&uuml;r ein solches Ger&auml;t ist ein CUL.
+    Setzt den IO oder physisches Ger&auml;t welches f&uuml;r den Empfang der Signale f&uuml;r dieses 'logische' Ger&auml;t verwendet werden soll.
+    Ein Beispiel f&uuml;r ein solches Ger&auml;t ist ein CUL.
    </li><br>
-   <a name="AESkey"></a>
+   <a id="WMBUS-attr-AESkey"></a>
    <li>AESKey<br>
       Ein 16 Bytes langer AES-Schl&uuml;ssel in hexadezimaler Schreibweise. Wird verwendet um Nachrichten von Z&auml;hlern zu entschl&uuml;sseln bei denen
       die Verschl&uuml;sselung aktiviert ist.
   </li><br>
+  <a id="WMBUS-attr-ignore"></a>
   <li>
-    <a name="ignore"></a>
     <a href="#ignore">ignore</a>
   </li><br>
+  <a id="WMBUS-attr-rawmsg_as_reading"></a>
   <li>rawmsg_as_reading<br>
-     Wenn auf 1 gesetzt so werden empfangene Nachrichten im Reading rawmsg gespeichert. Das kann verwendet werden um Rohnachrichten zu loggen und beim Debugging zu helfen.
+    Wenn auf 1 gesetzt so werden empfangene Nachrichten im Reading rawmsg gespeichert. Das kann verwendet werden um Rohnachrichten zu loggen und beim Debugging zu helfen.
   </li><br>
-  <a name="rawmsg_as_reading"></a> 
-  <li>ignoreUnknownDataBlocks<br>
+  <a id="WMBUS-attr-ignoreUnknownDataBlocks"></a>
+  <li>
+     ignoreUnknownDataBlocks<br>
      Wenn auf 1 gesetzt so werden Datenblocks die unbekannte/herstellerspezifische Daten enthalten ignoriert. Das ist hilfreich wenn ein Z&auml;hler Daten in unterschiedlichen
      Formaten sendet von denen einige nicht interpretiert werden k&ouml;nnen. Es verhindert, dass die unbekannten Daten die Readings der interpretierbaren Daten &uuml;berschreiben.
   </li><br> 
-  <a name="ignoreUnknownDataBlocks"></a>
+  <a id="WMBUS-attr-ignoreMasterMessages"></a>
   <li>ignoreMasterMessages
      Einige Geräte (z. B. Letrika Wechselrichter) senden nur dann Daten wenn sie eine spezielle Nachricht von einem Mastergerät erhalten haben.
      Die Nachrichten von dem Master werden ignoriert es sei denn es wird explizit mit diesem Attribut eingeschaltet.
   </li>
-  <a name="useVIFasReadingName"></a>
+  <a id="WMBUS-attr-useVIFasReadingName"></a>
   <li>useVIFasReadingName<br>
      Einige Ger&auml;te senden verschiedene Arten von Nachrichten mit logisch unterschiedlichem Inhalt. Da die Readings normalerweise aufsteigend nummeriert werden
      k&ouml;nnen Readings durch semantisch unterschiedliche Readings &uuml;berschrieben werden.
@@ -762,7 +766,7 @@ WMBUS_Attr(@)
   </li>
   </ul>
   <br>
-  <a name="WMBUSreadings"></a>
+  <a id="WMBUS-readings"></a>
   <b>Readings</b><br>
   <ul>
   Z&auml;hler k&ouml;nnen sehr viele unterschiedliche Informationen senden, abh&auml;ngig von ihrem Typ. Ein Elektrizit&auml;tsz&auml;hler wird andere Daten senden als ein

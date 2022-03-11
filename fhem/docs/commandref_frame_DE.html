@@ -479,7 +479,9 @@ Ger&auml;t dokumentiert.
     Ger&auml;tes ersetzt (soweit vorhanden). Falls der Wert in {}
     eingeschlossen ist, dann wird es als Perl Ausdruck ausgewertet. Die
     Auswertung passiert bei jeder &Auml;nderung eines Readings.<br>
-    Die <a href="#set">hier</a> beschriebene "set magic" wird auch angewendet.
+    Die <a href="#set">hier</a> beschriebene "set magic" wird auch angewendet.<br>
+    Hinweis: Manche Module aktualisieren STATE ganz oder teilweise direkt.
+    In diesen F&auml;llen kann es zu abweichenden Anzeigen kommen.
     </li>
 
     <a name="event-on-update-reading"></a>
@@ -866,7 +868,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="deleteattr"></a>
 <h3>deleteattr</h3>
 <ul>
-  <code>deleteattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
+  <code>deleteattr [-silent] &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
   <br>
   L&ouml;scht entweder ein einzelnes Attribut (siehe Abschnitt <a
   href="#attr">attr</a> ) oder alle Attribute eines Ger&auml;tes (falls
@@ -1670,10 +1672,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
     <a name="commandref"></a>
     <li>commandref<br>
-        Falls der Wert "full" (die Voreinstellung) ist, dann wird nach jedem
+        Falls der Wert "full" ist, dann wird nach jedem
         update ein komplettes commandref.html generiert. Falls der Wert
-        "modular" ist, dann wird die Moduldokumentation erst nach Bedarf
-        waehrend der Laufzeit per JavaScript geladen.
+        "modular" ist (voreingestellt seit FHEM 6.1), dann wird die
+        Moduldokumentation erst nach Bedarf waehrend der Laufzeit per
+        JavaScript geladen.
     </li><br>
 
     <a name="dnsHostsFile"></a>
@@ -1705,6 +1708,18 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         gesetzt ist, da es in diesem Fall FHEM eigene Routinen aufgerufen
         werden. Sonst werden die OS-eigenen, blockierenden Routinen inet_aton
         bzw gethostbyname aufgerufen.
+    </li><br>
+
+    <a name="encoding"></a>
+    <li>encoding<br>
+        W&auml;hlt das perl-interne Format, mit dem Strings kodiert sind.
+        M&ouml;gliche Werte sind: bytestream (Voreinstellung) und unicode.<br>
+        Achtung:
+        <ul>
+        <li>der Wert unicode ist experimentell, da nicht alle FHEM-Module
+          mit dieser Variante gepr&uuml;ft wurden.</li>
+        <li>&auml;ndern des Wertes bewirkt ein save und ein shutdown restart.</li>
+        </ul>
     </li><br>
 
     <a name="featurelevel"></a>
@@ -2062,9 +2077,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
       define roll_en *08:30:00 { fhem "trigger SwitchAllRoll on" if($we) }<br>
     </ul>
     $we wird mit IsWe() gesetzt, diese Funktion nimmt optional die Argumente
-    "today", "yesterday", "tomorrow", MM-DD oder YYYY-MM-DD. Achtung: alles
-    andere wird als "today" interpretiert, ohne eine Fehlermeldung zu
-    generieren.<br>
+    "today", "yesterday", "tomorrow", MM-DD oder YYYY-MM-DD. Achtung: bei
+    anderen Werten wird das state Reading ausgewertet, ohne eine Fehlermeldung
+    zu generieren.<br>
     </li><br>
 
   <li>
@@ -2095,7 +2110,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
         Gibt die erste Zahl aus dem Readingswert zur&uuml;ck.
         Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
-        Dezimalstellen gerundet.
+        Dezimalstellen gerundet und ggf. mit 0 aufgefüllt, wenn &lt;round&gt;
+        gr&ouml;&szlig;er ist als die Anzahl der Dezimalstellen.
         </li><br>
       <li>ReadingsTimestamp(&lt;devicename&gt;,
                             &lt;reading&gt;,&lt;defaultvalue&gt;)<br>
@@ -2135,7 +2151,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
                    &lt;defaultvalue&gt;,&lt;round&gt;)<br>
         Gibt die erste Zahl aus dem Attributwert zur&uuml;ck.
         Falls &lt;round&gt; spezifiziert ist, wird sie auf diese Anzahl von
-        Dezimalstellen gerundet.
+        Dezimalstellen gerundet und ggf. mit 0 aufgefüllt, wenn &lt;round&gt;
+        gr&ouml;&szlig;er ist als die Anzahl der Dezimalstellen.
         </li><br>
       <li>
         InternalVal(&lt;devicename&gt;,&lt;internal&gt;,

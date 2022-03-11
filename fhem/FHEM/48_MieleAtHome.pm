@@ -35,10 +35,11 @@ use Encode qw(encode_utf8);
 use List::Util qw[min max];
 use JSON;
 
-my $version = "1.0.2";
+my $version = "1.2.0";
 
 my $MAH_hasMimeBase64 = 1;
 
+# DONE: <option value="processAction">processAction</option>
 use constant PROCESS_ACTIONS => {
 		0x01 => "start",              # 1 START
 		0x02 => "stop",               # 2 STOP
@@ -49,11 +50,13 @@ use constant PROCESS_ACTIONS => {
 		0x07 => "stopSuperCooling",   # 7 STOP SUPERCOOLING
 };
 
+# DONE: <option value="light">light</option>
 use constant LIGHT_ACTIONS => {
 		0x01 => "enable",   # 1 Enable
 		0x02 => "disable",  # 2 Disable
 };
 
+# DONE: <option value="ventilationStep">ventilationStep</option>
 use constant VENTILATION_STEPS => {
 		0x01 => "Step1",  # 1 Step1
 		0x02 => "Step2",  # 2 Step2
@@ -61,11 +64,20 @@ use constant VENTILATION_STEPS => {
 		0x04 => "Step4",  # 4 Step4
 };
 
+# DONE: <option value="modes">modes</option>
+use constant MODE_ACTIONS => {
+		0x00 => "normalOperationMode",   # 0 Normal operation mode
+		0x01 => "sabbathMode",           # 1 Sabbath mode
+};
+
+# DONE: <option value="startTime">startTime</option>
+# DONE: <option value="powerOff">powerOff</option>
+# DONE: <option value="powerOn">powerOn</option>
+# DONE: <option value="targetTemperature">targetTemperature</option>
+
 # TODO: <option value="programId">programId</option>
-# TODO: <option value="targetTemperature">targetTemperature</option>
 # TODO: <option value="deviceName">deviceName</option>
 # TODO: <option value="colors">colors</option>
-# TODO: <option value="modes">modes</option>
 
 use constant COUNTRIES => {
 		"Miele-Deutschland"          => "de-DE",
@@ -387,7 +399,7 @@ sub MAH_SetFn($$@)
 		return undef;
 	}
 	elsif( $cmd eq 'autocreate' ) {
-		return "autocreate needs a valid ACCESS_TOKEN, please try again" if (MAH_getAccessToken($hash) == "");
+		return "autocreate needs a valid ACCESS_TOKEN, please try again" if (MAH_getAccessToken($hash) eq "");
 		return "use $cmd without arguments" if(@args != 0);
 		InternalTimer(gettimeofday()+0, "MAH_autocreate", $hash);
 		return undef;
@@ -404,7 +416,7 @@ sub MAH_SetFn($$@)
 	}
 	elsif( $cmd eq 'startTime') {
 		return "usage: startTime <OFFSET_H:MM>" if(@args != 1);
-		return MAH_setStartTime($hash, $args[0])
+		return MAH_setStartTime($hash, $args[0]);
 	}
 	elsif( $cmd eq 'update' ) {
 		return "use $cmd without arguments" if(@args != 0);
@@ -413,11 +425,19 @@ sub MAH_SetFn($$@)
 	}
 	elsif( $cmd eq 'ventilationStep') {
 		return "usage: ventilationStep <step>" if(@args != 1);
-		return MAH_setVentilationStep($hash, $args[0])
+		return MAH_setVentilationStep($hash, $args[0]);
 	}
 	elsif( $cmd eq 'light') {
 		return "usage: light enable|disable" if(@args != 1);
-		return MAH_setLight($hash, $args[0])
+		return MAH_setLight($hash, $args[0]);
+	}
+	elsif( $cmd eq 'mode') {
+		return "usage: mode <mode>" if(@args != 1);
+		return MAH_setMode($hash, $args[0]);
+	}
+	elsif( $cmd =~ /targetTemperature_zone([0-9]+)/) {
+		return "usage: targetTemperature_zone${1} <temp>" if(@args != 1);
+		return MAH_setTargetTemperature($hash, $1, $args[0]);
 	}
 	else
 	{
@@ -436,30 +456,47 @@ sub MAH_SetFn($$@)
 			}
 		}
 
-		# light actions
-		my $lightCmds = "";
-		my @lightIds = split(/,/, ReadingsVal($name, "actions_light", ""));
-		foreach my $lightId (@lightIds) {
-			if (defined LIGHT_ACTIONS->{$lightId}) {
-				$lightCmds .= LIGHT_ACTIONS->{$lightId} . ",";
-			}
-		}
-		chop($lightCmds); # remove trailing ','
+		# light
+		my $lightCmds = MAH_getAvailableCommands($hash, "actions_light", LIGHT_ACTIONS());
 		$list   .= "light:${lightCmds} " if ($lightCmds ne "");
 
 		# ventilation steps
-		my $ventilationStepCmds = "";
-		my @ventilationStepIds = split(/,/, ReadingsVal($name, "actions_ventilationStep", ""));
-		foreach my $ventilationStepId (@ventilationStepIds) {
-			if (defined VENTILATION_STEPS->{$ventilationStepId}) {
-				$ventilationStepCmds .= VENTILATION_STEPS->{$ventilationStepId} . ",";
+		my $ventilationStepCmds = MAH_getAvailableCommands($hash, "actions_ventilationStep", VENTILATION_STEPS());
+		$list   .= "ventilationStep:${ventilationStepCmds} " if ($ventilationStepCmds ne "");
+
+		# modes
+		my $modeCmds = MAH_getAvailableCommands($hash, "actions_modes", MODE_ACTIONS());
+		$list   .= "mode:${modeCmds} " if ($modeCmds ne "");
+
+		# target temperatures
+		my @availableTargetTemperatures = split(/ /, ReadingsVal($name, "actions_targetTemperature", ""));
+		foreach my $targetTemperature (@availableTargetTemperatures) {
+			if ($targetTemperature =~ /^([0-9]+)\[(-?[0-9]+),(-?[0-9]+)\]$/) {
+				$list .= "targetTemperature_zone$1:slider,$2,1,$3 "
 			}
 		}
-		chop($ventilationStepCmds); # remove trailing ','
-		$list   .= "ventilationStep:${ventilationStepCmds} " if ($ventilationStepCmds ne "");
 
 		return "Unknown argument $cmd, choose one of $list";
 	}
+}
+
+#------------------------------------------------------------------------------------------------------
+# returns the strings of the commands from const ACTIONS that are currently available (via `actions_...`)
+#------------------------------------------------------------------------------------------------------
+sub MAH_getAvailableCommands($$$)
+{
+	my ($hash, $action_reading, $ACTIONS) = @_;
+	my $name = $hash->{NAME};
+
+	my $cmds = "";
+	my @ids = split(/,/, ReadingsVal($name, $action_reading, ""));
+	foreach my $id (@ids) {
+		if (defined $ACTIONS->{$id}) {
+			$cmds .= $ACTIONS->{$id} . ",";
+		}
+	}
+	chop($cmds); # remove trailing ','
+	return $cmds;
 }
 
 #------------------------------------------------------------------------------------------------------
@@ -716,7 +753,7 @@ sub MAH_onOauthLoginReply($$$)
 	}
 
 	if ($code eq "") {
-		$code = scrapeGrantAccessPage($hash, $data);
+		$code = MAH_scrapeGrantAccessPage($hash, $data);
 		if ($code ne "") {
 			MAH_Log($hash, 5, "Bearer found in HTML");
 		}
@@ -731,7 +768,7 @@ sub MAH_onOauthLoginReply($$$)
 	MAH_doThirdpartyTokenRequest($hash, $code, "");
 }
 
-sub scrapeGrantAccessPage($$)
+sub MAH_scrapeGrantAccessPage($$)
 {
 	my ($hash, $data) = (@_);
 
@@ -1036,9 +1073,25 @@ sub MAH_onGetDeviceIdentAndStateReply($$$)
 	readingsBulkUpdate($hash, "signalFailure",         $json->{state}->{signalFailure});
 	readingsBulkUpdate($hash, "signalInfo",            $json->{state}->{signalInfo});
 
+	# target temperature
+	my @targetTemperatures = MAH_decodeTemperature($hash, @{$json->{state}->{targetTemperature}});
+	if (scalar(@targetTemperatures) == 1) {
+		readingsBulkUpdate($hash, "targetTemperature", ${targetTemperatures[0]});
+	} else {
+		for (my $i = 0; $i < scalar(@targetTemperatures); $i++) {
+			readingsBulkUpdate($hash, "targetTemperature_zone".($i+1), ${targetTemperatures[$i]});
+		}
+	}
+	
 	# temperature
-	readingsBulkUpdate($hash, "targetTemperature", MAH_decodeTemperature($hash, @{$json->{state}->{targetTemperature}}));
-	readingsBulkUpdate($hash, "temperature",       MAH_decodeTemperature($hash, @{$json->{state}->{temperature}}));
+	my @temperatures = MAH_decodeTemperature($hash, @{$json->{state}->{temperature}});
+	if (scalar(@temperatures) == 1) {
+		readingsBulkUpdate($hash, "temperature", ${temperatures[0]});
+	} else {
+		for (my $i = 0; $i < scalar(@temperatures); $i++) {
+			readingsBulkUpdate($hash, "temperature_zone".($i+1), ${temperatures[$i]});
+		}
+	}
 
 	#eta & state
 	my ($eta, $etaHR) = MAH_calculateETA($json->{state}->{remainingTime},
@@ -1122,27 +1175,20 @@ sub MAH_onGetDeviceActionsReply($$$)
 		return;
 	}
 
-	# possible processAction out of
-	# 1 START
-	# 2 STOP
-	# 3 PAUSE
-	# 4 START SUPERFREEZING
-	# 5 STOP SUPERFREEZING
-	# 6 START SUPERCOOLING
-	# 7 STOP SUPERCOOLING
-
 	no strict "refs";
 
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "actions_processAction",   join(",", @{$json->{processAction}}));
-	readingsBulkUpdate($hash, "actions_light",           join(",", @{$json->{light}}));
-	readingsBulkUpdate($hash, "actions_startTime",       join(",", @{$json->{startTime}}));
-	readingsBulkUpdate($hash, "actions_ventilationStep", join(",", @{$json->{ventilationStep}}));
-	readingsBulkUpdate($hash, "actions_programId",       join(",", @{$json->{programId}}));
-	readingsBulkUpdate($hash, "actions_startTime",       join(",", MAH_parseActionsStartTime($json->{startTime})));
-	readingsBulkUpdate($hash, "actions_deviceName",      $json->{deviceName});
-	readingsBulkUpdate($hash, "actions_powerOn",         defined($json->{powerOn})  ? $json->{powerOn}  : "0");
-	readingsBulkUpdate($hash, "actions_powerOff",        defined($json->{powerOff}) ? $json->{powerOff} : "0");
+	readingsBulkUpdate($hash, "actions_processAction",     join(",", @{$json->{processAction}}));
+	readingsBulkUpdate($hash, "actions_light",             join(",", @{$json->{light}}));
+	readingsBulkUpdate($hash, "actions_startTime",         join(",", MAH_parseActionsStartTime($json->{startTime})));
+	readingsBulkUpdate($hash, "actions_ventilationStep",   join(",", @{$json->{ventilationStep}}));
+	readingsBulkUpdate($hash, "actions_programId",         join(",", @{$json->{programId}}));
+	readingsBulkUpdate($hash, "actions_targetTemperature", MAH_parseActionsTargetTemperature($hash,$json->{targetTemperature}));
+	readingsBulkUpdate($hash, "actions_deviceName",        $json->{deviceName});
+	readingsBulkUpdate($hash, "actions_powerOff",          defined($json->{powerOff}) ? $json->{powerOff} : "0");
+	readingsBulkUpdate($hash, "actions_powerOn",           defined($json->{powerOn})  ? $json->{powerOn}  : "0");
+	# readingsBulkUpdate($hash, "actions_colors", );
+	readingsBulkUpdate($hash, "actions_modes",             join(",", @{$json->{modes}}));
 	readingsEndUpdate($hash, 1 );
 
 	use strict "refs";
@@ -1152,6 +1198,14 @@ sub MAH_onGetDeviceActionsReply($$$)
 
 #------------------------------------------------------------------------------------------------------
 # format time from array
+# "targetTemperature":[
+# 	{"value_raw":600,"value_localized":6.0,"unit":"Celsius"},
+# 	{"value_raw":-1800,"value_localized":-18.0,"unit":"Celsius"},
+# 	{"value_raw":-32768,"value_localized":null,"unit":"Celsius"}],
+# "temperature":[
+# 	{"value_raw":593,"value_localized":5.93,"unit":"Celsius"},
+# 	{"value_raw":-1800,"value_localized":-18.0,"unit":"Celsius"},
+# 	{"value_raw":-32768,"value_localized":null,"unit":"Celsius"}],
 #------------------------------------------------------------------------------------------------------
 sub MAH_decodeTemperature($@)
 {
@@ -1165,7 +1219,7 @@ sub MAH_decodeTemperature($@)
 		}
 	}
 
-	return join(", ", @retval);
+	return @retval;
 }
 
 #------------------------------------------------------------------------------------------------------
@@ -1185,6 +1239,40 @@ sub MAH_parseActionsStartTime($)
 	}
 
 	return "[?]";
+}
+
+#------------------------------------------------------------------------------------------------------
+# parse the target temperature from actions
+# [
+#     {
+#       "zone": 1,
+#       "min": 1,
+#       "max": 9
+#     },
+#     {
+#       "zone": 2,
+#       "min": -26,
+#       "max": -16
+#     }
+# ]
+#------------------------------------------------------------------------------------------------------
+sub MAH_parseActionsTargetTemperature($$)
+{
+	my ($hash,$json) = @_;
+
+	no strict "refs";
+
+	my $retval = "";
+	my @zones = @{$json};
+	for (my $i = 0; $i < scalar(@zones); $i++) {
+		my $zone = $zones[$i];
+		$retval .= $zone->{zone} . "[" . $zone->{min} . "," . $zone->{max} . "] ";
+	}
+
+	use strict "refs";
+
+	chop($retval); # remove trailing space
+	return $retval;
 }
 
 #------------------------------------------------------------------------------------------------------
@@ -1229,6 +1317,7 @@ sub MAH_calculateETA($$$)
 	if ($statusRaw == 2 || $statusRaw == 7) { # On (but not running) or End
 		my $eta   = POSIX::strftime("%H:%M", localtime(time + $remainingSecs)); # ignore startOffsetSecs here as this is very strange
 		my $etaHR = "+" . MAH_formatTime($remainingHour, $remainingMinute);
+		$etaHR = "Ende" if ($remainingHour == 0 && $remainingMinute == 0);
 		return ($eta, $etaHR);
 	}
 
@@ -1237,7 +1326,7 @@ sub MAH_calculateETA($$$)
 		my $etaHR = $eta;
 
 		# write remaining minutes in the last 15 minutes instead of
-		$etaHR = sprintf("+0:%02d", ${remainingMinute}) if ($remainingSecs <= 15 * 60);
+		$etaHR = "+" . MAH_formatTime($remainingHour, $remainingMinute) if ($remainingSecs <= 15 * 60);
 
 		return ($eta, $etaHR);
 	# }
@@ -1350,6 +1439,51 @@ sub MAH_setLight($$)
 	}
 
 	return MAH_setAction($hash, "light", "${lightActionId}");
+}
+
+#------------------------------------------------------------------------------------------------------
+# MAH_setMode
+#------------------------------------------------------------------------------------------------------
+sub MAH_setMode($$)
+{
+	my ($hash, $modeActionName) = @_;
+	my $name = $hash->{NAME};
+
+	my ($modeActionId) = grep{ MODE_ACTIONS->{$_} eq $modeActionName } keys %{MODE_ACTIONS()};
+	if (!defined $modeActionId) {
+		return "invalid mode action: '${modeActionName}'";
+	}
+
+	my @availableModeActions = split(/,/, ReadingsVal($name, "actions_modes", ""));
+	if (! grep {$_ eq $modeActionId} @availableModeActions) {
+		return "'${modeActionName}' is currently not available";
+	}
+
+	return MAH_setAction($hash, "modes", "${modeActionId}");
+}
+
+#------------------------------------------------------------------------------------------------------
+# MAH_setTargetTemperature
+#------------------------------------------------------------------------------------------------------
+sub MAH_setTargetTemperature($$$)
+{
+	my ($hash, $zone, $temp) = @_;
+	my $name = $hash->{NAME};
+
+	my @availableTargetTemperatures = split(/ /, ReadingsVal($name, "actions_targetTemperature", ""));
+	foreach my $targetTemperature (@availableTargetTemperatures) {
+		if ($targetTemperature =~ /^([0-9]+)\[(-?[0-9]+),(-?[0-9]+)\]$/) {
+			if ($1 eq $zone) {
+				if ($2 <= int($temp) && int($temp) <= $3) {
+					return MAH_setAction($hash, "targetTemperature", "[{\"zone\": $zone, \"value\": $temp}]");
+				} else {
+					return "temperature for zone ${zone} out of range, must be between ${2} and ${3}";
+				}
+			}
+		}
+	}
+
+	return "zone ${zone} not setable";
 }
 
 #------------------------------------------------------------------------------------------------------
@@ -1828,6 +1962,9 @@ sub MAH_Log($$$)
 	my $subroutine = ( split(':', $modAndSub) )[2];
 	my $name       = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MieleAtHome";
 
+	# replace non-printable characters by "<xx>"
+	$logMessage =~ s/([\x{00}-\x{1f}\x{7f}-\x{ffffffff}])/'<'.unpack('(H2)',$1).'>'/ge;
+
 	Log3($hash, $logLevel, "${name} (MieleAtHome::${subroutine}:${line}) " . $logMessage);
 	#Log3($hash, $logLevel, "${name} (MieleAtHome::${subroutine}:${line}) Stack was: " . MAH_getStacktrace());
 }
@@ -1862,7 +1999,7 @@ sub MAH_getStacktrace()
 
 =begin html
 
-<a name="MieleAtHome"></a>
+<a id="MieleAtHome"></a>
 <h3>MieleAtHome</h3>
 <ul>
 	<u><b>MieleAtHome - Controls Miele@home Devices</b></u><br>
@@ -1876,7 +2013,7 @@ sub MAH_getStacktrace()
 	<br>
 	To use this module you need to register as a developer at <a href="https://www.miele.com/f/com/en/register_api.aspx">https://www.miele.com/f/com/en/register_api.aspx</a>. After you successfully registered, you will receive a <i>clientId</i> and a <i>clientSecret</i> which you'll need to configure in your <code>&lt;gateway&gt;</code>-device.<br>
 	<br>
-	<a name="MieleAtHomedefine"></a>
+	<a id="MieleAtHome-define"></a>
 	<b>Define</b><br>
 	<br>
 	<u>(1) Setup gateway:</u><br>
@@ -1939,106 +2076,114 @@ sub MAH_getStacktrace()
 		</li>
 
 -->
-	<a name="MieleAtHomeset"></a>
+	<a id="MieleAtHome-set"></a>
 	<b>Set</b>
 	<ul>
-		<li><a name="autocreate"></a>
+		<li><a id="MieleAtHome-set-autocreate"></a>
 			<dt><code><b>autocreate</b></code></dt>
 			autocreate fhem-devices for each Miele@home appliance found in your account. Needs <i>login</i>, <i>clientId</i>, <i>password</i> and <i>clientSecret</i> to be configured properly. Only available for the gateway device.
 		</li>
-		<li><a name="clientSecret"></a>
+		<li><a id="MieleAtHome-set-clientSecret"></a>
 			<dt><code><b>clientSecret &lt;secret&gt;</b></code></dt>
 			sets the <i>clientSecret</i> of your Miele@home-developer Account and stores it in a file (base64-encoded if you have MIME::Base64 installed).
 		</li>
-		<li><a name="light"></a>
+		<li><a id="MieleAtHome-set-light"></a>
 			<dt><code><b>light [enable|disable]</b></code></dt>
 			enable/disable the light of your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="on"></a>
+		<li><a id="MieleAtHome-set-mode"></a>
+			<dt><code><b>mode &lt;mode&gt;</b></code></dt>
+			set the <i>mode</i> of your applience. can be either <i>sabbathMode</i> or <i>normalOperationMode</i>.
+		</li>
+		<li><a id="MieleAtHome-set-on"></a>
 			<dt><code><b>on</b></code></dt>
 			power up your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="off"></a>
+		<li><a id="MieleAtHome-set-off"></a>
 			<dt><code><b>off</b></code></dt>
 			power off your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="password"></a>
+		<li><a id="MieleAtHome-set-password"></a>
 			<dt><code><b>password &lt;pass&gt;</b></code></dt>
 			set the <i>password</i> of your Miele@home Account and stores it in a file (base64-encoded if you have MIME::Base64 installed).
 		</li>
-		<li><a name="pause"></a>
+		<li><a id="MieleAtHome-set-pause"></a>
 			<dt><code><b>pause</b></code></dt>
 			pause your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="start"></a>
+		<li><a id="MieleAtHome-set-start"></a>
 			<dt><code><b>start</b></code></dt>
 			start your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="startTime"></a>
+		<li><a id="MieleAtHome-set-startTime"></a>
 			<dt><code><b>startTime &lt;[H]H:MM&gt;</b></code></dt>
 			modify the start time of your device relative from current time. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="stop"></a>
+		<li><a id="MieleAtHome-set-stop"></a>
 			<dt><code><b>stop</b></code></dt>
 			stop your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="startSuperFreezing"></a>
+		<li><a id="MieleAtHome-set-startSuperFreezing"></a>
 			<dt><code><b>startSuperFreezing</b></code></dt>
 			start super freezing your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="stopSuperFreezing"></a>
+		<li><a id="MieleAtHome-set-stopSuperFreezing"></a>
 			<dt><code><b>stopSuperFreezing</b></code></dt>
 			stop super freezing your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="startSuperCooling"></a>
+		<li><a id="MieleAtHome-set-startSuperCooling"></a>
 			<dt><code><b>startSuperCooling</b></code></dt>
 			start super cooling your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="stopSuperCooling"></a>
+		<li><a id="MieleAtHome-set-stopSuperCooling"></a>
 			<dt><code><b>stopSuperCooling</b></code></dt>
 			stop super cooling your device. only available depending on the type and state of your appliance.
 		</li>
-		<li><a name="update"></a>
+		<li><a id="MieleAtHome-set-targetTemperature"></a>
+			<dt><code><b>targetTemperature_zoneN &lt;temp&gt;</b></code></dt>
+			set the <i>targetTemperature</i> of zone <i>N</i> of your applience. The available temperature-range is determined by the Miele-API.
+		</li>
+		<li><a id="MieleAtHome-set-update"></a>
 			<dt><code><b>update</b></code></dt>
 			instantly update all readings.
 		</li>
-		<li><a name="ventilationStep"></a>
+		<li><a id="MieleAtHome-set-ventilationStep"></a>
 			<dt><code><b>ventilationStep [Step1|Step2|Step3|Step4]</b></code></dt>
 			set the ventilation step of your device. only available depending on the type and state of your appliance.
 		</li>
 	</ul>
 	<br>
 
-	<a name="MieleAtHomeget"></a>
+	<a id="MieleAtHome-get"></a>
 	<b>Get</b>
 	<ul>
-		<li><a name="listDevices"></a>
+		<li><a id="MieleAtHome-get-listDevices"></a>
 			<dt><code><b>listDevices</b></code></dt>
 			lists the devices associated with your Miele@home-account. Needs <i>login</i>, <i>clientId</i>, <i>password</i> and <i>clientSecret</i> to be configured properly.
 		</li>
 	</ul>
 	<br>
 
-	<a name="MieleAtHomeattribut"></a>
+	<a id="MieleAtHome-attr"></a>
 	<b>Attributes</b>
 	<ul>
-		<li><a name="clientId"></a>
+		<li><a id="MieleAtHome-attr-clientId"></a>
 			<dt><code><b>clientId</b></code></dt>
 			set the <i>clientId</i> of your Miele@home-developer account.
 		</li>
-		<li><a name="country"></a>
+		<li><a id="MieleAtHome-attr-country"></a>
 			<dt><code><b>country</b></code></dt>
 			set the <i>country</i> where you registered your Miele@home account.
 		</li>
-		<li><a name="login"></a>
+		<li><a id="MieleAtHome-attr-login"></a>
 			<dt><code><b>login</b></code></dt>
 			set the <i>login</i> of your Miele@home account.
 		</li>
-		<li><a name="disable"></a>
+		<li><a id="MieleAtHome-attr-disable"></a>
 			<dt><code><b>disable</b></code></dt>
 			disables this MieleAtHome-instance.
 		</li>
-		<li><a name="lang"></a>
+		<li><a id="MieleAtHome-attr-lang"></a>
 			<dt><code><b>lang [de|en]</b></code></dt>
 			request the readings in either german or english. <i>en</i> is default.
 		</li>

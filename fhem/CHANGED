@@ -1,5 +1,280 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  82_LGTV_WebOS: split in to packages
+ - bugfix:  93_DbLog: $data{firstvalX} now usable, forum:#126631
+ - change:  70_DENON_AVR: applied STATE changes (thx Shadow3561)
+ - change:  73_AutoShuttersControl:  change ShuttersInformation fn
+                add table frame and whitespace-character to ShuttersInformation
+ - feature: configDB: statefile versioning added
+ - bugfix:  73_AutoShuttersControl: fix Comfort drive then target pos 0
+ - bugfix:  70_ESCVP21net: added cyclicConnect attr
+ - feature: 76_mssDialog: Add option to define dialogues by file
+ - change:  76_mssDialog: PBP code restructured
+ - feature: 89_AndroidDB: Added new features
+ - bugfix:  89_AndroidDBHost: Bug fixes
+ - bugfix:  70_DENON_AVR: handled some uninitialized values
+ - new:     72_UBUS_CALL: module to send call requests via uBus client
+ - new:     72_UBUS_CLIENT: module to communicate with uBus devices
+ - bugfix:  88_HMCCU: bugfixes and improvements
+ - bugfix:  70_ESCVP21net: bugfixes, handle IMEVENT
+ - feature: 73_GardenaSmartBridge: asyncron response processing,
+                                   no blocking if more then 3-4 devices
+ - bugfix:  70_ESCVP21net: fix for GetAll in statusCheckCmd
+ - feature: 93_InfluxDBLogger: strings and original timestamps supported
+ - feature: 70_ESCVP21net.pm: multiple checkStatusCmds, new GetStatus
+ - change:  70_DENON_AVR: added and fixed readings and commands (thx All-Ex)
+ - bugfix:  72_TA_CMI_JSON: skipping invalid JSON
+ - feature: 50_Signalbot: text formatting and emoticons via unicode
+ - feature: 70_ESCVP21net.pm: toggle, TW7400, new Readings
+ - new:     lib/FHEM/Text/Unicode: apply text styles in Unicode
+ - feature: 66_EseraMulti: added support for solar sensor Esera 11112
+ - feature: new module 74_UnifiProtect.pm
+            for Unifi Protect integration (justme1968)
+ - feature: 89_AndroidDB: added attribute presetFile
+ - bugfix:  70_ESCVP21net.pm: fix perl warning, set standard port
+ - feature: 88_HMCCU.pm: Optimized RPC requests
+ - feature: 30_HUEBridge: added get v2effects & set v2json
+ - feature: 31_HUEDevice: added get v2effects & set v2scene
+ - change:  93_DbRep: new sqlCmdHistory params, change optimizeTables
+                      fix MySQL dump clientSide, some minor fixes
+ - new:     70_ESCVP21net.pm: new module for Epson Beamer LAN control
+ - feature: 50_Signalbot: native SVG plot and DOIF uiTable widget handling
+ - change:  32_withings: updated oauth endpoint
+ - feature: 31_HUEDevice: added v2effect command
+ - bugfix:  14_Hideki.pm: fix match regex - forum:#125679
+ - bugfix:  66_EseraOneWire: fix match list
+ - change:  49_SSCAM: module ready for SVS 9.0.0 forum:#125646
+ - bugfix:  59_LuftdatenInfo: fix API endpoint
+ - bugfix:  10_KNX: fix dpt14 set 0
+ - bugfix:  89_FULLY: Fixed speak and overlayMessage commands.
+ - bugfix:  74_XiaomiBTLESens: fix incurrect temperatur then value is negativ
+ - feature: 30_HUEBridge: support eventstream api (push events)
+ - change:  70_DENON_AVR: added soundformat strings. patch by All-Ex
+ - change:  50_Signalbot: link improved, reply command added, bugfixes
+ - change:  93_DbRep: new design of sqlCmdHistory, minor fixes
+ - feature: 14_SD_WS07.pm
+               protocol definition 7.1 for Mebus HQ7312-2 (#1050)
+ - feature: 14_SD_WS.pm: 
+              protocol 27 for sensor EFS-3110A (#890)
+              protocol 106 for GT-TMBBQ-0   
+              protocol 110 for ADE WS1907 Weather station (#970)
+              protocol 111 for TS-FT002 water tank level (#1000)
+              protocol 113 for GFGT 433 B1 Wireless Grill sensor (#1003)
+              protocol 108 for BRESSER 5-in-1 Weather Center
+                  and BRESSER Professional Rain Gauge (#973)
+              protocol 115 for Bresser 6-in-1 and 
+                  5-in-1 Comfort Wetter Center (#1010)
+              new protocol 107 for Fine Offset WH51 (#1055)
+              new protocol 116 for Fine Offset WH57 (#1061)
+ - bugfix: 14_SD_WS.pm: 
+              Update protocol 64 for sensor WH2A (#1009)
+              Conrad S522 protocol 33 no reading batteryState (#1042)
+ - change: 90_SIGNALduino_un.pm
+              fix some PerlCritic hints (#914)
+              revised commandref
+ - feature: 00_SIGNALduino.pm  version 3.5.2
+              xFSK processing
+              Added support for directio and none.
+              Extension for "get sduino ccreg" (#918)
+              parse subs optimized (#926)
+              update reading  config when change settings (#948)
+              Allow incremental addition of match list entries (#1026)
+              added commandref rfmode & cc1101_reg_user
+              added hardware ESP32cc1101, MAPLEMINI_F103CB on attribute
+              added new attrib rfmode to changed to xFSK & revised commandref
+              added separat sub SIGNALduino_Attr_rfmode
+              added set cmd LaCrossePairForSec (for LaCrosse
+ - change: 00_SIGNALduino.pm  version 3.5.2
+              dependency added: Perl package Digest::CRC needed  
+              added N to send SN  xFSK sendCommand
+              added new sub SIGNALduino_calcRSSI to simplification code
+              revised Parse_MN and loglevel
+              revised logoutput text SIGNALduino_Get_Command
+              rename "get raw" to "get rawmsg" (#925)
+ - bugfix: 00_SIGNALduino.pm  version 3.5.2
+              SIGNALduino_CheckccConfResponse is more robust #1015 (#1031)
+              fix PERL WARNING (#895) (#972)
+              get ccreg command caused stacktrace #898
+              Bugfix define with hostname 901 (#904)
+              Wrong version assignment fixed
+              module runs now without fhemweb instance 
+              display protocol list (#947)
+              require 99_Utils only if really needed (#950)
+              corrected incorrect logoutput (#951)
+              Fix Multiple send delay (#941)
+              Fixes high CPU and MEM usage in patternExists (#988)
+ - bugfix:  89_FULLY: Removed parseParam
+ - bugfix:  73_AutoShuttersControl: fix setter Readings in ShuttersControl.pm
+ - change:  73_AutoShuttersControl: change Attribut ASC_advDate 
+               to ASC_advStartDate. Add Attribut ASC_advEndDate
+ - change:  50_Signalbot: new favorite feature and bug fixes
+ - change:  93_DbRep: usage of placeholder §device§, §reading§ in sqlCmd
+                      changed (refer to commandRef)
+ - bugfix:  71_COE_Node: fix for negative temparatures by thor3
+ - bugfix:  47_OBIS: remove control characters in strings
+ - feature: 10_KNX: KNX_scan Utility function
+ - bugfix:  82_LGTV_WebOS: rewrite and change code, fix bugs of older version
+ - bugfix:  88_HMCCU: Bugfixes and improvements
+ - bugfix:  73_.*Calculator: bugfix - Correct unit for SymcCounter
+ - bugfix:  82_LGTV_WebOS: fix net socket flapping
+ - change:  93_DbLog: standard unit assignment for readings beginning with 
+                      'temperature' removed, forum:#125087
+ - feature: 36_ShellyMonitor: support for readings of Shelly TRV
+ - feature: 82_LGTV_WebOS: add weibu and change part's of code
+ - bugfix:  93_DbLog: logging negative temperature of Type FBDECT
+                      forum:#125005 
+ - change:  93_DbRep: some changes according to forum:#124987
+ - bugfix:  88_HMCCU: Fixed ENUM conversion bug
+ - feature: 31_HUEDevice: allow json in set commands for lights.
+                          see https://forum.fhem.de/index.php/topic,11020
+                          posting #1864 and #1866
+ - feature: 73_NUKIBridge: 74_NUKIDevice: add all new features of API Version
+                      1.13
+ - bugfix:  88_HMCCU: Several improvements and bug fixes
+ - feature: 93_DbRep: Pragma query possible in sqlCmd, new getter initData
+                      minor fixes
+ - bugfix:  88_HMCCU: Several improvements and bug fixes
+ - bugfix:  93_DbRep: fix some problems with reduceLog 
+                     (Forum: #/topic,53584.msg1177799.html#msg1177799
+ - feature: 98_weekprofile: support HMCCUCHN with CCU
+ - change:  22_HOMEMODE: adapt new help anchors
+ - change:  77_UWZ: support for https connection
+ - feature: 73_NUKIBridge 74_NUKIDevice: new modul structure and rewrite code,
+                                add support for new smartlock 3.0 and 3.0 pro,
+                                version 2.0 pre-release
+ - feature: 93_DbRep: diffValue - recognize if diff is 0 or no value available
+ - change:  72_FB_CALLLIST: reading "count-missed-calls" only counts incoming
+                            missed calls
+ - bugfix:  88_HMCCU: Fixed device detection bug
+ - feature: 73_NUKIBridge 74_NUKIDevice: add support for
+                                         new SmartLock Generation 3
+ - bugfix:  88_HMCCU: Fixed delayed init and readingname bugs
+ - feature: 93_DbRep: new attr numDecimalPlaces, 
+                      Forum:#/topic,53584.msg1178063.html#msg1178063
+ - change:  98_WeekdayTimer: CONDITION now is checked at each switching time
+ - bugfix:  10_KNX: fix for dpt3, dpt10 and dpt19 (working days) 
+ - bugfix:  88_HMCCU: Fixed some bugs
+ - bugfix:  73_AutoShuttersControl: Fix uninitialized value within %charHash
+                                    in substitution iterator
+ - bugfix:  88_HMCCU: Fixed ePaper and BSL bugs
+ - bugfix:  88_HMCCU: Fixed some bugs
+ - bugfix:  73_km200: Allowing port behind IP address
+ - feature: 6.1 released
+
+1- 2021-11-07 (6.1)
+ - change:  20_OWFS: Move to deprecated
+ - change:  21_OWTEMP: Move to deprecated
+ - change:  49_SSCam: set compability to SVS 8.2.10
+ - bugfix:  58_RPI_1Wire: Improved behaviour when changing pollingInterval
+ - change:  93_RFHEM: Moved to deprecated (use FHEM2FHEM)
+ - bugfix:  93_DbRep: fix SQL statement if devspec can't be resolved, 
+                      Forum:#/topic,53584.msg1184155.html#msg1184155
+ - bugfix:  10_KNX: rework de- en-code, removed examples from cmdref->WIKI
+ - change:  47_OBIS: Added patch from alkazaa
+ - change:  58_RPI_1Wire: Support for multiple Busmasters, enhancements, fixes
+ - bugfix:  88_HMCCU: Keep eventMap when resetting attributes
+ - bugfix:  88_HMCCU: Fixed attribute room bug
+ - new:     58_RPI_1Wire: Raspberry Pi 1Wire interface replacing 58_GPIO4
+ - change:  73_AutoShuttersControl: change names of CommandTemplate variables,
+                                    change commadref for CommandTemplate
+ - feature: 73_AutoShuttersControl: add user control commands, expan
+                      SelfDefense for EG windows, Bugfixes and change commandref
+ - added:   maintainer added for 97_PiXtendV2.pm (=>PiXtend)
+ - feature: 73_GardenaSmartBridge.pm 74_GardenaSmartDevice.pm:
+            add stop/resume schedule, add wintermode, fix notifys,
+            fixing connection / interval / 404 error, add mower timestamp to
+            readings, increase slider to 720 and many many more backand stuff
+ - change:  88_HMCCU: Update to version 5.0
+ - bugfix:  73_AutoShuttersControl: fix regex to detect position
+                                    event with dot's
+ - change:  10_EIB: Move to deprecated
+ - bugfix:  73_AutoShuttersControl: fix ExternalTrigger,
+                                    fix set rainstate by night
+ - bugfix:  73_DoorBird: incrementalTim[e]out misspelling corrected
+ - feature: 48_MieleAtHome: support set targetTemperature and mode
+ - bugfix:  50_Signalbot: Fixed issue with Babble and invite
+ - bugfix:  73_ElectricityCalculator: use Data:Dumper inserted
+ - bugfix:  73_GasCalculator:         use Data:Dumper inserted
+ - bugfix:  73_WaterCalculator:       use Data:Dumper inserted
+ - bugfix:  49_SSCamSTRM: fix warnings
+ - bugfix:  10_KNX: multiple fixes & new cmd: blink - see Forum #122582
+ - feature: 23_LUXTRONIK2: new set parameter opModeHeating
+ - bugfix:  73_AutoShuttersControl: multiple bugfixes, change version
+ - change:  10_KNX: multiple fixes & cleanup - see Forum Thread #122582
+ - bugfix:  48_MieleAtHome: fix but in autocreate
+ - feature: 32_withings: added vascularAge reading
+ - feature: 49_SSCamSTRM: new setter snap
+ - feature: 02_RSS: support for more than one directory for background 
+                    images
+ - new:     50_Signalbot: Signal Messenger integration (official release)
+ - feature: 57_Calender: limit specification when=... amended
+ - change:  10_MQTT_BRIDGE: Move to deprecated
+ - feature: 98_weekprofile: add userattr 'weekprofile' to supported modules
+ - change:  98_weekprofile: using id's in module documentation
+ - change:  93_RFHEM: Deprecation message (use FHEM2FHEM), some fixes
+ - change:  93_DbRep: SQL code for SQLite, Forum:#122791
+ - bugfix:  70_ZoneMinder: Trigger-Port state fixed
+ - feature: 49_IPCAM: introduced attribute 'blocking'
+ - bugfix:  47_OBIS: Support Holley-smartmeters with negative metering
+ - change:  10_KNX: major rewrite of the module. pls. check forum #122582
+                    before shutdown/restart! fixed crash using Attr KNX_toggle
+ - bugfix:  11_OWDevice: bugfix for new attribute disable (forum #122563)
+ - feature: 57_Calendar: new attribute timeout
+ - change:  10_KNX: major rewrite of the module. pls. check forum
+                    https://forum.fhem.de/index.php/topic,122582.0.html
+                    before shutdown/restart!
+ - feature: 11_OWDevice: new attribute disable (forum #122563)
+ - change:  50_TelegramBot: parseMode for Photo & Video / FIX: 0_none logmode
+ - feature: 19_Revolt: add standard attributes ignore, showtime etc.
+ - feature: 23_LUXTRONIK2: new set parameter ventBOSUPCircPumpDeaerate
+ - bugfix:  73_DoorBird: Firmware update parsing fixed
+ - change:  70_VIERA: changed Commandref
+ - feature: 23_LUXTRONIK2: addded support for firmware V1.86.2
+ - change:  50_SSFile: compatibility to DSM7 
+ - bugfix:  93_DbRep: Forum: topic,53584.msg1167044.html#msg1167044
+ - change:  49_SSCam: set compatibility to SVS version 8.2.9
+ - bugfix:  76_SMAInverter:fix ETOTAL/LOADTOTAL bug
+ - change:  57_SSCal: compatibility to DSM7 
+ - bugfix:  10_WS980: v.1.5.0 fix fhem-crash when autodiscovery fails
+ - change:  10_WS980: allow to ignore invalid values
+ - bugfix:  46_TeslaPowerwall2AC: fix ssl Check and change package name
+ - feature: 49_SSCam: new value 8.2.8-xxxx for attr simu_SVSversion
+ - bugfix:  76_SMAInverter:fix ETOTAL/LOADTOTAL bug
+ - feature: 76_SMAInverter: hide unavailable data
+ - feature: 76_SMAInverter: AC Voltage and AC Curren read fixed
+ - feature: 76_SMAInverter: SBS1.5, SBS2.0, SBS2.5 read battery data included
+ - feature: 76_SMAInverter: SBS5.0-10, SBS6.0-10 read battery data included
+                            Thanks to MadMax!
+ - change:  60_allergy: removed deprecated extended API
+ - feature  OpenWeatherMapAPI: add wind_gust
+ - bugfix:  50_HP1000: change time format for Internal SYSTEMTIME_UTC
+ - bugfix:  73_AutoShuttersControl: add multiple Condition
+                                    for fixing shutter drives
+ - bugfix:  89_AndroidDBHost: Fixed module not loaded error
+ - change:  48_MieleAtHome: use id-tag instead of name-tag for docs
+ - new:     50_SSFile: Module that integrates Synology Sile Station
+ - bugfix:  98_WeekdayTimer: CONDITION now again is checked for entire day
+ - feature: 74_GardenaSmartDevice: add support for SmartIrrigationControl
+              add custom schedule breake ic24
+ - feature: 49_SSCam: new get command saveLastSnap 
+ - bugfix:  89_AndroidDB: Connection handling improved
+ - feature: 73_AutoShuttersControl: add abort rain unprotection waiting time
+ - bugfix:  lib/FHEM/Core/Authentication/Passwords.pm
+               change commandref
+ - bugfix:  98_WeekdayTimer: send delay also applied at startup
+ - feature: 73_AutoShuttersControl: new RainProtection package
+ - change:  49_IPCAM: allow zero for snapshots attribute, and some cleanup.
+ - change:  93_DbLog: some minor changes, e.g. PID Info in Log Output
+ - change:  doif.js: tolerate dots in element id, cleanup
+ - feature: 89_FULLY: Implemented some new commands
+ - bugfix:  98_serviced: interval not starting after FHEM start
+ - feature: 98_serviced: add attr disabledForIntervals
+ - change:  98_serviced: adapt new help format for commandref
+ - feature: 98_todoist: added title="<item>" option for addTask
+ - bugfix:  10_WS980: v1.3.0 - fix invalid values like 0xffff
+ - bugfix:  73_AutoShuttersControl: roolback fix #1149463
+ - bugfix:  73_AutoShuttersControl: fix logic error in EventProcessing 
+                         Forum #1149463
  - bugfix:  74_GardenaSmartDevice: fix uninitialized value in concatenation
  - feature: 98_backup: split modul code in to two files. add code for
                        error handling

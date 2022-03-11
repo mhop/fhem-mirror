@@ -54,6 +54,7 @@ use strict;
 use warnings;
 use Time::Local;
 use FHEM::Meta;
+use Data::Dumper;
 my %ElectricityCalculator_gets;
 my %EolectricityCalculator_sets;
 
@@ -422,7 +423,7 @@ sub ElectricityCalculator_Set($@)
 		$attr{$ElectricityCalcName}{ElectricityCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $ElectricityCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $ElectricityCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " " . $attr{$hash}{SiPrefixPower};
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
@@ -455,28 +456,40 @@ sub ElectricityCalculator_MidnightTimer($)
 	my ($ElectricityCountName, $ElectricityCountReadingRegEx)	= split(":", $RegEx, 2);
 	my $ElectricityCountDev							  			= $defs{$ElectricityCountName};
 	$ElectricityCountReadingRegEx						  		=~ s/[\.\*]+$//;
+	$ElectricityCountReadingRegEx						  		=~ s/[:]+$//;
 	my $ElectricityCountReadingRegExNeg							= $ElectricityCountReadingRegEx . "_";
 	
 	my @ElectricityCountReadingNameListComplete = keys(%{$ElectricityCountDev->{READINGS}});
 	my @ElectricityCountReadingNameListFiltered;
 
 	### Create Log entries for debugging purpose
-	Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
-	Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ElectricityCountName: " . $ElectricityCountName;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer RegEx               : " . $RegEx;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
 
 	### If no RegEx is available, leave routine
 	if (($ElectricityCountReadingRegEx eq "") || ($ElectricityCountReadingRegExNeg eq "")) { 
-		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
-		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
-		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
 		return;
 	}
 	
-	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
-		if (($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) && ($ElectricityCountReadingName !~ m[$ElectricityCountReadingRegExNeg])) {
-			push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
+	### Check whether system failure threat is given or log error message
+	eval {
+		### For each valid RegEx entry given in the list of existing devices
+		foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
+			if (($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) && ($ElectricityCountReadingName !~ m[$ElectricityCountReadingRegExNeg])) {
+				push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
+			}
 		}
-	}
+		1;
+	} or do {
+		my $ErrorMessage = $@;
+		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : Something went wrong with the RegEx : " . $ErrorMessage;
+		return;
+	};
 
 	### Create Log entries for debugging purpose
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer__________________________________________________________";
@@ -1404,7 +1417,7 @@ sub ElectricityCalculator_Notify($$)
 		<tr><td><ul><ul><a name="Currency"            ></a><li><b><u><code>Currency                 </code></u></b> : Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>Der Standard Wert ist &#8364;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="disable"             ></a><li><b><u><code>disable                  </code></u></b> : Deaktiviert das device. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>Der Standard Wert ist 0 = aktiviert.                                                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="WaterCounterOffset"  ></a><li><b><u><code>ElectricityCounterOffset </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Elektrizit&auml;tsz&auml;hlern und dem angezeigten Wert im Reading dieses Device.<BR>Der Offset-Wert wird wie folgt ermittelt: W<sub>Offset</sub> = W<sub>Mechanisch</sub> - W<sub>Module</sub><BR>Der Standard-Wert ist 0.00.                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a name="WaterCubicPerCounts" ></a><li><b><u><code>ElectricityKwhPerCounts  </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die Menge kWh pro Z&auml;hlimpulsen.<BR>Der Wert ist durch das mechanische Z&auml;hlwerk des Elektrizit&auml;tsz&auml;hlern vorgegeben. ElectricityKwhPerCounts = 0.001 bedeutet, dass jeder Z&auml;hlimpuls ein Tausendstel einer kWh ist (=Wh).<BR>Einige elektronische Z&auml;hler (Bsp.: HomeMatic HM-ES-TX-WM) stellen die gezählte Menge an elektrischer Energie als Wh bereit.<BR>Aus diesem Grund muss dieses Attribut auf 0.001 gesetzt werden um eine korrekte Transformation in kWh zu erm&ouml;glichen.<BR>Der Standard-Wert ist 1. <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCubicPerCounts" ></a><li><b><u><code>ElectricityKwhPerCounts  </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die Menge kWh pro Z&auml;hlimpulsen.<BR>Der Wert ist durch das mechanische Z&auml;hlwerk des Elektrizit&auml;tsz&auml;hlern vorgegeben. ElectricityKwhPerCounts = 0.001 bedeutet, dass jeder Z&auml;hlimpuls ein Tausendstel einer kWh ist (=Wh).<BR>Einige elektronische Z&auml;hler (Bsp.: HomeMatic HM-ES-TX-WM) stellen die gez&auml;hlte Menge an elektrischer Energie als Wh bereit.<BR>Aus diesem Grund muss dieses Attribut auf 0.001 gesetzt werden um eine korrekte Transformation in kWh zu erm&ouml;glichen.<BR>Der Standard-Wert ist 1. <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="WaterPricePerCubic"  ></a><li><b><u><code>ElectricityPricePerKWh   </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Preis pro kWh.<BR>Dieser Wert stammt vom Elektrizit&auml;tsversorger und steht auf der Abrechnung.<BR>Der Standard-Wert ist 0.2567.                                                                                                                                                                                                                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="MonthlyPayment"      ></a><li><b><u><code>MonthlyPayment           </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Elektrizit&auml;tsversorger.<BR>Der Standard-Wert ist 0.00.                                                                                                                                                                                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="MonthOfAnnualReading"></a><li><b><u><code>MonthOfAnnualReading     </code></u></b> : Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Elektrizit&auml;tsz&auml;hler jedes Jahr durch den Elektrizit&auml;tsversorger abgelesen wird.<BR>Der Standard-Wert ist 5 (Mai)                                                                                                                                                                                                                                                                                                                                                                                   <BR></li></ul></ul></td></tr>
@@ -1445,7 +1458,7 @@ sub ElectricityCalculator_Notify($$)
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear          </code></li></td><td>: Energieverbrauch seit Beginn des aktuellen Kalenderjahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast      </code></li></td><td>: Energieverbrauch in kWh des vorherigen Kalenderjahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve      </code></li></td><td>: Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Elektrizit&auml;tsversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Anzahl der Monate seit der letzten Z&auml;hlerablesung. Der Monat der Z&auml;hlerablesung ist der erste Monat = 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent        </code></li></td><td>: Aktuelle elektrische Leistung. (Mittelwert zwischen aktueller und letzter Messung)<BR>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver        </code></li></td><td>: Mittlere elektrische Leistung seit Mitternacht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax         </code></li></td><td>: Maximale elektrische Leistungsaufnahme seit Mitternacht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>

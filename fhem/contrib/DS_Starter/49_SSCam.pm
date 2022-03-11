@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 23781 2021-02-20 14:22:03Z DS_Starter $
+# $Id: 49_SSCam.pm 25176 2021-11-03 18:53:51Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -49,6 +49,7 @@ use FHEM::SynoModules::SMUtils qw(
                                   showModuleInfo
                                   jboolmap
                                   completeAPI
+                                  ApiVal
                                   showAPIinfo
                                   setCredentials
                                   getCredentials
@@ -184,6 +185,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.3" => "23.11.2022  made SYNO.SurveillanceStation.AudioStream, SYNO.SurveillanceStation.VideoStream optional for SVS compatibility to 9.0.0 ",
+  "9.10.2" => "03.11.2021  set SVS compatibility to 8.2.10 ",
+  "9.10.1" => "18.07.2021  set SVS compatibility to 8.2.9 ",
+  "9.10.0" => "03.07.2021  change getApiSites_Parse for better simu_SVSversion, new value 8.2.8-xxxx for attr simu_SVSversion ",
+  "9.9.0"  => "21.05.2021  new get command saveLastSnap ",
   "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
   "9.8.4"  => "20.02.2021  sub Define minor fix ",
   "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
@@ -276,6 +282,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.9.0"   => "21.05.2021 The new get command 'saveLastSnap' to save the last snapshot locally is now available. ",
   "9.8.0"   => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it.  ", 
   "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
                            "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
@@ -493,6 +500,7 @@ my %hget = (                                                                # Ha
   listLog           => { fn => "_getlistLog",           needcred => 1 },
   listPresets       => { fn => "_getlistPresets",       needcred => 1 },
   saveRecording     => { fn => "_getsaveRecording",     needcred => 1 },
+  saveLastSnap      => { fn => "_getsaveLastSnap",      needcred => 0 },
   svsinfo           => { fn => "_getsvsinfo",           needcred => 1 },
   storedCredentials => { fn => "_getstoredCredentials", needcred => 1 },
   snapGallery       => { fn => "_getsnapGallery",       needcred => 1 },
@@ -625,14 +633,46 @@ my %sdswfn = (                                                             # Fun
   "hls"       => {fn => "__switchedHLS"       },
 );
 
+my %hvada = (                                                              # Funktionshash Version Adaption
+  "a01"  => {AUTH  => "6" },
+);
+
+my %hsimu = (                                                              # Funktionshash Version Simulation
+  "71xxxx-simu"   => {INFO      => "1", AUTH      => "4", EXTREC   => "2", CAM      => "8", SNAPSHOT => "1", 
+                      PTZ       => "4", PRESET    => "1", SVSINFO  => "5", CAMEVENT => "1", EVENT    => "5", 
+                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "4"  },
+  "72xxxx-simu"   => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "8", SNAPSHOT => "1", 
+                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", 
+                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "4"  },
+  "800xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", 
+                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", 
+                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "1", REC      => "6"  },
+  "815xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", 
+                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", 
+                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", LOG      => "3", REC      => "6", 
+                      AUDIOSTM  => "2", VIDEOSTMS => "1", HMODE    => "1"                                    },
+  "820xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", 
+                      PTZ       => "5", PRESET    => "1", SVSINFO  => "6", CAMEVENT => "1", EVENT    => "5", 
+                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3", 
+                      AUDIOSTM  => "2", VIDEOSTMS => "1", REC      => "6"                                    },
+  "828xxxx-simu"  => {INFO      => "1", AUTH      => "6", EXTREC   => "3", CAM      => "9", SNAPSHOT => "1", 
+                      PTZ       => "6", PRESET    => "1", SVSINFO  => "8", CAMEVENT => "1", EVENT    => "5", 
+                      VIDEOSTM  => "1", EXTEVT    => "1", STM      => "1", HMODE    => "1", LOG      => "3", 
+                      AUDIOSTM  => "2", VIDEOSTMS => "1", REC      => "6"                                    },
+);
+
 # Standardvariablen und Forward-Deklaration
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $compstat          = "8.2.8";                           # getestete SVS-Version
+my $compstat          = "9.0.00";                          # getestete SVS-Version
 my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
+
+ my @simus  = qw(7.1-xxxx 7.2-xxxx 8.0.0-xxxx 
+                 8.1.5-xxxx 8.2.0-xxxx 8.2.8-xxxx
+                );                                         # mögliche Simulationsversionen
 
 #use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 #use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -785,6 +825,8 @@ sub Initialize {
  $hash->{FW_detailFn}       = \&FWdetailFn;
  $hash->{FW_deviceOverview} = 1;
  
+ my $simver = join ",", @simus; 
+ 
  $hash->{AttrList} = "disable:1,0 ".
                      "debugactivetoken:1,0 ".
                      "debugCachetime:1,0 ".
@@ -826,7 +868,7 @@ sub Initialize {
                      "session:SurveillanceStation,DSM ".
                      "showPassInLog:1,0 ".
                      "showStmInfoFull:1,0 ".
-                     "simu_SVSversion:7.2-xxxx,7.1-xxxx,8.0.0-xxxx,8.1.5-xxxx,8.2.0-xxxx ".
+                     "simu_SVSversion:$simver ".
                      "videofolderMap ".
                      "webCmd ".
                      $readingFnAttributes;   
@@ -3604,7 +3646,7 @@ sub __runLiveview {
         
         if ($hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
             if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
-                if($hash->{HELPER}{API}{AUDIOSTM}{VER}) {                                    # Audio aktivieren                                       
+                if(ApiVal ($hash, $hash->{HELPER}{API}{AUDIOSTM}, 'VER', '')) {              # Audio aktivieren                                       
                     $hash->{HELPER}{ACALL}{AKEY}  = "AUDIOSTM"; 
                     $hash->{HELPER}{ACALL}{APART} = qq{api=_ANAME_&version=_AVER_&method=Stream&cameraId=_CID_&_sid=_SID_}; 
                 } 
@@ -3612,7 +3654,7 @@ sub __runLiveview {
                     delete $hash->{HELPER}{AUDIOLINK};
                 }
                 
-                if($hash->{HELPER}{API}{VIDEOSTMS}{VER}) {                                   # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
+                if(ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'VER', '')) {             # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
                     $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS";
                     $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Stream&cameraId=_CID_&format=mjpeg&_sid=_SID_};
                 }
@@ -4094,6 +4136,7 @@ sub Get {
                     (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
                     "snapinfo:noArg ".
                     "saveRecording ".
+                    "saveLastSnap ".
                     "snapfileinfo:noArg ".
                     "eventlist:noArg ".
                     "stmUrlPath:noArg " 
@@ -4243,6 +4286,57 @@ sub _getsaveRecording {                  ## no critic "not used"
   $hash->{HELPER}{RECSAVEPATH} = $arg if($arg);
   __getRecAndSave($hash);
         
+return;
+}
+
+################################################################
+#                      Getter saveLastSnap
+#                Letzten Snap in File speichern
+################################################################
+sub _getsaveLastSnap {                   ## no critic 'not used'                 
+  my $paref = shift;
+  my $hash  = $paref->{hash}; 
+  my $name  = $paref->{name};
+  my $path  = $paref->{arg} // $attr{global}{modpath};
+  
+  return if(!IsModelCam($hash));
+  
+  my ($imgdata,$err);
+   
+  my $cache = cache($name, "c_init");                                                            # Cache initialisieren  
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure") if(!$cache);                                 
+  
+  if(!$cache || $cache eq "internal" ) {
+      $imgdata = $data{SSCam}{$name}{LASTSNAP};
+  } 
+  else {
+      $imgdata = cache($name, "c_read", "{LASTSNAP}");                           
+  }
+  
+  if(!$imgdata) {
+      Log3($name, 2, "$name - No image data available to save locally")
+  }
+  
+  my $fname = ReadingsVal($name, "LastSnapFilename", "");
+  my $file  = $path."/$fname";
+
+  open my $fh, '>', $file or do { $err = qq{Can't open file "$file": $!};
+                                  Log3($name, 2, "$name - $err");
+                                };       
+
+  if(!$err) {
+      $err = "none";      
+      binmode $fh;
+      print $fh MIME::Base64::decode_base64($imgdata);
+      close($fh);
+      Log3($name, 3, qq{$name - Last Snapshot was saved to local file "$file"});
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Errorcode", "none");
+  readingsBulkUpdate  ($hash, "Error",     $err  );
+  readingsEndUpdate   ($hash, 1);
+  
 return;
 }
 
@@ -4517,11 +4611,9 @@ sub __getCaminfoAll {
     
     __getSvsInfo ($hash);
     
-    # wenn gesetzt = manuelle Abfrage
-    # return if ($mode);                # 24.03.2018 geänd.
+    my $pcia = AttrVal($name,"pollcaminfoall", 0);
+    my $pnl  = AttrVal($name,"pollnologging",  0);
     
-    my $pcia = AttrVal($name,"pollcaminfoall",0);
-    my $pnl  = AttrVal($name,"pollnologging",0);
     if ($pcia) {        
         my $new = gettimeofday()+$pcia; 
         InternalTimer($new, $caller, $hash, 0);
@@ -4922,7 +5014,7 @@ sub __getStreamFormat {
     my $caller  = (caller(0))[3];
     
     RemoveInternalTimer($hash, $caller);
-    return if(IsDisabled($name));  
+    return if(IsDisabled($name) || !ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'VER', ''));  
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE}               = "getstreamformat"; 
@@ -5189,8 +5281,8 @@ sub getApiSites_Parse {
 
         delActiveToken($hash);                                                      # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         return;
-        
-    } elsif ($myjson ne "") {                                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
+    } 
+    elsif ($myjson ne "") {                                                         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($success) = evaljson($hash,$myjson);
         
         if(!$success) {
@@ -5230,7 +5322,7 @@ sub getApiSites_Parse {
             
             Log3($name, 4, "$name - installed SVS version is: $actvs"); 
                         
-            if(AttrVal($name,"simu_SVSversion",0)) {
+            if (AttrVal($name,"simu_SVSversion",0)) {
                 my @vl  = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
                 $actvs  = $vl[0];
                 $actvs .= $vl[1];
@@ -5238,66 +5330,42 @@ sub getApiSites_Parse {
                 $actvs .= "-simu";
             }
             
-            # Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
+            ### Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll    
+            ###########################################################################################################            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-            my @sims;
+            my $adavs = "a01";                                                             # adaptierte Version
             
-            # push @sims, "CAM:8";
-            # push @sims, "PTZ:4";
-            
-            for my $esim (@sims) {
-                my($k,$v) = split ":", $esim;
-                $hash->{HELPER}{API}{$k}{VER} = $v;
-                $hash->{HELPER}{API}{$k}{MOD} = "yes";
-                Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+            if($adavs) {
+                for my $av (sort keys %{$hvada{$adavs}}) {
+                    $hash->{HELPER}{API}{$av}{VER} = $hvada{$adavs}{$av};
+                    $hash->{HELPER}{API}{$av}{MOD} = "yes";
+                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$av}{NAME} adapted to: $hash->{HELPER}{API}{$av}{VER}");  
+                }
             }
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
                                     
-            # Simulation älterer SVS-Versionen
+            ### Simulation älterer SVS-Versionen
+            #####################################
             Log3($name, 4, "$name - ------- Begin of simulation section -------");
             
             if (AttrVal($name, "simu_SVSversion", undef)) {
-                my @mods;
                 Log3($name, 4, "$name - SVS version $actvs will be simulated");
                 
-                if ($actvs =~ /^71/x) {
-                    push @mods, "CAM:8";
-                    push @mods, "AUTH:4";
-                    push @mods, "EXTREC:2";
-                    push @mods, "PTZ:4";           
-                } 
-                elsif ($actvs =~ /^72/x) {
-                    push @mods, "CAM:8";
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "PTZ:5"; 
-                } 
-                elsif ($actvs =~ /^800/x) {
-                    push @mods, "CAM:9";
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "PTZ:5"; 
-                } 
-                elsif ($actvs =~ /^815/x) {
-                    push @mods, "CAM:9";
-                    push @mods, "AUTH:6";
-                    push @mods, "EXTREC:3";
-                    push @mods, "PTZ:5"; 
-                } 
-                elsif ($actvs =~ /^820/x) {
-                    # ab API v2.8 kein "SYNO.SurveillanceStation.VideoStream", "SYNO.SurveillanceStation.AudioStream",
-                    # "SYNO.SurveillanceStation.Streaming" mehr enthalten
-                    push @mods, "VIDEOSTMS:0";
-                    push @mods, "AUDIOSTM:0";
+                for my $ak (sort keys %{$hash->{HELPER}{API}}  ) {
+                    next if($ak =~ /^PARSET$/x);
+                    if(!exists $hsimu{$actvs}{$ak}) {
+                        Log3($name, 4, "$name - delete $hash->{HELPER}{API}{$ak}{NAME} due to version setting");
+                        delete $hash->{HELPER}{API}{$ak};
+                    }
                 }
-                
-                for my $elem (@mods) {
-                    my($k,$v) = split ":", $elem;
-                    $hash->{HELPER}{API}{$k}{VER} = $v;
+
+                for my $k (sort keys %{$hsimu{$actvs}}  ) {
+                    next if(!ApiVal ($hash, $hash->{HELPER}{API}{$k}, 'NAME', ''));
+                    $hash->{HELPER}{API}{$k}{VER} = $hsimu{$actvs}{$k};
                     $hash->{HELPER}{API}{$k}{MOD} = "yes";
-                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");  
                 }
             } 
             
@@ -5859,8 +5927,8 @@ sub camOp_Parse {
                 readingsSingleUpdate($hash, "CamStreamFormat", $sformat, 1);
                 setReadingErrorNone ($hash, 1);                
             } 
-            elsif ($OpMode eq "runpatrol") {                                                          # eine Tour wurde gestartet
-                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start") ? "on" : "off";          # falls Aufnahme noch läuft -> state = on setzen  
+            elsif ($OpMode eq "runpatrol") {                                                            # eine Tour wurde gestartet
+                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start") ? "on" : "off";            # falls Aufnahme noch läuft -> state = on setzen  
                 DoTrigger($name,"patrol started"); 
                                
                 Log3                ($name, 3, qq{$name - Patrol "$hash->{HELPER}{GOPATROLNAME}" of camera $camname has been started successfully} );
@@ -6172,7 +6240,7 @@ sub _parseSaveRec {                                     ## no critic "not used"
          
   my $err;
   
-  my $lrec = ReadingsVal("$name", "CamLastRec", "");
+  my $lrec = ReadingsVal($name, "CamLastRec", "");
   $lrec    = (split("/",$lrec))[1]; 
   my $sp   = $hash->{HELPER}{RECSAVEPATH} // $attr{global}{modpath};
   my $file = $sp."/$lrec";
@@ -6382,7 +6450,7 @@ sub _parsegetsvsinfo {                                  ## no critic "not used"
   }
 
   my $avsc   = $major.$minor.(($small=~/\d/x) ? $small : 0);                      # Kompatibilitätscheck
-  my $avcomp = $hash->{COMPATIBILITY};
+  my $avcomp = $compstat;
   $avcomp    =~ s/\.//gx;
 
   my $compstate = ($avsc <= $avcomp) ? "true" : "false";
@@ -6450,9 +6518,9 @@ sub __parserunliveviewHLS {                             ## no critic "not used"
   my $serveraddr       = $hash->{SERVERADDR};
   my $serverport       = $hash->{SERVERPORT};
   my $camid            = $hash->{CAMID};
-  my $apivideostms     = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};
-  my $apivideostmspath = $hash->{HELPER}{API}{VIDEOSTMS}{PATH};
-  my $apivideostmsver  = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
+  my $apivideostms     = ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'NAME', '');
+  my $apivideostmspath = ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'PATH', '');
+  my $apivideostmsver  = ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'VER',  '');
   my $sid              = $hash->{HELPER}{SID};
          
   $hash->{HELPER}{HLSSTREAM} = "active";
@@ -7017,13 +7085,13 @@ sub _parsegetsnapinfo {                                 ## no critic "not used"
 
   Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
 
-  __saveLastSnap   ($paref);                                                 # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern                
-  __doSnapRotation ($paref);                                                 # Rotationsfeature
+  __saveLastSnapToCache ($paref);                                               # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern                
+  __doSnapRotation      ($paref);                                               # Rotationsfeature
   
-  setReadingErrorNone($hash, 1);               
+  setReadingErrorNone   ($hash, 1);               
 
-  closeTrans         ($hash);                                                # Transaktion beenden falls gestartet
-  __refreshAfterSnap ($hash);                                                # fallabhängige Eventgenerierung 
+  closeTrans            ($hash);                                                # Transaktion beenden falls gestartet
+  __refreshAfterSnap    ($hash);                                                # fallabhängige Eventgenerierung 
 
 return;
 }
@@ -7047,9 +7115,9 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
 
   Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
   
-  __saveLastSnap      ($paref);                                                                              # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
-  __doSnapRotation    ($paref);                                                                              # Rotationsfeature
-  __moveSnapCacheToOld($paref);                                                                              # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
+  __saveLastSnapToCache ($paref);                                                                            # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
+  __doSnapRotation      ($paref);                                                                            # Rotationsfeature
+  __moveSnapCacheToOld  ($paref);                                                                            # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
        
        
   #####   transaktionaler Versand der erzeugten Schnappschüsse #####
@@ -7117,12 +7185,12 @@ return;
 ###############################################################################
 #  aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern 
 ###############################################################################
-sub __saveLastSnap {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $data    = $paref->{data};                                                                 # decodierte JSON Daten
+sub __saveLastSnapToCache {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};                                                                 # decodierte JSON Daten
   
-  my $cache   = cache($name, "c_init");                                                         # Cache initialisieren  
+  my $cache = cache($name, "c_init");                                                         # Cache initialisieren  
   
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
 
@@ -7440,7 +7508,7 @@ return;
 ###############################################################################
 #               Eigenschaften des Device liefern
 ###############################################################################
-sub IsModelCam {                                                           # Modelleigenschaft liefern Cam-> 1 , sonst 0
+sub IsModelCam {                                                          # Modelleigenschaft liefern Cam-> 1 , sonst 0
   my $hash = shift;
   
   my $m = ($hash->{MODEL} ne "SVS") ? 1 : 0;
@@ -7449,13 +7517,13 @@ return $m;
 }
 
 sub IsCapHLS {                                                            # HLS Lieferfähigkeit (existiert "SYNO.SurveillanceStation.VideoStream" & Reading)
-  my ($hash) = @_;
+  my $hash   = shift;
   my $name   = $hash->{NAME};
   my $cap    = 0;
-  my $api    = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
-  my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?1:0;
+  my $apiver = ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'VER', '');
+  my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS") ? 1 : 0;
   
-  $cap = 1 if($api && $csf);
+  $cap = 1 if($apiver && $csf);
   
 return $cap;
 }
@@ -7674,15 +7742,15 @@ sub streamDev {                                               ## no critic 'comp
     pws                => $pws,
     serveraddr         => $hash->{SERVERADDR},
     serverport         => $hash->{SERVERPORT},
-    apivideostm        => $hash->{HELPER}{API}{VIDEOSTM}{NAME},
-    apivideostmpath    => $hash->{HELPER}{API}{VIDEOSTM}{PATH},
-    apivideostmver     => $hash->{HELPER}{API}{VIDEOSTM}{VER}, 
-    apiaudiostm        => $hash->{HELPER}{API}{AUDIOSTM}{NAME},
-    apiaudiostmpath    => $hash->{HELPER}{API}{AUDIOSTM}{PATH},
-    apiaudiostmver     => $hash->{HELPER}{API}{AUDIOSTM}{VER},
-    apivideostms       => $hash->{HELPER}{API}{VIDEOSTMS}{NAME},  
-    apivideostmspath   => $hash->{HELPER}{API}{VIDEOSTMS}{PATH},
-    apivideostmsver    => $hash->{HELPER}{API}{VIDEOSTMS}{VER},
+    apivideostm        => ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTM},  'NAME', ''),
+    apivideostmpath    => ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTM},  'PATH', ''),
+    apivideostmver     => ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTM},  'VER',  ''),
+    apiaudiostm        => ApiVal ($hash, $hash->{HELPER}{API}{AUDIOSTM},  'NAME', ''),
+    apiaudiostmpath    => ApiVal ($hash, $hash->{HELPER}{API}{AUDIOSTM},  'PATH', ''),
+    apiaudiostmver     => ApiVal ($hash, $hash->{HELPER}{API}{AUDIOSTM},  'VER',  ''),
+    apivideostms       => ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'NAME', ''),
+    apivideostmspath   => ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'PATH', ''),
+    apivideostmsver    => ApiVal ($hash, $hash->{HELPER}{API}{VIDEOSTMS}, 'VER',  ''),
     camid              => $hash->{CAMID},
     sid                => $hash->{HELPER}{SID},
     proto              => $hash->{PROTOCOL},
@@ -7792,10 +7860,10 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $serverport         = $params->{serverport};
   my $apivideostms       = $params->{apivideostms};
   my $apivideostmspath   = $params->{apivideostmspath};
-  my $apivideostmsver = $params->{apivideostmsver};
+  my $apivideostmsver    = $params->{apivideostmsver};
   my $apiaudiostm        = $params->{apiaudiostm};
   my $apiaudiostmpath    = $params->{apiaudiostmpath};
-  my $apiaudiostmver  = $params->{apiaudiostmver};
+  my $apiaudiostmver     = $params->{apiaudiostmver};
   
   my $cmdrecendless      = $params->{cmdrecendless};
   my $ttrecstart         = $params->{ttrecstart};
@@ -7818,9 +7886,10 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   else {
       if($apivideostmsver) {                                  
           $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-      
-      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+      } 
+      elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
+          $link =~ s/"//gx;                                               # vermeidet Javascript Fehler "SyntaxError: " unterminated string literal"
       }
       
       return $ret if(!$link);
@@ -7830,10 +7899,10 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
       }
       
       if(!$ftui) {
-          $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+          $ret .= qq{<td><img src=$link $ha onClick="FW_okDialog('<img src=$link $pws>')"><br>};
       } 
       else {
-          $ret .= "<td><img src=$link $ha><br>";
+          $ret .= qq{<td><img src=$link $ha><br>};
       }
       
       $streamHash->{HELPER}{STREAM}       = "<img src=$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
@@ -7847,6 +7916,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
           else {                                                         # Aufnahmebutton Stop
              $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
           }       
+      
       $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>"; 
   }    
   
@@ -11604,7 +11674,8 @@ sub exitOnDis {
   if ($avail eq "disabled") {
       $errorcode = "402";
       $exit      = 1;
-  } elsif ($avail eq "disconnected") {
+  } 
+  elsif ($avail eq "disconnected") {
       $errorcode = "502";
       $exit      = 1;
   }
@@ -11779,7 +11850,7 @@ return;
        <li>Activation / Deactivation of a camera integrated PIR sensor  </li>
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
-       <li>save the last recording of camera locally </li>
+       <li>save the last recording or the last snapshot of camera locally </li>
        <li>Selection of several cache types for image data storage (attribute cacheType) </li>
        <li>execute Zoom actions (only if PTZ camera supports Zoom) </li>
     </ul>
@@ -12795,6 +12866,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Get a popup with a lists of presets saved for the camera.
   </ul>
   <br><br>
+  
+  <ul>
+  <li><b>  saveLastSnap [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  The (last) snapshot currently specified in the reading "LastSnapId" is saved locally as a jpg file. 
+  Optionally, the path to save the file can be specified in the command (default: modpath in global Device). <br>
+  The file is locally given the same name as contained in the reading "LastSnapFilename". <br>
+  The resolution of the snapshot is determined by the attribute "snapGallerySize".
+  
+  <br><br>
+  
+  <ul>
+    <b>Example:</b> <br><br>
+    get &lt;name&gt; saveLastSnap /opt/fhem/log
+  </ul>
+  
+  </ul>
+  <br><br>
 
   <ul>
   <li><b>  saveRecording [&lt;path&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
@@ -12804,7 +12893,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   The name of the saved local file is the same as displayed in Reading "CamLastRec". <br><br>
   
   <ul>
-    <b>Beispiel:</b> <br><br>
+    <b>Example:</b> <br><br>
     get &lt;name&gt; saveRecording /opt/fhem/log
   </ul>
   
@@ -13382,7 +13471,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
-    simulates another SVS version. (only a lower version than the installed one is possible !)  </li><br>
+    A logical "downgrade" to the specified SVS version is performed. The attribute is useful to temporarily eliminate 
+    incompatibilities that may occur when updating/upgrading Synology Surveillance Station.
+    Incompatibilities should be reported to the maitainer in a timely manner.  
+  </li>
+  <br>
     
   <a name="smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>
@@ -13731,7 +13824,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <li>Aktivierung / Deaktivierung eines kamerainternen PIR-Sensors </li>
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
       <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
-      <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
+      <li>lokales Abspeichern der letzten Kamera-Aufnahme bzw. des letzten Schnappschusses </li>
       <li>Auswahl unterschiedlicher Cache-Typen zur Bilddatenspeicherung (Attribut cacheType) </li>
       <li>ausführen von Zoom-Aktionen (bei PTZ-Kameras die Zoom unterstützen) </li>
      </ul> 
@@ -14783,6 +14876,24 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
+  <li><b>  saveLastSnap [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  
+  Der aktuell im Reading "LastSnapId" angegebene (letzte) Schnappschuß wird lokal als jpg-File gespeichert. 
+  Optional kann der Pfad zur Speicherung des Files im Befehl angegeben werden (default: modpath im global Device). <br>
+  Das File erhält lokal den gleichen Namen wie im Reading "LastSnapFilename" enthalten. <br>
+  Die Auflösung des Schnappschusses wird durch das Attribut "snapGallerySize" bestimmt.
+  
+  <br><br>
+  
+  <ul>
+    <b>Beispiel:</b> <br><br>
+    get &lt;name&gt; saveLastSnap /opt/fhem/log
+  </ul>
+  
+  </ul>
+  <br><br> 
+  
+  <ul>
   <li><b>  saveRecording [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Die aktuell im Reading "CamLastRec" angegebene Aufnahme wird lokal als MP4-File gespeichert. Optional kann der Pfad zur 
@@ -14795,7 +14906,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   </ul>
-  <br><br> 
+  <br><br>
 
   <ul>
   <li><b>  scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
@@ -15387,8 +15498,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="simu_SVSversion"></a>
   <li><b>simu_SVSversion</b><br>
-    Simuliert eine andere SVS-Version. (es ist nur eine niedrigere als die installierte SVS 
-    Version möglich !) </li><br>
+    Es wird ein logisches "Downgrade" auf die angegebene SVS-Version ausgeführt. Das Attribut ist hilfreich um eventuell 
+    bei einem Update/Upgrade der Synology Surveillance Station auftretende Inkompatibilitäten temporär zu eliminieren.
+    Auftretende Inkompatibilitäten sollten zeitnah dem Maitainer mitgeteilt werden.
+  </li>
+  <br>
   
   <a name="smtpHost"></a>
   <li><b>smtpHost &lt;Hostname&gt; </b><br>

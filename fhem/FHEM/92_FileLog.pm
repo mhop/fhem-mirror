@@ -42,6 +42,7 @@ FileLog_Initialize($)
   # logtype is used by the frontend
   no warnings 'qw';
   my @attrList = qw(
+    acceptedRange
     addLog
     addStateEvent:0,1 
     archiveCompress
@@ -185,10 +186,12 @@ FileLog_Define($@)
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
   if(!$hash->{READONLY}) {
+    restoreDir_mkDir($f=~m,^/,? "":".", $f, 1);
     $fh = new IO::File ">>$f";
     return "Can't open $f: $!" if(!defined($fh));
   }
 
+  binmode($fh, ":encoding(UTF-8)") if($fh && $unicodeEncoding);
   $hash->{FH} = $fh;
   $hash->{FD} = $fh->fileno() if($fh);
   $hash->{REGEXP} = $a[3];
@@ -246,6 +249,7 @@ FileLog_Switch($)
       Log3 $log, 0, "Can't open $cn";
       return 0;
     }
+    binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
     $log->{FH} = $fh;
     $log->{FD} = $fh->fileno();
     setReadingsVal($log, "linesInTheFile", 0, TimeNow());
@@ -301,6 +305,7 @@ FileLog_Log($$)
   my $written = 0;
   my $fmt = AttrVal($ln, "outputFormat", undef);
   my $emi = $log->{".filelog-event-min-interval"};
+  my $ar = $log->{".acceptedRange"};
   my $al = $log->{".addLog"};
 
   for (my $i = 0; $i < $max; $i++) {
@@ -321,10 +326,26 @@ FileLog_Log($$)
           }
         }
       }
+
       if($al && $al->{$n} && $s =~ m/^([^:]+):/) {
         my $ale = $al->{$n}{$1};
         $ale->{LAST} = time_str2num($t) if($ale);
       }
+
+      if($ar) {
+        my $doSkip=0;
+        my @sa = split(" ", $s);
+        for my $p (@{$ar}) {
+          my $col = $p->{col};
+          next if($col > int(@sa));
+          my $val = $sa[$col];
+          next if(!looks_like_number($val));
+          next if($p->{re} && $s !~ m/$p->{re}/);
+          $doSkip = 1 if($val < $p->{min} || $val > $p->{max});
+        }
+        next if($doSkip);
+      }
+
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
 
       if(!$switched) {
@@ -369,6 +390,20 @@ FileLog_Attr(@)
   if($a[2] eq "mseclog") {
     $defs{$a[1]}{mseclog} = ($a[0] eq "set" && (!defined($a[3]) || $a[3]) );
     return;
+  }
+
+  if($a[2] eq "acceptedRange") {
+    if($a[0] eq "del") {
+      delete($defs{$a[1]}{".acceptedRange"});
+      return;
+    }
+
+    my @ar; # colX:min:max:regexp
+    my $in = $a[3];
+    $in =~ s/\b(\d+):([0-9.-]+):([0-9.-]+)(:([^ ]+))?/
+        push(@ar, { col=>$1, min=>$2, max=>$3, re=>$5 } ); ""/ge;
+    return "attr $a[1] accepedRange: bad argument >$in<" if($in !~ m/^ *$/);
+    $defs{$a[1]}{".acceptedRange"} = \@ar;
   }
 
   if($a[0] eq "set" && $a[2] eq "ignoreRegexp") {
@@ -416,11 +451,12 @@ FileLog_Set($@)
   my ($hash, @a) = @_;
   my $me = $hash->{NAME};
 
-  return undef if( $hash->{REGEXP} eq 'fakelog' );
-
   return "no set argument specified" if(int(@a) < 2);
   my %sets = (reopen=>0, clear=>0, absorb=>1, addRegexpPart=>2, 
               removeRegexpPart=>1);
+  %sets = (clear=>0)                               # 95351
+                if($hash->{REGEXP} eq 'fakelog' || # deprecated
+                   $hash->{REGEXP} eq $me);        # 122373
   
   my $cmd = $a[1];
   if(!defined($sets{$cmd})) {
@@ -445,6 +481,7 @@ FileLog_Set($@)
         $fh = new IO::File(">>$cn");
       }
       return "Can't open $cn" if(!defined($fh));
+      binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
       $hash->{FH} = $fh;
       $hash->{FD} = $fh->fileno();
     }
@@ -507,6 +544,7 @@ FileLog_Set($@)
     close(FH1); close(FH2); close(FH3);
     rename("$mylogfile.new", $mylogfile);
     $fh = new IO::File(">>$mylogfile");
+    binmode($fh, ":encoding(UTF-8)") if($fh && $unicodeEncoding);
     $hash->{FH} = $fh;
     $hash->{FD} = $fh->fileno();
 
@@ -558,11 +596,14 @@ FileLog_fhemwebFn($$$$)
   }
   $ret .= "</table>";
   return $ret if($pageHash);
-  return $ret if( $defs{$d}{REGEXP} eq 'fakelog' );
+  return $ret if($defs{$d}{REGEXP} eq 'fakelog'); # deprecated
+  return $ret if($defs{$d}{REGEXP} eq $d);
 
   # DETAIL only from here on
   my $hash = $defs{$d};
 
+  $ret .= '<script>setTimeout(function(){if(window.FW_checkNotifydev)'.
+          'FW_checkNotifydev("REGEXP")}, 100)</script>';
   $ret .= "<br>Regexp parts";
   $ret .= "<br><table class=\"block wide\">";
   my @ra = split(/\|/, $hash->{REGEXP});
@@ -662,9 +703,12 @@ FileLog_logWrapper($)
   if(defined($type) && $type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
-    $path =~ s/%L/$attr{global}{logdir}/g
-        if($path =~ m/%/ && $attr{global}{logdir});
-    $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
+    my @t = localtime(gettimeofday());
+    $path = ResolveDateWildcards($path, @t);
+    if(!-f $path) {
+      $path = AttrVal($d,"archivedir","") . "/$file";
+      $path = ResolveDateWildcards($path, @t);
+    }
 
     FW_addContent();
     FW_pO "<div class=\"tiny\">" if($FW_ss);
@@ -782,6 +826,7 @@ FileLog_Get($@)
                         localtime(time_str2num("$fy-$fm-$fd 00:00:00")));
 
         if(AttrVal($name, "createGluedFile", 0)) {
+          $to = (split(" ", TimeNow()))[0] if($to eq "9"); # Special
           if($to =~ m/^(....)-(..)-(..)/) {
             my ($ty,$tm,$td) = ($1,$2,$3);
             my $linf_to = ResolveDateWildcards($hash->{logfile},
@@ -838,6 +883,7 @@ FileLog_Get($@)
 
   my $ifh;
   $ifh = new IO::File $inf if($inf);
+  binmode($ifh, ":encoding(UTF-8)") if($ifh && $unicodeEncoding);
   FileLog_seekTo($inf, $ifh, $hash, $from, $reformatFn) if($ifh);
 
   $to .= "z"; # return the 23:59:59 line too (Forum #118858)
@@ -870,6 +916,7 @@ FileLog_Get($@)
     if($outf ne "-") {
       $fname[$i] = "$outf.$i";
       $h{fh} = new IO::File "> $fname[$i]";
+      binmode($h{fh}, ":encoding(UTF-8)") if($h{fh} && $unicodeEncoding);
     }
     $h{re} = $fld[1];                                   # Filter: regexp
     $h{df} = defined($fld[2]) ? $fld[2] : "";           # default value
@@ -1023,6 +1070,8 @@ RESCAN:
     $rescanNum = 0;
     map { $rescanNum++ if(!$d[$_]->{count} && $d[$_]->{df} eq "") } (0..$#a);
     if($rescanNum) {
+      
+      binmode($ifh) if($unicodeEncoding);
       $rescan=1;
       my $buf;
       my $end = $hash->{pos}{"$inf:$from"};
@@ -1037,6 +1086,7 @@ RESCAN:
       sysread($ifh, $buf, $end-$start);
       @rescanArr = split("\n", $buf);
       $rescanIdx = $#rescanArr;
+      binmode($ifh, ":encoding(UTF-8)") if($ifh && $unicodeEncoding);
       goto RESCAN;
     }
   }
@@ -1206,6 +1256,7 @@ FileLog_sampleDataFn($$$$$)
     Log3 $wName, 1, "FileLog get sample data: $fName: $!";
     return ($desc, \@htmlArr, "");
   }
+  binmode($fh, ":encoding(UTF-8)") if($unicodeEncoding);
   $fh->seek(0, 2); # Go to the end
   my $sz = $fh->tell;
   $fh->seek($sz > 65536 ? $sz-65536 : 0, 0);
@@ -1270,12 +1321,12 @@ FileLog_regexpFn($$)
 =item summary_DE schreibt Events in eine Logdatei
 =begin html
 
-<a name="FileLog"></a>
+<a id="FileLog"></a>
 <h3>FileLog</h3>
 <ul>
   <br>
 
-  <a name="FileLogdefine"></a>
+  <a id="FileLog-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt; [readonly]</code>
@@ -1323,7 +1374,7 @@ FileLog_regexpFn($$)
     <br>
   </ul>
 
-  <a name="FileLogset"></a>
+  <a id="FileLog-set"></a>
   <b>Set </b>
   <ul>
     <li>reopen
@@ -1371,7 +1422,7 @@ FileLog_regexpFn($$)
     <br>
 
 
-  <a name="FileLogget"></a>
+  <a id="FileLog-get"></a>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
@@ -1439,12 +1490,21 @@ FileLog_regexpFn($$)
     <br>
   </ul>
 
-  <a name="FileLogattr"></a>
+  <a id="FileLog-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
 
-    <a name="addLog"></a>
+    <a id="FileLog-attr-acceptedRange"></a>
+    <li>acceptedRange col1:min:max[:regexp] ...<br>
+        This attribute takes a space separated list of ranges. An event wont
+        be logged, if the column of the event (counted from 0) is a number, and
+        it is outside of the specified range. The optional regexp will check
+        the event only, without the usual ^ and $ added to it. Example:<br>
+        <code>attr fl acceptedRange 1:5:35:[Tt]emperature 1:-90:-40:RSSI</code>
+        </li><br>
+
+    <a id="FileLog-attr-addLog"></a>
     <li>addLog<br>
         This attribute takes a comma-separated list of
         devspec:reading:maxInterval triples.  You may use regular expressions
@@ -1453,9 +1513,9 @@ FileLog_regexpFn($$)
         has arrived.
         </li><br>
 
-    <a name="archivedir"></a>
-    <a name="archivecmd"></a>
-    <a name="nrarchive"></a>
+    <a id="FileLog-attr-archivedir"></a>
+    <a id="FileLog-attr-archivecmd"></a>
+    <a id="FileLog-attr-nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
         When a new FileLog file is opened, the FileLog archiver wil be called.
         This happens only, if the name of the logfile has changed (due to
@@ -1477,13 +1537,13 @@ FileLog_regexpFn($$)
         <a href="#logfile">FHEM logfile</a> only.
         </li><br>
 
-    <a name="archiveCompress"></a>
+    <a id="FileLog-attr-archiveCompress"></a>
     <li>archiveCompress<br>
         If nrarchive, archivedir and archiveCompress is set, then the files
         in the archivedir will be compressed.
         </li><br>
 
-    <a name="createGluedFile"></a>
+    <a id="FileLog-attr-createGluedFile"></a>
     <li>createGluedFile<br>
         If set (to 1), and the SVG-Plot requests a time-range wich is stored
         in multiple files, a temporary file with the content of all files will
@@ -1494,7 +1554,7 @@ FileLog_regexpFn($$)
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <br>
 
-    <a name="eventOnThreshold"></a>
+    <a id="FileLog-attr-eventOnThreshold"></a>
     <li>eventOnThreshold<br>
         If set (to a nonzero number), the event linesInTheFile will be
         generated, if the lines in the file is a multiple of the set number.
@@ -1502,7 +1562,7 @@ FileLog_regexpFn($$)
         feature was implemented. A FHEM crash or kill will falsify the counter.
         </li><br>
 
-    <a name="filelog-event-min-interval"></a>
+    <a id="FileLog-attr-filelog-event-min-interval"></a>
     <li>filelog-event-min-interval<br>
         This attribute takes a comma-separated list of
         devspec:reading:minInterval triples.  You may use regular expressions
@@ -1514,7 +1574,7 @@ FileLog_regexpFn($$)
 
     <li><a href="#label">label</a><br></li>
       
-    <a name="logtype"></a>
+    <a id="FileLog-attr-logtype"></a>
     <li>logtype<br>
         Used by FHEMWEB to offer gnuplot/SVG images made from the
         logs.  The string is made up of tokens separated by comma (,), each
@@ -1528,14 +1588,14 @@ FileLog_regexpFn($$)
 
     <li><a href="#mseclog">mseclog</a></li><br>
 
-    <a name="outputFormat"></a>
+    <a id="FileLog-attr-outputFormat"></a>
     <li>outputFormat &lt;perlCode&gt;<br>
       If set, the result of the evaluated perlCode will be written to the file.
       Default is "$TIMESTAMP $NAME $EVENT\n".<br>
       Note: only this format ist compatible with the SVG Editor
       </li><br>
 
-    <a name="reformatFn"></a>
+    <a id="FileLog-attr-reformatFn"></a>
     <li>reformatFn &lt;perlFunctionName&gt;<br>
       used to convert "foreign" logfiles for the SVG Module, contains the
       name(!) of a function, which will be called with a "raw" line from the
@@ -1565,12 +1625,12 @@ FileLog_regexpFn($$)
 
 =begin html_DE
 
-<a name="FileLog"></a>
+<a id="FileLog"></a>
 <h3>FileLog</h3>
 <ul>
   <br>
 
-  <a name="FileLogdefine"></a>
+  <a id="FileLog-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt; [readonly]</code>
@@ -1624,7 +1684,7 @@ FileLog_regexpFn($$)
     <br>
   </ul>
 
-  <a name="FileLogset"></a>
+  <a id="FileLog-set"></a>
   <b>Set </b>
   <ul>
     <li>reopen
@@ -1675,7 +1735,7 @@ FileLog_regexpFn($$)
     <br>
 
 
-  <a name="FileLogget"></a>
+  <a id="FileLog-get"></a>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
@@ -1754,12 +1814,22 @@ FileLog_regexpFn($$)
     <br>
   </ul>
 
-  <a name="FileLogattr"></a>
+  <a id="FileLog-attr"></a>
   <b>Attribute</b>
   <ul>
     <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
 
-    <a name="addLog"></a>
+    <a id="FileLog-attr-acceptedRange"></a>
+    <li>acceptedRange col1:min:max[:regexp] ...<br>
+        Dieses Attribut spezifiert eine durch Leerzeichen getrennte Liste von
+        Bereichen. Falls die Spalte (gerechnet ab 0) eines Events eine Zahl
+        ist, und ausserhalb dieses Bereiches liegt, wird das Event nicht
+        geloggt. regexp ist optional, und pr&uuml;ft nur das Event, ohne die
+        Ergauml;nzung durch die &uuml;blichen ^ und $. Beispiel:<br>
+        <code>attr fl acceptedRange 1:5:35:[Tt]emperature 1:-90:-40:RSSI</code>
+        </li><br>
+
+    <a id="FileLog-attr-addLog"></a>
     <li>addLog<br>
         Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
         "devspec:readings:maxInterval" Tripel. readings kann ein regexp sein.
@@ -1767,9 +1837,9 @@ FileLog_regexpFn($$)
         wird der letzte Wert zum Logfile hinzugefuegt.
         </li><br>
 
-    <a name="archivedir"></a>
-    <a name="archivecmd"></a>
-    <a name="nrarchive"></a>
+    <a id="FileLog-attr-archivedir"></a>
+    <a id="FileLog-attr-archivecmd"></a>
+    <a id="FileLog-attr-nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
         Wenn eine neue FileLog-Datei ge&ouml;ffnet wird, wird der FileLog
         archiver aufgerufen.  Das geschieht aber nur , wenn der Name der Datei
@@ -1793,13 +1863,13 @@ FileLog_regexpFn($$)
         auschlie&szlig;lich auf das <a href="#logfile">FHEM logfile</a>
         Auswirkungen.  </li><br>
 
-    <a name="archiveCompress"></a>
+    <a id="FileLog-attr-archiveCompress"></a>
     <li>archiveCompress<br>
         Falls nrarchive, archivedir und archiveCompress gesetzt ist, dann
         werden die Dateien im archivedir komprimiert abgelegt.
         </li><br>
 
-    <a name="createGluedFile"></a>
+    <a id="FileLog-attr-createGluedFile"></a>
     <li>createGluedFile<br>
         Falls gesetzt (1), und im SVG-Plot ein Zeitbereich abgefragt wird, was
         in mehreren Logdateien gespeichert ist, dann wird f&uuml;r die Anfrage
@@ -1810,7 +1880,7 @@ FileLog_regexpFn($$)
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <br>
 
-    <a name="eventOnThreshold"></a>
+    <a id="FileLog-attr-eventOnThreshold"></a>
     <li>eventOnThreshold<br>
         Falls es auf eine (nicht Null-) Zahl gesetzt ist, dann wird das
         linesInTheFile Event generiert, falls die Anzahl der Zeilen in der
@@ -1820,7 +1890,7 @@ FileLog_regexpFn($$)
         verf&auml;lscht die Z&auml;hlung.
         </li><br>
 
-    <a name="filelog-event-min-interval"></a>
+    <a id="FileLog-attr-filelog-event-min-interval"></a>
     <li>filelog-event-min-interval<br>
         Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
         "devspec:readings:minInterval" Tripel. readings kann ein regexp sein.
@@ -1830,7 +1900,7 @@ FileLog_regexpFn($$)
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
-    <a name="logtype"></a>
+    <a id="FileLog-attr-logtype"></a>
     <li>logtype<br>
         Wird vom SVG Modul ben&ouml;tigt, um daten grafisch aufzubereiten.
         Der String wird aus komma-separierten Tokens
@@ -1878,14 +1948,14 @@ FileLog_regexpFn($$)
 
     <li><a href="#mseclog">mseclog</a></li><br>
 
-    <a name="outputFormat"></a>
+    <a id="FileLog-attr-outputFormat"></a>
     <li>outputFormat &lt;perlCode&gt;<br>
       Falls gesetzt, ist die Ausgabezeile das Ergebnis der Auswertung.
       Voreinstellung ist "$TIMESTAMP $NAME $EVENT\n".<br>
       Achtung: nur dieses Format ist kompatibel mit dem SVG-Editor.
       </li><br>
 
-    <a name="reformatFn"></a>
+    <a id="FileLog-attr-reformatFn"></a>
     <li>reformatFn &lt;perlFunktionsName&gt;<br>
       wird verwendet, um "fremde" Dateien f&uuml;r die SVG-Anzeige ins
       FileLog-Format zu konvertieren. Es enth&auml;lt nur den Namen einer

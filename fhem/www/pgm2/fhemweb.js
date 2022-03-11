@@ -264,6 +264,7 @@ FW_jqueryReadyFn()
             $(sel).append('<option value="'+attrName+'">'+attrName+'</option>');
           $(sel).val(attrName);
           FW_detailSelect(sel, true);
+          $(sel).trigger("change");
         });
     });
 
@@ -308,7 +309,8 @@ FW_jqueryReadyFn()
       return;
     $("#devSpecHelp").remove();
     var sel=this, devName=m[2], selType=m[1];
-    FW_displayHelp(devName, sel, selType, val, 1);
+    var group = $(this).parent().find(':selected').parent().attr('label');
+    FW_displayHelp(devName, sel, selType, val, group);
   });
 
   FW_smallScreenCommands();
@@ -333,30 +335,46 @@ FW_jqueryReadyFn()
 }
 
 function
-FW_displayHelp(devName, sel, selType, val, level)
+FW_displayHelp(devName, sel, selType, val, group)
 {
+  if(group) {
+    if(group.indexOf("userattr") >= 0)
+      return;
+    devName = (group == "framework" ? "commandref" : group);
+  }
+
   FW_getHelp(devName, function(data) { // show either the next or the outer li
     $("#content")
       .append("<div id='workbench' style='display:none'></div>");
-    $("#content > #workbench").html(data);
+    var wb = $("#content > #workbench");
+    wb.html(data);
 
-    var mtype = $("#content > #workbench a[id]").attr("id"), aTag;
+    var mtype = wb.find("a[id]").attr("id"), aTag;
     if(!mtype)
-      mtype = $("#content > #workbench a[name]").attr("name"), aTag;
-    if(level == 3) // commandref
+      mtype = wb.find("a[name]").attr("name");
+
+    if(devName == "commandref")
       mtype = "";
 
-    if(mtype) {           // old style #1 syntax: MODULETYPEattrname
+    if(mtype) {             // current syntax: FHEMWEB-attr-webCmd
       var mv = (""+mtype+"-"+selType+"-"+val).replace(/[^a-z0-9_-]/ig,'_');
-      aTag = $("#content > #workbench").find("a[id="+mv+"]");
-      if(!$(aTag).length) {
+      aTag = wb.find("a[id="+mv+"]");
+      if(!$(aTag).length) { // old style #1 syntax: FHEMWEBwebCmd
         mv = (""+mtype+val).replace(/[^a-z0-9_-]/ig,'_');
-        aTag = $("#content > #workbench").find("a[name="+mv+"]");
+        aTag = wb.find("a[name="+mv+"]");
       }
     }
-    if(!$(aTag).length) { // old style #2 syntax without type
+    if(!$(aTag).length) { // old style #2 syntax : webCmd
       var v = (val).replace(/[^a-z0-9_-]/ig,'_');
-      aTag = $("#content > #workbench").find("a[name="+v+"]");
+      aTag = wb.find("a[name="+v+"]");
+    }
+
+    if(!$(aTag).length) { // regexp attributes, like backend_.*
+      wb.find("a[id^='"+mtype+"-"+selType+"-'][data-pattern]").each(
+        function() {
+          if(val.match($(this).attr("data-pattern")))
+            aTag = this;
+        });
     }
 
     if($(aTag).length) {
@@ -365,20 +383,15 @@ FW_displayHelp(devName, sel, selType, val, level)
         liTag = $(aTag).parent("li");
       if(!$(liTag).length)
         liTag = $(aTag).parent().next("li");
+      $("#devSpecHelp").remove(); // shown only one if FHEM is slow
       if($(liTag).length) {
         $(sel).closest("div[cmd='"+selType+"']")
            .after('<div class="makeTable" id="devSpecHelp"></div>')
         $("#devSpecHelp").html($(liTag).html());
       }
     }
-    $("#content > #workbench").remove();
+    wb.remove();
 
-    if(!$(aTag).length) {
-      if(devName != "FHEMWEB" && level == 1)
-        return FW_displayHelp("FHEMWEB", sel, selType, val, 2);
-      if(devName != "commandref" && level < 3)
-        return FW_displayHelp("commandref", sel, selType, val, 3);
-    }
   });
 }
 
@@ -828,6 +841,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     }
     });
     
+  // Set and attr 
   $("div input.psc[type=submit]:not(.get)").click(function(e){
     e.preventDefault();
     var newDef = typeof cm !== 'undefined' ?
@@ -967,6 +981,8 @@ FW_execRawDef(data)
   doNext()
   {
     if(++i1 >= arr.length) {
+      if($("#FW_okDialog").length) // F2F remote cmd execution
+        return;
       return FW_okDialog("Executed everything, no errors found.");
     }
     str += arr[i1];
@@ -1096,6 +1112,10 @@ FW_doUpdate(evt)
   var retryTime = 5000;
   var now = new Date()/1000;
 
+  // d: array
+  // d[0]: informid
+  // d[1]: if the informid Widget has setValueFn, arg for this
+  // d[2]: else replace the html with this
   function
   setValue(d) // is Callable from eval below
   {
@@ -1108,12 +1128,18 @@ FW_doUpdate(evt)
           d[2] = '<html><pre>'+d[2]+'</pre></html>';
 
         var ma = /^<html>([\s\S]*)<\/html>/.exec(d[2]);
-        if(!d[0].match("-")) // not a reading
+        if(!d[0].match("-")) { // not a reading
           $(this).html(d[2]);
-        else if(ma)
+          FW_replaceWidgets($(this));
+
+        } else if(ma) {
           $(this).html(ma[1]);
-        else
+          FW_replaceWidgets($(this));
+
+        } else {
           $(this).text(d[2]);
+
+        }
 
         if(d[0].match(/-ts$/))  // timestamps
           $(this).addClass('changed');
@@ -1190,6 +1216,7 @@ FW_doUpdate(evt)
 
     } else {
       setValue(d);
+
     }
 
     // updateLine is deprecated, use setValueFn
@@ -1561,13 +1588,19 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
     vHash[o.value] = 1;
     newEl.options[j-1] = o;
   }
-  if(currVal)
-    $(newEl).val(currVal);
+
   if(elName)
     $(newEl).attr('name', elName);
   if(cmd)
     $(newEl).change(function(arg) { cmd($(newEl).val()) });
-  newEl.setValueFn = function(arg) { if(vHash[arg]) $(newEl).val(arg); };
+  newEl.setValueFn = function(arg) {
+    if(!vHash[arg] && typeof(arg) != "undefined")
+      arg = (arg+"").replace(/ /g,"."); // #124505, replaceAll is Chrome 84+
+    if(vHash[arg])
+      $(newEl).val(arg);
+  };
+  newEl.setValueFn(currVal);
+
   return newEl;
 }
 
@@ -1588,7 +1621,7 @@ FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
 
   if(currVal != undefined)
     currVal = currVal.replace(/[^\d.\-]/g, "");
-    currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
+  currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
   if(max==min)
     return undefined;
   if(!(fun == "lin" || fun == "log10"))
@@ -1628,7 +1661,7 @@ FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
       k++;
     }
   }
-  if(currVal)
+  if(typeof(currVal) != "undefined")
     $(newEl).val(currVal.toFixed(dp));
   if(elName)
     $(newEl).attr('name', elName);
@@ -2106,6 +2139,30 @@ FW_getSVG(emb)
     }
   }
   return undefined;
+}
+
+function
+FW_checkNotifydev(reName)
+{
+  var internals={};
+  $("table.internals tr td div.dname").each(function(){
+    internals[$(this).html()] = this;
+  });
+  if(!internals[reName] || internals.NOTIFYDEV)
+    return;
+  $(internals[reName])
+    .html(reName+" <a>(!)</a>")
+    .css("cursor","pointer")
+    .click(function(){
+      var val = $(internals[reName]).closest("tr").find("div[informid]").text();
+      FW_okDialog("Could not optimize the regexp:<ul>"+val+
+                "</ul>How I tried (notifyRegexpCheck):<ul><pre></pre></ul>");
+      FW_cmd(FW_root+'?cmd={notifyRegexpCheck("'+val+'")}&XHR=1',
+      function(res){
+        $("#FW_okDialog pre").html(res);
+      });
+
+    });
 }
 
 /*

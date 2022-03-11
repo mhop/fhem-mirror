@@ -54,6 +54,7 @@ use strict;
 use warnings;
 use Time::Local;
 use FHEM::Meta;
+use Data::Dumper;
 my %GasCalculator_gets;
 my %GasCalculator_sets;
 
@@ -422,7 +423,7 @@ sub GasCalculator_Set($@)
 		$attr{$GasCalcName}{GasCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $GasCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $GasCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " " . $attr{$hash}{SiPrefixPower};
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
@@ -455,28 +456,40 @@ sub GasCalculator_MidnightTimer($)
 	my ($GasCountName, $GasCountReadingRegEx) = split(":", $RegEx, 2);
 	my $GasCountDev							  = $defs{$GasCountName};
 	$GasCountReadingRegEx					  =~ s/[\.\*]+$//;
+	$GasCountReadingRegEx					  =~ s/[:]+$//;
 	my $GasCountReadingRegExNeg				  = $GasCountReadingRegEx . "_";
 
 	my @GasCountReadingNameListComplete = keys(%{$GasCountDev->{READINGS}});
 	my @GasCountReadingNameListFiltered;
 
 	### Create Log entries for debugging purpose
-	Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
-	Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer GasCountName        : " . $GasCountName;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer RegEx               : " . $RegEx;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
 
 	### If no RegEx is available, leave routine
 	if (($GasCountReadingRegEx eq "") || ($GasCountReadingRegExNeg eq "")) { 
-		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
-		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
-		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
 		return;
 	}
 	
-	foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
-		if (($GasCountReadingName =~ m[$GasCountReadingRegEx]) && ($GasCountReadingName !~ m[$GasCountReadingRegExNeg])) {
-			push(@GasCountReadingNameListFiltered, $GasCountReadingName);
+	### Check whether system failure threat is given or log error message
+	eval {
+		### For each valid RegEx entry given in the list of existing devices
+		foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
+			if (($GasCountReadingName =~ m[$GasCountReadingRegEx]) && ($GasCountReadingName !~ m[$GasCountReadingRegExNeg])) {
+				push(@GasCountReadingNameListFiltered, $GasCountReadingName);
+			}
 		}
-	}
+		1;
+	} or do {
+		my $ErrorMessage = $@;
+		Log3 $GasCalcName, 2, $GasCalcName. " : Something went wrong with the RegEx : " . $ErrorMessage;
+		return;
+	};
 
 	### Create Log entries for debugging purpose
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer__________________________________________________________";
@@ -1435,7 +1448,7 @@ sub GasCalculator_Notify($$)
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear          </code></li></td><td>: Energieverbrauch in kWh seit Anfang seit Anfang des Jahres (Mitternacht des 01. Januar).                                                                                 <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast      </code></li></td><td>: Gesamter Energieverbrauch in kWh des letzten Kalender-Jahres.                                                                                                            <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve      </code></li></td><td>: Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Gas-Versorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen. <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Anzahl der Monate seit der letzten Z&auml;hlerablesung. Der Monat der Z&auml;hlerablesung ist der erste Monat = 1.                                                                 <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter               </code></li></td><td>: Z&auml;hlerstand am Gasz&auml;hler. Bei Differenzen muss das Offset-Attribut korrigiert werden.                                                                          <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent        </code></li></td><td>: Aktuelle Heizleistung. (Mittelwert zwischen aktueller und letzter Messung)                                                                                               <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver        </code></li></td><td>: Mittlere Heitzleistung seit Mitternacht.                                                                                                                                 <BR>     </ul></ul></td></tr>

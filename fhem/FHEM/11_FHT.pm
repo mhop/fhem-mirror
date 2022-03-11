@@ -140,6 +140,7 @@ my %warnings = (
 );
 
 my %priority = (
+  "minute"      => 0,
   "desired-temp"=> 1,
   "mode"	=> 2,
   "report1"     => 3,
@@ -596,8 +597,11 @@ FHT_Parse($$)
       my $h = $io->{SOFTBUFFER}{$key};
       my $hcmd = $h->{CMD};
       my $hname = $h->{HASH}->{NAME};
-      Log3 $name, 4, "FHT softbuffer check: $hname / $hcmd";
-      if($hname eq $name && $hcmd =~ m/^$cmd $val/) {
+      my $val2 = ($val eq "30.5" ? "on" :
+                  $val eq  "5.5" ? "off" : "");
+      Log3 $name, 4, "FHT softbuffer check: $hname / $hcmd / $val / $val2";
+      if($hname eq $name && ($hcmd =~ m/^$cmd $val/ ||
+                             $hcmd =~ m/^$cmd $val2/)) {
         $found = $key;
         Log3 $name, 4, "FHT softbuffer found";
         last;
@@ -705,7 +709,7 @@ getFhtBuffer($)
   for(;;) {
     return 0 if(!defined($io->{FD}));    # Avoid crash if the CUL/FHZ is absent
     my $msg = CallFn($io->{NAME}, "GetFn", $io, (" ", "fhtbuf"));
-    Log3 $io, 5, "getFhtBuffer: $count $msg";
+    Log3 $io, 5, "getFhtBuffer: $count ".($msg ? $msg : "<empty>");
     return hex($1) if($msg && $msg =~ m/=> ([0-9A-F]+)$/i);
     return 0 if($count++ >= 5);
   }

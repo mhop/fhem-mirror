@@ -1,6 +1,6 @@
 Package: fhem
 Version: =VERS=
-Maintainer: Rudolf Koenig <r.koenig@koeniglich.de>
+Maintainer: FHEM e.V. <vorstand@fhem.de>
 Description: GPL'd perl server for house automation.
  It is used to automate some common tasks in the household like switching lamps
  / shutters / heating / etc. and to log events like temperature/humidity/power

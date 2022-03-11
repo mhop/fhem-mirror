@@ -1,5 +1,5 @@
 ##############################################
-# $Id: attrTmqtt2_roborock_Utils.pm 2020-01-19 Beta-User $
+# $Id$
 #
 
 package main;
@@ -52,14 +52,16 @@ EOD
   return \%ret;
 }
 
-
-
 1;
 
+__END__
+
 =pod
+=item summary helper functions needed for roborock MQTT2_DEVICE
+=item summary_DE needed Hilfsfunktionen für roborock MQTT2_DEVICE
 =begin html
 
-<a name="attrTmqtt2_roborock_Utils"></a>
+<a id="attrTmqtt2_roborock_Utils"></a>
 <h3>attrTmqtt2_roborock_Utils</h3>
 <ul>
   <b>Functions to support attrTemplates for roborock/valetudo</b><br> 

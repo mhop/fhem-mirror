@@ -43,6 +43,7 @@
 # 11.03.21 GA fix prevent parallel InternalTimer calls
 # 14.03.21 GA fix change order of PWMR processing for maxOffTime handling
 # 18.03.21 GA fix maxOffTime handling bug in restriction of max rooms on
+# 10.11.21 GA fix default verbosity of logs adjusted
 
 ##############################################
 # $Id$
@@ -719,7 +720,7 @@ PWM_Calculate($)
             {
               $newstateOHS_eoff = 1;
               $newstateOHS      = "off";
-              Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch forced to off since ThresholdTemp reached maxTemp ($temp >= $maxTemp)");
+              Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitch forced to off since ThresholdTemp reached maxTemp ($temp >= $maxTemp)");
               readingsBulkUpdate ($hash,  "OverallHeatingSwitchTT_Off", 1);
             }
             else
@@ -732,12 +733,12 @@ PWM_Calculate($)
           }
           else
           {
-            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitchThresholdTemp t_regexp does not match temperature");
+            Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitchThresholdTemp t_regexp does not match temperature");
           }
         }
         else
         {
-          Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitchThresholdTemp refers to invalid device or reading");
+          Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitchThresholdTemp refers to invalid device or reading");
         }
       }
 
@@ -756,12 +757,12 @@ PWM_Calculate($)
 
             if ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} eq "") {
               $newstateOHS = "on";
-              Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off (init timestamp)");
+              Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off (init timestamp)");
               readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", FmtDateTime(time() + $hash->{OverallHeatingSwitch_followUpTime}));
 
             } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitUntilOff}{VAL} ge TimeNow()) {
               $newstateOHS = "on";
-              Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off");
+              Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off");
             } else {
               readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntilOff", "");
             }
@@ -777,12 +778,12 @@ PWM_Calculate($)
 
           if ($hash->{READINGS}{OverallHeatingSwitchWaitBeforeOn}{VAL} eq "") {
             $newstateOHS = "off";
-            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for delayTimeOn before switching on (init timestamp)");
+            Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitch wait for delayTimeOn before switching on (init timestamp)");
             readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", FmtDateTime(time() + $hash->{OverallHeatingSwitch_delayTimeOn}));
 
           } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitBeforeOn}{VAL} ge TimeNow()) {
             $newstateOHS = "off";
-            Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for delayTimeOn before switching on");
+            Log3 ($name, 3, "PWM_Calculate: $name: OverallHeatingSwitch wait for delayTimeOn before switching on");
           } else {
             readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitBeforeOn", "");
           }

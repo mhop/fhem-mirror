@@ -84,6 +84,7 @@ at_Define($$)
         $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900, 0,0,-1);
 
       } else {
+        $hash->{STATE} = $err;
         return $err;
       }
 
@@ -93,7 +94,7 @@ at_Define($$)
   return "datespec is not allowed with +" if($abstime && $rel);
 
   if($hash->{CL}) {     # Do not check this for definition
-    $err = perlSyntaxCheck($command, ());
+    $err = perlSyntaxCheck($command, ("%SELF" => $name) );
     return $err if($err);
   }
 
@@ -194,7 +195,8 @@ at_Exec($)
 
   if(!$skip && !IsDisabled($name)) {
     Log3 $name, 5, "exec at command $name";
-    my $ret = AnalyzeCommandChain(undef, SemicolonEscape($hash->{COMMAND}));
+    my %sp = ( "%SELF" => $name );
+    my $ret = AnalyzeCommandChain(undef, EvalSpecials($hash->{"COMMAND"}, %sp));
     Log3 $name, 3, "$name: $ret" if($ret);
   }
 
@@ -281,7 +283,8 @@ at_Set($@)
    
   } elsif($a[1] eq "execNow") {
     my $name = $hash->{NAME};
-    my $ret = AnalyzeCommandChain(undef, SemicolonEscape($hash->{COMMAND}));
+    my %sp = ( "%SELF" => $name );
+    my $ret = AnalyzeCommandChain(undef, EvalSpecials($hash->{"COMMAND"}, %sp));
     Log3 $name, 3, "$name: $ret" if($ret);
 
   } elsif($a[1] eq "skip_next") {

@@ -66,6 +66,7 @@ my %zwave_class = (
     get   => { swbStatus   => "02",       },
     parse => { "..250300"  => "state:off",
                "..2503ff"  => "state:on",
+               "032503(..)"=> 'sprintf("swbStatus:%s", hex($1))',
                "052503(..)(..)(..)" => 'sprintf("swbStatus:%s target %s '.
                           'duration %s", hex($1), hex($2),ZWave_byte2time($3))',
                "03250100"  => "state:setOff",
@@ -199,8 +200,16 @@ my %zwave_class = (
                tmHeating   => "0101",
                tmCooling   => "0102",
                tmAuto      => "0103",
+               tmAuxiliary => "0104",
+               tmResume    => "0105",
                tmFan       => "0106",
+               tmFurnace   => "0107",
+               tmDryAir    => "0108",
+               tmMoistAir  => "0109",
+               tmAutoChange=> "010a",
                tmEnergySaveHeating => "010b",
+               tmEnergySaveCooling => "010c",
+               tmAway      => "010d",
                tmFullPower => "010f",
                tmManual    => "011f" },
     get   => { thermostatMode => "02" },
@@ -208,8 +217,16 @@ my %zwave_class = (
                "0.400301"  => "thermostatMode:heating",
                "0.400302"  => "thermostatMode:cooling",
                "0.400303"  => "thermostatMode:auto",
+               "0.400304"  => "thermostatMode:auxiliary",
+               "0.400305"  => "thermostatMode:resume",
                "0.400306"  => "thermostatMode:fanOnly",
+               "0.400307"  => "thermostatMode:furnace",
+               "0.400308"  => "thermostatMode:dryAir",
+               "0.400309"  => "thermostatMode:moistAir",
+               "0.40030a"  => "thermostatMode:autoChange",
                "0.40030b"  => "thermostatMode:energySaveHeating",
+               "0.40030c"  => "thermostatMode:energySaveCooling",
+               "0.40030d"  => "thermostatMode:away",
                "0.40030f"  => "thermostatMode:fullPower",
                "0.40031f"  => "thermostatMode:manual",
                "0.400100"  => "thermostatMode:setTmOff",
@@ -415,7 +432,8 @@ my %zwave_class = (
   WINDOW_COVERING          => { id => '6a' },
   IRRIGATION               => { id => '6b' },
   SUPERVISION              => { id => '6c' },
-  ENTRY_CONTROL            => { id => '6f' },
+  ENTRY_CONTROL            => { id => '6f',
+    parse => { "^..6f01(.*)" => 'ZWave_entryControlParse($hash,$1)'} },
   CONFIGURATION            => { id => '70',
     set   => { configDefault=>"04%02x80",
                configByte  => "04%02x01%02x",
@@ -662,6 +680,7 @@ my %zwave_modelIdAlias = ( "0175-0004-000a" => "devolo_Siren",
                            "010f-0203-1000" => "Fibaro_FGS223",
                            "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
                            "013c-0004-000a" => "Philio_PSE02", # Zipato Siren
+                           "0131-0003-1083" => "zipato_Siren",
                            "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
@@ -702,7 +721,12 @@ our %zwave_deviceSpecial;
                alarmAmbulanceOn=>"05000000000a030000",
                alarmPoliceOn   =>"05000000000a010000",
                alarmDoorchimeOn=>"050000000006160000",
-               alarmBeepOn     =>"05000000000a050000" } } }
+               alarmBeepOn     =>"05000000000a050000" } } },
+
+   zipato_Siren => {
+     ALARM => {
+      set => { doorbellOn      =>"05000000ff061600" } } }
+
 #   ZME_KFOB => {
 #     ZWAVEPLUS_INFO => {
 #      # Example only. ORDER must be >= 50
@@ -748,6 +772,7 @@ ZWave_Initialize($)
     dummy:1,0
     eventForRaw
     extendedAlarmReadings:0,1,2
+    generateRouteInfoEvents:1,0
     ignore:1,0
     ignoreDupMsg:1,0
     neighborListPos
@@ -1591,7 +1616,8 @@ ZWave_thermostatSetpointParse ($$)
   # output temperature with variable decimals as reported (according to $prec)
   my $rt = sprintf("setpointTemp:%0.*f %s %s", $prec, $sp, $scale, $type);
 
-  return ($rt);
+  return $rt if($type !~ m/heating|cooling/);
+  return ($rt, sprintf("desired-temp:%0.*f", $prec, $sp) );
 }
 
 sub
@@ -1792,7 +1818,14 @@ my %zwm_unit = (
   heating => ["kWh" ],
   cooling => ["kWh" ]
 );
-my @meter_type_text = ("undef", "energy", "gas", "water", "heating", "cooling");
+my @meter_type_text = (
+  "UNKNOWN_0",
+  "energy",
+  "gas",
+  "water",
+  "heating",
+  "cooling"
+);
 
 sub
 ZWave_meterParse($$)
@@ -1811,7 +1844,7 @@ ZWave_meterParse($$)
 
   my $meter_type = ($v1 & 0x1f);
   my $meter_type_text = ($meter_type > $#meter_type_text ?
-                        "undef" : $meter_type_text[$meter_type]);
+                        "UNKNOWN_${meter_type}" : $meter_type_text[$meter_type]);
 
   my $precision = ($v2>>5) & 0x7; # 3 bits
   my $scale     = ($v2>>3) & 0x3; # 2 bits, meaning unit
@@ -1820,8 +1853,8 @@ ZWave_meterParse($$)
   $scale |= (($v1 & 0x80) >> 5);
   $scale = 8+hex(substr($v3, -2)) if($scale == 7); # V4
 
-  my $unit_text = ($meter_type_text eq "undef" ?
-                        "undef" : $zwm_unit{$meter_type_text}[$scale]);
+  my $unit_text = ($meter_type_text =~ m/^UNKNOWN/ ?
+                        "UNKNOWN" : $zwm_unit{$meter_type_text}[$scale]);
   $meter_type_text = "power"   if ($unit_text eq "W");
   $meter_type_text = "voltage" if ($unit_text eq "V");
   $meter_type_text = "current" if ($unit_text eq "A");
@@ -1984,6 +2017,7 @@ ZWave_versionClassAllGet($@)
   return !$hash->{asyncGet}; # "veto" for parseHook/getAll
 }
 
+# https://sdomembers.z-wavealliance.org/document/dl/640
 my %zwave_ml_tbl = (
    '01' => { n => 'temperature',          st => ['C', 'F'] },
    '02' => { n => 'generalPurpose',       st => ['%', ''] },
@@ -2040,6 +2074,43 @@ my %zwave_ml_tbl = (
    '31' => { n => 'totalBodyWater',       st => ['Kg'] },
    '32' => { n => 'basicMetabolicRate',   st => ['J'] },
    '33' => { n => 'bodyMassIndex',        st => ['BMI'] },
+   '34' => { n => 'accelerationXaxis',    st => ['m/s2'] },
+   '35' => { n => 'accelerationYaxis',    st => ['m/s2'] },
+   '36' => { n => 'accelerationZaxis',    st => ['m/s2'] },
+   '37' => { n => 'smokeDensity',         st => ['%'] },
+   '38' => { n => 'waterFlow',            st => ['l/h'] },
+   '39' => { n => 'waterPressure',        st => ['kPa'] },
+   '3A' => { n => 'signalStrength',       st => ['RSSI  dBm'] },
+   '3B' => { n => 'particulateMatter10',  st => ['mol/m3', 'µg/m3'] },
+   '3C' => { n => 'respiratoryRate',      st => ['bpm'] },
+   '3D' => { n => 'relativeModulationLevel', st => ['%'] },
+   '3E' => { n => 'boilerWaterTemp',      st => ['C', 'F'] },
+   '3F' => { n => 'domesticHotWatertemp', st => ['C', 'F'] },
+   '40' => { n => 'outsideTemp',          st => ['C', 'F'] },
+   '41' => { n => 'exhaustTemp',          st => ['C', 'F'] },
+   '42' => { n => 'waterChlorineLevel',   st => ['mg/l'] },
+   '43' => { n => 'waterAcidity',         st => ['pH'] },
+   '44' => { n => 'waterOxidationReductionPotential', st => ['mV'] },
+   '45' => { n => 'heartRateLFHFratio',   st => [''] },
+   '46' => { n => 'motionDirection',      st => ['°'] },
+   '47' => { n => 'appliedForce',         st => ['N'] },
+   '48' => { n => 'returnAirTemp',        st => ['C', 'F'] },
+   '49' => { n => 'supplyAirTemp',        st => ['C', 'F'] },
+   '4A' => { n => 'condenserCoilTemp',    st => ['C', 'F'] },
+   '4B' => { n => 'evaporatorCoilTemp',   st => ['C', 'F'] },
+   '4C' => { n => 'liquidLineTemp',       st => ['C', 'F'] },
+   '4D' => { n => 'dischargeLineTemp',    st => ['C', 'F'] },
+   '4E' => { n => 'suctionPressure',      st => ['kPa', 'psi'] },
+   '4F' => { n => 'dischargePressure',    st => ['kPa', 'psi'] },
+   '50' => { n => 'defrostTemp',          st => ['C', 'F'] },
+   '51' => { n => 'ozone',                st => ['μg/m3'] },
+   '52' => { n => 'sulfurDioxide',        st => ['μg/m3'] },
+   '53' => { n => 'nitrogenDioxide',      st => ['μg/m3'] },
+   '54' => { n => 'ammonia',              st => ['μg/m3'] },
+   '55' => { n => 'lead',                 st => ['μg/m3'] },
+   '56' => { n => 'particulateMatter1',   st => ['μg/m3'] },
+   '57' => { n => 'personCounterEntering',st => [''] },
+   '58' => { n => 'personCounterExiting', st => [''] }
 );
 
 sub
@@ -4639,8 +4710,11 @@ ZWave_callbackId($;$)
     $zwave_cbid = ($zwave_cbid+1) % 256;
     my $hx = sprintf("%02x", $zwave_cbid);
     $zwave_cbid2dev{$hx} = $p;
-    #Log 1, "CB: $cmd => $hx" if($cmd);
-    $zwave_cbid2cmd{$hx} = $cmd if(defined($cmd));
+    my $iodev = $p->{IODev};
+    if($cmd && ref($iodev) eq "HASH" && $iodev->{setReadingOnAck}) {
+      Log3 $iodev, 5, "ReadingOnAck $p->{NAME} '$cmd' => $hx";
+      $zwave_cbid2cmd{"$p->{NAME} $hx"} = $cmd;
+    }
     return $hx;
   }
   return $zwave_cbid2dev{$p};
@@ -4864,9 +4938,80 @@ ZWave_addToSendStack($$$)
   return undef;
 }
 
+sub
+ZWAVE_parseRouteInfo($$$)
+{
+  my ($ioName, $hash, $arg) = @_;
+  my $repeaters = hex(substr($arg,4,2));
+  my @list;
+  my $maxlen = $repeaters * 2 + 8;
+  my $i=0;
+
+  for(my $off=6; $off<$maxlen; $off+=2,$i++) {
+    my $dec = hex(substr($arg, $off, 2));
+    my $msg = "reservedValue";
+    if(     $dec == 127) { $msg = "N/A";
+    } elsif($dec == 126) { $msg = "aboveMaxPower";
+    } elsif($dec == 125) { $msg = "belowReceiverSensitivity";
+    } elsif($dec > 161 && $dec < 225) {
+      $msg = unpack('c', pack('C', $dec))." dBm";
+    }
+    push(@list, "rssi$i:$msg");
+  }
+  my $rssi = join(" ", @list);
+
+  my $ackCh  = hex(substr($arg,16,2));
+  my $lastCh = hex(substr($arg,18,2));
+
+  my @schemeEncoding = qw( Idle DirectTransmission ApplicationStaticRoute 
+                           LastWorkingRoute NextToLastWorkingRoute 
+                           ReturnRoutOrControllerAutoRoute DirectResort 
+                           ExplorerFrame );
+  my $scheme= $schemeEncoding[hex(substr($arg,20,2))];
+
+  my $homeId = $hash->{homeId};
+  my @list2;
+
+  for(my $off=22; $off<($repeaters*2+22); $off+=2) {
+    my $dec = hex(substr($arg, $off, 2));
+    my $hex = sprintf("%02x", $dec);
+    my $h = ($hex eq $hash->{nodeIdHex} ?
+                  $hash : $modules{ZWave}{defptr}{"$homeId $hex"});
+    push @list2, ($h ? $h->{NAME} : "UNKNOWN_$dec") if($dec);
+  }
+
+  my $f = substr($arg, 30, 2);
+  push @list2, ("at ".($f==1 ? "9.6": ($f==2 ? "40":"100"))."kbps")
+    if($f =~ m/[123]/);
+  my $routefor = join(" ", @list2);
+
+  my $tries      = hex(substr($arg,32,2));
+  my $lastfailed = hex(substr($arg,34,4));
+  my @list3;
+
+  for(my $off=34; $off<=38; $off+=2) {
+    my $dec = hex(substr($arg, $off, 2));
+    my $hex = sprintf("%02x", $dec);
+    my $h = ($hex eq $hash->{nodeIdHex} ?
+                  $hash : $modules{ZWave}{defptr}{"$homeId $hex"});
+    push @list3, ($h ? $h->{NAME} : "UNKNOWN_$dec") if($dec);
+  }
+  $lastfailed=join(" ", @list3);
+
+  my $timeToCb   = hex(substr($arg,0,4))/100;
+  my $msg = "timeToCb:$timeToCb repeaters:$repeaters $rssi ".
+            "ackCh:$ackCh lastCh:$lastCh scheme:$scheme ".
+            "rep:$routefor routeTries:$tries lastFailed:$lastfailed";
+  Log3 $ioName, 5, "$hash->{NAME}: $msg";
+  if(AttrVal($hash->{NAME}, "generateRouteInfoEvents", 0)) {
+    DoTrigger($hash->{NAME}, $msg);
+  }
+  readingsSingleUpdate($hash, "routeInfo", $msg, 0);
+}
+
 
 ###################################
-# 0004000a03250300 (sensor binary off for id 11)
+# wakeup:notification for nodeIdHex 0c:
 # { ZWave_Parse($defs{zd}, "0004000c028407", "") }
 sub
 ZWave_Parse($$@)
@@ -5106,6 +5251,7 @@ ZWave_Parse($$@)
     if($id eq "00") {
       my $name="";
       if($hash) {
+        ZWAVE_parseRouteInfo($ioName, $hash, $arg) if(length($arg) == 38);
         ZWave_processSendStack($hash, "ack", $callbackid);
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
 
@@ -5128,12 +5274,13 @@ ZWave_Parse($$@)
           }
 
           if($iodev->{setReadingOnAck}) {
-            my $ackCmd = $zwave_cbid2cmd{$callbackid};
+            my $ackCmd = $zwave_cbid2cmd{"$lname $callbackid"};
             if($ackCmd) {
-              #Log 1, "ACK: $callbackid => $ackCmd";
+              Log3 $iodev, 5, "ReadingOnAck $lname $callbackid => '$ackCmd'";
               my ($type, $reading, $val) = split(" ", $ackCmd, 3);
-              readingsBulkUpdate($lhash, $reading, $val, 1) 
+              readingsBulkUpdate($lhash, $reading, $val, 1)
                   if($type eq "set" && defined($val));
+              delete($zwave_cbid2cmd{"$lname $callbackid"});
               $name = $lname;
             }
           }
@@ -6072,6 +6219,33 @@ ZWave_firmwareUpdateParse($$$)
     return 1; #Veto
   }
 }
+
+
+sub
+ZWave_entryControlParse($$)
+{
+  my ($hash, $msg) = @_;
+  $msg =~ m/^(..)(..)(..)(..)(.*)$/;
+  my ($seq, $dt, $et, $l, $data) = ($1, $2, $3, $4, $5);
+  return "UNPARSED_ENTRY_CONTROL: $msg" if(!defined($et));
+
+  my %dataType = ("00"=>"NA", "01"=>"RAW", "02"=>"ASCII", "03"=>"MD5");
+  $dt = $dataType{$dt} ? $dataType{$dt} : "unknown_$et";
+
+  my %eventType = (
+    "00"=>"CACHING", "01"=>"CACHED_KEYS", "02"=>"ENTER", "03"=>"DISARM_ALL",
+    "04"=>"ARM_ALL", "05"=>"ARM_AWAY", "06"=>"ARM_HOME", "07"=>"EXIT_DELAY",
+    "08"=>"ARM_1", "09"=>"ARM_2", "0A"=>"ARM_3", "0B"=>"ARM_4", "0C"=>"ARM_5",
+    "0D"=>"ARM_6", "0E"=>"RFID", "0F"=>"BELL", "10"=>"FIRE", "11"=>"POLICE",
+    "12"=>"ALERT_PANIC", "13"=>"ALERT_MEDICAL", "14"=>"GATE_OPEN",
+    "15"=>"GATE_CLOSE", "16"=>"LOCK", "17"=>"UNLOCK", "18"=>"TEST" );
+  $et = $eventType{$et} ? $eventType{$et} : "unknown_$et";
+
+  $data = "" if(!defined($data));
+  $data = pack("H*", $data) if($dt eq "ASCII");
+
+  return "entry_control:sequence $seq dataType $dt eventType $et data $data"
+}
 1;
 
 =pod
@@ -6085,9 +6259,9 @@ ZWave_firmwareUpdateParse($$$)
   This module is used to control ZWave devices via FHEM, see <a
   href="http://www.z-wave.com">www.z-wave.com</a> for details for this device
   family. The full specification of ZWave command classes can be found here:
-  <a href="http://zwavepublic.com/specifications" 
+  <a href="https://www.silabs.com/wireless/z-wave/specification" 
   title="website with the full specification of ZWave command classes">
-  http://zwavepublic.com/specifications</a>.
+  https://www.silabs.com/wireless/z-wave/specification</a>.
   This module is a client of the <a href="#ZWDongle">ZWDongle</a>
   module, which is directly attached to the controller via USB or TCP/IP.  To
   use the SECURITY features, the Crypt-Rijndael perl module is needed.
@@ -7228,6 +7402,21 @@ ZWave_firmwareUpdateParse($$$)
       if really needed as duplicate events are generated.
       </li>
 
+    <li><a name="generateRouteInfoEvents">generateRouteInfoEvents</a><br>
+      if set (to 1) a timeToCb event with additional information regarding the
+      controller to device communication is generated, after sending data to
+      the device.<br>
+      Notes:
+      <ul>
+      <li>A controller with SDK 6.60 or higher is required. 
+        (tested with UZB1/Razberry firmware 5.27)</li>
+      <li>Additional Information in Silicon Lab documents:
+      "Appl. Programmers Guide" and 
+      "Z-Wave Network Installation and maintenance Procedures User Guide"</li>
+      <li>ReadingFnAttributes are not supported for this event.</li>
+      </ul>
+    </li>
+
     <li><a href="#ignore">ignore</a></li>
     <li><a name="ignoreDupMsg">ignoreDupMsg</a><br>
       Experimental: if set (to 1), ignore duplicate wakeup messages, or
@@ -7419,6 +7608,16 @@ ZWave_firmwareUpdateParse($$$)
     $mode = [unsecured|unsecured_withTimeout|unsecured_inside|
       unsecured_inside_withTimeout|unsecured_outside|
       unsecured_outside_withTimeout|secured</li>
+
+  <br><br><b>Class ENTRY_CONTROL</b>
+  <li>entry_control:sequence $seq dataType $dt eventType $et data $data<br>
+  where:<ul>
+  <li>$dt is one of NA RAW ASCII MD5</li>
+  <li>$et is one of CACHING CACHED_KEYS ENTER DISARM_ALL ARM_ALL ARM_AWAY
+      ARM_HOME EXIT_DELAY ARM_1 ARM_2 ARM_3 ARM_4 ARM_5 ARM_6 RFID BELL FIRE
+      POLICE ALERT_PANIC ALERT_MEDICAL GATE_OPEN GATE_CLOSE LOCK UNLOCK TEST</li>
+  </ul>
+  </li>
 
   <br><br><b>Class HAIL</b>
   <li>hail:01<br></li>

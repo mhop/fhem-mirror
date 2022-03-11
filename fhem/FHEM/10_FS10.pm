@@ -89,7 +89,7 @@ sub Initialize {
 	                      "$main::readingFnAttributes " .
 	                      'model:'.join q{,} , sort keys %models;
 	$hash->{AutoCreate} = {'FS10.*' => {FILTER => '%NAME', autocreateThreshold => '5:180', GPLOT => q{}}};
-	return
+	return;
 }
 
 sub Attr {

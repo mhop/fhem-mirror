@@ -378,12 +378,12 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
-  $hash->{NotifyFn}  = "OWDevice_Notify";
-  $hash->{NotifyOrderPrefix}= "50b-";
+  #$hash->{NotifyFn}  = "OWDevice_Notify";
+  #$hash->{NotifyOrderPrefix}= "50b-";
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model cstrings ".
+  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model cstrings disable:0,1 ".
                        "resolution:9,10,11,12 ".
                        $readingFnAttributes;
 }
@@ -506,6 +506,9 @@ OWDevice_UpdateValues($) {
 
         my ($hash)= @_;
 
+        my $name= $hash->{NAME};
+        return if (AttrVal($name, 'disable', 0) == 1);
+
         my @polls= @{$hash->{fhem}{polls}};
         my @getters= @{$hash->{fhem}{getters}};
         my @state= @{$hash->{fhem}{state}};
@@ -577,8 +580,13 @@ OWDevice_Attr($@)
               delete $hash->{fhem}{interfaces} if(defined($hash->{fhem}{interfaces}));
               Log3 $name, 5, "$name: no interfaces";
             }
+        } elsif($attrName eq "disable" && ($cmd eq 'del' || !$attrVal)) { # restart after disable
+            $init_done ? RemoveInternalTimer($hash)
+                       : RemoveInternalTimer("OWDevice_UpdateValues");# just to be sure...;
+            InternalTimer(int(gettimeofday()) + $hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
+                if defined $hash->{fhem}{interval};
         }
-}        
+}
 
 ###################################
 sub
@@ -694,28 +702,19 @@ OWDevice_Define($$)
         $hash->{fhem}{alerting}= $alerting;
         Log3 $name, 5, "$name: alerting: $alerting";
 
-        $hash->{NOTIFYDEV} = "global";
-        
-        if( $init_done ) {
-          OWDevice_InitValues($hash);
-          OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
-        }
-
+        InternalTimer(int(gettimeofday())+ 12, 'OWDevice_Start', $hash, 0); # wait for fhem ready
         return undef;
 }
 
 sub
-OWDevice_Notify($$)
+OWDevice_Start($$)
 {
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
 
-  return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-
-  return if($attr{$name} && $attr{$name}{disable});
-
+  return if IsDisabled( $name );
+  
   OWDevice_InitValues($hash);
   RemoveInternalTimer($hash);
   # http://forum.fhem.de/index.php/topic,16945.0/topicseen.html#msg110673
@@ -723,8 +722,9 @@ OWDevice_Notify($$)
   Log3 $name, 5, "$name: initial delay: $delay";
   InternalTimer(int(gettimeofday())+$delay, "OWDevice_UpdateValues", $hash, 0) if(defined($hash->{fhem}{interval}));
 
-  return undef;
+  return;
 }
+
 sub
 OWDevice_InitValues($)
 {
@@ -908,6 +908,7 @@ OWDevice_InitValues($)
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
     <li>cstrings: interprets reading as C-style string, i.e. stops reading on the first zero byte. Default is 0 (off).</li>
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
+    <li>disable: set to 1 to disable polling.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li>model: preset with device type, e.g. DS18S20.</li>
     <li>resolution: resolution of temperature reading in bits, can be 9, 10, 11 or 12. 
@@ -1071,6 +1072,7 @@ OWDevice_InitValues($)
     <li>trimvalues: Entfernt voran- und nachgestellte Leerzeichen aus den readings. Standartwert ist 1 (ein).</li>
     <li>cstrings: Interpretiert die readings als C-String, d.h. h&ouml;rt mit dem ersten 0-Byte zu lesen auf. Standardwert ist 0 (off).</li>
     <li>polls: Eine per Komma getrennte Liste der abzurufenden readings. Mit diesem Attribut unterdrückt man alle standartmäßig abgerufenen readings und ersetzt sie durch die eigene Zusammenstellung.</li>
+    <li>disable: auf 1 setzen, um Polling abzustellen.</li>
     <li>interfaces: Ersetzt die durch dieses Gerät erzeugten Interfaces.</li>
     <li>model: Angabe des Gerätetyps, z.B.: DS18S20.</li>
     <li>resolution: Angabe der Auflösung für die Temperaturmessung in bits, zur Verfügung stehen: 9, 10, 11 oder 12. 

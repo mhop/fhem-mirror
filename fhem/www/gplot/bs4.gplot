@@ -2,6 +2,7 @@
 # Display brightness sensor log (BS) of the form
 2012-07-29_16:54:47 e.ext.bs brightness: 39.45  lux: 138267  flags: 0
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 

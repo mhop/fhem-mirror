@@ -71,6 +71,7 @@ use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
 use Encode;
+use Encode::Guess;
 use File::Find;
 use File::Glob ':bsd_glob';
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -144,6 +145,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.8.1"  => "24.05.2021  fix FHEM crash when malfomed JSON is received ".
+                           "Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531 ",
   "0.8.0"  => "18.03.2021  extend commandref, switch to 'stable' ",
   "0.7.7"  => "07.01.2021  avoid FHEM crash if Cache file content is not valid JSON format ",
   "0.7.6"  => "20.12.2020  minor change to avoid increase memory ",
@@ -767,11 +770,17 @@ sub __fillUploadQueue {
 
   for my $sn (keys %{$found}) {
       my $fname  = (split "\/", $found->{$sn}{lfile})[-1];
-      my $mtime  = $found->{$sn}{mtime}  * 1000;                        # Angabe in Millisekunden
-      my $crtime = $found->{$sn}{crtime} * 1000;                        # Angabe in Millisekunden
-      my $dir    = $remDir.$found->{$sn}{ldir};                         # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
       
-      if($struc eq "false") {                                           # Ziel nicht Struktur erhaltend (alle Files landen im Zielverzeichnis ohne Unterverzeichnisse)
+      my $enc    = guess_encoding($fname, qw/utf8/);                                   # check ob Name UTF8 kodiert, Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531
+      if(!ref $enc ) {
+          $fname  = encode ("utf8", $fname);
+      }
+       
+      my $mtime  = $found->{$sn}{mtime}  * 1000;                                       # Angabe in Millisekunden
+      my $crtime = $found->{$sn}{crtime} * 1000;                                       # Angabe in Millisekunden
+      my $dir    = $remDir.$found->{$sn}{ldir};                                        # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
+      
+      if($struc eq "false") {                                                          # Ziel nicht Struktur erhaltend (alle Files landen im Zielverzeichnis ohne Unterverzeichnisse)
           $dir = $remDir;
       }
       
@@ -1657,7 +1666,7 @@ sub execOp_parse {
                 return;
             }
             
-            $jdata = decode_json($myjson);
+            eval { $jdata = decode_json($myjson); };                          ## no critic 'eval not tested'  #Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531
             
             Log3($name, 5, "$name - JSON returned: ". Dumper $jdata);
        
@@ -1699,7 +1708,7 @@ sub execOp_parse {
             
             $errorcode = $jdata->{error}->{code};
             $cherror   = $jdata->{error}->{errors};                                   
-            $error     = expErrors($hash,$errorcode);                                 # Fehlertext zum Errorcode ermitteln
+            $error     = expErrors($hash,$errorcode) // q{};                          # Fehlertext zum Errorcode ermitteln
             
             if ($error =~ /not found/) {
                 $error .= " New error: ".($cherror // "'  '");
@@ -2775,6 +2784,7 @@ return $out;
         "Time::HiRes": 0,
         "HttpUtils": 0,
         "Encode": 0,
+        "Encode::Guess": 0,
         "FHEM::SynoModules::API": 0,
         "FHEM::SynoModules::SMUtils": 0,
         "FHEM::SynoModules::ErrCodes": 0,

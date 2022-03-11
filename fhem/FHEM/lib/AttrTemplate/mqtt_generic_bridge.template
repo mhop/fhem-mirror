@@ -24,13 +24,13 @@ prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devic
 filter:TYPE=MQTT_GENERIC_BRIDGE
 desc:This template is proposal to fullfill requirements for the rest of the s some basic configuration on the MQTT_GENERIC_BRIDGE side itself, especially <b>different topic structures for sending readings values and receiving commands and/or reading values.</b><br>Note: All outgoing messages will be sent without retain flag; change this to 1, if you absulutely need values stored on your MQTT server (e.g. if your clients are not always connected).
 order:000001
-par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
-par:SUBSCRIPTIONS;Current subscription attribute value of the IO-Device, defaults to 'setByTheProgram';{ AttrVal("DEVICE",'subscriptions','setByTheProgram') }
-par:RADIO_SETCLIENTODERMGB_M2D;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE MQTT2_DEVICE" (recommended);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,"TYPE","MQTT") eq "MQTT"; AttrVal($io,"clientOrder",undef) }
-par:RADIO_SETCLIENTODERMGB_ONLY;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE" (MGB only mode);{ my $io = AttrVal("DEVICE",'IODev',""); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,"clientOrder",undef) }
-par:RADIO_SETCLIENTODERM2D_MGB;Set clientOrder on IODev to "MQTT2_DEVICE MQTT_GENERIC_BRIDGE" (default, may cause unintended autocreates);{ my $io = AttrVal('DEVICE','IODev',""); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
-par:RADIO_DONTSETCLIENTODER;Leave clientOrder on IODev (default is "MQTT2_DEVICE MQTT_GENERIC_BRIDGE", may cause unintended autocreates);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
-par:ATTRTVERSION;Version of attrTemplate;{ '20210222' }
+par:IODEVNAME;Name of the IO-Device; { AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
+par:SUBSCRIPTIONS;Current subscription attribute value of the IO-Device, defaults to 'setByTheProgram';{ my $io = AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}); AttrVal($io,'subscriptions','setByTheProgram') }
+par:RADIO_SETCLIENTODERMGB_M2D;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE MQTT2_DEVICE" (recommended);{ my $io = AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
+par:RADIO_SETCLIENTODERMGB_ONLY;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE" (MGB only mode);{ my $io = AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
+par:RADIO_SETCLIENTODERM2D_MGB;Set clientOrder on IODev to "MQTT2_DEVICE MQTT_GENERIC_BRIDGE" (default, may cause unintended autocreates);{ my $io = AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
+par:RADIO_DONTSETCLIENTODER;Leave clientOrder on IODev (default is "MQTT2_DEVICE MQTT_GENERIC_BRIDGE", may cause unintended autocreates);{ my $io = AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
+par:ATTRTVERSION;Version of attrTemplate;{ '20211208' }
 attr DEVICE globalDefaults sub:base=DEVICE/set pub:base=DEVICE
 setreading DEVICE attrTemplateVersion ATTRTVERSION_MQTT
 option:{ RADIO_SETCLIENTODERMGB_M2D }
@@ -53,7 +53,7 @@ option:global
 ## subordintated devices section
 
 name:----subordinated-devices-section--------
-filter:MQTT_GENERIC_BRIDGE
+filter:TYPE=MQTT_GENERIC_BRIDGE
 prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devices[0];return 0}
 order:000002
 
@@ -214,3 +214,17 @@ attr TARGETDEV MQTTPREFIXAlias dim=pct
 option:{ SENDALLREADINGS && InternalVal("TARGETDEV",'TYPE','none') eq 'FBDECT' }
 attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$device/$name"}
 attr TARGETDEV MQTTPREFIXAlias dim=pct
+
+
+############
+name:mgb_avr
+prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devices[0];return 0}
+filter:TYPE=MQTT_GENERIC_BRIDGE
+desc:This template is intented to allow control for all "FHEM-like" audio/video receivers like PIONEERAVR or YAMAHA_AVR type devices.<br>NOTE: Early testing version, see https://forum.fhem.de/index.php/topic,122632.msg1171882.html#msg1171882 for details.<br>Might still need some changes!
+order:M_10000
+par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BRIDGE controll;{ undef }
+par:MQTTPREFIX;prefix used in MGB;{ InternalVal("DEVICE",'prefix',undef) } 
+
+option:global
+attr TARGETDEV MQTTPREFIXPublish state:topic={"$base/$device"} volume|mute|speakers|input:topic={"$base/$device/$name"}
+attr TARGETDEV MQTTPREFIXSubscribe state:stopic={"$base/$device"} volume|mute|speakers|input:stopic={"$base/$device/$name"}

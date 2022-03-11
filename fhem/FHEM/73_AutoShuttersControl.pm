@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2020 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -49,25 +49,16 @@ use utf8;
 use FHEM::Meta;
 
 use FHEM::Automation::ShuttersControl;
-use GPUtils qw(GP_Import GP_Export);
+use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
 BEGIN {
     # Import from main context
-    GP_Import(
-        qw(
-          readingFnAttributes
-          )
-    );
-
-    #-- Export to main context with different name
-    GP_Export(
-        qw(
-          Initialize
-          )
-    );
+    GP_Import(qw(readingFnAttributes));
 }
+
+sub ::AutoShuttersControl_Initialize { goto &Initialize }
 
 sub Initialize {
     my $hash = shift;
@@ -81,7 +72,7 @@ sub Initialize {
     $hash->{UndefFn}    = \&FHEM::Automation::ShuttersControl::Undef;
     $hash->{DeleteFn}   = \&FHEM::Automation::ShuttersControl::Delete;
     $hash->{ShutdownFn} = \&FHEM::Automation::ShuttersControl::Shutdown;
-    $hash->{AttrList}   =
+    $hash->{AttrList} =
         'ASC_tempSensor '
       . 'ASC_brightnessDriveUpDown '
       . 'ASC_autoShuttersControlMorning:on,off '
@@ -100,7 +91,8 @@ sub Initialize {
       . 'ASC_expert:1 '
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
-      . 'ASC_advDate:DeadSunday,FirstAdvent '
+      . 'ASC_advStartDate:DeadSunday,FirstAdvent '
+      . 'ASC_advEndDate:CandlemasDay,EpiphanyDay '
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
     $hash->{FW_detailFn} =
@@ -112,6 +104,8 @@ sub Initialize {
 
 1;
 
+__END__
+
 =pod
 =item device
 =item summary       Module for controlling shutters depending on various conditions
@@ -120,7 +114,7 @@ sub Initialize {
 
 =begin html
 
-<a name="AutoShuttersControl"></a>
+<a id="AutoShuttersControl"></a>
 <h3>AutoShuttersControl</h3>
 <ul>
     <p>
@@ -138,7 +132,7 @@ sub Initialize {
         closed window with shutters down is tilted, the shutters could be half opened for ventilation.
         Many more is possible.
     </p>
-    <a name="AutoShuttersControlDefine"></a>
+    <a id="AutoShuttersControl-define"></a>
     <strong>Define</strong>
     <ul>
         <p>
@@ -166,7 +160,7 @@ sub Initialize {
         </p>
     </ul>
     <br/>
-    <a name="AutoShuttersControlReadings"></a>
+    <a id="AutoShuttersControl-Readings"></a>
     <strong>Readings</strong>
     <ul>
         <p>Within the ASC device:</p>
@@ -200,122 +194,139 @@ sub Initialize {
                 If the brightness or time mode is used, the value from <em>ASC_Time_Up_Late</em> is shown.
             </li>
             <li><strong>ASC_Time_DriveDown</strong> - if the astro mode is used, the next sunset is shown.
-                If the brightness or time mode is used, the value from <em>ASC_TASC_Time_Down_Lateime_Up_Late</em> is
+                If the brightness or time mode is used, the value from <em>ASC_TASC_Time_Down_Late</em> is
                 shown.
             </li>
             <li><strong>ASC_ShuttersLastDrive</strong> - initiator for the last action</li>
         </ul>
     </ul>
     <br/><br/>
-    <a name="AutoShuttersControlSet"></a>
+    <a id="AutoShuttersControl-set"></a>
     <strong>Set</strong>
     <ul>
+        <a id="AutoShuttersControl-set-advDriveDown"></a>
+        <li><strong>advDriveDown</strong> - execute all moves delayed by <i>ASC_Adv on</i>.</li>
+        <a id="AutoShuttersControl-set-ascEnable"></a>
         <li><strong>ascEnable on|off</strong> - enable or disable the global control by ASC</li>
+        <a id="AutoShuttersControl-set-controlShading"></a>
         <li><strong>controlShading on|off</strong> - enable or disable the global shading control by ASC</li>
+        <a id="AutoShuttersControl-set-createNewNotifyDev"></a>
         <li><strong>createNewNotifyDev</strong> - re-creates the internal structure for NOTIFYDEV. Is only present if
             the
             <em>ASC_Expert</em> attribute is set to 1.
         </li>
+        <a id="AutoShuttersControl-set-hardLockOut"></a>
         <li><strong>hardLockOut on|off</strong> - <li><strong>hardLockOut - on/off</strong> - Aktiviert den hardwareseitigen Aussperrschutz f&uuml;r die Rolll&auml;den, bei denen das Attributs <em>ASC_LockOut</em> entsprechend auf hard gesetzt ist. Mehr Informationen in der Beschreibung bei den Attributen f&uuml;r die Rollladenger&auml;ten.</li>
         </li>
+        <a id="AutoShuttersControl-set-partyMode"></a>
         <li><strong>partyMode on|off</strong> - controls the global party mode for shutters. Every shutters whose
             <em>ASC_Partymode</em> attribute is set to <em>on</em>, is not longer controlled by ASC. The last saved
             working command send to the device, i.e. by a event, created by a window or presence event, will be executed
             once the party mode is disabled.
         </li>
-        <li><strong>renewAllTimer</strong> - resets the sunrise and sunset timers for every associated
-            shutter device and creates new internal FHEM timers.
-        </li>
+        <a id="AutoShuttersControl-set-renewTimer"></a>
         <li><strong>renewTimer</strong> - resets the sunrise and sunset timers for selected shutter
             device and creates new internal FHEM timers.
         </li>
+        <a id="AutoShuttersControl-set-renewAllTimer"></a>
+        <li><strong>renewAllTimer</strong> - resets the sunrise and sunset timers for all shutter
+            device and creates new internal FHEM timers.</li>
+        <a id="AutoShuttersControl-set-scanForShutters"></a>
         <li><strong>scanForShutters</strong> - scans the whole FHEM installation for (new) devices whose <em>ASC</em>
             attribute is set (to 1 or 2, see above).
         </li>
+        <a id="AutoShuttersControl-set-selfDefense"></a>
         <li><strong>selfDefense on|off</strong> - controls the self defense function. This function listens for
             example on a residents device. If this device is set to <em>absent</em> and a window is still open, ASC will close
             the shutter for a rudimentary burglary protection.
         </li>
+        <a id="AutoShuttersControl-set-shutterASCenableToggle"></a>
         <li><strong>shutterASCenableToggle on|off</strong> - controls if the ASC controls are shown at a associated
             shutter device.
         </li>
+        <a id="AutoShuttersControl-set-sunriseTimeWeHoliday"></a>
         <li><strong>sunriseTimeWeHoliday on|off</strong> - controls the weekend and holiday support. If enabled, the
             <em>ASC_Time_Up_WE_Holiday</em> attribute is considered.
         </li>
+        <a id="AutoShuttersControl-set-wiggle"></a>
         <li><strong>wiggle</strong> - wiggles a device for a given value (default 5%, controlled by
             <em>ASC_WiggleValue</em>) up or down and back after a minute. Useful as a deterrence in combination with
             alarm system.
         </li>
     </ul>
     <br/><br/>
-    <a name="AutoShuttersControlGet"></a>
+    <a id="AutoShuttersControl-get"></a>
     <strong>Get</strong>
     <ul>
+        <a id="AutoShuttersControl-get-showNotifyDevsInformations"></a>
         <li><strong>showNotifyDevsInformations</strong> - shows the generated <em>NOTIFYDEV</em> structure. Useful for
             debugging and only shown if the <em>ASC_expert</em> attribute is set to 1.
         </li>
     </ul>
     <br/><br/>
-    <a name="AutoShuttersControlAttributes"></a>
+    <a id="AutoShuttersControl-attr"></a>
     <strong>Attributes</strong>
     <ul>
         <p>At the global <abbr>ASC</abbr> device:</p>
 
         <ul>
-            <a name="ASC_autoAstroModeEvening"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeEvening"></a>
             <li><strong>ASC_autoAstroModeEvening</strong> - REAL, CIVIL, NAUTIC, ASTRONOMIC or HORIZON</li>
-            <a name="ASC_autoAstroModeEveningHorizon"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeEveningHorizon"></a>
             <li><strong>ASC_autoAstroModeEveningHorizon</strong> - Height above the horizon. Is only considered
                 if the <em>ASC_autoAstroModeEvening</em> attribute is set to <em>HORIZON</em>. Defaults to <em>0</em>.
             </li>
-            <a name="ASC_autoAstroModeMorning"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeMorning"></a>
             <li><strong>ASC_autoAstroModeMorning</strong> - REAL, CIVIL, NAUTIC, ASTRONOMIC or HORIZON</li>
-            <a name="ASC_autoAstroModeMorningHorizon"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeMorningHorizon"></a>
             <li><strong>ASC_autoAstroModeMorningHorizon</strong> - Height above the horizon. Is only considered
                 if the <em>ASC_autoAstroModeMorning</em> attribute is set to <em>HORIZON</em>. Defaults to <em>0</em>.
             </li>
-            <a name="ASC_autoShuttersControlComfort"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoShuttersControlComfort"></a>
             <li><strong>ASC_autoShuttersControlComfort - on|off</strong> -
                 Controls the comfort functions: If a three state sensor, like the <abbr>HmIP-SRH</abbr> window handle
                 sensor, is installed, <abbr>ASC</abbr> will open the window if the sensor signals open position. The
                 <em>ASC_ComfortOpen_Pos</em> attribute has to be set for the shutter to <em>on</em>, defaults to <em>off</em>.
             </li>
-            <a name="ASC_autoShuttersControlEvening"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoShuttersControlEvening"></a>
             <li><strong>ASC_autoShuttersControlEvening - on|off</strong> - Enables the automatic control by <abbr>ASC</abbr>
                 at the evenings.
             </li>
-            <a name="ASC_autoShuttersControlMorning"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoShuttersControlMorning"></a>
             <li><strong>ASC_autoShuttersControlMorning - on|off</strong> - Enables the automatic control by <abbr>ASC</abbr>
                 at the mornings.
             </li>
-            <a name="ASC_blockAscDrivesAfterManual"></a>
+            <a id="AutoShuttersControl-attr-ASC_blockAscDrivesAfterManual"></a>
             <li><strong>ASC_blockAscDrivesAfterManual 0|1</strong> - If set to <em>1</em>, <abbr>ASC</abbr> will not
                 automatically control a shutter if there was an manual control to the shutter. To be considered, the
                 <em>ASC_ShuttersLastDrive</em> reading has to contain the value <em>manual</em> and the shutter is in
                 an unknown (i.e. not otherwise configured in <abbr>ASC</abbr>) position.
             </li>
-            <a name="ASC_brightnessDriveUpDown"></a>
+            <a id="AutoShuttersControl-attr-ASC_brightnessDriveUpDown"></a>
             <li><strong>ASC_brightnessDriveUpDown - VALUE-MORNING:VALUE-EVENING</strong> - Drive the shutters by
                 brightness. <em>VALUE-MORNING</em> sets the brightness threshold for the morning. If the value is
                 reached in the morning, the shutter will go up. Vice versa in the evening. This is a global setting
                 and can be overwritte per device with the <em>ASC_BrightnessSensor</em> attribute (see below).
             </li>
-            <a name="ASC_debug"></a>
+            <a id="AutoShuttersControl-attr-ASC_debug"></a>
             <li><strong>ASC_debug</strong> -
                 Extendend logging for debugging purposes
             </li>
-            <a name="ASC_expert"></a>
+            <a id="AutoShuttersControl-attr-ASC_expert"></a>
             <li><strong>ASC_expert</strong> - Switches the export mode on. Currently, if set to <em>1</em>, <em>get</em>
                 and <em>set</em> will contain additional functions regarding the NOTIFYDEFs.
             </li>
-            <a name="ASC_freezeTemp"></a>
+            <a id="AutoShuttersControl-attr-ASC_freezeTemp"></a>
             <li><strong>ASC_freezeTemp</strong> - Temperature threshold for the freeze protection. The freeze protection
                 prevents the shutter to be operated by <abbr>ASC</abbr>. Last operating order will be kept.
             </li>
-            <a name="ASC_advDate"></a>
-            <li><strong>ASC_advDate</strong> - Advent Season, selected FirstAdvent or DeadSunday.
+            <a id="AutoShuttersControl-attr-ASC_advStartDate"></a>
+            <li><strong>ASC_advStartDate</strong> - Begin of Advent Season, selected FirstAdvent or DeadSunday.
             </li>
-            <a name="ASC_rainSensor"></a>
+            <a id="AutoShuttersControl-attr-ASC_advEndDate"></a>
+            <li><strong>ASC_advEndDate</strong> - End of Advent Season, selected CandlemasDay 6. January or EpiphanyDay 2. February.
+            </li>
+            <a id="AutoShuttersControl-attr-ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS]</strong> - Contains
                 settings for the rain protection. <em>DEVICNAME</em> specifies a rain sensor, the optional
                 <em>READINGNAME</em> the name of the reading at the <em>DEVICENAME</em>. The <em>READINGNAME</em>
@@ -323,26 +334,29 @@ sub Initialize {
                 sets the threshold for the amount of rain for when the shutter is driven to <em>CLOSEDPOS</em> as soon
                 the threshold is reached. <em>HYSTERESE</em> sets a hysteresis for <em>MAXTRIGGER</em>.
             </li>
-            <a name="ASC_residentsDev"></a>
+            <a id="AutoShuttersControl-attr-ASC_residentsDev"></a>
             <li><strong>ASC_residentsDev DEVICENAME[:READINGNAME]</strong> - <em>DEVICENAME</em> points to a device
                 for presence, e.g. of type <em>RESIDENTS</em>. <em>READINGNAME</em> points to a reading at
                 <em>DEVICENAME</em> which contains a presence state, e.g. <em>rgr_Residents:state</em>. The target
                 should contain values alike the <em>RESIDENTS</em> family.
             </li>
-            <a name="ASC_shuttersDriveDelay"></a>
+            <a id="AutoShuttersControl-attr-ASC_GuestRoom"></a>
+            <li><strong>ASC_GuestRoom on|off</strong> - (not functionality implemented yet?).
+            </li>
+            <a id="AutoShuttersControl-attr-ASC_shuttersDriveDelay"></a>
             <li><strong>ASC_shuttersDriveDelay</strong> - Maximum random drive delay in seconds for calculating
                 the operating time. <em>0</em> equals to no delay.
             </li>
-            <a name="ASC_tempSensor"></a>
-            <li><strong>ASC_tempSensor DEVICENAME[:READINGNAME]</strong> - <em>DEVICENAME</em> points to a device
+            <a id="AutoShuttersControl-attr-ASC_TempSensor"></a>
+            <li><strong>ASC_TempSensor DEVICENAME[:READINGNAME]</strong> - <em>DEVICENAME</em> points to a device
                 with a temperature, <em>READINGNAME</em> to a reading located at the <em>DEVICENAME</em>, for example
                 <em>OUTDOOR_TEMP:measured-temp</em>. <em>READINGNAME</em> defaults to <em>temperature</em>.
             </li>
-            <a name="ASC_twilightDevice"></a>
+            <a id="AutoShuttersControl-attr-ASC_twilightDevice"></a>
             <li><strong>ASC_twilightDevice</strong> - points to a <em>DEVICENAME</em> containing values regarding
                 the sun position. Supports currently devices of type <em>Twilight</em> or <em>Astro</em>.
             </li>
-            <a name="ASC_windSensor"></a>
+            <a id="AutoShuttersControl-attr-ASC_windSensor"></a>
             <li><strong>ASC_windSensor DEVICENAME[:READINGNAME]</strong> - <em>DEVICENAME</em> points to a device
                 containing a wind speed. Reads from the <em>wind</em> reading, if not otherwise specified by
                 <em>READINGNAME</em>.
@@ -351,6 +365,7 @@ sub Initialize {
         <br/>
         <p>At shutter devices, controlled by <abbr>ASC</abbr>:</p>
         <ul>
+            <a id="AutoShuttersControl-attr-ASC"></a>
             <li><strong>ASC - 0|1|2</strong>
                 <ul>
                     <li>0 - don't create attributes for <abbr>ASC</abbr> at the first scan and don't be controlled
@@ -361,6 +376,7 @@ sub Initialize {
                     controlled by <em><abbr>pct</abbr></em> values.</li>
                 </ul>
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Antifreeze"></a>
             <li><strong>ASC_Antifreeze - soft|am|pm|hard|off</strong> - Freeze protection.
                 <ul>
                     <li>soft - see <em>ASC_Antifreeze_Pos</em>.</li>
@@ -369,42 +385,55 @@ sub Initialize {
                     <li>off - freeze protection is disabled, default value</li>
                 </ul>
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Antifreeze_Pos"></a>
             <li><strong>ASC_Antifreeze_Pos</strong> - Position to be operated if the shutter should be closed,
                 but <em>ASC_Antifreeze</em> is not set to <em>off</em>. (Default: dependent on attribut<em>ASC</em> 85/15).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeEvening"></a>
             <li><strong>ASC_AutoAstroModeEvening</strong> - Can be set to <em>REAL</em>, <em>CIVIL</em>,
                 <em>NAUTIC</em>, <em>ASTRONOMIC</em> or <em>HORIZON</em>. Defaults to none of those.</li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeEveningHorizon"></a>
             <li><strong>ASC_AutoAstroModeEveningHorizon</strong> - If this value is reached by the sun, a sunset is
                 presumed. Is used if <em>ASC_autoAstroModeEvening</em> is set to <em>HORIZON</em>. Defaults to none.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeMorning"></a>
             <li><strong>ASC_AutoAstroModeMorning</strong> - Can be set to <em>REAL</em>, <em>CIVIL</em>,
                 <em>NAUTIC</em>, <em>ASTRONOMIC</em> or <em>HORIZON</em>. Defaults to none of those.</li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeMorningHorizon"></a>
             <li><strong>ASC_AutoAstroModeMorningHorizon</strong> - If this value is reached by the sun, a sunrise is
                 presumed. Is used if <em>ASC_AutoAstroModeMorning</em> is set to <em>HORIZON</em>. Defaults to none.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Shutter_IdleDetection"></a>
             <li><strong>ASC_Shutter_IdleDetection</strong> - indicates the Reading which gives information about the running status of the roller blind, as well as secondly the value in the Reading which says that the roller blind does not run.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_afterManual"></a>
             <li><strong>ASC_BlockingTime_afterManual</strong> - Time in which operations by <abbr>ASC</abbr> are blocked
                 after the last manual operation in seconds. Defaults to 1200 (20 minutes).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforDayOpen"></a>
             <li><strong>ASC_BlockingTime_beforDayOpen</strong> - Time in which no closing operation is made by
                 <abbr>ASC</abbr> after opening at the morning in seconds. Defaults to 3600 (one hour).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforNightClose"></a>
             <li><strong>ASC_BlockingTime_beforNightClose</strong> - Time in which no closing operation is made by
                 <abbr>ASC</abbr> before closing at the evening in seconds. Defaults to 3600 (one hour).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_BrightnessSensor"></a>
             <li><strong>ASC_BrightnessSensor - DEVICE[:READING] MORNING-VALUE:EVENING-VALUE</strong> -
                 Drive this shutter by brightness. <em>MORNING-VALUE</em> sets the brightness threshold for the morning.
                 If the value is reached in the morning, the shutter will go up. Vice versa in the evening, specified by
                 <em>EVENING-VALUE</em>. Gets the brightness from <em>DEVICE</em>, reads by default from the
                 <em>brightness</em> reading, unless <em>READING</em> is specified. Defaults to <em>none</em>.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Closed_Pos"></a>
             <li><strong>ASC_Closed_Pos</strong> - The closed position value from 0 to 100 percent in increments of 10.
                 (Default: dependent on attribut<em>ASC</em> 100/0).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_ComfortOpen_Pos"></a>
             <li><strong>ASC_ComfortOpen_Pos</strong> - The comfort opening position, ranging
                 from 0 to 100 percent in increments of 10. (Default: dependent on attribut<em>ASC</em> 20/80).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Down"></a>
             <li><strong>ASC_Down - astro|time|brightness|roommate</strong> - Drive the shutter depending on this setting:
                 <ul>
                     <li>astro - drive down at sunset</li>
@@ -415,9 +444,15 @@ sub Initialize {
                 </ul>
                 Defaults to <em>astro</em>.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_DriveUpMaxDuration"></a>
             <li><strong>ASC_DriveUpMaxDuration</strong> - Drive up duration of the shutter plus 5 seconds. Defaults
                 to 60 seconds if not set.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Drive_Delay"></a>
+            <li><strong>ASC_Drive_Delay</strong> - maximum value for a random delay (in seconds) to add to the calculated drive times. (needs also <i>ASC_Drive_DelayStart</i> to be set!)</li>
+            <a id="AutoShuttersControl-attr-ASC_Drive_DelayStart"></a>
+            <li><strong>ASC_Drive_DelayStart</strong> - delay in seconds to add to each calculated drive time.</li>
+            <a id="AutoShuttersControl-attr-ASC_LockOut"></a>
             <li><strong>ASC_LockOut soft|hard|off</strong> - Configures the lock out protection for the current
                 shutter. Values are:
                 <ul>
@@ -433,9 +468,11 @@ sub Initialize {
                     </li>
                 </ul>
             </li>
+            <a id="AutoShuttersControl-attr-ASC_LockOut_Cmd"></a>
             <li><strong>ASC_LockOut_Cmd inhibit|blocked|protection</strong> - Configures the lock out command for
                 <em>ASC_LockOut</em> if hard is chosen as a value. Defaults to none.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Mode_Down"></a>
             <li><strong>ASC_Mode_Down always|home|absent|off</strong> - When will a shutter be driven down:
                 <ul>
                     <li>always - <abbr>ASC</abbr> will drive always. Default value.</li>
@@ -445,6 +482,7 @@ sub Initialize {
                     operate the shutter.</li>
                 </ul>
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Mode_Up"></a>
             <li><strong>ASC_Mode_Up always|home|absent|off</strong> - When will a shutter be driven up:
                 <ul>
                     <li>always - <abbr>ASC</abbr> will drive always. Default value.</li>
@@ -454,78 +492,105 @@ sub Initialize {
                         operate the shutter.</li>
                 </ul>
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Open_Pos"></a>
             <li><strong>ASC_Open_Pos</strong> - The opening position value from 0 to 100 percent in increments of 10.
                 (Default: dependent on attribut<em>ASC</em> 0/100).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Sleep_Pos"></a>
             <li><strong>ASC_Sleep_Pos</strong> - The opening position value from 0 to 100 percent in increments of 10.
                 (Default: dependent on attribut<em>ASC</em> 75/25).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Partymode"></a>
             <li><strong>ASC_Partymode on|off</strong> - Party mode. If configured to on, driving orders for the
                 shutter by <abbr>ASC</abbr> will be queued if <em>partyMode</em> is set to <em>on</em> at the
                 global <abbr>ASC</abbr> device. Will execute the driving orders after <em>partyMode</em> is disabled.
                 Defaults to off.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Pos_Reading"></a>
             <li><strong>ASC_Pos_Reading</strong> - Points to the reading name, which contains the current
                 position for the shutter in percent. Will be used for <em>set</em> at devices of unknown kind.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyDownValue_beforeNightClose"></a>
             <li><strong>ASC_PrivacyDownValue_beforeNightClose</strong> - How many seconds is the privacy mode activated
                 before the shutter is closed in the evening. For Brightness, in addition to the time value,
                 the Brightness value must also be specified. 1800:300 means 30 min before night close or above a brightness
                 value of 300. -1 is the default
                 value.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyDown_Pos"></a>
             <li><strong>ASC_PrivacyDown_Pos</strong> -
                 Position in percent for privacy mode, defaults to 50.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyUpValue_beforeDayOpen"></a>
             <li><strong>ASC_PrivacyUpValue_beforeDayOpen</strong> - How many seconds is the privacy mode activated
                 before the shutter is open in the morning. For Brightness, in addition to the time value,
                 the Brightness value must also be specified. 1800:600 means 30 min before day open or above a brightness
                 value of 600. -1 is the default
                 value.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyUp_Pos"></a>
             <li><strong>ASC_PrivacyUp_Pos</strong> -
                 Position in percent for privacy mode, defaults to 50.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_ExternalTrigger"></a>
+            <li><strong>ASC_ExternalTrigger</strong> - DEVICE:READING VALUEACTIVE:VALUEINACTIVE POSACTIVE:[POSINACTIVE VALUEACTIVE2:POSACTIVE2], example: setting to "WohnzimmerTV:state on:off 66:100" will cause a "state:on" event to drive the shutter to position 66. "state:off" event will set it to position 100. If no POSINACTIVE is set, <i>LastStatus</i> position will be used as target position.</li>
+            <a id="AutoShuttersControl-attr-ASC_WindProtection"></a>
             <li><strong>ASC_WindProtection on|off</strong> - Shutter is protected by the wind protection. Defaults
                 to off.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_RainProtection"></a>
             <li><strong>ASC_RainProtection on|off</strong> - Shutter is protected by the rain protection. Defaults
                 to off.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Roommate_Device"></a>
             <li><strong>ASC_Roommate_Device</strong> - Comma separated list of <em>ROOMMATE</em> devices, representing
                 the inhabitants of the room to which the shutter belongs. Especially useful for bedrooms. Defaults
                 to none.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Roommate_Reading"></a>
             <li><strong>ASC_Roommate_Reading</strong> - Specifies a reading name to <em>ASC_Roommate_Device</em>.
                 Defaults to <em>state</em>.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_GuestRoom"></a>
+            <li><strong>ASC_GuestRoom on|off</strong> - (not functionality implemented yet?).
+            </li>
+            <a id="AutoShuttersControl-attr-ASC_Adv"></a>
+            <li><strong>ASC_Adv - on/off</strong> If on, from 1. advent to 6. January all closing commands will be delayed until <i>set ASCDEVICE advDriveDown</i> is issued.</li>
+            <a id="AutoShuttersControl-attr-ASC_Self_Defense_Mode"></a>
             <li><strong>ASC_Self_Defense_Mode - absent/gone/off</strong> - which Residents status Self Defense should become 
                 active without the window being open. (default: gone) off exclude from self defense
             </li>
-            <li><strong>ASC_Self_Defense_AbsentDelay</strong> - um wie viele Sekunden soll das fahren in Selfdefense bei
-                Residents absent verz&ouml;gert werden. (default: 300)
+            <a id="AutoShuttersControl-attr-ASC_Self_Defense_AbsentDelay"></a>
+            <li><strong>ASC_Self_Defense_AbsentDelay</strong> - time in seconds to wait after Residents went gone. (default: 300)
             </li>
+            <a id="AutoShuttersControl-attr-ASC_ShuttersPlace"></a>
             <li><strong>ASC_ShuttersPlace window|terrace</strong> - If set to <em>terrace</em>, and the
                 residents device is set to <em>gone</em>, and <em>selfDefense</em> is activated, the shutter will
                 be closed. If set to window, will not. Defaults to window.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Down_Early"></a>
             <li><strong>ASC_Time_Down_Early</strong> - Will not drive before time is <em>ASC_Time_Down_Early</em>
                 or later, even the sunset occurs earlier. To be set in military time. Defaults to 16:00.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Down_Late"></a>
             <li><strong>ASC_Time_Down_Late</strong> - Will not drive after time is <em>ASC_Time_Down_Late</em>
                 or earlier, even the sunset occurs later. To be set in military time. Defaults to 22:00.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Up_Early"></a>
             <li><strong>ASC_Time_Up_Early</strong> - Will not drive before time is <em>ASC_Time_Up_Early</em>
                 or earlier, even the sunrise occurs earlier. To be set in military time. Defaults to 05:00.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Up_Late"></a>
             <li><strong>ASC_Time_Up_Late</strong> - Will not drive after time is <em>ASC_Time_Up_Late</em>
                 or earlier, even the sunrise occurs later. To be set in military time. Defaults to 08:30.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Up_WE_Holiday"></a>
             <li><strong>ASC_Time_Up_WE_Holiday</strong> - Will not drive before time is <em>ASC_Time_Up_WE_Holiday</em>
                 on weekends and holidays (<em>holiday2we</em> is considered). Defaults to 08:00. <strong>Warning!</strong>
                 If <em>ASC_Up</em> set to <em>brightness</em>, the time for <em>ASC_Time_Up_WE_Holiday</em>
                 must be earlier then <em>ASC_Time_Up_Late</em>.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Up"></a>
             <li><strong>ASC_Up astro|time|brightness|roommate</strong> - Drive the shutter depending on this setting:
                 <ul>
                     <li>astro - drive up at sunrise</li>
@@ -536,24 +601,30 @@ sub Initialize {
                 </ul>
                 Defaults to <em>astro</em>.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Ventilate_Pos"></a>
             <li><strong>ASC_Ventilate_Pos</strong> - The opening position value for ventilation
                 from 0 to 100 percent in increments of 10. (Default: dependent on attribut<em>ASC</em> 70/30).
             </li>
+            <a id="AutoShuttersControl-attr-ASC_Ventilate_Window_Open"></a>
             <li><strong>ASC_Ventilate_Window_Open on|off</strong> - Drive to ventilation position as window is opened
                 or tilted, even when the current shutter position is lower than the <em>ASC_Ventilate_Pos</em>.
                 Defaults to on.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_WiggleValue"></a>
             <li><strong>ASC_WiggleValue</strong> - How many percent should the shutter be driven if a wiggle drive
                 is operated. Defaults to 5.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_WindParameters"></a>
             <li><strong>ASC_WindParameters THRESHOLD-ON[:THRESHOLD-OFF] [DRIVEPOSITION]</strong> -
                 Threshold for when the shutter is driven to the wind protection position. Optional
                 <em>THRESHOLD-OFF</em> sets the complementary value when the wind protection is disabled. Disabled
                 if <em>THRESHOLD-ON</em> is set to -1. Defaults to <q>50:20 <em>ASC_Closed_Pos</em></q>.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_WindowRec"></a>
             <li><strong>ASC_WindowRec</strong> - WINDOWREC:[READING], Points to the window contact device, associated with the shutter.
                 Defaults to none. Reading is optional
             </li>
+            <a id="AutoShuttersControl-attr-ASC_WindowRec_subType"></a>
             <li><strong>ASC_WindowRec_subType</strong> - Model type of the used <em>ASC_WindowRec</em>:
                 <ul>
                     <li><strong>twostate</strong> - optical or magnetical sensors with two states: opened or closed</li>
@@ -561,6 +632,22 @@ sub Initialize {
                 </ul>
                 Defaults to twostate.
             </li>
+            <a id="AutoShuttersControl-attr-ASC_SlatPosCmd_SlatDevice"></a>
+            <li><strong>ASC_SlatPosCmd_SlatDevice</strong> - If your shutter is "venetian blind" type (with turnable slats, lamellas or similar), this is the place to set additional command and/or device info to control the slat level. Examples: <i>attr ROLLO ASC_SlatPosCmd_SlatDevice slatPct</i> or <i>attr ROLLO ASC_SlatPosCmd_SlatDevice dim:ROLLOSLATDEVICE</i>. Providing a device name for the slat device is only needed in case it's different to the shutter itself. If attribute is set, additional positioning values for the respective slat levels can be set in attributes <i>ASC_Open_Pos</i>, <i>ASC_Closed_Pos</i>, <i>ASC_Ventilate_Pos</i>, <i>ASC_ComfortOpen_Pos</i>, <i>ASC_Shading_Pos</i> and <i>ASC_Sleep_Pos</i>.</li>
+            <a id="AutoShuttersControl-attr-ASC_CommandTemplate"></a>
+            <li><strong>ASC_CommandTemplate</strong> - <strong>FHEM or Perl command</strong> (Perl in braces as usual needs escaping semicolons etc.).<br>
+            This optional attribute will override the internally determined command to drive this shutter. Setting it, is only recommended in <strong>some rare and special cases,</strong>, in most cases there's <strong>no need</strong> to set this attribute!
+            The parameters <i>$name</i> (name of the shutter device), <i>$pos</i> (target position for the respective drive command), <i>$slatPos</i> (target position for the (turnable) lammellas in venetion blinds) and <i>$cause</i> (internal label for the cause of the driving command) will be replaced by the appropirate values. You may have to take care to avoid unneeded driving commands.
+            Examples:
+            <ul>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name $pos</i> - Address the position command directly to the main switch of the device</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name pct $pos</i> - Address the setter <i>pct</i> for positioning commands</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name datapoint 4.LEVEL_2 $slatPos 4.LEVEL $pos</i> - combined positioning command, e.g. appropriate for HM-IP-venetian blind type actors</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { fhem("set $name ".($pos+1024)).";set $name 0")}</i> - positioning command with Perl calculation and additional "execute" command, e.g. for an SPS type blind</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { myPerlFn("$name",$pos,$slatPos,"$cause")}</i> - call own Perl function (e.g. from 99_myUtils.pm)</li>
+            </ul>
+            </li>
+            <a id="AutoShuttersControl-attr-ASC_WindowRec_PosAfterDayClosed"></a>
             <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
             <blockquote>
                 <p>
@@ -571,7 +658,7 @@ sub Initialize {
                 <ul>
                     <li>
                         The <em>controlShading</em> reading is set to on, and there is a device
-                        of type Astro or Twilight configured to <em>ASC_twilightDevice</em>, and <em>ASC_tempSensor</em>
+                        of type Astro or Twilight configured to <em>ASC_twilightDevice</em>, and <em>ASC_TempSensor</em>
                         is set.
                     </li>
                     <li>
@@ -588,34 +675,45 @@ sub Initialize {
                     The following attributes are available:
                 </p>
                 <ul>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_InOutAzimuth"></a>
                     <li><strong>ASC_Shading_InOutAzimuth</strong> - Azimuth value from which shading is to be used when shading is exceeded and shading when undershooting is required.
                         Defaults to 95:265.
                     </li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_MinMax_Elevation"></a>
                     <li><strong>ASC_Shading_MinMax_Elevation</strong> - Shading starts as min point of sun elevation is
                         reached and end as max point of sun elevation is reached, depending also on other sensor values. Defaults to 25.0:100.0.
                     </li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_Min_OutsideTemperature"></a>
                     <li><strong>ASC_Shading_Min_OutsideTemperature</strong> - Shading starts at this outdoor temperature,
                         depending also on other sensor values. Defaults to 18.0.
                     </li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_Mode"></a>
                     <li><strong>ASC_Shading_Mode absent|always|off|home</strong> - see <em>ASC_Mode_Down</em> above,
                         but for shading. Defaults to off.
                     </li>
-                    <li><strong>ASC_Shading_Pos</strong> - Shading position in percent. (Default: dependent on attribut<em>ASC</em> 85/15)</li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_Pos"></a>
+                    <li><strong>ASC_Shading_Pos</strong> - Shading position in percent. (Default: dependent on attribute <em>ASC</em> 85/15)</li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_StateChange_Cloudy"></a>
                     <li><strong>ASC_Shading_StateChange_Cloudy</strong> - Shading <strong>ends</strong> at this
                         outdoor brightness, depending also on other sensor values. Defaults to 20000.
                     </li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_StateChange_SunnyCloudy"></a>
                     <li><strong>ASC_Shading_StateChange_SunnyCloudy</strong> - Shading <strong>starts/stops</strong> at this
                         outdoor brightness, depending also on other sensor values. An optional parameter specifies how many successive brightness reading values should be used to average the brightness value. Defaults to 35000:20000 [3].
                     </li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_WaitingPeriod"></a>
                     <li><strong>ASC_Shading_WaitingPeriod</strong> - Waiting time in seconds before additional sensor values
                         to <em>ASC_Shading_StateChange_Sunny</em> or <em>ASC_Shading_StateChange_Cloudy</em>
                         are used for shading. Defaults to 120.
                     </li>
+                    <a id="AutoShuttersControl-attr-ASC_Shading_BetweenTheTime"></a>
+                    <li><strong>ASC_Shading_BetweenTheTime</strong> - Limit the time slots for shading functionality. Example: 9:00-13:00 11:25-15:30</li>
                 </ul>
             </blockquote>
         </ul>
     </ul>
     <p>
+    <a id="AutoShuttersControl-API"></a>
         <strong><u>AutoShuttersControl <abbr>API</abbr> description</u></strong>
     </p>
     <p>
@@ -778,7 +876,7 @@ sub Initialize {
 
 =begin html_DE
 
-<a name="AutoShuttersControl"></a>
+<a id="AutoShuttersControl"></a>
 <h3>AutoShuttersControl</h3>
 <ul>
     <p>AutoShuttersControl (ASC) erm&ouml;glicht eine vollst&auml;ndige Automatisierung der vorhandenen Rolll&auml;den. Das Modul bietet umfangreiche Konfigurationsm&ouml;glichkeiten, um Rolll&auml;den bspw. nach Sonnenauf- und untergangszeiten, nach Helligkeitswerten oder rein zeitgesteuert zu steuern.
@@ -787,7 +885,7 @@ sub Initialize {
     <p>
         Man kann festlegen, welche Rolll&auml;den von ASC in die Automatisierung mit aufgenommen werden sollen. Daraufhin stehen diverse Attribute zur Feinkonfiguration zur Verf&uuml;gung. So sind unter anderem komplexe L&ouml;sungen wie Fahrten in Abh&auml;ngigkeit des Bewohnerstatus einfach umsetzbar. Beispiel: Hochfahren von Rolll&auml;den, wenn der Bewohner erwacht ist und drau&szlig;en bereits die Sonne aufgegangen ist. Weiterhin ist es m&ouml;glich, dass der geschlossene Rollladen z.B. nach dem Ankippen eines Fensters in eine L&uuml;ftungsposition f&auml;hrt. Und vieles mehr.
     </p>
-    <a name="AutoShuttersControlDefine"></a>
+    <a id="AutoShuttersControl-define"></a>
     <strong>Define</strong>
     <ul>
         <code>define &lt;name&gt; AutoShuttersControl</code>
@@ -805,7 +903,7 @@ sub Initialize {
         Habt Ihr das Attribut gesetzt, k&ouml;nnt Ihr den automatischen Scan nach den Devices ansto&szlig;en.
     </ul>
     <br />
-    <a name="AutoShuttersControlReadings"></a>
+    <a id="AutoShuttersControl-Readings"></a>
     <strong>Readings</strong>
     <ul>
         <u>Im ASC-Device</u>
@@ -836,97 +934,131 @@ sub Initialize {
         </ul>
     </ul>
     <br /><br />
-    <a name="AutoShuttersControlSet"></a>
+    <a id="AutoShuttersControl-set"></a>
     <strong>Set</strong>
     <ul>
+        <a id="AutoShuttersControl-set-advDriveDown"></a>
         <li><strong>advDriveDown</strong> - holt bei allen Rolll&auml;den durch ASC_Adv on ausgesetzte Fahrten nach.</li>
+        <a id="AutoShuttersControl-set-ascEnable"></a>
         <li><strong>ascEnable - on/off</strong> - Aktivieren oder deaktivieren der globalen ASC Steuerung</li>
+        <a id="AutoShuttersControl-set-controlShading"></a>
         <li><strong>controlShading - on/off</strong> - Aktiviert oder deaktiviert die globale Beschattungssteuerung</li>
+        <a id="AutoShuttersControl-set-createNewNotifyDev"></a>
         <li><strong>createNewNotifyDev</strong> - Legt die interne Struktur f&uuml;r NOTIFYDEV neu an. Diese Funktion steht nur zur Verf&uuml;gung, wenn Attribut ASC_expert auf 1 gesetzt ist.</li>
+        <a id="AutoShuttersControl-set-hardLockOut"></a>
         <li><strong>hardLockOut - on/off</strong> - Aktiviert den hardwareseitigen Aussperrschutz f&uuml;r die Rolll&auml;den, bei denen das Attributs <em>ASC_LockOut</em> entsprechend auf hard gesetzt ist. Mehr Informationen in der Beschreibung bei den Attributen f&uuml;r die Rollladenger&auml;ten.</li>
+        <a id="AutoShuttersControl-set-partyMode"></a>
         <li><strong>partyMode - on/off</strong> - Aktiviert den globalen Partymodus. Alle Rollladen-Ger&auml;ten, in welchen das Attribut <em>ASC_Partymode</em> auf <em>on</em> gesetzt ist, werden durch ASC nicht mehr gesteuert. Der letzte Schaltbefehl, der bspw. durch ein Fensterevent oder Wechsel des Bewohnerstatus an die Rolll&auml;den gesendet wurde, wird beim Deaktivieren des Partymodus ausgef&uuml;hrt</li>
+        <a id="AutoShuttersControl-set-renewTimer"></a>
         <li><strong>renewTimer</strong> - erneuert beim ausgew&auml;hlten Rollladen die Zeiten f&uuml;r Sonnenauf- und -untergang und setzt die internen Timer neu.</li>
+        <a id="AutoShuttersControl-set-renewAllTimer"></a>
         <li><strong>renewAllTimer</strong> - erneuert bei allen Rolll&auml;den die Zeiten f&uuml;r Sonnenauf- und -untergang und setzt die internen Timer neu.</li>
+        <a id="AutoShuttersControl-set-scanForShutters"></a>
         <li><strong>scanForShutters</strong> - Durchsucht das System nach Ger&auml;tenRo mit dem Attribut <em>ASC = 1</em> oder <em>ASC = 2</em></li>
+        <a id="AutoShuttersControl-set-selfDefense"></a>
         <li><strong>selfDefense - on/off</strong> - Aktiviert bzw. deaktiviert die Selbstschutzfunktion. Beispiel: Wenn das Residents-Ger&auml;t <em>absent</em> meldet, die Selbstschutzfunktion aktiviert wurde und ein Fenster im Haus noch ge&ouml;ffnet ist, so wird an diesem Fenster der Rollladen deaktivieren dann heruntergefahren.</li>
+        <a id="AutoShuttersControl-set-shutterASCenableToggle"></a>
         <li><strong>shutterASCenableToggle - on/off</strong> - Aktivieren oder deaktivieren der ASC Kontrolle beim einzelnen Rollladens</li>
+        <a id="AutoShuttersControl-set-sunriseTimeWeHoliday"></a>
         <li><strong>sunriseTimeWeHoliday - on/off</strong> - Aktiviert die Wochenendunterst&uuml;tzung und somit, ob im Rollladenger&auml;t das Attribut <em>ASC_Time_Up_WE_Holiday</em> beachtet werden soll oder nicht.</li>
+        <a id="AutoShuttersControl-set-wiggle"></a>
         <li><strong>wiggle</strong> - bewegt einen oder mehrere Rolll&auml;den um einen definierten Wert (Default: 5%) und nach einer Minute wieder zur&uuml;ck in die Ursprungsposition. Diese Funktion k&ouml;nnte bspw. zur Abschreckung in einem Alarmsystem eingesetzt werden.</li>
     </ul>
     <br /><br />
-    <a name="AutoShuttersControlGet"></a>
+    <a id="AutoShuttersControl-get"></a>
     <strong>Get</strong>
     <ul>
+        <a id="AutoShuttersControl-get-showNotifyDevsInformations"></a>
         <li><strong>showNotifyDevsInformations</strong> - zeigt eine &Uuml;bersicht der abgelegten NOTIFYDEV Struktur. Diese Funktion wird prim&auml;r f&uuml;rs Debugging genutzt. Hierzu ist das Attribut <em>ASC_expert = 1</em> zu setzen.</li>
     </ul>
     <br /><br />
-    <a name="AutoShuttersControlAttributes"></a>
+    <a id="AutoShuttersControl-attr"></a>
     <strong>Attributes</strong>
     <ul>
         <u>Im ASC-Device</u>
         <ul>
-            <a name="ASC_autoAstroModeEvening"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeEvening"></a>
             <li><strong>ASC_autoAstroModeEvening</strong> - REAL, CIVIL, NAUTIC, ASTRONOMIC oder HORIZON</li>
-            <a name="ASC_autoAstroModeEveningHorizon"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeEveningHorizon"></a>
             <li><strong>ASC_autoAstroModeEveningHorizon</strong> - H&ouml;he &uuml;ber dem Horizont. Wird nur ber&uuml;cksichtigt, wenn im Attribut <em>ASC_autoAstroModeEvening</em> der Wert <em>HORIZON</em> ausgew&auml;hlt wurde. (default: 0)</li>
-            <a name="ASC_autoAstroModeMorning"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeMorning"></a>
             <li><strong>ASC_autoAstroModeMorning</strong> - REAL, CIVIL, NAUTIC, ASTRONOMIC oder HORIZON</li>
-            <a name="ASC_autoAstroModeMorningHorizon"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoAstroModeMorningHorizon"></a>
             <li><strong>ASC_autoAstroModeMorningHorizon</strong> - H&ouml;he &uuml;ber dem Horizont. Wird nur ber&uuml;cksichtigt, wenn im Attribut <em>ASC_autoAstroModeMorning</em> der Wert <em>HORIZON</em> ausgew&auml;hlt wurde. (default: 0)</li>
-            <a name="ASC_autoShuttersControlComfort"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoShuttersControlComfort"></a>
             <li><strong>ASC_autoShuttersControlComfort - on/off</strong> - schaltet die Komfortfunktion an. Bedeutet, dass ein Rollladen mit einem threestate-Sensor am Fenster beim &Ouml;ffnen in eine Offenposition f&auml;hrt. Hierzu muss beim Rollladen das Attribut <em>ASC_ComfortOpen_Pos</em> entsprechend konfiguriert sein. (default: off)</li>
-            <a name="ASC_autoShuttersControlEvening"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoShuttersControlEvening"></a>
             <li><strong>ASC_autoShuttersControlEvening - on/off</strong> - Aktiviert die automatische Steuerung durch das ASC-Modul am Abend.</li>
-            <a name="ASC_autoShuttersControlMorning"></a>
+            <a id="AutoShuttersControl-attr-ASC_autoShuttersControlMorning"></a>
             <li><strong>ASC_autoShuttersControlMorning - on/off</strong> - Aktiviert die automatische Steuerung durch das ASC-Modul am Morgen.</li>
-            <a name="ASC_blockAscDrivesAfterManual"></a>
+            <a id="AutoShuttersControl-attr-ASC_blockAscDrivesAfterManual"></a>
             <li><strong>ASC_blockAscDrivesAfterManual - 0,1</strong> - wenn dieser Wert auf 1 gesetzt ist, dann werden Rolll&auml;den vom ASC-Modul nicht mehr gesteuert, wenn zuvor manuell eingegriffen wurde. Voraussetzung hierf&uuml;r ist jedoch, dass im Reading <em>ASC_ShuttersLastDrive</em> der Status <em>manual</em> enthalten ist und sich der Rollladen auf eine unbekannte (nicht in den Attributen anderweitig konfigurierte) Position befindet.</li>
-            <a name="ASC_brightnessDriveUpDown"></a>
+            <a id="AutoShuttersControl-attr-ASC_brightnessDriveUpDown"></a>
             <li><strong>ASC_brightnessDriveUpDown - WERT-MORGENS:WERT-ABENDS</strong> - Werte bei dem Schaltbedingungen f&uuml;r Sonnenauf- und -untergang gepr&uuml;ft werden sollen. Diese globale Einstellung kann durch die WERT-MORGENS:WERT-ABENDS Einstellung von ASC_BrightnessSensor im Rollladen selbst &uuml;berschrieben werden.</li>
-            <a name="ASC_debug"></a>
+            <a id="AutoShuttersControl-attr-ASC_debug"></a>
             <li><strong>ASC_debug</strong> - Aktiviert die erweiterte Logausgabe f&uuml;r Debugausgaben</li>
-            <a name="ASC_expert"></a>
+            <a id="AutoShuttersControl-attr-ASC_expert"></a>
             <li><strong>ASC_expert</strong> - ist der Wert 1, so werden erweiterte Informationen bez&uuml;glich des NotifyDevs unter set und get angezeigt</li>
-            <a name="ASC_freezeTemp"></a>
+            <a id="AutoShuttersControl-attr-ASC_freezeTemp"></a>
             <li><strong>ASC_freezeTemp</strong> - Temperatur, ab welcher der Frostschutz greifen soll und der Rollladen nicht mehr f&auml;hrt. Der letzte Fahrbefehl wird gespeichert.</li>
-            <a name="ASC_advDate"></a>
-            <li><strong>ASC_advDate</strong> - Adventszeit, Auswahl ab wann die Adventszeit beginnen soll.</li>
-            <a name="ASC_rainSensor"></a>
+            <a id="AutoShuttersControl-attr-ASC_advStartDate"></a>
+            <li><strong>ASC_advStartDate</strong> - Start der Adventszeit, Auswahl ab wann die Adventszeit beginnen soll. 1. Advent oder Totensonntag</li>
+            <a id="AutoShuttersControl-attr-ASC_advEndDate"></a>
+            <li><strong>ASC_advEndDate</strong> - Ende der Adventszeit, Auswahl ab wann die Adventszeit Enden soll. EpiphanyDay 6. Januar oder CandlemasDay 2. Februar</li>
+            <a id="AutoShuttersControl-attr-ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor - DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS:[WAITINGTIME]]</strong> - der Inhalt ist eine Kombination aus Devicename, Readingname, Wert ab dem getriggert werden soll, Hysterese Wert ab dem der Status Regenschutz aufgehoben werden soll und der "wegen Regen geschlossen Position", sowie der Wartezeit bis dann tats&auml;chlich die aktion ausgeführt wird.</li>
-            <a name="ASC_residentsDev"></a>
+            <a id="AutoShuttersControl-attr-ASC_residentsDev"></a>
             <li><strong>ASC_residentsDev - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Devicenamen und Readingnamen des Residents-Device der obersten Ebene (z.B. rgr_Residents:state)</li>
-            <a name="ASC_shuttersDriveDelay"></a>
+            <a id="AutoShuttersControl-attr-ASC_shuttersDriveDelay"></a>
             <li><strong>ASC_shuttersDriveDelay</strong> - maximale Zufallsverz&ouml;gerung in Sekunden bei der Berechnung der Fahrzeiten. 0 bedeutet keine Verz&ouml;gerung</li>
-            <a name="ASC_tempSensor"></a>
-            <li><strong>ASC_tempSensor - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Device und Reading f&uuml;r die Au&szlig;entemperatur</li>
-            <a name="ASC_twilightDevice"></a>
+            <a id="AutoShuttersControl-attr-ASC_TempSensor"></a>
+            <li><strong>ASC_TempSensor - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Device und Reading f&uuml;r die Au&szlig;entemperatur</li>
+            <a id="AutoShuttersControl-attr-ASC_twilightDevice"></a>
             <li><strong>ASC_twilightDevice</strong> - das Device, welches die Informationen zum Sonnenstand liefert. Wird unter anderem f&uuml;r die Beschattung verwendet.</li>
-            <a name="ASC_windSensor"></a>
+            <a id="AutoShuttersControl-attr-ASC_windSensor"></a>
             <li><strong>ASC_windSensor - DEVICE[:READING]</strong> - Sensor f&uuml;r die Windgeschwindigkeit. Kombination aus Device und Reading.</li>
         </ul>
         <br />
         <br />
         <u> In den Rolll&auml;den-Ger&auml;ten</u>
         <ul>
+            <a id="AutoShuttersControl-attr-ASC"></a>
             <li><strong>ASC - 0/1/2</strong> 0 = "kein Anlegen der Attribute beim ersten Scan bzw. keine Beachtung eines Fahrbefehles",1 = "Inverse oder Rollo - Bsp.: Rollo oben 0, Rollo unten 100 und der Befehl zum prozentualen Fahren ist position",2 = "Homematic Style - Bsp.: Rollo oben 100, Rollo unten 0 und der Befehl zum prozentualen Fahren ist pct</li>
+            <a id="AutoShuttersControl-attr-ASC_Antifreeze"></a>
             <li><strong>ASC_Antifreeze - soft/am/pm/hard/off</strong> - Frostschutz, wenn soft f&auml;hrt der Rollladen in die ASC_Antifreeze_Pos und wenn hard/am/pm wird gar nicht oder innerhalb der entsprechenden Tageszeit nicht gefahren (default: off)</li>
+            <a id="AutoShuttersControl-attr-ASC_Antifreeze_Pos"></a>
             <li><strong>ASC_Antifreeze_Pos</strong> - Position die angefahren werden soll, wenn der Fahrbefehl komplett schlie&szlig;en lautet, aber der Frostschutz aktiv ist (Default: ist abh&auml;ngig vom Attribut<em>ASC</em> 85/15) !!!Verwendung von Perlcode ist m&ouml;glich, dieser muss in {} eingeschlossen sein. R&uuml;ckgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeEvening"></a>
             <li><strong>ASC_AutoAstroModeEvening</strong> - aktuell REAL,CIVIL,NAUTIC,ASTRONOMIC (default: none)</li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeEveningHorizon"></a>
             <li><strong>ASC_AutoAstroModeEveningHorizon</strong> - H&ouml;he &uuml;ber Horizont, wenn beim Attribut ASC_autoAstroModeEvening HORIZON ausgew&auml;hlt (default: none)</li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeMorning"></a>
             <li><strong>ASC_AutoAstroModeMorning</strong> - aktuell REAL,CIVIL,NAUTIC,ASTRONOMIC (default: none)</li>
+            <a id="AutoShuttersControl-attr-ASC_AutoAstroModeMorningHorizon"></a>
             <li><strong>ASC_AutoAstroModeMorningHorizon</strong> - H&ouml;he &uuml;ber Horizont,a wenn beim Attribut ASC_autoAstroModeMorning HORIZON ausgew&auml;hlt (default: none)</li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_afterManual"></a>
             <li><strong>ASC_BlockingTime_afterManual</strong> - wie viel Sekunden soll die Automatik nach einer manuellen Fahrt aussetzen. (default: 1200)</li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforDayOpen"></a>
             <li><strong>ASC_BlockingTime_beforDayOpen</strong> - wie viel Sekunden vor dem morgendlichen &ouml;ffnen soll keine schlie&szlig;en Fahrt mehr stattfinden. (default: 3600)</li>
+            <a id="AutoShuttersControl-attr-ASC_BlockingTime_beforNightClose"></a>
             <li><strong>ASC_BlockingTime_beforNightClose</strong> - wie viel Sekunden vor dem n&auml;chtlichen schlie&szlig;en soll keine &ouml;ffnen Fahrt mehr stattfinden. (default: 3600)</li>
+            <a id="AutoShuttersControl-attr-ASC_BrightnessSensor"></a>
             <li><strong>ASC_BrightnessSensor - DEVICE[:READING] WERT-MORGENS:WERT-ABENDS</strong> / 'Sensorname[:brightness [400:800]]' Angaben zum Helligkeitssensor mit (Readingname, optional) f&uuml;r die Beschattung und dem Fahren der Rollladen nach brightness und den optionalen Brightnesswerten f&uuml;r Sonnenauf- und Sonnenuntergang. (default: none)</li>
+            <a id="AutoShuttersControl-attr-ASC_Down"></a>
             <li><strong>ASC_Down - astro/time/brightness</strong> - bei astro wird Sonnenuntergang berechnet, bei time wird der Wert aus ASC_Time_Down_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Down_Early und ASC_Time_Down_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Down_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Down_Early und ASC_Time_Down_Late geschaut, ob die als Attribut im Moduldevice hinterlegte ASC_brightnessDriveUpDown der Down Wert erreicht wurde. Wenn ja, wird der Rollladen runter gefahren (default: astro)</li>
             <ul></p>
                 <strong><u>Beschreibung der besonderen Positionsattribute</u></strong>
+                <a id="AutoShuttersControl-attr-ASC_Closed_Pos"></a>
                 <li><strong>ASC_Closed_Pos</strong> - in 10 Schritten von 0 bis 100 (Default: ist abh&auml;ngig vom Attribut<em>ASC</em> 0/100)</li>
+                <a id="AutoShuttersControl-attr-ASC_Open_Pos"></a>
                 <li><strong>ASC_Open_Pos</strong> -  in 10 Schritten von 0 bis 100 (default: ist abh&auml;ngig vom Attribut<em>ASC</em> 100/0)</li>
+                <a id="AutoShuttersControl-attr-ASC_Sleep_Pos"></a>
                 <li><strong>ASC_Sleep_Pos</strong> -  in 10 Schritten von 0 bis 100 (default: ist abh&auml;ngig vom Attribut<em>ASC</em> 75/25) !!!Verwendung von Perlcode ist m&ouml;glich, dieser muss in {} eingeschlossen sein. R&uuml;ckgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+                <a id="AutoShuttersControl-attr-ASC_ComfortOpen_Pos"></a>
                 <li><strong>ASC_ComfortOpen_Pos</strong> - in 10 Schritten von 0 bis 100 (Default: ist abh&auml;ngig vom Attribut<em>ASC</em> 20/80) !!!Verwendung von Perlcode ist m&ouml;glich, dieser muss in {} eingeschlossen sein. R&uuml;ckgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_Pos"></a>
                 <li><strong>ASC_Shading_Pos</strong> - Position des Rollladens f&uuml;r die Beschattung (Default: ist abh&auml;ngig vom Attribut<em>ASC</em> 80/20) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+                <a id="AutoShuttersControl-attr-ASC_Ventilate_Pos"></a>
                 <li><strong>ASC_Ventilate_Pos</strong> -  in 10 Schritten von 0 bis 100 (default: ist abh&auml;ngig vom Attribut <em>ASC</em> 70/30) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
                 </p>
                 <strong>In Bezug auf die Verwendung mit Lamellen gibt es folgende erg&auml;nzende Parameter</strong>.
@@ -935,28 +1067,54 @@ sub Initialize {
                     <li>Wird hingegen ein ander Command verwendet z.B. slatPct oder &auml;hnliches dann muss hinter der normalen Positionsangebe noch die Position f&uuml;r die Lamellen mit angegeb werden. Beispiel: <em>attr ROLLONAME ASC_Shading_Pos 30:75</em>. <strong>Bitte beachtet in diesem Zusammenhang auch das Attribut ASC_SlatPosCmd_SlatDevice wo mindesten die Angabe des SlatPosCMD Voraussetzung ist.</strong></li>
                 </ul>
             </p></ul>
+            <a id="AutoShuttersControl-attr-ASC_Shutter_IdleDetection"></a>
             <li><strong>ASC_Shutter_IdleDetection</strong> - <strong>READING:VALUE</strong> gibt das Reading an welches Auskunft &uuml;ber den Fahrstatus des Rollos gibt, sowie als zweites den Wert im Reading welcher aus sagt das das Rollo <strong>nicht</strong> f&auml;hrt</li>
+            <a id="AutoShuttersControl-attr-ASC_DriveUpMaxDuration"></a>
             <li><strong>ASC_DriveUpMaxDuration</strong> - die Dauer des Hochfahrens des Rollladens plus 5 Sekunden (default: 60)</li>
+            <a id="AutoShuttersControl-attr-ASC_Drive_Delay"></a>
             <li><strong>ASC_Drive_Delay</strong> - maximaler Wert f&uuml;r einen zuf&auml;llig ermittelte Verz&ouml;gerungswert in Sekunden bei der Berechnung der Fahrzeiten.</li>
+            <a id="AutoShuttersControl-attr-ASC_Drive_DelayStart"></a>
             <li><strong>ASC_Drive_DelayStart</strong> - in Sekunden verz&ouml;gerter Wert ab welchen das Rollo gefahren werden soll.</li>
+            <a id="AutoShuttersControl-attr-ASC_LockOut"></a>
             <li><strong>ASC_LockOut - soft/hard/off</strong> - stellt entsprechend den Aussperrschutz ein. Bei global aktivem Aussperrschutz (set ASC-Device lockOut soft) und einem Fensterkontakt open bleibt dann der Rollladen oben. Dies gilt nur bei Steuerbefehlen &uuml;ber das ASC Modul. Stellt man global auf hard, wird bei entsprechender M&ouml;glichkeit versucht den Rollladen hardwareseitig zu blockieren. Dann ist auch ein Fahren &uuml;ber die Taster nicht mehr m&ouml;glich. (default: off)</li>
+            <a id="AutoShuttersControl-attr-ASC_LockOut_Cmd"></a>
             <li><strong>ASC_LockOut_Cmd - inhibit/blocked/protection</strong> - set Befehl f&uuml;r das Rollladen-Device zum Hardware sperren. Dieser Befehl wird gesetzt werden, wenn man "ASC_LockOut" auf hard setzt (default: none)</li>
+            <a id="AutoShuttersControl-attr-ASC_Mode_Down"></a>
             <li><strong>ASC_Mode_Down - always/home/absent/off</strong> - Wann darf die Automatik steuern. immer, niemals, bei Abwesenheit des Roommate (ist kein Roommate und absent eingestellt, wird gar nicht gesteuert) (default: always)</li>
+            <a id="AutoShuttersControl-attr-ASC_Mode_Up"></a>
             <li><strong>ASC_Mode_Up - always/home/absent/off</strong> - Wann darf die Automatik steuern. immer, niemals, bei Abwesenheit des Roommate (ist kein Roommate und absent eingestellt, wird gar nicht gesteuert) (default: always)</li>
+            <a id="AutoShuttersControl-attr-ASC_Partymode"></a>
             <li><strong>ASC_Partymode -  on/off</strong> - schaltet den Partymodus an oder aus. Wird am ASC Device set ASC-DEVICE partyMode on geschalten, werden alle Fahrbefehle an den Rolll&auml;den, welche das Attribut auf on haben, zwischengespeichert und sp&auml;ter erst ausgef&uuml;hrt (default: off)</li>
+            <a id="AutoShuttersControl-attr-ASC_Pos_Reading"></a>
             <li><strong>ASC_Pos_Reading</strong> - Name des Readings, welches die Position des Rollladen in Prozent an gibt; wird bei unbekannten Device Typen auch als set Befehl zum fahren verwendet</li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyUpValue_beforeDayOpen"></a>
             <li><strong>ASC_PrivacyUpValue_beforeDayOpen</strong> - wie viele Sekunden vor dem morgendlichen &ouml;ffnen soll der Rollladen in die Sichtschutzposition fahren, oder bei Brightness ab welchem minimum Brightnesswert soll das Rollo in die Privacy Position fahren. Bei Brightness muss zusätzlich zum Zeitwert der Brightnesswert mit angegeben werden 1800:600 bedeutet 30 min vor day open oder bei über einem Brightnesswert von 600 (default: -1)</li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyDownValue_beforeNightClose"></a>
             <li><strong>ASC_PrivacyDownValue_beforeNightClose</strong> - wie viele Sekunden vor dem abendlichen schlie&szlig;en soll der Rollladen in die Sichtschutzposition fahren, oder bei Brightness ab welchem minimum Brightnesswert soll das Rollo in die Privacy Position fahren. Bei Brightness muss zusätzlich zum Zeitwert der Brightnesswert mit angegeben werden 1800:300 bedeutet 30 min vor night close oder bei unter einem Brightnesswert von 300 (default: -1)</li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyUp_Pos"></a>
             <li><strong>ASC_PrivacyUp_Pos</strong> - Position den Rollladens f&uuml;r den morgendlichen Sichtschutz (default: 50) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_PrivacyDown_Pos"></a>
             <li><strong>ASC_PrivacyDown_Pos</strong> - Position den Rollladens f&uuml;r den abendlichen Sichtschutz (default: 50) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_ExternalTrigger"></a>
             <li><strong>ASC_ExternalTrigger</strong> - DEVICE:READING VALUEACTIVE:VALUEINACTIVE POSACTIVE:[POSINACTIVE VALUEACTIVE2:POSACTIVE2], Beispiel: "WohnzimmerTV:state on:off 66:100" bedeutet das wenn ein "state:on" Event kommt soll das Rollo in Position 66 fahren, kommt ein "state:off" Event soll es in Position 100 fahren. Es ist m&ouml;glich die POSINACTIVE weg zu lassen dann f&auml;hrt das Rollo in LastStatus Position.</li>
+            <a id="AutoShuttersControl-attr-ASC_WindProtection"></a>
             <li><strong>ASC_WindProtection - on/off</strong> - soll der Rollladen beim Windschutz beachtet werden. on=JA, off=NEIN. (default off)</li>
+            <a id="AutoShuttersControl-attr-ASC_RainProtection"></a>
             <li><strong>ASC_RainProtection - on/off</strong> - soll der Rollladen beim Regenschutz beachtet werden. on=JA, off=NEIN. (default off)</li>
+            <a id="AutoShuttersControl-attr-ASC_Roommate_Device"></a>
             <li><strong>ASC_Roommate_Device</strong> - mit Komma getrennte Namen des/der Roommate Device/s, welche den/die Bewohner des Raumes vom Rollladen wiedergibt. Es macht nur Sinn in Schlaf- oder Kinderzimmern (default: none)</li>
-            <li><strong>ASC_Adv - on/off</strong> bei on wird das runterfahren des Rollos w&auml;hrend der Weihnachtszeit (1. Advent bis 6. Januar) ausgesetzt! Durch set ASCDEVICE advDriveDown werden alle ausgesetzten Fahrten nachgeholt.</li>
+            <a id="AutoShuttersControl-attr-ASC_Roommate_Reading"></a>
             <li><strong>ASC_Roommate_Reading</strong> - das Reading zum Roommate Device, welches den Status wieder gibt (default: state)</li>
+            <a id="AutoShuttersControl-attr-ASC_GuestRoom"></a>
+            <li><strong>ASC_GuestRoom on|off</strong> - (not functionality implemented yet?).
+            </li>
+            <a id="AutoShuttersControl-attr-ASC_Adv"></a>
+            <li><strong>ASC_Adv - on/off</strong> bei on wird das runterfahren des Rollos w&auml;hrend der Weihnachtszeit (1. Advent bis 6. Januar) ausgesetzt! Durch set ASCDEVICE advDriveDown werden alle ausgesetzten Fahrten nachgeholt.</li>
+            <a id="AutoShuttersControl-attr-ASC_Self_Defense_Mode"></a>
             <li><strong>ASC_Self_Defense_Mode - absent/gone/off</strong> - ab welchen Residents Status soll Selfdefense aktiv werden ohne das Fenster auf sind. (default: gone)</li>
+            <a id="AutoShuttersControl-attr-ASC_Self_Defense_AbsentDelay"></a>
             <li><strong>ASC_Self_Defense_AbsentDelay</strong> - um wie viele Sekunden soll das fahren in Selfdefense bei Residents absent verz&ouml;gert werden. (default: 300)</li>
+            <a id="AutoShuttersControl-attr-ASC_Self_Defense_Exclude"></a>
             <li><strong>ASC_Self_Defense_Exclude - on/off</strong> - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist. (default: off), off bedeutet das es ausgeschlossen ist vom Self Defense</li></p>
             <ul>
                 <strong><u>Beschreibung der Beschattungsfunktion</u></strong>
@@ -964,32 +1122,71 @@ sub Initialize {
                 </br><strong>Im ASC Device</strong> das Reading "controlShading" mit dem Wert on, sowie ein Astro/Twilight Device im Attribut "ASC_twilightDevice" und das Attribut "ASC_tempSensor".
                 </br><strong>In den Rollladendevices</strong> ben&ouml;tigt ihr ein Helligkeitssensor als Attribut "ASC_BrightnessSensor", sofern noch nicht vorhanden. Findet der Sensor nur f&uuml;r die Beschattung Verwendung ist der Wert DEVICENAME[:READING] ausreichend.
                 </br>Alle weiteren Attribute sind optional und wenn nicht gesetzt mit Default-Werten belegt. Ihr solltet sie dennoch einmal anschauen und entsprechend Euren Gegebenheiten setzen. Die Werte f&uuml;r die Fensterposition und den Vor- Nachlaufwinkel sowie die Grenzwerte f&uuml;r die StateChange_Cloudy und StateChange_Sunny solltet ihr besondere Beachtung dabei schenken.
+                <a id="AutoShuttersControl-attr-ASC_Shading_InOutAzimuth"></a>
                 <li><strong>ASC_Shading_InOutAzimuth</strong> - Azimut Wert ab dem bei &Uuml;berschreiten Beschattet und bei Unterschreiten Endschattet werden soll. (default: 95:265)</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_MinMax_Elevation"></a>
                 <li><strong>ASC_Shading_MinMax_Elevation</strong> - ab welcher min H&ouml;he des Sonnenstandes soll beschattet und ab welcher max H&ouml;he wieder beendet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 25.0:100.0)</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_Min_OutsideTemperature"></a>
                 <li><strong>ASC_Shading_Min_OutsideTemperature</strong> - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 18)</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_Mode"></a>
                 <li><strong>ASC_Shading_Mode - absent,always,off,home</strong> / wann soll die Beschattung nur stattfinden. (default: off)</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_Pos"></a>
                 <li><strong>ASC_Shading_Pos</strong> - Position des Rollladens f&uuml;r die Beschattung (Default: ist abh&auml;ngig vom Attribut<em>ASC</em> 80/20) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_StateChange_SunnyCloudy"></a>
                 <li><strong>ASC_Shading_StateChange_SunnyCloudy</strong> - Brightness Wert ab welchen die Beschattung stattfinden und aufgehoben werden soll, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte. Ein optionaler dritter Wert gibt an wie, viele Brightnesswerte für den aktuellen Brightness-Durchschnitt berücksichtigt werden. Standard ist 3, es sollten nicht mehr als 5 ber&uuml;cksichtigt werden. (default: 35000:20000 [3])</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_WaitingPeriod"></a>
                 <li><strong>ASC_Shading_WaitingPeriod</strong> - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten f&uuml;r die Beschattung stattfinden soll (default: 1200)</li>
-                <li><strong>ASC_Shading_BetweenTheTime</strong> - das fahren in die Beschattung erfolgt bei Angabe nur innerhalb des Zeitraumes, Bsp: 9:00-13:00 11:25-15:30</li>
+                <a id="AutoShuttersControl-attr-ASC_Shading_BetweenTheTime"></a>
+                <li><strong>ASC_Shading_BetweenTheTime</strong> - das Fahren in die Beschattung erfolgt bei Angabe nur innerhalb des Zeitraumes, Bsp: 9:00-13:00 11:25-15:30</li>
             </ul></p>
+            <a id="AutoShuttersControl-attr-ASC_ShuttersPlace"></a>
             <li><strong>ASC_ShuttersPlace - window/terrace/awning</strong> - Wenn dieses Attribut auf terrace gesetzt ist, das Residence Device in den Status "gone" geht und SelfDefense aktiv ist (ohne das das Reading selfDefense gesetzt sein muss), wird das Rollo geschlossen. awning steht für Markise und wirkt sich auf die Beschattungssteuerung aus. (default: window)</li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Down_Early"></a>
             <li><strong>ASC_Time_Down_Early</strong> - Sonnenuntergang fr&uuml;hste Zeit zum Runterfahren (default: 16:00) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss ein Zeitformat in Form HH:MM[:SS] sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Down_Late"></a>
             <li><strong>ASC_Time_Down_Late</strong> - Sonnenuntergang sp&auml;teste Zeit zum Runterfahren (default: 22:00) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss ein Zeitformat in Form HH:MM[:SS] sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Up_Early"></a>
             <li><strong>ASC_Time_Up_Early</strong> - Sonnenaufgang fr&uuml;hste Zeit zum Hochfahren (default: 05:00) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss ein Zeitformat in Form HH:MM[:SS] sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Up_Late"></a>
             <li><strong>ASC_Time_Up_Late</strong> - Sonnenaufgang sp&auml;teste Zeit zum Hochfahren (default: 08:30) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss ein Zeitformat in Form HH:MM[:SS] sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_Time_Up_WE_Holiday"></a>
             <li><strong>ASC_Time_Up_WE_Holiday</strong> - Sonnenaufgang fr&uuml;hste Zeit zum Hochfahren am Wochenende und/oder Urlaub (holiday2we wird beachtet). (default: 08:00) ACHTUNG!!! in Verbindung mit Brightness f&uuml;r <em>ASC_Up</em> muss die Uhrzeit kleiner sein wie die Uhrzeit aus <em>ASC_Time_Up_Late</em> !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss ein Zeitformat in Form HH:MM[:SS] sein!!!</li>
+            <a id="AutoShuttersControl-attr-ASC_Up"></a>
             <li><strong>ASC_Up - astro/time/brightness</strong> - bei astro wird Sonnenaufgang berechnet, bei time wird der Wert aus ASC_Time_Up_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Up_Early und ASC_Time_Up_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Up_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Up_Early und ASC_Time_Up_Late geschaut, ob die als Attribut im Moduldevice hinterlegte Down Wert von ASC_brightnessDriveUpDown erreicht wurde. Wenn ja, wird der Rollladen hoch gefahren (default: astro)</li>
+            <a id="AutoShuttersControl-attr-ASC_Ventilate_Window_Open"></a>
             <li><strong>ASC_Ventilate_Window_Open</strong> - auf l&uuml;ften, wenn das Fenster gekippt/ge&ouml;ffnet wird und aktuelle Position unterhalb der L&uuml;ften-Position ist (default: on)</li>
+            <a id="AutoShuttersControl-attr-ASC_WiggleValue"></a>
             <li><strong>ASC_WiggleValue</strong> - Wert um welchen sich die Position des Rollladens &auml;ndern soll (default: 5)</li>
+            <a id="AutoShuttersControl-attr-ASC_WindParameters"></a>
             <li><strong>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION]</strong> / Angabe von Max Wert ab dem f&uuml;r Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist der TRIGGERMAX Wert mit -1 an zu geben. (default: '50:20 ClosedPosition')</li>
+            <a id="AutoShuttersControl-attr-ASC_WindowRec_PosAfterDayClosed"></a>
             <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
+            <a id="AutoShuttersControl-attr-ASC_WindowRec"></a>
             <li><strong>ASC_WindowRec</strong> - WINDOWREC:[READING], Name des Fensterkontaktes, an dessen Fenster der Rollladen angebracht ist (default: none). Reading ist optional</li>
+            <a id="AutoShuttersControl-attr-ASC_WindowRec_subType"></a>
             <li><strong>ASC_WindowRec_subType</strong> - Typ des verwendeten Fensterkontaktes: twostate (optisch oder magnetisch) oder threestate (Drehgriffkontakt) (default: twostate)</li>
-            <li><strong>ASC_SlatPosCmd_SlatDevice</strong> - Angaben zu einem Slat (Lamellen) CMD und sofern diese Lamellen &uuml;ber ein anderes Device gesteuert werden zum Slat Device. Beispiel: attr ROLLO ASC_SlatPosCmd_SlatDevice slatPct[:ROLLOSLATDEVICE] [ ] bedeutet optinal. Kann also auch weg gelassen werden. Wenn Ihr das SLAT Device mit angibt dann bitte ohne []. Beispiel: attr ROLLO ASC_SlatPosCmd_SlatDevice slatPct:ROLLOSLATDEVICE. Damit das ganze dann auch greift muss in den 6 Positionsangaben ASC_Open_Pos, ASC_Closed_Pos, ASC_Ventilate_Pos, ASC_ComfortOpen_Pos, ASC_Shading_Pos und ASC_Sleep_Pos ein weiterer Parameter f&uuml;r die Lamellenstellung mit angegeben werden.</li>
+            <a id="AutoShuttersControl-attr-ASC_SlatPosCmd_SlatDevice"></a>
+            <li><strong>ASC_SlatPosCmd_SlatDevice</strong> - Angaben zu einem Slat (Lamellen) CMD und - sofern diese Lamellen &uuml;ber ein anderes Device gesteuert werden - zum Slat Device. Beispiele: <i>attr ROLLO ASC_SlatPosCmd_SlatDevice slatPct</i> oder <i>attr ROLLO ASC_SlatPosCmd_SlatDevice dim:ROLLOSLATDEVICE</i>. Die Angabe des Devices ist nur erforderlich, wenn zur Steuerung der Lamellen ein anderes Device verwendet wird. Damit das ganze dann auch greift, muss in den 6 Positionsangaben ASC_Open_Pos, ASC_Closed_Pos, ASC_Ventilate_Pos, ASC_ComfortOpen_Pos, ASC_Shading_Pos und ASC_Sleep_Pos ein weiterer Parameter f&uuml;r die Lamellenstellung mit angegeben werden.</li>
+            <a id="AutoShuttersControl-attr-ASC_CommandTemplate"></a>
+            <a id="AutoShuttersControl-attr-ASC_CommandTemplate"></a>
+            <li><strong>ASC_CommandTemplate</strong> - <strong>FHEM-Kommando(s) oder Perl-Anweisung</strong> (in geschweiften Klammern unter Beachtung der üblichen Regeln für das escapen von Semicolons etc.).<br>
+            Dieses Attribut übersteuert das sonst intern ermittelte Fahrkommando und ist <strong>für seltene und spezielle Fälle</strong> gedacht. In der Regel ist es nicht erforderlich, dieses Attribut zu setzen!<br>
+            Die Variablen <i>$name</i> (der Name des Rollladen-Devices), <i>$pos</i> (die Zielposition des Fahrbefehls), <i>$slatPos</i> (die Zielposition des Fahrbefehls für eventuelle Lamellen) und <i>$cause</i> (die interne Benennung des Fahranlasses) werden durch die ermittelten Werte ersetzt, es muss selbst dafür gesorgt werden, dass eventuell unnötige Fahrbefehle aussortiert werden.
+            Beispiele:
+            <ul>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name $pos</i> - Positionsbefehl direkt an Gerät
+            setzen</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name pct $pos</i> - Positionsbefehl auf den setter <i>pct</i> absetzen</li>
+            <li><i>attr ROLLO ASC_CommandTemplate set $name datapoint 4.LEVEL_2 $slatPos 4.LEVEL $pos</i> - Positionsbefehl und Lamellen-Ansteuerung für HM-IP-Jalousieaktoren</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { fhem("set $name ".($pos+1024)).";set $name 0")}</i> - Positionsbefehl für eine SPS in Perl umrechnen</li>
+            <li><i>attr ROLLO ASC_CommandTemplate { myPerlFn("$name",$pos,$slatPos,"$cause")}</i> - eigene Perl-Funktion (z.B. in 99_myUtils.pm) aufrufen</li>
+            </ul>
+            <strong>Hinweis: ASC_CommandTemplate</strong> ist für seltene und spezielle Fälle gedacht. In der Regel ist es nicht erforderlich, dieses Attribut zu setzen!
+            </li>
         </ul>
     </ul>
     </p>
+    <a id="AutoShuttersControl-API"></a>
     <strong><u>Beschreibung der AutoShuttersControl API</u></strong>
     </br>Mit dem Aufruf der API Funktion und &Uuml;bergabe der entsprechenden Parameter ist es m&ouml;glich auf interne Daten zu zu greifen.
     </p>
@@ -1263,11 +1460,11 @@ sub Initialize {
     "Rollo",
     "Control"
   ],
-  "release_status": "testing",
+  "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.10.12",
+  "version": "v0.10.22",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
     "CoolTux"
@@ -1279,7 +1476,7 @@ sub Initialize {
     "runtime": {
       "requires": {
         "FHEM": 5.00918799,
-        "perl": 5.016, 
+        "perl": 5.023, 
         "Meta": 0,
         "JSON": 0,
         "Date::Parse": 0

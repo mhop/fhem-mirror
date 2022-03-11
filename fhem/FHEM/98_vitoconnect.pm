@@ -186,9 +186,13 @@
 #                 *experimentell* Attribut vitoconnect_device
 #                 Workaround für Forum #561
 #                 Neue Readings für "*ValueReadAt"
-#                 
 #
-#   ToDo:         timeout konfigurierbar machen
+# 2021-07-19      Anpassungen für privaten apiKey. Redirect URIs muss "http://localhost:4200/" sein.
+#                 Nutzung des refresh_token
+#
+# 2021-07-19      neue Readings für heating.burners.0.*
+#
+#   ToDo:         timeout, intervall konfigurierbar machen
 #				  Attribute implementieren und dokumentieren
 #                 Mehrsprachigkeit
 #                 Auswerten der Readings in getCode usw.
@@ -210,16 +214,10 @@ use DateTime;
 use Time::Piece;
 use Time::Seconds;
 
-my $client_id     = '79742319e39245de5f91d15ff4cac2a8';
-my $client_secret = '8ad97aceb92c5892e102b093c7c083fa';
-my $authorizeURL  = 'https://iam.viessmann.com/idp/v2/authorize';
-
-my $token_url  = "https://iam.viessmann.com/idp/v2/token";
-my $apiURLBase = "https://api.viessmann-platform.io";
-my $apiURLInst =
-  "https://api.viessmann-platform.io/operational-data/v1/installations";
-my $general      = "/general-management/installations?expanded=true&";
-my $callback_uri = "vicare://oauth-callback/everest";
+my $client_secret = "2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c";
+my $callback_uri  = "http://localhost:4200/";
+my $apiURLBase    = "https://api.viessmann-platform.io/iot/v1/equipment/";
+my $apiURL        = "https://api.viessmann.com/iot/v1/equipment/";
 
 my $RequestList = {
     "heating.boiler.serial.value"      => "Kessel_Seriennummer",
@@ -244,10 +242,16 @@ my $RequestList = {
     "heating.burner.statistics.hours"    => "Brenner_Betriebsstunden",
     "heating.burner.statistics.starts"   => "Brenner_Starts",
 
+    "heating.burners.0.active"            => "Brenner_1_aktiv",
+    "heating.burners.0.modulation.unit"   => "Brenner_1_Modulation/Einheit",
+    "heating.burners.0.modulation.value"  => "Brenner_1_Modulation",
+    "heating.burners.0.statistics.hours"  => "Brenner_1_Betriebsstunden",
+    "heating.burners.0.statistics.starts" => "Brenner_1_Starts",
+
     "heating.circuits.enabled"                   => "Aktive_Heizkreise",
     "heating.circuits.0.active"                  => "HK1-aktiv",
-	"heating.circuits.0.type"                  => "HK1-Typ",
-	"heating.circuits.0.circulation.pump.status" => "HK1-Zirkulationspumpe",
+    "heating.circuits.0.type"                    => "HK1-Typ",
+    "heating.circuits.0.circulation.pump.status" => "HK1-Zirkulationspumpe",
     "heating.circuits.0.circulation.schedule.active" =>
       "HK1-Zeitsteuerung_Zirkulation_aktiv",
     "heating.circuits.0.circulation.schedule.entries" =>
@@ -334,7 +338,7 @@ my $RequestList = {
     "heating.circuits.0.zone.mode.active" => "HK1-ZoneMode_aktive",
 
     "heating.circuits.1.active"                  => "HK2-aktiv",
-    "heating.circuits.1.type"                  => "HK2-Typ",
+    "heating.circuits.1.type"                    => "HK2-Typ",
     "heating.circuits.1.circulation.pump.status" => "HK2-Zirkulationspumpe",
     "heating.circuits.1.circulation.schedule.active" =>
       "HK2-Zeitsteuerung_Zirkulation_aktiv",
@@ -421,7 +425,7 @@ my $RequestList = {
     "heating.circuits.1.zone.mode.active" => "HK2-ZoneMode_aktive",
 
     "heating.circuits.2.active"                  => "HK3-aktiv",
-    "heating.circuits.2.type"                  => "HK3-Typ",
+    "heating.circuits.2.type"                    => "HK3-Typ",
     "heating.circuits.2.circulation.pump.status" => "HK3-Zirkulationspumpe",
     "heating.circuits.2.circulation.schedule.active" =>
       "HK3-Zeitsteuerung_Zirkulation_aktiv",
@@ -610,30 +614,42 @@ my $RequestList = {
     "heating.gas.consumption.dhw.week"  => "Gasverbrauch_WW/Woche",
     "heating.gas.consumption.dhw.month" => "Gasverbrauch_WW/Monat",
     "heating.gas.consumption.dhw.year"  => "Gasverbrauch_WW/Jahr",
-    "heating.gas.consumption.dhw.dayValueReadAt"   => "Gasverbrauch_WW/Tag_gelesen_am",
-    "heating.gas.consumption.dhw.weekValueReadAt"  => "Gasverbrauch_WW/Woche_gelesen_am",
-    "heating.gas.consumption.dhw.monthValueReadAt" => "Gasverbrauch_WW/Monat_gelesen_am",
-    "heating.gas.consumption.dhw.yearValueReadAt"  => "Gasverbrauch_WW/Jahr_gelesen_am",
-    "heating.gas.consumption.dhw.unit"  => "Gasverbrauch_WW/Einheit",
+    "heating.gas.consumption.dhw.dayValueReadAt" =>
+      "Gasverbrauch_WW/Tag_gelesen_am",
+    "heating.gas.consumption.dhw.weekValueReadAt" =>
+      "Gasverbrauch_WW/Woche_gelesen_am",
+    "heating.gas.consumption.dhw.monthValueReadAt" =>
+      "Gasverbrauch_WW/Monat_gelesen_am",
+    "heating.gas.consumption.dhw.yearValueReadAt" =>
+      "Gasverbrauch_WW/Jahr_gelesen_am",
+    "heating.gas.consumption.dhw.unit" => "Gasverbrauch_WW/Einheit",
 
     "heating.gas.consumption.heating.day"   => "Gasverbrauch_Heizung/Tag",
     "heating.gas.consumption.heating.week"  => "Gasverbrauch_Heizung/Woche",
     "heating.gas.consumption.heating.month" => "Gasverbrauch_Heizung/Monat",
     "heating.gas.consumption.heating.year"  => "Gasverbrauch_Heizung/Jahr",
-	"heating.gas.consumption.heating.dayValueReadAt"   => "Gasverbrauch_Heizung/Tag_gelesen_am",
-    "heating.gas.consumption.heating.weekValueReadAt"  => "Gasverbrauch_Heizung/Woche_gelesen_am",
-    "heating.gas.consumption.heating.monthValueReadAt" => "Gasverbrauch_Heizung/Monat_gelesen_am",
-    "heating.gas.consumption.heating.yearValueReadAt"  => "Gasverbrauch_Heizung/Jahr_gelesen_am",
-    "heating.gas.consumption.heating.unit"  => "Gasverbrauch_Heizung/Einheit",
-    "heating.gas.consumption.total.day"     => "Gasverbrauch_Total/Tag",
-    "heating.gas.consumption.total.month"   => "Gasverbrauch_Total/Woche",
-    "heating.gas.consumption.total.unit"    => "Gasverbrauch_Total/Einheit",
-    "heating.gas.consumption.total.week"    => "Gasverbrauch_Total/Woche",
-    "heating.gas.consumption.total.year"    => "Gasverbrauch_Total/Jahr",
-    "heating.gas.consumption.total.dayValueReadAt"     => "Gasverbrauch_Total/Tag_gelesen_am",
-    "heating.gas.consumption.total.monthValueReadAt"   => "Gasverbrauch_Total/Woche_gelesen_am",
-    "heating.gas.consumption.total.weekValueReadAt"    => "Gasverbrauch_Total/Woche_gelesen_am",
-    "heating.gas.consumption.total.yearValueReadAt"    => "Gasverbrauch_Total/Jahr_gelesen_am",
+    "heating.gas.consumption.heating.dayValueReadAt" =>
+      "Gasverbrauch_Heizung/Tag_gelesen_am",
+    "heating.gas.consumption.heating.weekValueReadAt" =>
+      "Gasverbrauch_Heizung/Woche_gelesen_am",
+    "heating.gas.consumption.heating.monthValueReadAt" =>
+      "Gasverbrauch_Heizung/Monat_gelesen_am",
+    "heating.gas.consumption.heating.yearValueReadAt" =>
+      "Gasverbrauch_Heizung/Jahr_gelesen_am",
+    "heating.gas.consumption.heating.unit" => "Gasverbrauch_Heizung/Einheit",
+    "heating.gas.consumption.total.day"    => "Gasverbrauch_Total/Tag",
+    "heating.gas.consumption.total.month"  => "Gasverbrauch_Total/Monat",
+    "heating.gas.consumption.total.unit"   => "Gasverbrauch_Total/Einheit",
+    "heating.gas.consumption.total.week"   => "Gasverbrauch_Total/Woche",
+    "heating.gas.consumption.total.year"   => "Gasverbrauch_Total/Jahr",
+    "heating.gas.consumption.total.dayValueReadAt" =>
+      "Gasverbrauch_Total/Tag_gelesen_am",
+    "heating.gas.consumption.total.monthValueReadAt" =>
+      "Gasverbrauch_Total/Woche_gelesen_am",
+    "heating.gas.consumption.total.weekValueReadAt" =>
+      "Gasverbrauch_Total/Woche_gelesen_am",
+    "heating.gas.consumption.total.yearValueReadAt" =>
+      "Gasverbrauch_Total/Jahr_gelesen_am",
 
     "heating.gas.consumption.fuelCell.day" =>
       "Gasverbrauch_Brennstoffzelle/Tag",
@@ -683,11 +699,15 @@ my $RequestList = {
     "heating.power.consumption.total.month" => "Stromverbrauch_Total/Monat",
     "heating.power.consumption.total.week"  => "Stromverbrauch_Total/Woche",
     "heating.power.consumption.total.year"  => "Stromverbrauch_Total/Jahr",
-    "heating.power.consumption.total.dayValueReadAt"   => "Stromverbrauch_Total/Tag_gelesen_am",
-    "heating.power.consumption.total.monthValueReadAt" => "Stromverbrauch_Total/Monat_gelesen_am",
-    "heating.power.consumption.total.weekValueReadAt"  => "Stromverbrauch_Total/Woche_gelesen_am",
-    "heating.power.consumption.total.yearValueReadAt"  => "Stromverbrauch_Total/Jahr_gelesen_am",
-    "heating.power.consumption.total.unit"  => "Stromverbrauch_Total/Einheit",
+    "heating.power.consumption.total.dayValueReadAt" =>
+      "Stromverbrauch_Total/Tag_gelesen_am",
+    "heating.power.consumption.total.monthValueReadAt" =>
+      "Stromverbrauch_Total/Monat_gelesen_am",
+    "heating.power.consumption.total.weekValueReadAt" =>
+      "Stromverbrauch_Total/Woche_gelesen_am",
+    "heating.power.consumption.total.yearValueReadAt" =>
+      "Stromverbrauch_Total/Jahr_gelesen_am",
+    "heating.power.consumption.total.unit" => "Stromverbrauch_Total/Einheit",
 
     "heating.power.production.current.status" =>
       "Stromproduktion_aktueller_Status",
@@ -816,8 +836,8 @@ sub vitoconnect_Initialize {
       . "vitoconnect_raw_readings:0,1 "
       . "vitoconnect_gw_readings:0,1 "
       . "vitoconnect_actions_active:0,1 "
-  	  . "vitoconnect_device:0,1 "
-	  . "vitoconnect_timeout:selectnumbers,10,1.0,30,0,lin "
+      . "vitoconnect_device:0,1 "
+      . "vitoconnect_timeout:selectnumbers,10,1.0,30,0,lin "
       . $readingFnAttributes;
     return;
 }
@@ -828,16 +848,18 @@ sub vitoconnect_Define {
     my @param = split( '[ \t]+', $def );
 
     if ( int(@param) < 5 ) {
-        return
-"too few parameters: define <name> vitoconnect <user> <passwd> <intervall>";
+        return "too few parameters: "
+          . "define <name> vitoconnect <user> <passwd> <intervall>";
     }
 
     $hash->{user}            = $param[2];
     $hash->{intervall}       = $param[4];
     $hash->{counter}         = 0;
+    $hash->{timeout}         = 15;
     $hash->{".access_token"} = "";
     $hash->{".installation"} = "";
     $hash->{".gw"}           = "";
+    $hash->{"Redirect_URI"}  = $callback_uri;
 
     my $isiwebpasswd = vitoconnect_ReadKeyValue( $hash, "passwd" );
     if ( $isiwebpasswd eq "" ) {
@@ -847,6 +869,7 @@ sub vitoconnect_Define {
     else {
         Log3 $name, 3, "$name - Passwort war bereits gespeichert";
     }
+    $hash->{apiKey} = vitoconnect_ReadKeyValue( $hash, "apiKey" );
     InternalTimer( gettimeofday() + 10, "vitoconnect_GetUpdate", $hash );
     return;
 }
@@ -884,13 +907,21 @@ sub vitoconnect_Set {
     elsif ( $opt eq "password" ) {
         my $err = vitoconnect_StoreKeyValue( $hash, "passwd", $args[0] );
         return $err if ($err);
+        vitoconnect_getCode($hash);
+        return;
+    }
+    elsif ( $opt eq "apiKey" ) {
+        $hash->{apiKey} = $args[0];
+        my $err = vitoconnect_StoreKeyValue( $hash, "apiKey", $args[0] );
+        RemoveInternalTimer($hash);
+        vitoconnect_getCode($hash);
         return;
     }
     elsif ( $opt eq "HK1-Heizkurve-Niveau" ) {
         my $slope = ReadingsVal( $name, "HK1-Heizkurve-Steigung", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.heating.curve/setCurve",
+            "heating.circuits.0.heating.curve/commands/setCurve",
             "{\"shift\":$args[0],\"slope\":$slope}",
             $name, $opt, @args
         );
@@ -900,7 +931,7 @@ sub vitoconnect_Set {
         my $slope = ReadingsVal( $name, "HK2-Heizkurve-Steigung", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.1.heating.curve/setCurve",
+            "heating.circuits.1.heating.curve/commands/setCurve",
             "{\"shift\":$args[0],\"slope\":$slope}",
             $name, $opt, @args
         );
@@ -910,7 +941,7 @@ sub vitoconnect_Set {
         my $slope = ReadingsVal( $name, "HK3-Heizkurve-Steigung", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.2.heating.curve/setCurve",
+            "heating.circuits.2.heating.curve/commands/setCurve",
             "{\"shift\":$args[0],\"slope\":$slope}",
             $name, $opt, @args
         );
@@ -920,7 +951,7 @@ sub vitoconnect_Set {
         my $shift = ReadingsVal( $name, "HK1-Heizkurve-Niveau", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.heating.curve/setCurve",
+            "heating.circuits.0.heating.curve/commands/setCurve",
             "{\"shift\":$shift,\"slope\":$args[0]}",
             $name, $opt, @args
         );
@@ -930,7 +961,7 @@ sub vitoconnect_Set {
         my $shift = ReadingsVal( $name, "HK2-Heizkurve-Niveau", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.1.heating.curve/setCurve",
+            "heating.circuits.1.heating.curve/commands/setCurve",
             "{\"shift\":$shift,\"slope\":$args[0]}",
             $name, $opt, @args
         );
@@ -940,7 +971,7 @@ sub vitoconnect_Set {
         my $shift = ReadingsVal( $name, "HK3-Heizkurve-Niveau", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.2.heating.curve/setCurve",
+            "heating.circuits.2.heating.curve/commands/setCurve",
             "{\"shift\":$shift,\"slope\":$args[0]}",
             $name, $opt, @args
         );
@@ -955,9 +986,11 @@ sub vitoconnect_Set {
         }
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.operating.programs.holiday/schedule",
+            "heating.circuits.0.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
@@ -970,9 +1003,11 @@ sub vitoconnect_Set {
         }
         vitoconnect_action(
             $hash,
-            "heating.circuits.1.operating.programs.holiday/schedule",
+            "heating.circuits.1.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
@@ -985,9 +1020,11 @@ sub vitoconnect_Set {
         }
         vitoconnect_action(
             $hash,
-            "heating.circuits.2.operating.programs.holiday/schedule",
+            "heating.circuits.2.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
@@ -995,9 +1032,11 @@ sub vitoconnect_Set {
         my $start = ReadingsVal( $name, "HK1-Urlaub_Start", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.operating.programs.holiday/schedule",
+            "heating.circuits.0.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
@@ -1005,9 +1044,11 @@ sub vitoconnect_Set {
         my $start = ReadingsVal( $name, "HK2-Urlaub_Start", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.1.operating.programs.holiday/schedule",
+            "heating.circuits.1.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
@@ -1015,224 +1056,257 @@ sub vitoconnect_Set {
         my $start = ReadingsVal( $name, "HK3-Urlaub_Start", "" );
         vitoconnect_action(
             $hash,
-            "heating.circuits.2.operating.programs.holiday/schedule",
+            "heating.circuits.2.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK1-Urlaub_unschedule" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.0.operating.programs.holiday/unschedule",
-            "{}", $name, $opt, @args );
+        vitoconnect_action(
+            $hash,
+            "heating.circuits.0.operating.programs.holiday/commands/unschedule",
+            "{}",
+            $name,
+            $opt,
+            @args
+        );
         return;
     }
     elsif ( $opt eq "HK2-Urlaub_unschedule" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.1.operating.programs.holiday/unschedule",
-            "{}", $name, $opt, @args );
+        vitoconnect_action(
+            $hash,
+            "heating.circuits.1.operating.programs.holiday/commands/unschedule",
+            "{}",
+            $name,
+            $opt,
+            @args
+        );
         return;
     }
     elsif ( $opt eq "HK3-Urlaub_unschedule" ) {
-        vitoconnect_action( $hash,
-            "heating.circuits.2.operating.programs.holiday/unschedule",
-            "{}", $name, $opt, @args );
+        vitoconnect_action(
+            $hash,
+            "heating.circuits.2.operating.programs.holiday/commands/unschedule",
+            "{}",
+            $name,
+            $opt,
+            @args
+        );
         return;
     }
     elsif ( $opt eq "HK1-Zeitsteuerung_Heizung" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.0.heating.schedule/setSchedule",
+            "heating.circuits.0.heating.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK2-Zeitsteuerung_Heizung" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.1.heating.schedule/setSchedule",
+            "heating.circuits.1.heating.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK3-Zeitsteuerung_Heizung" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.2.heating.schedule/setSchedule",
+            "heating.circuits.2.heating.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK1-Betriebsart" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.0.operating.modes.active/setMode",
+            "heating.circuits.0.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK2-Betriebsart" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.1.operating.modes.active/setMode",
+            "heating.circuits.1.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK3-Betriebsart" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.2.operating.modes.active/setMode",
+            "heating.circuits.2.operating.modes.active/commands/setMode",
             "{\"mode\":\"$args[0]\"}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK1-Solltemperatur_comfort_aktiv" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.0.operating.programs.comfort/$args[0]",
+            "heating.circuits.0.operating.programs.comfort/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK2-Solltemperatur_comfort_aktiv" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.1.operating.programs.comfort/$args[0]",
+            "heating.circuits.1.operating.programs.comfort/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK3-Solltemperatur_comfort_aktiv" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.2.operating.programs.comfort/$args[0]",
+            "heating.circuits.2.operating.programs.comfort/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK1-Solltemperatur_comfort" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.operating.programs.comfort/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.0.operating.programs.comfort/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK2-Solltemperatur_comfort" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.operating.programs.comfort/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.1.operating.programs.comfort/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK3-Solltemperatur_comfort" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.operating.programs.comfort/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.2.operating.programs.comfort/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK1-Solltemperatur_eco_aktiv" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.0.operating.programs.eco/$args[0]",
+            "heating.circuits.0.operating.programs.eco/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
 
     }
     elsif ( $opt eq "HK2-Solltemperatur_eco_aktiv" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.1.operating.programs.eco/$args[0]",
+            "heating.circuits.1.operating.programs.eco/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK3-Solltemperatur_eco_aktiv" ) {
         vitoconnect_action( $hash,
-            "heating.circuits.2.operating.programs.eco/$args[0]",
+            "heating.circuits.2.operating.programs.eco/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK1-Solltemperatur_normal" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.operating.programs.normal/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.0.operating.programs.normal/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK2-Solltemperatur_normal" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.operating.programs.normal/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.1.operating.programs.normal/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK3-Solltemperatur_normal" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.operating.programs.normal/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.2.operating.programs.normal/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK1-Solltemperatur_reduziert" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.0.operating.programs.reduced/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.0.operating.programs.reduced/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK2-Solltemperatur_reduziert" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.1.operating.programs.reduced/setTemperature",
+        vitoconnect_action($hash,
+            "heating.circuits.1.operating.programs.reduced/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK3-Solltemperatur_reduziert" ) {
-        vitoconnect_action(
-            $hash,
-            "heating.circuits.2.operating.programs.reduced/setTemperature",
+        vitoconnect_action($hash,
+               "heating.circuits.2.operating.programs.reduced/commands/setTemperature",
             "{\"targetTemperature\":$args[0]}",
-            $name, $opt, @args
+            $name,
+            $opt,
+            @args
         );
         return;
     }
     elsif ( $opt eq "HK1-Name" ) {
-        vitoconnect_action( $hash, "heating.circuits.0/setName",
+        vitoconnect_action( $hash, "heating.circuits.0/commands/setName",
             "{\"name\":\"@args\"}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK2-Name" ) {
-        vitoconnect_action( $hash, "heating.circuits.1/setName",
+        vitoconnect_action( $hash, "heating.circuits.1/commands/setName",
             "{\"name\":\"@args\"}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "HK3-Name" ) {
-        vitoconnect_action( $hash, "heating.circuits.2/setName",
+        vitoconnect_action( $hash, "heating.circuits.2/commands/setName",
             "{\"name\":\"@args\"}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "WW-einmaliges_Aufladen" ) {
-        vitoconnect_action( $hash, "heating.dhw.oneTimeCharge/$args[0]",
+        vitoconnect_action( $hash,
+            "heating.dhw.oneTimeCharge/commands/$args[0]",
             "{}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "WW-Zirkulationspumpe_Zeitplan" ) {
         vitoconnect_action( $hash,
-            "heating.dhw.pumps.circulation.schedule/setSchedule",
+            "heating.dhw.pumps.circulation.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "WW-Zeitplan" ) {
-        vitoconnect_action( $hash, "heating.dhw.schedule/setSchedule",
+        vitoconnect_action( $hash, "heating.dhw.schedule/commands/setSchedule",
             "{\"newSchedule\":@args}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "WW-Haupttemperatur" ) {
         vitoconnect_action( $hash,
-            "heating.dhw.temperature.main/setTargetTemperature",
+            "heating.dhw.temperature.main/commands/setTargetTemperature",
             "{\"temperature\":$args[0]}", $name, $opt, @args );
         return;
     }
     elsif ( $opt eq "WW-Solltemperatur" ) {
         vitoconnect_action( $hash,
-            "heating.dhw.temperature/setTargetTemperature",
+            "heating.dhw.temperature/commands/commands/setTargetTemperature",
+            "{\"temperature\":$args[0]}", $name, $opt, @args );
+        return;
+    }
+    elsif ( $opt eq "WW-Temperatur_2" ) {
+        vitoconnect_action( $hash,
+            "heating.dhw.temperature.temp2/commands/setTargetTemperature",
             "{\"temperature\":$args[0]}", $name, $opt, @args );
         return;
     }
@@ -1243,10 +1317,9 @@ sub vitoconnect_Set {
             $t += ONE_DAY;
             $end = $t->strftime("%Y-%m-%d");
         }
-
         vitoconnect_action(
             $hash,
-            "heating.operating.programs.holiday/schedule",
+            "heating.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$args[0]\",\"end\":\"$end\"}",
             $name, $opt, @args
         );
@@ -1256,7 +1329,7 @@ sub vitoconnect_Set {
         my $start = ReadingsVal( $name, "Urlaub_Start", "" );
         vitoconnect_action(
             $hash,
-            "heating.operating.programs.holiday/schedule",
+            "heating.operating.programs.holiday/commands/schedule",
             "{\"start\":\"$start\",\"end\":\"$args[0]\"}",
             $name, $opt, @args
         );
@@ -1264,19 +1337,20 @@ sub vitoconnect_Set {
     }
     elsif ( $opt eq "Urlaub_unschedule" ) {
         vitoconnect_action( $hash,
-            "heating.operating.programs.holiday/unschedule",
+            "heating.operating.programs.holiday/commands/unschedule",
             "{}", $name, $opt, @args );
         return;
     }
 
     my $val =
         "unknown value $opt, choose one of update:noArg clearReadings:noArg "
-      . "password logResponseOnce:noArg "
+      . "password apiKey logResponseOnce:noArg "
       . "WW-einmaliges_Aufladen:activate,deactivate "
       . "WW-Zirkulationspumpe_Zeitplan:textField-long "
       . "WW-Zeitplan:textField-long "
       . "WW-Haupttemperatur:slider,10,1,60 "
       . "WW-Solltemperatur:slider,10,1,60 "
+      . "WW-Temperatur_2:slider,10,1,60 "
       . "Urlaub_Start "
       . "Urlaub_Ende "
       . "Urlaub_unschedule:noArg ";
@@ -1386,8 +1460,6 @@ sub vitoconnect_GetUpdate {
     }
     else {
         vitoconnect_getResource($hash);
-
-        #vitoconnect_getCode($hash);
     }
     return;
 }
@@ -1396,9 +1468,19 @@ sub vitoconnect_getCode {
     my ($hash)       = @_;
     my $name         = $hash->{NAME};
     my $isiwebpasswd = vitoconnect_ReadKeyValue( $hash, "passwd" );
-    my $param        = {
+    my $client_id    = $hash->{apiKey};
+    if ( !defined($client_id) ) {
+        Log3 $name, 1, "$name - set apiKey first";
+        readingsSingleUpdate( $hash, "state", "Set apiKey to continue", 1 );
+        return;
+    }
+    my $authorizeURL = 'https://iam.viessmann.com/idp/v2/authorize';
+
+    my $param = {
         url => "$authorizeURL?client_id=$client_id"
-          . "&scope=openid&redirect_uri=$callback_uri"
+          . "&redirect_uri=$callback_uri&"
+          . "code_challenge=2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c&"
+          . "&scope=IoT%20User%20offline_access"
           . "&response_type=code",
         hash            => $hash,
         header          => "Content-Type: application/x-www-form-urlencoded",
@@ -1406,7 +1488,7 @@ sub vitoconnect_getCode {
         user            => $hash->{user},
         pwd             => $isiwebpasswd,
         sslargs         => { SSL_verify_mode => 0 },
-        timeout         => 10,
+        timeout         => $hash->{timeout},
         method          => "POST",
         callback        => \&vitoconnect_getCodeCallback
     };
@@ -1428,49 +1510,51 @@ sub vitoconnect_getCodeCallback {
         $response_body =~ /code=(.*)"/;
         $hash->{".code"} = $1;
         Log3 $name, 4, "$name - code: " . $hash->{".code"};
-        if ( $hash->{".code"} ) {
+        if ( $hash->{".code"} && $hash->{".code"} ne "4" ) {
             $hash->{login} = "ok";
         }
         else {
             $hash->{login} = "failure";
-
         }
     }
     else {
-        # Error code, type of error, error message
         Log3 $name, 1, "$name - An error occured: $err";
         $hash->{login} = "failure";
     }
     if ( $hash->{login} eq "ok" ) {
+        readingsSingleUpdate( $hash, "state", "login ok", 1 );
         vitoconnect_getAccessToken($hash);
     }
     else {
-        readingsSingleUpdate( $hash, "state", "login failure", 1 );
-        Log3 $name, 1, "$name - Login failure";
-
-        # neuen Timer starten in einem konfigurierten Interval.
-        InternalTimer( gettimeofday() + $hash->{intervall},
-            "vitoconnect_GetUpdate", $hash );
+        readingsSingleUpdate( $hash, "state",
+            "Login failure. Check password and apiKey", 1 );
+        Log3 $name, 1, "$name - Login failure. Check password and apiKey";
     }
     return;
 }
 
 sub vitoconnect_getAccessToken {
-    my ($hash) = @_;
-    my $name   = $hash->{NAME};
-    my $param  = {
-        url  => $token_url,
-        hash => $hash,
-        header =>
-          "Content-Type: application/x-www-form-urlencoded;charset=utf-8",
-        data => "client_id=$client_id&client_secret=$client_secret&code="
-          . $hash->{".code"}
-          . "&redirect_uri=$callback_uri&grant_type=authorization_code",
+    my ($hash)    = @_;
+    my $name      = $hash->{NAME};
+    my $client_id = $hash->{apiKey};
+    my $param     = {
+        url    => "https://iam.viessmann.com/idp/v2/token",
+        hash   => $hash,
+        header => "Content-Type: application/x-www-form-urlencoded",
+        data   => "grant_type=authorization_code"
+          . "&code_verifier="
+          . $client_secret
+          . "&client_id=$client_id"
+          . "&redirect_uri=$callback_uri"
+          . "&code="
+          . $hash->{".code"},
         sslargs  => { SSL_verify_mode => 0 },
         method   => "POST",
-        timeout  => 10,
+        timeout  => $hash->{timeout},
         callback => \&vitoconnect_getAccessTokenCallback
     };
+
+    #Log3 $name, 1, "$name - " . $param->{"data"};
     HttpUtils_NonblockingGet($param);
     return;
 }
@@ -1493,11 +1577,15 @@ sub vitoconnect_getAccessTokenCallback {
         my $access_token = $decode_json->{"access_token"};
         if ( $access_token ne "" ) {
             $hash->{".access_token"} = $access_token;
-            Log3 $name, 4, "$name - Access Token: $access_token";
+            $hash->{"refresh_token"} = $decode_json->{"refresh_token"};
+
+            Log3 $name, 4,
+              "$name - Access Token: " . substr( $access_token, 0, 20 ) . "...";
             vitoconnect_getGw($hash);
         }
         else {
             Log3 $name, 1, "$name - Access Token: nicht definiert";
+            Log3 $name, 5, "$name - Received response: $response_body\n";
             InternalTimer( gettimeofday() + $hash->{intervall},
                 "vitoconnect_GetUpdate", $hash );
         }
@@ -1510,15 +1598,78 @@ sub vitoconnect_getAccessTokenCallback {
     return;
 }
 
+sub vitoconnect_getRefresh {
+    my ($hash)    = @_;
+    my $name      = $hash->{NAME};
+    my $client_id = $hash->{apiKey};
+    my $param     = {
+        url    => "https://iam.viessmann.com/idp/v2/token",
+        hash   => $hash,
+        header => "Content-Type: application/x-www-form-urlencoded",
+        data   => "grant_type=refresh_token"
+          . "&client_id=$client_id"
+          . "&refresh_token="
+          . $hash->{"refresh_token"},
+        sslargs  => { SSL_verify_mode => 0 },
+        method   => "POST",
+        timeout  => $hash->{timeout},
+        callback => \&vitoconnect_getRefreshCallback
+    };
+
+    #Log3 $name, 1, "$name - " . $param->{"data"};
+    HttpUtils_NonblockingGet($param);
+    return;
+}
+
+sub vitoconnect_getRefreshCallback {
+    my ( $param, $err, $response_body ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    if ( $err eq "" ) {
+        Log3 $name, 4, "$name - getRefreshCallback went ok";
+        Log3 $name, 5, "$name - Received response: $response_body\n";
+        my $decode_json = eval { decode_json($response_body) };
+        if ($@) {
+            Log3 $name, 1, "$name - JSON error while request: $@";
+            InternalTimer( gettimeofday() + $hash->{intervall},
+                "vitoconnect_GetUpdate", $hash );
+            return;
+        }
+        my $access_token = $decode_json->{"access_token"};
+        if ( $access_token ne "" ) {
+            $hash->{".access_token"} = $access_token;
+
+            #$hash->{"refresh_token"} =  $decode_json->{"refresh_token"};
+
+            Log3 $name, 4,
+              "$name - Access Token: " . substr( $access_token, 0, 20 ) . "...";
+            vitoconnect_getGw($hash);
+        }
+        else {
+            Log3 $name, 1, "$name - Access Token: nicht definiert";
+            Log3 $name, 5, "$name - Received response: $response_body\n";
+            InternalTimer( gettimeofday() + $hash->{intervall},
+                "vitoconnect_GetUpdate", $hash );    # zurück zu getCode?
+        }
+    }
+    else {
+        Log3 $name, 1, "$name - getRefresh: An error occured: $err";
+        InternalTimer( gettimeofday() + $hash->{intervall},
+            "vitoconnect_GetUpdate", $hash );
+    }
+    return;
+}
+
 sub vitoconnect_getGw {
     my ($hash)       = @_;
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $param        = {
-        url      => "$apiURLBase$general",
+        url      => $apiURL . "gateways",
         hash     => $hash,
         header   => "Authorization: Bearer $access_token",
-        timeout  => 10,
+        timeout  => $hash->{timeout},
         sslargs  => { SSL_verify_mode => 0 },
         callback => \&vitoconnect_getGwCallback
     };
@@ -1534,7 +1685,7 @@ sub vitoconnect_getGwCallback {
     if ( $err eq "" ) {
         Log3 $name, 4, "$name - getGwCallback went ok";
         Log3 $name, 5, "$name - Received response: $response_body\n";
-        my $decode_json = eval { decode_json($response_body) };
+        my $items = eval { decode_json($response_body) };
         if ($@) {
             readingsSingleUpdate( $hash, "state",
                 "JSON error while request: $@", 1 );
@@ -1547,55 +1698,122 @@ sub vitoconnect_getGwCallback {
             my $dir         = path( AttrVal( "global", "logdir", "log" ) );
             my $file        = $dir->child("gw.json");
             my $file_handle = $file->openw_utf8();
-            $file_handle->print( Dumper($decode_json) );
+            $file_handle->print( Dumper($items) );
         }
+        $hash->{".gw"} = $items->{data}[0]->{serial};
+        readingsSingleUpdate( $hash, "gw", $response_body, 1 );
+        vitoconnect_getInstallation($hash);
+    }
+    else {
+        Log3 $name, 1, "$name - An error occured: $err";
+        InternalTimer( gettimeofday() + $hash->{intervall},
+            "vitoconnect_GetUpdate", $hash );
+    }
+    return;
+}
 
-        #Baustelle!!
-        if ( AttrVal( $name, "vitoconnect_gw_readings", 0 ) eq "1" ) {
-            readingsBeginUpdate($hash);
-            my $e = "0";
-            for my $entity ( @{ $decode_json->{entities} } ) {
-                my $FieldName = "entity" . $e;
-                readingsBulkUpdate(
-                    $hash,
-                    $FieldName . ".class",
-                    $entity->{class}[0]
-                );
-                my %Properties = %{ $entity->{properties} };
-                my @Keys       = keys(%Properties);
-                for my $Key (@Keys) {
-                    readingsBulkUpdate( $hash, $FieldName . ".property." . $Key,
-                        $Properties{$Key} );
-                }
-                my $e2 = "0";
-                for my $entity2 ( @{ $entity->{entities} } ) {
-                    my $FieldName2 = $FieldName . ".entity" . $e2;
-                    readingsBulkUpdate(
-                        $hash,
-                        $FieldName2 . ".class",
-                        $entity2->{class}[0]
-                    );
+sub vitoconnect_getInstallation {
+    my ($hash)       = @_;
+    my $name         = $hash->{NAME};
+    my $access_token = $hash->{".access_token"};
+    my $param        = {
+        url      => $apiURL . "installations",
+        hash     => $hash,
+        header   => "Authorization: Bearer $access_token",
+        timeout  => $hash->{timeout},
+        sslargs  => { SSL_verify_mode => 0 },
+        callback => \&vitoconnect_getInstallationCallback
+    };
+    HttpUtils_NonblockingGet($param);
+    return;
+}
 
-                  # my %Properties2 = %{ $entity2->{properties} };
-                  # my @Keys2       = keys(%Properties);
-                  # for my $Key2 (@Keys2) {
-                  # readingsBulkUpdate( $hash, $FieldName2 .".property" . $Key2,
-                  # $Properties2{$Key2} );
-                  # }
-                    $e2 = $e2 + 1;
-                }
-                $e = $e + 1;
-            }
-            readingsEndUpdate( $hash, 1 );
+sub vitoconnect_getInstallationCallback {
+    my ( $param, $err, $response_body ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    if ( $err eq "" ) {
+        Log3 $name, 4, "$name - getInstallationCallback went ok";
+        Log3 $name, 5, "$name - Received response: $response_body";
+        my $items = eval { decode_json($response_body) };
+        if ($@) {
+            readingsSingleUpdate( $hash, "state",
+                "JSON error while request: $@", 1 );
+            Log3 $name, 1, "$name - JSON error while request: $@";
+            InternalTimer( gettimeofday() + $hash->{intervall},
+                "vitoconnect_GetUpdate", $hash );
+            return;
         }
+        if ( $hash->{".logResponseOnce"} ) {
+            my $dir         = path( AttrVal( "global", "logdir", "log" ) );
+            my $file        = $dir->child("installation.json");
+            my $file_handle = $file->openw_utf8();
+            $file_handle->print( Dumper($items) );
+        }
+        my $id = $items->{data}[0]->{id};
+        if ( $id == "" ) {
+            Log3 $name, 1, "$name - Something went wrong. Will retry";
+            InternalTimer( gettimeofday() + $hash->{intervall},
+                "vitoconnect_GetUpdate", $hash );
+        }
+        else {
+            $hash->{".installation"} = $items->{data}[0]->{id};
+            readingsSingleUpdate( $hash, "installation", $response_body, 1 );
+            vitoconnect_getDevice($hash);
+        }
+    }
+    else {
+        Log3 $name, 1, "$name - An error occured: $err";
+        InternalTimer( gettimeofday() + $hash->{intervall},
+            "vitoconnect_GetUpdate", $hash );
+    }
+    return;
+}
 
-        my $installation = $decode_json->{entities}[0]->{properties}->{id};
-        Log3 $name, 4, "$name - installation: $installation";
-        $hash->{".installation"} = $installation;
-        my $gw =
-          $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
-        Log3 $name, 4, "$name - gw: $gw";
-        $hash->{".gw"} = $gw;
+sub vitoconnect_getDevice {
+    my ($hash)       = @_;
+    my $name         = $hash->{NAME};
+    my $access_token = $hash->{".access_token"};
+    my $installation = $hash->{".installation"};
+    my $gw           = $hash->{".gw"};
+    my $param        = {
+        url     => $apiURL . "installations/$installation/gateways/$gw/devices",
+        hash    => $hash,
+        header  => "Authorization: Bearer $access_token",
+        timeout => $hash->{timeout},
+        sslargs => { SSL_verify_mode => 0 },
+        callback => \&vitoconnect_getDeviceCallback
+    };
+    HttpUtils_NonblockingGet($param);
+    return;
+}
+
+sub vitoconnect_getDeviceCallback {
+    my ( $param, $err, $response_body ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    if ( $err eq "" ) {
+        Log3 $name, 4, "$name - getDeviceCallback went ok";
+        Log3 $name, 5, "$name - Received response: $response_body\n";
+        my $items = eval { decode_json($response_body) };
+        if ($@) {
+            readingsSingleUpdate( $hash, "state",
+                "JSON error while request: $@", 1 );
+            Log3 $name, 1, "$name - JSON error while request: $@";
+            InternalTimer( gettimeofday() + $hash->{intervall},
+                "vitoconnect_GetUpdate", $hash );
+            return;
+        }
+        if ( $hash->{".logResponseOnce"} ) {
+            my $dir         = path( AttrVal( "global", "logdir", "log" ) );
+            my $file        = $dir->child("device.json");
+            my $file_handle = $file->openw_utf8();
+            $file_handle->print( Dumper($items) );
+        }
+        readingsSingleUpdate( $hash, "device", $response_body, 1 );
+        vitoconnect_getFeatures($hash);
         vitoconnect_getResource($hash);
     }
     else {
@@ -1606,28 +1824,100 @@ sub vitoconnect_getGwCallback {
     return;
 }
 
+sub vitoconnect_getFeatures {
+    my ($hash)       = @_;
+    my $name         = $hash->{NAME};
+    my $access_token = $hash->{".access_token"};
+    my $installation = $hash->{".installation"};
+    my $gw           = $hash->{".gw"};
+    my $dev          = AttrVal( $name, 'vitoconnect_device', 0 );
+
+    Log3 $name, 4, "$name - getFeatures went ok";
+
+    # Service Documents -ToDo
+
+    # Gateway features
+    my $param = {
+        url    => $apiURL . "installations/$installation/gateways/$gw/features",
+        hash   => $hash,
+        header => "Authorization: Bearer $access_token",
+        timeout => $hash->{timeout},
+        sslargs => { SSL_verify_mode => 0 },
+    };
+    ( my $err, my $msg ) = HttpUtils_BlockingGet($param);
+    my $decode_json = eval { decode_json($msg) };
+    if ( $err ne "" || $decode_json->{statusCode} ne "" ) {
+        Log3 $name, 1,
+          "$name - Fehler während " . "Gateway features: $err :: $msg";
+    }
+    else {
+        readingsSingleUpdate( $hash, "gw_features", $msg, 1 );
+    }
+
+    # installation features
+    my $param = {
+        url     => $apiURL . "installations/$installation/features",
+        hash    => $hash,
+        header  => "Authorization: Bearer $access_token",
+        timeout => $hash->{timeout},
+        sslargs => { SSL_verify_mode => 0 },
+    };
+    ( my $err, my $msg ) = HttpUtils_BlockingGet($param);
+    my $decode_json = eval { decode_json($msg) };
+    if ( $err ne "" || $decode_json->{statusCode} ne "" ) {
+        Log3 $name, 1,
+          "$name - Fehler während " . "installation features: $err :: $msg";
+    }
+    else {
+        readingsSingleUpdate( $hash, "installation_features", $msg, 1 );
+    }
+
+  #Events
+  #    my $param        = {
+  #        url      => "https://api.viessmann.com/iot/v1/events-history/events",
+  #        hash     => $hash,
+  #        header   => "Authorization: Bearer $access_token",
+  #        data => "gatewaySerial=$gw",
+  #        method   => "POST",
+  #        timeout  => $hash->{timeout} ,
+  #        sslargs  => { SSL_verify_mode => 0 },
+  #    };
+  #    ( my $err, my $msg ) = HttpUtils_BlockingGet($param);
+  #    my $decode_json = eval { decode_json($msg) };
+  #	if ( $err ne "" || $decode_json->{statusCode} ne "" ) {
+  #			Log3 $name, 1, "$name - Fehler während "
+  #				. "events: $err :: $msg";
+  #    }
+  #    else {
+  #        readingsSingleUpdate ( $hash, "events", $msg, 1);
+  #    }
+
+    return;
+}
+
 sub vitoconnect_getResource {
     my ($hash)       = @_;
     my $name         = $hash->{NAME};
     my $access_token = $hash->{".access_token"};
     my $installation = $hash->{".installation"};
     my $gw           = $hash->{".gw"};
+    my $dev          = AttrVal( $name, 'vitoconnect_device', 0 );
 
-    #Log3 $name, 4, "$name - access_token: $access_token";
-    #Log3 $name, 4, "$name - installation: $installation";
-    #Log3 $name, 4, "$name - gw: $gw";
+    Log3 $name, 4, "$name - enter getResource";
+    Log3 $name, 4,
+      "$name - access_token: " . substr( $access_token, 0, 20 ) . "...";
+    Log3 $name, 4, "$name - installation: $installation";
+    Log3 $name, 4, "$name - gw: $gw";
     if ( $access_token eq "" || $installation eq "" || $gw eq "" ) {
         vitoconnect_getCode($hash);
         return;
     }
-	my $dev=AttrVal( $name, 'vitoconnect_device', 0 );
-	#Log3 $name, 4, "$name - dev: $dev";
     my $param = {
-        url => "$apiURLBase/operational-data/installations/$installation/"
-          . "gateways/$gw/devices/$dev/features/",
+        url => $apiURL
+          . "installations/$installation/gateways/$gw/devices/$dev/features",
         hash     => $hash,
         header   => "Authorization: Bearer $access_token",
-        timeout  => 10,
+        timeout  => $hash->{timeout},
         sslargs  => { SSL_verify_mode => 0 },
         callback => \&vitoconnect_getResourceCallback
     };
@@ -1637,15 +1927,14 @@ sub vitoconnect_getResource {
 
 sub vitoconnect_getResourceCallback {
     my ( $param, $err, $response_body ) = @_;
-    my $hash         = $param->{hash};
-    my $name         = $hash->{NAME};
-    my $file_handle2 = "";
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
 
-    #AnalyzeCommand( $hash, "deletereading $name .*" );
     if ( $err eq "" ) {
         Log3 $name, 4, "$name - getResourceCallback went ok";
-        Log3 $name, 5, "$name - Received response: $response_body\n";
-        my $decode_json = eval { decode_json($response_body) };
+        Log3 $name, 5, "$name - Received response: "
+          . substr( $response_body, 0, 100 ) . "...";
+        my $items = eval { decode_json($response_body) };
         if ($@) {
             readingsSingleUpdate( $hash, "state",
                 "JSON error while request: $@", 1 );
@@ -1654,7 +1943,7 @@ sub vitoconnect_getResourceCallback {
                 "vitoconnect_GetUpdate", $hash );
             return;
         }
-        my $items = $decode_json;
+
         if ( !$items->{statusCode} eq "" ) {
             Log3 $name, 4,
                 "$name - statusCode: $items->{statusCode} "
@@ -1673,7 +1962,7 @@ sub vitoconnect_getResourceCallback {
             if ( $items->{statusCode} eq "401" ) {
 
                 #  EXPIRED TOKEN
-                vitoconnect_getCode($hash);
+                vitoconnect_getRefresh($hash);
                 return;
             }
             elsif ( $items->{statusCode} eq "404" ) {
@@ -1704,118 +1993,70 @@ sub vitoconnect_getResourceCallback {
             else {
                 Log3 $name, 1, "$name - unbekannter Fehler: "
                   . "Bitte den Entwickler informieren!";
+                Log3 $name, 1,
+                    "$name - statusCode: $items->{statusCode} "
+                  . "errorType: $items->{errorType} "
+                  . "message: $items->{message} "
+                  . "error: $items->{error}";
                 InternalTimer( gettimeofday() + $hash->{intervall},
                     "vitoconnect_GetUpdate", $hash );
                 return;
             }
         }
 
-        readingsBeginUpdate($hash);
         if ( $hash->{".logResponseOnce"} ) {
             my $dir         = path( AttrVal( "global", "logdir", "log" ) );
-            my $file        = $dir->child("entities.json");
+            my $file        = $dir->child("resource.json");
             my $file_handle = $file->openw_utf8();
-
-            #$file_handle->print(Dumper($items));
-            $file_handle->print( Dumper( @{ $items->{entities} } ) );
-            my $file2 = $dir->child("actions.json");
-            $file_handle2 = $file2->openw_utf8();
+            $file_handle->print( Dumper($items) );
         }
 
-        for my $item ( @{ $items->{entities} } ) {
-            my $FieldName = $item->{class}[0];
-            Log3 $name, 5, "$name - FieldName $FieldName";
-            my %Properties = %{ $item->{properties} };
-            my @Keys       = keys(%Properties);
-            for my $Key (@Keys) {
-                my $Reading = $RequestList->{ $FieldName . "." . $Key };
+        readingsBeginUpdate($hash);
+        foreach ( @{ $items->{data} } ) {
+            my $feature    = $_;
+            my $properties = $feature->{properties};
+            foreach my $key ( keys %$properties ) {
+                my $Reading =
+                  $RequestList->{ $feature->{feature} . "." . $key };
                 if ( !defined($Reading)
                     || AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" )
-                { $Reading = $FieldName . "." . $Key; }
-
-                # Log3 $name, 5, "$name - Property: $FieldName $Key";
-                my $Type  = $Properties{$Key}{type};
-                my $Value = $Properties{$Key}{value};
-                if ( $Type eq "string" ) {
-                    readingsBulkUpdate( $hash, $Reading, $Value );
-                    Log3 $name, 5,
-                      "$name - $FieldName" . ".$Key: $Value ($Type)";
+                {
+                    $Reading = $feature->{feature} . "." . $key;
                 }
-                elsif ( $Type eq "number" ) {
-                    readingsBulkUpdate( $hash, $Reading, $Value );
-                    Log3 $name, 5,
-                      "$name - $FieldName" . ".$Key: $Value ($Type)";
-                }
-                elsif ( $Type eq "array" ) {
+                my $Type  = $properties->{$key}->{type};
+                my $Value = $properties->{$key}->{value};
+                if ( $Type eq "array" ) {
                     if ( defined($Value) ) {
-                        # my $Array = join( ",", @$Value );
-						# Log3 $name, 1, "$name - Array Workaround for Property: $FieldName $Key ";
-						if ( ref($Value) eq 'ARRAY' ) {
-						  my $Array = ( join( ",", @$Value ) );
-                          readingsBulkUpdate( $hash, $Reading, $Array );
-                          Log3 $name, 5,
-                            "$name - $FieldName" . ".$Key: $Array ($Type)";
-						} else {
-							Log3 $name, 4, "$name - Array Workaround for Property: $FieldName $Key ";
-						}
+                        if ( ref($Value) eq 'ARRAY' ) {
+                            my $Array = ( join( ",", @$Value ) );
+                            readingsBulkUpdate( $hash, $Reading, $Array );
+                            Log3 $name, 5, "$name - $Reading $Array ($Type)";
+                        }
+                        else {
+                            Log3 $name, 4,
+                              "$name - Array Workaround for Property: $Reading";
+                        }
                     }
-                }
-                elsif ( $Type eq "boolean" ) {
-                    readingsBulkUpdate( $hash, $Reading, $Value );
-                    Log3 $name, 5,
-                      "$name - $FieldName" . ".$Key: $Value ($Type)";
                 }
                 elsif ( $Type eq "Schedule" ) {
                     my $Result = encode_json($Value);
                     readingsBulkUpdate( $hash, $Reading, $Result );
-                    Log3 $name, 5,
-                      "$name - $FieldName" . ".$Key: $Result ($Type)";
-                }
-                elsif ( $Type eq "ErrorListChanges" ) {
-                    my $Result = encode_json($Value);
-                    readingsBulkUpdate( $hash, $Reading, $Result );
-                    Log3 $name, 5,
-                      "$name - $FieldName" . ".$Key: $Result ($Type)";
+                    Log3 $name, 5, "$name - $Reading: $Result ($Type)";
                 }
                 else {
-                    readingsBulkUpdate( $hash, $Reading, "Unknown: $Type" );
-                    Log3 $name, 5,
-                      "$name - $FieldName" . ".$Key: $Value ($Type)";
-                }
-            }
-
-            if ( AttrVal( $name, 'vitoconnect_actions_active', 0 ) eq "1" ) {
-                my @actions = @{ $item->{actions} };
-                if (@actions) {
-                    if ( $hash->{".logResponseOnce"} ) {
-                        $file_handle2->print( Dumper(@actions) );
-                    }
-                    for my $action (@actions) {
-                        my @fields = @{ $action->{fields} };
-                        my $Result = "action: ";
-                        for my $field (@fields) {
-                            $Result .= $field->{name} . " ";
-                        }
-                        readingsBulkUpdate( $hash,
-                            $FieldName . "." . $action->{"name"}, $Result );
-                    }
+                    readingsBulkUpdate( $hash, $Reading, $Value );
+                    Log3 $name, 5, "$name - $Reading: $Value ($Type)";
                 }
             }
         }
-        $hash->{counter} = $hash->{counter} + 1;
+        readingsBulkUpdate( $hash, "state", "last update: " . TimeNow() . "" );
+        readingsEndUpdate( $hash, 1 );
     }
     else {
-        readingsSingleUpdate( $hash, "state", "An error occured: $err", 1 );
         Log3 $name, 1, "$name - An error occured: $err";
-        InternalTimer( gettimeofday() + $hash->{intervall},
-            "vitoconnect_GetUpdate", $hash );
-        return;
     }
-    readingsBulkUpdate( $hash, "state", "last update: " . TimeNow() . "" );
-    readingsEndUpdate( $hash, 1 );
     InternalTimer( gettimeofday() + $hash->{intervall},
         "vitoconnect_GetUpdate", $hash );
-    $hash->{".logResponseOnce"} = 0;
     return;
 }
 
@@ -1824,24 +2065,25 @@ sub vitoconnect_action {
     my $access_token = $hash->{".access_token"};
     my $installation = $hash->{".installation"};
     my $gw           = $hash->{".gw"};
-	
-	my $dev=AttrVal( $name, 'vitoconnect_device', 0 );
-    my $param = {
-        url => "$apiURLInst/$installation/gateways/$gw/"
+    my $dev          = AttrVal( $name, 'vitoconnect_device', 0 );
+    my $param        = {
+        url => $apiURLBase
+          . "installations/$installation/gateways/$gw/"
           . "devices/$dev/features/$feature",
         hash   => $hash,
         header => "Authorization: Bearer $access_token\r\n"
           . "Content-Type: application/json",
         data    => $data,
-        timeout => 10,
+        timeout => $hash->{timeout},
         method  => "POST",
         sslargs => { SSL_verify_mode => 0 },
     };
     Log3 $name, 4, "$name - url=$param->{url}";
     Log3 $name, 4, "$name - data=$param->{data}";
     ( my $err, my $msg ) = HttpUtils_BlockingGet($param);
+    my $decode_json = eval { decode_json($msg) };
 
-    if ( $err ne "" || $msg ne "" ) {
+    if ( $err ne "" || $decode_json->{statusCode} ne "" ) {
         Log3 $name, 1, "$name - set $name $opt @args: Fehler während der "
           . "Befehlsausführung: $err :: $msg";
     }
@@ -1931,6 +2173,7 @@ sub vitoconnect_ReadKeyValue {
 	<a href="https://github.com/thetrueavatar/Viessmann-Api">thetrueavatar</a><br>
     
 	 You need the user and password from the ViCare App account.<br>
+	 Attention: This module is limited to one 'installation' per account. If you have two or more heaters use one viessmann account and device for each heater.<br>
 	 
 	 For details see: <a href="https://wiki.fhem.de/wiki/Vitoconnect">FHEM Wiki (german)</a><br><br>
 	 

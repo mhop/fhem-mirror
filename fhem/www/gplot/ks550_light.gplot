@@ -38,6 +38,7 @@
 
 ### Settings
 
+set readonly
 set terminal size <SIZE>
 set title '<TL>'
 set ylabel '<L1>'

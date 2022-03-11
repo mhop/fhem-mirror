@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.07: - 2021-05-08 - Optimize garbage JSON processing 
 #   0.1.06: - 2021-04-26 - Split JSON strings to avoid processing multiple root nodes
 #   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
@@ -55,7 +56,7 @@ use Digest::MD5 qw(md5);
 
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
-my $version = "0.1.06";
+my $version = "0.1.07";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'   or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -91,6 +92,7 @@ use constant {
 };
 my $EMPTY = q{};
 my $SPACE = q{ };
+my $COMMA = q{,};
 
 ## Import der FHEM Funktionen
 BEGIN {
@@ -295,7 +297,7 @@ sub Define {
     $hash->{helper}->{passObj} = FHEM::Core::Authentication::Passwords->new( $hash->{TYPE} );
 
     # get password form old storage and save to new format
-    if ( !defined(ReadPassword($hash)) ) {
+    if ( !defined( ReadPassword($hash) ) ) {
         if ( defined( ReadPasswordOld($hash) ) ) {
             my ( $passResp, $passErr ) = $hash->{helper}->{passObj}->setStorePassword( $name, ReadPasswordOld($hash) );
             if ( defined($passErr) ) {
@@ -1964,6 +1966,23 @@ sub Ready {
     return;
 }
 
+sub splitTest {
+    my $buf = shift;
+    my $name = "sd18";
+    my @bufs;
+    $buf =~ s///xsm;
+    my $index = index( $buf, '}{' );
+    if ( $index > 0 ) {
+        Log3( $name, LOG_RECEIVE, "[$name] - Splitting double-JSON buffer" );
+        push( @bufs, decode_json(substr( $buf, 0, $index + 1 ) ));
+        push( @bufs, decode_json(substr( $buf, $index + 1 )));
+    }
+    else {
+        push( @bufs, $buf );
+    }
+    return Dumper(@bufs);
+}
+
 sub wsReadDevIo {
     my $hash   = shift;
     my $name   = $hash->{NAME};
@@ -1975,6 +1994,7 @@ sub wsReadDevIo {
     }
     $buf =~ s///xsm;
     $buf =~ s/\\x\{1e\}//xsm;
+
     #if ( !( $buf =~ /}$/xsm ) ) {
     #    $buf = substr( $buf, 0, rindex( $buf, "}" ) );
     #}
@@ -1982,11 +2002,20 @@ sub wsReadDevIo {
         return;
     }
     Log3( $name, LOG_DEBUG, qq([$name] Received from DevIo: $buf) );
-    
-    my @bufs = split (/}\{/xsm, $buf);
+
+    my @bufs;
+    my $index = index( $buf, '}{' );
+    if ( $index > 0 ) {
+        Log3( $name, LOG_RECEIVE, "[$name] - Splitting double-JSON buffer" );
+        push( @bufs, substr( $buf, 0, $index + 1 ) );
+        push( @bufs, substr( $buf, $index + 1 ) );
+    }
+    else {
+        push( @bufs, $buf );
+    }
 
     foreach my $bufi (@bufs) {
-        Log3 ($name, LOG_RECEIVE, "[$name] - Extracted".$bufi );
+        Log3( $name, LOG_RECEIVE, "[$name] - Extracted" . $bufi );
         parseWebsocketRead( $hash, $bufi );
     }
 

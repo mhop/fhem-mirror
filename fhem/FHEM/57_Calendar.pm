@@ -1736,6 +1736,7 @@ sub Calendar_Initialize($) {
   $hash->{AttrList}=  "update:none,onUrlChanged ".
                       "synchronousUpdate:0,1 ".
                       "delay " .
+                      "timeout " .
                       "removevcalendar:0,1 " .
                       "ignoreCancelled:0,1 ".
                       "SSLVerify:0,1 ".
@@ -2076,16 +2077,24 @@ sub Calendar_Get($@) {
         for my $limit (@limits) {
           if($limit =~ /count=([1-9]+\d*)/) {
             $count= $1;
-          } elsif($limit =~ /when=(today|tomorrow)/i) {
-            my ($from,$to);
+          } elsif($limit =~ /^when=(today|tomorrow|(-?\d+)(..(-?\d+))?)$/i) {
+            my ($from,$to,$d1,$d2);
             if (lc($1) eq 'today') {
-              $from  = Calendar_GetSecondsFromMidnight();
-              $to    = DAYSECONDS - $from - 1;
-              $from *= -1;
+              $d1= 0;
+              $d2= 0;
+            } elsif(lc($1) eq 'tomorrow') {
+              $d1= 1;
+              $d2= 1;
             } else {
-              $from  = DAYSECONDS - Calendar_GetSecondsFromMidnight();
-              $to    = $from + DAYSECONDS - 1;
+              $d1= $2;
+              $d2= $d1;
+              if(defined($4) and ($4 ne '')) {
+                $d2= $4;
+              }
+              ($d1,$d2)= ($d2,$d1) if($d1> $d2);
             }
+            $from  = $d1*DAYSECONDS - Calendar_GetSecondsFromMidnight();
+            $to    = $from + ($d2-$d1+1)*DAYSECONDS - 1;
             push @filters, { ref => \&filter_endafter, param => $t+$from };
             push @filters, { ref => \&filter_startbefore, param => $t+$to };
           } elsif($limit =~ /from=([+-]?)(.+)/ ) {
@@ -2619,12 +2628,13 @@ sub Calendar_GetUpdate($$$;$) {
       }
     }
 
+    my $timeout= AttrVal($name, "timeout", 30);
     HttpUtils_NonblockingGet({
       url => $url,
       hideurl => 1,
       noshutdown => 1,
       hash => $hash,
-      timeout => 30,
+      timeout => $timeout,
       type => 'caldata',
       removeall => $removeall,
       sslargs => $SSLArgs,
@@ -2888,6 +2898,11 @@ sub Calendar_UpdateCalendar($$) {
   my $t= $hash->{".fhem"}{t};
   my $removeall= $hash->{".fhem"}{removeall};
 
+  if(!defined($ical->{entries})) {
+    Log3 $hash, 1, "Calendar $name: no ical entries";
+    readingsSingleUpdate($hash, "state", "error (no ical entries)", 1);
+    return 0;
+  }
   my @entries= @{$ical->{entries}};
   my $root= @{$ical->{entries}}[0];
   my $calname= "?";
@@ -3589,6 +3604,8 @@ sub CalendarEventsAsHtml($;$) {
       a timespan &lt;timespec&gt; from now; use a minus sign for events in the
       past; &lt;timespec&gt; is described below in the Attributes section</td></tr>
     <tr><td><code>when=today|tomorrow</code></td><td>shows events for today or tomorrow</td></tr>
+    <tr><td><code>when=&lt;D1&gt;</code></td><td>shows events for day &lt;D1&gt; from now, &lt;D1&gt;= 0 stands for today, negative values allowed </td></tr>
+    <tr><td><code>when=&lt;D1&gt;..&lt;D2&gt;</code></td><td>shows events for the day range from day &lt;D1&gt; to day &lt;D2&gt; from now</td></tr>
     </table><br>
 
     Examples:<br>
@@ -3737,6 +3754,12 @@ sub CalendarEventsAsHtml($;$) {
         actually retrieving the calendar from its source. If not set, a random time between 10 and 29 
         seconds is chosen. When several calendar devices are defined, staggered delays reduce
         load error rates.
+        </li><p>
+
+    <li><code>timeout &lt;time&gt;</code><br>
+        The timeout in seconds for retrieving the calendar from its source. The default is 30. 
+        Increase for very large calendars that take time to be assembled and retrieved from 
+        their sources.
         </li><p>
 
     <li><code>removevcalendar 0|1</code><br>
@@ -3991,7 +4014,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOn  notify MyCalendar:start:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor on")
                 } \<br>
@@ -3999,7 +4022,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOff  notify MyCalendar:end:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor off")
                 } \<br>
@@ -4009,7 +4032,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>
     define LogActors notify MyCalendar:(start|end):.*
     { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; \<br>
-      my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+      my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
      Log3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
@@ -4315,6 +4338,9 @@ sub CalendarEventsAsHtml($;$) {
     zeigt nur Termine die vor einer Zeitspanne &lt;timespec&gt; ab jetzt starten;
     Minuszeichen f&uuml;r Termine in der Vergangenheit benutzen; &lt;timespec&gt; wird weiter unten im Attribut-Abschnitt beschrieben.</td></tr>
     <tr><td><code>when=today|tomorrow</code></td><td>zeigt anstehende Termin f&uuml;r heute oder morgen an</td></tr>
+    <tr><td><code>when=&lt;D1&gt;</code></td><td>zeigt Termine f&uuml;r Tag &lt;D1&gt; von heute an, &lt;D1&gt;= 0 steht f&uuml;r heute, negative Werte sind erlaubt</td></tr>
+    <tr><td><code>when=&lt;D1&gt;..&lt;D2&gt;</code></td><td>zeigt Termine f&uuml;r den Tagesbereich von Tag
+     &lt;D1&gt; bis Tag &lt;D2&gt; von heute an</td></tr>
     </table><br>
 
     Examples:<br>
@@ -4395,11 +4421,17 @@ sub CalendarEventsAsHtml($;$) {
         URL seit dem letzten Aufruf ver&auml;ndert hat, insbesondere nach der Auswertung von wildcards im define.<br/>
         </li><p>
 
-    <li><code>delay &lt;time&gt;</code><br>
+     <li><code>delay &lt;time&gt;</code><br>
         Wartezeit in Sekunden nach der Initialisierung von FHEM oder einer Konfigurations&auml;nderung bevor
         der Kalender tats&auml;chlich von der Quelle geladen wird. Wenn nicht gesetzt wird eine
         Zufallszeit zwischen 10 und 29 Sekunden gew&auml;hlt. Wenn mehrere Kalender definiert sind, f&uuml;hren
         gestaffelte Wartezeiten zu einer Verminderung der Ladefehleranf&auml;lligkeit.
+        </li><p>
+
+      <li><code>timeout &lt;time&gt;</code><br>
+        Der Timeout in Sekunden um einen Kalender von seiner Quelle zu holen. Standard ist 30.
+        Erh&ouml;hen f&uuml;r sehr gro&szlig;e Kalender, bei denen es eine Weile dauert,
+        sie an der Quelle zusammenzustellen und herunterzuladen.
         </li><p>
 
     <li><code>removevcalendar 0|1</code><br>
@@ -4641,7 +4673,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOn  notify MyCalendar:start:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor on")
                 } \<br>
@@ -4649,7 +4681,7 @@ sub CalendarEventsAsHtml($;$) {
     define SwitchActorOff  notify MyCalendar:end:.* { \<br>
                 my $reading="$EVTPART0";; \<br>
                 my $uid= "$EVTPART1";; \<br>
-                my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+                my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
                 if(defined $actor) {
                    fhem("set $actor off")
                 } \<br>
@@ -4659,7 +4691,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>
     define LogActors notify MyCalendar:(start|end):.*
     { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; \<br>
-      my $actor= fhem('get MyCalendar filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
+      my $actor= fhem('get MyCalendar events filter:uid=="'.$uid.'" format:custom="$S"');; \<br>
      Log3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>

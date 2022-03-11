@@ -208,10 +208,12 @@ FHEM::Core::Authentication::Passwords->new(<INSTANZTYPE>);
 =head1 SYNOPSIS
 
   use FHEM::Core::Authentication::Passwords qw(:ALL);
-  our $passwd = FHEM::Core::Authentication::Passwords->new();
   
-  you can also save the password object in the instance hash
-  our $hash->{helper}->{passwdobj} = FHEM::Core::Authentication::Passwords->new();
+  the password object in the instance hash
+  Define() {
+  ...
+  our $hash->{helper}->{passwdobj} = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
+  ...
 
 =head1 DESCRIPTION
 

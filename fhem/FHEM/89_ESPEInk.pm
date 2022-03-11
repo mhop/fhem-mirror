@@ -4,6 +4,15 @@
 #   Umstellung verzögerte berechnung der Pixel erst beim upload
 #   blocktext (ESPEInk_FormatBlockText) korrigiert für Behandlung von \\n
 #   text height ($th) is potentially wrong if text is wrapped to multiple lines so text height shoul dbe calced from one char only (addobjects)
+#
+# Änderungen eki - 2021-10-07
+#   Zusammenstellunge aller Änderungen aus dem Forumschat
+#   - neues Device mit 5.65 inch und 6 Farben
+#   - neues Attribut mininterval (es wird mindestens mininterval sekunden gewartet, bis ein neues Bild hochgeladen werden kann)
+#   - neues Attribut uploadTimeout (timeout bevor abgebrochen und ein Fehler bezüglich der upload Kommunikation gemeldet wird)
+#   - Korrektur zum Setzen von Farben in icons
+#   - Korrektur bezüglich Warnungen beim Start
+
 
 package main;
 use strict;
@@ -38,7 +47,8 @@ my @ESPEInk_palettes = (
 [3,[0,0,0],[255,255,255],[127,127,127]],
 [4,[0,0,0],[255,255,255],[127,127,127],[127,0,0]],
 [2,[0,0,0],[255,255,255]],
-[3,[0,0,0],[255,255,255],[220,180,0]]
+[3,[0,0,0],[255,255,255],[220,180,0]],
+[7,[0,0,0],[255,255,255],[0,255,0],[0,0,255],[255,0,0],[255,255,0],[255,128,0]]
 );
 
 #---------------------------------------------------------------------------------------------------
@@ -49,32 +59,32 @@ my %ESPEInk_devices = (
 #	"9.7inch_e-Paper_HAT"			=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	24},
 #	"7.8inch_e-Paper_HAT"			=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	23},
 #	"6inch_e-Paper_HAT"				=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	22},
-#	"2.9inch_e-Paper_HAT_(D)"		=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	21},
-	"7.5inch_e-Paper_HAT_(B)_HD"	=>	{width	=>	880,	height	=>	528,	pindex	=>	1,	id	=>	24},
-	"7.5inch_e-Paper_HAT_V2_(B)"	=>	{width	=>	800,	height	=>	480,	pindex	=>	1,	id	=>	23},
-	"7.5inch_e-Paper_HAT_V2"		=>	{width	=>	800,	height	=>	480,	pindex	=>	0,	id	=>	22},
-	"7.5inch_e-Paper_HAT_(C)"		=>	{width	=>	640,	height	=>	384,	pindex	=>	5,	id	=>	21},
-	"7.5inch_e-Paper_HAT_(B)"		=>	{width	=>	640,	height	=>	384,	pindex	=>	1,	id	=>	20},
-	"7.5inch_e-Paper_HAT"			=>	{width	=>	640,	height	=>	384,	pindex	=>	0,	id	=>	19},
-	"5.83inch_e-Paper_HAT_(C)"		=>	{width	=>	600,	height	=>	448,	pindex	=>	5,	id	=>	18},
-	"5.83inch_e-Paper_HAT_(B)"		=>	{width	=>	600,	height	=>	448,	pindex	=>	1,	id	=>	17},
-	"5.83inch_e-Paper_HAT"			=>	{width	=>	600,	height	=>	448,	pindex	=>	0,	id	=>	16},
-	"4.2inch_e-Paper_Module_(C)"	=>	{width	=>	400,	height	=>	300,	pindex	=>	5,	id	=>	15},
-	"4.2inch_e-Paper_Module_(B)"	=>	{width	=>	400,	height	=>	300,	pindex	=>	1,	id	=>	14},
-	"4.2inch_e-Paper_Module"		=>	{width	=>	400,	height	=>	300,	pindex	=>	0,	id	=>	13},
-	"2.9inch_e-Paper_Module_(D)"	=>	{width	=>	128,	height	=>	296,	pindex	=>	0,	id	=>	12},
-	"2.9inch_e-Paper_Module_(C)"	=>	{width	=>	128,	height	=>	296,	pindex	=>	5,	id	=>	11},
-	"2.9inch_e-Paper_Module_(B)"	=>	{width	=>	128,	height	=>	296,	pindex	=>	1,	id	=>	10},
-	"2.9inch_e-Paper_Module"		=>	{width	=>	128,	height	=>	296,	pindex	=>	0,	id	=>	9},
-	"2.7inch_e-Paper_HAT_(B)"		=>	{width	=>	176,	height	=>	264,	pindex	=>	1,	id	=>	8},
-	"2.7inch_e-Paper_HAT"			=>	{width	=>	176,	height	=>	264,	pindex	=>	0,	id	=>	7},
-	"2.13inch_e-Paper_HAT_(D)"		=>	{width	=>	104,	height	=>	212,	pindex	=>	0,	id	=>	6},
-	"2.13inch_e-Paper_HAT_(C)"		=>	{width	=>	104,	height	=>	212,	pindex	=>	5,	id	=>	5},
-	"2.13inch_e-Paper_HAT_(B)"		=>	{width	=>	104,	height	=>	212,	pindex	=>	1,	id	=>	4},
-	"2.13inch_e-Paper_HAT"			=>	{width	=>	122,	height	=>	250,	pindex	=>	0,	id	=>	3},
-	"1.54inch_e-Paper_Module_(C)"	=>	{width	=>	152,	height	=>	152,	pindex	=>	5,	id	=>	2},
-	"1.54inch_e-Paper_Module_(B)"	=>	{width	=>	200,	height	=>	200,	pindex	=>	3,	id	=>	1},
-	"1.54inch_e-Paper_Module"		=>	{width	=>	200,	height	=>	200,	pindex	=>	0,	id	=>	0}
+	"5.65inch_e-Paper_HAT_(F)"		=>	{width	=>	600,	height	=>	448,	pindex	=>	6,	updateint => 35, id	=>	25},
+	"7.5inch_e-Paper_HAT_(B)_HD"	=>	{width	=>	880,	height	=>	528,	pindex	=>	1,	updateint => 21, id	=>	24},
+	"7.5inch_e-Paper_HAT_V2_(B)"	=>	{width	=>	800,	height	=>	480,	pindex	=>	1,	updateint => 16, id	=>	23},
+	"7.5inch_e-Paper_HAT_V2"		=>	{width	=>	800,	height	=>	480,	pindex	=>	0,	updateint => 5,  id	=>	22},
+	"7.5inch_e-Paper_HAT_(C)"		=>	{width	=>	640,	height	=>	384,	pindex	=>	5,	updateint => 21, id	=>	21},
+	"7.5inch_e-Paper_HAT_(B)"		=>	{width	=>	640,	height	=>	384,	pindex	=>	1,	updateint => 16, id	=>	20},
+	"7.5inch_e-Paper_HAT"			=>	{width	=>	640,	height	=>	384,	pindex	=>	0,	updateint => 5,  id	=>	19},
+	"5.83inch_e-Paper_HAT_(C)"		=>	{width	=>	600,	height	=>	448,	pindex	=>	5,	updateint => 26, id	=>	18},
+	"5.83inch_e-Paper_HAT_(B)"		=>	{width	=>	600,	height	=>	448,	pindex	=>	1,	updateint => 20, id	=>	17},
+	"5.83inch_e-Paper_HAT"			=>	{width	=>	600,	height	=>	448,	pindex	=>	0,	updateint => 5,  id	=>	16},
+	"4.2inch_e-Paper_Module_(C)"	=>	{width	=>	400,	height	=>	300,	pindex	=>	5,	updateint => 15, id	=>	15},
+	"4.2inch_e-Paper_Module_(B)"	=>	{width	=>	400,	height	=>	300,	pindex	=>	1,	updateint => 15, id	=>	14},
+	"4.2inch_e-Paper_Module"		=>	{width	=>	400,	height	=>	300,	pindex	=>	0,	updateint => 4,  id	=>	13},
+	"2.9inch_e-Paper_Module_(D)"	=>	{width	=>	128,	height	=>	296,	pindex	=>	0,	updateint => 2,  id	=>	12},
+	"2.9inch_e-Paper_Module_(C)"	=>	{width	=>	128,	height	=>	296,	pindex	=>	5,	updateint => 15, id	=>	11},
+	"2.9inch_e-Paper_Module_(B)"	=>	{width	=>	128,	height	=>	296,	pindex	=>	1,	updateint => 15, id	=>	10},
+	"2.9inch_e-Paper_Module"		=>	{width	=>	128,	height	=>	296,	pindex	=>	0,	updateint => 2,  id	=>	9},
+	"2.7inch_e-Paper_HAT_(B)"		=>	{width	=>	176,	height	=>	264,	pindex	=>	1,	updateint => 15, id	=>	8},
+	"2.7inch_e-Paper_HAT"			=>	{width	=>	176,	height	=>	264,	pindex	=>	0,	updateint => 6,  id	=>	7},
+	"2.13inch_e-Paper_HAT_(D)"		=>	{width	=>	104,	height	=>	212,	pindex	=>	0,	updateint => 2,  id	=>	6},
+	"2.13inch_e-Paper_HAT_(C)"		=>	{width	=>	104,	height	=>	212,	pindex	=>	5,	updateint => 15, id	=>	5},
+	"2.13inch_e-Paper_HAT_(B)"		=>	{width	=>	104,	height	=>	212,	pindex	=>	1,	updateint => 15, id	=>	4},
+	"2.13inch_e-Paper_HAT"			=>	{width	=>	122,	height	=>	250,	pindex	=>	0,	updateint => 2,  id	=>	3},
+	"1.54inch_e-Paper_Module_(C)"	=>	{width	=>	152,	height	=>	152,	pindex	=>	5,	updateint => 28, id	=>	2},
+	"1.54inch_e-Paper_Module_(B)"	=>	{width	=>	200,	height	=>	200,	pindex	=>	3,	updateint => 8,  id	=>	1},
+	"1.54inch_e-Paper_Module"		=>	{width	=>	200,	height	=>	200,	pindex	=>	0,	updateint => 2,  id	=>	0}
 );
 
 #---------------------------------------------------------------------------------------------------
@@ -141,6 +151,8 @@ sub ESPEInk_Initialize($) {
 		. "disable:0,1 "
 		. "definition:textField-long "
 		. "definitionFile "
+		. "mininterval "
+		. "uploadTimeout "
         . $readingFnAttributes;
 
 	$hash->{STATE} = "Initialized";
@@ -381,6 +393,31 @@ sub ESPEInk_Set($@) {
 
 #---------------------------------------------------------------------------------------------------
 # Attr function, check attribute setting, conversion to readings and error handling
+sub ESPEInk_FetchReadings(@) {
+	my @values = @_;
+	my @outvalues;
+	my $outvalue;
+
+	foreach my $value (@values) {
+		if ($value =~ m/\[/) {
+			$value =~ s/[\[\]]//g;
+			my ($dev,$reading) = split(":",$value);
+			$value = ReadingsVal($dev,$reading,'');
+		}
+		push(@outvalues,$value);
+		$outvalue = $value;
+	}
+
+	if ((scalar @outvalues) > 1) {
+		return @outvalues;
+	} else {
+		return $outvalue;
+	}
+}
+
+
+#---------------------------------------------------------------------------------------------------
+# Attr function, check attribute setting, conversion to readings and error handling
 sub ESPEInk_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
 	my $err;
@@ -405,7 +442,7 @@ sub ESPEInk_Attr(@) {
 			my $colormode = ESPEInk_GetSetting($name,"colormode");
 			my $ipal = $ESPEInk_devices{$attr_value}{"pindex"};
 			$hash->{DEVICETYPE} = $attr_value;
-			if (($colormode eq "color") && (($ipal&1)==0) && $ESPEInk_InitializationDone) {
+			if (($colormode eq "color") && ($ipal==0 or $ipal==4) && $ESPEInk_InitializationDone) {
 			    $err = "Inconsistent setting for device type $attr_value. Device does not support color mode, setting colormode attribute to monochrome.";
 				fhem("attr $name colormode monochrome");
 				fhem("attr $name devicetype $attr_value");
@@ -416,18 +453,18 @@ sub ESPEInk_Attr(@) {
 		} elsif($attr_name eq "colormode") {
 		    my $devtype = ESPEInk_GetSetting($name,"devicetype");
 			my $ipal = $ESPEInk_devices{$devtype}{"pindex"};
-			if (($attr_value eq "color") && (($ipal&1)==0) && $ESPEInk_InitializationDone) {
+			if (($attr_value eq "color") && ($ipal==0 or $ipal==4) && $ESPEInk_InitializationDone) {
 			    $err = "Invalid argument $attr_value to $attr_name. Device does not support color mode.";
 			    return $err;
 			}
 			$hash->{COLORMODE} = $attr_value;
 		} elsif($attr_name =~ '^\d+-.*') {
 			if ($attr_name =~ '(x$|y$|size$)') {
-				return "Invalid argument $attr_value to $attr_name must be an interger number" if ($attr_value !~ '-?\d+');
+				return "Invalid argument $attr_value to $attr_name must be an interger number" if ($attr_value !~ '-?\d+' && $attr_value !~ '^\[.*');
 			} elsif ($attr_name =~ '(size)') {
-				return "Invalid argument $attr_value to $attr_name must be a positive interger number"  if ($attr_value !~ '\d+');
+				return "Invalid argument $attr_value to $attr_name must be a positive interger number"  if ($attr_value !~ '\d+' && $attr_value !~ '^\[.*');
 			} elsif ($attr_name =~ '(angle)') {
-				return "Invalid argument $attr_value to $attr_name must be an integer number between -180 and +180"  if ($attr_value !~ '-?\d+' || int($attr_value) < -180 || int($attr_value) > 180);
+				return "Invalid argument $attr_value to $attr_name must be an integer number between -180 and +180"  if (($attr_value !~ '-?\d+' && $attr_value !~ '^\[.*') || int($attr_value) < -180 || int($attr_value) > 180);
 			} elsif ($attr_name =~ '(color)') {
 				return "Invalid argument $attr_value to $attr_name must be a valid rgb hex string" if (!ESPEInk_CheckColorString($attr_value));
 			} elsif ($attr_name =~ '(font)') {
@@ -451,6 +488,8 @@ sub ESPEInk_Attr(@) {
 		} elsif($attr_name eq "coloroffset") {
 		} elsif($attr_name eq "maxretries") {
 		} elsif($attr_name eq "timeout") {
+		} elsif($attr_name eq "mininterval") {
+		} elsif($attr_name eq "uploadTimeout") {
 		} elsif($attr_name eq "definition") {
 				ESPEInk_ResetNotifies({hash=>$hash,definition=>$attr_value});
 		} elsif($attr_name eq "definitionFile") {
@@ -675,6 +714,7 @@ sub ESPEInk_ResetNotifies($) {
 				my $eval;
 				($text,$eval) = split("{",$text);
 				($device,$reading) = split(':',$text);
+				next if (($type eq 'iconreading') && (length($text) == 0)); # nothing to do, just skip - Hajo  2
 				if ($device) {
 					$reading = "state" if (!$reading);
 					$notifies .= $device.":".$reading."|" if ($defs{$device});
@@ -722,7 +762,7 @@ sub ESPEInk_Cleanup($) {
 # Check color setting for validity
 sub ESPEInk_CheckColorString($) {
 	my ($color) = @_;
-	return $color =~ '^(?:[0-9a-fA-F]{3}){1,2}$';
+	return ($color =~ '^(?:[0-9a-fA-F]{3}){1,2}$') || ($color =~ '^\[');
 }
 
 #---------------------------------------------------------------------------------------------------
@@ -795,6 +835,7 @@ sub ESPEInk_CorrectXY($$$$$$$$$$) {
 sub ESPEInk_CheckFontString($) {
 	my ($font) = @_;
 	my $ret = 0;
+	$ret = 1 if ($font =~ '^\['); # reading:value format
 	$ret = 1 if ($font && $font =~ '(small|medium|large|giant)');
 	$ret = ($font && -e $font) if (!$ret);
 	return $ret;
@@ -806,6 +847,10 @@ sub ESPEInk_CheckIconString($) {
 	my ($icon) = @_;
 	my $ret = 0;
 	my $picdata = undef;
+
+	if ($icon =~ '^\[') {
+		return($ret,$icon) if ($ret);
+	}
 
 	if ($icon =~ /http(?:s)\:\/\//) { 	# Web link, check if it can be downloaded
 		($ret, $picdata) = HttpUtils_BlockingGet({url=>$icon,timeout=>30});
@@ -1232,11 +1277,17 @@ sub ESPEInk_AddObjects($$) {
 	
 	if ($definition) {	# work on all definitions if definition attribute is defined
 		foreach my $line (split(/\n/,$definition)) { # go through the definition line by line
+            Log3 $hash, 4, "check1: $line" . " - " . length($line);
+            next if (length($line) <1); # Hajo 5
 			next if ($line =~ /^\s*\#.*/); # check for comment lines
 			my ($type, $text, $x, $y, $size, $ang, $col, $fnt,$linegap,$blockwidth,$docolor);
 			$type = undef;
 			$text = undef;
 			($type, $text, $x, $y, $size, $ang, $col, $fnt, $linegap, $blockwidth) = split("#",$line);
+            if (!defined $fnt) {$fnt = ''}; # Hajo 6
+            if (!defined $linegap) {$linegap = ''}; # Hajo 7
+            if (!defined $blockwidth) {$blockwidth = ''}; # Hajo 8
+			($x, $y, $size, $ang, $col, $fnt,$linegap,$blockwidth) = ESPEInk_FetchReadings($x, $y, $size, $ang, $col, $fnt,$linegap,$blockwidth);
 			$linegap = int($linegap) if ($linegap);
 			$blockwidth = int($blockwidth) if ($blockwidth);
 
@@ -1259,6 +1310,7 @@ sub ESPEInk_AddObjects($$) {
 				my ($device,$reading) = split(':',$text,2);
 				$reading = "state" if (!$reading);
 				$text = ReadingsVal($device,$reading,'');
+				next if (($type eq 'iconreading') && (length($text) == 0)); # nothing to do, just skip - Hajo  2
 				if ($eval) {
 					$eval =~ s/\}//g;
 					$text = sprintf($eval,ReadingsVal($device,$reading,""));
@@ -1332,9 +1384,11 @@ sub ESPEInk_AddObjects($$) {
 					if ($docolor) {
 						for (my $iy=0; $iy<$sh; $iy++) {
 						for (my $ix=0; $ix<$sw; $ix++) {
-							($r,$g,$b) = $icon_img->rgb($icon_img->getPixel($ix,$iy));	# get color values in source file
+							($r,$g,$b) = $icon_img->rgb($icon_img->getPixel($ix,$iy));							# get color values in source file
+							(my $alpha) = $icon_img->alpha($icon_img->getPixel($ix,$iy));						# get alpha-channel
+							$icon_img->setPixel($ix,$iy,$color) if ($alpha == 0 && $r<180 && $g<180 && $b<180);	# set color to given color if original color is black  *your favorite tresholds may be different						$icon_img->setPixel($ix,$iy,$color) if ($r>0 && $g>0 && $b>0);	# set color to given color if original color is black
 							#Log3 $hash, 1, "$r, $g, $b";
-							$icon_img->setPixel($ix,$iy,$color) if ($r>0 && $g>0 && $b>0);	# set color to given color if original color is black
+							#$icon_img->setPixel($ix,$iy,$color) if ($r>0 && $g>0 && $b>0);	# set color to given color if original color is black
 						}
 						}
 					}
@@ -1430,12 +1484,13 @@ sub ESPEInk_AddObjects($$) {
 	}
 
 	for (my $itext=1; $itext<=$deftexts; $itext++) {
-		my $docolor = (ReadingsVal($name,"$itext-color",0) ne 0) && (ReadingsVal($name,"$itext-color",0) ne '000000');
-		$r= hex(substr(ReadingsVal($name,"$itext-color","000000"),0,2));
-		$g= hex(substr(ReadingsVal($name,"$itext-color","000000"),2,2));
-		$b= hex(substr(ReadingsVal($name,"$itext-color","000000"),4,2));
+		my $ccolor = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-color",'000000'));
+		my $docolor = ($ccolor ne 0) && ($ccolor ne '000000');
+		$r= hex(substr($ccolor,0,2));
+		$g= hex(substr($ccolor,2,2));
+		$b= hex(substr($ccolor,4,2));
 		$color = $image->colorResolve($r,$g,$b);
-		$angle = ReadingsVal($name,"$itext-angle",0)/180*(4*atan2(1,1));
+		$angle = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0))/180*(4*atan2(1,1));
 		if (ReadingsVal($name,"$itext-isIcon",0)) {
 			my ($ret,$path) = ESPEInk_CheckIconString(ReadingsVal($name,"$itext-icon",""));
 			my ($ext) = $path =~ /(\.[^.]+)$/;
@@ -1494,8 +1549,10 @@ sub ESPEInk_AddObjects($$) {
 				if ($docolor) {
 					for (my $iy=0; $iy<$sh; $iy++) {
 					for (my $ix=0; $ix<$sw; $ix++) {
-						($r,$g,$b) = $icon_img->rgb($icon_img->getPixel($ix,$iy));	# get color values in source file
-						$icon_img->setPixel($ix,$iy,$color) if ($r>0 && $g>0 && $b>0);	# set color to given color if original color is black
+						($r,$g,$b) = $icon_img->rgb($icon_img->getPixel($ix,$iy));										# get color values in source file
+						(my $alpha) = $icon_img->alpha($icon_img->getPixel($ix,$iy));									# get alpha-channel
+						$icon_img->setPixel($ix,$iy,$color) if ($alpha == 0 && $r<180 && $g<180 && $b<180);				# set color to given color if original color is black  *your favorite tresholds may be different						$icon_img->setPixel($ix,$iy,$color) if ($r>0 && $g>0 && $b>0);	# set color to given color if original color is black
+						#$icon_img->setPixel($ix,$iy,$color) if ($r>0 && $g>0 && $b>0);	# set color to given color if original color is black
 					}
 					}
 				}
@@ -1505,35 +1562,37 @@ sub ESPEInk_AddObjects($$) {
 				my $icon_img_rot = GD::Image->new($srw,$srh,1);
 				$icon_img_rot->alphaBlending(0);
 				$icon_img_rot->fill($srw/2,$srh/2,$icon_img_rot->colorAllocateAlpha(0,0,0,127));
-				$icon_img_rot->copyRotated($icon_img,$srw/2,$srh/2,0,0,$sw,$sh,ReadingsVal($name,"$itext-angle",0));
-				my $dh = ReadingsVal($name,"$itext-size",10);
+				$icon_img_rot->copyRotated($icon_img,$srw/2,$srh/2,0,0,$sw,$sh,ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0)));
+				my $dh = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size",10));
 				my $dw = $srw*$dh/$srh;
 				my ($iw,$ih) = $image->getBounds;
-				my ($x,$y) = ESPEInk_CorrectXY($name,"icon","$dw#$dh",ReadingsVal($name,"$itext-font",""),ReadingsVal($name,"$itext-angle",""),ReadingsVal($name,"$itext-size",""),$iw,$ih,ReadingsVal($name,"$itext-x",0),ReadingsVal($name,"$itext-y",0));
+				my ($x,$y) = ESPEInk_CorrectXY($name,"icon","$dw#$dh",ESPEInk_FetchReadings(ReadingsVal($name,"$itext-font","")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle","")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size","")),$iw,$ih,ESPEInk_FetchReadings(ReadingsVal($name,"$itext-x",0)),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-y",0)));
 				$image->copyResized($icon_img_rot,$x,$y,0,0,$dw,$dh,$srw,$srh);
 			}
 		} elsif (!ReadingsVal($name,"$itext-isSymbol",0)) {
+			my $cfont = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-font",""));
 			$font = undef;
-			$font = gdGiantFont if (ReadingsVal($name,"$itext-font","") eq "giant");
-			$font = gdLargeFont if (ReadingsVal($name,"$itext-font","") eq "large");
-			$font = gdMediumBoldFont if (ReadingsVal($name,"$itext-font","") eq "medium");
-			$font = gdSmallFont if (ReadingsVal($name,"$itext-font","") eq "small");
+			
+			$font = gdGiantFont if ($cfont eq "giant");
+			$font = gdLargeFont if ($cfont eq "large");
+			$font = gdMediumBoldFont if ($cfont eq "medium");
+			$font = gdSmallFont if ($cfont eq "small");
 			my ($dw,$dh) = $image->getBounds;
 			my $ly = ReadingsVal($name,"$itext-y",0);
       # Do not use full text here, since only height is relevant here and this can be calced from one char
       # 
-			my ($tw, $th) = ESPEInk_GetStringPixelWidth($name,"A",ReadingsVal($name,"$itext-font","small"),ReadingsVal($name,"$itext-angle",0),ReadingsVal($name,"$itext-size",10));
+			my ($tw, $th) = ESPEInk_GetStringPixelWidth($name,"A",ESPEInk_FetchReadings(ReadingsVal($name,"$itext-font","small")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0)),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size",10)));
 			$th += int(ReadingsVal($name,"$itext-linegap",0));
 
-			my $text = ESPEInk_FormatBlockText($name,ReadingsVal($name,"$itext-text",""),ReadingsVal($name,"$itext-font","small"),ReadingsVal($name,"$itext-angle",0),ReadingsVal($name,"$itext-size",10),int(ReadingsVal($name,"$itext-blockwidth",0)),$th);
+			my $text = ESPEInk_FormatBlockText($name,ReadingsVal($name,"$itext-text",""),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-font","small")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0)),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size",10)),int(ESPEInk_FetchReadings(ReadingsVal($name,"$itext-blockwidth",0))),$th);
 			foreach my $tline (split(/\\n/,$text)) {
-				my ($x,$y) = ESPEInk_CorrectXY($name,"text",$tline,ReadingsVal($name,"$itext-font",""),ReadingsVal($name,"$itext-angle",""),ReadingsVal($name,"$itext-size",""),$dw,$dh,ReadingsVal($name,"$itext-x",0),$ly);
+				my ($x,$y) = ESPEInk_CorrectXY($name,"text",$tline,ESPEInk_FetchReadings(ReadingsVal($name,"$itext-font","")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle","")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size","")),$dw,$dh,ESPEInk_FetchReadings(ReadingsVal($name,"$itext-x",0)),$ly);
 
 				if (!$font) {	#use TTF from file given
 					my $fontfile = ReadingsVal($name,"$itext-font","");
-					my @bounds = $image->stringFT($color,ReadingsVal($name,"$itext-font",""),ReadingsVal($name,"$itext-size",10),$angle,$x,ReadingsVal($name,"$itext-size",10)+$y,$tline);
+					my @bounds = $image->stringFT($color,ESPEInk_FetchReadings(ReadingsVal($name,"$itext-font","")),ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size",10)),$angle,$x,ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size",10))+$y,$tline);
 				} else {
-					if ((ReadingsVal($name,"$itext-angle",0) < -45) || (ReadingsVal($name,"$itext-angle",0) > 45)) {
+					if ((ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0)) < -45) || (ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0)) > 45)) {
 						$image->stringUp($font,$x,$y,$tline,$color);
 					} else {
 						$image->string($font,$x,$y,$tline,$color);
@@ -1544,13 +1603,13 @@ sub ESPEInk_AddObjects($$) {
 		} else {
 			my ($sym,$s1,$s2) = ("","","");
 			($sym,$s1,$s2) = split("-",ReadingsVal($name,"$itext-symbol",""));
-			my $size = ReadingsVal($name,"$itext-size","");
-			my $width = ReadingsVal($name,"$itext-width",0);
-			my $height = ReadingsVal($name,"$itext-height",0);
-			my $ang = ReadingsVal($name,"$itext-angle",0);
-			my $arc = ReadingsVal($name,"$itext-arc",0);
-			my $x = ReadingsVal($name,"$itext-x",0);
-			my $y = ReadingsVal($name,"$itext-y",0);
+			my $size = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-size",""));
+			my $width = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-width",0));
+			my $height = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-height",0));
+			my $ang = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-angle",0));
+			my $arc = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-arc",0));
+			my $x = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-x",0));
+			my $y = ESPEInk_FetchReadings(ReadingsVal($name,"$itext-y",0));
 			$image->setStyle($color);
 			if ($sym eq "line") {
 				my $angle = atan2($height,$width);
@@ -1627,6 +1686,7 @@ sub ESPEInk_ConvertAborted(@) {
 # if wanted, Floyd-Steinberg-Dithering is performed to better represent pictures with many colors
 sub ESPEInk_Convert(@) {
     my ($hash,$upload) = @_;
+	my $name = $hash->{NAME};
     if (defined ($hash->{helper}{RUNNING_PID}))
     {
         BlockingKill($hash->{helper}{RUNNING_PID});
@@ -1640,12 +1700,12 @@ sub ESPEInk_Convert(@) {
 	   $hash->{helper}{DO_UPLOAD} = $upload;
        $hash->{helper}{RUNNING_PID} =
                BlockingCall(
-               "ESPEInk_DoConvert",      # callback worker task
-               $hash,                    # hash of the device and upload trigger
-               "ESPEInk_ConvertDone",    # callback result method
-               120,                      # timeout seconds
-               "ESPEInk_ConvertAborted", # callback for abortion
-               $hash );                  # parameter for abortion
+               "ESPEInk_DoConvert",					# callback worker task
+               $hash,								# hash of the device and upload trigger
+               "ESPEInk_ConvertDone",				# callback result method
+               AttrVal($name,"uploadTimeout",290),	# timeout seconds
+               "ESPEInk_ConvertAborted",			# callback for abortion
+               $hash );								# parameter for abortion
        Log3 $hash, 4, "Start forked process to convert output picture";
        return "Starting conversion in background";
     }
@@ -1812,6 +1872,27 @@ sub ESPEInk_getPixel($$$$) {
 }
 
 #---------------------------------------------------------------------------------------------------
+# get pixel from image
+sub ESPEInk_getPixel7C($$$$) {
+	my ($image, $w, $h, $indx ) = @_;
+
+  my $iy = int( $indx / $w );
+  my $ix = $indx % $w;
+  my ($r,$g,$b) = $image->rgb($image->getPixel($ix,$iy));
+  my $retval = 7;
+
+  #convert color values to values between 0 and 6
+  $retval = 0 if ($r==0&&$g==0&&$b==0);
+  $retval = 1 if ($r==255&&$g==255&&$b==255);
+  $retval = 2 if ($r==0&&$g==255&&$b==0);
+  $retval = 3 if ($r==0&&$g==0&&$b==255);
+  $retval = 4 if ($r==255&&$g==0&&$b==0);
+  $retval = 5 if ($r==255&&$g==255&&$b==0);
+  $retval = 6 if ($r==255&&$g==128&&$b==0);
+  return $retval;
+}
+
+#---------------------------------------------------------------------------------------------------
 # helper function for coding picture pixels to EInk bit settings
 sub ESPEInk_CodePixel2BitsImage($$$$$$$$) {
 	my ($indx,$bits,$comp,$imax,$image,$w,$h,$isize) = @_;
@@ -1848,11 +1929,20 @@ sub ESPEInk_CodePixel2BitsImage($$$$$$$$) {
 		}
 	} elsif ($bits == 16) {
 		$v = 0;
-		for (my $i=0; $i<$bits; $i+=2) {
-			if ($indx<$isize) {
-				$v|=(ESPEInk_getPixel($image,$w,$h,$indx)<<$i);
+		if ($comp == -2) {
+			for (my $i=0; $i<$bits; $i+=4) {
+				if ($indx<$isize) {
+					$v|=(ESPEInk_getPixel7C($image,$w,$h,$indx)<<$i);
+				}
+				$indx++;
 			}
-			$indx++;
+		} else {
+			for (my $i=0; $i<$bits; $i+=2) {
+				if ($indx<$isize) {
+					$v|=(ESPEInk_getPixel($image,$w,$h,$indx)<<$i);
+				}
+				$indx++;
+			}
 		}
 		return ($indx, ESPEInk_Word2String($v));
 	}
@@ -1932,14 +2022,14 @@ sub ESPEInk_Encode4UploadImage($$$) {
   my $h = $param->{imageh};
   my $isize = $param->{imagesize};
 
-	if (($i+int($param->{maxulsize})*($bits==8?4:2)) > ($isize-1)) {
+	if (($i+int($param->{maxulsize})*($bits==8?4:($comp==-2?1:2))) > ($isize-1)) {
 		$imax = $isize-1;
 	} else {
-		$imax = $i+int($param->{maxulsize})*($bits==8?4:2);
+		$imax = $i+int($param->{maxulsize})*($bits==8?4:($comp==-2?1:2));
 	}
 	
 	if ($param->{device} == 3) {
-		$imax = $i+int($param->{maxulsize})*($bits==8?4:2)-(($param->{board} eq "ESP8266")?366:122);
+		$imax = $i+int($param->{maxulsize})*($bits==8?4:($comp==-2?1:2))-(($param->{board} eq "ESP8266")?366:122);
 	}
 
 	my $postdata = "";
@@ -2072,9 +2162,9 @@ sub ESPEInk_HTTPCallbackA(@) {
 			} elsif ($param->{control}{stepindex} == 2) {
 				$hash->{STATE} = "Successfully uploaded image to device";
 			}
-		} elsif (($param->{device} > 15) && ($param->{device} < 22)) {		# special treatment for bigger displays, upload is done in one step for all colors
-			if ($param->{control}{stepindex} == 0) {						# we have different steps for uploading the different colors and closing the upload
-				$comp = -1;
+		} elsif ((($param->{device} > 15) && ($param->{device} < 22)) || $param->{device} == 25) {		# special treatment for bigger displays, upload is done in one step for all colors
+			if ($param->{control}{stepindex} == 0) {													# we have different steps for uploading the different colors and closing the upload
+				$comp = $param->{device}==25?-2:-1;
 				$bits = 16;
 				$param->{command} = "LOAD";									# start uploading black channel
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{command};
@@ -2254,6 +2344,18 @@ sub ESPEInk_Upload(@) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 	
+	my $devtype = ESPEInk_GetSetting($name,"devicetype");
+	my $minint = AttrVal($name,"mininterval",0);
+	if ($minint eq 'auto') {
+		$minint = $ESPEInk_devices{$devtype}{"updateint"};
+	}
+
+	my $dlastupdate = gettimeofday()-ReadingsVal($name,"updatestart",0);
+	if ($dlastupdate < $minint) {
+		Log3 ($hash, 3, "$name: Time $dlastupdate since last Upload too small, try again later or change mininterval ($minint)");
+		return "Time since last Upload too small, try again later or change mininterval";
+	}
+
 	my $url = ESPEInk_GetSetting($name,"url"); 
 	if (!defined $url) {
 		return "Error, missing url. Define url to device first";
@@ -2263,25 +2365,24 @@ sub ESPEInk_Upload(@) {
 		Log3 ($hash, 2, "$name: Upload of image currently running, try again later");
 		return $hash->{STATE};
 	}
-
 	$hash->{STATE} = "Uploading image to device";
 
+	readingsSingleUpdate( $hash, "updatestart", gettimeofday(), 1 );
 	my @outarray;
 
-	my $devtype = ESPEInk_GetSetting($name,"devicetype");
 	my $boardtype = ESPEInk_GetSetting($name,"boardtype");
 	my $devind = $ESPEInk_devices{$devtype}{"id"};
 
 	my $rootname = $FW_dir; #File::Spec->rel2abs($FW_dir); # get Filename of FHEMWEB root
 	my $filename = catfile($rootname,$hash->{SUBFOLDER},$name,"result.png");
-  my $image;  # JV
+    my $image;  # JV
 	if (!open(RESULT,$filename)) {
 		Log3 $hash, 1, "File $filename cannot be opened";
 		return "Error opening image file $filename for upload";
 	} # else {
-  close RESULT;
+    close RESULT;
     # my $image = GD::Image->newFromPng($filename); # JV
-		$image = GD::Image->newFromPng($filename);    # JV
+	$image = GD::Image->newFromPng($filename);    # JV
 		# my ($w,$h) = $image->getBounds;
 		# my ($r,$g,$b);
 		# my $i = 0;
@@ -2293,7 +2394,7 @@ sub ESPEInk_Upload(@) {
 				# $i++;
 			# }
 		# }
-#	}
+    #	}
 
 	$ESPEInk_uploadcontrol{"retries"} = 0;									# actual number of retries
 	$ESPEInk_uploadcontrol{"maxretries"} = AttrVal($name,"maxretries",3);	# maximum number of retries
@@ -2554,6 +2655,9 @@ sub ESPEInk_Upload(@) {
             <li><i>interval</i><br>
 				The time interval for regular updates of the information to the eInk display. The device automatically converts the inputs and uploads the result to the eInk display in this interval.
 				If this value is set to 0 there will be automatical updates in case a triggering device is specified (see set textreading). Otherwise 0 means no automatic updates.
+            </li>
+            <li><i>mininterval</i><br>
+				The time interval that shall at least be elapsed since the last upload. If the interval since last upload is smaller than this value, not uploads will be performed.
             </li>
             <li><i>boardtype</i><br>
 				The type of driver board to be used. Currently ESP8266 and ESP32 driver boards are supported.

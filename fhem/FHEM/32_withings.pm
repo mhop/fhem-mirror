@@ -25,7 +25,7 @@ use JSON;
 
 use POSIX qw( strftime );
 use Time::Local qw(timelocal);
-use Digest::SHA qw(hmac_sha1_base64);
+use Digest::SHA qw(hmac_sha1_base64 hmac_sha256_hex);
 
 #use Encode qw(encode);
 #use LWP::Simple;
@@ -191,6 +191,19 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      143 => { name => "unknown 143", reading => "unknown143", },#
                      144 => { name => "unknown 144", reading => "unknown144", },#
                      145 => { name => "unknown 145", reading => "unknown145", },#
+                     146 => { name => "unknown 146", reading => "unknown146", },#
+                     147 => { name => "unknown 147", reading => "unknown147", },#
+                     148 => { name => "unknown 148", reading => "unknown148", },#
+                     149 => { name => "unknown 149", reading => "unknown149", },#
+                     150 => { name => "unknown 150", reading => "unknown150", },#
+                     151 => { name => "unknown 151", reading => "unknown151", },#
+                     152 => { name => "unknown 152", reading => "unknown152", },#
+                     153 => { name => "unknown 153", reading => "unknown153", },#
+                     154 => { name => "unknown 154", reading => "unknown154", },#
+                     155 => { name => "Vascular Age", reading => "vascularAge", },#
+                     156 => { name => "unknown 156", reading => "unknown156", },#
+                     157 => { name => "unknown 157", reading => "unknown157", },#
+                     158 => { name => "unknown 158", reading => "unknown158", },#
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
@@ -330,11 +343,11 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'snoring' => { name => "Snoring", reading => "snoringDuration", unit => "s", },
                         'snoringepisodecount' => { name => "Snoring Episode Count", reading => "snoringEpisodeCount", unit => 0, },
                         'breathing_event_probability' => { name => "Breathing Event Probability", reading => "breathingEventProbability", unit => 0, },
+                        'night_events' => { name => "Night Events", reading => "nightEvents", unit => 0, },
                         'apnea_activated' => { name => "Apnea Activated", reading => "apneaActivated", unit => 0, },
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
                         'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
-
                         #'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
                         #'steps' => { name => "Steps", reading => "steps", unit => 0, },
                         #'calories' => { name => "Calories", reading => "calories", unit => 0, },
@@ -1218,6 +1231,7 @@ sub withings_getUsers($) {
   my @users = ();
   foreach my $user (@{$json->{body}{users}}) {
     next if( !defined($user->{id}) );
+    next if( $user->{idparentaccount} ne $hash->{AccountID} );
 
     push( @users, $user );
   }
@@ -1310,6 +1324,16 @@ sub withings_getDeviceDetail($) {
     $hash->{typeID} = $device->{type};
     $hash->{lastsessiondate} = $device->{lastsessiondate} if( defined($device->{lastsessiondate}) );
     $hash->{lastweighindate} = $device->{lastweighindate} if( defined($device->{lastweighindate}) );
+
+    readingsBeginUpdate($hash);
+    if( defined($device->{batterylvl}) and $device->{batterylvl} > 0 and $device->{type} ne '32' and $device->{model} ne '22') {
+      readingsBulkUpdate( $hash, "batteryPercent", $device->{batterylvl}, 1 );
+      readingsBulkUpdate( $hash, "batteryState", ($device->{batterylvl}>20?"ok":"low"), 1 );
+    }
+    readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime(int($device->{lastweighindate})), 1 ) if( defined($device->{lastweighindate}) and int($device->{lastweighindate}) > 0  and $device->{model} ne '60' );
+    readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime(int($device->{lastsessiondate})), 1 ) if( defined($device->{lastsessiondate}) );
+    readingsBulkUpdate( $hash, "firmware", $device->{fw}, 1 ) if( defined($device->{fw}) );
+    readingsEndUpdate($hash,1);
   }
 
   return $json->{body};
@@ -1970,20 +1994,20 @@ sub withings_parseProperties($$) {
   my ($hash,$json) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "$name: parsedevice\n".Dumper($json);
-
   #parse
   my $detail = $json->{body};
+  Log3 $name, 5, "$name: parsedevice\n".Dumper($json->{body});
 
   readingsBeginUpdate($hash);
 
-  if( defined($detail->{batterylvl}) and $detail->{batterylvl} > 0 and $detail->{type} ne '32' and $detail->{model} ne '22') {
-    readingsBulkUpdate( $hash, "batteryPercent", $detail->{batterylvl}, 1 );
-    readingsBulkUpdate( $hash, "batteryState", ($detail->{batterylvl}>20?"ok":"low"), 1 );
+  if( defined($json->{body}{batterylvl}) and $json->{body}{batterylvl} > 0 and $json->{body}{type} ne '32' and $json->{body}{model} ne '22') {
+    readingsBulkUpdate( $hash, "batteryPercent", $json->{body}{batterylvl}, 1 );
+    readingsBulkUpdate( $hash, "batteryState", ($json->{body}{batterylvl}>20?"ok":"low"), 1 );
   }
-  readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime($detail->{lastweighindate}), 1 ) if( defined($detail->{lastweighindate}) and $detail->{lastweighindate} > 0  and $detail->{model} ne '60' );
-  readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime($detail->{lastsessiondate}), 1 ) if( defined($detail->{lastsessiondate}) );
-  $hash->{lastsessiondate} = $detail->{lastsessiondate} if( defined($detail->{lastsessiondate}) );
+  readingsBulkUpdate( $hash, "lastWeighinDate", FmtDateTime(int($json->{body}{lastweighindate})), 1 ) if( defined($json->{body}{lastweighindate}) and int($json->{body}{lastweighindate}) > 0  and $json->{body}{model} ne '60' );
+  readingsBulkUpdate( $hash, "lastSessionDate", FmtDateTime(int($json->{body}{lastsessiondate})), 1 ) if( defined($json->{body}{lastsessiondate}) );
+  readingsBulkUpdate( $hash, "firmware", $json->{body}{fw}, 1 ) if( defined($json->{body}{fw}) );
+  $hash->{lastsessiondate} = $json->{body}{lastsessiondate} if( defined($json->{body}{lastsessiondate}) );
 
   readingsEndUpdate($hash,1);
 
@@ -2525,7 +2549,7 @@ sub withings_parseVasistas($$;$) {
       $newlastupdate = $device->{lastweighindate} if($device->{lastweighindate} and $device->{lastweighindate} < $newlastupdate);
 
       #start in-bed detection
-      if($hash->{modelID} eq "61" && $datatype =~ /Sleep/ && $iscurrent == 0){
+      if($hash->{modelID} && $hash->{modelID} eq "61" && $datatype =~ /Sleep/ && $iscurrent == 0){
         if($device->{lastweighindate} > (time()-1800)){
           readingsSingleUpdate( $hash, "in_bed", 1, 1 );
         } else {
@@ -3646,6 +3670,8 @@ sub withings_addExtension($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  return undef if($name =~ /test/);
+
   #withings_removeExtension() ;
   my $url = "/withings";
   delete $data{FWEXT}{$url} if($data{FWEXT}{$url});
@@ -3708,6 +3734,47 @@ sub withings_Webcall() {
       return ( "text/plain; charset=utf-8",
           "1" );
     }
+    if($request =~ /appli=/){
+      $request =~ /appli=(.*?)(&|$)/;
+      my $appli = $1 || undef;
+
+      if($appli eq "1"){
+        Log3 "withings", 4, "New user measurement ".$request;
+      }
+      if($appli eq "2"){
+        Log3 "withings", 4, "New temperature measurement ".$request;
+      }
+      if($appli eq "4"){
+        Log3 "withings", 4, "New heart measurement ".$request;
+      }
+      if($appli eq "16"){
+        Log3 "withings", 4, "New activity measurement ".$request;
+      }
+      if($appli eq "44"){
+        Log3 "withings", 4, "New sleep measurement ".$request;
+      }
+      if($appli eq "46"){
+        Log3 "withings", 4, "New user profile measurement ".$request;
+      }
+      if($appli eq "50"){
+        readingsSingleUpdate( $userhash, "in_bed", 1, 1 );
+      }
+      if($appli eq "51"){
+        readingsSingleUpdate( $userhash, "in_bed", 0, 1 );
+      }
+      if($appli eq "52"){
+        Log3 "withings", 4, "Withings sleep mat was inflated ".$request;
+      }
+      if($appli eq "53"){
+        Log3 "withings", 4, "Withings device setup ".$request;
+      }
+      if($appli eq "54"){
+        Log3 "withings", 4, "New ECG data ".$request;
+      }
+      if($appli eq "55"){
+        Log3 "withings", 4, "ECG failed ".$request;
+      }
+    }
     InternalTimer(gettimeofday()+2, "withings_poll", $userhash, 0);
 
     return ( "text/plain; charset=utf-8",
@@ -3732,19 +3799,19 @@ sub withings_AuthApp($;$) {
   my $cid = AttrVal($name,'client_id','');
   my $cb = AttrVal($name,'callback_url','');
 
-  my $url = "https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=".$cid."&scope=user.info,user.metrics,user.activity&state=connect&redirect_uri=".$cb;
+  my $url = "https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=".$cid."&scope=user.info,user.metrics,user.activity,user.sleepevents&state=connect&redirect_uri=".$cb;
   return $url if(!defined($code) || $code eq "");
 
   my $cs = AttrVal($name,'client_secret','');
 
-  Log3 "withings", 2, "Withings auth call ".$code;
+  Log3 "withings", 4, "Withings auth call ".$code." ".$cb." ".$name;
 
   my $datahash = {
-    url => "https://account.withings.com/oauth2/token",
+    url => "https://wbsapi.withings.net/v2/oauth2",
     method => "POST",
     timeout => 10,
     noshutdown => 1,
-    data => { grant_type => 'authorization_code', client_id => $cid, client_secret => $cs, code => $code, redirect_uri => $cb },
+    data => { action => 'requesttoken', grant_type => 'authorization_code', client_id => $cid, client_secret => $cs, code => $code, redirect_uri => $cb },
   };
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
@@ -3762,26 +3829,26 @@ sub withings_AuthApp($;$) {
     Log3 $name, 1, "$name: LOGIN JSON ERROR: $data";
     return undef;
   }
-  if(defined($json->{errors})){
+  if(defined($json->{error})){
     Log3 $name, 2, "$name: LOGIN RETURN ERROR: $data";
     return undef;
   }
 
   Log3 $name, 4, "$name: LOGIN SUCCESS: $data";
 
-  my $user = $json->{userid} || "NOUSER";
+  my $user = $json->{body}{userid} || "NOUSER";
   my $userhash = $modules{$hash->{TYPE}}{defptr}{"U$user"};
   if(!defined($userhash)){
     Log3 $name, 2, "$name: LOGIN USER ERROR: $data";
     return undef;
   }
   #readingsSingleUpdate( $hash, "access_token", $json->{access_token}, 1 ) if(defined($json->{access_token}));
-  $userhash->{helper}{OAuthKey} = $json->{access_token} if(defined($json->{access_token}));
+  $userhash->{helper}{OAuthKey} = $json->{body}{access_token} if(defined($json->{body}{access_token}));
   #readingsSingleUpdate( $hash, "expires_in", $json->{expires_in}, 1 ) if(defined($json->{expires_in}));
-  $userhash->{helper}{OAuthValid} = (int(time)+$json->{expires_in}) if(defined($json->{expires_in}));
-  readingsSingleUpdate( $userhash, ".refresh_token", $json->{refresh_token}, 1 ) if(defined($json->{refresh_token}));
+  $userhash->{helper}{OAuthValid} = (int(time)+$json->{body}{expires_in}) if(defined($json->{body}{expires_in}));
+  readingsSingleUpdate( $userhash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
+  InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $userhash, 0);
 
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
@@ -3794,16 +3861,19 @@ sub withings_AuthRefresh($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+
+  #my $nonce = withings_GetNonce($hash);
+
   my $cid = AttrVal($hash->{IODev}->{NAME},'client_id','');
   my $cs = AttrVal($hash->{IODev}->{NAME},'client_secret','');
   my $ref = ReadingsVal($name,'.refresh_token','');
 
   my $datahash = {
-    url => "https://account.withings.com/oauth2/token",
+    url => "https://wbsapi.withings.net/v2/oauth2",
     method => "POST",
     timeout => 10,
     noshutdown => 1,
-    data => { grant_type => 'refresh_token', client_id => $cid, client_secret => $cs, refresh_token => $ref },
+    data => { action => 'requesttoken', client_id => $cid, grant_type => 'refresh_token', client_secret => $cs, refresh_token => $ref },
   };
 
 
@@ -3821,24 +3891,68 @@ sub withings_AuthRefresh($) {
     Log3 $name, 1, "$name: REFRESH JSON ERROR: $data";
     return undef;
   }
-  if(defined($json->{errors})){
+  if(defined($json->{error})){
     Log3 $name, 2, "$name: REFRESH RETURN ERROR: $data";
     return undef;
   }
 
   Log3 $name, 4, "$name: REFRESH SUCCESS: $data";
 
-  #readingsSingleUpdate( $hash, "access_token", $json->{access_token}, 1 ) if(defined($json->{access_token}));
-  $hash->{helper}{OAuthKey} = $json->{access_token} if(defined($json->{access_token}));
-  #readingsSingleUpdate( $hash, "expires_in", $json->{expires_in}, 1 ) if(defined($json->{expires_in}));
-  $hash->{helper}{OAuthValid} = (int(time)+$json->{expires_in}) if(defined($json->{expires_in}));
-  readingsSingleUpdate( $hash, ".refresh_token", $json->{refresh_token}, 1 ) if(defined($json->{refresh_token}));
+  #readingsSingleUpdate( $hash, "access_token", $json->{body}{access_token}, 1 ) if(defined($json->{body}{access_token}));
+  $hash->{helper}{OAuthKey} = $json->{body}{access_token} if(defined($json->{body}{access_token}));
+  #readingsSingleUpdate( $hash, "expires_in", $json->{body}{expires_in}, 1 ) if(defined($json->{body}{expires_in}));
+  $hash->{helper}{OAuthValid} = (int(time)+$json->{body}{expires_in}) if(defined($json->{body}{expires_in}));
+  readingsSingleUpdate( $hash, ".refresh_token", $json->{body}{refresh_token}, 1 ) if(defined($json->{body}{refresh_token}));
 
-  InternalTimer(gettimeofday()+$json->{expires_in}-60, "withings_AuthRefresh", $hash, 0);
+  InternalTimer(gettimeofday()+$json->{body}{expires_in}-60, "withings_AuthRefresh", $hash, 0);
 
   #https://wbsapi.withings.net/notify?action=subscribe&access_token=a639e912dfc31a02cc01ea4f38de7fa4a1464c2e&callbackurl=http://fhem:remote@gu9mohkaxqdgpix5.myfritz.net/fhem/withings&appli=1&comment=fhem
 
   return undef;
+}
+
+sub withings_GetNonce($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $acc = $hash->{helper}{OAuthKey};
+  my $cid = AttrVal($name,'client_id','');
+  my $ts = int(time());
+
+  my $sig = "getnonce,$cid,".$ts;
+  $sig=hmac_sha256_hex($sig, AttrVal($name,'client_secret',''));
+
+  my $datahash = {
+    url => "https://wbsapi.withings.net/v2/signature",
+    method => "POST",
+    timeout => 10,
+    noshutdown => 1,
+    data => { action => 'getnonce', client_id => $cid, timestamp => $ts, signature => $sig },
+  };
+
+
+  my($err,$data) = HttpUtils_BlockingGet($datahash);
+
+  if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/)
+  {
+    Log3 $name, 1, "$name: NONCE ERROR $err";
+    return undef;
+  }
+
+  my $json = eval { JSON::decode_json($data) };
+  if($@)
+  {
+    Log3 $name, 1, "$name: NONCE JSON ERROR: $data";
+    return undef;
+  }
+  if(!defined($json->{body}{nonce})){
+    Log3 $name, 2, "$name: NONCE RETURN ERROR: $data";
+    return undef;
+  }
+
+  Log3 $name, 5, "$name: NONCE SUCCESS: ";
+  return $json->{body}{nonce};
+
 }
 
 sub withings_AuthList($) {
@@ -3870,7 +3984,7 @@ sub withings_AuthList($) {
     Log3 $name, 1, "$name: LIST JSON ERROR: $data";
     return undef;
   }
-  if(defined($json->{errors})){
+  if(defined($json->{error})){
     Log3 $name, 2, "$name: LIST RETURN ERROR: $data";
     return undef;
   }
@@ -3897,7 +4011,7 @@ sub withings_AuthUnsubscribe($) {
   my $acc = $hash->{helper}{OAuthKey};
   my $cb = AttrVal($hash->{IODev}->{NAME},'callback_url','');
 
-  my @applis = ("1", "4", "16", "44", "46");
+  my @applis = ("1", "2", "4", "16", "44", "46", "50", "51", "52", "54", "55");
   foreach my $appli (@applis) {
 
     my $datahash = {
@@ -3943,7 +4057,7 @@ sub withings_AuthSubscribe($) {
 
   my $acc = $hash->{helper}{OAuthKey};
   my $cb = AttrVal($hash->{IODev}->{NAME},'callback_url','');
-  my @applis = ("1", "4", "16", "44", "46");
+  my @applis = ("1", "2", "4", "16", "44", "46", "50", "51", "52", "54", "55");
 
   my $ret = "Please open the following URLs in your browser to subscribe:\n\n";
   foreach my $appli (@applis) {
@@ -4071,7 +4185,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'dailySteps';
     $unit = 'steps';
   }
-  elsif($event =~ m/steps/)
+  elsif($event =~ m/^steps/)
   {
     $reading = 'steps';
     $unit = 'steps';
@@ -4106,7 +4220,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'diastolicBloodPressure';
     $unit = 'mmHg';
   }
-  elsif($event =~ m/spo2/)
+  elsif($event =~ m/^spo2/)
   {
     $reading = 'spo2';
     $unit = '%';
@@ -4131,7 +4245,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'fatMassWeight';
     $unit = 'kg';
   }
-  elsif($event =~ m/weight/)
+  elsif($event =~ m/^weight/)
   {
     $reading = 'weight';
     $unit = 'kg';
@@ -4171,22 +4285,22 @@ sub withings_DbLog_splitFn($) {
     $reading = 'dailyCaloriesActive';
     $unit = 'kcal';
   }
-  elsif($event =~ m/calories/)
+  elsif($event =~ m/^calories/)
   {
     $reading = 'calories';
     $unit = 'kcal';
   }
-  elsif($event =~ m/co2/)
+  elsif($event =~ m/^co2/)
   {
     $reading = 'co2';
     $unit = 'ppm';
   }
-  elsif($event =~ m/voc/)
+  elsif($event =~ m/^voc/)
   {
     $reading = 'voc';
     $unit = 'ppm';
   }
-  elsif($event =~ m/light/)
+  elsif($event =~ m/^light/)
   {
     $reading = 'light';
     $unit = 'lux';
@@ -4196,7 +4310,7 @@ sub withings_DbLog_splitFn($) {
     $reading = 'batteryPercent';
     $unit = '%';
   }
-  elsif($event =~ m/durationTo/)
+  elsif($event =~ m/^durationTo/)
   {
     $value = $parts[1];
     $unit = 's';
@@ -4211,10 +4325,15 @@ sub withings_DbLog_splitFn($) {
     $value = $parts[1];
     $unit = 'bpm';
   }
-  elsif($event =~ m/pressure/)
+  elsif($event =~ m/^pressure/)
   {
     $value = $parts[1];
     $unit = 'mmHg';
+  }
+  elsif($event =~ m/^vascularAge/)
+  {
+    $value = $parts[1];
+    $unit = 'a';
   }
   else
   {
@@ -4405,6 +4524,7 @@ sub withings_weekdays2Int( $ ) {
     <li>heartSounds</li>
     <li>pulseWave</li>
     <li>spo2</li>
+    <li>vascularAge</li>
 
     <li>bodyTemperature</li>
     <li>skinTemperature</li>

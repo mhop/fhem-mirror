@@ -33,8 +33,10 @@ MQTT2_CLIENT_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     autocreate:no,simple,complex
+    binaryTopicRegexp
     clientId
     clientOrder
+    connectTimeout
     disable:1,0
     disabledForIntervals
     disconnectAfter
@@ -95,8 +97,8 @@ sub
 MQTT2_CLIENT_connect($)
 {
   my ($hash) = @_;
-  return if($hash->{authError});
-  my $disco = (ReadingsVal($hash->{NAME}, "state", "") eq "disconnected");
+  return if($hash->{authError} || AttrVal($hash->{NAME}, "disable", 0));
+  my $disco = (DevIo_getState($hash) eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
   $hash->{BUF}="";
@@ -294,6 +296,11 @@ MQTT2_CLIENT_Attr(@)
     $hash->{clientId} = $param[0] if($type eq "set");
   }
 
+  if($attrName eq "connectTimeout") {
+    delete($hash->{TIMEOUT});
+    $hash->{TIMEOUT} = $param[0] if($type eq "set");
+  }
+
   if($attrName eq "sslargs") {
     $hash->{sslargs} = {};
     for my $kv (split(" ",$param[0])) {
@@ -343,6 +350,27 @@ MQTT2_CLIENT_Attr(@)
     }
   }
 
+  if($attrName eq "disable") {
+    if($type eq "set" && $param[0]) {
+      MQTT2_CLIENT_Disco($hash,1)
+        if(DevIo_getState($hash) ne "disconnected");
+
+    } else {
+      InternalTimer(0, \&MQTT2_CLIENT_connect, $hash, 1)
+        if(DevIo_getState($hash) ne "opened");
+    }
+  }
+
+  if($attrName eq "binaryTopicRegexp") {
+    if($type eq "set") {
+      return "Bad regexp $param[0]: starting with *" if($param[0] =~ m/^\*/);
+      eval { "hallo" =~ m/^$param[0]$/ };
+      return "Bad regexp $param[0]: $@" if($@);
+      $hash->{binaryTopicRegexp} = $param[0];
+    } else {
+      delete($hash->{binaryTopicRegexp});
+    }
+  }
 
   return undef;
 }
@@ -484,6 +512,11 @@ MQTT2_CLIENT_Read($@)
       $off += 2;
     }
     $val = substr($pl, $off);
+    if($unicodeEncoding) {
+      if(!$hash->{binaryTopicRegexp} || $tp !~ m/^$hash->{binaryTopicRegexp}$/) {
+        $val = Encode::decode('UTF-8', $val);
+      }
+    }
     MQTT2_CLIENT_send($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
     MQTT2_CLIENT_updateDisconnectTimer($hash);
 
@@ -507,6 +540,7 @@ MQTT2_CLIENT_Read($@)
   } else {
     Log 1, "M2: Unhandled packet $cpt, disconneting $name";
     MQTT2_CLIENT_Disco($hash);
+    return;
   }
 
   # Allow some IO inbetween, for overloaded systems
@@ -547,6 +581,11 @@ MQTT2_CLIENT_doPublish($@)
     $hdr += 2; # QoS:1
     push(@{$hash->{qosQueue}}, [$topic,$val,$retain]);
     $pi = pack("n",1+($hash->{qosCnt}++%65535)); # Packet Identifier, if QoS > 0
+  }
+
+  if($unicodeEncoding) {
+    $topic = Encode::encode('UTF-8', $topic);
+    $val   = Encode::encode('UTF-8', $val);
   }
   my $msg = pack("C", $hdr).
             MQTT2_CLIENT_calcRemainingLength(2+length($topic)+length($val)+
@@ -643,7 +682,9 @@ MQTT2_CLIENT_getStr($$)
 {
   my ($in, $off) = @_;
   my $l = unpack("n", substr($in, $off, 2));
-  return (substr($in, $off+2, $l), $off+2+$l);
+  my $r = substr($in, $off+2, $l);
+  $r = Encode::decode('UTF-8', $r) if($unicodeEncoding);
+  return ($r, $off+2+$l);
 }
 
 1;
@@ -720,6 +761,17 @@ MQTT2_CLIENT_getStr($$)
       attribute it is not really useful.
       </li></br>
 
+    <a id="MQTT2_CLIENT-attr-binaryTopicRegexp"></a>
+    <li>binaryTopicRegexp &lt;regular-expression&gt;<br>
+      this attribute is only relevant, if the global attribute "encoding
+      unicode" is set.<br>
+      In this case the MQTT payload is automatically assumed to be UTF-8, which
+      may cause conversion-problems if the payload is binary. This conversion
+      wont take place, if the topic matches the regular expression specified.
+      Note: as is the case with other modules, ^ and $ is added to the regular
+      expression.
+    </li><br>
+
     <a id="MQTT2_CLIENT-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>
       set the MQTT clientId. If not set, the name of the MQTT2_CLIENT instance
@@ -734,9 +786,19 @@ MQTT2_CLIENT_getStr($$)
       Note: Changing the attribute affects _all_ MQTT2_CLIENT instances.
       </li></br>
 
+    <a id="MQTT2_CLIENT-attr-connectTimeout"></a>
+    <li>connectTimeout &lt;seconds&gt;<br>
+      change the HTTP connect timeout, default is 4 seconds. This seems to be
+      necessary for some MQTT servers in robotic vacuum cleaners.
+      </li></br>
+
     <li><a href="#disable">disable</a><br>
-        <a href="#disabledForIntervals">disabledForIntervals</a><br>
-      disable dispatching of messages.
+      disable the connection to the server.
+      </li><br>
+
+    <li><a href="#disabledForIntervals">disabledForIntervals</a><br>
+      disable sending or dispatching of messages but not the connection to the
+      server.
       </li><br>
 
     <a id="MQTT2_CLIENT-attr-disconnectAfter"></a>

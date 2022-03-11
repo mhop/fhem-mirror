@@ -1117,7 +1117,6 @@
   <Manufacturer id="015f" name="McoHome Technology Co Ltd">
     <Product id="0001" name="Mini Energy Dimmer" type="0001"/>
     <Product id="0001" name="Mini Energy Switch" type="0002"/>
-	<Product id="5102" name="MH7 Water/Electrical Heating Thermostat" type="0702" forumNr="no-statistics"/>
     <Product config="mcohome/mhp210.xml" id="1302" name="MH-P210 Mini Energy Dimmer" type="210a"/>
     <Product config="mcohome/mhp220.xml" id="1352" name="MH-P220 Micro Dimmer" type="220a"/>
     <Product config="mcohome/mhp220.xml" id="5101" name="MH-P220 Micro Dimmer" type="220a"/>
@@ -1284,6 +1283,7 @@
     <Product config="popp/zweather.xml" id="0400" name="ZWeather" type="0100"/>
     <Product config="popp/123601.xml" id="0001" name="123601 Plug-in Switch" type="1100"/>
     <Product config="popp/123580.xml" id="0002" name="123580 Plug-in Dimmer" type="1100"/>
+    <Product config="popp/701202.xml" id="0014" name="701202 Mold Detector" type="0004"/>
   </Manufacturer>
   <Manufacturer id="0064" name="Popp / Duwi (Reitz-Group.de)">
     <Product config="duwi/zw-edan-300.xml" id="0000" name="ZW EDAN 300 Flush Mounted Dimmer" type="0001"/>
@@ -1831,6 +1831,7 @@
     <Product config="heiman/HS1CG-Z.xml" id="1000" name="Combustible Gas Sensor HS1CG-Z" type="8003"/>
     <Product config="heiman/HS1WL-Z.xml" id="1000" name="Water Leakage Sensor HS1WL-Z" type="8004"/>
     <Product config="heiman/HS1CA-Z.xml" id="1000" name="CO Sensor HS1CA-Z" type="8005"/>
+    <Product config="zipato/ne-nas-ab02z.xml" id="1083" name="Indoor Siren" type="0003"/>
   </Manufacturer>
   <Manufacturer id="0120" name="Zonoff"></Manufacturer>
   <Manufacturer id="027a" name="Zooz">

@@ -2,6 +2,7 @@
 # Display volume log (USF1000) of the form
 # 2012-05-05_17:18:49 e.ext.tank v: 62  V: 1850
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 

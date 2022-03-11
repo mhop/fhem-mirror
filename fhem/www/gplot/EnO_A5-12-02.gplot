@@ -11,6 +11,7 @@
 # if plotsize is less than 800,400
 #set terminal png transparent small size <SIZE> crop
 
+set readonly
 set terminal png transparent size <SIZE> crop
 
 set output '<OUT>.png'

@@ -73,7 +73,7 @@ MQTT2_DEVICE_Define($$)
 
   return "wrong syntax for $name: define <name> MQTT2_DEVICE [clientid]"
         if(int(@a));
-  $hash->{DEVICETOPIC} = $name;
+  $hash->{DEVICETOPIC} = $name if(!AttrVal($name, "devicetopic", 0));
   if($hash->{CID}) {
     my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid};
     if(!$dpc->{$hash->{CID}}) {
@@ -154,6 +154,7 @@ MQTT2_DEVICE_Parse($$)
   }
 
   my ($cid, $topic, $value) = split("\0", $msg, 3);
+  $cid = $iodev->{NAME} if($cid eq "");        # empty cid, #122525
   return "" if(!defined($topic));
   for my $step (1,2,3,4) {
 
@@ -284,8 +285,9 @@ MQTT2_DEVICE_Parse($$)
     my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
     if(!$cidArr || !int(@{$cidArr})) {
       my $devName = $newCid;
-      $devName = makeDeviceName($devName);
-      return "UNDEFINED MQTT2_$devName MQTT2_DEVICE $newCid ".$iodev->{NAME};
+      $devName = makeDeviceName("MQTT2_$devName");
+      return "UNDEFINED $devName MQTT2_DEVICE $newCid ".$iodev->{NAME}
+        if(!$defs{$devName}); # 125159
     }
     return "";
   }
@@ -359,10 +361,11 @@ MQTT2_DEVICE_Get($@)
 {
   my ($hash, @a) = @_;
   return "Not enough arguments for get" if(!defined($a[1]));
+  my $name = $hash->{NAME};
 
-  my ($gets,$cmdList) = MQTT2_getCmdHash(AttrVal($hash->{NAME}, "getList", ""));
+  my ($gets,$cmdList) = MQTT2_getCmdHash(AttrVal($name, "getList", ""));
   return "Unknown argument $a[1], choose one of $cmdList" if(!$gets->{$a[1]});
-  return undef if(IsDisabled($hash->{NAME}));
+  return undef if(IsDisabled($name));
   Log3 $hash, 3, "MQTT2_DEVICE get ".join(" ", @a);
 
   my ($getReading, $cmd) = split(" ",$gets->{$a[1]},2);
@@ -578,7 +581,7 @@ sub
 MQTT2_DEVICE_delReading($)
 {
   my ($name) = @_;
-  my $cid = $defs{$name}{CID};
+  my $cid = $defs{$name} ? $defs{$name}{CID} : undef;
   $cid = "" if(!defined($cid));
   for my $key1 (sort keys %{$modules{MQTT2_DEVICE}{defptr}}) {
     next if($key1 !~ m/^re/);
@@ -617,7 +620,7 @@ MQTT2_DEVICE_addReading($$)
         $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
       }
     } else {
-      if($re =~ m/^([^\?.*\[\](|)]+):\.\*$/) {
+      if($re =~ m/^([^:\\\?.*\[\](|)]+):\.\*$/) { # nothing smelling like regexp
         $modules{MQTT2_DEVICE}{defptr}{"re:*:$1"}{$re}{"$name,$code"} = 1;
       } else {
         $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = 1;
@@ -896,10 +899,12 @@ zigbee2mqtt_devStateIcon255($;$$)
   <a id="MQTT2_DEVICE-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; MQTT2_DEVICE</code>
+    <code>define &lt;name&gt; MQTT2_DEVICE [clientId]</code>
     <br><br>
     To enable a meaningful function you will need to set at least one of the
     readingList, setList or getList attributes below.<br>
+    Specifying the clientId (sometimes referred to as CID) is optional, and it
+    makes only sense, if the IO Device is an MQTT2_SERVER.
   </ul>
   <br>
 

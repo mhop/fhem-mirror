@@ -9,9 +9,13 @@
 # since version 1.25 modified by mabula
 #
 #
-# Version = 1.31
+# Version = 1.32
 #
 # Version  History:
+#
+# - 1.32 - 2021-07-25 Dr. H-J Breymayer
+# -- Commandref corrected
+#
 # - 1.31 - 2020-01-15 Dr. H-J Breymayer
 # -- new command display web page on TV
 #
@@ -1558,7 +1562,7 @@ sub VIERA_RClayout_TV_SVG() {
        q </b>  for exit.<br>
     <br>
     <b>Notes:</b><br>
-    <ul>Activate volume remotecontrol by DLNA: Menu -> Setup -> Network Setup -> Network Link Settings -> DLNA RemoteVolume -> On</ul>
+    <ul>Activate Remote Control and VIERA-LINK in the TV menue under network and setup</ul>
     <br>
     Example:
     <ul><code>
@@ -1767,7 +1771,7 @@ sub VIERA_RClayout_TV_SVG() {
        q </b>  f&uuml;r exit.<br>
     <br>
     <b>Anmerkung:</b><br>
-    <ul>Aktivieren von Fernbedienung der Lautst&auml;rke per DLNA: Men&uuml; -> Setup -> Netzwerk-Setup -> Netzwerkverbindungsein. -> DLNA-Fernbed. Lautst. -> Ein</ul>
+    <ul>Aktivieren von Remote Control und VIERA-LINK im TV Men&uuml; unter Netzwerk und Setup</ul>
     <br>
     Beispiel:
     <ul><code>

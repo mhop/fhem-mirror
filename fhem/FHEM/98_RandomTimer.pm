@@ -31,7 +31,8 @@ use utf8;
 use Time::HiRes qw(gettimeofday);
 use Time::Local qw(timelocal_nocheck);
 use List::Util qw(max);
-use GPUtils qw(GP_Import GP_Export);
+use POSIX qw(strftime);
+use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
@@ -62,7 +63,6 @@ BEGIN {
           perlSyntaxCheck
           SemicolonEscape
           FmtDateTime
-          strftime
           GetTimeSpec
           CommandDelete
           stacktrace )
@@ -126,7 +126,7 @@ sub Define {
     }
 
     my ( $e, $h, $m, $s, $f ) = GetTimeSpec($stspec);
-    return $e if ($e);
+    return $e if $e;
 
     return "invalid timeToSwitch <$timeToSwitch>, use 9999"
       if ( !( $timeToSwitch =~ m{^[0-9]{2,4}$}ixms ) );
@@ -158,8 +158,7 @@ sub Define {
         $hash->{helper}{offReading} = q{state};
     }
 
-    readingsSingleUpdate( $hash, 'TimeToSwitch', $hash->{helper}{TIMETOSWITCH},
-        1 );
+    readingsSingleUpdate( $hash, 'TimeToSwitch', $hash->{helper}{TIMETOSWITCH}, 1 );
 
     RemoveInternalTimer($hash,\&RT_SetTimer);
     InternalTimer(time,\&RT_SetTimer,$hash);
@@ -167,12 +166,8 @@ sub Define {
 }
 
 sub Undef {
-
-    my $hash = shift;
-    my $arg  = shift // return;
-    
+    my $hash = shift // return;
     RemoveInternalTimer($hash);
-    
     delete $modules{RandomTimer}{defptr}{ $hash->{NAME} };
     return;
 }
@@ -204,7 +199,7 @@ sub Attr {
             return $err if $err;
         }
     }
-  
+
     return;
 }
 
@@ -271,8 +266,7 @@ sub device_switch {
     Log3( $hash, 4, "[$hash->{NAME}] command: $command" );
 
     my $ret = AnalyzeCommandChain( $hash, $command );
-    Log3( $hash, 3, "[$hash->{NAME}] ERROR: $ret SENDING $command" )
-      if ($ret);
+    Log3( $hash, 3, "[$hash->{NAME}] ERROR: $ret SENDING $command" ) if $ret;
 
     return;
 }
@@ -319,20 +313,16 @@ sub disableDown {
     my $hash = shift // return;
     my $disableCondCmd = AttrVal( $hash->{NAME}, "disableCondCmd", 0 );
 
-    if ( $disableCondCmd ne 'none' ) {
-        Log3( $hash, 4,
-            "[$hash->{NAME}] setting requested disableCondCmd on $hash->{DEVICE}: " );
-        $hash->{COMMAND} =
-          AttrVal( $hash->{NAME}, 'disableCondCmd', 0 ) eq 'onCmd'
-          ? 'on'
-          : 'off';
-        device_switch($hash);
-    }
-    else {
-        Log3( $hash, 4,
-            "[$hash->{NAME}] no action requested on $hash->{DEVICE}" );
-    }
-    return;
+    return Log3( $hash, 4, "[$hash->{NAME}] no action requested on $hash->{DEVICE}" ) 
+        if $disableCondCmd eq 'none';
+
+    Log3( $hash, 4,
+        "[$hash->{NAME}] setting requested disableCondCmd on $hash->{DEVICE}: " );
+    $hash->{COMMAND} =
+        AttrVal( $hash->{NAME}, 'disableCondCmd', 0 ) eq 'onCmd'
+        ? 'on'
+        : 'off';
+    return device_switch($hash);
 }
 
 sub down {
@@ -341,8 +331,7 @@ sub down {
         "[$hash->{NAME}] setting requested keepDeviceAlive on $hash->{DEVICE}" );
     $hash->{COMMAND} =
       AttrVal( $hash->{NAME}, 'keepDeviceAlive', 0 ) ? 'on' : 'off';
-    device_switch($hash);
-    return;
+    return device_switch($hash);
 }
 
 sub RT_Exec {
@@ -465,11 +454,8 @@ sub isAktive {
 sub isDisabled {
     my $hash = shift // return;
 
-    my $disable = IsDisabled( $hash->{NAME} );
-    return $disable if $disable;
-
-    my $disableCond = AttrVal( $hash->{NAME}, "disableCond", "nf" );
-    return 0 if $disableCond eq 'nf';
+    return 1 if IsDisabled( $hash->{NAME} );
+    my $disableCond = AttrVal( $hash->{NAME}, 'disableCond', undef) // return 0;
 
     return AnalyzePerlCommand( $hash, $disableCond );
 }
@@ -483,9 +469,9 @@ sub schaltZeitenErmitteln {
 
     readingsBeginUpdate($hash);
 
-    readingsBulkUpdate( $hash, "StartTime",
+    readingsBulkUpdate( $hash, 'StartTime',
         FmtDateTime( $hash->{helper}{startTime} ) );
-    readingsBulkUpdate( $hash, "StopTime",
+    readingsBulkUpdate( $hash, 'StopTime',
         FmtDateTime( $hash->{helper}{stopTime} ) );
     readingsEndUpdate( $hash, defined( $hash->{LOCAL} ? 0 : 1 ) );
     return;
@@ -496,7 +482,7 @@ sub setActive {
     my $value = shift // return;
     $hash->{helper}{active} = $value;
     my $trigger = ( isDisabled($hash) ) ? 0 : 1;
-    readingsSingleUpdate( $hash, "active", $value, $trigger );
+    readingsSingleUpdate( $hash, 'active', $value, $trigger );
     return;
 }
 
@@ -661,8 +647,8 @@ sub zeitBerechnen {
     $jetzt_arr[2] = $hour;
     $jetzt_arr[1] = $min;
     $jetzt_arr[0] = $sec;
-    my $next = timelocal_nocheck(@jetzt_arr);
-    return $next;
+    my $nxt = timelocal_nocheck(@jetzt_arr);
+    return $nxt;
 }
 
 1;
@@ -678,11 +664,11 @@ __END__
 
 =begin html
 
-<a name="RandomTimer"></a>
+<a id="RandomTimer"></a>
 <h3>RandomTimer</h3>
 <div>
   <ul>
-    <a name="RandomTimerdefine"></a>
+    <a id="RandomTimer-define"></a>
     <b>Define</b>
     <ul>
       <code>
@@ -757,30 +743,30 @@ __END__
       </ul><br>
    </ul>
    <ul>
-     <a name="RandomTimerset"></a>
+     <a id="RandomTimer-set"></a>
      <b>Set</b><br>
-     <ul>
+     <ul><a id="RandomTimer-set-execNow"></a>
        <code>set &lt;name&gt; execNow</code>
      <br>
      This will force the RandomTimer device to immediately execute the next switch instead of waiting untill timeToSwitch has passed. Use this in case you want immediate reaction on changes of reading values factored in disableCond. As RandomTimer itself will not be notified about any event at all, you'll need an additional event handler like notify that listens to relevant events and issues the "execNow" command towards your RandomTimer device(s). <br>
      NOTE: If the RandomTimer is disabled by attribute, this will not have any effect (different to <code>set &lt;name&gt; active</code>.)
      </ul><br>
-     <ul>
+     <ul><a id="RandomTimer-set-active"></a>
        <code>set &lt;name&gt; active</code>
      <br>
      Same effect than execNow, but will also delete a disable attribute if set.
      </ul><br>
-     <ul>
+     <ul><a id="RandomTimer-set-inactive"></a>
        <code>set &lt;name&gt; inactive</code>
      <br>
      Temporarily disable the RandomTimer w/o setting disable attribute. When set the next switch will be immediately executed.
      </ul><br>
     </ul>
    <ul>  
-    <a name="RandomTimerAttributes"></a>
+    <id name="RandomTimer-attr"></a>
     <b>Attributes</b>
     <ul>
-      <li>
+      <li><a id="RandomTimer-attr-disableCond"></a>
         <code>disableCond</code><br>
         The default behavior of a RandomTimer is, that it works. To set the Randomtimer out of work, you can specify in the disableCond attibute a condition in perlcode that must evaluate to true. The Condition must be put into round brackets. The best way is to define a function in 99_utils.<br>
         <br>
@@ -795,12 +781,12 @@ __END__
         </ul>
       </li>
       <br>
-      <li>
+      <li><a id="RandomTimer-attr-forceStoptimeSameDay"></a>
         <code>forceStoptimeSameDay</code><br>
         When <b>timespec_start</b> is later then <b>timespec_stop</b>, it forces the <b>timespec_stop</b> to end on the current day instead of the next day. See <a href="https://forum.fhem.de/index.php/topic,72988.0.html" title="Random Timer in Verbindung mit Twilight, EIN-Schaltzeit nach AUS-Schaltzeit">forum post</a> for use case.<br>
       </li>
       <br>
-      <li>
+      <li><a id="RandomTimer-attr-keepDeviceAlive"></a>
         <code>keepDeviceAlive</code><br>
         The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached. The <b>keepDeviceAlive</b> attribute changes the behavior. If set, the device status is not changed when the stoptime is reached.<br>
         <br>
@@ -810,7 +796,7 @@ __END__
         </ul>
       </li>
       <br>
-      <li>
+      <li><a id="RandomTimer-attr-disableCondCmd"></a>
         <code>disableCondCmd</code><br>
         In case the disable condition becomes true while a RandomTimer is already <b>running</b>, by default the same action is executed as when stoptime is reached (see keepDeviceAlive attribute). Setting the <b>disableCondCmd</b> attribute changes this as follows: "none" will lead to no action, "offCmd" means "use off command", "onCmd" will lead to execution of the "on command". Delete the attribute to get back to default behaviour.<br>
     <br>
@@ -818,21 +804,19 @@ __END__
         <ul>
           <li><code>attr ZufallsTimerZ disableCondCmd offCmd</code></li>
         </ul>
-      </li><br><br>
-      <li>
-        <code>disabledForIntervals</code><br>
-        See <a href="#disabledForIntervals">commandref for at - disabledForIntervals</a>
       </li><br>
-      <li>
+      <li><a href="#disabledForIntervals"><code>disabledForIntervals</code></a>
+      </li><br>
+      <li><a id="RandomTimer-attr-offCmd" data-pattern="o.*Cmd"></a>
         <code>onCmd, offCmd</code><br>
-        Setting the on-/offCmd changes the command sent to the device. Standard is: "set &lt;device&gt; on". The device can be specified by a @.<br>
+        Setting the on-/offCmd changes the command sent to the device. Default <code>onCmd</code> is <code>set &lt;device&gt; on</code>. The device can be specified by a @.<br>
         <br>
         <b>Examples</b>
         <ul>
           <li><code>
             attr Timer oncmd  {fhem("set @ on-for-timer 14")}
-          </code></li>
-          <br>NOTE: using on-for-timer commands might lead to irritating results!
+          </code><br>
+          NOTE: using on-for-timer commands might lead to irritating results!</li>
           <li><code>
             attr Timer offCmd {fhem("set @ off 16")}
           </code></li>
@@ -852,8 +836,8 @@ __END__
            [EDIPlug] result of function Value(EDIPlug_01) must be 'on' or 'off'
         </code>
         NOTE: From $featurelevel 6.1 on or if attribute offState is set, the funktion ReadingsVal(&lt;device&gt;,"state",undef) will be used instead of Value(). If "state" of the device exactly matches the regex provided in the attribute "offState" or lowercase of "state" contains a part matching to "off", device will be considered to be "off" (or "on" in all other cases respectively).
-      </li>
-      <li>
+      </li><br>
+      <li><a id="RandomTimer-attr-offState"></a>
         <code>offState</code><br>
         Setting this attribute, evaluation of on of will use ReadingsVal(&lt;device&gt;,"state",undef) instead of Value(). The attribute value will be used as regex, so e.g. also "dim00" beside "off" may be considered as indication the device is "off". You may use an optional second parameter (space separated) to check a different reading, e.g. for a HUEDevice-group "0 any_on" might be usefull.
       <br>NOTE: This will be default behaviour starting with featurelevel 6.1.
@@ -865,13 +849,13 @@ __END__
         </a>
       </li>
       <br>
-      <li>
+      <li><a id="RandomTimer-attr-runonce"></a>
         <code>runonce</code><br>
         Deletes the RandomTimer device after <b>timespec_stop</b> is reached.
         <br>
       </li>
       <br>
-      <li>
+      <li><a id="RandomTimer-attr-switchmode"></a>
         <code>switchmode</code><br>
         Setting the switchmode you can influence the behavior of switching on/off. The parameter has the Format 999/999 and the default ist 800/200. The values are in "per mill". The first parameter sets the value of the probability that the device will be switched on when the device is off. The second parameter sets the value of the probability that the device will be switched off when the device is on.<br>
         <br>

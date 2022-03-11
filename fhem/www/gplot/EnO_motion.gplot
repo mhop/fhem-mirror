@@ -7,6 +7,7 @@
 # Logfile record example:
 # 2015-10-17_08:38:08 device motion on
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set title '<TL>'

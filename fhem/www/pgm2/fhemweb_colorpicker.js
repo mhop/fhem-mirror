@@ -36,7 +36,12 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     else if( mode == 'BRI' ) {
       color = parseInt(255 * color / vArr[4]);
       color = colorpicker_rgb2hex(color,color,color);
-    } 
+    } else if( mode == 'HUE' ) {
+      var h = 255 * params[0] / vArr[4];
+      var s = 1;
+      var v = 1;
+      var color = colorpicker_hsv2rgb(h,s,v);
+    }
 
     var newEl = $('<div informID="###" style="width:32px;height:19px;border:1px solid #fff;border-radius:8px;background-color:#'+color+'" >').get(0);
     $(newEl).click(function(arg) { cmd(params[0]) });

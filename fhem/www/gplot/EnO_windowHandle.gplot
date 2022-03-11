@@ -7,6 +7,7 @@
 # Logfile record example:
 # 2015-10-17_08:38:08 device closed|open|tilted|open_from_tilted
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

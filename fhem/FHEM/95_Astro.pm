@@ -773,6 +773,7 @@ sub Define ($@) {
 
  return $@ unless ( FHEM::Meta::SetInternals($hash) );
  use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+ return 'Astro may not be run on Windows systems' if $^O eq 'MSWin32';
 
  if ($global) {
    return "$type global device $modules{$type}{global}{NAME} is already defined"
@@ -2516,8 +2517,9 @@ sub Update($@) {
       defined( $hash->{RECOMPUTEAT} ) ? split( ',', $hash->{RECOMPUTEAT} ) : () )
   {
     if ( $comp eq 'NewDay' ) {
+        my @dch = localtime($now + 86400 + 3600*((localtime($now))[8] - (localtime($now + 86400.))[8]));
         push @next,
-          _timelocal_modern( 0, 0, 0, (localtime($now + 86400.))[3,4], (localtime($now + 86400.))[5]+1900. );
+          _timelocal_modern( 0, 0, 0, $dch[3], $dch[4], $dch[5]+1900. );
         next;
     }
     my $k = ".$comp";
@@ -3196,7 +3198,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.1.2",
+  "version": "v2.2",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",

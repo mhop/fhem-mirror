@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+# noansi: modified for better timing compatibility with CUL
 #
 # HMUARTLGW provides support for the eQ-3 HomeMatic Wireless LAN Gateway
 # (HM-LGW-O-TW-W-EU) and the eQ-3 HomeMatic UART module (HM-MOD-UART), which
@@ -14,6 +15,7 @@ package main;
 use strict;
 use warnings;
 
+use DevIo;
 use Digest::MD5;
 use Time::HiRes qw(gettimeofday time);
 use Time::Local;
@@ -136,8 +138,6 @@ sub HMUARTLGW_Initialize($)
 {
 	my ($hash) = @_;
 
-	require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
 	$hash->{ReadyFn}   = "HMUARTLGW_Ready";
 	$hash->{ReadFn}    = "HMUARTLGW_Read";
 	$hash->{WriteFn}   = "HMUARTLGW_Write";
@@ -149,6 +149,7 @@ sub HMUARTLGW_Initialize($)
 	$hash->{RenameFn}  = "HMUARTLGW_Rename";
 	$hash->{ShutdownFn}= "HMUARTLGW_Shutdown";
 	$hash->{NotifyFn}  = "HMUARTLGW_Notify";
+	$hash->{NotifyOrderPrefix} = "47-"; #make sure, HMUARTLGW_InitConnection is called once prior to CUL_HM initialisation
 
 	$hash->{AttrList}= "hmId " .
 	                   "lgwPw " .
@@ -1448,17 +1449,24 @@ sub HMUARTLGW_Parse($$$$)
 
 			Log3($hash, 5, "HMUARTLGW ${name} Dispatch: ${dmsg}");
 
-			my $wait = 0;
-			if (!(hex($flags) & (1 << 5))) {
-				#!BIDI
-				$wait = 0.100;
-			} else {
-				$wait = 0.300;
-			}
-			$wait -= $hash->{Helper}{RoundTrip}{Delay} if (defined($hash->{Helper}{RoundTrip}{Delay}));
+			if ($modules{CUL_HM}{defptr}{$src}) {
+				my $flgh = hex($flags);
+				my $wait = 0.100;
+				$wait += 0.200 if ($flgh & (1 << 5) && # BIDI
+								   $modules{CUL_HM}{defptr}{$src}->{IODev}->{TYPE} =~ m/^(?:TSCUL|HMUARTLGW)$/s);
+				$wait -= 0.044 if ($flgh & (1 << 6)); # received from Repeater
 
-			$modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = $recvtime + $wait
-				if ($modules{CUL_HM}{defptr}{$src} && $wait > 0);
+				$wait -= $hash->{Helper}{RoundTrip}{Delay}
+					if (defined($hash->{Helper}{RoundTrip}{Delay}));
+
+				if ($wait > 0) {
+					my $nextSend = $recvtime + $wait;
+					$modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = $nextSend
+						if (!defined($modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend})   ||
+							$nextSend < $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} ||
+							($recvtime - $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend}) > 0.09); # not allready set by previous IO
+				}
+			}
 
 			Dispatch($hash, $dmsg, \%addvals);
 		}

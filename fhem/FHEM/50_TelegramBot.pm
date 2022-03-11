@@ -181,21 +181,29 @@
 #   replyKeyboardRemove - #msg592808
 #   replace single semicolons in favorites (with double semicolons) - msg1078989
 #   FIX: answercallback always if querydata is set
-
 #   Add new sendformat video to set - cmd sendVideo / silentVideo
 #   Recognize stream of video format (esp. mp4 - needs testing)
 #   recognize stream isMedia with negative numbers
 #   document video commands
 #SVN 21.10.2020
+
+#   Also support edited_message updates
+#   check parseMsg if $from not there --> log then 
+#   removed new_chat_participant
+#   log all new contacts - with source
+#   #msg1168649: Corrected logging verbose to make 0_None work
+#   caption parseMode / formatting also available for photo and video sends
+
 #   
 #   
 ##############################################################################
 # TASKS 
 #   
+#   Customize Favoriten beendet --> msg1133794
+#   Option to delete message at the end insteda of sending "-"
+#   
+#   
 #   change doc to have "a name" on attributes to allow inline help
-#   
-#   
-#   
 #   Restructure help in logical blocks
 #   
 #   queryDialogStart / queryDialogEnd - keep msg id 
@@ -1817,33 +1825,16 @@ sub TelegramBot_SendIt($$$$$;$$$)
   # DEBUG OPTION
   #  $hash->{HU_DO_PARAMS}->{url} = "http://requestb.in/1ibjnj81" if ( $msg =~ /^ZZZ/ );
 
-      my $parseMode = TelegramBot_AttrNum($name,"parseModeSend","0" );
-      if ( $parseMode == 1 ) {
-        $parseMode = "Markdown";
-      } elsif ( $parseMode == 2 ) {
-        $parseMode = "HTML";
-      } elsif ( $parseMode == 3 ) {
-        $parseMode = 0;
-        if ( $msg =~ /^markdown(.*)$/is ) {
-          $msg = $1;
-          $parseMode = "Markdown";
-        } elsif ( $msg =~ /^HTML(.*)$/is ) {
-          $msg = $1;
-          $parseMode = "HTML";
-        }
-      } else {
-        $parseMode = 0;
-      }
-      Log3 $name, 4, "TelegramBot_SendIt parseMode $parseMode";
+      my $parseMode = 0;
+      ($parseMode, $msg) = TelegramBot_evalParseMode( $hash, $msg );
     
       if ( length($msg) > 1000 ) {
         $hash->{sentMsgText} = substr($msg,0, 1000)."...";
        } else {
         $hash->{sentMsgText} = $msg;
        }
-      $msg =~ s/(?<![\\])\\s/ /g;
-      $msg =~ s/(?<![\\])\\n/\x0A/g;
-      $msg =~ s/(?<![\\])\\t/\x09/g;
+
+      $msg = TelegramBot_removeSpecialFormat( $hash, $msg );
 
       # add msg (no file)
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0 ) if ( ! defined( $ret ) );
@@ -1889,10 +1880,16 @@ sub TelegramBot_SendIt($$$$$;$$$)
 
       # add caption
       if ( defined( $addPar ) ) {
-        $addPar =~ s/(?<![\\])\\n/\x0A/g;
-        $addPar =~ s/(?<![\\])\\t/\x09/g;
+        my $parseMode = 0;
+        ($parseMode, $addPar) = TelegramBot_evalParseMode( $hash, $addPar );
+        
+        $addPar = TelegramBot_removeSpecialFormat( $hash, $addPar );
 
         $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+        
+        # add parseMode
+        $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0 ) if ( ( ! defined( $ret ) ) && ( $parseMode ) );
+        
         $addPar = undef;
       }
       
@@ -1928,10 +1925,16 @@ sub TelegramBot_SendIt($$$$$;$$$)
 
       # add caption
       if ( defined( $addPar ) ) {
-        $addPar =~ s/(?<![\\])\\n/\x0A/g;
-        $addPar =~ s/(?<![\\])\\t/\x09/g;
+        my $parseMode = 0;
+        ($parseMode, $addPar) = TelegramBot_evalParseMode( $hash, $addPar );
+        
+        $addPar = TelegramBot_removeSpecialFormat( $hash, $addPar );
 
         $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+        
+        # add parseMode
+        $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0 ) if ( ( ! defined( $ret ) ) && ( $parseMode ) );
+        
         $addPar = undef;
       }
       
@@ -2349,6 +2352,9 @@ sub TelegramBot_Callback($$$)
         if ( defined( $update->{message} ) ) {
           
           $ret = TelegramBot_ParseMsg( $hash, $update->{update_id}, $update->{message} );
+        } elsif ( defined( $update->{edited_message} ) ) {
+          
+          $ret = TelegramBot_ParseMsg( $hash, $update->{update_id}, $update->{edited_message} );
         } elsif ( defined( $update->{callback_query} ) ) {
           
           $ret = TelegramBot_ParseCallbackQuery( $hash, $update->{update_id}, $update->{callback_query} );
@@ -2403,13 +2409,13 @@ sub TelegramBot_Callback($$$)
         readingsSingleUpdate($hash, "PollingErrCount", $cnt, 1); 
       } else {
         # Write digest in log on next date
-        $doLog = ( $pv ne "3_None" );
+        $doLog = ( $pv ne "0_None" );
         readingsSingleUpdate($hash, "PollingErrCount", 1, 1); 
       }
       
     } elsif ( substr($now,0,10) ne substr($tst,0,10) ) {
       readingsSingleUpdate($hash, "PollingErrCount", 0, 1);
-      $doLog = ( $pv ne "3_None" );
+      $doLog = ( $pv ne "0_None" );
     }
 
     # log level is 2 on error if not digest is selected
@@ -2501,9 +2507,15 @@ sub TelegramBot_ParseMsg($$$)
   my $mid = $message->{message_id};
   
   my $from = $message->{from};
+  if ( ! defined( $from ) )  {
+    Log3 $name, 3, "TelegramBot $name: No from user in message - blocked";
+    
+    return $ret;
+  }
+  
   my $mpeer = $from->{id};
 
-  # ignore if unknown contacts shall be accepter
+  # ignore if unknown contacts shall be accepted
   if ( ( AttrVal($name,'allowUnknownContacts',1) == 0 ) && ( ! TelegramBot_IsKnownContact( $hash, $mpeer ) ) ) {
     my $mName = $from->{first_name};
     $mName .= " ".$from->{last_name} if ( defined($from->{last_name}) );
@@ -2513,19 +2525,22 @@ sub TelegramBot_ParseMsg($$$)
   }
 
   # check peers beside from only contact (shared contact) and new_chat_participant are checked
+  Log3 $name, 3, "TelegramBot $name: Found from id in message - id : ".$from->{id} if ( TelegramBot_IsKnownContact( $hash, $from->{id} ) );
   push( @contacts, $from );
 
   my $chatId = "";
   my $chat = $message->{chat};
   if ( ( defined( $chat ) ) && ( $chat->{type} ne "private" ) ) {
+    Log3 $name, 3, "TelegramBot $name: Found chat id in message - id : ".$chat->{id} if ( TelegramBot_IsKnownContact( $hash, $chat->{id} ) );
     push( @contacts, $chat );
     $chatId = $chat->{id};
   }
 
-  my $user = $message->{new_chat_participant};
-  if ( defined( $user ) ) {
-    push( @contacts, $user );
-  }
+  # new chat participant has been removed and replaced with new_chat_members
+  # my $user = $message->{new_chat_participant};
+  # if ( defined( $user ) ) {
+    # push( @contacts, $user );
+  # }
 
   # get reply message id
   my $replyId;
@@ -2722,7 +2737,6 @@ sub TelegramBot_ParseChannelPost($$$)
 
   my $mpeer = $chatId;
 
-
   # ignore if unknown contacts shall be accepter
   if ( ( AttrVal($name,'allowUnknownContacts',1) == 0 ) && ( ! TelegramBot_IsKnownContact( $hash, $chatId ) ) ) {
     my $mName = $chat->{title};
@@ -2731,6 +2745,7 @@ sub TelegramBot_ParseChannelPost($$$)
     return $ret;
   }
 
+  Log3 $name, 3, "TelegramBot $name: Found chat id in channel - id : ".$chat->{id} if ( TelegramBot_IsKnownContact( $hash, $chat->{id} ) );
   push( @contacts, $chat );
 
 
@@ -2950,6 +2965,7 @@ sub TelegramBot_ParseCallbackQuery($$$)
   $mpeernorm =~ s/ /_/g;
   
   # check peers beside from only contact (shared contact) and new_chat_participant are checked
+  Log3 $name, 3, "TelegramBot $name: Found from id in callback - id : ".$from->{id} if ( TelegramBot_IsKnownContact( $hash, $from->{id} ) );
   push( @contacts, $from );
 
   my $answerData = "";
@@ -3516,6 +3532,9 @@ sub TelegramBot_checkAllowedPeer($$$) {
 
 
 
+
+
+
 #####################################
 # stores Telegram API Token 
 sub TelegramBot_getBaseURL($)
@@ -3620,6 +3639,53 @@ sub TelegramBot_AttrNum($$$)
   $val =~ s/[^-\.\d]//g;
   return $val;
 } 
+
+
+######################################
+#  parseMode either from attr or from prefix to message
+# returns parseMode and msg as tupel
+sub TelegramBot_evalParseMode($$) {
+  my ($hash, $msg) = @_;
+
+  my $name = $hash->{NAME};
+
+  my $parseMode = TelegramBot_AttrNum($name,"parseModeSend","0" );
+  if ( $parseMode == 1 ) {
+    $parseMode = "Markdown";
+  } elsif ( $parseMode == 2 ) {
+    $parseMode = "HTML";
+  } elsif ( $parseMode == 3 ) {
+    $parseMode = 0;
+    if ( $msg =~ /^markdown(.*)$/is ) {
+      $msg = $1;
+      $parseMode = "Markdown";
+    } elsif ( $msg =~ /^HTML(.*)$/is ) {
+      $msg = $1;
+      $parseMode = "HTML";
+    }
+  } else {
+    $parseMode = 0;
+  }
+  Log3 $name, 4, "TelegramBot_SendIt parseMode $parseMode";
+
+  return ($parseMode,$msg);
+
+}
+
+
+######################################
+#  remove / replace double separators, line feed and tabs
+sub TelegramBot_removeSpecialFormat($$) {
+  my ($hash, $msg) = @_;
+
+  my $name = $hash->{NAME};
+
+  $msg =~ s/(?<![\\])\\s/ /g;
+  $msg =~ s/(?<![\\])\\n/\x0A/g;
+  $msg =~ s/(?<![\\])\\t/\x09/g;
+
+  return $msg
+}
 
 
 ######################################

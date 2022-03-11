@@ -3,6 +3,7 @@
 # Anzeige der gemessenen CPU Temperatur und des errechneten Durchschnitts
 #
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

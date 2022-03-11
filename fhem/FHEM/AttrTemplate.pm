@@ -26,6 +26,9 @@ package main;
 # - order:<val> sort the templates for help purposes.
 # - option:<perl> if perl code return false, skip all commands until next
 #   option (or name:)
+# - loop:<variable>:1:2:3:...  replicate the commands between this line and
+#   loop:END, and replace <variable> in each iteration with the values in the
+#   colon separated list
 
 
 my %templates;
@@ -289,12 +292,12 @@ AttrTemplate_Set($$@)
       return
       "<html>".
          "<input type='hidden' value='set $name attrTemplate $entry'>".
-         "<p>Specify the unknown parameters for $entry:</p>".
+         "<p>Specify the unknown parameters for $name/$entry:</p>".
          "<table class='block wide'><tr>".
          join("</tr><tr>", map { 
            my @t=split("= with ",$_,2);
            "<td>$t[1]</td><td>" .($t[0] =~ m/^RADIO_/ ?
-             "<input type='radio' name='s' value='$t[0]'>":
+             "<input type='radio' name='$name.s' value='$t[0]'>":
              "<input type='text' name='$t[0]' size='20'></td>")
          } @mComm)."</tr></table>".
         '<script>
@@ -303,10 +306,10 @@ AttrTemplate_Set($$@)
             $("#FW_okDialog").parent().find("button").css("display","block");
             $("#FW_okDialog").parent().find(".ui-dialog-buttonpane button")
             .unbind("click").click(function(){
-              var cmd;
+              var cmd = "";
               $("#FW_okDialog input").each(function(){
                 var t=$(this).attr("type");
-                if(t=="hidden") cmd = $(this).val();
+                if(t=="hidden")cmd +=";"+$(this).val();
                 if(t=="text")  cmd +=" "+$(this).attr("name")+"="+$(this).val();
                 if(t=="radio") cmd +=" "+$(this).val()+"="+
                                           ($(this).prop("checked") ? 1:0);
@@ -332,7 +335,34 @@ AttrTemplate_Set($$@)
     }
   }
 
-  my $cmdlist = join("\n",@{$h->{cmds}});
+  # Loop unrolling
+  my @cmds;
+  for(my $i1 = 0; $i1 < @{$h->{cmds}}; $i1++) {
+    my $cmd = $h->{cmds}[$i1];
+
+    if($cmd =~ m/^loop:([^:]*):/) {
+      my @loop = split(":", $cmd);
+      my $var = $1;
+      my $i2;
+      for($i2=$i1+1; $i2<@{$h->{cmds}}; $i2++) {
+        last if($h->{cmds}[$i2] =~ m/^loop:END/)
+      }
+      for(my $i3=2; $i3<@loop; $i3++) {
+        for(my $i4=$i1+1; $i4<$i2; $i4++) {
+          $cmd = $h->{cmds}[$i4];
+          $cmd =~ s/$var/$loop[$i3]/g;
+          push @cmds, $cmd;
+        }
+      }
+      $i1=$i2;
+
+    } else {
+      push @cmds, $cmd;
+    }
+
+  }
+  my $cmdlist = join("\n",@cmds);
+
   $repl{DEVICE} = $name;
   Log3 $name, 5, "AttrTemplate replace ".
                         join(",", map { "$_=>$repl{$_}" } sort keys %repl);
@@ -342,6 +372,7 @@ AttrTemplate_Set($$@)
   my $cmd = "";
   my @ret;
   my $option = 1;
+  my $withHtml;
   map {
 
     if($_ =~ m/^(.*)\\$/) {
@@ -363,7 +394,13 @@ AttrTemplate_Set($$@)
         $cmd =~ s/##.*//; #114109
         Log3 $name, 5, "AttrTemplate exec $cmd";
         my $r = AnalyzeCommand($cl, $cmd);
-        push(@ret, $r) if($r);
+        if($r) {
+          if($r =~ m,^<html>(.*)</html>$,s) {
+            $r = $1;
+            $withHtml = 1;
+          }
+          push(@ret, $r);
+        }
 
       } else {
         Log3 $name, 5, "AttrTemplate skip $cmd";
@@ -373,7 +410,11 @@ AttrTemplate_Set($$@)
     }
   } split("\n", $cmdlist);
 
-  return join("\n", @ret) if(@ret);
+  if(@ret) {
+    my $r = join("\n", @ret);
+    $r = "<html>$r</html>" if($withHtml);
+    return $r;
+  }
 
   if($h->{farewell}) {
     my $fw = $h->{farewell};

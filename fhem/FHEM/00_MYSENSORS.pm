@@ -36,17 +36,19 @@ use Exporter ('import');
 
 use DevIo;
 use GPUtils qw(:all);
+use Scalar::Util qw(looks_like_number);
+use Time::HiRes qw(gettimeofday);
 
 sub main::MYSENSORS_Initialize { goto &Initialize };
 
 my %sets = (
-  "connect" => [],
-  "disconnect" => [],
-  "inclusion-mode" => [qw(on off)],
+  connect          => [qw(noArg)],
+  disconnect       => [qw(noArg)],
+  'inclusion-mode' => [qw(on off)],
 );
 
 my %gets = (
-  "version"   => ""
+  version   => ''
 );
 
 my @clients = qw(
@@ -58,7 +60,7 @@ sub Initialize {
   my $hash = shift // return;
 
   # Provider
-  $hash->{Clients} = join (':',@clients);
+  $hash->{Clients} = join q{:}, @clients;
   $hash->{ReadyFn} = \&Ready;
   $hash->{ReadFn}  = \&Read;
 
@@ -70,16 +72,16 @@ sub Initialize {
 
    my @attrList = (
     'disable:0,1',
+    'first-sensorid:selectnumbers,1,1,255,0,lin',
+    'last-sensorid:selectnumbers,2,1,255,0,lin',
     qw(
       autocreate:1
       requestAck:1
-      first-sensorid
-      last-sensorid
       stateFormat
       OTA_firmwareConfig
     )
   );
-  $hash->{AttrList} = $hash->{AttrList} = join(" ", @attrList);
+  $hash->{AttrList} = $hash->{AttrList} = join q{ }, @attrList;
   return;
 }
 
@@ -91,11 +93,11 @@ BEGIN { GP_Import(
     CommandDefine
     CommandModify
     CommandAttr
-    gettimeofday
     readingsSingleUpdate
     DevIo_OpenDev
     DevIo_SimpleWrite
     DevIo_SimpleRead
+    DevIo_getState
     DevIo_CloseDev
     RemoveInternalTimer
     InternalTimer
@@ -116,7 +118,7 @@ my %sensorAttr = (
 sub Define {
   my $hash = shift // return;
 
-  InternalTimer(time(), "MYSENSORS::Start", $hash,0); 
+  InternalTimer(time, \&Start, $hash,0); 
   return;
 }
 
@@ -417,15 +419,15 @@ sub Set {
                       .join ',', @{$sets{$_}} : $_} sort keys %sets)
     if !defined($sets{$command});
 
-  if ($command eq "connect") {
+  if ($command eq 'connect') {
     return Start($hash);
   }
   
-  if ($command eq "disconnect") {
+  if ($command eq 'disconnect') {
     return Stop($hash);
   }
   
-  if ($command eq "inclusion-mode") {
+  if ($command eq 'inclusion-mode') {
     sendMessage($hash,
                 radioId => 0, 
                 childId => 0, 
@@ -447,7 +449,7 @@ sub Attr {
   my $value     = shift;
 
   my $hash = $defs{$name};
-  if ($attribute eq "autocreate" && $init_done) {
+  if ($attribute eq 'autocreate' && $init_done) {
     my $mode = $command eq "set" ? 1 : 0;
     $hash->{'inclusion-mode'} = $mode;
     return sendMessage($hash,
@@ -459,8 +461,8 @@ sub Attr {
     );
   }
   
-  if ($attribute eq "requestAck") {
-    if ($command eq "set") {
+  if ($attribute eq 'requestAck') {
+    if ($command eq 'set') {
       $hash->{ack} = 1;
     } else {
       $hash->{ack} = 0;
@@ -470,12 +472,17 @@ sub Attr {
     return;
   }
 
-  if ($attribute eq "OTA_firmwareConfig") {
-    return;
+  if ($attribute eq 'OTA_firmwareConfig') {
+    if ($command eq 'set') {
+      return getFirmwareTypes($hash, 'set', $value);
+    } else {
+      delete $hash->{'.fwList'};
+      return;
+    }
   }
-  if ($attribute eq "disable") {
-    return Stop($hash) if $command eq "set" && $value;
-    InternalTimer(time(), "MYSENSORS::Start", $hash,0);
+  if ($attribute eq 'disable') {
+    return Stop($hash) if $command eq 'set' && $value;
+    InternalTimer(time, \&Start, $hash,0);
     return;
   }
   return;
@@ -485,26 +492,33 @@ sub Start {
   my $hash = shift // return;
   my ($dev) = split m{\s+}xms, $hash->{DEF};
   $hash->{DeviceName} = $dev;
-  if (!AttrVal($hash->{NAME},"stateFormat",0)) {
+  if (!AttrVal($hash->{NAME},'stateFormat',0)) {
     CommandAttr(undef, "$hash->{NAME} stateFormat connection")
   }
+  getFirmwareTypes($hash, 'start');
   return if IsDisabled( $hash->{NAME} );
   DevIo_CloseDev($hash);
-  return DevIo_OpenDev($hash, 0, "MYSENSORS::Init");
+  if($dev eq 'none') {
+    Log3($hash, 1, "$hash->{NAME} device is none, commands will be echoed only");
+    $::attr{$hash->{NAME}}{disable} = 1;
+    return;
+  }
+  return DevIo_OpenDev($hash, 0, \&Init);
 }
 
 sub Stop {
   my $hash = shift // return;
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
-  readingsSingleUpdate($hash,"connection","disconnected",1);
+  readingsSingleUpdate($hash,'connection','disconnected',1);
   return;
 }
 
 sub Ready {
   my $hash = shift // return;
-  return DevIo_OpenDev($hash, 1, "MYSENSORS::Init") if($hash->{STATE} eq "disconnected");
-  if(defined($hash->{USBDev})) {
+  return if AttrVal($hash->{NAME}, 'disable', 0);
+  return DevIo_OpenDev($hash, 1, \&Init) if DevIo_getState($hash) eq 'disconnected';
+  if ( defined $hash->{USBDev} ) {
     my $po = $hash->{USBDev};
     my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
     return ( $InBytes > 0 );
@@ -515,8 +529,8 @@ sub Ready {
 sub Init {
   my $hash = shift // return;
   my $name = $hash->{NAME};
-  $hash->{'inclusion-mode'} = AttrVal($name,"autocreate",0);
-  $hash->{ack} = AttrVal($name,"requestAck",0);
+  $hash->{'inclusion-mode'} = AttrVal($name,'autocreate',0);
+  $hash->{ack} = AttrVal($name,'requestAck',0);
   $hash->{outstandingAck} = 0;
   if ($hash->{ack}) {
     GP_ForallClients($hash,sub {
@@ -529,7 +543,7 @@ sub Init {
       };
     });
   }
-  readingsSingleUpdate($hash,"connection","connected",1);
+  readingsSingleUpdate($hash,'connection','connected',1);
   return sendMessage($hash, 
                      radioId => 0, 
                      childId => 0, 
@@ -548,8 +562,8 @@ sub GetConnectStatus {
   Log3( $name, 4, "MySensors: GetConnectStatus called ..." );
 
   # neuen Timer starten in einem konfigurierten Interval.
-  InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
-  InternalTimer(gettimeofday()+5, "MYSENSORS::Start", $hash);  #Start timer for reset if after 5 seconds RESPONSE is not received
+  InternalTimer(gettimeofday()+300, \&GetConnectStatus, $hash);# Restart check in 5 mins again
+  InternalTimer(gettimeofday()+5, \&Start, $hash);  #Start timer for reset if after 5 seconds RESPONSE is not received
   #query heartbeat from gateway 
   return sendMessage($hash, 
                      radioId => 0, 
@@ -599,8 +613,8 @@ sub Read {
       if ($msg->{ack}) {
         onAcknowledge($hash,$msg);
       }
-      RemoveInternalTimer($hash,"MYSENSORS::GetConnectStatus");
-      InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
+      RemoveInternalTimer($hash,\&GetConnectStatus);
+      InternalTimer(gettimeofday()+300, \&GetConnectStatus, $hash);# Restart check in 5 mins again
       
       my $type = $msg->{cmd};
       my $dispatch = {
@@ -694,12 +708,12 @@ sub onInternalMsg {
         my $client = shift;
         MYSENSORS::DEVICE::onGatewayStarted($client);
       });
-      return InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);
+      return InternalTimer(gettimeofday()+300, \&GetConnectStatus, $hash);
     }
     
     if ($type == I_HEARTBEAT_RESPONSE) {
-      RemoveInternalTimer($hash,"MYSENSORS::Start"); ## Reset reconnect because timeout was not reached
-      readingsSingleUpdate($hash, "heartbeat", "alive", 0);
+      RemoveInternalTimer($hash,\&Start); ## Reset reconnect because timeout was not reached
+      readingsSingleUpdate($hash, 'heartbeat', 'alive', 0);
       if ($client = matchClient($hash,$msg)){ 
          return if IsDisabled( $client->{NAME} );
          MYSENSORS::DEVICE::onInternalMessage($client,$msg) 
@@ -794,25 +808,34 @@ sub onAcknowledge {
 
 sub getFirmwareTypes {
   my $hash = shift;
+  my $mode = shift // 0;
+  my $filename = shift // AttrVal($hash->{NAME}, 'OTA_firmwareConfig', undef);
+
   my $name = $hash->{NAME};
+  return @{$hash->{'.fwList'}} if !$mode && defined $hash->{'.fwList'};
+  return 'OTA_firmwareConfig_not_valid_at_GW' if !$mode && !defined $hash->{'.fwList'};
   my @fwTypes = ();
-  my $filename = AttrVal($name, "OTA_firmwareConfig", undef);
   if (defined($filename)) {  
-    my ($err, @lines) = FileRead({FileName => "./FHEM/firmware/" . $filename, 
-                                  ForceType => "file"}); 
-    if (defined($err) && $err) {
+    my ($err, @lines) = FileRead({FileName => "./FHEM/firmware/$filename", 
+                                  ForceType => 'file'}); 
+    if ( defined $err && $err ) {
       Log3($name, 2, "$name: could not read MySensor firmware configuration file - $err");
-    } else {
-      for (my $i = 0; $i < @lines ; $i++) {
-        chomp(my $row = $lines[$i]);
-        if (index($row, "#") != 0) {
-          my @tokens = split(",", $row);
-          push(@fwTypes, $tokens[0]);
-        }
+      return $err if $mode eq 'set' && $init_done;
+      return @fwTypes;
+    } 
+    for (@lines) {
+      chomp($_);
+      if (index($_, "#") != 0) {
+        my @tokens = split m{,}xms, $_;
+        push @fwTypes, $tokens[0] if looks_like_number($tokens[0]);
       }
     }
+    $hash->{'.fwList'} = [@fwTypes];
   }
+  delete $hash->{'.fwList'} if !@fwTypes;
   Log3($name, 5, "$name: getFirmwareTypes - list contains: @fwTypes");
+  return if $mode eq 'set' && @fwTypes;
+  return 'file contains no valid data' if $mode eq 'set' && !@fwTypes;
   return @fwTypes;
 }
 
@@ -820,22 +843,22 @@ sub getLatestFirmware {
   my $hash = shift;
   my $type = shift // return;
   my $name = $hash->{NAME};
-  my $cfgfilename = AttrVal($name, "OTA_firmwareConfig", undef);
+  my $cfgfilename = AttrVal($name, 'OTA_firmwareConfig', undef);
   my $version = undef;
   $name = undef;
   my $filename = undef;
   if (defined($cfgfilename)) {  
-    my ($err, @lines) = FileRead({FileName => "./FHEM/firmware/" . $cfgfilename, 
-                                  ForceType => "file"}); 
+    my ($err, @lines) = FileRead({FileName => "./FHEM/firmware/$cfgfilename", 
+                                  ForceType => 'file'}); 
     if (defined($err) && $err) {
       Log3($name, 2, "$name: could not read MySensor firmware configuration file - $err");
     } else {
-      for (my $i = 0; $i < @lines ; $i++) {
-        chomp(my $row = $lines[$i]);
-        if (index($row, "#") != 0) {
-          my @tokens = split(",", $row);
+      for (@lines) {
+        chomp($_);
+        if (index($_, '#') != 0) {
+          my @tokens = split m{,}xms, $_;
           if ($tokens[0] eq $type) {
-            if ((not defined $version) || ($tokens[2] > $version)) {
+            if ( !defined $version || $tokens[2] > $version ) {
               $name = $tokens[1];
               $version = $tokens[2];
               $filename = $tokens[3];
@@ -882,14 +905,14 @@ sub sendMessage {
 sub _scheduleTimer {
   my $hash = shift;
   $hash->{outstandingAck} = 0;
-  RemoveInternalTimer($hash,"MYSENSORS::Timer");
+  RemoveInternalTimer($hash,\&Timer);
   my $next;
   for my $radioid (keys %{$hash->{messagesForRadioId}}) {
     my $msgsForId = $hash->{messagesForRadioId}->{$radioid};
     $hash->{outstandingAck} += @{$msgsForId->{messages}};
     $next = $msgsForId->{nexttry} if (!defined $next || $next >= $msgsForId->{nexttry});
   };
-  InternalTimer($next, "MYSENSORS::Timer", $hash, 0) if (defined $next);
+  InternalTimer($next, \&Timer, $hash, 0) if defined $next;
   return;
 }
 
@@ -916,12 +939,10 @@ sub matchChan76GWClient {
     if ( defined( $defs{$d} )
       && defined( $defs{$d}{radioId} )
       && $defs{$d}{radioId} == $radioId ) {
-        #my $clientname = $defs{$d}->{NAME};
-        #$found = $defs{$d} if AttrVal($clientname,"OTA_Chan76_IODev","") eq 
-        $found = $defs{$d} if AttrVal($d,"OTA_Chan76_IODev","") eq $name;
+        $found = $defs{$d} if AttrVal($d,'OTA_Chan76_IODev','') eq $name;
     }
   }
-  
+
   Log3($hash, 4, "$name: matched firmware config request to IO-name $found->{NAME}") if $found;
   return $found;
 }
@@ -939,6 +960,7 @@ sub parseMsg {
                (?<type>    [0-9]{1,2});
                (?<payload> .*)
                \z}xms);
+    #my $payload = $+{payload} // q{};
 
     return {
         radioId => $+{nodeid}, # docs speak of "nodeId"
@@ -1000,75 +1022,83 @@ __END__
 
 =begin html
 
-<a name="MYSENSORS"></a>
+<a id="MYSENSORS"></a>
 <h3>MYSENSORS</h3>
+<p>connects fhem to <a href="http://MYSENSORS.org">MYSENSORS</a>.</p>
+<p>A single MYSENSORS device can serve multiple <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> clients.<br>
+  Each <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> represents a mysensors node.</p>
+
+<a id="MYSENSORS-define"></a>
+<h4>Define</h4>
+<p><code>define &lt;name&gt; MYSENSORS &lt;serial device&gt;|&lt;ip:port&gt;</code></p>
+<p>Specifies the MYSENSORS device.</p>
+
+<a id="MYSENSORS-set"></a>
+<h4>Set</h4>
 <ul>
-  <p>connects fhem to <a href="http://MYSENSORS.org">MYSENSORS</a>.</p>
-  <p>A single MYSENSORS device can serve multiple <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> clients.<br/>
-     Each <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> represents a mysensors node.<br/>
-  <a name="MYSENSORSdefine"></a>
-  <p><b>Define</b></p>
-  <ul>
-    <p><code>define &lt;name&gt; MYSENSORS &lt;serial device&gt|&lt;ip:port&gt;</code></p>
-    <p>Specifies the MYSENSORS device.</p>
-  </ul>
-  <a name="MYSENSORSset"></a>
-  <p><b>Set</b></p>
-  <ul>
-    <li>
-      <p><code>set &lt;name&gt; connect</code><br/>
-         (re-)connects the MYSENSORS-device to the MYSENSORS-gateway</p>
-    </li>
-    <li>
-      <p><code>set &lt;name&gt; disconnect</code><br/>
-         disconnects the MYSENSORS-device from the MYSENSORS-gateway</p>
-    </li>
-    <li>
-      <p><code>set &lt;name&gt; inclusion-mode on|off</code><br/>
-         turns the gateways inclusion-mode on or off</p>
-    </li>
-  </ul>
-  <a name="MYSENSORSattr"></a>
-  <p><b>Attributes</b></p>
-  <ul>
-    <li>
-      <p><code>attr &lt;name&gt; autocreate</code><br/>
-         enables auto-creation of MYSENSOR_DEVICE-devices on receival of presentation-messages</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; requestAck</code><br/>
-         request acknowledge from nodes.<br/>
-         if set the Readings of nodes are updated not before requested acknowledge is received<br/>
-         if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).
-         May also be configured for individual nodes if not set for gateway.</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; first-sensorid <&lt;number &lth; 255&gt;></code><br/>
-         configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code><br/>
-         specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a>
-         (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
-         in the folder FHEM/firmware. The format of the configuration file is the following (csv):</p>
-      <p><code>#Type,Name,Version,File,Comments</code><br/>
-         <code>10,Blink,1,Blink.hex,blinking example</code><br/></p>
-      <p>The meaning of the columns is the following:</br>
-         <dl>
-           <dt><code>Type</code></dt>
-           <dd>a numeric value (range 0 .. 65536) - each node will be assigned a firmware type</dd>
-           <dt><code>Name</code></dt>
-           <dd>a short name for this type</dd>
-           <dt><code>Version</code></dt> 
-           <dd>a numeric value (range 0 .. 65536) - the version of the firmware (may be different 
-               to the value that is send during the node presentation)</dd>
-           <dt><code>File</code></dt>
-           <dd>the filename containing the firmware - must also be stored in the folder FHEM/firmware</dd>
-           <dt><code>Comments</code></dt>
-           <dd>a description / comment for the firmware</dd>
-         </dl></p>
-    </li>
-  </ul>
+  <li><a id="MYSENSORS-set-connect"></a>
+    <p><b>connect</b></p>
+    <p><code>set &lt;name&gt; connect</code></p>
+    <p>(re-)connects the MYSENSORS-device to the MYSENSORS-gateway</p>
+    <p>Can also be used to reload the <i>OTA_firmwareConfig</i> file after editing.</p>
+  </li>
+  <li><a id="MYSENSORS-set-disconnect"></a>
+    <p><b>disconnect</b></p>
+    <p><code>set &lt;name&gt; disconnect</code></p>
+    <p>disconnects the MYSENSORS-device from the MYSENSORS-gateway</p>
+  </li>
+  <li><a id="MYSENSORS-set-inclusion-mode"></a>
+    <p><b>inclusion-mode</b></p>
+    <p><code>set &lt;name&gt; inclusion-mode on|off</code></p>
+    <p>turns the gateways inclusion-mode on or off</p>
+  </li>
+</ul>
+
+<a id="MYSENSORS-attr"></a>
+<h4>Attributes</h4>
+<ul>
+  <li><a id="MYSENSORS-attr-autocreate"></a>
+    <p><b>autocreate</b></p>
+    <p><code>attr &lt;name&gt; autocreate</code></p>
+    <p>enables auto-creation of MYSENSOR_DEVICE-devices on receival of presentation-messages</p>
+  </li>
+  <li><a id="MYSENSORS-attr-requestAck"></a>
+    <p><b>requestAck</b></p>
+    <p><code>attr &lt;name&gt; requestAck</code></p>
+    <p>request acknowledge from nodes.</p>
+    <p>if set the Readings of nodes are updated not before requested acknowledge is received<br>
+      if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).</p>
+    <p>May also be configured for individual nodes if not set for gateway.</p>
+  </li>
+  <li><a id="MYSENSORS-attr-first-sensorid"></a>
+    <p><b>first-sensorid</b></p>
+    <p><code>attr &lt;name&gt; first-sensorid &lt;number &lt; 255&gt;</code></p>
+    <p>configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
+  </li>
+  <li><a id="MYSENSORS-attr-OTA_firmwareConfig"></a>
+    <p><b>OTA_firmwareConfig</b></p>
+    <p><code>attr &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code></p>
+    <p>specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a> 
+      (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
+      in the folder FHEM/firmware. The format of the configuration file is the following (csv):</p>
+    <p><code>#Type,Name,Version,File,Comments</code><br/>
+      <code>10,Blink,1,Blink.hex,blinking example</code></p>
+    <p>The meaning of the columns is the following:</p>
+      <dl>
+        <dt><code>Type</code></dt>
+        <dd>a numeric value (range 0 .. 65536) - each node will be assigned a firmware type</dd>
+        <dt><code>Name</code></dt>
+        <dd>a short name for this type</dd>
+        <dt><code>Version</code></dt> 
+        <dd>a numeric value (range 0 .. 65536) - the version of the firmware (may be different 
+            to the value that is send during the node presentation)</dd>
+        <dt><code>File</code></dt>
+        <dd>the filename containing the firmware - must also be stored in the folder FHEM/firmware</dd>
+        <dt><code>Comments</code></dt>
+        <dd>a description / comment for the firmware</dd>
+      </dl>
+      <p>Note: Firmware config file by default only is read at startup. If you change it later, just issue a <i>connect</i> command to update also Internal values.</p>
+  </li>
 </ul>
 
 =end html

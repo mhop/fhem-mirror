@@ -160,7 +160,7 @@ FS10Log($$)
   #define n31 notify fs10 {FS10Log("@", "%")}
   #define here notify action
 
-  Log 2,"FS10 $a1 = $a2 old: $oldvalue{$a1}{TIME}=> $oldvalue{$a1}{VAL});";
+  Log 2,"FS10 $a1 = $a2 old: ".OldTimestamp($a1)." => ".OldTimestamp($a1);
 }
 
 1;

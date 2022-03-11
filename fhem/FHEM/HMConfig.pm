@@ -1701,11 +1701,11 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 
 ##############################---set---########################################
 %culHmGlobalSets       = (# all but virtuals
-                       regBulk       => "-list-.-peerChn- -addr1:data1- -addr2:data2-..."
+                       regBulk       => "-list-.-peerChn- -addr1:data1- [-addr2:data2-]..."
                       ,getRegRaw     => "(List0|List1|List2|List3|List4|List5|List6|List7) [-peerChn-]"
                       ,getConfig     => ""
                       ,regSet        => "[(prep|{exec})] -regName- -value- [-peerChn-]"
-                      ,clear         => "[(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]"
+                      ,clear         => "[({msgErrors}|msgEvents|rssi|attack|trigger|register|oldRegs|readings|all)]"
                       ,tplDel        => "-tplDel-"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
@@ -1827,8 +1827,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                                             ,display        =>"-text- (comma|no) -unit- (off|1|2|3) (off|on|slow|fast) -symbol-"
                                            }
                      ,"HM-PB-4DIS-WM-2"  =>{ text           =>"-txt1- [-txt2-]"  }
-                     ,"HM-OU-LED16"      =>{ led            =>"(off|red|green|orange)"
-                                            ,ilum           => "(0..15;1) (0..127;1)"
+                     ,"HM-OU-LED16"      =>{ ilum           => "(0..15;1) (0..127;1)"
                                             ,statusRequest  =>""
                                            }
                      ,"HM-OU-CFM-PL"     =>{ "on-for-timer" =>"-sec-"
@@ -1863,7 +1862,7 @@ $culHmModelSets{"HM-ES-TX-WM"}           = $culHmModelSets{"HM-PB-4DIS-WM-2"};
                                          
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
-$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
+#$culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### reference subtype sets
 
 
@@ -1931,6 +1930,8 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,tempTmplSet    =>"-tempTmpl-"
                                                 ,peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [(actor|remote|{both})]"
                                                }
+                     ,"HM-OU-LED1600"        =>{ led            =>"-color-"}
+                     ,"HM-OU-LED1601"        =>{ led            =>"(off|red|green|orange)"}
                      ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[,(-color2-...)] 'rep:' [(1..255;1|{1})]"}
                      ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[{replay}|-MP3No-[,-MP3No-...]] 'rep:' [(1..255;1|{1})] 'vol:' [(0..10;1|{10})] 'dur:' [(-duration-|{108000})]"
                                                 ,pct            =>"-value- [-ontime-]"}
@@ -1976,6 +1977,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,off            =>""
                                                 ,up             =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                                 ,down           =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
+                                                ,statusRequest  =>""
                                                }
                      ,"HM-LC-RGBW-WM03"      =>{ colProgram     =>"(0..255;1|{0})"                                           
                                                 ,brightAuto     =>"'bright:' (0..100;0.5|{100}) 'colProg:' [(0..255;1|{0})] 'min:' [(0..255;1|{0})] 'max:' [(0..255;1|{255})] [(-ontime-|{0})] [(-ramp-|{5})]"
@@ -2009,6 +2011,9 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
  );
 # clones- - - - - - - - - - - - - - - - -
 
+for (my$ch = 1;$ch < 17;$ch++){
+  $culHmChanSets{"HM-OU-LED16".uc(sprintf("%02x",$ch))}     = $culHmChanSets{"HM-OU-LED1601"};
+}
 $culHmChanSets{"HM-DIS-EP-WM5502"}      = $culHmChanSets{"HM-DIS-EP-WM5501"};
 $culHmChanSets{"HM-DIS-EP-WM5504"}      = 
 $culHmChanSets{"HM-DIS-EP-WM5505"}      = 

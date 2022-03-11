@@ -5,6 +5,7 @@
 # define <webLinkDefinitionName> SVG <fileLogDefinitionName>:co20:CURRENT
 # attr <webLinkDefinitionName> label "Air quality - Min $data{min1}, Max $data{max1}, Last $data{currval1}"
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

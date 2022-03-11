@@ -335,12 +335,9 @@ HttpUtils_Connect($)
   $hash->{displayurl} = $hash->{hideurl} ? "<hidden>" : $hash->{url};
   $hash->{sslargs}    = {} if(!defined($hash->{sslargs}));
 
-  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}"
-    .($hash->{callback} ? " NonBlocking":" Blocking");
-
   if($hash->{url} !~ /
       ^(http|https):\/\/                # $1: proto
-       (([^:\/]+):([^:\/]+)@)?          # $2: auth, $3:user, $4:password
+       (([^:\/]+):([^:\/]*)@)?          # $2: auth, $3:user, $4:password
        ([^:\/]+|\[[0-9a-f:]+\])         # $5: host or IPv6 address
        (:\d+)?                          # $6: port
        (\/.*)$                          # $7: path
@@ -352,7 +349,7 @@ HttpUtils_Connect($)
   ($hash->{protocol},$authstring,$user,$pwd,$host,$port,$hash->{path})
         = (lc($1),$2,$3,$4,$5,$6,$7);
   $hash->{host} = $host;
-  
+
   if(defined($port)) {
     $port =~ s/^://;
   } else {
@@ -373,6 +370,8 @@ HttpUtils_Connect($)
    $hash->{auth} = 0;
   }
   
+  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}"
+    .($hash->{callback} ? " NonBlocking":" Blocking")." via ".$hash->{protocol};
 
   my $proxy = AttrVal("global", "proxy", undef);
   if($proxy) {
@@ -489,6 +488,57 @@ HttpUtils_Connect($)
 }
 
 sub
+HttpUtils_Connect2NonblockingSSL($$)
+{
+  my ($hash, $par) = @_;
+
+  $hash->{conn}->blocking(0);
+  $par->{SSL_startHandshake} = 0;
+  if(!IO::Socket::SSL->start_SSL($hash->{conn}, $par) ||
+     $hash->{conn}->connect_SSL() ||
+     $! != EWOULDBLOCK) {
+    HttpUtils_Close($hash);
+    return $hash->{callback}($hash,
+                "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
+  }
+
+  $hash->{FD} = $hash->{conn}->fileno();
+  $selectlist{$hash} = $hash;
+  my %timerHash = (hash=>$hash, sts=>$selectTimestamp, msg=>"start_SSL");
+  InternalTimer(gettimeofday()+$hash->{timeout},
+                    "HttpUtils_TimeoutErr", \%timerHash);
+
+  $hash->{directReadFn} = sub() {
+    if(!$hash->{conn}->can('connect_SSL')) { # 126593
+      my $err = "HttpUtils_Connect2NonblockingSSL: connection handle in ".
+                "$hash->{NAME} was replaced, terminating connection";
+      HttpUtils_Close($hash);
+      Log 1, $err;
+      return $hash->{callback}($hash, $err);
+    }
+
+    return if(!$hash->{conn}->connect_SSL() && $! == EWOULDBLOCK);
+
+    RemoveInternalTimer(\%timerHash);
+    delete($hash->{FD});
+    delete($hash->{directReadFn});
+    delete($selectlist{$hash});
+
+    if($! || $SSL_ERROR) {
+      HttpUtils_Close($hash);
+      return $hash->{callback}($hash,
+                 "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
+    }
+
+    $hash->{hu_sslAdded} = $hash->{keepalive} ? 1 : 2;
+    return HttpUtils_Connect2($hash); # Continue with HTML-Processing
+  };
+
+  return undef;
+}
+
+
+sub
 HttpUtils_Connect2($)
 {
   my ($hash) = @_;
@@ -533,6 +583,9 @@ HttpUtils_Connect2($)
       $par{SSL_verify_mode} = 0
         if(!$hash->{sslargs} || !defined($hash->{sslargs}{SSL_verify_mode}));
 
+      return HttpUtils_Connect2NonblockingSSL($hash,\%par)
+        if($hash->{callback});
+      
       eval {
         IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
       };
@@ -545,6 +598,9 @@ HttpUtils_Connect2($)
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
   }
+
+  delete($hash->{hu_sslAdded}) # Coming from HttpUtils_Connect2NonblockingSSL
+    if($hash->{hu_sslAdded} && $hash->{hu_sslAdded} == 2);
 
   if(!$hash->{conn}) {
     undef $hash->{conn};
@@ -622,12 +678,14 @@ HttpUtils_Connect2($)
   $s = 0 if($hash->{protocol} eq "https");
 
   if($hash->{callback}) { # Nonblocking read
+    $hash->{EventSource} = 1 if($hdr =~ m/Accept:\s*text\/event-stream/i);
+
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
     delete($hash->{httpdatalen});
     delete($hash->{httpheader});
     $hash->{NAME} = "" if(!defined($hash->{NAME})); 
-    my %timerHash = (hash=>$hash, checkSTS=>$selectTimestamp, msg=>"write to");
+    my %timerHash = (hash=>$hash, sts=>$selectTimestamp, msg=>"write to");
     $hash->{conn}->blocking(0);
     $hash->{directReadFn} = sub() {
       my $buf;
@@ -730,7 +788,22 @@ HttpUtils_DataComplete($)
         return 1;
       }
       return 0 if(length($r) < $l);
-      $hash->{httpdata} .= substr($r, 0, $l);
+
+      my $ret = substr($r, 0, $l);
+      if( $hash->{EventSource} ) {
+        $hash->{httpdata} .= $ret;
+        if( $ret !~ /\n$/ ) {
+          # data is incomplete
+        } else {
+          $hash->{callback}($hash, undef, $hash->{httpdata});
+          $hash->{httpdata} = '';
+        }
+
+      } else {
+        $hash->{httpdata} .= $ret;
+
+      }
+
       $hash->{buf} = substr($r, $l);
     }
     return 0;
@@ -876,7 +949,7 @@ HttpUtils_ParseAnswer($)
 
   }
   
-  if(($code==301 || $code==302 || $code==303) 
+  if(($code==301 || $code==302 || $code==303 || $code==308)
 	&& !$hash->{ignoreredirects}) { # redirect
     if(++$hash->{redirects} > 5) {
       return ("$hash->{displayurl}: Too many redirects", "");
@@ -911,6 +984,10 @@ HttpUtils_ParseAnswer($)
       return ($@, $ret) if($@);
     }
   }
+  my $encoding = defined($hash->{forceEncoding}) ? $hash->{forceEncoding} :
+                 $hash->{httpheader} =~ m/^Content-Type.*charset=(\S*)/im ? $1 :
+                'UTF-8';
+  $ret = Encode::decode($encoding, $ret) if($unicodeEncoding && $encoding);
 
   # Debug
   Log3 $hash, $hash->{loglevel}+1,
@@ -927,7 +1004,7 @@ HttpUtils_ParseAnswer($)
 #    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
-#    compress(1), incrementalTimeout(0)
+#    compress(1), incrementalTimeout(0), forceEncoding(undef)
 # Example:
 #   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }

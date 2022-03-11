@@ -385,7 +385,7 @@ sub KODI_PlayerUpdate($$)
   my $obj  = {
     "method" => "Player.GetProperties",
     "params" => { 
-      "properties" => ["time","totaltime", "repeat", "shuffled", "speed" ]
+      "properties" => ["time","totaltime", "repeat", "shuffled", "speed", "currentaudiostream" ]
     #"canseek", "canchangespeed", "canmove", "canzoom", "canrotate", "canshuffle", "canrepeat"
     }
   };
@@ -516,6 +516,13 @@ sub KODI_ResetMediaReadings($)
   readingsBulkUpdate($hash, "songid", "" );
   readingsBulkUpdate($hash, "currentTrack", "" );
   
+  readingsBulkUpdate($hash, "currentAudioStream_bitrate", "" );
+  readingsBulkUpdate($hash, "currentAudioStream_channels", "" );
+  readingsBulkUpdate($hash, "currentAudioStream_codec", "" );
+  readingsBulkUpdate($hash, "currentAudioStream_index", "" );
+  readingsBulkUpdate($hash, "currentAudioStream_language", "" );
+  readingsBulkUpdate($hash, "currentAudioStream_name", "" );
+
   readingsEndUpdate($hash, 1);
   
   # delete streamdetails readings
@@ -888,6 +895,12 @@ sub KODI_CreateReading($$$) {
   elsif($key eq 'shuffled') {
     $key = 'shuffle';
     $value = ($value ? 'on' : 'off');
+  }
+  elsif($key eq 'currentaudiostream') {
+    #{"id":3296,"jsonrpc":"2.0","result":{"currentaudiostream":{"bitrate":0,"channels":6,"codec":"eac3","index":1,"language":"eng","name":"E-AC3 5.1 @ 768 kbps [Atmos] - DD+ 6 channels"},"partymode":false,"repeat":"off","shuffled":false,"speed":1,"time":{"hours":0,"milliseconds":297,"minutes":2,"seconds":37},"totaltime":{"hours":2,"milliseconds":622,"minutes":23,"seconds":11}}}
+    foreach my $tag (keys %{$value}) {
+      readingsBulkUpdate($hash, "currentAudioStream_$tag", $value->{$tag});
+    }
   }
   elsif($key eq 'muted') {
     $key = 'mute';
@@ -1927,6 +1940,7 @@ sub KODI_HTTP_Request($$@)
   <li><b>audiolibrary</b> - Possible values: cleanfinished, cleanstarted, remove, scanfinished, scanstarted, update</li>
   <li><b>currentAlbum</b> - album of the current song/musicvideo</li>
   <li><b>currentArtist</b> - artist of the current song/musicvideo</li>
+  <li><b>currentAudioStream_*</b> - informations about currently active audio stream</li>
   <li><b>currentMedia</b> - file/URL of the media item being played</li>
   <li><b>currentTitle</b> - title of the current media item</li>
   <li><b>currentTrack</b> - track of the current song/musicvideo</li>

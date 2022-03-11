@@ -21,6 +21,7 @@
 #   First version: 25.12.2013
 #
 #   Todo:       
+#               set..IExpr etc. von AttrVal auf GetFAttr umstellen, damit auch generische Attribute ohne Num funktionieren
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
@@ -140,7 +141,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.08 - 1.4.2021';
+my $Module_Version = '4.1.10 - 6.7.2021';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -266,8 +267,8 @@ my $AttrList = join (' ',
       'model',                                # for attr templates
       'regexDecode',
       'bodyDecode', 
-      'regexCompile') .
-      $main::readingFnAttributes;  
+      'regexCompile',
+      $main::readingFnAttributes);
 
 
 #########################################################################
@@ -1246,6 +1247,7 @@ sub SetFn {
         # Konvertiere input mit IExpr falls definiert
         my $exp = AttrVal($name, "set${setNum}Expr", "");           # old syntax for input in set
         $exp    = AttrVal($name, "set${setNum}IExpr", $exp);        # new syntax overrides old one
+        #Log3 $name, 5, "$name: set calls EvalExpr with exp $exp";
         $rawVal = EvalExpr($hash, {expr => $exp, val => $rawVal, '@setValArr' => \@setValArr, action => "set${setNum}IExpr"});
         Log3 $name, 4, "$name: set will now set $setName -> $rawVal";
     } 
@@ -2151,7 +2153,7 @@ sub CheckRedirects {
         Log3 $name, 4, "$name: no header to look for redirects";
         return;
     }
-    my @header  = split("\r\n", $header);
+    my @header  = split("[\r\n]+", $header);
     my @header0 = split(" ", shift @header);
     my $code    = $header0[1];
     Log3 $name, 4, "$name: checking for redirects, code=$code, ignore=$request->{ignoreredirects}";
@@ -2171,6 +2173,7 @@ sub CheckRedirects {
     map { $redirAdr = $1 if ( $_ =~ m{ [Ll]ocation: \s* (\S+) $ }xms ) } @header;
     if (!$redirAdr) {
         Log3 $name, 3, "$name: Error: got Redirect but no Location-Header from server";
+        return;
     }
     $redirAdr = "/$redirAdr" if($redirAdr !~ m/^http/ && $redirAdr !~ m/^\//);
     my $rurl = ($redirAdr =~ m/^http/) ? $redirAdr : $addr.$redirAdr;

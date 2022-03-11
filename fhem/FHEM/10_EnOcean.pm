@@ -443,16 +443,19 @@ my %EnO_eepConfig = (
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
  # special profiles
   "G5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", manufID => "00D", model => 'tracker'}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
+  "H5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", devMode => 'master', devUpdate => 'auto', manufID => '00D', motionMode => 'fully'}},
   "G5.10.12" => {attr => {subType => "roomSensorControl.01", eep => "A5-10-12", manufID => "00D", scaleMax => 40, scaleMin => 0, scaleDecimals => 1}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "I5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "Eltako_FUD14", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
+  "I5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_FRM60", sensorMode => 'pushbutton', teachMethod => "confirm", webCmd => "opens:stop:closes:position"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "O5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR14", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
+  "G6.02.01" => {attr => {subType => "switch", eep => "F6-02-01", manufID => "00D", model => "Eltako_F4CT55", sensorMode => 'pushbutton'}},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
   "ZZ.13.03" => {attr => {subType => "environmentApp", eep => "A5-13-03", devMode => "master", manufID => "7FF"}},
   "ZZ.13.04" => {attr => {subType => "environmentApp", eep => "A5-13-04", devMode => "master", manufID => "7FF"}},
@@ -489,6 +492,7 @@ my %EnO_models = (
   "Eltako_FBHF65SB" => {attr => {manufID => "00D"}},
   "Eltako_FHK14" => {attr => {manufID => "00D"}},
   "Eltako_FHK61" => {attr => {manufID => "00D"}},
+  "Eltako_FRM60" => {attr => {manufID => "00D"}},
   "Eltako_FSA12" => {attr => {manufID => "00D"}},
   "Eltako_FSB14" => {attr => {manufID => "00D"}},
   "Eltako_FSB61" => {attr => {manufID => "00D"}},
@@ -499,14 +503,20 @@ my %EnO_models = (
   "Eltako_FSM61" => {attr => {manufID => "00D"}},
   "Eltako_FT55" => {attr => {manufID => "00D"}},
   "Eltako_FTS12" => {attr => {manufID => "00D"}},
-  "Eltako_TF"=> {attr => {manufID => "00D"}},
-  "Eltako_TF_RWB"=> {attr => {manufID => "00D"}},
   "Eltako_FUD14" => {attr => {manufID => "00D"}},
   "Eltako_FUD61" => {attr => {manufID => "00D"}},
+  "Eltako_F4CT55"=> {attr => {manufID => "00D"}},
+  "Eltako_TF"=> {attr => {manufID => "00D"}},
+  "Eltako_TF_RWB"=> {attr => {manufID => "00D"}},
   "Holter_OEM" => {attr => {pidCtrl => "off"}},
   "Micropelt_MVA004" => {attr => {remoteCode => "FFFFFFFE", remoteEEP => "A5-20-01", remoteID => "getNextID", remoteManagement => "manager"}, xml => {productID => "0x004900000000", xmlDescrLocation => "/FHEM/lib/EnO_ReCom_Device_Descr.xml"}},
   other => {},
   tracker => {}
+);
+
+my %EnO_mscRefID = (
+  "0000045C" => {model => "Eltako_F4CT55", version => "0000", attr => {eep => "G6.02.01"}},
+  "0000043E" => {model => "Eltako_FRM60", teachIn => "FFF80D80", version => "0000", attr => {eep => "I5.3F.7F"}}
 );
 
 my @EnO_defaultChannel = ("all", "input", 0..29);
@@ -768,23 +778,24 @@ sub EnOcean_Initialize($) {
   }
   my $subTypeList = join(",", sort grep { !$subTypeList{$_}++ } @subTypeList);
 
+  $hash->{AttrFn} = "EnOcean_Attr";
   $hash->{AutoCreate} = {"EnO.*" => {ATTR => "creator:autocreate", FILTER => "%NAME"}};
-  $hash->{noAutocreatedFilelog} = 1;
-  $hash->{Match} = "^EnOcean:";
   $hash->{DefFn} = "EnOcean_Define";
   $hash->{DeleteFn} = "EnOcean_Delete";
-  $hash->{UndefFn} = "EnOcean_Undef";
+  $hash->{GetFn} = "EnOcean_Get";
+  $hash->{Match} = "^EnOcean:";
+  $hash->{noAutocreatedFilelog} = 1;
+  $hash->{NotifyFn} = "EnOcean_Notify";
+  #$hash->{NotifyOrderPrefix} = "45-";
   $hash->{ParseFn} = "EnOcean_Parse";
   $hash->{SetFn} = "EnOcean_Set";
  #$hash->{StateFn} = "EnOcean_State";
-  $hash->{GetFn} = "EnOcean_Get";
-  $hash->{NotifyFn} = "EnOcean_Notify";
-  $hash->{AttrFn} = "EnOcean_Attr";
-  $hash->{AttrList} = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                      "showtime:1,0 " .
-                      "actualTemp angleMax:slider,-180,20,180 alarmAction " .
+  $hash->{UndefFn} = "EnOcean_Undef";
+  $hash->{AttrList} = "IODev do_not_notify:select,0,1 ignore:0,1 dummy:0,1 " .
+                      "showtime:select,0,1 " .
+                      "actualTemp angleMax:slider,-180,20,180 alarmAction alwaysUpdateReadings:select,0,1 " .
                       "angleMin:slider,-180,20,180 " .
-                      "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
+                      "angleTime blockUnknownMSC:no,yes blockMotion:no,yes " .
                       "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
                       "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
                       "blockFanSpeed:no,yes blockKey:no,yes " .
@@ -803,7 +814,7 @@ sub EnOcean_Initialize($) {
                       "demandRespAction:textField-long demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
                       "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
                       "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
-                      "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
+                      "devChannel devMode:master,slave devUpdate:select,auto,off " .
                       "dimMax dimMin dimValueOn disable:0,1 disabledForIntervals " .
                       "displayContent:default,humidity,off,setpointTemp,tempertureExtern,temperatureIntern,time,no_change " .
                       "displayOrientation:0,90,180,270 " .
@@ -811,6 +822,7 @@ sub EnOcean_Initialize($) {
                       "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable measurementTypeSelect:feed,room " .
                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
                       "model:" . join(",", sort keys %EnO_models) . " " .
+                      "motionMode:select,fully,semi motionRefDev " .
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction:textField-long observeInterval observeLogic:and,or " .
                       #observeCmds observeExeptions
                       "observeRefDev openLoopCtrlScale pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
@@ -819,10 +831,10 @@ sub EnOcean_Initialize($) {
                       "pollInterval postmasterID productID rampTime rcvRespAction:textField-long ".
                       "releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no remoteCode remoteEEP remoteID remoteManufID " .
                       "remoteManagement:client,manager,off rlcAlgo:no,2++,3++,4++ rlcRcv rlcSnd rlcTX:true,false " .
-                      "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
+                      "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS rotationSpeed:select,high,low " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sendTimePeriodic sensorMode:switch,pushbutton " .
-                      "serviceOn:no,yes settingAccuracy:high,low setpointRefDev setpointSummerMode:slider,0,5,100 " .
+                      "serviceOn:no,yes setCmdTrigger:man,refDev setpointRefDev setpointSummerMode:slider,0,5,100 settingAccuracy:high,low " .
                       "signal:off,on signOfLife:off,on signOfLifeInterval setpointTempRefDev shutTime shutTimeCloses subDef " .
                       "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
@@ -851,7 +863,6 @@ sub EnOcean_Initialize($) {
   } else {
     Log3 undef, 2, "EnOcean XML functions are not available.";
   }
-  #$hash->{NotifyOrderPrefix} = "45-";
   return undef;
 }
 
@@ -861,12 +872,13 @@ sub EnOcean_Define($$) {
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   my $ioDev = $hash->{IODev}{NAME} if (exists $hash->{IODev});
+  #Log3 $name, 2, "EnOcean $name IODev: $ioDev" if (defined $ioDev);
   # proposed IODev set by TCM attr assignIODev
   $ioDev = $modules{$ioModulesType}{assignIODev}{NAME} if (exists $modules{$ioModulesType}{assignIODev});
   #Log3 $name, 2, "EnOcean $name assignIODev IODev: $ioDev" if (defined $ioDev);
   # proposed IODev set by TCM Teach flag
   $ioDev = $modules{$ioModulesType}{Teach}{NAME} if (exists $modules{$ioModulesType}{Teach});
-  #Log3 $name, 2, "EnOcean $name Teach IODev: $ioDev" if (defined $ioDev);
+  #Log3 $name, 2, "EnOcean $name teach IODev: $ioDev" if (defined $ioDev);
 
   my ($autocreateFilelog, $autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
      ('./log/' . $name . '-%Y.log', undef, undef, 'EnOcean', 'Plots');
@@ -905,6 +917,7 @@ sub EnOcean_Define($$) {
         if (defined $ioDev) {
           AssignIoPort($hash, $ioDev);
           $hash->{IODev}{NAME} = $ioDev;
+          $attr{$name}{IODev} = $ioDev;
 	} else {
 	  AssignIoPort($hash);
           # find IODev name
@@ -912,6 +925,7 @@ sub EnOcean_Define($$) {
 	    if ($iHash eq $hash->{IODev}) {
 	      $ioDev = $defs{$iName}{NAME};
 	      $hash->{IODev}{NAME} = $defs{$iName}{NAME};
+	      $attr{$name}{IODev} = $defs{$iName}{NAME};
 	      Log3 $name, 3, "EnOcean $name define defsName: $iName defsHash: $iHash IOHash: $hash->{IODev}";
 	      last;
 	    }
@@ -960,6 +974,7 @@ sub EnOcean_Define($$) {
             if (defined $ioDev) {
               AssignIoPort($hash, $ioDev);
               $hash->{IODev}{NAME} = $ioDev;
+              $attr{$name}{IODev} = $ioDev;
             } else {
               AssignIoPort($hash);
               # find IODev name
@@ -967,6 +982,7 @@ sub EnOcean_Define($$) {
                 if ($iHash eq $hash->{IODev}) {
                   $ioDev = $defs{$iName}{NAME};
 	          $hash->{IODev}{NAME} = $defs{$iName}{NAME};
+	          $attr{$name}{IODev} = $defs{$iName}{NAME};
 	          Log3 $name, 3, "EnOcean $name define defsName: $iName defsHash: $iHash IOHash: $hash->{IODev}";
 	          last;
 	        }
@@ -1012,6 +1028,7 @@ sub EnOcean_Define($$) {
           if (defined $ioDev) {
             AssignIoPort($hash, $ioDev);
             $hash->{IODev}{NAME} = $ioDev;
+            $attr{$name}{IODev} = $ioDev;
 	  } else {
 	    AssignIoPort($hash);
             # find IODev name
@@ -1019,6 +1036,7 @@ sub EnOcean_Define($$) {
 	      if ($iHash eq $hash->{IODev}) {
 	        $ioDev = $defs{$iName}{NAME};
 	        $hash->{IODev}{NAME} = $defs{$iName}{NAME};
+	        $attr{$name}{IODev} = $defs{$iName}{NAME};
 	        Log3 $name, 3, "EnOcean $name define defsName: $iName defsHash: $iHash IOHash: $hash->{IODev}";
 	        last;
 	      }
@@ -1030,7 +1048,7 @@ sub EnOcean_Define($$) {
         my $packetType = hex $msg[1];
 
         if ($packetType == 1) {
-          my ($data, $rorg, $status);
+          my ($data, $rorg, $sourceID, $status);
           #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
           (undef, undef, $rorg, $data, undef, $status, undef) = @msg;
           $attr{$name}{subType} = $EnO_rorgname{$rorg};
@@ -1080,8 +1098,41 @@ sub EnOcean_Define($$) {
             readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name UTE teach-in is missing";
           } elsif ($attr{$name}{subType} eq "MSC") {
-            readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
-            Log3 $name, 2, "EnOcean $name MSC not supported";
+            $attr{$name}{manufID} = substr($data, 0, 3);
+            if ($attr{$name}{manufID} eq '00D') {
+              if (substr($data, 4, 2) eq 'FF') {
+                # Eltako MSC teachIn
+                my $refID = substr($data, 6, 8);
+                  if (exists $EnO_mscRefID{$refID}) {
+                    $hash->{helper}{teachInWait} = "MSC" if (exists $EnO_mscRefID{$refID}{teachIn});
+                    if (!exists $hash->{IODev}) {
+                      (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
+	              $attr{$name}{IODev} = $hash->{IODev}{NAME};
+                    }
+                    $hash->{DEF} = $def;
+                    $modules{EnOcean}{defptr}{$def} = $hash;
+                    $attr{$name}{modelVersion} = $EnO_mscRefID{$refID}{version};
+                    $attr{$name}{mscRefID} = $refID;
+                    $attr{$name}{room} = $autocreateDeviceRoom;
+                    $attr{$name}{subDef} = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000") if (!exists $attr{$name}{subDef});
+                    foreach my $attrCntr (keys %{$EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}}) {
+                      $attr{$name}{$attrCntr} = $EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}{$attrCntr} if ($attrCntr ne "subDef");
+                    }
+                    EnOcean_CreateSVG(undef, $hash, $attr{$name}{eep});
+                    readingsSingleUpdate($hash, "teach", "MSC teach-in EEP $attr{$name}{eep} requested Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+                    Log3 $name, 2, "EnOcean $name MSC teach-in EEP $attr{$name}{eep} requested Manufacturer " . $EnO_manuf{$attr{$name}{manufID}};
+                  } else {
+                    readingsSingleUpdate($hash, "teach", "MSC teach-in REF-ID $refID not supported Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+                    Log3 $name, 2, "EnOcean $name MSC teach-in REF-ID $refID not supported Manufacturer " . $EnO_manuf{$attr{$name}{manufID}};
+                  }
+              } else {
+                readingsSingleUpdate($hash, "teach", "MSC teach-in is missing Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
+                Log3 $name, 2, "EnOcean $name MSC teach-in is missing Manufacturer " . $EnO_manuf{$attr{$name}{manufID}};
+              }
+            } else {
+              readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
+              Log3 $name, 2, "EnOcean $name MSC not supported";
+            }
           } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
             $hash->{helper}{teachInWait} = "STE";
             readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
@@ -1132,6 +1183,7 @@ sub EnOcean_Define($$) {
         # no device infos
         if (!exists $hash->{IODev}) {
 	  (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
+	  $attr{$name}{IODev} = $hash->{IODev}{NAME};
 	}
         # assign defptr
         if (exists $hash->{OLDDEF}) {
@@ -1167,6 +1219,7 @@ sub EnOcean_Define($$) {
 
         if (!exists $hash->{IODev}) {
           (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
+	  $attr{$name}{IODev} = $hash->{IODev}{NAME};
         }
         if (exists($hash->{OLDDEF}) && $hash->{OLDDEF} =~ m/^[A-Fa-f0-9]{8}$/i) {
           delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
@@ -2283,134 +2336,166 @@ sub EnOcean_Set($@) {
         return "Usage: $cmd arguments needed or wrong.";
       }
     } elsif ($st eq "switch") {
-      # Rocker Switch, simulate a PTM200 switch module
-      # separate first and second action
-      ($cmd1, $cmd2) = split(",", $cmd, 2);
-      # check values
-      if (!defined($EnO_ptm200btn{$cmd1}) || ($cmd2 && !defined($EnO_ptm200btn{$cmd2}))) {
-        $cmdList .= join(":noArg ", sort keys %EnO_ptm200btn) . ':noArg';
-        return SetExtensions($hash, $cmdList, $name, @a);
-      }
-      my $channelA = ReadingsVal($name, "channelA", undef);
-      my $channelB = ReadingsVal($name, "channelB", undef);
-      my $channelC = ReadingsVal($name, "channelC", undef);
-      my $channelD = ReadingsVal($name, "channelD", undef);
-      my $lastChannel = ReadingsVal($name, ".lastChannel", "A");
-      my $releasedChannel = AttrVal($name, "releasedChannel", "auto");
-      my $subDefA = AttrVal($name, "subDefA", $subDef);
-      my $subDefB = AttrVal($name, "subDefB", $subDef);
-      my $subDefC = AttrVal($name, "subDefC", $subDef);
-      my $subDefD = AttrVal($name, "subDefD", $subDef);
-      my $subDefI = AttrVal($name, "subDefI", $subDef);
-      my $subDef0 = AttrVal($name, "subDef0", $subDef);
-      my $switchType = AttrVal($name, "switchType", "direction");
-
-      # first action
-      if ($cmd1 eq "released") {
-        if ($switchType eq "central") {
-          if ($releasedChannel eq "auto") {
-            if ($lastChannel =~ m/0|I/) {
-              $releasedChannel = $lastChannel;
+      if ($model eq "Eltako_F4CT55") {
+        my %cmdList = ("colourA0" => "08", "colourAI" => "09","colourB0" => "0A","colourBI" => "0B","colourAll" => "0C");
+        if (!exists $cmdList{$cmd}) {
+          $cmdList .= join(":colorpicker,RGB ", sort keys %cmdList) . ':colorpicker,RGB';
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList;
+        }
+        if (defined $a[1]) {
+          if ($a[1] =~ m/^[\dA-Fa-f]{6}$/) {
+            readingsBeginUpdate($hash);
+            if ($cmd eq "colourAll") {
+              while (my ($key, undef) = each(%cmdList)) {
+                readingsBulkUpdate($hash, $key, uc($a[1]));
+              }
             } else {
+              readingsBulkUpdate($hash, $cmd, uc($a[1]));
+              #readingsDelete($hash, "colourAll");
+            }
+            #readingsBulkUpdate($hash, 'state', uc($a[1]));
+            readingsEndUpdate($hash, 1);
+            $data = uc($a[1]) . $cmdList{$cmd};
+            $rorg = "A5";
+            shift(@a);
+            $updateState = 0;
+            Log3 $name, 3, "EnOcean set $name $cmd";
+          } else {
+            return "Usage: $cmd value is not hexadecimal or out of range.";
+          }
+        } else {
+          return "Usage: $cmd values are missing";
+        }
+      } else {
+        # Rocker Switch, simulate a PTM200 switch module
+        # separate first and second action
+        ($cmd1, $cmd2) = split(",", $cmd, 2);
+        # check values
+        if (!defined($EnO_ptm200btn{$cmd1}) || ($cmd2 && !defined($EnO_ptm200btn{$cmd2}))) {
+          $cmdList .= join(":noArg ", sort keys %EnO_ptm200btn) . ':noArg';
+          return SetExtensions($hash, $cmdList, $name, @a);
+        }
+        my $channelA = ReadingsVal($name, "channelA", undef);
+        my $channelB = ReadingsVal($name, "channelB", undef);
+        my $channelC = ReadingsVal($name, "channelC", undef);
+        my $channelD = ReadingsVal($name, "channelD", undef);
+        my $lastChannel = ReadingsVal($name, ".lastChannel", "A");
+        my $releasedChannel = AttrVal($name, "releasedChannel", "auto");
+        my $subDefA = AttrVal($name, "subDefA", $subDef);
+        my $subDefB = AttrVal($name, "subDefB", $subDef);
+        my $subDefC = AttrVal($name, "subDefC", $subDef);
+        my $subDefD = AttrVal($name, "subDefD", $subDef);
+        my $subDefI = AttrVal($name, "subDefI", $subDef);
+        my $subDef0 = AttrVal($name, "subDef0", $subDef);
+        my $switchType = AttrVal($name, "switchType", "direction");
+
+        # first action
+        if ($cmd1 eq "released") {
+          if ($switchType eq "central") {
+            if ($releasedChannel eq "auto") {
+              if ($lastChannel =~ m/0|I/) {
+                $releasedChannel = $lastChannel;
+              } else {
+                $releasedChannel = 0;
+              }
+            } elsif ($releasedChannel !~ m/0|I/) {
               $releasedChannel = 0;
             }
-          } elsif ($releasedChannel !~ m/0|I/) {
-            $releasedChannel = 0;
-          }
-        } elsif ($switchType eq "channel") {
-          if ($releasedChannel eq "auto") {
-            if ($lastChannel =~ m/A|B|C|D/) {
-              $releasedChannel = $lastChannel;
-            } else {
+          } elsif ($switchType eq "channel") {
+            if ($releasedChannel eq "auto") {
+              if ($lastChannel =~ m/A|B|C|D/) {
+                $releasedChannel = $lastChannel;
+              } else {
+                $releasedChannel = "A";
+              }
+            } elsif ($releasedChannel !~ m/A|B|C|D/) {
               $releasedChannel = "A";
             }
-          } elsif ($releasedChannel !~ m/A|B|C|D/) {
-            $releasedChannel = "A";
+          }
+          $subDef = AttrVal($name, "subDef" . $releasedChannel, $subDef);
+        } elsif ($switchType eq "central") {
+          if ($cmd1 =~ m/.0/) {
+            $subDef = $subDef0;
+            $lastChannel = 0;
+          } elsif ($cmd1 =~ m/.I/) {
+            $subDef = $subDefI;
+            $lastChannel = "I";
+          }
+        } elsif ($switchType eq "channel") {
+          $lastChannel = substr($cmd1, 0, 1);
+          $subDef = AttrVal($name, "subDef" . $lastChannel, $subDefA);
+        } else {
+          $lastChannel = substr($cmd1, 0, 1);
+        }
+
+        if ($switchType eq "universal") {
+          if ($cmd1 =~ m/A./ && (!defined($channelA) || $cmd1 ne $channelA)) {
+            $cmd1 = "A0";
+          } elsif ($cmd1 =~ m/B./ && (!defined($channelB) || $cmd1 ne $channelB)) {
+            $cmd1 = "B0";
+          } elsif ($cmd1 =~ m/C./ && (!defined($channelC) || $cmd1 ne $channelC)) {
+            $cmd1 = "C0";
+          } elsif ($cmd1 =~ m/D./ && (!defined($channelD) || $cmd1 ne $channelD)) {
+            $cmd1 = "D0";
+          } elsif ($cmd1 eq "released") {
+
+          } else {
+            $sendCmd = undef;
           }
         }
-        $subDef = AttrVal($name, "subDef" . $releasedChannel, $subDef);
-      } elsif ($switchType eq "central") {
-        if ($cmd1 =~ m/.0/) {
-          $subDef = $subDef0;
-          $lastChannel = 0;
-        } elsif ($cmd1 =~ m/.I/) {
-          $subDef = $subDefI;
-          $lastChannel = "I";
+        # second action
+        if ($cmd2 && $switchType eq "universal") {
+          if ($cmd2 =~ m/A./ && (!defined($channelA) || $cmd2 ne $channelA)) {
+            $cmd2 = "A0";
+          } elsif ($cmd2 =~ m/B./ && (!defined($channelB) || $cmd2 ne $channelB)) {
+            $cmd2 = "B0";
+          } elsif ($cmd2 =~ m/C./ && (!defined($channelC) || $cmd2 ne $channelC)) {
+            $cmd2 = "C0";
+          } elsif ($cmd2 =~ m/D./ && (!defined($channelD) || $cmd2 ne $channelD)) {
+            $cmd2 = "D0";
+          } else {
+            $cmd2 = undef;
+          }
+          if ($cmd2 && undef($sendCmd)) {
+            # only second action has changed, send as first action
+            $cmd1 = $cmd2;
+            $cmd2 = undef;
+            $sendCmd = 1;
+          }
         }
-      } elsif ($switchType eq "channel") {
-        $lastChannel = substr($cmd1, 0, 1);
-        $subDef = AttrVal($name, "subDef" . $lastChannel, $subDefA);
-      } else {
-        $lastChannel = substr($cmd1, 0, 1);
-      }
-
-      if ($switchType eq "universal") {
-        if ($cmd1 =~ m/A./ && (!defined($channelA) || $cmd1 ne $channelA)) {
-          $cmd1 = "A0";
-        } elsif ($cmd1 =~ m/B./ && (!defined($channelB) || $cmd1 ne $channelB)) {
-          $cmd1 = "B0";
-        } elsif ($cmd1 =~ m/C./ && (!defined($channelC) || $cmd1 ne $channelC)) {
-          $cmd1 = "C0";
-        } elsif ($cmd1 =~ m/D./ && (!defined($channelD) || $cmd1 ne $channelD)) {
-          $cmd1 = "D0";
-        } elsif ($cmd1 eq "released") {
-
-        } else {
-          $sendCmd = undef;
+        # convert and send first and second command
+        my $switchCmd;
+        ($switchCmd, $status) = split(':', $EnO_ptm200btn{$cmd1}, 2);
+        # reset T21 status flag if 4 rocker
+        $status = '10' if ($switchCmd > 3);
+        $switchCmd <<= 5;
+        if ($cmd1 ne "released") {
+          # set the pressed flag
+          $switchCmd |= 0x10 ;
         }
-      }
-      # second action
-      if ($cmd2 && $switchType eq "universal") {
-        if ($cmd2 =~ m/A./ && (!defined($channelA) || $cmd2 ne $channelA)) {
-          $cmd2 = "A0";
-        } elsif ($cmd2 =~ m/B./ && (!defined($channelB) || $cmd2 ne $channelB)) {
-          $cmd2 = "B0";
-        } elsif ($cmd2 =~ m/C./ && (!defined($channelC) || $cmd2 ne $channelC)) {
-          $cmd2 = "C0";
-        } elsif ($cmd2 =~ m/D./ && (!defined($channelD) || $cmd2 ne $channelD)) {
-          $cmd2 = "D0";
-        } else {
-          $cmd2 = undef;
+        if($cmd2) {
+          # execute second action
+          if ($switchType =~ m/^central|channel$/) {
+            # second action not supported
+            $cmd = $cmd1;
+          } else {
+            my ($d2, undef) = split(':', $EnO_ptm200btn{$cmd2}, 2);
+            # reset T21 status flag if 4 rocker
+            $status = '10' if ($d2 > 3);
+            $switchCmd |= ($d2 << 1) | 0x01;
+          }
         }
-        if ($cmd2 && undef($sendCmd)) {
-          # only second action has changed, send as first action
-          $cmd1 = $cmd2;
-          $cmd2 = undef;
-          $sendCmd = 1;
+        if (defined $sendCmd) {
+          $data = sprintf "%02X", $switchCmd;
+          $rorg = "F6";
+          SetExtensionsCancel($hash);
+          Log3 $name, 3, "EnOcean set $name $cmd";
+          if ($updateState) {
+            readingsSingleUpdate($hash, "channel" . $1, $cmd1, 1) if ($cmd1 =~ m/^([A-D])./);
+            readingsSingleUpdate($hash, "channel" . $1, $cmd2, 1) if ($cmd2 && $cmd2 =~ m/^([A-D])./);
+          }
+          readingsSingleUpdate($hash, ".lastChannel", $lastChannel, 0);
         }
-      }
-      # convert and send first and second command
-      my $switchCmd;
-      ($switchCmd, $status) = split(':', $EnO_ptm200btn{$cmd1}, 2);
-      # reset T21 status flag if 4 rocker
-      $status = '10' if ($switchCmd > 3);
-      $switchCmd <<= 5;
-      if ($cmd1 ne "released") {
-        # set the pressed flag
-        $switchCmd |= 0x10 ;
-      }
-      if($cmd2) {
-        # execute second action
-        if ($switchType =~ m/^central|channel$/) {
-          # second action not supported
-          $cmd = $cmd1;
-        } else {
-          my ($d2, undef) = split(':', $EnO_ptm200btn{$cmd2}, 2);
-          # reset T21 status flag if 4 rocker
-          $status = '10' if ($d2 > 3);
-          $switchCmd |= ($d2 << 1) | 0x01;
-        }
-      }
-      if (defined $sendCmd) {
-        $data = sprintf "%02X", $switchCmd;
-        $rorg = "F6";
-        SetExtensionsCancel($hash);
-        Log3 $name, 3, "EnOcean set $name $cmd";
-        if ($updateState) {
-          readingsSingleUpdate($hash, "channel" . $1, $cmd1, 1) if ($cmd1 =~ m/^([A-D])./);
-          readingsSingleUpdate($hash, "channel" . $1, $cmd2, 1) if ($cmd2 && $cmd2 =~ m/^([A-D])./);
-        }
-        readingsSingleUpdate($hash, ".lastChannel", $lastChannel, 0);
       }
 
     } elsif ($st eq "switch.00") {
@@ -2448,6 +2533,79 @@ sub EnOcean_Set($@) {
         SetExtensionsCancel($hash);
       }
       Log3 $name, 3, "EnOcean set $name $switchCmd";
+
+    } elsif ($st eq "occupSensor.01") {
+      # Occupancy Sensor (EEP A5-07-01)
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
+      # $db[3] > 0xFA is error code
+      # $db[2] is solar panel current where =0 uA ... 0xFF = 127 uA
+      # $db[1] is PIR Status (motion) where 0 ... 127 = off, 128 ... 255 = on
+      $rorg = "A5";
+      my $signOfLifeCmd;
+      if ($cmd eq "status") {
+        $data = "FAFF0008";
+        $hash->{helper}{lastCmd} = $cmd;
+        $cmd = 'off';
+        $signOfLifeCmd = 'status';
+      } elsif ($cmd eq 'teach') {
+        # teach-in EEP A5-07-01
+        $data = $manufID eq '00D' ? '1C080D80' : '1C0FFF80';
+        $attr{$name}{eep} = "A5-07-01";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = 'status';
+        CommandDeleteReading(undef, "$name .*");
+        readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
+        #($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+      } elsif ($cmd eq "fullyOn") {
+        $data = "FAFFFF08";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'fullyOn');
+        readingsBulkUpdate($hash, "state", 'on');
+        readingsEndUpdate($hash, 1);
+      } elsif ($cmd eq "off") {
+        $data = "FAFF0008";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = 'status';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'off');
+        readingsBulkUpdate($hash, "state", 'off');
+        readingsEndUpdate($hash, 1);
+      } elsif ($cmd eq "on") {
+        $data = AttrVal($name, 'motionMode', 'fully') eq 'semi' ? 'FAFFC808' : 'FAFFFF08';
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'on');
+        readingsBulkUpdate($hash, "state", 'on');
+        readingsEndUpdate($hash, 1);
+      } elsif ($cmd eq "semiOn") {
+        $data = "FAFFC808";
+        $hash->{helper}{lastCmd} = $cmd;
+        $signOfLifeCmd = AttrVal($name, "devUpdate", 'auto') eq 'auto' ? $cmd : 'off';
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "motion", 'semiOn');
+        readingsBulkUpdate($hash, "state", 'on');
+        readingsEndUpdate($hash, 1);
+      } else {
+        if (AttrVal($name, 'devMode', 'slave') eq 'master') {
+          if ($manufID eq "00D") {
+          # Eltako FBH55SB [TF-Modus]
+            return "Unknown argument " . $cmd . ", choose one of fullyOn:noArg off:noArg on:noArg semiOn:noArg teach:noArg"
+          } else {
+            return "Unknown argument " . $cmd . ", choose one of off:noArg on:noArg teach:noArg"
+          }
+        } else {
+          return undef;
+        }
+      }
+      $updateState = 0;
+      my %signOfLifePeriod = ('off' => 120, 'on' => 60, 'fullyOn' => 60, 'semiOn' => 60, 'status' => 1020, 'teach' => 1020);
+      RemoveInternalTimer($hash->{helper}{timer}{signOfLife}) if(exists $hash->{helper}{timer}{signOfLife});
+      $hash->{helper}{timer}{signOfLife} = {hash => $hash, function => $signOfLifeCmd, period => $signOfLifePeriod{$signOfLifeCmd}};
+      InternalTimer(gettimeofday() + $signOfLifePeriod{$signOfLifeCmd}, 'EnOcean_SignOfLife', $hash->{helper}{timer}{signOfLife}, 0);
+      Log3 $name, 3, "EnOcean set $name $cmd";
 
     } elsif ($st eq "roomSensorControl.01") {
       # Room Sensor and Control Unit (EEP A5-04-01, A5-10-10 ... A5-10-14)
@@ -2586,8 +2744,7 @@ sub EnOcean_Set($@) {
       } else {
         if (AttrVal($name, 'devMode', 'master') eq 'master') {
           return "Unknown argument " . $cmd . ", choose one of " . $cmdList . " setpoint:slider,0,1,255 setpointScaled switch:on,off teach:noArg"
-        }
-        else {
+        } else {
           return undef;
         }
       }
@@ -4352,6 +4509,68 @@ sub EnOcean_Set($@) {
 
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
+        if ($model eq "Eltako_FRM60") {
+        my $position = 0;
+        my $setCmd = ReadingsVal($name, 'block', 'unlook') eq 'look' ? 0x0C : 8;
+        my $shutCmd = AttrVal($name, 'rotationSpeed', 'high') eq 'low' ? 0x13 : 3;
+        $rorg = "A5";
+        if ($cmd =~ m/^\d+$/) {
+          # interpretive numeric value as position
+          unshift(@a, 'position');
+          $cmd = 'position';
+        }
+        if ($cmd eq "teach") {
+          # teach-in EEP A5-3F-7F, Manufacturer "Eltako"
+          $data = "FFF80D80";
+          $attr{$name}{eep} = "A5-3F-7F";
+          CommandDeleteReading(undef, "$name .*");
+          readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
+          $shutCmd = 0;
+          $updateState = 0;
+          ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
+        } elsif ($cmd eq "closes") {
+          $position = 0;
+        } elsif ($cmd eq "opens") {
+          $position = 100;
+        } elsif ($cmd eq "position") {
+          # closed: 100, open: 0
+          if (defined $a[1] && $a[1] =~ m/^\d+$/ && $a[1] <= 100) {
+             $position = $a[1] * 2;
+             shift (@a);
+             if (defined $a[1]) {
+               if ($a[1] =~ m/^high|low$/) {
+                 $shutCmd = $a[1] eq 'low' ? 0x13 : 3;
+                 shift (@a);
+                 if (defined $a[1]) {
+                   if ($a[1] =~ m/^lock|unlock$/) {
+                     $setCmd = $a[1] eq 'lock' ? 0x0C : 8;
+                     shift (@a);
+                   } else {
+                     return "Usage: $a[1] is wrong";
+                   }
+                 }
+               } else {
+                 return "Usage: $a[1] is wrong";
+               }
+             }
+          } else {
+            return "Usage: $a[1] is not numeric or out of range";
+          }
+        } elsif ($cmd eq "stop") {
+          # stop
+          $shutCmd = 0;
+        } else {
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "closes:noArg opens:noArg position:slider,0,5,100 stop:noArg teach:noArg"
+        }
+        if ($shutCmd || $cmd eq "stop") {
+          $updateState = 0;
+          # invert position
+          $data = sprintf "%02X00%02X%02X", 200 - $position, $shutCmd, $setCmd;
+        }
+        Log3 $name, 3, "EnOcean set $name $cmd";
+
+        } else {
         # Eltako Shutter
         my $angleMax = AttrVal($name, "angleMax", 90);
         my $angleMin = AttrVal($name, "angleMin", -90);
@@ -4670,6 +4889,7 @@ sub EnOcean_Set($@) {
           $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy), $shutCmd, $setCmd;
         }
         Log3 $name, 3, "EnOcean set $name $cmd";
+      }
       }
 
     } elsif ($st eq "actuator.01") {
@@ -6103,7 +6323,7 @@ sub EnOcean_Set($@) {
       $window = $window eq 'open' ? 0x10 : 0;
       $setpointShift = int(($setpointShift + $setpointShiftMax) * 255 / ($setpointShiftMax * 2));
       #$setpointShift = unpack('C', pack('c', $setpointShift));
-      my %fanSpeed = ('auto' => 0, 'off' =>1, 1 => 2, 2 => 3, 3 => 4);
+      my %fanSpeed = ('auto' => 0, 'off' => 1, 1 => 2, 2 => 3, 3 => 4);
       $occupancy = $occupancy eq 'occupied' ? 1 : 0;
       $data = sprintf "%02X%02X%02X%02X", $setpointType | $heating | $cooling | $window | 1,
                                           $setpointShift, $setpointBase,
@@ -7305,9 +7525,17 @@ sub EnOcean_Parse($$) {
         Log3 $name, 2, "EnOcean $name remote device with SenderID $senderID assigned";
         return '';
 
-      } elsif ($learningDev eq 'teachMsg' && ($rorgname =~ m/^VLD|MSC|SEC|ENC$/ || $rorgname eq '4BS' && (hex(substr($data, 6, 2))) & 8)) {
-        Log3 undef, 4, "EnOcean Received $rorgname telegram to the unknown device with SenderID $senderID.";
-        return '';
+      } elsif ($learningDev eq 'teachMsg' && ($rorgname =~ m/^VLD|SEC|ENC$/ || $rorgname eq '4BS' && (hex(substr($data, 6, 2))) & 8)) {
+          Log3 undef, 4, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram.";
+          return '';
+      } elsif ($learningDev eq 'teachMsg' && $rorgname eq "MSC") {
+          if ($teach && substr($data, 0, 3) eq '00D' && substr($data, 4, 2) eq 'FF') {
+            Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
+            return $ret;
+          } else {
+            Log3 undef, 4, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram.";
+            return '';
+          }
 
       } elsif ($rorg eq 'A5' &&
                hex(substr($data, 0, 2)) >> 2 == 0x3F &&
@@ -8055,6 +8283,7 @@ sub EnOcean_Parse($$) {
           $st = "raw";
         }
 
+#####*
         # signal telegram learn mode status
         my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, $attr{$name}{eep} eq 'raw' ? 1 : 0, 0, $hash->{DEF}, $attr{$name}{eep} eq 'raw' ? 'FF-FF-FF' : $attr{$name}{eep});
         EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
@@ -8064,23 +8293,25 @@ sub EnOcean_Parse($$) {
         return "";
       }
 
+    } elsif (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} eq 'MSC') {
+      # Eltako MSC teach-in response
+      my $ownSenderID = defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : $hash->{DEF};
+      if (substr($data, 0, 6) ne substr($ownSenderID, 2, 6)) {
+        # wrong response, device rejected, clear teach-in request
+        delete $hash->{helper}{teachInWait};
+        readingsSingleUpdate($hash, 'teach', '4BS teach-in response wrong, device rejected', 1);
+        Log3 $name, 2, "EnOcean $name 4BS teach-in rejected by SenderID $senderID";
+      }
+      return '';
+
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
       # [Kieback&Peter MD15-FTL-xx]
-      push @event, "3:energyInput:" . (($db[2] & 0x40) ? "enabled" : "disabled");
+      push @event, "1:energyInput:" . (($db[2] & 0x40) ? "enabled" : "disabled");
       my $battery = ($db[2] & 0x10) ? "ok" : "low";
-      my $energyStorage;
-      if ($db[2] & 0x20) {
-        $energyStorage = 'charged';
-        $battery = 'ok';
-      } else {
-        $energyStorage = 'empty';
-      }
-      if (!exists($hash->{helper}{battery}) || $hash->{helper}{battery} ne $battery) {
-        push @event, "3:battery:$battery";
-        $hash->{helper}{battery} = $battery;
-      }
-      push @event, "3:energyStorage:$energyStorage";
+      push @event, "1:battery:$battery";
+      my $energyStorage = ($db[2] & 0x20) ? 'charged' : 'empty';
+      push @event, "1:energyStorage:$energyStorage";
       my $roomTemp = ReadingsVal($name, "roomTemp", 20);
       if ($db[2] & 4) {
         readingsDelete($hash, "roomTemp");
@@ -8096,11 +8327,11 @@ sub EnOcean_Parse($$) {
 #      } else {
 #        $maintenanceMode = 'off';
 #      }
-      push @event, "3:cover:" . (($db[2] & 8) ? "open" : "closed");
+      push @event, "1:cover:" . (($db[2] & 8) ? "open" : "closed");
       my $window = ($db[2] & 2) ? "open" : "closed";
-      push @event, "3:window:$window";
-      push @event, "3:actuatorState:". (($db[2] & 1) ? "obstructed" : "ok");
-      push @event, "3:selfCtrl:" . (($db[0] & 4) ? "on" : "off");
+      push @event, "1:window:$window";
+      push @event, "1:actuatorState:". (($db[2] & 1) ? "obstructed" : "ok");
+      push @event, "1:selfCtrl:" . (($db[0] & 4) ? "on" : "off");
       my $functionSelect = 0;
       my $setpointSelect = 0;
       my $setpointSet = ReadingsVal($name, "setpointSetRestore", ReadingsVal($name, "setpointSet", $setpoint));
@@ -8213,8 +8444,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = 100;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:valveOpend:runInit";
-        push @event, "3:operationMode:off";
+        push @event, "1:maintenanceMode:valveOpend:runInit";
+        push @event, "1:operationMode:off";
         readingsDelete($hash, "setpointSet");
         readingsDelete($hash, "setpointTemp");
         readingsDelete($hash, "setpointTempSet");
@@ -8230,16 +8461,16 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:runInit";
+          push @event, "1:operationMode:off";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
           $setpointSet = 0;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:valveClosed";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:valveClosed";
+          push @event, "1:operationMode:off";
           readingsDelete($hash, "waitingCmds");
           $functionSelect = 1;
           $waitingCmds = 0x10;
@@ -8259,9 +8490,9 @@ sub EnOcean_Parse($$) {
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:runInit";
-        push @event, "3:operationMode:off";
-        push @event, "3:waitingCmds:$operationMode";
+        push @event, "1:maintenanceMode:runInit";
+        push @event, "1:operationMode:off";
+        push @event, "1:waitingCmds:$operationMode";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8278,9 +8509,9 @@ sub EnOcean_Parse($$) {
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:listSet";
-        push @event, "3:operationMode:off";
-        push @event, "3:waitingCmds:$operationMode";
+        push @event, "1:maintenanceMode:listSet";
+        push @event, "1:operationMode:off";
+        push @event, "1:waitingCmds:$operationMode";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8295,14 +8526,14 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:runInit";
+          push @event, "1:operationMode:off";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
           $db[2] = (40 - $temperature) * 255 / 40;
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpoint";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpoint";
           readingsDelete($hash, "setpointTemp");
           readingsDelete($hash, "setpointTempSet");
           readingsDelete($hash, "waitingCmds");
@@ -8316,8 +8547,8 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:runInit";
+          push @event, "1:operationMode:off";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
@@ -8335,8 +8566,8 @@ sub EnOcean_Parse($$) {
           $setpointTemp = $setpointTempSet;
           $db[2] = (40 - $temperature) * 255 / 40;
           push @event, "3:setpointTemp:" . sprintf("%0.1f", $setpointTemp);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpointTemp";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpointTemp";
           readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
@@ -8350,8 +8581,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:off";
-        push @event, "3:operationMode:summerMode";
+        push @event, "1:maintenanceMode:off";
+        push @event, "1:operationMode:summerMode";
         #readingsDelete($hash, "setpointSet");
         readingsDelete($hash, "setpointTemp");
         readingsDelete($hash, "setpointTempSet");
@@ -8365,14 +8596,14 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpoint";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpoint";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
           $db[2] = (40 - $temperature) * 255 / 40;
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpoint";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpoint";
           $waitingCmds = 0;
         }
 
@@ -8383,8 +8614,8 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpointTemp";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpointTemp";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
@@ -8402,8 +8633,8 @@ sub EnOcean_Parse($$) {
           $db[2] = (40 - $temperature) * 255 / 40;
           $setpointTemp = $setpointTempSet;
           push @event, "3:setpointTemp:" . sprintf("%.1f", $setpointTemp);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpointTemp";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpointTemp";
           $waitingCmds = 0;
         }
 
@@ -8413,8 +8644,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:off";
-        push @event, "3:operationMode:summerMode";
+        push @event, "1:maintenanceMode:off";
+        push @event, "1:operationMode:summerMode";
         $waitingCmds = 0;
 
        } elsif ($maintenanceMode eq "valveOpend:runInit") {
@@ -8423,8 +8654,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = 100;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:valveOpend:runInit";
-        push @event, "3:operationMode:off";
+        push @event, "1:maintenanceMode:valveOpend:runInit";
+        push @event, "1:operationMode:off";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8438,8 +8669,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:valveClosed";
-        push @event, "3:operationMode:off";
+        push @event, "1:maintenanceMode:valveClosed";
+        push @event, "1:operationMode:off";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8451,7 +8682,7 @@ sub EnOcean_Parse($$) {
         $db[2] = (40 - $temperature) * 255 / 40;
         $waitingCmds = 0;
       }
-      push @event, "3:state:T: " . sprintf("%0.1f", $temperature) . " SPT: " . sprintf("%.1f", $setpointTemp) . " SP: $setpoint";
+      push @event, "1:state:T: " . sprintf("%0.1f", $temperature) . " SPT: " . sprintf("%.1f", $setpointTemp) . " SP: $setpoint";
       # sent message to the actuator
       $data = sprintf "%02X%02X%02X08", $setpointSet, $db[2], $waitingCmds | $summerMode | $setpointSelect | $functionSelect;
       EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
@@ -9155,7 +9386,7 @@ sub EnOcean_Parse($$) {
       push @event, "3:state:" . ($db[0] & 1 ? "error" : "ok");
 
     } elsif ($st =~ m/^tempSensor/) {
-      # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-1B)
+      # Temperature Sensor with with different ranges (EEP A5-02-01 ... A5-02-30)
       # $db[1] is the temperature where 0x00 = max °C ... 0xFF = min °C
       my $temp;
       $temp = sprintf "%0.1f",   0 - $db[1] / 6.375 if ($st eq "tempSensor.01");
@@ -9185,6 +9416,12 @@ sub EnOcean_Parse($$) {
       $temp = sprintf "%0.1f", 62.3 - (($db[2] << 8) | $db[1]) / 10 if ($st eq "tempSensor.30");
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
+      readingsDelete($hash, "alarm");
+      if (AttrVal($name, "signOfLife", 'off') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1320), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "COSensor.01") {
       # Gas Sensor, CO Sensor (EEP A5-09-01)
@@ -9323,7 +9560,6 @@ sub EnOcean_Parse($$) {
 
     } elsif ($st eq "particlesSensor.01") {
       # Gas Sensor, Particles Sensor (EEP A5-09-07)
-      # [untested]
       # $db[3]_bit_7 ... $db[2]_bit_7 is the particle concentration < 10 µm
       # where 0 = 0 µg/m3 ... 511 = 511 µg/m3
       # $db[2]_bit_6 ... $db[1]_bit_6 is the particle concentration < 2.5 µm
@@ -9337,7 +9573,7 @@ sub EnOcean_Parse($$) {
       my $pm_2_5 = "inactive";
       my $pm_1 = "inactive";
       if ($db[0] & 4) {$pm_10 = $db[3] << 1 | $db[2] >> 7;}
-      if ($db[0] & 2) {$pm_2_5 = ($db[2] & 0x7F) << 1 | $db[1] >> 7;}
+      if ($db[0] & 2) {$pm_2_5 = ($db[2] & 0x7F) << 2 | $db[1] >> 6;}
       if ($db[0] & 1) {$pm_1 = ($db[1] & 0x3F) << 3 | $db[0] >> 5;}
       push @event, "3:particles_10:$pm_10";
       push @event, "3:particles_2_5:$pm_2_5";
@@ -10324,15 +10560,13 @@ sub EnOcean_Parse($$) {
       # 2 = x/100, 3 = x/1000
       my $dataType = ($db[0] & 4) >> 2;
       my $divisor = $db[0] & 3;
-      my $meterReading;
+      my $meterReading = $db[3] << 16 | $db[2] << 8 | $db[1];
       if ($divisor == 3) {
-        $meterReading = sprintf "%.3f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 1000;
+        $meterReading = sprintf "%.3f", $meterReading / 1000;
       } elsif ($divisor == 2) {
-        $meterReading = sprintf "%.2f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 100;
+        $meterReading = sprintf "%.2f", $meterReading / 100;
       } elsif ($divisor == 1) {
-        $meterReading = sprintf "%.1f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 10;
-      } else {
-        $meterReading = $db[3] << 16 | $db[2] << 8 | $db[1];
+        $meterReading = sprintf "%.1f", $meterReading / 10;
       }
       my $channel = $db[0] >> 4;
 
@@ -10366,7 +10600,7 @@ sub EnOcean_Parse($$) {
             $serialNumber = sprintf "%4s%01x%01x%01x%01x", $serialNumber,
                             $db[2] >> 4, $db[2] & 0x0F, $db[3] >> 4, $db[3] & 0x0F;
           }
-          push @event, "3:serialNumber:$serialNumber";
+          push @event, "1:serialNumber:$serialNumber";
         } elsif ($dataType == 1) {
           # momentary power
           push @event, "3:power:$meterReading";
@@ -10376,7 +10610,7 @@ sub EnOcean_Parse($$) {
         } else {
           # power consumption
           push @event, "3:energy$channel:$meterReading";
-          push @event, "3:currentTariff:$channel";
+          push @event, "1:currentTariff:$channel";
         }
       } elsif ($st eq "autoMeterReading.02" || $st eq "autoMeterReading.03") {
         # Automated meter reading (AMR), Gas, Water (EEP A5-12-02, A5-12-03)
@@ -10387,7 +10621,7 @@ sub EnOcean_Parse($$) {
         } else {
           # cumulative counter
           push @event, "3:consumption$channel:$meterReading";
-          push @event, "3:currentTariff:$channel";
+          push @event, "1:currentTariff:$channel";
         }
       }
 
@@ -10740,9 +10974,9 @@ sub EnOcean_Parse($$) {
         InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
       } else {
         my $in0 = $db[1] & 1;
-        my $in1 = ($db[1] & 2) > 1;
-        my $in2 = ($db[1] & 4) > 2;
-        my $in3 = ($db[1] & 8) > 3;
+        my $in1 = ($db[1] & 2) >> 1;
+        my $in2 = ($db[1] & 4) >> 2;
+        my $in3 = ($db[1] & 8) >> 3;
         my $wake = $db[1] & 16 ? 'high' : 'low';
         push @event, "3:in0:$in0";
         push @event, "3:in1:$in1";
@@ -10755,8 +10989,8 @@ sub EnOcean_Parse($$) {
     } elsif ($st eq "digitalInput.04") {
       # 3 digital inputs, 1 digital input 8 bit (EEP A5-30-04)
       my $in0 = $db[0] & 1;
-      my $in1 = ($db[0] & 2) > 1;
-      my $in2 = ($db[0] & 4) > 2;
+      my $in1 = ($db[0] & 2) >> 1;
+      my $in2 = ($db[0] & 4) >> 2;
       my $in3 = $db[1];
       push @event, "3:in0:$in0";
       push @event, "3:in1:$in1";
@@ -10920,88 +11154,104 @@ sub EnOcean_Parse($$) {
         }
 
       } elsif ($manufID eq "00D") {
+        if ($model eq "Eltako_FRM60") {
+          my ($position, $state);
+          # invert position
+          $position = 200 - $db[3];
+          $position = $db[3] == 1 ? 1 : int($db[3] / 2);
+          if ($position == 100) {
+            push @event, "3:endPosition:closed";
+            $state = "closed";
+          } elsif ($position == 0) {
+            push @event, "3:endPosition:open";
+            $state = "open";
+          } else {
+            push @event, "3:endPosition:not_reached";
+            $state = $position;
+          }
+          push @event, "1:block:" . ($db[0] & 4 ? 'lock' : 'unlock');
+          push @event, "3:position:$position";
+          push @event, "3:state:$state";
+        } else {
         # [Eltako shutter]
-        my $angleMax = AttrVal($name, "angleMax", 90);
-	my $angleMin = AttrVal($name, "angleMin", -90);
-	my $anglePos = ReadingsVal($name, ".anglePosStart", undef);
-	my $angleTime = AttrVal($name, "angleTime", 0);
-	my $position = ReadingsVal($name, ".positionStart", undef);
-        my $shutTime = AttrVal($name, "shutTime", 255);
-        my $shutTimeStop = ($db[3] << 8 | $db[2]) * 0.1;
-        my $state;
-        $angleMax = 90 if ($angleMax !~ m/^[+-]?\d+$/);
-        $angleMax = 180 if ($angleMax > 180);
-        $angleMax = -180 if ($angleMax < -180);
-        $angleMin = -90 if ($angleMin !~ m/^[+-]?\d+$/);
-        $angleMin = 180 if ($angleMin > 180);
-        $angleMin = -180 if ($angleMin < -180);
-        ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
-        $angleMax ++ if ($angleMin == $angleMax);
-        $angleTime = 0 if ($angleTime !~ m/^[+-]?\d+$/);
-        $angleTime = 6 if ($angleTime > 6);
-        $angleTime = 0 if ($angleTime < 0);
-        $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
-        $shutTime = 255 if ($shutTime > 255);
-        $shutTime = 1 if ($shutTime < 1);
+          my $angleMax = AttrVal($name, "angleMax", 90);
+          my $angleMin = AttrVal($name, "angleMin", -90);
+	  my $anglePos = ReadingsVal($name, ".anglePosStart", undef);
+	  my $angleTime = AttrVal($name, "angleTime", 0);
+	  my $position = ReadingsVal($name, ".positionStart", undef);
+          my $shutTime = AttrVal($name, "shutTime", 255);
+          my $shutTimeStop = ($db[3] << 8 | $db[2]) * 0.1;
+          my $state;
+          $angleMax = 90 if ($angleMax !~ m/^[+-]?\d+$/);
+          $angleMax = 180 if ($angleMax > 180);
+          $angleMax = -180 if ($angleMax < -180);
+          $angleMin = -90 if ($angleMin !~ m/^[+-]?\d+$/);
+          $angleMin = 180 if ($angleMin > 180);
+          $angleMin = -180 if ($angleMin < -180);
+          ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
+          $angleMax ++ if ($angleMin == $angleMax);
+          $angleTime = 0 if ($angleTime !~ m/^[+-]?\d+$/);
+          $angleTime = 6 if ($angleTime > 6);
+          $angleTime = 0 if ($angleTime < 0);
+          $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
+          $shutTime = 255 if ($shutTime > 255);
+          $shutTime = 1 if ($shutTime < 1);
 
-        if ($db[0] == 0x0A) {
-          push @event, "3:block:unlock";
-        } elsif ($db[0] == 0x0E) {
-          push @event, "3:block:lock";
-        }
-        if (defined $position) {
-          if ($db[1] == 1) {
-            # up
-            $position -= $shutTimeStop / $shutTime * 100;
-            if ($angleTime) {
-              $anglePos -= ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
-              if ($anglePos < $angleMin) {
+          push @event, "1:block:" . ($db[0] & 4 ? 'lock' : 'unlock');
+          if (defined $position) {
+            if ($db[1] == 1) {
+              # up
+              $position -= $shutTimeStop / $shutTime * 100;
+              if ($angleTime) {
+                $anglePos -= ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
+                if ($anglePos < $angleMin) {
+                  $anglePos = $angleMin;
+                }
+              } else {
                 $anglePos = $angleMin;
               }
-            } else {
-              $anglePos = $angleMin;
-            }
-            if ($position <= 0) {
-              $anglePos = 0;
-              $position = 0;
-              push @event, "3:endPosition:open";
-              $state = "open";
-            } else {
-              push @event, "3:endPosition:not_reached";
-              $state = "stop";
-            }
-            push @event, "3:anglePos:" . sprintf("%d", $anglePos);
-            push @event, "3:position:" . sprintf("%d", $position);
-            push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
-            push @event, "3:.positionStart:" . sprintf("%d", $position);
-          } elsif ($db[1] == 2) {
-          # down
-            $position += $shutTimeStop / $shutTime * 100;
-            if ($angleTime) {
-              $anglePos += ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
-              if ($anglePos > $angleMax) {
+              if ($position <= 0) {
+                $anglePos = 0;
+                $position = 0;
+                push @event, "3:endPosition:open";
+                $state = "open";
+              } else {
+                push @event, "3:endPosition:not_reached";
+                $state = "stop";
+              }
+              push @event, "3:anglePos:" . sprintf("%d", $anglePos);
+              push @event, "3:position:" . sprintf("%d", $position);
+              push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
+              push @event, "3:.positionStart:" . sprintf("%d", $position);
+            } elsif ($db[1] == 2) {
+            # down
+              $position += $shutTimeStop / $shutTime * 100;
+              if ($angleTime) {
+                $anglePos += ($angleMax - $angleMin) * $shutTimeStop / $angleTime;
+                if ($anglePos > $angleMax) {
+                  $anglePos = $angleMax;
+                }
+              } else {
                 $anglePos = $angleMax;
               }
+              if($position >= 100) {
+                $anglePos = $angleMax;
+                $position = 100;
+                push @event, "3:endPosition:closed";
+                $state = "closed";
+              } else {
+                push @event, "3:endPosition:not_reached";
+                $state = "stop";
+              }
+              push @event, "3:anglePos:" . sprintf("%d", $anglePos);
+              push @event, "3:position:" . sprintf("%d", $position);
+              push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
+              push @event, "3:.positionStart:" . sprintf("%d", $position);
             } else {
-              $anglePos = $angleMax;
+              $state = "not_reached";
             }
-            if($position >= 100) {
-              $anglePos = $angleMax;
-              $position = 100;
-              push @event, "3:endPosition:closed";
-              $state = "closed";
-            } else {
-              push @event, "3:endPosition:not_reached";
-              $state = "stop";
-            }
-            push @event, "3:anglePos:" . sprintf("%d", $anglePos);
-            push @event, "3:position:" . sprintf("%d", $position);
-            push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
-            push @event, "3:.positionStart:" . sprintf("%d", $position);
-          } else {
-            $state = "not_reached";
+            push @event, "3:state:$state";
           }
-        push @event, "3:state:$state";
         }
 
       } else {
@@ -11911,6 +12161,7 @@ sub EnOcean_Parse($$) {
         my $battery = $db[1] & 0x80 ? 'low' : 'ok';
         push @event, "1:battery:$battery";
         push @event, "1:batteryPercent:". ($db[1] & 0x7F);
+        push @event, "1:burglaryAlarm:off";
         my %errorStatus = (
           0 => "ok",
           1 => "error",
@@ -12634,6 +12885,32 @@ sub EnOcean_Parse($$) {
           push @event, "3:taughtInDevID" . sprintf('%02d', $db[4]) . ":" . substr($data, 8, 8);
         }
       }
+    } elsif ($manufID eq "00D") {
+        if (substr($data, 4, 2) eq 'FE') {
+          # teachin states
+          if (substr($data, 6, 6) eq '030301') {
+            # teachin started
+            if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} eq "MSC" &&
+                exists($attr{$name}{mscRefID}) &&
+                exists($EnO_mscRefID{$attr{$name}{mscRefID}})) {
+              EnOcean_SndRadio(undef, $hash, $packetType, "A5", $EnO_mscRefID{$attr{$name}{mscRefID}}{teachIn}, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+              push @event, "3:teach:4BS teach-in response sent";
+              Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
+            } else {
+              delete $hash->{helper}{teachInWait};
+            }
+        } elsif (substr($data, 6, 6) eq '030300') {
+          delete $hash->{helper}{teachInWait};
+        } elsif (substr($data, 6, 6) eq '030400') {
+          delete $hash->{helper}{teachInWait};
+          push @event, "3:teach:4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: $EnO_manuf{$manufID}";
+          Log3 $name, 2, "EnOcean $name 4BS teach-in accepted EEP: $attr{$name}{eep} Manufacturer: $EnO_manuf{$manufID}";
+        } elsif (substr($data, 6, 6) eq 'FC0100') {
+          delete $hash->{helper}{teachInWait};
+          push @event, "3:teach:4BS teach-in not accepted by $hash->{DEF}";
+          Log3 $name, 2, "EnOcean $name 4BS teach-in not accepted by $hash->{DEF}";
+        }
+      }
 
     } elsif ($st eq "raw") {
       # raw
@@ -12656,7 +12933,7 @@ sub EnOcean_Parse($$) {
     if ($signalMID == 1) {
       push @event, "3:smartAckMailbox:empty";
     } elsif ($signalMID == 2) {
-      push @event, "3:smartAckMailbox:not_exits";
+      push @event, "3:smartAckMailbox:not_exists";
     } elsif ($signalMID == 3) {
       push @event, "3:smartAckMailbox:reset";
     } elsif ($signalMID == 4) {
@@ -13697,7 +13974,7 @@ sub EnOcean_Parse($$) {
   for(my $i = 0; $i < int(@event); $i++) {
     # Flag & 1: reading, Flag & 2: always update
     my ($flag, $vn, $vv) = split(':', $event[$i], 3);
-    if ($flag + 0 & 2) {
+    if ($flag + 0 & 2 || $attr{$name}{alwaysUpdateReadings}) {
       readingsBulkUpdate($hash, $vn, $vv);
     } else {
       readingsBulkUpdateIfChanged($hash, $vn, $vv);
@@ -13801,6 +14078,13 @@ sub EnOcean_Attr(@) {
       }
 
     } else {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "alwaysUpdateReadings") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^[0-1]$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -13994,7 +14278,7 @@ sub EnOcean_Attr(@) {
   } elsif ($attrName eq "devUpdate") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^(off|auto|demand|polling|interrupt)$/) {
+    } elsif ($attrVal !~ m/^off|auto$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -14414,6 +14698,13 @@ sub EnOcean_Attr(@) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "rotationSpeed") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^high|low$/) {
+      $err = "attribute-value [$attrName] = $attrVal is not valid";
+    }
+
   } elsif ($attrName eq "secLevel") {
     if (!defined $attrVal){
 
@@ -14823,12 +15114,16 @@ sub EnOcean_Notify(@) {
           } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
             @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
             EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+          } elsif ($attr{$name}{subType} eq 'occupSensor.01' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+            my @setCmd = ($name, ReadingsVal($name, 'motion', 'status'));
+            EnOcean_Set($hash, @setCmd);
           }
         }
       }
       # teach-in response actions
       # delete temporary teach-in response device, see V9333_02
       #Log3($name, 2, "EnOcean $name <notify> DEFINED $definedName");
+      #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
 
     } elsif ($devName eq "global" && $s =~ m/^INITIALIZED$/) {
       # assign remote management defptr
@@ -14849,6 +15144,9 @@ sub EnOcean_Notify(@) {
         } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
           @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
           EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+        } elsif ($attr{$name}{subType} eq 'occupSensor.01' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+          my @setCmd = ($name, ReadingsVal($name, 'motion', 'status'));
+          EnOcean_Set($hash, @setCmd);
         } elsif ($attr{$name}{subType} eq "switch.05") {
           my @getCmd = ($name, 'state');
           EnOcean_Get($hash, @getCmd);
@@ -14877,6 +15175,9 @@ sub EnOcean_Notify(@) {
         } elsif ($attr{$name}{subType} eq 'environmentApp' && AttrVal($name, 'devMode', 'slave') eq 'master') {
           @{$hash->{helper}{periodic}{time}} = ($hash, 'time', $attr{$name}{sendTimePeriodic}, 30, -1, undef);
           EnOcean_SndPeriodic($hash->{helper}{periodic}{time});
+        } elsif ($attr{$name}{subType} eq 'occupSensor.01' && AttrVal($name, 'devMode', 'slave') eq 'master') {
+          my @setCmd = ($name, ReadingsVal($name, 'motion', 'status'));
+          EnOcean_Set($hash, @setCmd);
         }
       }
 
@@ -15041,6 +15342,16 @@ sub EnOcean_Notify(@) {
       #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
       }
 
+      if (defined(AttrVal($name, "motionRefDev", undef)) &&
+          $devName eq AttrVal($name, "motionRefDev", "") &&
+          $parts[0] eq "motion") {
+        if (AttrVal($name, "subType", '') eq 'occupSensor.01') {
+          my @setCmd = ($name, $parts[1]);
+          EnOcean_Set($hash, @setCmd);
+          #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+        }
+      }
+
       if (defined(AttrVal($name, "temperatureRefDev", undef)) && AttrVal($name, "setCmdTrigger", "man") eq "refDev") {
         # sent a setpoint or setpointTemp telegram
         if ($devName eq AttrVal($name, "temperatureRefDev", "")) {
@@ -15182,7 +15493,7 @@ sub EnOcean_constLightCtrl($) {
     $hash->{helper}{constLightCtrl}[7] = 2;
   }
   InternalTimer(gettimeofday() + $hash->{helper}{constLightCtrl}[6], 'EnOcean_constLightCtrl', $hash->{helper}{constLightCtrl}, 0);
-  Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 4 B: $brightness D: $dimTemp >> $dimCalc CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef') . " RESPONSE: " . ($hash->{helper}{constLightCtrl}[7] // 'undef');
+  #Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 4 B: $brightness D: $dimTemp >> $dimCalc CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef') . " RESPONSE: " . ($hash->{helper}{constLightCtrl}[7] // 'undef');
   return $logLevel;
 }
 
@@ -16355,7 +16666,6 @@ sub EnOcean_CheckSenderID($$$) {
     $IDCntr1 = $unusedID + 1;
     $IDCntr2 = $unusedID + 127;
   }
-
   if ($ctrl eq "getBaseID") {
     # get TCM BaseID of the EnOcean device
     if ($defs{$ioDev}{BaseID}) {
@@ -17283,6 +17593,18 @@ sub EnOcean_sndUTE($$$$$$$) {
   $attr{$name}{manufID} = "7FF";
   $data = sprintf "%02X%02X%s%s%s%s%s", $db[6], $db[5], $db[4], $db[3], $db[2], $db[1], $db[0];
   return ($err, "D4", $data);
+}
+
+#
+sub EnOcean_SignOfLife($) {
+  my ($functionHash) = @_;
+  my $hash = $functionHash->{hash};
+  return if (AttrVal($hash->{NAME}, 'devUpdate', 'off') ne 'auto');
+  my $function = $functionHash->{function};
+  my $period = $functionHash->{period};
+  my @setCmd = ($hash->{NAME}, $function);
+  EnOcean_Set($hash, @setCmd);
+  return;
 }
 
 #
@@ -18292,15 +18614,17 @@ sub EnOcean_Delete($$) {
 =item summary_DE EnOcean Gateway und Aktor
 =begin html
 
-<a name="EnOcean"></a>
+<a id="EnOcean"></a>
 <h3>EnOcean</h3>
 <ul><br>
   <b>Quick Links</b>
   <ul>
-  <li><a href="#EnOceanget">Get Commands</a></li>
-  <li><a href="#EnOceanset">Set Commands</a></li>
-  <li><a href="#EnOceanattr">Attributes</a></li>
-  <li><a href="#EnOceanevents">Generated Events</a></li>
+  <li><a href="#EnOcean-define">Define</a></li>
+  <li><a href="#EnOcean-internals">Internals</a></li>
+  <li><a href="#EnOcean-get">Get Commands</a></li>
+  <li><a href="#EnOcean-set">Set Commands</a></li>
+  <li><a href="#EnOcean-attr">Attributes</a></li>
+  <li><a href="#EnOcean-events">Generated Events</a></li>
   </ul><br><br>
   EnOcean devices are sold by numerous hardware vendors (e.g. Eltako, Peha, etc),
   using the RF Protocol provided by the EnOcean Alliance.<br><br>
@@ -18334,16 +18658,16 @@ sub EnOcean_Delete($$) {
   Fhem recognizes a number of devices automatically. In order to teach-in, for
   some devices the sending of confirmation telegrams has to be turned on.
   Some equipment types and/or device models must be manually specified.
-  Do so using the <a href="#EnOceanattr">attributes</a>
-  <a href="#subType">subType</a> and <a href="#model">model</a>, see chapter
-  <a href="#EnOceanset">Set</a> and
-  <a href="#EnOceanevents">Generated events</a>. With the help of additional
-  <a href="#EnOceanattr">attributes</a>, the behavior of the devices can be
+  Do so using the <a href="#EnOcean-attr">attributes</a>
+  <a href="#EnOcean-attr-subType">subType</a> and <a href="#EnOcean-attr-model">model</a>, see chapter
+  <a href="#EnOcean-set">Set</a> and
+  <a href="#EnOcean-events">Generated events</a>. With the help of additional
+  <a href="#EnOcean-attr">attributes</a>, the behavior of the devices can be
   changed separately.
   <br><br>
   Fhem and the EnOcean devices must be trained with each other. To this, Fhem
-  must be in the learning mode, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>,
-  <a href="#EnOcean_smartAck">Smart Ack Learning</a> and <a href="#TCM_learningMode">learningMode</a>.
+  must be in the learning mode, see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>,
+  <a href="#EnOcean-smartAck">Smart Ack Learning</a> and <a href="#TCM_learningMode">learningMode</a>.
   The teach-in procedure depends on the type of the devices.
   <br><br>
   Switches (EEP RPS) and contacts (EEP 1BS) are recognized when receiving the first message.
@@ -18351,14 +18675,16 @@ sub EnOcean_Delete($$) {
   Sensors (EEP 4BS) has to send a teach-in telegram. The profile-less
   4BS teach-in procedure transfers no EEP profile identifier and no manufacturer
   ID. In this case Fhem does not recognize the device automatically. The proper
-  device type must be set manually, use the <a href="#EnOceanattr">attributes</a>
-  <a href="#subType">subType</a>, <a href="#manufID">manufID</a> and/or
-  <a href="#model">model</a>. If the EEP profile identifier and the manufacturer
+  device type must be set manually, use the <a href="#EnOcean-attr">attributes</a>
+  <a href="#EnOcean-attr-subType">subType</a>, <a href="#EnOcean-attr-manufID">manufID</a> and/or
+  <a href="#EnOcean-attr-model">model</a>. If the EEP profile identifier and the manufacturer
   ID are sent the device is clearly identifiable. Fhem automatically assigns
   these devices to the correct profile.
   <br><br>
   4BS devices can also be taught in special cases by using of confirmation telegrams. This method
-  is used for the EnOcean Tipp-Funk devices. The function is activated via the attribute [<a href="#EnOcean_teachMethod">teachMethod</a>] = confirm.<br>
+  is used for the EnOcean Tipp-Funk devices. The function is activated via the attribute
+  [<a href="#EnOcean-teachMethod">teachMethod</a>] = confirm. Some Eltako devices are fully preconfigured via
+  <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> for this procedure.<br>
   For example the remote device Eltako TF100D can be learned as follows
   <ul><br>
   <code>define &lt;name&gt; EnOcean H5-38-08</code><br>
@@ -18367,13 +18693,22 @@ sub EnOcean_Delete($$) {
   </ul>
   <br>
   Some 4BS, VLD or MSC devices must be paired bidirectional,
-  see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.
+  see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.
+  <br><br>
+  For some devices, Eltako uses a company-specific MSC teach-in process. These devices send special MSC telegrams
+  when switched on. With bidirectional actuators, the MSC telegrams are only sent as long as they are still in the
+  delivery state or the teach-in process is activated manually. See <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a>
+  for the supported devices. To teach-in the devices in Fhem,
+  <br>
+  <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code>
+  <br><br>
+  must be activated.
   <br><br>
   Devices that communicate encrypted, has to taught-in through specific procedures.
   <br><br>
   Smart Ack Learning is a futher process where devices exchange information about each
   other in order to create the logical links in the EnOcean network and a Post Master Mail Box.
-  It can result in Learn In or Learn Out, see <a href="#EnOcean_smartAck">Smart Ack Learning</a>.
+  It can result in Learn In or Learn Out, see <a href="#EnOcean-smartAck">Smart Ack Learning</a>.
   <br><br>
   Fhem supports many of most common EnOcean profiles and manufacturer-specific
   devices. Additional profiles and devices can be added if required.
@@ -18382,7 +18717,7 @@ sub EnOcean_Delete($$) {
   <a href="#TCM">TCM</a> module is necessary.
   <br><br>
   Please note that EnOcean repeaters also send Fhem data telegrams again.
-  Use the TCM <code>attr &lt;name&gt; <a href="#blockSenderID">blockSenderID</a> own</code>
+  Use the TCM <code>attr &lt;name&gt; <a href="#EnOcean-attr-blockSenderID">blockSenderID</a> own</code>
   to block receiving telegrams with a TCM SenderIDs.
   <br><br>
 
@@ -18393,25 +18728,25 @@ sub EnOcean_Delete($$) {
     of the acknowledgment telegrams of the actuator. If within one second no acknowledgment
     telegram is received, the last set command is sent again.
     The set command is repeated a maximum of 5 times. The maximum number can be specified in the attribute
-    <a href="#EnOcean_observeCmdRepetition">observeCmdRepetition</a>.<br>
+    <a href="#EnOcean-attr-observeCmdRepetition">observeCmdRepetition</a>.<br>
     The function can only be used if the actuator immediately after the reception of
     the set command sends an acknowledgment message.<br>
-    The observing function is turned on by the Attribute <a href="#EnOcean_observe">observe.</a>
+    The observing function is turned on by the Attribute <a href="#EnOcean-attr-observe">observe.</a>
     In addition, further devices can be monitored. The names of this devices can be entered in the
-    <a href="#EnOcean_observeRefDev">observeRefDev</a> attribute. If additional device are specified,
+    <a href="#EnOcean-attr-observeRefDev">observeRefDev</a> attribute. If additional device are specified,
     the monitoring is stopped as soon as the first acknowledgment telegram of one of the devices was received (OR logic).
-    If the <a href="#EnOcean_observeLogic">observeLogic</a> attribute is set to "and", the monitoring is stopped when a telegram
+    If the <a href="#EnOcean-attr-observeLogic">observeLogic</a> attribute is set to "and", the monitoring is stopped when a telegram
     was received by all devices (AND logic). Please note that the name of the own device has also to be entered in the
-    <a href="#EnOcean_observeRefDev">observeRefDev</a> if required.<br>
+    <a href="#EnOcean-attr-observeRefDev">observeRefDev</a> if required.<br>
     If the maximum number of retries is reached and still no all acknowledgment telegrams has been received, the reading
     "observeFailedDev" shows the faulty devices and the command can be executed, that is stored in the
-    <a href="#EnOcean_observeErrorAction">observeErrorAction</a> attribute.
+    <a href="#EnOcean-attr-observeErrorAction">observeErrorAction</a> attribute.
     <br><br>
   </ul>
 
   <b>Energy Management</b><br>
   <ul>
-    <li><a href="#demand_response">Demand Response</a> (EEP A5-37-01)</li>
+    <li><a href="#EnOcean-attr-demand_response">Demand Response</a> (EEP A5-37-01)</li>
     Demand Response (DR) is a standard to allow utility companies to send requests for reduction in power
     consumption during peak usage times. It is also used as a means to allow users to reduce overall power
     comsumption as energy prices increase. The EEP was designed with a very flexible setting for the level
@@ -18420,12 +18755,12 @@ sub EnOcean_Delete($$) {
     The profile also includes a timeout setting to indicate how long the DR event should last if the
     DR transmitting device does not send heartbeats or subsequent new DR levels.<br>
     The DR actor controls the target actuators such as switches, dimmers etc. The DR actor
-    is linked to the FHEM target actors via the attribute <a href="#EnOcean_demandRespRefDev">demandRespRefDev</a>.<br>
+    is linked to the FHEM target actors via the attribute <a href="#EnOcean-attr-demandRespRefDev">demandRespRefDev</a>.<br>
     <ul>
     <li>Standard actions are available for the following profiles:</li>
     <ul>
-    <li>switch (setting the switching command for min, max by the attribute <a href="#EnOcean_demandRespMin">demandRespMin</a>,
-    <a href="#EnOcean_demandRespMax">demandRespMax</a>)</li>
+    <li>switch (setting the switching command for min, max by the attribute <a href="#EnOcean-attr-demandRespMin">demandRespMin</a>,
+    <a href="#EnOcean-attr-demandRespMax">demandRespMax</a>)</li>
     <li>gateway/switching (on, off)</li>
     <li>gateway/dimming (dim 0...100, relative to the max or current set value)</li>
     <li>lightCtrl.01 (dim 0...255)</li>
@@ -18435,7 +18770,7 @@ sub EnOcean_Delete($$) {
     <li>roomCtrlPanel.00 (roomCtrlMode comfort|economy)</li>
     </ul>
     <li>On the target actuator can be specified alternatively a freely definable command.
-    The command sequence is stored in the attribute <a href="#EnOcean_demandRespAction">demandRespAction</a>.
+    The command sequence is stored in the attribute <a href="#EnOcean-attr-demandRespAction">demandRespAction</a>.
     The command sequence can be designed similar to "notify". For the command sequence predefined variables can be used,
     eg. $LEVEL. This actions can be executed very flexible depending on the given energy
     reduction levels.
@@ -18457,7 +18792,7 @@ sub EnOcean_Delete($$) {
     is 15. Through the optional parameters "powerUsageScale", "randomStart", "randomEnd" and "timeout"
     the control behavior can be customized. The threshold at which the reading "powerUsageLevel"
     between "min" and "max" switch is specified with the attribute
-    <a href="#EnOcean_demandRespThreshold">demandRespThreshold</a>.
+    <a href="#EnOcean-attr-demandRespThreshold">demandRespThreshold</a>.
     </li>
     </ul>
     Additional information about the profile itself can be found in the EnOcean EEP documentation.
@@ -18481,9 +18816,9 @@ sub EnOcean_Delete($$) {
     </ul><br><br>
     The automatic control can be turned off by any other command. If the dimmaktor reports its stats,
     the control is also deactivated any manual input, for example on a wall switch.<br>
-    The straight-line characteristic is determined via the attribute <a href="#EnOcean_openLoopCtrlScale">openLoopCtrlScale</a>.
+    The straight-line characteristic is determined via the attribute <a href="#EnOcean-attr-openLoopCtrlScale">openLoopCtrlScale</a>.
     Below and above the characteristic thresholds, the dimming values remain constant at the value of dimHigh or dimLow.
-    The name of the brightness sensor must be specified in the <a href="#EnOcean_brightnessRefDev">brightnessRefDev</a> attribute.<br>
+    The name of the brightness sensor must be specified in the <a href="#EnOcean-attr-brightnessRefDev">brightnessRefDev</a> attribute.<br>
     Currently, the constant light control is available for the gateway/dimming profile. More profiles will follow.
   <br><br>
   </ul>
@@ -18561,17 +18896,17 @@ sub EnOcean_Delete($$) {
       power-up the remote device<br>
       <code>get &lt;name&gt; remoteID</code><br><br>
     </ul>
-    All commands are described in the remote management chapters of the <a href="#EnOcean_remoteSet">set</a>-
-    and <a href="#EnOcean_remoteGet">get</a>-commands.<br><br>
+    All commands are described in the remote management chapters of the <a href="#EnOcean-remoteSet">set</a>-
+    and <a href="#EnOcean-remoteGet">get</a>-commands.<br><br>
     The Remote Management Function is configured using the following attributes:<br>
     <ul>
-      <li><a href="#EnOcean_remoteCode">remoteCode</a></li>
-      <li><a href="#EnOcean_remoteEEP">remoteEEP</a></li>
-      <li><a href="#EnOcean_remoteID">remoteID</a></li>
-      <li><a href="#EnOcean_remoteManagement">remoteManagement</a></li>
-      <li><a href="#EnOcean_remoteManufID">remoteManufID</a></li>
+      <li><a href="#EnOcean-attr-remoteCode">remoteCode</a></li>
+      <li><a href="#EnOcean-attr-remoteEEP">remoteEEP</a></li>
+      <li><a href="#EnOcean-attr-remoteID">remoteID</a></li>
+      <li><a href="#EnOcean-attr-remoteManagement">remoteManagement</a></li>
+      <li><a href="#EnOcean-attr-remoteManufID">remoteManufID</a></li>
     </ul><br>
-    The content of events is described in the chapter <a href="#EnOcean_remoteEvents">Remote Management Events</a><br><br>.
+    The content of events is described in the chapter <a href="#EnOcean-attr-remoteEvents">Remote Management Events</a><br><br>.
     The following extended functions are supported:
     <ul>
       <li>210:remoteLinkTableInfo</li>
@@ -18610,9 +18945,9 @@ sub EnOcean_Delete($$) {
       <li>Radio link quality reporting</li>
       <li>Learn Mode Status</li>
     </ul>
-    The Signal Telegram function commands are activated by the attribute <a href="#EnOcean_signal">signal</a>.
-    All commands are described in the signal telegram chapter of the <a href="#EnOcean_signalGet">get</a>-commands.
-    The content of events is described in the chapter <a href="#EnOcean_signalEvents">Signal Telegram Events</a>.
+    The Signal Telegram function commands are activated by the attribute <a href="#EnOcean-attr-signal">signal</a>.
+    All commands are described in the signal telegram chapter of the <a href="#EnOcean-signalGet">get</a>-commands.
+    The content of events is described in the chapter <a href="#EnOcean-signalEvents">Signal Telegram Events</a>.
     <br><br>
   </ul>
 
@@ -18689,7 +19024,7 @@ sub EnOcean_Delete($$) {
   <br><br>
   </ul>
 
-  <a name="EnOceandefine"></a>
+  <a id="EnOcean-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; EnOcean &lt;DEF&gt; [&lt;EEP&gt;]|getNextID|&lt;EEP&gt;</code>
@@ -18721,9 +19056,10 @@ sub EnOcean_Delete($$) {
       <code>define sensor1 EnOcean A5-02-05</code><br>
     </ul><br>
 
-   Inofficial EEP for special devices
+   <a id="EnOcean-Inofficial-EEP">Inofficial EEP</a> for special devices
    <ul>
      <li>G5-07-01 PioTek-Tracker<br></li>
+     <li>H5-07-01 Presence Sensor (Master)<br></li>
      <li>G5-10-12 Room Sensor and Control Unit [Eltako FUTH65D]<br></li>
      <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
      <li>H5-38-08 Gateway, Dimming [Eltako TF61D, TF100D]<br></li>
@@ -18733,6 +19069,8 @@ sub EnOcean_Delete($$) {
      <li>O5-38-08 Gateway, Switching [Eltako FSR14] with teachMethod confirm<br></li>
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
      <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
+     <li>I5-3F-7F Shutter [Eltako FRM60] - MSC teach-in supported<br></li>
+     <li>G6-02-01 Pushbutton with controllable LEDs [Eltako F4CT55] - MSC teach-in supported<br></li>
      <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
      <li>G5-ZZ-ZZ Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
      <li>ZZ-13-03 Environmental Applications, Data Exchange (EEP A5-13-03)<br></li>
@@ -18743,15 +19081,15 @@ sub EnOcean_Delete($$) {
 
     The <a href="#autocreate">autocreate</a> module may help you if the actor or sensor send
     acknowledge messages or teach-in telegrams. In order to control this devices e. g. switches with
-    additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
-    <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br>
+    additional SenderIDs you can use the attributes <a href="#EnOcean-attr-subDef">subDef</a>,
+    <a href="#EnOcean-attr-subDef0">subDef0</a> and <a href="#EnOcean-attr-subDefI">subDefI</a>.<br>
     Fhem communicates unicast, if bidirectional 4BS or UTE teach-in is used, see
-    <a href="#EnOcean_teach-in"> Bidirectional Teach-In / Teach-Out</a>. In this case
+    <a href="#EnOcean-teach-in"> Bidirectional Teach-In / Teach-Out</a>. In this case
     Fhem send unicast telegrams with its SenderID and the DestinationID of the device.
     <br><br>
   </ul>
 
-  <a name="EnOceaninternals"></a>
+  <a id="EnOcean-internals"></a>
   <b>Internals</b>
   <ul>
     <li>DEF: 0000000 ... FFFFFFFF|&lt;EEP&gt;<br>
@@ -18797,10 +19135,10 @@ sub EnOcean_Delete($$) {
     <br><br>
   </ul>
 
-  <a name="EnOceanset"></a>
+  <a id="EnOcean-set"></a>
   <b>Set</b>
   <ul>
-    <li><a name="EnOcean_teach-in">Teach-In / Teach-Out</a>
+    <li><a id="EnOcean-teach-in">Teach-In / Teach-Out</a>
     <ul>
       <li>Teach-in remote devices</li>
       <br>
@@ -18866,7 +19204,7 @@ sub EnOcean_Delete($$) {
     </ul>
     </li>
 
-    <li><a name="EnOcean_smartAck">Smart Ack Learning</a>
+    <li><a id="EnOcean-smartAck">Smart Ack Learning</a>
     <ul>
       <li>Teach-in remote Smart Ack devices</li>
       <br>
@@ -18886,7 +19224,7 @@ sub EnOcean_Delete($$) {
     </ul>
     </li>
 
-    <li><a name="EnOcean_remoteSet">Remote Management</a>
+    <li><a id="EnOcean-remoteSet">Remote Management</a>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -18952,7 +19290,7 @@ sub EnOcean_Delete($$) {
     <a href="#setExtensions">set extensions</a> are supported, if the corresponding
     <a href="#eventMap">eventMap</a> specifies the <code>on</code> and <code>off</code>
     mappings, for example <code>attr <name> eventMap on-till:on-till AI:on A0:off</code>.<br>
-    With the help of additional <a href="#EnOceanattr">attributes</a>, the
+    With the help of additional <a href="#EnOcean-attr">attributes</a>, the
     behavior of the devices can be adapt.<br>
     The attr subType must be switch. This is done if the device was created by autocreate.
     <br><br>
@@ -18987,6 +19325,33 @@ sub EnOcean_Delete($$) {
     </li>
     <br><br>
 
+    <li>Wireless 4-way colour pushbuttons display (EEP F6-02-01)<br>
+       [Eltako F4CT55]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+    <li>colourAll RRGGBB<br>
+      set all colour displays to RGB value</li>
+    <li>colourAO RRGGBB<br>
+      set colour display A0 to RGB value</li>
+    <li>colourAI RRGGBB<br>
+      set colour display AI to RGB value</li>
+    <li>colourBO RRGGBB<br>
+      set colour display B0 to RGB value</li>
+    <li>colourBI RRGGBB<br>
+      set colour display BI to RGB value</li>
+    </ul><br>
+    [RR] = 00 ... FF red color intensity in HEX notation<br>
+    [GG] = 00 ... FF green color intensity in HEX notation<<br>
+    [BB] = 00 ... FF blue color intensity in HEX notation<<br>
+    The attr subType must be set to switch, manufID to 00D and attr model to Eltako_F4CT55. This is done if the device was
+    created by the <a href="#EnOcean-eltako-msc">Eltako MSC autocreate</a>. However, the device can also be created with the help
+    of the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> G6-02-01. If the released state is to be displayed after the end
+    of a keystroke, set attr sensorMode to pushbutton manually.
+    </li>
+    <br><br>
+
     <li>Pushbutton Switch (EEP D2-03-00)<br>
          RORG VLD [EnOcean PTM 215 Modul]
     <ul>
@@ -19017,8 +19382,8 @@ sub EnOcean_Delete($$) {
     <a href="#setExtensions">set extensions</a> are supported, if the corresponding
     <a href="#eventMap">eventMap</a> specifies the <code>on</code> and <code>off</code>
     mappings, for example <code>attr <name> eventMap on-till:on-till AI:on A0:off</code>.<br>
-    If <a href="#EnOcean_comMode">comMode</a> is set to biDir the device can be controlled bidirectionally.<br>
-    With the help of additional <a href="#EnOceanattr">attributes</a>, the behavior of the devices can be adapt.<br>
+    If <a href="#EnOcean-attr-comMode">comMode</a> is set to biDir the device can be controlled bidirectionally.<br>
+    With the help of additional <a href="#EnOcean-attr">attributes</a>, the behavior of the devices can be adapt.<br>
     The attr subType must be switch.00. This is done if the device was created by autocreate.
     <br><br>
     <ul>
@@ -19047,10 +19412,40 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The attr subType must be contact. The attribute must be set manually.
        A monitoring period can be set for signOfLife telegrams of the sensor, see
-       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "off" and an interval of 1980 sec.<br>
        Set the manufID to 00D for Eltako devices that send a periodic voltage telegram. (For example TF-FKB)
     </li><br><br>
+
+    <li>Occupancy Sensor (EEP A5-07-01)<br>
+        [Eltako FBH55SB]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+          initiate teach-in</li>
+      <li>on<br>
+          Motion detection is sent. With the attribute <a href="#EnOcean-attr-motionMode">motionMode</a> you
+          can choose between the fully automatic and semi-automatic mode. Fully automatic is default. Semi-automatic
+          motion detection is available in TF mode on the Eltako actuator.</li>
+      <li>fullyOn<br>
+          Fully automatic motion detection is sent.</li>
+      <li>semiOn<br>
+          Semi-automatic motion detection is sent. Switch-on takes place by the light sensor.</li>
+      <li>off<br>
+          No motion is sent.</li>
+    </ul><br>
+      The current motion status can be set manually or will be taken from the motion reported by
+      a motion reference device <a href="#EnOcean-attr-motionRefDev">motionRefDev</a>.<br>
+      If the attribute <a href="#EnOcean-attr-devUpdate">devUpdate</a> is set to "auto", data telegrams with the current
+      motion status are sent periodically.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
+      The attr subType must be occupSensor.01. The attribute must be set manually. The device can be fully defined
+      via the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> H5-07-01.<br>
+      Set the attribute manufID to 00D for Eltako device function fullyOn and semiOn.
+    </li>
+    <br><br>
 
     <li>Room Sensor and Control Unit (EEP A5-10-02)<br>
         [Thermokon SR04 PTS]<br>
@@ -19070,15 +19465,15 @@ sub EnOcean_Delete($$) {
           Set switch</li>
     </ul><br>
       The actual temperature will be taken from the temperature reported by
-      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
-      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
-      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
+      a temperature reference device <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#EnOcean-attr-actualTemp">actualTemp</a> if it is set.<br>
+      If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
       command is sent when the reference device is updated.<br>
       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-      attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-      <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
+      attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+      <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
-      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.05. The attribute must be set manually.
     </li>
     <br><br>
@@ -19101,15 +19496,15 @@ sub EnOcean_Delete($$) {
           Set switch</li>
     </ul><br>
       The actual temperature will be taken from the temperature reported by
-      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
-      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
-      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
+      a temperature reference device <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#EnOcean-attr-actualTemp">actualTemp</a> if it is set.<br>
+      If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
       command is sent when the reference device is updated.<br>
       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-      attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-      <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
+      attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+      <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
-      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.05 and attr manufID must be 019. The attribute must be set manually.
     </li>
     <br><br>
@@ -19130,18 +19525,18 @@ sub EnOcean_Delete($$) {
           Set the desired temperature</li>
     </ul><br>
       The actual temperature will be taken from the temperature reported by
-      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
-      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
-      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpointTemp
+      a temperature reference device <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#EnOcean-attr-actualTemp">actualTemp</a> if it is set.<br>
+      If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpointTemp
       command is sent when the reference device is updated.<br>
       This profil can be used with a further Room Sensor and Control Unit Eltako FTR55*
       to control a heating/cooling relay FHK12, FHK14 or FHK61. If Fhem and FTR55*
       is teached in, the temperature control of the FTR55* can be either blocked
       or to a setpoint deviation of +/- 3 K be limited. For this use the optional parameter
       [block] = lock|unlock, unlock is default.<br>
-      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
       A monitoring period can be set for signOfLife telegrams of the sensor, see
-      <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+      <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
       Default is "off" and an interval of 1320 sec.<br>
       The attr subType must be roomSensorControl.05 and attr manufID must be 00D.
       The attributes must be set manually.
@@ -19164,18 +19559,18 @@ sub EnOcean_Delete($$) {
           Set switch</li>
     </ul><br>
       The actual temperature will be taken from the temperature reported by
-      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
-      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
+      a temperature reference device <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#EnOcean-attr-actualTemp">actualTemp</a> if it is set.<br>
       The actual humidity will be taken from the humidity reported by
-      a humidity reference device <a href="#EnOcean_humidityRefDev">humidityRefDev</a>
-      primarily or from the attribute <a href="#EnOcean_humidity">humidity</a> if it is set.<br>
-      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
+      a humidity reference device <a href="#EnOcean-attr-humidityRefDev">humidityRefDev</a>
+      primarily or from the attribute <a href="#EnOcean-attr-humidity">humidity</a> if it is set.<br>
+      If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
       command is sent when the reference device is updated.<br>
       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-      attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-      <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
+      attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+      <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
-      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.01. The attribute must be set manually.
     </li>
     <br><br>
@@ -19196,11 +19591,11 @@ sub EnOcean_Delete($$) {
           Set switch</li>
     </ul><br>
       The actual temperature will be taken from the temperature reported by
-      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
-      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
-      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
+      a temperature reference device <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#EnOcean-attr-actualTemp">actualTemp</a> if it is set.<br>
+      If the attribute <a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
       command is sent when the reference device is updated.<br>
-      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.01 and attr manufID must be 00D. The attribute must be set manually.
     </li>
     <br><br>
@@ -19227,7 +19622,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The periodic interval is configured using the attribute:<br>
        <ul>
-       <li><a href="#EnOcean_sendTimePeriodic">sendTimePeriodic</a></li>
+       <li><a href="#EnOcean-attr-sendTimePeriodic">sendTimePeriodic</a></li>
        </ul>
        The attr subType must be environmentApp and devMode is set to master. This is done with the help of the inofficial EEPs ZZ-13-03 or ZZ-13-04. Type
        <code>define <name> EnOcean ZZ-13-04 getNextID</code> manually.
@@ -19242,13 +19637,13 @@ sub EnOcean_Delete($$) {
     where <code>value</code> is
       <li>setpoint setpoint/%<br>
           Set the actuator to the specifed setpoint (0...100). The setpoint can also be set by the
-          <a href="#EnOcean_setpointRefDev">setpointRefDev</a> device if it is set.</li>
+          <a href="#EnOcean-attr-setpointRefDev">setpointRefDev</a> device if it is set.</li>
       <li>setpointTemp t/&#176C<br>
           Set the actuator to the specifed temperature setpoint. The temperature setpoint can also be set by the
-          <a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
+          <a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
           The FHEM PID controller calculates the actuator setpoint based on the temperature setpoint. The controller's
-          operation can be set via the PID parameters <a href="#EnOcean_pidFactor_P">pidFactor_P</a>,
-          <a href="#EnOcean_pidFactor_I">pidFactor_I</a> and <a href="#EnOcean_pidFactor_D">pidFactor_D</a>.<br>
+          operation can be set via the PID parameters <a href="#EnOcean-attr-pidFactor_P">pidFactor_P</a>,
+          <a href="#EnOcean-attr-pidFactor_I">pidFactor_I</a> and <a href="#EnOcean-attr-pidFactor_D">pidFactor_D</a>.<br>
           If the attribute pidCtrl is set to off, the PI controller of the actuator is used (selfCtrl mode). Please
           read the instruction manual of the device, whether the device has an internal PI controller.<br></li>
       <li>runInit<br>
@@ -19262,34 +19657,34 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The Heating Radiator Actuating Drive is configured using the following attributes:<br>
        <ul>
-         <li><a href="#EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
-         <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
-         <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
-         <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
-         <li><a href="#EnOcean_pidActorTreshold">pidActorTreshold</a></li>
-         <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
-         <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
-         <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
-         <li><a href="#EnOcean_pidFactor_I">pidFactor_I</a></li>
-         <li><a href="#EnOcean_pidFactor_D">pidFactor_D</a></li>
-         <li><a href="#EnOcean_pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
-         <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
-         <li><a href="#EnOcean_rcvRespAction">rcvRespAction</a></li>
-         <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
-         <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
-         <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
-         <li><a href="#EnOcean_summerMode">summerMode</a></li>
-         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
+         <li><a href="#EnOcean-attr-pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
+         <li><a href="#EnOcean-attr-pidActorErrorAction">pidActorErrorAction</a></li>
+         <li><a href="#EnOcean-attr-pidActorErrorPos">pidActorErrorPos</a></li>
+         <li><a href="#EnOcean-attr-pidActorLimitLower">pidActorLimitLower</a></li>
+         <li><a href="#EnOcean-attr-pidActorTreshold">pidActorTreshold</a></li>
+         <li><a href="#EnOcean-attr-pidCtrl">pidCtrl</a></li>
+         <li><a href="#EnOcean-attr-pidDeltaTreshold">pidDeltaTreshold</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_P">pidFactor_P</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_I">pidFactor_I</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_D">pidFactor_D</a></li>
+         <li><a href="#EnOcean-attr-pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
+         <li><a href="#EnOcean-attr-pidSensorTimeout">pidSensorTimeout</a></li>
+         <li><a href="#EnOcean-attr-rcvRespAction">rcvRespAction</a></li>
+         <li><a href="#EnOcean-attr-setpointRefDev">setpointRefDev</a></li>
+         <li><a href="#EnOcean-attr-setpointSummerMode">setpointSummerMode</a></li>
+         <li><a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a></li>
+         <li><a href="#EnOcean-attr-summerMode">summerMode</a></li>
+         <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
        </ul>
     The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
-    <a href="#temperatureRefDev">temperatureRefDev</a> if it is set. The internal temperature sensor
+    <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a> if it is set. The internal temperature sensor
     of the Micropelt iTRV MVA-002 is not suitable as an actual temperature value for the PID controller.
     An external room thermostat is required.<br>
     The attr event-on-change-reading .* shut not by set. The PID controller expects periodic events.
     If these are missing, a communication alarm is signaled.<br>
     The attr subType must be hvac.01. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
+    see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.<br>
     The command is not sent until the device wakes up and sends a message, usually
     every 10 minutes.
     </li>
@@ -19303,13 +19698,13 @@ sub EnOcean_Delete($$) {
     where <code>value</code> is
       <li>setpoint setpoint/%<br>
           Set the actuator to the specifed setpoint (0...100). The setpoint can also be set by the
-          <a href="#EnOcean_setpointRefDev">setpointRefDev</a> device if it is set.</li>
+          <a href="#EnOcean-attr-setpointRefDev">setpointRefDev</a> device if it is set.</li>
       <li>setpointTemp t/&#176C<br>
           Set the actuator to the specifed temperature setpoint. The temperature setpoint can also be set by the
-          <a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
+          <a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
           The FHEM PID controller calculates the actuator setpoint based on the temperature setpoint. The controller's
-          operation can be set via the PID parameters <a href="#EnOcean_pidFactor_P">pidFactor_P</a>,
-          <a href="#EnOcean_pidFactor_I">pidFactor_I</a> and <a href="#EnOcean_pidFactor_D">pidFactor_D</a>.</li>
+          operation can be set via the PID parameters <a href="#EnOcean-attr-pidFactor_P">pidFactor_P</a>,
+          <a href="#EnOcean-attr-pidFactor_I">pidFactor_I</a> and <a href="#EnOcean-attr-pidFactor_D">pidFactor_D</a>.</li>
       <li>runInit<br>
           Maintenance Mode: Run init sequence</li>
       <li>valveOpens<br>
@@ -19321,38 +19716,38 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The Heating Radiator Actuating Drive is configured using the following attributes:<br>
        <ul>
-         <li><a href="#EnOcean_blockKey">blockKey</a></li>
-         <li><a href="#EnOcean_displayOrientation">displayOrientation</a></li>
-         <li><a href="#EnOcean_measurementCtrl">measurementCtrl</a></li>
-         <li><a href="#model">model</a></li>
-         <li><a href="#EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
-         <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
-         <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
-         <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
-         <li><a href="#EnOcean_pidActorLimitUpper">pidActorLimitUpper</a></li>
-         <li><a href="#EnOcean_pidActorTreshold">pidActorTreshold</a></li>
-         <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
-         <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
-         <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
-         <li><a href="#EnOcean_pidFactor_I">pidFactor_I</a></li>
-         <li><a href="#EnOcean_pidFactor_D">pidFactor_D</a></li>
-         <li><a href="#EnOcean_pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
-         <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
-         <li><a href="#EnOcean_rcvRespAction">rcvRespAction</a></li>
-         <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
-         <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
-         <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
-         <li><a href="#EnOcean_summerMode">summerMode</a></li>
-         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
-         <li><a href="#EnOcean_wakeUpCycle">wakeUpCycle</a></li>
+         <li><a href="#EnOcean-attr-blockKey">blockKey</a></li>
+         <li><a href="#EnOcean-attr-displayOrientation">displayOrientation</a></li>
+         <li><a href="#EnOcean-attr-measurementCtrl">measurementCtrl</a></li>
+         <li><a href="#EnOcean-attr-model">model</a></li>
+         <li><a href="#EnOcean-attr-pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
+         <li><a href="#EnOcean-attr-pidActorErrorAction">pidActorErrorAction</a></li>
+         <li><a href="#EnOcean-attr-pidActorErrorPos">pidActorErrorPos</a></li>
+         <li><a href="#EnOcean-attr-pidActorLimitLower">pidActorLimitLower</a></li>
+         <li><a href="#EnOcean-attr-pidActorLimitUpper">pidActorLimitUpper</a></li>
+         <li><a href="#EnOcean-attr-pidActorTreshold">pidActorTreshold</a></li>
+         <li><a href="#EnOcean-attr-pidCtrl">pidCtrl</a></li>
+         <li><a href="#EnOcean-attr-pidDeltaTreshold">pidDeltaTreshold</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_P">pidFactor_P</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_I">pidFactor_I</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_D">pidFactor_D</a></li>
+         <li><a href="#EnOcean-attr-pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
+         <li><a href="#EnOcean-attr-pidSensorTimeout">pidSensorTimeout</a></li>
+         <li><a href="#EnOcean-attr-rcvRespAction">rcvRespAction</a></li>
+         <li><a href="#EnOcean-attr-setpointRefDev">setpointRefDev</a></li>
+         <li><a href="#EnOcean-attr-setpointSummerMode">setpointSummerMode</a></li>
+         <li><a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a></li>
+         <li><a href="#EnOcean-attr-summerMode">summerMode</a></li>
+         <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
+         <li><a href="#EnOcean-attr-wakeUpCycle">wakeUpCycle</a></li>
        </ul>
     The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
-    <a href="#temperatureRefDev">temperatureRefDev</a> if it is set.<br>
+    <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a> if it is set.<br>
     The attr event-on-change-reading .* shut not by set. The PID controller expects periodic events.
     If these are missing, a communication alarm is signaled.<br>
     The attr subType must be hvac.04. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
+    see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.<br>
     The OEM version of the Holter SmartDrive MX has an internal PID controller. This function is activated by
     attr <device> model Holter_OEM and attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
@@ -19370,13 +19765,13 @@ sub EnOcean_Delete($$) {
           Maintenance Mode: Run init sequence</li>
       <li>setpoint setpoint/%<br>
           Set the actuator to the specifed setpoint (0...100). The setpoint can also be set by the
-          <a href="#EnOcean_setpointRefDev">setpointRefDev</a> device if it is set.</li>
+          <a href="#EnOcean-attr-setpointRefDev">setpointRefDev</a> device if it is set.</li>
       <li>setpointTemp t/&#176C<br>
           Set the actuator to the specifed temperature setpoint. The temperature setpoint can also be set by the
-          <a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
+          <a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a> device if it is set.<br>
           The FHEM PID controller calculates the actuator setpoint based on the temperature setpoint. The controller's
-          operation can be set via the PID parameters <a href="#EnOcean_pidFactor_P">pidFactor_P</a>,
-          <a href="#EnOcean_pidFactor_I">pidFactor_I</a> and <a href="#EnOcean_pidFactor_D">pidFactor_D</a>.</li>
+          operation can be set via the PID parameters <a href="#EnOcean-attr-pidFactor_P">pidFactor_P</a>,
+          <a href="#EnOcean-attr-pidFactor_I">pidFactor_I</a> and <a href="#EnOcean-attr-pidFactor_D">pidFactor_D</a>.</li>
       <li>standby<br>
           enter standby mode<br>
           After the standby command, the valve remains closed permanently and can no longer be controlled by Fhem.
@@ -19384,37 +19779,37 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The Heating Radiator Actuating Drive is configured using the following attributes:<br>
        <ul>
-         <li><a href="#EnOcean_blockKey">blockKey</a></li>
-         <li><a href="#EnOcean_measurementTypeSelect">measurementTypeSelect</a></li>
-         <li><a href="#model">model</a></li>
-         <li><a href="#EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
-         <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
-         <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
-         <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
-         <li><a href="#EnOcean_pidActorTreshold">pidActorTreshold</a></li>
-         <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
-         <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
-         <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
-         <li><a href="#EnOcean_pidFactor_I">pidFactor_I</a></li>
-         <li><a href="#EnOcean_pidFactor_D">pidFactor_D</a></li>
-         <li><a href="#EnOcean_pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
-         <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
-         <li><a href="#EnOcean_rcvRespAction">rcvRespAction</a></li>
-         <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
-         <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
-         <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
-         <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
-         <li><a href="#EnOcean_summerMode">summerMode</a></li>
-         <li><a href="#EnOcean_wakeUpCycle">wakeUpCycle</a></li>
-         <li><a href="#EnOcean_windowOpenCtrl">windowOpenCtrl</a></li>
+         <li><a href="#EnOcean-attr-blockKey">blockKey</a></li>
+         <li><a href="#EnOcean-attr-measurementTypeSelect">measurementTypeSelect</a></li>
+         <li><a href="#EnOcean-attr-model">model</a></li>
+         <li><a href="#EnOcean-attr-pidActorCallBeforeSetting">pidActorCallBeforeSetting</a></li>
+         <li><a href="#EnOcean-attr-pidActorErrorAction">pidActorErrorAction</a></li>
+         <li><a href="#EnOcean-attr-pidActorErrorPos">pidActorErrorPos</a></li>
+         <li><a href="#EnOcean-attr-pidActorLimitLower">pidActorLimitLower</a></li>
+         <li><a href="#EnOcean-attr-pidActorTreshold">pidActorTreshold</a></li>
+         <li><a href="#EnOcean-attr-pidCtrl">pidCtrl</a></li>
+         <li><a href="#EnOcean-attr-pidDeltaTreshold">pidDeltaTreshold</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_P">pidFactor_P</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_I">pidFactor_I</a></li>
+         <li><a href="#EnOcean-attr-pidFactor_D">pidFactor_D</a></li>
+         <li><a href="#EnOcean-attr-pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a></li>
+         <li><a href="#EnOcean-attr-pidSensorTimeout">pidSensorTimeout</a></li>
+         <li><a href="#EnOcean-attr-rcvRespAction">rcvRespAction</a></li>
+         <li><a href="#EnOcean-attr-setpointRefDev">setpointRefDev</a></li>
+         <li><a href="#EnOcean-attr-setpointSummerMode">setpointSummerMode</a></li>
+         <li><a href="#EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a></li>
+         <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
+         <li><a href="#EnOcean-attr-summerMode">summerMode</a></li>
+         <li><a href="#EnOcean-attr-wakeUpCycle">wakeUpCycle</a></li>
+         <li><a href="#EnOcean-attr-windowOpenCtrl">windowOpenCtrl</a></li>
        </ul>
     The actual temperature will be reported by the Heating Radiator Actuating Drive or by the
-    <a href="#temperatureRefDev">temperatureRefDev</a> if it is set.<br>
+    <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a> if it is set.<br>
     The attr event-on-change-reading .* shut not by set. The PID controller expects periodic events.
     If these are missing, a communication alarm is signaled.<br>
     The attr subType must be hvac.06. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.<br>
+    see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.<br>
     The actuator has an internal PID controller. This function is activated by
     attr <device> pidCtrl off.<br>
     The command is not sent until the device wakes up and sends a message, usually
@@ -19447,7 +19842,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
     The attr subType must be hvac.10. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.
+    see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -19468,11 +19863,11 @@ sub EnOcean_Delete($$) {
     </ul><br>
     The attr subType must be hvac.11. This is done if the device was
     created by autocreate. To control the device, it must be bidirectional paired,
-    see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.
+    see <a href="#EnOcean-teach-in">Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
-    <li>Energy management, <a name="demand_response">demand response</a> (EEP A5-37-01)<br>
+    <li>Energy management, <a id="EnOcean-demand-response">demand response</a> (EEP A5-37-01)<br>
       demand response master commands<br>
       <ul>
         <code>set &lt;name&gt; &lt;value&gt;</code>
@@ -19500,7 +19895,7 @@ sub EnOcean_Delete($$) {
       </li>
       <br><br>
 
-      <li><a name="Gateway">Gateway</a> (EEP A5-38-08)<br>
+      <li><a id="EnOcean-Gateway">Gateway</a> (EEP A5-38-08)<br>
         The Gateway profile include 7 different commands (Switching, Dimming,
         Setpoint Shift, Basic Setpoint, Control variable, Fan stage, Blind Central Command).
         The commands can be selected by the attribute gwCmd or command line. The attribute
@@ -19673,7 +20068,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Gateway (EEP A5-38-08)<br>
-         <a name="Blind Command Central">Blind Command Central</a><br>
+         <a id="EnOcean-Blind Command Central">Blind Command Central</a><br>
          [not fully tested]<br>
      <ul>
       <code>set &lt;name&gt; &lt;value&gt;</code>
@@ -19720,7 +20115,7 @@ sub EnOcean_Delete($$) {
         Position Logic, normal: Blinds fully opens corresponds to Position = 0 %<br>
         Position Logic, inverse: Blinds fully opens corresponds to Position = 100 %<br>
         The attr subType must be gateway and gwCmd must be blindCmd.<br>
-        See also attributes <a href="#EnOcean_sendDevStatus">sendDevStatus and <a href="#EnOcean_serviceOn">serviceOn</a></a><br>
+        See also attributes <a href="#EnOcean-attr-sendDevStatus">sendDevStatus and <a href="#EnOcean-attr-serviceOn">serviceOn</a></a><br>
         The profile is linked with controller profile, see <a href="#Blind Status">Blind Status</a>.<br>
      </li>
      <br><br>
@@ -19763,15 +20158,15 @@ sub EnOcean_Delete($$) {
      </ul><br>
         color values: 00 ... FF hexadecimal<br>
         rampTime Range: t = 1 s ... 65535 s or 1 if no time specified, ramping time can be set by attribute
-        <a href="#EnOcean_rampTime">rampTime</a><br>
+        <a href="#EnOcean-attr-rampTime">rampTime</a><br>
         The attr subType or subTypSet must be lightCtrl.01. This is done if the device was created by autocreate.<br>
         The subType is associated with the subtype lightCtrlState.02.
      </li>
      <br><br>
 
-    <li><a name="Manufacturer Specific Applications">Manufacturer Specific Applications</a> (EEP A5-3F-7F)<br>
+    <li><a id="EnOcean-Manufacturer Specific Applications">Manufacturer Specific Applications</a> (EEP A5-3F-7F)<br>
         Shutter<br>
-        [Eltako FSB12, FSB14, FSB61, FSB70, tested with Eltako devices only]<br>
+        [Eltako FSB12, FSB14, FSB61, FSB70]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -19799,16 +20194,47 @@ sub EnOcean_Delete($$) {
       Position Range: position = 0 % ... 100 %<br>
       Slat Angle Range: &alpha; = -180 &#176 ... 180 &#176<br>
       Angle Time Range: ta = 0 s ... 6 s<br>
-      The devive can only fully controlled if the attributes <a href="#angleMax">angleMax</a>,
-      <a href="#angleMin">angleMin</a>, <a href="#angleTime">angleTime</a>,
-      <a href="#shutTime">shutTime</a> and <a href="#shutTimeCloses">shutTimeCloses</a>,
+      The devive can only fully controlled if the attributes <a href="#EnOcean-attr-angleMax">angleMax</a>,
+      <a href="#EnOcean-attr-angleMin">angleMin</a>, <a href="#EnOcean-attr-angleTime">angleTime</a>,
+      <a href="#EnOcean-attr-shutTime">shutTime</a> and <a href="#EnOcean-attr-shutTimeCloses">shutTimeCloses</a>,
       are set correctly.
-      If <a href="#EnOcean_settingAccuracy">settingAccuracy</a> is set to high, the run-time is sent in 1/10 increments.<br>
+      If <a href="#EnOcean-attr-settingAccuracy">settingAccuracy</a> is set to high, the run-time is sent in 1/10 increments.<br>
       Set attr subType to manufProfile, manufID to 00D and attr model to Eltako_FSB14|FSB61|FSB70|FSB_ACK manually.
       If the attribute model is set to Eltako_FSB_ACK, with the status "open_ack" the readings position and anglePos are also updated.<br>
-      If the attribute <a href="#EnOcean_calAtEndpoints">calAtEndpoints</a> is to yes, the roller blind positions are calibrated when
+      If the attribute <a href="#EnOcean-attr-calAtEndpoints">calAtEndpoints</a> is to yes, the roller blind positions are calibrated when
       the endpoints are driven.<br>
       Use the sensor type "Szenentaster/PC" for Eltako devices.
+    </li>
+    <br><br>
+
+    <li><a id="EnOcean-Manufacturer Specific Applications">Manufacturer Specific Applications</a> (EEP A5-3F-7F)<br>
+        Shutter<br>
+        [Eltako FRM60]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>position/%<br>
+        drive blinds to position</li>
+      <li>closes<br>
+        issue blinds closes command</li>
+      <li>opens<br>
+        issue blinds opens command</li>
+      <li>position position/% [high|low [lock|unlock]]<br>
+        drive blinds to position with rotation speed and lock key option</li>
+      <li>stop<br>
+        issue stop command</li>
+     <li>teach<br>
+        initiate teach-in</li>
+    </ul><br>
+      [position] = 0 % ... 100 %<br>
+      The parameters rotation speed can be set permanently with the help of the attribute
+      <a href="#EnOcean-attr-rotationSpeed">rotationSpeed</a><br>.
+      The attr subType must be set to manufProfile, manufID to 00D and attr model to Eltako_FRM60. This is done if the device was
+      created by the <a href="#EnOcean-eltako-msc">Eltako MSC autocreate</a>. However, the device can also be created with the help
+      of the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> I5-3F-7F and then taught in the actuator.
+      To control the device, it must be bidirectional paired, see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
+    <br>
     </li>
     <br><br>
 
@@ -19873,11 +20299,11 @@ sub EnOcean_Delete($$) {
        [autoOffTime] = 0 s ... 0.1 s ... 6553.4 s<br>
        [delayOffTime] = 0 s ... 0.1 s ... 6553.4 s<br>
        [channel] = 0...29|all|input, all is default<br>
-       The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>
+       The default channel can be specified with the attr <a href="#EnOcean-attr-defaultChannel">defaultChannel</a>.<br>
        [rampTime] = 1..3|switch|stop, switch is default<br>
        The attr subType must be actuator.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -19900,7 +20326,7 @@ sub EnOcean_Delete($$) {
       <li>alarm  [&lt;channel&gt;]<br>
         set actuator to the "alarm" mode. When the actuator ist set to the "alarm" mode neither local
         nor central positioning and configuration commands will be executed. Before entering the "alarm"
-        mode, the actuator will execute the "alarm action" as configured by the attribute <a href="#EnOcean_alarmAction">alarmAction</a>
+        mode, the actuator will execute the "alarm action" as configured by the attribute <a href="#EnOcean-attr-alarmAction">alarmAction</a>
       </li>
       <li>lock  [&lt;channel&gt;]<br>
         set actuator to the "blockade" mode. When the actuator ist set to the "blockade" mode neither local
@@ -19912,13 +20338,13 @@ sub EnOcean_Delete($$) {
       Channel Range: 1 ... 4|all, default is all<br>
       Position Range: position = 0 % ... 100 %<br>
       Slat Angle Range: &alpha; = 0 % ... 100 %<br>
-      The devive can only fully controlled if the attributes <a href="#EnOcean_alarmAction">alarmAction</a>,
-      <a href="#angleTime">angleTime</a>, <a href="#EnOcean_reposition">reposition</a> and <a href="#shutTime">shutTime</a>
+      The devive can only fully controlled if the attributes <a href="#EnOcean-attr-alarmAction">alarmAction</a>,
+      <a href="#EnOcean-attr-angleTime">angleTime</a>, <a href="#EnOcean-attr-reposition">reposition</a> and <a href="#EnOcean-attr-shutTime">shutTime</a>
       are set correctly.<br>
-      With the attribute <a name="EnOcean_defaultChannel">defaultChannel</a> the default channel can be specified.<br>
+      With the attribute <a href="#EnOcean-attr-defaultChannel">defaultChannel</a> the default channel can be specified.<br>
       The attr subType must be blindsCtrl.00 or blindsCtrl.01. This is done if the device was
       created by autocreate. To control the device, it must be bidirectional paired,
-      see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+      see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -19947,8 +20373,8 @@ sub EnOcean_Delete($$) {
       vacation blick interval Range: blinkInterval = 3 ... 255<br>
       The multisensor window handle is configured using the following attributes:<br>
       <ul>
-        <li><a href="#EnOcean_subDefH">subDefH</a></li>
-        <li><a href="#EnOcean_subDefW">subDefW</a></li>
+        <li><a href="#EnOcean-attr-subDefH">subDefH</a></li>
+        <li><a href="#EnOcean-attr-subDefW">subDefW</a></li>
       </ul>
       The attr subType must be multisensor.01. This is done if the device was
       created by autocreate.
@@ -19999,25 +20425,25 @@ sub EnOcean_Delete($$) {
        Setpoint Range: t = 0 &#176C ... 40 &#176C<br>
        The room controller is configured using the following attributes:<br>
        <ul>
-       <li><a href="#EnOcean_blockDateTime">blockDateTime</a></li>
-       <li><a href="#EnOcean_blockDisplay">blockDisplay</a></li>
-       <li><a href="#EnOcean_blockFanSpeed">blockFanSpeed</a></li>
-       <li><a href="#EnOcean_blockMotion">blockMotion</a></li>
-       <li><a href="#EnOcean_blockProgram">blockProgram</a></li>
-       <li><a href="#EnOcean_blockOccupany">blockOccupancy</a></li>
-       <li><a href="#EnOcean_blockTemp">blockTemp</a></li>
-       <li><a href="#EnOcean_blockTimeProgram">blockTimeProgram</a></li>
-       <li><a href="#EnOcean_blockSetpointTemp">blockSetpointTemp</a></li>
-       <li><a href="#EnOcean_daylightSavingTime">daylightSavingTime</a></li>
-       <li><a href="#EnOcean_displayContent">displayContent</a></li>
-       <li><a href="#EnOcean_pollInterval">pollInterval</a></li>
-       <li><a href="#EnOcean_temperatureScale">temperatureScale</a></li>
-       <li><a href="#EnOcean_timeNotation">timeNotation</a></li>
-       <li><a href="#EnOcean_timeProgram[1-4]">timeProgram[1-4]</a></li>
+       <li><a href="#EnOcean-attr-blockDateTime">blockDateTime</a></li>
+       <li><a href="#EnOcean-attr-blockDisplay">blockDisplay</a></li>
+       <li><a href="#EnOcean-attr-blockFanSpeed">blockFanSpeed</a></li>
+       <li><a href="#EnOcean-attr-blockMotion">blockMotion</a></li>
+       <li><a href="#EnOcean-attr-blockProgram">blockProgram</a></li>
+       <li><a href="#EnOcean-attr-blockOccupany">blockOccupancy</a></li>
+       <li><a href="#EnOcean-attr-blockTemp">blockTemp</a></li>
+       <li><a href="#EnOcean-attr-blockTimeProgram">blockTimeProgram</a></li>
+       <li><a href="#EnOcean-attr-blockSetpointTemp">blockSetpointTemp</a></li>
+       <li><a href="#EnOcean-attr-daylightSavingTime">daylightSavingTime</a></li>
+       <li><a href="#EnOcean-attr-displayContent">displayContent</a></li>
+       <li><a href="#EnOcean-attr-pollInterval">pollInterval</a></li>
+       <li><a href="#EnOcean-attr-temperatureScale">temperatureScale</a></li>
+       <li><a href="#EnOcean-attr-timeNotation">timeNotation</a></li>
+       <li><a href="#EnOcean-attr-timeProgram[1-4]">timeProgram[1-4]</a></li>
        </ul>
        The attr subType must be roomCtrlPanel.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20050,7 +20476,7 @@ sub EnOcean_Delete($$) {
        Setpoint Shift Max Range: t = 0 K ... 10 K<br>
        The attr subType must be roomCtrlPanel.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired by Smart Ack,
-       see <a href="#EnOcean_smartAck">SmartAck Learning</a>.
+       see <a href="#EnOcean-smartAck">SmartAck Learning</a>.
     </li>
     <br><br>
 
@@ -20078,13 +20504,13 @@ sub EnOcean_Delete($$) {
        Setpoint Range: t = 0 &#176C ... 40 &#176C<br>
        The fan controller is configured using the following attributes:<br>
        <ul>
-       <li><a href="#EnOcean_setCmdTrigger">setCmdTrigger</a></li>
-       <li><a href="#EnOcean_switchHysteresis">switchHysteresis</a></li>
-       <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
+       <li><a href="#EnOcean-attr-setCmdTrigger">setCmdTrigger</a></li>
+       <li><a href="#EnOcean-attr-switchHysteresis">switchHysteresis</a></li>
+       <li><a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a></li>
        </ul>
        The attr subType must be fanCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
        behaves like a master. Only one fan can be taught as a slave.
     </li>
     <br><br>
@@ -20105,12 +20531,12 @@ sub EnOcean_Delete($$) {
        [setpointTemp] t = 0 &#176C ... 40 &#176C<br>
        [setpointTempShift] t = Range: t = -10 K ... 10 K<br>
        [channel] = 0...29|all, all is default<br>
-       The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>
+       The default channel can be specified with the attr <a href="#EnOcean-attr-defaultChannel">defaultChannel</a>.<br>
        [overrideTime] = 0 h ... 63 h, 0 is default (endless)<br>
        Duration of the override until fallback to the room control panel setpointTemp value.
        The attr subType must be heatingActuator.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20139,7 +20565,7 @@ sub EnOcean_Delete($$) {
        xThreshold Range: 0 % ... 100 %<br>
        The attr subType must be heatRecovery.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20163,12 +20589,12 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The valve controller is configured using the following attributes:<br>
        <ul>
-       <li><a href="#EnOcean_devMode">devMode</a></li>
+       <li><a href="#EnOcean-attr-devMode">devMode</a></li>
        </ul>
        The attr subType must be valveCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
-       behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
+       behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.
      </li>
     <br><br>
 
@@ -20188,10 +20614,10 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The generic profile device is configured using the following attributes:<br>
        <ul>
-       <li><a href="#EnOcean_comMode">comMode</a></li>
-       <li><a href="#EnOcean_devMode">devMode</a></li>
-       <li><a href="#EnOcean_gpDef">gpDef</a></li>
-       <li><a href="#EnOcean_manufID">manufID</a></li>
+       <li><a href="#EnOcean-attr-comMode">comMode</a></li>
+       <li><a href="#EnOcean-attr-devMode">devMode</a></li>
+       <li><a href="#EnOcean-attr-gpDef">gpDef</a></li>
+       <li><a href="#EnOcean-attr-manufID">manufID</a></li>
        </ul>
        The attr subType must be genericProfile. This is done if the device was
        created by autocreate. If the profile in slave mode is operated, especially the channel
@@ -20227,8 +20653,8 @@ sub EnOcean_Delete($$) {
       </ul><br>
         The Radio Link Test device is configured using the following attributes:<br>
       <ul>
-        <li><a href="#EnOcean_rltRepeat">rltRepeat</a></li>
-        <li><a href="#EnOcean_rltType">rltType</a></li>
+        <li><a href="#EnOcean-attr-rltRepeat">rltRepeat</a></li>
+        <li><a href="#EnOcean-attr-rltType">rltType</a></li>
       </ul>
       The attr subType must be readioLinkTest. This is done if the device was
       created by autocreate or manually by <code>define &lt;name&gt; EnOcean A5-3F-00</code><br>.
@@ -20237,11 +20663,11 @@ sub EnOcean_Delete($$) {
 
  </ul></ul>
 
-  <a name="EnOceanget"></a>
+  <a id="EnOcean-get"></a>
   <b>Get</b>
   <ul>
 
-    <li><a name="EnOcean_remoteGet">Remote Management</a>
+    <li><a id="EnOcean-remoteGet">Remote Management</a>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -20275,7 +20701,7 @@ sub EnOcean_Delete($$) {
     </ul>
     </li><br><br>
 
-    <li><a name="EnOcean_signalGet">Signal Telegram</a>
+    <li><a id="EnOcean-signalGet">Signal Telegram</a>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -20341,10 +20767,10 @@ sub EnOcean_Delete($$) {
        </li>
 
     </ul><br>
-       The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>
+       The default channel can be specified with the attr <a href="#EnOcean-attr-defaultChannel">defaultChannel</a>.<br>
        The attr subType must be actuator.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20358,13 +20784,13 @@ sub EnOcean_Delete($$) {
         query position and angle value</li>
     </ul><br>
       Channel Range: 1 ... 4|all, default is all<br>
-      The devive can only fully controlled if the attributes <a href="#EnOcean_alarmAction">alarmAction</a>,
-      <a href="#angleTime">angleTime</a>, <a href="#EnOcean_reposition">reposition</a> and <a href="#shutTime">shutTime</a>
+      The devive can only fully controlled if the attributes <a href="#EnOcean-attr-alarmAction">alarmAction</a>,
+      <a href="#EnOcean-attr-angleTime">angleTime</a>, <a href="#EnOcean-attr-reposition">reposition</a> and <a href="#EnOcean-attr-shutTime">shutTime</a>
       are set correctly.<br>
-      With the attribute <a name="EnOcean_defaultChannel">defaultChannel</a> the default channel can be specified.<br>
+      With the attribute <a href="#EnOcean-defaultChannel">defaultChannel</a> the default channel can be specified.<br>
       The attr subType must be blindsCtrl.00 or blindsCrtl.01. This is done if the device was
       created by autocreate. To control the device, it must be bidirectional paired,
-      see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+      see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20381,8 +20807,8 @@ sub EnOcean_Delete($$) {
     </ul><br>
       The multisensor window handle is configured using the following attributes:<br>
       <ul>
-        <li><a href="#EnOcean_subDefH">subDefH</a></li>
-        <li><a href="#EnOcean_subDefW">subDefW</a></li>
+        <li><a href="#EnOcean-attr-subDefH">subDefH</a></li>
+        <li><a href="#EnOcean-attr-subDefW">subDefW</a></li>
       </ul>
       The attr subType must be multisensor.01. This is done if the device was
       created by autocreate.
@@ -20406,7 +20832,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The attr subType must be roomCtrlPanel.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20421,7 +20847,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The attr subType must be fanCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20438,7 +20864,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The attr subType must be heatingActuator.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20455,7 +20881,7 @@ sub EnOcean_Delete($$) {
     </ul><br>
        The attr subType must be heatRecovery.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
     <br><br>
 
@@ -20469,133 +20895,136 @@ sub EnOcean_Delete($$) {
     </ul><br>
       The attr subType must be valveCtrl.00. This is done if the device was
       created by autocreate. To control the device, it must be bidirectional paired,
-      see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
-      behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.
+      see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
+      behaves like a master or slave, see <a href="#EnOcean-attr-devMode">devMode</a>.
     </li>
     <br><br>
 
   </ul><br>
 
-  <a name="EnOceanattr"></a>
+  <a id="EnOcean-attr"></a>
   <b>Attributes</b>
   <ul>
     <ul>
-    <li><a name="actualTemp">actualTemp</a> t/&#176C<br>
+    <li><a id="EnOcean-attr-actualTemp">actualTemp</a> t/&#176C<br>
       The value of the actual temperature, used by a Room Sensor and Control Unit
       or when controlling HVAC components e. g. Battery Powered Actuators (MD15 devices). Should by
       filled via a notify from a distinct temperature sensor.<br>
       If absent, the reported temperature from the HVAC components is used.
     </li>
-    <li><a name="EnOcean_alarmAction">alarmAction</a> &lt;channel1&gt;[:&lt;channel2&gt;[:&lt;channel3&gt;[:&lt;channel4&gt;]]]<br>
+    <li><a id="EnOcean-attr-alarmAction">alarmAction</a> &lt;channel1&gt;[:&lt;channel2&gt;[:&lt;channel3&gt;[:&lt;channel4&gt;]]]<br>
       [alarmAction] = no|stop|opens|closes, default is no<br>
       Action that is executed before the actuator is entering the "alarm" mode.<br>
       Notice subType blindsCrtl.00, blindsCrtl.01: The attribute can only be set while the actuator is online.
     </li>
-    <li><a name="angleMax">angleMax</a> &alpha;s/&#176, [&alpha;s] = -180 ... 180, 90 is default.<br>
+    <li><a id="EnOcean-attr-alwaysUpdateReadings">alwaysUpdateReadings</a> 0|1, [alwaysUpdateReadings] = 0 is default.<br>
+      The readings of the device are always updated if alwaysUpdateReadings is set.
+    </li>
+    <li><a id="EnOcean-attr-angleMax">angleMax</a> &alpha;s/&#176, [&alpha;s] = -180 ... 180, 90 is default.<br>
       Slat angle end position maximum.<br>
       angleMax is supported for shutter.
     </li>
-    <li><a name="angleMin">angleMin</a> &alpha;o/&#176, [&alpha;o] = -180 ... 180, -90 is default.<br>
+    <li><a id="EnOcean-attr-angleMin">angleMin</a> &alpha;o/&#176, [&alpha;o] = -180 ... 180, -90 is default.<br>
       Slat angle end position minimum.<br>
       angleMin is supported for shutter.
     </li>
-    <li><a name="angleTime">angleTime</a> &lt;channel1&gt;[:&lt;channel2&gt;[:&lt;channel3&gt;[:&lt;channel4&gt;]]]<br>
+    <li><a id="EnOcean-attr-angleTime">angleTime</a> &lt;channel1&gt;[:&lt;channel2&gt;[:&lt;channel3&gt;[:&lt;channel4&gt;]]]<br>
       subType blindsCtrl.00, blindsCtrl.01: [angleTime] = 0|0.01 .. 2.54, 0 is default.<br>
       subType manufProfile: [angleTime] = 0 ... 6, 0 is default.<br>
       Runtime value for the sunblind reversion time. Select the time to revolve
       the sunblind from one slat angle end position to the other end position.<br>
       Notice subType blindsCrtl.00: The attribute can only be set while the actuator is online.
     </li>
-    <li><a name="EnOcean_blockDateTime">blockDateTime</a> yes|no, [blockDateTime] = no is default.<br>
+    <li><a id="EnOcean-attr-blockDateTime">blockDateTime</a> yes|no, [blockDateTime] = no is default.<br>
       blockDateTime is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockDisplay">blockDisplay</a> yes|no, [blockDisplay] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockDisplay">blockDisplay</a> yes|no, [blockDisplay] = no is default.<br>
       blockDisplay is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockFanSpeed">blockFanSpeed</a> yes|no, [blockFanSpeed] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockFanSpeed">blockFanSpeed</a> yes|no, [blockFanSpeed] = no is default.<br>
       blockFanSpeed is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockKey">blockKey</a> yes|no, [blockKey] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockKey">blockKey</a> yes|no, [blockKey] = no is default.<br>
       blockKey is supported for roomCtrlPanel.00 and hvac.04.
-      </li>
-    <li><a name="EnOcean_blockMotion">blockMotion</a> yes|no, [blockMotion] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockMotion">blockMotion</a> yes|no, [blockMotion] = no is default.<br>
       blockMotion is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockOccupany">blockOccupancy</a> yes|no, [blockOccupancy] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockOccupancy">blockOccupancy</a> yes|no, [blockOccupancy] = no is default.<br>
       blockOccupancy is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockTemp">blockTemp</a> yes|no, [blockTemp] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockTemp">blockTemp</a> yes|no, [blockTemp] = no is default.<br>
       blockTemp is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockTimeProgram">blockTimeProgram</a> yes|no, [blockTimeProgram] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockTimeProgram">blockTimeProgram</a> yes|no, [blockTimeProgram] = no is default.<br>
       blockTimeProgram is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockSetpointTemp">blockSetpointTemp</a> yes|no, [blockSetpointTemp] = no is default.<br>
+    </li>
+    <li><a id="EnOcean-attr-blockSetpointTemp">blockSetpointTemp</a> yes|no, [blockSetpointTemp] = no is default.<br>
       blockSetPointTemp is supported for roomCtrlPanel.00.
-      </li>
-    <li><a name="EnOcean_blockUnknownMSC">blockUnknownMSC</a> yes|no,
+    </li>
+    <li><a id="EnOcean-attr-blockUnknownMSC">blockUnknownMSC</a> yes|no,
       [blockUnknownMSC] = no is default.<br>
       If the structure of the MSC telegrams can not interpret the raw data to be output. Setting this attribute to yes,
       the output can be suppressed.
     </li>
-    <li><a name="EnOcean_brightnessDayNight">brightnessDayNight</a> E_min/lx:E_max/lx,
+    <li><a id="EnOcean-attr-brightnessDayNight">brightnessDayNight</a> E_min/lx:E_max/lx,
       [brightnessDayNight] = 0...99000:0...99000, 10:20 is default.<br>
       Set switching thresholds for reading dayNight based on the reading brightness.
     </li>
-    <li><a name="EnOcean_brightnessDayNightCtrl">brightnessDayNightCtrl</a> custom|sensor,
+    <li><a id="EnOcean-attr-brightnessDayNightCtrl">brightnessDayNightCtrl</a> custom|sensor,
       [brightnessDayNightCtrl] = custom|sensor, sensor is default.<br>
       Control the dayNight reading through the device-specific or custom threshold and delay.
     </li>
-    <li><a name="EnOcean_brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
+    <li><a id="EnOcean-attr-brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
       [brightnessDayNightDelay] = 0...99000:0...99000, 600:600 is default.<br>
       Set switching delay for reading dayNight based on the reading brightness. The reading dayNight is reset or set
       if the thresholds are permanently undershot or exceed during the delay time.
     </li>
-    <li><a name="EnOcean_brightnessRefDev">brightnessRefDev</a> &lt;name&gt;<br>
+    <li><a id="EnOcean-attr-brightnessRefDev">brightnessRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading brightness.
     </li>
-    <li><a name="EnOcean_brightnessSunny">brightnessSunny</a> E_min/lx:E_max/lx,
+    <li><a id="EnOcean-attr-brightnessSunny">brightnessSunny</a> E_min/lx:E_max/lx,
      [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
      Set switching thresholds for reading isSunny based on the reading brightness.
     </li>
-   <li><a name="EnOcean_brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
+   <li><a id="EnOcean-attr-brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
      [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
      Set switching delay for reading isSunny based on the reading brightness. The reading isSunny is reset or set
      if the thresholds are permanently undershot or exceed during the delay time.
    </li>
-   <li><a name="EnOcean_brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
+   <li><a id="EnOcean-attr-brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
      [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
      Set switching thresholds for reading isSunnyEast based on the reading sunEast.
    </li>
-   <li><a name="EnOcean_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
+   <li><a id="EnOcean-attr-brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
      [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
      Set switching delay for reading isSunnyEast based on the reading sunEast. The reading isSunnyEast is reset or set
      if the thresholds are permanently undershot or exceed during the delay time.
    </li>
-   <li><a name="EnOcean_brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
+   <li><a id="EnOcean-attr-brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
      [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
      Set switching thresholds for reading isSunnySouth based on the reading sunSouth.
    </li>
-   <li><a name="EnOcean_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
+   <li><a id="EnOcean-attr-brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
      [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
      Set switching delay for reading isSunnySouth based on the reading sunSouth. The reading isSunnySouth is reset or set
      if the thresholds are permanently undershot or exceed during the delay time.
    </li>
-   <li><a name="EnOcean_brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
+   <li><a id="EnOcean-attr-brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
      [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
      Set switching thresholds for reading isSunnyWest based on the reading sunWest.
    </li>
-   <li><a name="EnOcean_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
+   <li><a id="EnOcean-attr-brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
      [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
      Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
      if the thresholds are permanently undershot or exceed during the delay time.
    </li>
-   <li><a name="EnOcean_calAtEndpoints">calAtEndpoints</a> no|yes, [calAtEndpoints] = no is default<br>
+   <li><a id="EnOcean-attr-calAtEndpoints">calAtEndpoints</a> no|yes, [calAtEndpoints] = no is default<br>
      Callibrize shutter position at the endpoints. The shutter motor is switched on with the time of
-     <a href="#shutTimeCloses">shutTimeCloses</a> if the end positions are selected.
+     <a href="#EnOcean-attr-shutTimeCloses">shutTimeCloses</a> if the end positions are selected.
    </li>
-   <li><a name="EnOcean_comMode">comMode</a> biDir|confirm|uniDir, [comMode] = uniDir is default.<br>
+   <li><a id="EnOcean-attr-comMode">comMode</a> biDir|confirm|uniDir, [comMode] = uniDir is default.<br>
      Communication Mode between an enabled EnOcean device and Fhem.<br>
      Unidirectional communication means a point-to-multipoint communication
      relationship. The EnOcean device e. g. sensors does not know the unique
@@ -20604,10 +21033,10 @@ sub EnOcean_Delete($$) {
      Bidirectional communication means a point-to-point communication
      relationship between an enabled EnOcean device and Fhem. It requires all parties
      involved to know the unique Sender ID of their partners. Bidirectional communication
-     needs a teach-in / teach-out process, see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+     needs a teach-in / teach-out process, see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
    </li>
-   <li><a name="EnOcean_customCmdAlarmOff">customCmdAlarmOff</a> &lt;command&gt;<br>
-     <a name="EnOcean_customCmdAlarmOn">customCmdAlarmOn</a> &lt;command&gt;<br>
+   <li><a id="EnOcean-attr-customCmdAlarmOff">customCmdAlarmOff</a> &lt;command&gt;<br>
+     <a id="EnOcean-attr-customCmdAlarmOn">customCmdAlarmOn</a> &lt;command&gt;<br>
      Command being executed if an alarm is set (on) or deleted (off).  If &lt;command&gt; is enclosed in {},
      then it is a perl expression, if it is enclosed in "", then it is a shell command,
      else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
@@ -20619,10 +21048,10 @@ sub EnOcean_Delete($$) {
      scripts, and will be textually replaced for Fhem commands.<br>
      The alarm commands have a higher priority than the up and down commands.
    </li>
-   <li><a name="EnOcean_customCmdDown">customCmdDown</a> &lt;command&gt;<br>
-     <a name="EnOcean_customCmdUp">customCmdUp</a> &lt;command&gt;<br>
-     The command is executed if the Up or Down command is triggered, see <a href="#EnOcean_customCmdDownTrigger">customCmdDownTrigger</a> or
-     <a href="#EnOcean_customCmdUpTrigger">customCmdUpTrigger</a>. If &lt;command&gt; is enclosed in {},
+   <li><a id="EnOcean-attr-customCmdDown">customCmdDown</a> &lt;command&gt;<br>
+     <a id="EnOcean-attr-customCmdUp">customCmdUp</a> &lt;command&gt;<br>
+     The command is executed if the Up or Down command is triggered, see <a href="#EnOcean-attr-customCmdDownTrigger">customCmdDownTrigger</a> or
+     <a href="#EnOcean-attr-customCmdUpTrigger">customCmdUpTrigger</a>. If &lt;command&gt; is enclosed in {},
      then it is a perl expression, if it is enclosed in "", then it is a shell command,
      else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
      and the current readings<br>
@@ -20633,13 +21062,13 @@ sub EnOcean_Delete($$) {
      scripts, and will be textually replaced for Fhem commands.<br>
      The alarm commands have a higher priority than the up and down commands.
    </li>
-   <li><a name="EnOcean_customCmdDownPeriod">customCmdDownPeriod</a> once|threeTimes|3|10|180|600<br>
-     <a name="EnOcean_customCmdUpPeriod">customCmdUpPeriod</a> once|threeTimes|3|10|180|600<br>
+   <li><a id="EnOcean-attr-customCmdDownPeriod">customCmdDownPeriod</a> once|threeTimes|3|10|180|600<br>
+     <a id="EnOcean-attr-customCmdUpPeriod">customCmdUpPeriod</a> once|threeTimes|3|10|180|600<br>
      [customCmdDownPeriod] = once|threeTimes|3|10|180|600, once is default.<br>
      Number or period of custom command to be executed.
    </li>
-   <li><a name="EnOcean_customCmdDownTrigger">customCmdDownTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
-     The commands in the attribute <a href="#EnOcean_customCmdDown">customCmdDown</a> are executed if one of the selected readings is triggered as follows:
+   <li><a id="EnOcean-attr-customCmdDownTrigger">customCmdDownTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+     The commands in the attribute <a href="#EnOcean-attr-customCmdDown">customCmdDown</a> are executed if one of the selected readings is triggered as follows:
      <ul>
        <li>[dayNight] = night</li>
        <li>[isRaining] = no</li>
@@ -20650,10 +21079,10 @@ sub EnOcean_Delete($$) {
        <li>[isSunnyWest] = yes</li>
        <li>[isWindy] = no</li>
      </ul>
-     The commands in the attribute <a href="#EnOcean_customCmdDown">customCmdDown</a> are executed periodically every second if the attribute is not set.
+     The commands in the attribute <a href="#EnOcean-attr-customCmdDown">customCmdDown</a> are executed periodically every second if the attribute is not set.
    </li>
-   <li><a name="EnOcean_customCmdUpTrigger">customCmdUpTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
-     The commands in the attribute <a href="#EnOcean_customCmdUp">customCmdUp</a> are executed if one of the selected readings is triggered as follows:
+   <li><a id="EnOcean-attr-customCmdUpTrigger">customCmdUpTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+     The commands in the attribute <a href="#EnOcean-attr-customCmdUp">customCmdUp</a> are executed if one of the selected readings is triggered as follows:
      <ul>
        <li>[dayNight] = day</li>
        <li>[isRaining] = yes</li>
@@ -20664,24 +21093,24 @@ sub EnOcean_Delete($$) {
        <li>[isSunnyWest] = no</li>
        <li>[isWindy] = yes</li>
      </ul>
-     The commands in the attribute <a href="#EnOcean_customCmdUp">customCmdUp</a> are executed periodically every second if the attribute is not set.
+     The commands in the attribute <a href="#EnOcean-attr-customCmdUp">customCmdUp</a> are executed periodically every second if the attribute is not set.
    </li>
-   <li><a name="EnOcean_customCmdPriority">customCmdPriority</a> down|up,
+   <li><a id="EnOcean-attr-customCmdPriority">customCmdPriority</a> down|up,
      [customCmdPriority] = down|up, up is default.<br>
      Priority of custom commands. If both the up and down command are triggered, only the prioritized command is executed.
    </li>
-    <li><a name="EnOcean_dataEnc">dataEnc</a> VAES|AES-CBC, [dataEnc] = VAES is default<br>
+    <li><a id="EnOcean-attr-dataEnc">dataEnc</a> VAES|AES-CBC, [dataEnc] = VAES is default<br>
       Data encryption algorithm
     </li>
-    <li><a name="EnOcean_defaultChannel">defaultChannel</a> &lt;channel&gt;
+    <li><a id="EnOcean-attr-defaultChannel">defaultChannel</a> &lt;channel&gt;
       subType actuator.01: [defaultChannel] = all|input|0 ... 29, all is default.<br>
       subType blindsCtrl.00,  blindsCtrl.01: [defaultChannel] = all|1 ... 4, all is default.<br>
       Default device channel
     </li>
-    <li><a name="EnOcean_daylightSavingTime">daylightSavingTime</a> supported|not_supported, [daylightSavingTime] = supported is default.<br>
+    <li><a id="EnOcean-attr-daylightSavingTime">daylightSavingTime</a> supported|not_supported, [daylightSavingTime] = supported is default.<br>
       daylightSavingTime is supported for roomCtrlPanel.00.
       </li>
-    <li><a name="EnOcean_demandRespAction">demandRespAction</a> &lt;command&gt;<br>
+    <li><a id="EnOcean-attr-demandRespAction">demandRespAction</a> &lt;command&gt;<br>
       Command being executed after an demand response command is set.  If &lt;command&gt; is enclosed in {},
       then it is a perl expression, if it is enclosed in "", then it is a shell command,
       else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the demand response
@@ -20690,44 +21119,47 @@ sub EnOcean_Delete($$) {
       on the target device. This data is available as a local variable in perl, as environment variable for shell
       scripts, and will be textually replaced for Fhem commands.
     </li>
-    <li><a name="EnOcean_demandRespMax">demandRespMax</a> A0|AI|B0|BI|C0|CI|D0|DI, [demandRespMax] = B0 is default<br>
+    <li><a id="EnOcean-attr-demandRespMax">demandRespMax</a> A0|AI|B0|BI|C0|CI|D0|DI, [demandRespMax] = B0 is default<br>
       Switch command which is executed if the demand response switches to a maximum.
     </li>
-    <li><a name="EnOcean_demandRespMin">demandRespMin</a> A0|AI|B0|BI|C0|CI|D0|DI, [demandRespMax] = BI is default<br>
+    <li><a id="EnOcean-attr-demandRespMin">demandRespMin</a> A0|AI|B0|BI|C0|CI|D0|DI, [demandRespMax] = BI is default<br>
       Switch command which is executed if the demand response switches to a minimum.
     </li>
-    <li><a name="EnOcean_demandRespRefDev">demandRespRefDev</a> &lt;name&gt;<br>
+    <li><a id="EnOcean-attr-demandRespRefDev">demandRespRefDev</a> &lt;name&gt;<br>
     </li>
-    <li><a name="EnOcean_demandRespRandomTime">demandRespRandomTime</a> t/s [demandRespRandomTime] = 1 is default<br>
+    <li><a id="EnOcean-attr-demandRespRandomTime">demandRespRandomTime</a> t/s [demandRespRandomTime] = 1 is default<br>
       Maximum length of the random delay at the start or end of a demand respose event in slave mode.
     </li>
-    <li><a name="EnOcean_demandRespThreshold">demandRespThreshold</a> 0...15 [demandRespTheshold] = 8 is default<br>
+    <li><a id="EnOcean-attr-demandRespThreshold">demandRespThreshold</a> 0...15 [demandRespTheshold] = 8 is default<br>
       Threshold for switching the power usage level between minimum and maximum in the master mode.
     </li>
-    <li><a name="EnOcean_demandRespTimeoutLevel">demandRespTimeoutLevel</a> max|last [demandRespTimeoutLevel] = max is default<br>
+    <li><a id="EnOcean-attr-demandRespTimeoutLevel">demandRespTimeoutLevel</a> max|last [demandRespTimeoutLevel] = max is default<br>
       Demand response timeout level in slave mode.
     </li>
-    <li><a name="devChannel">devChannel</a> 00 ... FF, [devChannel] = FF is default<br>
+    <li><a id="EnOcean-attr-devChannel">devChannel</a> 00 ... FF, [devChannel] = FF is default<br>
       Number of the individual device channel, FF = all channels supported by the device
     </li>
-    <li><a name="destinationID">destinationID</a> multicast|unicast|00000001 ... FFFFFFFF,
+    <li><a id="EnOcean-attr-destinationID">destinationID</a> multicast|unicast|00000001 ... FFFFFFFF,
       [destinationID] = multicast is default<br>
       Destination ID, special values: multicast = FFFFFFFF, unicast = [DEF]
     </li>
-    <li><a name="EnOcean_devMode">devMode</a> master|slave, [devMode] = master is default.<br>
+    <li><a id="EnOcean-attr-devMode">devMode</a> master|slave, [devMode] = master is default.<br>
       device operation mode.
     </li>
+    <li><a id="EnOcean-attr-devUpdate">devUpdate</a> auto|off, [devUpdate] = auto is default.<br>
+      device status update mode.
+    </li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
-    <li><a name="EnOcean_dimMax">dimMax</a> dim/%|off, [dimMax] = 255 is default.<br>
+    <li><a id="EnOcean-attr-dimMax">dimMax</a> dim/%|off, [dimMax] = 255 is default.<br>
       maximum brightness value<br>
       dimMax is supported for the profile gateway/dimming.
       </li>
-    <li><a name="EnOcean_dimMin">dimMin</a> dim/%|off, [dimMax] = off is default.<br>
+    <li><a id="EnOcean-attr-dimMin">dimMin</a> dim/%|off, [dimMax] = off is default.<br>
       minimum brightness value<br>
       If [dimMax] = off, then the actuator takes down the ramp time set there.
       dimMin is supported for the profile gateway/dimming.
       </li>
-    <li><a name="dimValueOn">dimValueOn</a> dim/%|last|stored,
+    <li><a id="EnOcean-attr-dimValueOn">dimValueOn</a> dim/%|last|stored,
       [dimValueOn] = 100 is default.<br>
       Dim value for the command "on".<br>
       The dimmer switched on with the value 1 % ... 100 % if [dimValueOn] =
@@ -20738,10 +21170,10 @@ sub EnOcean_Delete($$) {
       stored.<br>
       dimValueOn is supported for the profile gateway/dimming.
       </li>
-    <li><a href="#EnOcean_disable">disable</a> 0|1<br>
+    <li><a href="#disable">disable</a> 0|1<br>
       If applied set commands will not be executed.
     </li>
-    <li><a href="#EnOcean_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...<br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...<br>
       Space separated list of HH:MM tupels. If the current time is between
       the two time specifications, set commands will not be executed. Instead of
       HH:MM you can also specify HH or HH:MM:SS. To specify an interval
@@ -20750,19 +21182,19 @@ sub EnOcean_Delete($$) {
         23:00-24:00 00:00-01:00
       </ul>
     </li>
-    <li><a name="EnOcean_displayContent">displayContent</a>
+    <li><a id="EnOcean-attr-displayContent">displayContent</a>
       humidity|off|setpointTemp|temperatureExtern|temperatureIntern|time|default|no_change, [displayContent] = no_change is default.<br>
       displayContent is supported for roomCtrlPanel.00.
     </li>
-    <li><a name="EnOcean_displayOrientation">displayOrientation</a> rad/&#176, [displayOrientation] = 0|90|180|270, 0 is default.<br>
+    <li><a id="EnOcean-attr-displayOrientation">displayOrientation</a> rad/&#176, [displayOrientation] = 0|90|180|270, 0 is default.<br>
       Display orientation of the actuator
     </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a name="EnOcean_eep">eep</a> &lt;00...FF&gt;-&lt;00...3F&gt;-&lt;00...7F&gt;<br>
+    <li><a id="EnOcean-attr-eep">eep</a> &lt;00...FF&gt;-&lt;00...3F&gt;-&lt;00...7F&gt;<br>
       EnOcean Equipment Profile (EEP)
-    <li><a href="#eventMap">eventMap</a></li>
     </li>
-    <li><a name="EnOcean_gpDef">gpDef</a> &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]] ...
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a id="EnOcean-attr-gpDef">gpDef</a> &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]] ...
                                           &lt;name of channel 64&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]
                                          <br>
       Generic Profiles channel definitions are set automatically in master mode. If the profile in slave mode is operated, the channel
@@ -20770,49 +21202,58 @@ sub EnOcean_Delete($$) {
       parameters to be specified in decimal. First, the outgoing channels (direction = O) are to be defined, then the incoming channels
       (direction = I) should be described. The channel numbers are assigned automatically starting with 00th.
     </li>
-    <li><a name="gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd<br>
-      Gateway Command Type, see <a href="#Gateway">Gateway</a> profile
+    <li><a id="EnOcean-attr-gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd<br>
+      Gateway Command Type, see <a href="#EnOcean-Gateway">Gateway</a> profile
     </li>
-    <li><a name="EnOcean_humidity">humidity</a> rH/%<br>
+    <li><a id="EnOcean-attr-humidity">humidity</a> rH/%<br>
       The value of the actual humidity, used by a Room Sensor and Control Unit. Should by
       filled via a notify from a distinct humidity sensor.
     </li>
-    <li><a name="EnOcean_humidityRefDev">humidityRefDev</a> &lt;name&gt;<br>
+    <li><a id="EnOcean-attr-humidityRefDev">humidityRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading humidity.
     </li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#IODev">IODev</a></li>
-    <li><a name="EnOcean_keyRcv">keyRcv</a> &lt;private key 16 byte hex&gt;<br>
+    <li><a id="EnOcean-attr-IODev">IODev</a>
+      EnOcean IODev name
+    </li>
+    <li><a id="EnOcean-attr-keyRcv">keyRcv</a> &lt;private key 16 byte hex&gt;<br>
       Private Key for receive direction
     </li>
-    <li><a name="EnOcean_keySnd">keySnd</a> &lt;private key 16 byte hex&gt;<br>
+    <li><a id="EnOcean-attr-keySnd">keySnd</a> &lt;private key 16 byte hex&gt;<br>
       Private Key for send direction
     </li>
-    <li><a name="EnOcean_macAlgo">macAlgo</a> no|3|4<br>
+    <li><a id="EnOcean-attr-macAlgo">macAlgo</a> no|3|4<br>
       MAC Algorithm
     </li>
-    <li><a name="EnOcean_manufID">manufID</a> &lt;000 ... 7FF&gt;<br>
+    <li><a id="EnOcean-attr-manufID">manufID</a> &lt;000 ... 7FF&gt;<br>
       Manufacturer ID number
     </li>
-    <li><a name="EnOcean_measurementCtrl">measurementCtrl</a> enable|disable<br>
+    <li><a id="EnOcean-attr-measurementCtrl">measurementCtrl</a> enable|disable<br>
       Enable or disable the temperature measurements of the actuator. If the temperature
       measurements are turned off, the foot temperature may be displayed and an external temperature sensor must be exists, see attribute
-      <a href="#temperatureRefDev">temperatureRefDev</a>.
+      <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>.
     </li>
-    <li><a name="EnOcean_measurementTypeSelect">measurementTypeSelect</a> foot|room<br>
+    <li><a id="EnOcean-attr-measurementTypeSelect">measurementTypeSelect</a> foot|room<br>
       Select the temperature measurements type displayed by the actuator. If the temperature
       measurements are turned to foot, the foot temperature may be displayed and an external
-      temperature sensor must be exists, see attribute <a href="#temperatureRefDev">temperatureRefDev</a>.
+      temperature sensor must be exists, see attribute <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a>.
     </li>
-    <li><a href="#model">model</a></li>
-    <li><a name="EnOcean_observe">observe</a> off|on, [observe] = off is default.<br>
+    <li><a href="#EnOcean-attr-model">model</a></li>
+    <li><a id="EnOcean-attr-motionMode">motionMode</a> fully|semi, [motionMode] = fully is default.<br>
+      Fully automatic or semi automatic motion detection
+    </li>
+    <li><a id="EnOcean-attr-motionRefDev">motionRefDev</a> &lt;name&gt;<br>
+      Name of the device whose reference value is read. The reference values is
+      the reading motion.
+    </li>
+    <li><a id="EnOcean-attr-observe">observe</a> off|on, [observe] = off is default.<br>
       Observing and repeating the execution of set commands
     </li>
-    <li><a name="EnOcean_observeCmdRepetition">observeCmdRepetition</a> 1..5, [observeCmdRepetition] = 2 is default.<br>
+    <li><a id="EnOcean-attr-observeCmdRepetition">observeCmdRepetition</a> 1..5, [observeCmdRepetition] = 2 is default.<br>
       Maximum number of command retries
     </li>
-    <li><a name="EnOcean_observeErrorAction">observeErrorAction</a> &lt;command&gt;<br>
+    <li><a id="EnOcean-attr-observeErrorAction">observeErrorAction</a> &lt;command&gt;<br>
       Command being executed after an error.  If &lt;command&gt; is enclosed in {},
       then it is a perl expression, if it is enclosed in "", then it is a shell command,
       else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the set
@@ -20821,84 +21262,84 @@ sub EnOcean_Delete($$) {
       is available as a local variable in perl, as environment variable for shell
       scripts, and will be textually replaced for Fhem commands.
     </li>
-    <li><a name="EnOcean_observeInterval">observeInterval</a> 1/s ... 255/s, [observeInterval] = 1 is default.<br>
+    <li><a id="EnOcean-attr-observeInterval">observeInterval</a> 1/s ... 255/s, [observeInterval] = 1 is default.<br>
       Interval between two observations
     </li>
-    <li><a name="EnOcean_observeLogic">observeLogic</a> and|or, [observeLogic] = or is default.<br>
+    <li><a id="EnOcean-attr-observeLogic">observeLogic</a> and|or, [observeLogic] = or is default.<br>
       Observe logic
     </li>
-    <li><a name="EnOcean_observeRefDev">observeRefDev</a> &lt;name&gt; [&lt;name&gt; [&lt;name&gt;]],
+    <li><a id="EnOcean-attr-observeRefDev">observeRefDev</a> &lt;name&gt; [&lt;name&gt; [&lt;name&gt;]],
       [observeRefDev] = &lt;name of the own device&gt; is default<br>
       Names of the devices to be observed. The list must be separated by spaces.
     </li>
-    <li><a name="EnOcean_openLoopCtrlScale">openLoopCtrlScale</a> &lt;dimHigh&gt;:&lt;brightness1&gt; &lt;dimLow&gt;:&lt;brightness2&gt;,
+    <li><a id="EnOcean-attr-openLoopCtrlScale">openLoopCtrlScale</a> &lt;dimHigh&gt;:&lt;brightness1&gt; &lt;dimLow&gt;:&lt;brightness2&gt;,
       [openLoopCtrlScale] = 100:100 0:0 is default.<br>
       Bases of the straight-line characteristic of the open loop control dimming function.
     </li>
-    <li><a name="EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a>,
+    <li><a id="EnOcean-attr-pidActorCallBeforeSetting">pidActorCallBeforeSetting</a>,
         [pidActorCallBeforeSetting] = not defined is default<br>
         Callback-function, which can manipulate the actorValue. Further information see modul PID20.
     </li>
-    <li><a name="EnOcean_pidActorErrorAction">pidActorErrorAction</a> freeze|errorPos,
+    <li><a id="EnOcean-attr-pidActorErrorAction">pidActorErrorAction</a> freeze|errorPos,
         [pidActorErrorAction] = freeze is default<br>
         required action on error
     </li>
-    <li><a name="EnOcean_pidActorErrorPos">pidActorErrorPos</a> valvePos/%,
+    <li><a id="EnOcean-attr-pidActorErrorPos">pidActorErrorPos</a> valvePos/%,
         [pidActorErrorPos] = 0...100, 0 is default<br>
         actor's position to be used in case of error
     </li>
-    <li><a name="EnOcean_pidActorLimitLower">pidActorLimitLower</a> valvePos/%,
+    <li><a id="EnOcean-attr-pidActorLimitLower">pidActorLimitLower</a> valvePos/%,
         [pidActorLimitLower] = 0...100, 0 is default<br>
         lower limit for actor
     </li>
-    <li><a name="EnOcean_pidActorLimitUpper">pidActorLimitUpper</a> valvePos/%,
+    <li><a id="EnOcean-attr-pidActorLimitUpper">pidActorLimitUpper</a> valvePos/%,
         [pidActorLimitUpper] = 0...100, 100 is default<br>
         upper limit for actor
     </li>
-    <li><a name="EnOcean_pidActorTreshold">pidActorTreshold</a> valvePos/%,
+    <li><a id="EnOcean-attr-pidActorTreshold">pidActorTreshold</a> valvePos/%,
         [pidActorTreshold] = 1...100, 1 is default<br>
         actor treshold
     </li>
-    <li><a name="EnOcean_pidCtrl">pidCtrl</a> on|off,
+    <li><a id="EnOcean-attr-pidCtrl">pidCtrl</a> on|off,
         [pidCtrl] = on is default<br>
         Activate the Fhem PID regulator
     </li>
-    <li><a name="EnOcean_pidDeltaTreshold">pidDeltaTreshold</a> &lt;floating-point number&gt;,
+    <li><a id="EnOcean-attr-pidDeltaTreshold">pidDeltaTreshold</a> &lt;floating-point number&gt;,
         [pidDeltaTreshold] = 0 is default<br>
         if delta < delta-threshold the pid will enter idle state
     </li>
-    <li><a name="EnOcean_pidFactor_P">pidFactor_P</a> &lt;floating-point number&gt;,
+    <li><a id="EnOcean-attr-pidFactor_P">pidFactor_P</a> &lt;floating-point number&gt;,
         [pidFactor_P] = 25 is default<br>
         P value for PID
     </li>
-    <li><a name="EnOcean_pidFactor_I">pidFactor_I</a> &lt;floating-point number&gt;,
+    <li><a id="EnOcean-attr-pidFactor_I">pidFactor_I</a> &lt;floating-point number&gt;,
         [pidFactor_I] = 0.25 is default<br>
         I value for PID
     </li>
-    <li><a name="EnOcean_pidFactor_D">pidFactor_D</a> &lt;floating-point number&gt;,
+    <li><a id="EnOcean-attr-pidFactor_D">pidFactor_D</a> &lt;floating-point number&gt;,
         [pidFactor_D] = 0 is default<br>
         D value for PID
     </li>
-    <li><a name="EnOcean_pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a>
+    <li><a id="EnOcean-attr-pidIPortionCallBeforeSetting">pidIPortionCallBeforeSetting</a>
         [pidIPortionCallBeforeSetting] = not defined is default<br>
         Callback-function, which can manipulate the value of I-Portion. Further information see modul PID20.
     </li>
-    <li><a name="EnOcean_pidSensorTimeout">pidSensorTimeout t/s</a>
+    <li><a id="EnOcean-attr-pidSensorTimeout">pidSensorTimeout t/s</a>
         [pidSensorTimeout] = 3600 is default<br>
-        number of seconds to wait before sensor <a href="#temperatureRefDev">temperatureRefDev</a> will be recognized n/a
+        number of seconds to wait before sensor <a href="#EnOcean-attr-temperatureRefDev">temperatureRefDev</a> will be recognized n/a
     </li>
-    <li><a name="EnOcean_pollInterval">pollInterval</a> t/s, [pollInterval] = 10 is default.<br>
+    <li><a id="EnOcean-attr-pollInterval">pollInterval</a> t/s, [pollInterval] = 10 is default.<br>
       [pollInterval] = 1 ... 1440.<br>
       pollInterval is supported for roomCtrlPanel.00.
       </li>
-    <li><a name="EnOcean_rampTime">rampTime</a> t/s or relative, [rampTime] = 1 is default.<br>
+    <li><a id="EnOcean-attr-rampTime">rampTime</a> t/s or relative, [rampTime] = 1 is default.<br>
       No ramping or for Eltako dimming speed set on the dimmer if [rampTime] = 0.<br>
       Gateway/dimmung: Ramping time 1 s to 255 s or relative fast to low dimming speed if [rampTime] = 1 ... 255.<br>
       lightCtrl.01: Ramping time 1 s to 65535 s<br>
       rampTime is supported for gateway, command dimming and lightCtrl.01.
       </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a name="EnOcean_rcvRespAction">rcvRespAction</a> &lt;command&gt;<br>
+    <li><a id="EnOcean-attr-rcvRespAction">rcvRespAction</a> &lt;command&gt;<br>
       Command being executed after an message from the aktor is received and before an response message is sent.
       If &lt;command&gt; is enclosed in {}, then it is a perl expression, if it is enclosed in "", then it is a shell command,
       else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME
@@ -20911,112 +21352,116 @@ sub EnOcean_Delete($$) {
       This data is available as a local variable in perl, as environment variable for shell
       scripts, and will be textually replaced for Fhem commands.
     </li>
-    <li><a name="EnOcean_remoteCode">remoteCode</a> &lt;00000000...FFFFFFFE&gt;<br>
+    <li><a id="EnOcean-attr-remoteCode">remoteCode</a> &lt;00000000...FFFFFFFE&gt;<br>
       Remote Management Security Code, 00000000 is interpreted as on code has been set.
     </li>
-    <li><a name="EnOcean_remoteEEP">remoteEEP</a> &lt;00...FF&gt;-&lt;00...3F&gt;-&lt;00...7F&gt;<br>
+    <li><a id="EnOcean-attr-remoteEEP">remoteEEP</a> &lt;00...FF&gt;-&lt;00...3F&gt;-&lt;00...7F&gt;<br>
       Remote Management EnOcean Equipment Profile (EEP)
     </li>
-    <li><a name="EnOcean_remoteID">remoteID</a> &lt;00000001...FFFFFFFE&gt;<br>
+    <li><a id="EnOcean-attr-remoteID">remoteID</a> &lt;00000001...FFFFFFFE&gt;<br>
       Remote Management Remote Device ID
     </li>
-    <li><a name="EnOcean_remoteManagement">remoteManagement</a> client|manager|off,
+    <li><a id="EnOcean-attr-remoteManagement">remoteManagement</a> client|manager|off,
       [remoteManagement] = off is default.<br>
       Enable Remote Management for the device.
     </li>
-    <li><a name="EnOcean_remoteManufID">remoteManufID</a> &lt;000...7FF&gt;<br>
+    <li><a id="EnOcean-attr-remoteManufID">remoteManufID</a> &lt;000...7FF&gt;<br>
       Remote Management Manufacturer ID
     </li>
-    <li><a name="repeatingAllowed">repeatingAllowed</a> yes|no,
+    <li><a id="EnOcean-attr-repeatingAllowed">repeatingAllowed</a> yes|no,
       [repeatingAllowed] = yes is default.<br>
       EnOcean Repeater in the transmission range of Fhem may forward data messages
       of the device, if the attribute is set to yes.
     </li>
-    <li><a name="EnOcean_releasedChannel">releasedChannel</a> A|B|C|D|I|0|auto, [releasedChannel] = auto is default.<br>
+    <li><a id="EnOcean-attr-releasedChannel">releasedChannel</a> A|B|C|D|I|0|auto, [releasedChannel] = auto is default.<br>
       Attribute releasedChannel determines via which SenderID (subDefA ... subDef0) the command released is sent.
       If [releasedChannel] = auto, the SenderID the last command A0, AI, B0, BI, C0, CI, D0 or DI is used.
       Attribute releasedChannel is supported for attr switchType = central and attr switchType = channel.
       </li>
-    <li><a name="EnOcean_reposition">reposition</a> directly|opens|closes, [reposition] = directly is default.<br>
+    <li><a id="EnOcean-attr-reposition">reposition</a> directly|opens|closes, [reposition] = directly is default.<br>
       Attribute reposition specifies how to adjust the internal positioning tracker before going to the new position.
       </li>
-    <li><a name="EnOcean_rlcAlgo">rlcAlgo</a> 2++|3++<br>
+    <li><a id="EnOcean-attr-rlcAlgo">rlcAlgo</a> 2++|3++|4++|no<br>
       RLC Algorithm
     </li>
-    <li><a name="EnOcean_rlcRcv">rlcRcv</a> &lt;rolling code 2 or 3 byte hex&gt;<br>
+    <li><a id="EnOcean-attr-rlcRcv">rlcRcv</a> &lt;rolling code 2 or 3 byte hex&gt;<br>
       Rolling Code for receive direction
     </li>
-    <li><a name="EnOcean_rlcSnd">rlcSnd</a> &lt;rolling code 2 or 3 byte hex&gt;<br>
+    <li><a id="EnOcean-attr-rlcSnd">rlcSnd</a> &lt;rolling code 2 or 3 byte hex&gt;<br>
       Rolling Code for send direction
     </li>
-    <li><a name="EnOcean_rlcTX">rlcTX</a> false|true<br>
+    <li><a id="EnOcean-attr-rlcTX">rlcTX</a> false|true<br>
       Rolling Code is expected in the received telegram
     </li>
-    <li><a name="EnOcean_rltRepeat">rltRepeat</a> 16|32|64|128|256,
+    <li><a id="EnOcean-attr-rltRepeat">rltRepeat</a> 16|32|64|128|256,
       [rltRepeat] = 16 is default.<br>
       Number of RLT MasterTest messages sent
     </li>
-    <li><a name="EnOcean_rltType">rltType</a> 1BS|4BS,
+    <li><a id="EnOcean-attr-rltType">rltType</a> 1BS|4BS,
       [rltType] = 4BS is default.<br>
       Type of RLT MasterTest message
     </li>
-    <li><a name="scaleDecimals">scaleDecimals</a> 0 ... 9<br>
+    <li><a id="EnOcean-attr-rotationSpeed">rotationSpeed</a> high|low,
+      [rotationSpeed] = high is default.<br>
+      Rotation Speed
+    </li>
+    <li><a id="EnOcean-attr-scaleDecimals">scaleDecimals</a> 0 ... 9<br>
       Decimal rounding with x digits of the scaled reading setpoint
     </li>
-    <li><a name="EnOcean_teachMethod">teachMethod</a> 1BS|4B|confirm|GP|RPS|smartAck|STE|UTE<br>
+    <li><a id="EnOcean-attr-teachMethod">teachMethod</a> 1BS|4B|confirm|GP|RPS|smartAck|STE|UTE<br>
       teach-in method
     </li>
-    <li><a name="scaleMax">scaleMax</a> &lt;floating-point number&gt;<br>
+    <li><a id="EnOcean-attr-scaleMax">scaleMax</a> &lt;floating-point number&gt;<br>
       Scaled maximum value of the reading setpoint
     </li>
-    <li><a name="scaleMin">scaleMin</a> &lt;floating-point number&gt;<br>
+    <li><a id="EnOcean-attr-scaleMin">scaleMin</a> &lt;floating-point number&gt;<br>
       Scaled minimum value of the reading setpoint
     </li>
-    <li><a name="EnOcean_secLevel">secLevel</a> encapsulation|encryption|off, [secLevel] = off is default<br>
+    <li><a id="EnOcean-attr-secLevel">secLevel</a> encapsulation|encryption|off, [secLevel] = off is default<br>
       Security level of the data
     </li>
-    <li><a name="EnOcean_secMode">secMode</a> rcv|snd|bidir<br>
+    <li><a id="EnOcean-attr-secMode">secMode</a> rcv|snd|bidir<br>
       Telegram direction, which is secured
     </li>
-    <li><a name="EnOcean_sendDevStatus">sendDevStatus</a> no|yes, [sendDevStatus] = no is default.<br>
+    <li><a id="EnOcean-attr-sendDevStatus">sendDevStatus</a> no|yes, [sendDevStatus] = no is default.<br>
       Send new status of the device.
     </li>
-    <li><a name="EnOcean_sendTimePeriodic">sendTimePeriodic</a> t/s|off, [sendTimePeriodic] = off | 1 ... 86400, 600 is default.<br>
+    <li><a id="EnOcean-attr-sendTimePeriodic">sendTimePeriodic</a> t/s|off, [sendTimePeriodic] = off | 1 ... 86400, 600 is default.<br>
       Time period of time telegrams.
     </li>
-    <li><a name="sensorMode">sensorMode</a> switch|pushbutton,
+    <li><a id="EnOcean-attr-sensorMode">sensorMode</a> switch|pushbutton,
       [sensorMode] = switch is default.<br>
       The status "released" will be shown in the reading state if the
       attribute is set to "pushbutton".
     </li>
-    <li><a name="EnOcean_serviceOn">serviceOn</a> no|yes,
+    <li><a id="EnOcean-attr-serviceOn">serviceOn</a> no|yes,
       [serviceOn] = no is default.<br>
       Device in Service Mode.
     </li>
-    <li><a name="EnOcean_setCmdTrigger">setCmdTrigger</a> man|refDev, [setCmdTrigger] = man is default.<br>
+    <li><a id="EnOcean-attr-setCmdTrigger">setCmdTrigger</a> man|refDev, [setCmdTrigger] = man is default.<br>
       Operation mode to send set commands<br>
       If the attribute is set to "refDev", a device-specific set command is sent when the reference device is updated.
       For the subType "roomSensorControl.05" and "fanCrtl.00"  the reference "temperatureRefDev" is supported.<br>
       For the subType "roomSensorControl.01" the references "humidityRefDev" and "temperatureRefDev" are supported.<br>
       </li>
-    <li><a name="EnOcean_setpointRefDev">setpointRefDev</a> &lt;name&gt;<br>
+    <li><a id="EnOcean-attr-setpointRefDev">setpointRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading setpoint.
     </li>
-    <li><a name="EnOcean_setpointSummerMode">setpointSummerMode</a> valvePos/%,
+    <li><a id="EnOcean-attr-setpointSummerMode">setpointSummerMode</a> valvePos/%,
         [setpointSummerMode] = 0...100, 0 is default<br>
       Valve position in summer operation
     </li>
-    <li><a name="EnOcean_setpointTempRefDev">setpointTempRefDev</a> &lt;name&gt;<br>
+    <li><a id="EnOcean-attr-setpointTempRefDev">setpointTempRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading setpointTemp.
     </li>
-    <li><a name="EnOcean_settingAccuracy">settingAccuracy</a> high|low,
+    <li><a id="EnOcean-attr-settingAccuracy">settingAccuracy</a> high|low,
       [settingAccuracy] = low is default.<br>
       set setting accurancy.
     </li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a name="shutTime">shutTime</a> &lt;channel1&gt;[:&lt;channel2&gt;[:&lt;channel3&gt;[:&lt;channel4&gt;]]]<br>
+    <li><a id="EnOcean-attr-shutTime">shutTime</a> &lt;channel1&gt;[:&lt;channel2&gt;[:&lt;channel3&gt;[:&lt;channel4&gt;]]]<br>
       subType blindsCtrl.00,  blindsCtrl.01: [shutTime] = 5 ... 300, 300 is default.<br>
       subType manufProfile: [shutTime] = 1 ... 255, 255 is default.<br>
       Use the attr shutTime to set the time delay to the position "Halt" in
@@ -21024,24 +21469,24 @@ sub EnOcean_Delete($$) {
       or roller shutter needs to move from its end position to the other position.<br>
       Notice subType blindsCrtl.00: The attribute can only be set while the actuator is online.
     </li>
-    <li><a name="shutTimeCloses">shutTimeCloses</a> t/s, [shutTimeCloses] = 1 ... 255,
+    <li><a id="EnOcean-attr-shutTimeCloses">shutTimeCloses</a> t/s, [shutTimeCloses] = 1 ... 255,
       [shutTimeCloses] = [shutTime] is default.<br>
       Set the attr shutTimeCloses to define the runtime used by the commands opens and closes.
       Select a runtime that is at least as long as the value set by the delay switch of the actuator.
       <br>
       shutTimeCloses is supported for shutter.
     </li>
-    <li><a name="EnOcean_signal">signal</a> off|on,
+    <li><a id="EnOcean-attr-signal">signal</a> off|on,
       [signal] = off is default.<br>
       Activate the request functions of signal telegram messages.
     </li>
-    <li><a name="EnOcean_signOfLife">signOfLife</a> off|on, [signOfLive] = off is default.<br>
+    <li><a id="EnOcean-attr-signOfLife">signOfLife</a> off|on, [signOfLive] = off is default.<br>
       Monitoring signOfLife telegrams from sensors.
     </li>
-    <li><a name="EnOcean_signOfLifeInterval">signOfLifeInterval</a> 1...65535<br>
+    <li><a id="EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> 1...65535<br>
       Monitoring period in seconds for signOfLife telegrams from sensors.
     </li>
-    <li><a name="subDef">subDef</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDef">subDef</a> &lt;EnOcean SenderID&gt;,
       [subDef] = [DEF] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) to control a bidirectional switch or actor.<br>
       In order to control devices that send acknowledge telegrams, you cannot reuse the ID of this
@@ -21053,7 +21498,7 @@ sub EnOcean_Delete($$) {
       needs to be reloaded. The assigned SenderID will only displayed after the system configuration
       has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDefA">subDefA</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefA">subDefA</a> &lt;EnOcean SenderID&gt;,
       [subDefA] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = A0|AI|released<br>
       Used with switch type "channel". Set attr switchType to channel.<br>
@@ -21062,7 +21507,7 @@ sub EnOcean_Delete($$) {
       If [subDefA] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDefB">subDefB</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefB">subDefB</a> &lt;EnOcean SenderID&gt;,
       [subDefB] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = B0|BI|released<br>
       Used with switch type "channel". Set attr switchType to channel.<br>
@@ -21071,7 +21516,7 @@ sub EnOcean_Delete($$) {
       If [subDefB] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDefC">subDefC</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefC">subDefC</a> &lt;EnOcean SenderID&gt;,
       [subDefC] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = C0|CI|released<br>
       Used with switch type "channel". Set attr switchType to channel.<br>
@@ -21080,7 +21525,7 @@ sub EnOcean_Delete($$) {
       If [subDefC] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDefD">subDefD</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefD">subDefD</a> &lt;EnOcean SenderID&gt;,
       [subDefD] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = D0|DI|released<br>
       Used with switch type "channel". Set attr switchType to channel.<br>
@@ -21089,7 +21534,7 @@ sub EnOcean_Delete($$) {
       If [subDefD] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDef0">subDef0</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDef0">subDef0</a> &lt;EnOcean SenderID&gt;,
       [subDef0] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = A0|B0|C0|D0|released<br>
       Used with switch type "central". Set attr switchType to central.<br>
@@ -21099,7 +21544,7 @@ sub EnOcean_Delete($$) {
       If [subDef0] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="subDefI">subDefI</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefI">subDefI</a> &lt;EnOcean SenderID&gt;,
       [subDefI] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = AI|BI|CI|DI<br>
       Used with switch type "central". Set attr switchType to central.<br>
@@ -21109,40 +21554,47 @@ sub EnOcean_Delete($$) {
       If [subDefI] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
     </li>
-    <li><a name="EnOcean_subDefH">subDefH</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefH">subDefH</a> &lt;EnOcean SenderID&gt;,
       [subDefH] = undef is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset)<br>
       Used with subType "multisensor.00". If the attribute subDefH is set, the position of the window handle as EEP F6-10-00
       (windowHandle) telegram is forwarded.<br>
       If [subDefH] = getNextID FHEM can assign a free SenderID alternatively.
     </li>
-    <li><a name="EnOcean_subDefW">subDefW</a> &lt;EnOcean SenderID&gt;,
+    <li><a id="EnOcean-attr-subDefW">subDefW</a> &lt;EnOcean SenderID&gt;,
       [subDefW] = undef is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset)<br>
       Used with subType "multisensor.00". If the attribute subDefW is set, the window state as EEP D5-00-01
       (contact) telegram is forwarded.<br>
       If [subDefW] = getNextID FHEM can assign a free SenderID alternatively.
     </li>
-    <li><a href="#subType">subType</a></li>
-    <li><a name="subTypeSet">subTypeSet</a> &lt;type of device&gt;, [subTypeSet] = [subType] is default.<br>
+    <li><a id="EnOcean-attr-subType">subType</a>
+      Type of device (EEP Profile). The profile has to fit their basic profile.
+      More information can be found in the basic profiles.
+    </li>
+    <li><a id="EnOcean-attr-subTypeReading">subTypeReading</a> &lt;type of device&gt;, [subTypeReading] = [subType] is default.<br>
+      Type of device (EEP Profile) used for readings. Set the Attribute manually.
+      The profile has to fit their basic profile. More information can be found in the basic profiles.
+    </li>
+    <li><a id="EnOcean-attr-subTypeSet">subTypeSet</a> &lt;type of device&gt;, [subTypeSet] = [subType] is default.<br>
       Type of device (EEP Profile) used for sending commands. Set the Attribute manually.
       The profile has to fit their basic profile. More information can be found in the basic profiles.
     </li>
-    <li><a name="EnOcean_summerMode">summerMode</a> off|on,
+    <li><a id="EnOcean-attr-summerMode">summerMode</a> off|on,
       [summerMode] = off is default.<br>
       Put Battery Powered Actuator (hvac.01/hvac.06) or Heating Radiator Actuating Drive (hvac.04) in summer operation
       to reduce energy consumption. If [summerMode] = on, the set commands are not executed.
     </li>
-    <li><a name="EnOcean_switchHysteresis">switchHysteresis</a> &lt;value&gt;,
+    <li><a id="EnOcean-attr-switchHysteresis">switchHysteresis</a> &lt;value&gt;,
       [switchHysteresis] = 1 is default.<br>
       Switch Hysteresis
     </li>
-    <li><a name="switchMode">switchMode</a> switch|pushbutton,
+    <li><a id="EnOcean-attr-switchMode">switchMode</a> switch|pushbutton,
       [switchMode] = switch is default.<br>
       The set command "released" immediately after &lt;value&gt; is sent if the
       attribute is set to "pushbutton".
     </li>
-    <li><a name="switchType">switchType</a> direction|universal|central|channel,
+    <li><a id="EnOcean-attr-switchType">switchType</a> direction|universal|central|channel,
       [switchType] = direction is default.<br>
       EnOcean Devices support different types of sensors, e. g. direction
       switch, universal switch or pushbutton, central on/off.<br>
@@ -21165,23 +21617,26 @@ sub EnOcean_Delete($$) {
       Partly for the switchType <code>central</code> two different SenderID
       are required. In this case set the Attribute <code>switchType</code> to
       <code>central</code> and define the Attributes
-      <a href="#subDef0">subDef0</a> and <a href="#subDefI">subDefI</a>.<br>
+      <a href="#EnOcean-attr-subDef0">subDef0</a> and <a href="#EnOcean-attr-subDefI">subDefI</a>.<br>
       Furthermore, SenderIDs can be used depending on the channel A, B, C or D.
       In this case set the Attribute switchType to <code>channel</code> and define
-      the Attributes <a href="#subDefA">subDefA</a>, <a href="#subDefB">subDefB</a>,
-      <a href="#subDefC">subDefC</a>, or <a href="#subDefD">subDefD</a>.
+      the Attributes <a href="#EnOcean-attr-subDefA">subDefA</a>, <a href="#EnOcean-attr-subDefB">subDefB</a>,
+      <a href="#EnOcean-attr-subDefC">subDefC</a>, or <a href="#EnOcean-attr-subDefD">subDefD</a>.
       </li>
-    <li><a name="temperatureRefDev">temperatureRefDev</a> &lt;name&gt;<br>
+    <li><a id="EnOcean-attr-temperatureRefDev">temperatureRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading temperature.
     </li>
-    <li><a name="EnOcean_temperatureScale">temperatureScale</a> F|C|default|no_change, [temperatureScale] = no_change is default.<br>
+    <li><a id="EnOcean-attr-temperatureScale">temperatureScale</a> F|C|default|no_change, [temperatureScale] = no_change is default.<br>
       temperatureScale is supported for roomCtrlPanel.00.
       </li>
-    <li><a name="EnOcean_timeNotation">timeNotation</a> 12|24|default|no_change, [timeNotation] = no_change is default.<br>
+    <li><a id="EnOcean-attr-timeNotation">timeNotation</a> 12|24|default|no_change, [timeNotation] = no_change is default.<br>
       timeNotation is supported for roomCtrlPanel.00.
       </li>
-    <li><a name="EnOcean_timeProgram[1-4]">timeProgram[1-4]</a> &lt;period&gt; &lt;starttime&gt; &lt;endtime&gt; &lt;roomCtrlMode&gt;, [timeProgam[1-4]] = &lt;none&gt; is default.<br>
+    <li><a id="EnOcean-attr-timeProgram1">timeProgram1</a><br>
+        <a id="EnOcean-attr-timeProgram2">timeProgram2</a><br>
+        <a id="EnOcean-attr-timeProgram3">timeProgram3</a><br>
+        <a id="EnOcean-attr-timeProgram4">timeProgram4</a> &lt;period&gt; &lt;starttime&gt; &lt;endtime&gt; &lt;roomCtrlMode&gt;, [timeProgam[1-4]] = &lt;none&gt; is default.<br>
       [period] = FrMo|FrSu|ThFr|WeFr|TuTh|MoWe|SaSu|MoFr|MoSu|Su|Sa|Fr|Th|We|Tu|Mo<br>
       [starttime] = [00..23]:[00|15|30|45]<br>
       [endtime] = [00..23]:[00|15|30|45]<br>
@@ -21189,42 +21644,42 @@ sub EnOcean_Delete($$) {
       The Room Control Panel Kieback & Peter RBW322-FTL supports only [roomCtrlMode] = comfort.<br>
       timeProgram is supported for roomCtrlPanel.00.
       </li>
-    <li><a name="EnOcean_trackerWakeUpCycle">trackerWakeUpCycle</a> t/s, [wakeUpCycle] =10 s, 20 s, 30 s, 40 s, 60 s, 120 s, 180 s, 240 s, 3600, 86400 s, 30 s is default.<br>
+    <li><a id="EnOcean-attr-trackerWakeUpCycle">trackerWakeUpCycle</a> t/s, [wakeUpCycle] =10 s, 20 s, 30 s, 40 s, 60 s, 120 s, 180 s, 240 s, 3600, 86400 s, 30 s is default.<br>
       Transmission cycle of the tracker.
     </li>
-    <li><a name="EnOcean_updateState">updateState</a> default|yes|no, [updateState] = default is default.<br>
+    <li><a id="EnOcean-attr-updateState">updateState</a> default|yes|no, [updateState] = default is default.<br>
       update reading state after set commands
       </li>
-    <li><a name="EnOcean_uteResponseRequest">uteResponseRequest</a> yes|no<br>
+    <li><a id="EnOcean-attr-uteResponseRequest">uteResponseRequest</a> yes|no<br>
       request UTE teach-in/teach-out response message, the standard value depends on the EEP profil
       </li>
     <li><a href="#verbose">verbose</a></li>
-    <li><a name="EnOcean_wakeUpCycle">wakeUpCycle</a> t/s, [wakeUpCycle] = auto|10 s ... 151200 s, 300 s is default for hvac.04 and auto for hvac.06.<br>
+    <li><a id="EnOcean-attr-wakeUpCycle">wakeUpCycle</a> t/s, [wakeUpCycle] = auto|10 s ... 151200 s, 300 s is default for hvac.04 and auto for hvac.06.<br>
       Transmission cycle of the actuator.
     </li>
     <li><a href="#webCmd">webCmd</a></li>
-    <li><a name="EnOcean_windowOpenCtrl">windowOpenCtrl</a> disable|enable, disable s is default.<br>
+    <li><a id="EnOcean-attr-windowOpenCtrl">windowOpenCtrl</a> disable|enable, disable s is default.<br>
       Window open detection. Valve will be closed if the window is open.
     </li>
-    <li><a name="EnOcean_windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
+    <li><a id="EnOcean-attr-windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
      [windSpeedStormy] = 0...35:0...35, 13.9:17.2 is default.<br>
      Set switching thresholds for reading isStormy based on the reading windSpeed.
     </li>
-    <li><a name="EnOcean_windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
+    <li><a id="EnOcean-attr-windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
       [windSpeedStormyDelay] = 0...99000:0...99000, 60:3 is default.<br>
       Set switching delay for reading isStormy based on the reading windSpeed. The reading isStormy is reset or set
       if the thresholds are permanently undershot or exceed during the delay time.
     </li>
-    <li><a name="EnOcean_windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
+    <li><a id="EnOcean-attr-windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
       [windSpeedWindy] = 0...35:0...35, 1.6:3.4 is default.<br>
       Set switching thresholds for reading isWindy based on the reading windSpeed.
     </li>
-    <li><a name="EnOcean_windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
+    <li><a id="EnOcean-attr-windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
       [windSpeedWindyDelay] = 0...99000:0...99000, 60:3 is default.<br>
       Set switching delay for reading isWindy based on the reading windSpeed. The reading isWindy is reset or set
       if the thresholds are permanently undershot or exceed during the delay time.
     </li>
-    <li><a name="EnOcean_updateGlobalAttr">updateGlobalAttr</a> no|yes,
+    <li><a id="EnOcean-attr-updateGlobalAttr">updateGlobalAttr</a> no|yes,
      [timeEvent] = no|yes, no is default.<br>
      Update the global attributes latitude and longitude with the received GPS coordinates.
     </li>
@@ -21232,12 +21687,12 @@ sub EnOcean_Delete($$) {
   </ul>
   <br>
 
-  <a name="EnOceanevents"></a>
+  <a id="EnOcean-events"></a>
   <b>Generated events</b>
   <ul>
     <ul>
 
-     <li><a name="EnOcean_remoteEvents">Remote Management</a><br>
+     <li><a id="EnOcean-remoteEvents">Remote Management</a><br>
      <ul>
          <li>remoteDevCfg&lt;0000...FFFF&gt;: &lt;device config&gt;</li>
          <li>remoteFunction&lt;01...99&gt;: &lt;remote function number&gt;:&lt;remote manufacturer ID&gt;:&lt;explanation&gt;</li>
@@ -21258,7 +21713,7 @@ sub EnOcean_Delete($$) {
      </li>
      <br><br>
 
-     <li><a name="EnOcean_signalEvents">Signal Telegram</a><br>
+     <li><a id="EnOcean-signalEvents">Signal Telegram</a><br>
      <ul>
          <li>harvester: very_good|good|average|bad|very_bad</li>
          <li>hwVersion: 00000000...FFFFFFFF</li>
@@ -21266,6 +21721,18 @@ sub EnOcean_Delete($$) {
          <li>smartAckMailbox: empty|not_exists|reset</li>
          <li>swVersion: 00000000...FFFFFFFF</li>
      </ul>
+     </li>
+     <br><br>
+
+     <li>Bistable Switch (EEP F6-02-01 ... F6-02-04)<br>
+         [EnOcean PTM 202 Module]<br>
+     <ul>
+         <li>B0</li>
+         <li>BI</li>
+         <li>channelB: B0|BI</li>
+         <li>state: B0|BI</li>
+     </ul><br>
+         Single rocker operation only (Button B0 or BI) and energy bow pressed only, no release telegram.
      </li>
      <br><br>
 
@@ -21310,6 +21777,29 @@ sub EnOcean_Delete($$) {
      </ul><br>
          The status of the device may become "released", this is not the case for a normal switch.<br>
          Set attr model to Eltako_FT55|FSM12|FSM61|FTS12 or attr sensorMode to pushbutton manually.
+     </li>
+     <br><br>
+
+     <li>Wireless 4-way colour pushbuttons display (EEP F6-02-01)<br>
+       [Eltako F4CT55]<br>
+     <ul>
+         <li>A0</li>
+         <li>AI</li>
+         <li>B0</li>
+         <li>BI</li>
+         <li>&lt;BtnX,BtnY&gt; First and second action where BtnX and BtnY is
+             one of the above, e.g. A0,BI</li>
+         <li>released</li>
+         <li>buttons: pressed|released</li>
+         <li>colourAll: &lt;RRGGBBY&gt;</li>
+         <li>colourAI: &lt;RRGGBBY&gt;</li>
+         <li>colourAO: &lt;RRGGBBY&gt;</li>
+         <li>colourBI: &lt;RRGGBBY&gt;</li>
+         <li>colourBO: &lt;RRGGBBY&gt;</li>
+         <li>state: &lt;BtnX&gt;[,&lt;BtnY&gt;] [released]</li>
+     </ul><br>
+         The attr subType must be set to switch, manufID to 00D and attr model to Eltako_F4CT55.
+         If the released state is to be displayed after the end of a keystroke, set attr sensorMode to pushbutton manually.
      </li>
      <br><br>
 
@@ -21433,7 +21923,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
         Set attr subType to smokeDetector.02 manually.
         A monitoring period can be set for signOfLife telegrams of the sensor, see
-        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
         Default is "on" and an interval of 1440 sec.
 
      </li>
@@ -21465,7 +21955,7 @@ sub EnOcean_Delete($$) {
          <li>state: open|closed</li>
      </ul></li>
         The device should be created by autocreate. A monitoring period can be set for signOfLife telegrams of the sensor, see
-       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "off" and an interval of 1980 sec.
      <br><br>
 
@@ -21476,6 +21966,9 @@ sub EnOcean_Delete($$) {
        <li>temperature: t/&#176C (Sensor Range: t = &lt;t min&gt; &#176C ... &lt;t max&gt; &#176C)</li>
        <li>state: t/&#176C</li>
      </ul><br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
+        Default is "off" and an interval of 1230 sec.<br>
         The attr subType must be tempSensor.01 ... tempSensor.30. This is done if the device was
         created by autocreate.
      </li>
@@ -21496,7 +21989,7 @@ sub EnOcean_Delete($$) {
        manufID must be 00D for Eltako Devices. This is done if the device was
        created by autocreate.<br>
        A monitoring period can be set for signOfLife telegrams of the sensor, see
-       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "off" and an interval of 3300 sec.
      </li>
      <br><br>
@@ -21514,7 +22007,7 @@ sub EnOcean_Delete($$) {
        The attr subType must be tempHumiSensor.03. This is done if the device was
        created by autocreate.<br>
        A monitoring period can be set for signOfLife telegrams of the sensor, see
-       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "off" and an interval of 1540 sec.
      </li>
      <br><br>
@@ -21546,7 +22039,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be lightSensor.01 and attr manufID must be 00D
         for Eltako Devices. This is done if the device was created by
         autocreate.<br>
-        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 110 is default).<br>
+        <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 110 is default).<br>
 
      </li>
      <br><br>
@@ -21621,7 +22114,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be occupSensor.<01|02>. This is done if the device was
         created by autocreate. Current is the solar panel current. Some values are
         displayed only for certain types of devices.<br>
-        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
+        <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
      </li>
      <br><br>
 
@@ -21637,7 +22130,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be occupSensor.01. This is done if the device was
         created by autocreate. The attr model has to be set manually to tracker.
         Alternatively, the profile will be defined with inofficial EEP G5-07-01.<br>
-        The transmission cycle is set using the attribute <a href="#EnOcean_trackerWakeUpCycle">trackerWakeUpCycle</a>.
+        The transmission cycle is set using the attribute <a href="#EnOcean-attr-trackerWakeUpCycle">trackerWakeUpCycle</a>.
      </li>
      <br><br>
 
@@ -21655,7 +22148,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
         The attr subType must be occupSensor.03. This is done if the device was
         created by autocreate.<br>
-        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
+        <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
      </li>
      <br><br>
 
@@ -21675,7 +22168,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be lightTempOccupSensor.<01|02|03> and attr
         manufID must be 00D for Eltako Devices. This is done if the device was
         created by autocreate. Set model to Eltako_TF manually for Eltako TF devices or to FBH55SB, FBH65SB, FBHF65SB.<br>
-        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
+        <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
 
      </li>
      <br><br>
@@ -21815,12 +22308,12 @@ sub EnOcean_Delete($$) {
        <li>state: T: t/&#176C SPT: t/&#176C NR: t/K</li><br>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
        A monitoring period can be set for signOfLife telegrams of the sensor, see
-       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "off" and an interval of 1320 sec.<br>
        The attr subType must be roomSensorControl.05 and attr
        manufID must be 00D for Eltako Devices. This is done if the device was
@@ -21840,8 +22333,8 @@ sub EnOcean_Delete($$) {
        <li>state: T: t/&#176C H: rH/% SP: 0 ... 255 SW: 0|1</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.01 and attr
@@ -21861,8 +22354,8 @@ sub EnOcean_Delete($$) {
        <li>state: T: t/&#176C SP: 0 ... 63 P: absent|present</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.02. This is done if the device was
@@ -21979,8 +22472,8 @@ sub EnOcean_Delete($$) {
        <li>state: T: t/&#176C F: 0|1|2|3|auto SP: 0 ... 255 P: absent|present|disabled</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.1F. This is done if the device was
@@ -22002,8 +22495,8 @@ sub EnOcean_Delete($$) {
        <li>state: t/&#176C H: rH/% SP: 0 ... 255 B: ok|low</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.20. This is done if the device was created by autocreate.
@@ -22023,8 +22516,8 @@ sub EnOcean_Delete($$) {
        <li>state: t/&#176C H: rH/% SP: 0 ... 255 F: auto|off|1|2|3 O: occupied|unoccupied</li>
      </ul><br>
        The scaling of the setpoint adjustment is device- and vendor-specific. Set the
-       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
-       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       attributes <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.22.
@@ -22072,7 +22565,7 @@ sub EnOcean_Delete($$) {
      </li>
      <br><br>
 
-     <li><a name="Blind Status">Blind Status</a> (EEP A5-11-03)<br>
+     <li><a id="EnOcean-Blind Status">Blind Status</a> (EEP A5-11-03)<br>
          [untested, experimental status]<br>
      <ul>
        <li>open|closed|not_reached|not_available</li>
@@ -22151,15 +22644,15 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Automated meter reading (AMR), Electricity (EEP A5-12-01)<br>
-         [Eltako FSS12, DSZ14DRS, DSZ14WDRS, Thermokon SR-MI-HS, untested]<br>
-         [Eltako FWZ12-16A tested]<br>
+         [Eltako DSZ14WDRS, FSS12, Thermokon SR-MI-HS, untested]<br>
+         [Eltako DSZ14DRS, FWZ12-16A tested]<br>
      <ul>
        <li>P/W</li>
        <li>power: P/W</li>
        <li>energy<0 ... 15>: E/kWh</li>
        <li>currentTariff: 0 ... 15</li>
        <li>serialNumber: S-&lt;nnnnnn&gt;</li>
-      <li>state: P/W</li>
+       <li>state: P/W</li>
      </ul><br>
         The attr subType must be autoMeterReading.01 and attr
         manufID must be 00D for Eltako Devices. This is done if the device was
@@ -22255,27 +22748,27 @@ sub EnOcean_Delete($$) {
         autocreate.<br>
         The Eltako Weather Station FWS61 supports not the day/night indicator
         (dayNight). The thresholds and delay times can be adjusted by the attributes<br>
-        <a href="#EnOcean_brightnessDayNight">brightnessDayNight</a>,
-        <a href="#EnOcean_brightnessDayNightCtrl">brightnessDayNightCtrl</a>,
-        <a href="#EnOcean_brightnessDayNightDelay">brightnessDayNightDelay</a>,
-        <a href="#EnOcean_brightnessSunny">brightnessSunny</a>,
-        <a href="#EnOcean_brightnessSunnyDelay">brightnessSunnyDelay</a>,
-        <a href="#EnOcean_brightnessSunnyEast">brightnessSunnyEast</a>,
-        <a href="#EnOcean_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a>,
-        <a href="#EnOcean_brightnessSunnySouth">brightnessSunnySouth</a>,
-        <a href="#EnOcean_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a>,
-        <a href="#EnOcean_brightnessSunnyWest">brightnessSunnyWest</a>,
-        <a href="#EnOcean_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a>,
-        <a href="#EnOcean_windSpeedStormy">windSpeedStormy</a>,
-        <a href="#EnOcean_windSpeedStormyDelay">windSpeedStormyDelay</a>,
-        <a href="#EnOcean_windSpeedWindy">windSpeedWindy</a>,
-        <a href="#EnOcean_windSpeedWindyDelay">windSpeedWindyDelay</a>.<br>
-        Execution of custom alarm commands, see <a href="#EnOcean_customCmdAlarmOff">customCmdAlarmOff</a>,
-        <a href="#EnOcean_customCmdAlarmOn">customCmdAlarmOn</a>, <a href="#EnOcean_signOfLife">signOfLife</a> ([signOfLive] = on is default) and
-        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 660 is default).<br>
+        <a href="#EnOcean-attr-brightnessDayNight">brightnessDayNight</a>,
+        <a href="#EnOcean-attr-brightnessDayNightCtrl">brightnessDayNightCtrl</a>,
+        <a href="#EnOcean-attr-brightnessDayNightDelay">brightnessDayNightDelay</a>,
+        <a href="#EnOcean-attr-brightnessSunny">brightnessSunny</a>,
+        <a href="#EnOcean-attr-brightnessSunnyDelay">brightnessSunnyDelay</a>,
+        <a href="#EnOcean-attr-brightnessSunnyEast">brightnessSunnyEast</a>,
+        <a href="#EnOcean-attr-brightnessSunnyEastDelay">brightnessSunnyEastDelay</a>,
+        <a href="#EnOcean-attr-brightnessSunnySouth">brightnessSunnySouth</a>,
+        <a href="#EnOcean-attr-brightnessSunnySouthDelay">brightnessSunnySouthDelay</a>,
+        <a href="#EnOcean-attr-brightnessSunnyWest">brightnessSunnyWest</a>,
+        <a href="#EnOcean-attr-brightnessSunnyWestDelay">brightnessSunnyWestDelay</a>,
+        <a href="#EnOcean-attr-windSpeedStormy">windSpeedStormy</a>,
+        <a href="#EnOcean-attr-windSpeedStormyDelay">windSpeedStormyDelay</a>,
+        <a href="#EnOcean-attr-windSpeedWindy">windSpeedWindy</a>,
+        <a href="#EnOcean-attr-windSpeedWindyDelay">windSpeedWindyDelay</a>.<br>
+        Execution of custom alarm commands, see <a href="#EnOcean-attr-customCmdAlarmOff">customCmdAlarmOff</a>,
+        <a href="#EnOcean-attr-customCmdAlarmOn">customCmdAlarmOn</a>, <a href="#EnOcean-attr-signOfLife">signOfLife</a> ([signOfLive] = on is default) and
+        <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 660 is default).<br>
         Execution of custom up and down commands that can be triggered by the readings dayNight, isRaining, isStormy,
-        isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#EnOcean_customCmdDown">customCmdDown</a> and
-        <a href="#EnOcean_customCmdUp">customCmdUp</a>.
+        isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#EnOcean-attr-customCmdDown">customCmdDown</a> and
+        <a href="#EnOcean-attr-customCmdUp">customCmdUp</a>.
      </li>
      <br><br>
 
@@ -22297,7 +22790,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
         The attr subType must be environmentApp. This is done if the device was created by
         autocreate. The global attributes latitude and longitude are set automatically if the attribute
-        <a href="#EnOcean_updateGlobalAttr">updateGlobalAttr</a> is set.<br>
+        <a href="#EnOcean-attr-updateGlobalAttr">updateGlobalAttr</a> is set.<br>
      </li>
      <br><br>
 
@@ -22361,7 +22854,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be multiFuncSensor. This is done if the device was
         created by autocreate.
         A monitoring period can be set for signOfLife telegrams of the sensor, see
-        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
         Default is "on" and an interval of 132 sec.
      </li>
      <br><br>
@@ -22381,7 +22874,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be doorContact. This is done if the device was
         created by autocreate.<br>
         A monitoring period can be set for signOfLife telegrams of the sensor, see
-        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
         Default is "on" and an interval of 132 sec.
      </li>
      <br><br>
@@ -22400,7 +22893,7 @@ sub EnOcean_Delete($$) {
         The attr subType must be windowContact. This is done if the device was
         created by autocreate.<br>
         A monitoring period can be set for signOfLife telegrams of the sensor, see
-        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
         Default is "on" and an interval of 132 sec.
      </li>
      <br><br>
@@ -22809,7 +23302,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
-         Shutter (EEP F6-02-01 ... F6-02-02)<br>
+         Shutter<br>
          [Eltako FSB12, FSB14, FSB61, FSB70]<br>
      <ul>
         <li>open|open_ack<br>
@@ -22831,10 +23324,23 @@ sub EnOcean_Delete($$) {
         The values of the reading position and anglePos are updated automatically,
         if the command position is sent or the reading state was changed
         manually to open or closed.<br>
-        Set attr subType manufProfile, attr manufID to 00D and attr model to
-        Eltako_FSB14|FSB61|FSB70|FSB_ACK manually.
-        If the attribute model is set to Eltako_FSB_ACK, with the status "open_ack" the readings position and anglePos are also updated.<br>
+     </li>
+     <br><br>
 
+     <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
+         Shutter<br>
+         [Eltako FRM60]<br>
+     <ul>
+        <li>&lt;pos/%&gt;</li>
+        <li>open<br>
+            The status of the device will become "open" after the TOP endpoint is reached.</li>
+        <li>closed<br>
+            The status of the device will become "closed" if the BOTTOM endpoint is reached</li>
+        <li>endPosition: open|closed|not_reached</li>
+        <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
+        <li>teach: &lt;result of teach procedure&gt;</li>
+        <li>state: open|closed|&lt;pos/%&gt;</li>
+     </ul><br>
      </li>
      <br><br>
 
@@ -22888,7 +23394,7 @@ sub EnOcean_Delete($$) {
         <br>
         The attr subType must be actuator.01. This is done if the device was
         created by autocreate. To control the device, it must be bidirectional paired,
-        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+        see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -22916,7 +23422,7 @@ sub EnOcean_Delete($$) {
         <br>
         The attr subType must be blindsCtrl.00 or blindsCtrl.01. This is done if the device was
         created by autocreate. To control the device, it must be bidirectional paired,
-        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+        see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -22956,7 +23462,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
        The attr subType must be multisensor.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -22982,11 +23488,11 @@ sub EnOcean_Delete($$) {
      </ul><br>
       The multisensor is configured using the following attributes:<br>
       <ul>
-        <li><a href="#EnOcean_subDefH">subDefH</a></li>
-        <li><a href="#EnOcean_subDefW">subDefW</a></li>
+        <li><a href="#EnOcean-attr-subDefH">subDefH</a></li>
+        <li><a href="#EnOcean-attr-subDefW">subDefW</a></li>
       </ul>
        A monitoring period can be set for signOfLife telegrams of the sensor, see
-       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "on" and an interval of 990 sec.<br>
        After the teach-in, the sensor must be calibrated immediately. The procedure is described in the user manual.
        If calibration was successful, the reading calibrationStep displays none and statusCalibration ok.<br>
@@ -23022,7 +23528,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
        The attr subType must be roomCtrlPanel.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -23047,7 +23553,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
        The attr subType must be roomCtrlPanel.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired by Smart Ack,
-       see <a href="#EnOcean_smartAck">SmartAck Learning</a>.
+       see <a href="#EnOcean-smartAck">SmartAck Learning</a>.
      </li>
      <br><br>
 
@@ -23096,7 +23602,7 @@ sub EnOcean_Delete($$) {
        The attr subType must be multiFuncSensor.40. This is done if the device was
        created by autocreate.
         A monitoring period can be set for signOfLife telegrams of the sensor, see
-        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a> and <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>.
        Default is "on" and an interval of 216 sec.<br>
      </li>
      <br><br>
@@ -23134,7 +23640,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
        The attr subType must be fanCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -23173,7 +23679,7 @@ sub EnOcean_Delete($$) {
         <br>
         The attr subType must be heatingActuator.00. This is done if the device was
         created by autocreate. To control the device, it must be bidirectional paired,
-        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+        see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -23241,7 +23747,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
        The attr subType must be heatRecovery.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 
@@ -23256,7 +23762,7 @@ sub EnOcean_Delete($$) {
      </ul><br>
        The attr subType must be valveCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+       see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
 

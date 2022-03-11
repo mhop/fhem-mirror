@@ -1,4 +1,5 @@
 # Created by FHEM/98_SVG.pm, 2015-01-24 09:05:00
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

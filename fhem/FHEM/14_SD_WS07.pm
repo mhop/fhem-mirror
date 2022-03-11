@@ -111,6 +111,7 @@ SD_WS07_Parse($$)
   # 11101011 1000  000010111000  1111  00000000       other device from HomeAuto_User SD_WS07_T_EB1
   # 11000100 1000  000100100010  1111  00000000       other device from HomeAuto_User SD_WS07_T_C41
   # 01100100 0000  000100001110  1111  00101010       hama TS36E from HomeAuto_User - Bat bit identified
+  # 01001101 1010  000011110101  1111  00001010       Mebus HQ7312-2 from rpsVerni https://github.com/RFD-FHEM/RFFHEM/issues/1024
   # Long-ID  BCCC  TEMPERATURE    ??   HUMIDITY       B=Battery, C=Channel
 
   # 10110001 1000  000100011010  1010  00101100       Auriol AFW 2 A1, IAN: 297514
@@ -300,7 +301,10 @@ SD_WS07_Parse($$)
   <ul>
     <li>Auriol AFW 2 A1, IAN: 297514</li>
     <li>Eurochon EAS800z</li>
+    <li>FreeTec outdoor module for weather station NC-7344</li>
+    <li>Mebus HQ7312-2</li>
     <li>Technoline WS6750/TX70DTH</li>
+    <li>TFA 30320902</li>
   </ul>
   <br>
   New received devices are added in FHEM with autocreate.
@@ -382,9 +386,10 @@ SD_WS07_Parse($$)
   <ul>
     <li>Auriol AFW 2 A1, IAN: 297514</li>
     <li>Eurochon EAS800z</li>
+    <li>FreeTec Aussenmodul fuer Wetterstation NC-7344</li>
+    <li>Mebus HQ7312-2</li>
     <li>Technoline WS6750/TX70DTH</li>
     <li>TFA 30320902</li>
-    <li>FreeTec Aussenmodul fuer Wetterstation NC-7344</li>
   </ul>
   <br>
   Neu empfangene Sensoren werden in FHEM per autocreate angelegt.

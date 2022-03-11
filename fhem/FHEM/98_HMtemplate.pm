@@ -116,7 +116,7 @@ sub HMtemplate_Attr(@) {#######################################################
       elsif ($calc eq "fltCvT60"){ my $calcVal = CUL_HM_CvTflt60(CUL_HM_fltCvT60($attrVal)); return "Value $attrVal not possible. Use $calcVal" if ($attrVal != $calcVal); }
       elsif ($calc eq "min2time"){ my $calcVal = CUL_HM_min2time(CUL_HM_time2min($attrVal)); return "Value $attrVal not possible. Use $calcVal" if ($attrVal != $calcVal); }
       else{
-        return "value $attrVal not numeric for $rN"  if ($attrVal !~/^\d+?\.?\d?$/);
+        return "value $attrVal not numeric for $rN"  if ($attrVal !~/^\d+?\.?\d*$/);
         return "value $attrVal out of range for $rN :"
               .$culHmRegDef->{$ty.$rN}{min} ."..."
               .$culHmRegDef->{$ty.$rN}{max}          if ($culHmRegDef->{$ty.$rN}{min} > $attrVal 
@@ -620,13 +620,13 @@ sub HMtemplate_noDup(@) {#return list with no duplicates#######################
 sub HMtemplate_sourceList($){
   my $type = shift;
   my $match;
-  if   ($type =~ m/peer-(Long|Short)/){$match = "RegL_03.*"}
-  elsif($type =~ m/peer/             ){$match = "RegL_..\..*"}
-  elsif($type eq "basic"             ){$match = "RegL_..\."}
-  
+  if   ($type =~ m/peer-(Long|Short)/){$match = 'RegL_03.*'}
+  elsif($type =~ m/peer/             ){$match = 'RegL_..\..+'}
+  elsif($type eq "basic"             ){$match = 'RegL_..\.'}
+
   my @list;
-  foreach my $e (devspec2array("TYPE=CUL_HM:FILTER=subType!=virtual")){
-    my @l1 = grep/$match$/,CUL_HM_reglUsed($e);
+  foreach my $e (grep{!$defs{$_}{helper}{role}{vrt}} devspec2array("TYPE=CUL_HM")){
+    my @l1 = grep {$_ =~ m/$match$/} CUL_HM_reglUsed($e);
     $_ = $e foreach(@l1);
     push @list,@l1;
   }

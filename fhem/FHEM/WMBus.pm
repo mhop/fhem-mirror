@@ -1016,7 +1016,7 @@ my %VIFInfo_other = (
     type         => 0b01111111,
     bias         => 0,
     unit         => 'manufacturer specific',
-  },  
+  },
   
 );
 
@@ -1054,6 +1054,27 @@ my %VIFInfo_KAM = (
   },
 );
 
+# according to MBUS Spec:
+# E00x xxxx
+# Reserved for object actions (master to slave): see table on page 75
+# or for error codes (slave to master): see table on page 74
+
+ # but Kamstrup uses it for a value that is called 
+ # "target V1, month"
+ # or
+ # "V1 reverse"
+ # both are volumes, with one is sent depends of the value of the configuration register R
+ # the value of the register is not part of the WMBUS data but is set at manufacturing
+my %VIFInfo_KAM2 = (       
+  VIF_TARGET_OR_REVERSE_VOLUME      => {                     #  10(nnn-6) m3/h 0.001l/h to 10000l/h
+    typeMask     => 0b00010000,
+    expMask      => 0b00000111,
+    type         => 0b00010000,
+    bias         => -6,
+    unit         => 'm³/h',
+    calcFunc     => \&valueCalcNumeric,
+  },
+);
 
 # see 4.2.3, page 24
 my %validDeviceTypes = (
@@ -1379,6 +1400,7 @@ sub decodeValueInformationBlock($$$) {
   my $dataBlockExt;
   my @VIFExtensions = ();
   my $analyzeVIF = 1;
+  
 
   $dataBlockRef->{type}  = '';
   # The unit and multiplier is taken from the table for primary VIF
@@ -1445,13 +1467,19 @@ sub decodeValueInformationBlock($$$) {
         #print "ESY\n";
         $vifInfoRef = \%VIFInfo_ESY2;
         $dataBlockExt->{value} = unpack('C',substr($vib,2,1)) * 100;
+       } elsif ($self->{manufacturer} eq 'KAM') {
+         #print "KAM\n";
+         #$dataBlockExt->{value} = $vif;
+         $vifInfoRef = \%VIFInfo_KAM2;
       } else {
         $dataBlockExt->{value} = $vif;
         $vifInfoRef = \%VIFInfo_other;
       }
       
       if (findVIF($vif, $vifInfoRef, $dataBlockExt)) {
-        push @VIFExtensions, $dataBlockExt;
+#         if ($self->{manufacturer} ne 'KAM') {
+          push @VIFExtensions, $dataBlockExt;
+#         }
       } else {
         $dataBlockRef->{type} = 'unknown';
         $dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
@@ -1565,6 +1593,9 @@ sub decodePayload($$) {
   
   my @dataBlocks = ();
   my $dataBlock;
+
+  #printf ("payload is %s\n" , unpack("H*", $payload));
+
 
   
   PAYLOAD: while ($offset < length($payload)) {
@@ -1860,6 +1891,8 @@ sub decodeCompactFrame($$)
   # all in all that would be 4 * 4 (for vif) * 4 * 4 (for dif) * 3 (type of telegram) combinations (768)
   # for now only search for those that are documented or have been observed in real telegrams
   for my $vif  ("13","14","15","16") { 
+    my $vifExt = '9' . substr($vif,1,1);
+    #print $vifExt;
     #printf("compact frame $vif\n");
     if ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "44$vif"))) {
       # Info, Volume, Target Volume
@@ -1868,8 +1901,17 @@ sub decodeCompactFrame($$)
                           . pack("H*", "04$vif") . substr($compact,7,4) # volume
                           . pack("H*", "44$vif") . substr($compact,11,4); # target volume 
       last;
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "523B" . "04${vifExt}3C"))) {
+      # Info, Volume, Max flow, Target Volume
+      # convert into full frame
+      print "CF found\n";
+      $applicationlayer =   pack("H*", "02FF20") . substr($compact, 5, 2) # Info
+                          . pack("H*", "04$vif") . substr($compact,7,4) # volume
+                          . pack("H*", "523B") . substr($compact,11,2) # max flow 
+                          . pack("H*", "04${vifExt}3C") . substr($compact,13,4); # target volume 
+      last;
     } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "523B"))) {
-      # Info, Volume, Max flow
+      # Info, Volume, Max flow, Target Volume
       # convert into full frame
       $applicationlayer =   pack("H*", "02FF20") . substr($compact, 5, 2) # Info
                           . pack("H*", "04$vif") . substr($compact,7,4) # volume
@@ -2460,16 +2502,19 @@ sub dumpResult($)
       printf("Type %x %s\n", $self->{afield_type}, $self->{typestring});
       printf("IsEncrypted %d\n", $self->{isEncrypted});
       
-      printf("Status: %x %s\n", $self->{status}, $self->{statusstring});
-      if ($self->{cw_parts}{mode} == 5) {
-        print "Codeword:\n";
-        print "bidirectional: ". $self->{cw_parts}{bidirectional} . "\n";
-        print "accessability: ". $self->{cw_parts}{accessability} . "\n";
-        print "synchronous: $self->{cw_parts}{synchronous}\n";
-        print "mode: $self->{cw_parts}{mode}\n";
-        print "encrypted_blocks: $self->{cw_parts}{encrypted_blocks}\n";
-        print "content: $self->{cw_parts}{content}\n";
-        print "hops: $self->{cw_parts}{hops}\n";
+      
+      if ($self->{errorcode} == ERR_NO_ERROR) {
+        printf("Status: %x %s\n", $self->{status}, $self->{statusstring});
+        if ($self->{cw_parts}{mode} == 5) {
+          print "Codeword:\n";
+          print "bidirectional: ". $self->{cw_parts}{bidirectional} . "\n";
+          print "accessability: ". $self->{cw_parts}{accessability} . "\n";
+          print "synchronous: $self->{cw_parts}{synchronous}\n";
+          print "mode: $self->{cw_parts}{mode}\n";
+          print "encrypted_blocks: $self->{cw_parts}{encrypted_blocks}\n";
+          print "content: $self->{cw_parts}{content}\n";
+          print "hops: $self->{cw_parts}{hops}\n";
+        }
       }
   }  
   

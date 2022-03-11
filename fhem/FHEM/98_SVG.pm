@@ -13,6 +13,7 @@ sub FW_pO(@);
 use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
 use vars qw($FW_RET);     # Returned data (html)
 use vars qw($FW_RETTYPE); # image/png or the like
+use vars qw($FW_chash);   # client fhem hash
 use vars qw($FW_cssdir);  # css directory
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_dir);     # base directory for web server
@@ -81,6 +82,7 @@ SVG_Initialize($)
     plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
     plotsize
     plotReplace:textField-long
+    plotAsPngFix:1,0
     startDate
     title
   );
@@ -142,6 +144,7 @@ SVG_Set($@)
 
   my ($err,@rows) = FileRead($srcName);
   return $err if($err);
+  @rows = grep { $_ !~ m/^set readonly/ } @rows;
   $err = FileWrite($dstName, @rows);
 
   if($err) {
@@ -393,7 +396,7 @@ SVG_PEdit($$$$)
   $ret .= "</tr>";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Grid aligned</td>";
-  $ret .= "<td>".SVG_cb("gridy", "left", $conf{hasygrid})."</td>";
+  $ret .= "<td>".SVG_cb("gridy1","left", $conf{hasy1grid})."</td>";
   $ret .= "<td>".SVG_cb("gridy2","right",$conf{hasy2grid})."</td>";
   $ret .= "</tr>";
   $ret .= "<tr class=\"odd\">";
@@ -527,7 +530,9 @@ SVG_PEdit($$$$)
   }
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
-  $ret .= FW_submit("submit", "Write .gplot file")."&nbsp;".
+  $ret .= (exists($conf{readonly}) ?
+              FW_submit("readonly",'The .gplot file is set readonly') :
+              FW_submit("submit", "Write .gplot file"))."&nbsp;".
           FW_submit("showFileLogData", "Show preprocessed input").
           "</td></tr>";
 
@@ -536,6 +541,12 @@ SVG_PEdit($$$$)
   my $sl = "$FW_ME/SVG_WriteGplot?detail=$d&showFileLogData=1";
   if(defined($FW_pos{zoom}) && defined($FW_pos{off})) {
     $sl .= "&pos=zoom=$FW_pos{zoom};off=$FW_pos{off}";
+  }
+  my $ro="";
+  if(exists($conf{readonly})) {
+    $ro = '$("table.plotEditor input").prop("readonly", true);
+           $("table.plotEditor input[type=checkbox]").prop("disabled", true);
+           $("table.plotEditor select").prop("disabled", true);';
   }
 
   $ret .= <<'EOF';
@@ -553,12 +564,13 @@ EOF
     $ret .= 
     "FW_cmd('$sl', function(arg){" .<<"EOF";
       FW_okDialog(arg);
-    });
+    }); // {
   });
   setTimeout(function(){
     \$("table.internals div[informid=$gpfEsc-GPLOTFILE]")
       .html("<a href='$link'>$gpf</a>");
     }, 10);
+  $ro
 </script>
 EOF
   return $ret;
@@ -660,6 +672,13 @@ SVG_WriteGplot($)
 
   return if($FW_hiddenroom{detail});
   return SVG_showData() if($FW_webArgs{showFileLogData});
+  if($FW_webArgs{readonly}) {
+    $FW_RET .=
+      '<div id="errmsg">'.
+        "gplot file marked as readonly: won't write!".
+      '</div>';
+    return 0;
+  }
 
   if(!defined($FW_webArgs{par_0_0})) {
     $FW_RET .=
@@ -686,7 +705,7 @@ SVG_WriteGplot($)
   push @rows, "set xtics ".$FW_webArgs{xtics} if($FW_webArgs{xtics});
   push @rows, "set ytics ".$FW_webArgs{ytics};
   push @rows, "set y2tics ".$FW_webArgs{y2tics};
-  push @rows, "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
+  push @rows, "set grid".($FW_webArgs{gridy1} ? " ytics" :"").
                       ($FW_webArgs{gridy2} ? " y2tics":"")."";
   push @rows, "set ylabel \"$FW_webArgs{ylabel}\"";
   push @rows, "set y2label \"$FW_webArgs{y2label}\"";
@@ -942,7 +961,7 @@ SVG_calcOffsets($$)
         my @range = split(" ", $fr);
         my @t = localtime;
         $SVG_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
-        $SVG_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
+        $SVG_devs{$d}{to} = $range[1] ? ResolveDateWildcards($range[1], @t):"9";
         return;
 
       }
@@ -1218,6 +1237,7 @@ SVG_doShowLog($$$$;$)
     }
 
   }
+  $FW_RET = Encode::encode('UTF-8', $FW_RET) if($unicodeEncoding);
   return ($FW_RETTYPE, $FW_RET);
 
 }
@@ -1297,8 +1317,8 @@ SVG_digestConf($$)
   # Digest grid
   my $t = ($conf{grid} ? $conf{grid} : "");
   #$conf{hasxgrid} = ( $t =~ /.*xtics.*/ ? 1 : 0); # Unused
-  $conf{hasygrid} = ( $t =~ /.*ytics.*/ ? 1 : 0);
-  $conf{hasy2grid}= ( $t =~ /.*y2tics.*/ ? 1 : 0);
+  $conf{hasy1grid} = ( $t =~ /.*ytics.*/ ? 1 : 0);
+  map { $conf{"hasy${_}grid"} = ($t =~ /.*y${_}tics.*/ ? 1 : 0) } (2..8);
 
   # Digest axes/title/etc from $plot (gnuplot) and draw the line-titles
   my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
@@ -1865,11 +1885,8 @@ SVG_render($$$$$$$$$$)
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
         my $off6 = $x+$w;
-        if( ($a eq "x1y1") && $conf{hasygrid} )  {
+        if($a =~ m/^x1y(.)$/ && $conf{"hasy${1}grid"})  {
           SVG_pO "<polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
-            if($tvalue > $hmin{$a} && $tvalue < $hmax{$a});
-        }elsif( ($a eq "x1y2") && $conf{hasy2grid} )  {
-          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
             if($tvalue > $hmin{$a} && $tvalue < $hmax{$a});
         }
         $off2 += $th/4;
@@ -1886,11 +1903,7 @@ SVG_render($$$$$$$$$$)
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
         my $off6 = $x+$w;
-        if( ($a eq "x1y1") && $conf{hasygrid} )  {
-          my $off6 = $x+$w;
-          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
-            if($i > $hmin{$a} && $i < $hmax{$a});
-        }elsif(  ($a eq "x1y2") && $conf{hasy2grid} )  {
+        if($a =~ m/^x1y(.)$/ && $conf{"hasy${1}grid"})  {
           SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
             if($i > $hmin{$a} && $i < $hmax{$a});
         }
@@ -2452,24 +2465,28 @@ plotAsPng(@)
   @webs=devspec2array("TYPE=FHEMWEB");
   foreach(@webs) {
     if(!InternalVal($_,'TEMPORARY',undef)) {
-      $FW_wname=InternalVal($_,'NAME','');
+      $FW_wname = InternalVal($_,'NAME','');
+      $FW_chash = $defs{$FW_wname};
       last;
     }
   }
 
+  my $svgName = $plotName[0];
   $FW_RET                 = undef;
-  $FW_webArgs{dev}        = $plotName[0];
-  $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
-  $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
-  $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
+  $FW_webArgs{dev}        = $svgName;
+  $FW_webArgs{logdev}     = InternalVal($svgName, "LOGDEVICE", "");
+  $FW_webArgs{gplotfile}  = InternalVal($svgName, "GPLOTFILE", "");
+  $FW_webArgs{logfile}    = InternalVal($svgName, "LOGFILE", "CURRENT"); 
   $FW_pos{zoom}           = $plotName[1] if $plotName[1];
   $FW_pos{off}            = $plotName[2] if $plotName[2];
 
   ($mimetype, $svgdata)   = SVG_showLog("unused");
 
-  my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+  my ($w, $h) = split(",", AttrVal($svgName,"plotsize","800,160"));
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
-  $svgdata =~ s/\.SVGplot\./\./g;
+
+  # Forum #32791,#116138: some lib versions cannot parse complex CSS selectors
+  $svgdata =~ s/\.SVGplot\./\./g if(AttrVal($svgName, "plotAsPngFix", 0));
 
   eval {
     require Image::LibRSVG;
@@ -2595,8 +2612,9 @@ plotAsPng(@)
         </li><br>
 
     <a id="SVG-attr-fixedoffset"></a>
-    <li>fixedoffset &lt;nDays&gt;<br>
-        Set an fixed offset (in days) for the plot.
+    <li>fixedoffset &lt;offset&gt;<br>
+        Set a fixed offset for the plot. The resolution is the currently
+        chosen zoom-level.
         </li><br>
 
     <a id="SVG-attr-label"></a>
@@ -2640,6 +2658,14 @@ plotAsPng(@)
         on each side, separated by comma: left,right[,useLeft,useRight].  You
         can set individual numbers by setting the nrAxis of the SVG. Default is
         1,1.
+        </li><br>
+
+    <a id="SVG-attr-plotAsPngFix"></a>
+    <li>plotAsPngFix [0|1]<br>
+        Affects only the plotAsPng function: Some LibRSVG versions cannot cope
+        with complex CSS selectors, so the resulting PNG is black and white
+        only. If this attribute is set to 1, the CSS selector complexity will
+        be reduced.
         </li><br>
 
     <a id="SVG-attr-plotfunction"></a>
@@ -2845,8 +2871,9 @@ plotAsPng(@)
 
 
     <a id="SVG-attr-fixedoffset"></a>
-    <li>fixedoffset &lt;nTage&gt;<br>
-      Verschiebt den Plot-Offset um einen festen Wert (in Tagen). 
+    <li>fixedoffset &lt;offset&gt;<br>
+      Verschiebt den Plot-Offset um einen festen Wert, die Einheit h&auml;ngt
+      vom aktuellen Zoom-Level ab.
       </li><br>
 
     <a id="SVG-attr-fixedrange"></a>
@@ -2919,6 +2946,13 @@ plotAsPng(@)
         Achse links, 1 Achse rechts).
         </li><br>
 
+    <a id="SVG-attr-plotAsPngFix"></a>
+    <li>plotAsPngFix [0|1]<br>
+        Betrifft nur die plotAsPng Funktion: Bestimmte LibRSVG Versionen
+        k&ouml;nnen nicht mit komplexen CSS Selektoren umgehen, und das
+        Ergebnis ist ein schwarz/wei&szlig; Bild. Falls dieses Attribut auf 1
+        gesetzt wird, werden die CSS Anweisungen vereinfacht.
+        </li><br>
 
     <a id="SVG-attr-plotfunction"></a>
     <li>plotfunction<br>

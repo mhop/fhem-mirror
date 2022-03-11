@@ -4,7 +4,7 @@
 #
 # Copyright (C) 2014 Norbert Truchsess
 # Copyright (C) 2019 Hauswart@forum.fhem.de
-# Copyright (C) 2010 Beta-User@forum.fhem.de
+# Copyright (C) 2022 Beta-User@forum.fhem.de
 #
 #     This file is part of fhem.
 #
@@ -230,16 +230,16 @@ my %static_mappings = (
 sub Define {
     my $hash = shift;
     my $def  = shift // return;
-    return $@ unless ( FHEM::Meta::SetInternals($hash) );
-    my ($name, $type, $radioId) = split m{\s+}xms, $def; # split("[ \t]+", $def);
-    return "requires 1 parameter!" if (!defined $radioId || $radioId eq "");
+    return $@ if !FHEM::Meta::SetInternals($hash);
+    my ($name, $type, $radioId) = split m{\s+}xms, $def;
+    return 'requires 1 parameter!' if (!defined $radioId || $radioId eq '');
     $hash->{radioId} = $radioId;
     $hash->{sets} = {
-      'time'   => "noArg",
-      'reboot' => "noArg",
-      'clear'  => "noArg",
-      'flash'  => "noArg",
-      'fwType' => "",
+      time   => 'noArg',
+      reboot => 'noArg',
+      clear  => 'noArg',
+      flash  => 'noArg',
+      fwType => '',
     };
 
     $hash->{ack} = 0;
@@ -261,17 +261,17 @@ sub Set {
     return "At least one parameter is needed!" if !defined $command;
     return "Node is disabled!" if IsDisabled( $hash->{NAME} );
     if(!defined($hash->{sets}->{$command})) {
-      $hash->{sets}->{fwType} = join(",", MYSENSORS::getFirmwareTypes($hash->{IODev}));
-      my $list = join(" ", map {
-        $hash->{sets}->{$_} ne "" ? "$_:$hash->{sets}->{$_}" 
+      $hash->{sets}->{fwType} = join q{,}, MYSENSORS::getFirmwareTypes( $hash->{IODev} );
+      my $list = join( q{ }, map {
+        $hash->{sets}->{$_} ne '' ? "$_:$hash->{sets}->{$_}" 
                                        : $_
                                } sort keys %{$hash->{sets}});
-      $hash->{sets}->{fwType} = "";
+      $hash->{sets}->{fwType} = q{};
       return SetExtensions($hash, $list, $name, $command, @values);
     }
     
     if ($command =~ m{\A(time|reboot|clear|flash|fwType)\z}xms) {
-      if ($command eq "time") {
+      if ($command eq 'time') {
         my $t = timegm_nocheck(localtime(time));
         return sendClientMessage($hash, 
                                  childId => 255, 
@@ -282,8 +282,8 @@ sub Set {
                                  );
       }
       
-      if ($command eq "reboot") {
-        (AttrVal($name, "OTA_BL_Type", 0) or ReadingsVal($name, "BL_VERSION", 0)) 
+      if ($command eq 'reboot') {
+        (AttrVal($name, 'OTA_BL_Type', 0) or ReadingsVal($name, 'BL_VERSION', 0)) 
           ? return sendClientMessage($hash, 
                                      childId => 255, 
                                      cmd => C_INTERNAL, 
@@ -293,7 +293,7 @@ sub Set {
             : return;
       }
       
-      if ($command eq "clear") {
+      if ($command eq 'clear') {
         Log3 ($name,3,"MYSENSORS_DEVICE $name: clear");
         return sendClientMessage($hash, 
                                  childId => 255, 
@@ -304,25 +304,25 @@ sub Set {
                                  );
       }
       
-      if ($command eq "flash") {
-        my $blVersion = ReadingsVal($name, "BL_VERSION", "");
-        my $blType = AttrVal($name, "OTA_BL_Type", "");
-        my $fwType = ReadingsNum($name, "FW_TYPE", -1);
+      if ($command eq 'flash') {
+        my $blVersion = ReadingsVal($name, 'BL_VERSION', '');
+        my $blType = AttrVal($name, 'OTA_BL_Type', '');
+        my $fwType = ReadingsNum($name, 'FW_TYPE', -1);
         if ($fwType == -1) {
           Log3 ($name,3,"Firmware type not defined (FW_TYPE) for $name, update not started");
           return "$name: Firmware type not defined (FW_TYPE)";
         } 
-        if ($blVersion eq "3.0" or $blType eq "Optiboot") {
-          Log3 ($name,4,"Startet flashing Firmware: Optiboot method");
+        if ($blVersion eq '3.0' or $blType eq 'Optiboot') {
+          Log3 ($name,4,'Startet flashing Firmware: Optiboot method');
           return flashFirmware($hash, $fwType);
         } 
-        if ($blType eq "MYSBootloader") {
+        if ($blType eq 'MYSBootloader') {
           $hash->{OTA_requested} = 1;
           Log3 ($name,4,"Send reboot command to MYSBootloader node to start update");
           return sendClientMessage($hash, 
                                    childId => 255, 
                                    cmd => C_INTERNAL, 
-                                   ack => 1, 
+                                   ack => 0, 
                                    subType => I_REBOOT
                                    );
         } else {
@@ -335,7 +335,8 @@ sub Set {
       if ($command eq 'fwType') {
         my $type = shift @values // return;
         return "fwType must be numeric, but got >$type<." if ($type !~ m{^[0-9]{2,20}$}xms);
-        return readingsSingleUpdate($hash, 'FW_TYPE', $type, 1);
+        readingsSingleUpdate($hash, 'FW_TYPE', $type, 1);
+        return;
       }
     }
     
@@ -553,9 +554,9 @@ sub onStreamMessage {
                               payload => $payload
                               );
           }
-          readingsSingleUpdate($hash, "state", "updating", 1) if ($hash->{STATE} ne "updating");
-          readingsSingleUpdate($hash, "state", "update done", 1) if ($block == 0);
-          if ($block == 0 && $blType ne "Optiboot") {
+          readingsSingleUpdate($hash, 'state', 'updating', 1) if !ReadingsVal($hash->{NAME},'state',0) eq 'updating';
+          readingsSingleUpdate($hash, 'state', 'update done', 1) if $block == 0;
+          if ($block == 0 && $blType ne 'Optiboot') {
             readingsSingleUpdate($hash, 'FW_VERSION', $version, 1);
             delete $hash->{OTA_requested} if (defined $hash->{OTA_requested});
           }
@@ -699,7 +700,7 @@ sub Attr {
         for my $type (keys %$readingsForId) {
           if (($readingsForId->{$type}->{name} // "") eq $1) {
             delete $readingsForId->{$type};
-            unless (keys %$readingsForId) {
+            if (!keys %$readingsForId) {
               delete $readingMappings->{$id};
             }
           last FIND;
@@ -786,8 +787,8 @@ sub onPresentationMessage {
     my @ret = ();
     for my $type (@{$sensorMappings->{sends}}) {
         if (defined $readingMappings->{$id}->{$type}) {
-          next unless defined $hash->{getCommentReadings};
-          next unless $hash->{getCommentReadings} eq "2";
+          next if !defined $hash->{getCommentReadings};
+          next if $hash->{getCommentReadings} ne '2';
         }
         my $typeStr = $typeMappings->{$type}->{type};
         if ($hash->{IODev}->{'inclusion-mode'}) {
@@ -820,7 +821,7 @@ sub onPresentationMessage {
           $idStr =~ s/[^A-Za-z\d_\.-]+/_/gx;
         }
         if (defined $hash->{sets}->{"$typeStr$idStr"}) {
-          next unless (defined ($hash->{getCommentReadings}) && $hash->{getCommentReadings} eq "2");
+          next if !defined ($hash->{getCommentReadings}) || $hash->{getCommentReadings} ne '2';
         }
         if ($hash->{IODev}->{'inclusion-mode'}) {
           my @values = ();
@@ -925,8 +926,8 @@ sub onInternalMessage {
     }
     
     if ($type == I_SKETCH_NAME) {
-        readingsSingleUpdate($hash, "state", "received presentation", 1) unless ($hash->{STATE} eq "received presentation");
-        readingsSingleUpdate($hash, "SKETCH_NAME", $msg->{payload}, 1);
+        readingsSingleUpdate($hash, 'state', 'received presentation', 1) if !ReadingsVal($hash->{NAME},'state',0) eq 'received presentation';
+        readingsSingleUpdate($hash, 'SKETCH_NAME', $msg->{payload}, 1);
         delete $hash->{FW_DATA} if (defined $hash->{FW_DATA});
         $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
         if (defined $hash->{getCommentReadings}){
@@ -1098,9 +1099,9 @@ sub sendClientMessage {
     my ($hash,%msg) = @_;
     $msg{radioId} = $hash->{radioId};
     my $name = $hash->{NAME};
-    $msg{ack} = $hash->{ack} unless defined $msg{ack};
+    $msg{ack} = $hash->{ack} if !defined $msg{ack};
     my $messages = $hash->{retainedMessagesForRadioId}->{messages};
-    unless ($hash->{nowSleeping}) {
+    if (!$hash->{nowSleeping}) {
       sendMessage($hash->{IODev},%msg);
       refreshInternalMySTimer($hash,"Ack") if (($msg{ack} or $hash->{IODev}->{ack}) and $hash->{timeoutAck});
       Log3 ($name,5,"$name is not sleeping, sending message!");
@@ -1112,7 +1113,7 @@ sub sendClientMessage {
     } else {
       Log3 ($name,5,"$name is sleeping, enqueing message! ");
       #write to queue if node is asleep
-      unless (defined $hash->{retainedMessages}) {
+      if (!defined $hash->{retainedMessages}) {
         $messages = {messages => [%msg]};
         $hash->{retainedMessages}=1;
         Log3 ($name,5,"$name: No array yet for enqueued messages, building it!");
@@ -1186,7 +1187,7 @@ sub flashFirmware {
       my $start = 0;
       my $end = 0;
       my @fwdata = ();
-      readingsSingleUpdate($hash, "state", "updating", 1) unless ($hash->{STATE} eq "updating");
+      readingsSingleUpdate($hash, 'state', 'updating', 1) if !ReadingsVal($hash->{NAME},'state',0) eq 'updating';
       for (my $i = 0; $i < @lines ; $i++) {
         chomp(my $row = $lines[$i]);
         if (length($row) > 0) {
@@ -1291,7 +1292,7 @@ sub refreshInternalMySTimer {
 sub timeoutAlive {
     my $hash = shift // return;
     Log3 $hash->{NAME}, 5, "$hash->{NAME}: timeoutAlive called";
-    readingsSingleUpdate($hash,"heartbeat","dead",1) unless (ReadingsVal($hash,"heartbeat","dead") eq "NACK");
+    readingsSingleUpdate($hash,'heartbeat','dead',1) if ReadingsVal($hash,'heartbeat','dead') ne 'NACK';
     return;
 }
 
@@ -1339,125 +1340,158 @@ __END__
 
 =begin html
 
-<a name="MYSENSORS_DEVICE"></a>
+<a id="MYSENSORS_DEVICE"></a>
 <h3>MYSENSORS_DEVICE</h3>
-<ul>
-    <p>represents a mysensors sensor attached to a mysensor-node</p>
-    <p>requires a <a href="#MYSENSORS">MYSENSORS</a>-device as IODev</p>
-    <a name="MYSENSORS_DEVICE define"></a>
-    <p><b>Define</b></p>
-    <ul>
-    <p><code>define &lt;name&gt; MYSENSORS_DEVICE &lt;Sensor-type&gt; &lt;node-id&gt;</code><br/>Specifies the MYSENSOR_DEVICE device.</p>
-    </ul>
-    <a name="MYSENSORS_DEVICEset"></a>
-    <p><b>Set</b></p>
-    <ul>
-      <b>AttrTemplate</b>
-      <li>Helps to easily configure your devices. Just get a list of all available attrTremplates by issuing
-      <ul>
-        <p><code>set &lt;name&gt; attrTemplate ?</code></p>
-      </ul>
-      Have a look at the descriptions and choose a suitable one. Then use the drop-down list and click "set" or issue a.<br>
-      <ul>
-        <p><code>set &lt;name&gt; attrTemplate A_02a_atmospheric_pressure</code></p>
-      </ul>
-      </li><br>
-      <b>clear</b>
-      <li>
-         <p><code>set &lt;name&gt; clear</code><br/>clears MySensors EEPROM area and reboot (i.e. "factory" reset) - requires MY_SPECIAL_DEBUG</p>
-      </li>
-      <b>flash</b>
-      <li>
-         <p><code>set &lt;name&gt; flash</code><br/>
-         Checks whether a newer firmware version is available. If a newer firmware version is
-         available the flash procedure is started. The sensor node must support FOTA for
-         this.</p>
-      </li>
-      <b>fwType</b>
-      <li>
-         <p><code>set &lt;name&gt; fwType &lt;value&gt;</code><br/>
-         assigns a firmware type to this node (must be a numeric value in the range 0 .. 65536).
-         Should be contained in the <a href="#MYSENSORSattrOTA_firmwareConfig">FOTA configuration
-         file</a>.</p>
-      </li>
-      <b>time</b>
-      <li>
-        <p><code>set &lt;name&gt; time</code><br/>sets time for nodes (that support it)</p>
-      </li>
-      <b>reboot</b>
-      <li>
-        <p><code>set &lt;name&gt; reboot</code><br/>reboots a node (requires a bootloader that supports it).<br/>Attention: Nodes that run the standard arduino-bootloader will enter a bootloop!<br/>Dis- and reconnect the nodes power to restart in this case.</p>
-    </li>
+<p>represents a mysensors sensor attached to a mysensor-node</p>
+<p>requires a <a href="#MYSENSORS">MYSENSORS</a>-device as IODev</p>
 
-    </ul>
-  <a name="MYSENSORS_DEVICEget"></a>
-   <p><b>Get</b></p>
-     <ul>
-       <li>
-         <p><code>get &lt;name&gt; Extended_DEBUG</code><br/>
-           requires MY_SPECIAL_DEBUG</p>
-       retrieves the CPU frequency, CPU voltage and free memory of the sensor</p>
-       </li>
-     </ul>
-     <ul>
-       <li>
-         <p><code>get &lt;name&gt; ReadingsFromComment</code><br/>
-           rebuild reding names from comments of presentation messages if available</p>
-    After issuing this get check the log for changes. </p>
-       </li>
-     </ul>
-    
-     <ul>
-      <li>
-            <p><code>get &lt;name&gt; RSSI</code><br/>
-            requires MY_SIGNAL_REPORT_ENABLED, not supported by all transportation layers</p>
-        delievers a set of Signal Quality information.</p>
-         </li>
-    </ul>
-    <a name="MYSENSORS_DEVICEattr"></a>
-    <p><b>Attributes</b></p>
-    <ul>
-    <li>
-        <p><code>attr &lt;name&gt; config [&lt;M|I&gt;]</code><br/>configures metric (M) or inch (I). Defaults to 'M'</p>
-    </li>
-    <li>
-         <p><code>attr &lt;name&gt; OTA_autoUpdate [&lt;0|1&gt;]</code><br/>
-          specifies whether an automatic update of the sensor node should be performed (1) during startup of the
-          node or not (0). Defaults to 0</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; setCommands [&lt;command:reading:value&gt;]*</code><br/>configures one or more commands that can be executed by set.<br/>e.g.: <code>attr &lt;name&gt; setCommands on:switch_1:on off:switch_1:off</code><br/>if list of commands contains both 'on' and 'off' <a href="#setExtensions">set extensions</a> are supported</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; setReading_&lt;reading&gt; [&lt;value&gt;]*</code><br/>configures a reading that can be modified by set-command<br/>e.g.: <code>attr &lt;name&gt; setReading_switch_1 on,off</code></p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; setExtensionsEvent</code><br/>If set, the event will contain the command implemented by SetExtensions
-      (e.g. on-for-timer 10), else the executed command (e.g. on).
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; mapReading_&lt;reading&gt; &lt;childId&gt; &lt;readingtype&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code><br/>configures the reading-name for a given childId and sensortype<br/>e.g.: <code>attr xxx mapReading_aussentemperatur 123 temperature</code>
-    or <code>attr xxx mapReading_leftwindow 10 status 1:closed 0:open</code>. See also mapReadingType for setting defaults for types without predefined defaults</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; requestAck</code><br/>request acknowledge from nodes.<br/>if set the Readings of nodes are updated not before requested acknowledge is received<br/>if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).<br/>May also be configured on the gateway for all nodes at once</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; mapReadingType_&lt;reading&gt; &lt;new reading name&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code><br/>configures reading type names that should be used instead of technical names<br/>e.g.: <code>attr xxx mapReadingType_LIGHT switch 0:on 1:off</code>to be used for mysensor Variabletypes that have no predefined defaults (yet)</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; OTA_BL_Type &lt;either Optiboot or MYSBootloader&gt;*</code><br/>For other bootloaders than Optiboot V3.0 OTA updates will only work if bootloader type is specified - MYSBootloader will reboot node if firmware update is started, so make sure, node will really recover</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; OTA_Chan76_IODev </code><br/>As MYSBootloader per default uses nRF24 channel 76, you may specify a different IODev for OTA data using channel 76</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; timeoutAck &lt;time in seconds&gt;*</code><br/>configures timeout to set device state to NACK in case not all requested acks are received</p>
-    </li>
-    <li>
-        <p><code>attr &lt;name&gt; timeoutAlive &lt;time in seconds&gt;*</code><br/>configures timeout to set device state to alive or dead. If messages from node are received within timout spec, state will be alive, otherwise dead. If state is NACK (in case timeoutAck is also set), state will only be changed to alive, if there are no outstanding messages to be sent.</p>
-    </li>
+<a id="MYSENSORS_DEVICE-define"></a>
+<h4>Define</h4>
+<p><code>define &lt;name&gt; MYSENSORS_DEVICE &lt;Sensor-type&gt; &lt;node-id&gt;</code>
+<p>Specifies the MYSENSOR_DEVICE device.</p>
+
+<a id="MYSENSORS_DEVICE-set"></a>
+<h4>Set</h4>
+<ul>
+  <li><a id="MYSENSORS_DEVICE-set-attrTemplate"></a>
+    <p><b>AttrTemplate</b></p>
+    <p>Helps to easily configure your devices. Just get a list of all available attrTremplates by issuing<br>
+    <code>set &lt;name&gt; attrTemplate ?</code></p>
+    <p>Have a look at the descriptions and choose a suitable one. Then use the drop-down list and click "set" or use<br>
+    <code>set &lt;name&gt; attrTemplate A_02a_atmospheric_pressure</code></p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-set-clear"></a>
+    <p><b>clear</b></p>
+    <p><code>set &lt;name&gt; clear</code></p>
+    <p>clears MySensors EEPROM area and reboot (i.e. &quot;factory&quot; reset) - requires MY_SPECIAL_DEBUG</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-set-flash"></a>
+    <p><b>flash</b></p>
+    <p><code>set &lt;name&gt; flash</code></p>
+    <p>Checks whether a newer firmware version is available. If a newer firmware version is
+    available the flash procedure is started. The sensor node must support FOTA for
+    this.</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-set-fwType"></a>
+    <p><b>fwType</b></p>
+    <p><code>set &lt;name&gt; fwType &lt;value&gt;</code></p>
+    <p>assigns a firmware type to this node (must be a numeric value in the range 0 .. 65536).<br>
+    Should be contained in the <a href="#MYSENSORS-attr-ota_firmwareconfig">FOTA configuration file</a></p>. <p>Note: Firmware config file by default only is read at startup. If you change it later, just issue a <i>connect</i> command to the GW to update also Internal values.</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-set-time"></a>
+    <p><b>time</b></p>
+    <p><code>set &lt;name&gt; time</code></p>
+    <p>sets time for nodes (that support it)</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-set-reboot"></a>
+    <p><b>reboot</b></p>
+    <p><code>set &lt;name&gt; reboot</code></p>
+    <p>reboots a node (requires a bootloader that supports it).<br/>Attention: Nodes that run the standard arduino-bootloader will enter a bootloop!<br/>Dis- and reconnect the nodes power to restart in this case.</p>
+  </li>
 </ul>
+
+<a id="MYSENSORS_DEVICE-get"></a>
+<h4>Get</h4>
+<ul>
+  <li><a id="MYSENSORS_DEVICE-get-Extended_DEBUG"></a>
+    <p><b>Extended_DEBUG</b></p>
+    <p><code>get &lt;name&gt; Extended_DEBUG</code></p>
+    <p>requires MY_SPECIAL_DEBUG<br>
+    retrieves the CPU frequency, CPU voltage and free memory of the sensor</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-get-ReadingsFromComment"></a>
+    <p><b>ReadingsFromComment</b></p>
+    <p><code>get &lt;name&gt; ReadingsFromComment</code></p>
+    <p>rebuild reding names from comments of presentation messages if available<br>
+    After issuing this get check the log for changes.</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-get-RSSI"></a>
+    <p><b>RSSI</b></p>
+    <p><code>get &lt;name&gt; RSSI</code></p>
+    <p>requires MY_SIGNAL_REPORT_ENABLED, not supported by all transportation layers<br>
+    delievers a set of Signal Quality information.</p>
+  </li>
+</ul>
+
+<a id="MYSENSORS_DEVICE-attr"></a>
+<h4>Attributes</h4>
+<ul>
+  <li><a id="MYSENSORS_DEVICE-attr-config"></a>
+    <p><b>config</b></p>
+    <p><code>attr &lt;name&gt; config [&lt;M|I&gt;]</code></p>
+    <p>configures metric (M) or inch (I). Defaults to 'M'</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-OTA_autoUpdate"></a>
+    <p><b>OTA_autoUpdate</b></p>
+    <p><code>attr &lt;name&gt; OTA_autoUpdate [&lt;0|1&gt;]</code></p>
+    <p>specifies whether an automatic update of the sensor node should be performed (1) during startup of the node or not (0). Defaults to 0</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-setCommands">
+    <p></a><b>setCommands</b></p>
+    <p><code>attr &lt;name&gt; setCommands [&lt;command:reading:value&gt;]*</code></p>
+    <p>configures one or more commands that can be executed by set.</p>
+    <p>e.g.:<br>
+      <code>attr &lt;name&gt; setCommands on:switch_1:on off:switch_1:off</code></p>
+    <p>if list of commands contains both 'on' and 'off' <a href="#setExtensions">set extensions</a> are supported</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-setReading_ " data-pattern="setReading_.*"></a>
+    <p><b>setReading_&lt;reading&gt;</b></p>
+    <p><code>attr &lt;name&gt; setReading_&lt;reading&gt; [&lt;value&gt;]*</code></p>
+    <p>configures a reading that can be modified by set-command</p>
+    <p>e.g.:<br>
+      <code>attr &lt;name&gt; setReading_switch_1 on,off</code></p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-setExtensionsEvent"></a>
+    <p><b>setExtensionsEvent</b></p>
+    <p><code>attr &lt;name&gt; setExtensionsEvent</code></p>
+    <p>If set, the event will contain the command implemented by SetExtensions (e.g. on-for-timer 10), else the executed command (e.g. on).</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-mapReading_" data-pattern="mapReading_.*"></a>
+    <p><b>mapReading_&lt;reading&gt;</b></p>
+    <p><code>attr &lt;name&gt; mapReading_&lt;reading&gt; &lt;childId&gt; &lt;readingtype&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code></p>
+    <p>configures the reading-name for a given childId and sensortype</p>
+    <p>e.g.:<br>
+      <code>attr xxx mapReading_aussentemperatur 123 temperature</code><br>
+      <code>attr xxx mapReading_leftwindow 10 status 1:closed 0:open</code></p>
+    <p>See also mapReadingType for setting defaults for types without predefined defaults</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-requestAck"></a>
+    <p><b>requestAck</b></p>
+    <p><code>attr &lt;name&gt; requestAck</code></p>
+    <p>request acknowledge from nodes.<br>
+    if set the Readings of nodes are updated not before requested acknowledge is received<br>
+    if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).<br>
+    May also be configured on the gateway for all nodes at once</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-mapReadingType_" data-pattern="mapReadingType_.*"></a>
+    <p><b>mapReadingType_&lt;reading&gt;</b></p>
+    <p><code>attr &lt;name&gt; mapReadingType_&lt;reading&gt; &lt;new reading name&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code></p>
+    <p>configures reading type names that should be used instead of technical names</p>
+    <p>e.g.:<br>
+      <code>attr xxx mapReadingType_LIGHT switch 0:on 1:off</code></p>
+    <p>to be used for mysensor Variabletypes that have no predefined defaults (yet)</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-OTA_BL_Type"></a>
+    <p><b>OTA_BL_Type</b></p>
+    <p><code>attr &lt;name&gt; OTA_BL_Type &lt;either Optiboot or MYSBootloader&gt;*</code></p>
+    <p>For other bootloaders than Optiboot V3.0 OTA updates will only work if bootloader type is specified - MYSBootloader will reboot node if firmware update is started, so make sure, node will really recover</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-OTA_Chan76_IODev">
+    <p></a><b>OTA_Chan76_IODev</b></p>
+    <p><code>attr &lt;name&gt; OTA_Chan76_IODev </code></p>
+    <p>As MYSBootloader per default uses nRF24 channel 76, you may specify a different IODev for OTA data using channel 76</p>
+  </li>
+  <li><a id="MYSENSORS_DEVICE-attr-timeoutAck"></a>
+    <p><b>timeoutAck</b></p>
+    <p><code>attr &lt;name&gt; timeoutAck &lt;time in seconds&gt;*</code></p>
+    <p>configures timeout to set device state to NACK in case not all requested acks are received</p>
+  </li>
+  
+  <li><a id="MYSENSORS_DEVICE-attr-timeoutAlive"></a>
+    <p><b>timeoutAlive</b></p>
+    <p><code>attr &lt;name&gt; timeoutAlive &lt;time in seconds&gt;*</code></p>
+    <p>configures timeout to set device state to alive or dead. If messages from node are received within timout spec, state will be alive, otherwise dead. If state is NACK (in case timeoutAck is also set), state will only be changed to alive, if there are no outstanding messages to be sent.</p>
+  </li>
 </ul>
 
 =end html

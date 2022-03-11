@@ -24,10 +24,11 @@ notify_Initialize($)
     forwardReturnValue:1,0
     ignoreRegexp
     readLog:1,0
+    setList
     showtime:1,0
   );
   use warnings 'qw';
-  $hash->{AttrList} = join(" ", @attrList);
+  $hash->{AttrList} = join(" ", @attrList)." $readingFnAttributes";
 
   $hash->{SetFn}    = "notify_Set";
   $hash->{StateFn}  = "notify_State";
@@ -122,7 +123,10 @@ notify_Exec($$)
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
       $ntfy->{TRIGGERTIME} = $now;
-      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME} if(AttrVal($ln,'showtime',1));
+      setReadingsVal($ntfy, "triggeredByDev",   $n, $dev->{NTFY_TRIGGERTIME});
+      setReadingsVal($ntfy, "triggeredByEvent", $s, $dev->{NTFY_TRIGGERTIME});
+      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME}
+        if(AttrVal($ln, 'showtime', !AttrVal($ln, "stateFormat", 0)));
       last if($dat);
     }
   }
@@ -179,13 +183,21 @@ notify_Set($@)
 
   return "no set argument specified" if(int(@a) < 2);
   my %sets = (addRegexpPart=>2, removeRegexpPart=>1, inactive=>0, active=>0);
+  my $setList = AttrVal($me, "setList", "");
+  my %usrSets = map { $_ =~ s/:.*//; $_ => 1 } split(" ", $setList);
   
   my $cmd = $a[1];
-  if(!defined($sets{$cmd})) {
-    my $ret ="Unknown argument $cmd, choose one of ".join(" ", sort keys %sets);
+  if(!defined($sets{$cmd}) && !defined($usrSets{$cmd})) {
+    my $ret ="Unknown argument $cmd, choose one of ".
+        join(" ", sort keys %sets)." $setList";
     $ret =~ s/active/active:noArg/g;
     return $ret;
   }
+  if($usrSets{$cmd}) {
+    readingsSingleUpdate($hash, $cmd, join(" ",@a[2..$#a]), 1);
+    return;
+  }
+
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
 
   if($cmd eq "addRegexpPart") {
@@ -233,6 +245,8 @@ notify_State($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
+  $hash->{STATE} = $val if($vt eq "STATE" && !$init_done);
+
   return undef if($vt ne "state" || $val ne "inactive");
   readingsSingleUpdate($hash, "state", "inactive", 1);
   return undef;
@@ -261,6 +275,8 @@ notify_fhemwebFn($$$$)
       $ret .= "</tr>";
     }
   }
+  $ret .= '<script>setTimeout(function(){if(window.FW_checkNotifydev)'.
+          'FW_checkNotifydev("REGEXP")}, 100)</script>';
 
   my @et = devspec2array("TYPE=eventTypes");
   if(!@et) {
@@ -436,6 +452,7 @@ END
           be textually replaced for FHEM commands.</li>
         <li>$NAME and $TYPE contain the name and type of the device triggering
           the event, e.g. myFht and FHT</li>
+        <li>$SELF contains the name of the notify itself</li>
        </ul></li>
 
       <li>Note: the following is deprecated and will be removed in a future
@@ -574,6 +591,18 @@ END
         </code></ul>
         </li>
 
+    <a id="notify-attr-setList"></a>
+    <li>setList<br>
+        space separated list of user-defined commands. When executing such a
+        command, a reading with the same name is set to the arguments of the
+        command.<br>
+        Can be used in scenarios like:
+        <ul><code>
+          define Leuchtdauer notify schalter:on
+                set Licht on-for-timer [$SELF:dauer]<br>
+          attr Leuchtdauer setList dauer:60,120,180
+        </code></ul>
+        </li>
 
   </ul>
   <br>
@@ -650,6 +679,8 @@ END
 
           <li>$NAME und $TYPE enthalten den Namen bzw. Typ des Ereignis
             ausl&ouml;senden Ger&auml;tes, z.B. myFht und FHT</li>
+
+        <li>$SELF enthaelt den Namen dieser notify</li>
        </ul></li>
 
       <li>Achtung: Folgende Vorgehensweise ist abgek&uuml;ndigt, funktioniert
@@ -803,6 +834,18 @@ END
         <ul><code>
           define n notify n:.*Server.started.* { Log 1, "Wirklich" }<br>
           attr n readLog
+        </code></ul>
+        </li>
+
+    <a id="notify-attr-setList"></a>
+    <li>setList<br>
+        Leerzeichen getrennte Liste von benutzerdefinierten Befehlen. Beim
+        ausf&uuml;ren solcher Befehle wird ein gleichnamiges Reading auf dem
+        Wert des Befehls gesetzt. Kann z.Bsp. wie folgt verwendet werden:
+        <ul><code>
+          define Leuchtdauer notify schalter:on
+                set Licht on-for-timer [$SELF:dauer]<br>
+          attr Leuchtdauer setList dauer:60,120,180
         </code></ul>
         </li>
 

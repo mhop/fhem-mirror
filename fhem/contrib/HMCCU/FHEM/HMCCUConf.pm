@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.027
+#  Version 5.0
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.027';
+$HMCCU_CONFIG_VERSION = '5.0';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -52,20 +52,68 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 ######################################################################
 
 %HMCCU_STATECONTROL = (
-	'SHUTTER_CONTACT'  => {
-		F => 3, S => 'STATE', C => '', V => '', P => 2
+	'ACCELERATION_TRANSCEIVER' => {
+		F => 3, S => 'MOTION', C => '', V => '', P => 1
 	},
-	'SHUTTER_CONTACT_TRANSCEIVER' => {
-		F => 3, S => 'STATE', C => '', V => '', P => 2
-	},
-	'ROTARY_HANDLE_SENSOR' => {
-		F => 3, S => 'STATE', C => '', V => '', P => 2
-	},
-	'ROTARY_HANDLE_TRANSCEIVER' => {
-		F => 3, S => 'STATE', C => '', V => '', P => 2
+	'ACCESSPOINT_GENERIC_RECEIVER' => {
+		F => 3, S => 'VOLTAGE', C => '', V => '', P => 1
 	},
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'ACOUSTIC_ALARM_ACTIVE', C => 'ACOUSTIC_ALARM_SELECTION', V => '', P => 2
+	},
+	'BLIND' => {
+		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
+	},
+	'BLIND_TRANSMITTER' => {
+		F => 3, S => 'LEVEL', C => '', V => '', P => 1
+	},
+	'BLIND_VIRTUAL_RECEIVER' => {
+		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
+	},
+	'BRIGHTNESS_TRANSMITTER' => {
+		F => 3, S => 'CURRENT_ILLUMINATION', C => '', V => '', P => 2
+	},
+	'CLIMATE_TRANSCEIVER' => {
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => '', V => '', P => 1
+	},
+	'CLIMATECONTROL_REGULATOR' => {
+		F => 3, S => 'LEVEL', C => 'SETPOINT', V => 'on:30.5,off:4.5', P => 2
+	},
+	'CLIMATECONTROL_RT_TRANSCEIVER' => {
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
+	},
+	'CLIMATECONTROL_VENT_DRIVE' => {
+		F => 3, S => 'VALVE_STATE', C => '', V => '', P => 2
+	},
+	'DIMMER' => {
+		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
+	},
+	'DIMMER_TRANSMITTER' => {
+		F => 3, S => 'LEVEL', C => '', V => '', P => 1
+	},
+	'DIMMER_VIRTUAL_RECEIVER' => {
+		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
+	},
+	'DIMMER_WEEK_PROFILE' => {
+		F => 3, S => 'WEEK_PROGRAM_CHANNEL_LOCKS', C => 'WEEK_PROGRAM_TARGET_CHANNEL_LOCK', V => '', P => 2 
+	},
+	'DOOR_LOCK_STATE_TRANSMITTER' => {
+		F => 3, S => 'LOCK_STATE', C => 'LOCK_TARGET_LEVEL', V => 'open:2,unlocked:1,locked:0'
+	},
+	'ENERGIE_METER_TRANSMITTER' => {
+		F => 3, S => 'CURRENT', C => '', V => '', P => 1
+	},
+	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_POINT_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
+	},
+	'KEY' => {
+		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
+	},
+	'KEY_TRANSCEIVER' => {
+		F => 3, S => 'PRESS_SHORT', C => '', V => '', P => 1
+	},
+	'LUXMETER' => {
+		F => 3, S => 'LUX', C => '', V => '', P => 2
 	},
 	'MOTION_DETECTOR' => {
 		F => 3, S => 'MOTION', C => '', V => '', P => 1
@@ -73,38 +121,38 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		F => 3, S => 'MOTION', C => 'MOTION_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
 	},
-	'PRESENCEDETECTOR_TRANSCEIVER' => {
-		F => 3, S => 'PRESENCE_DETECTION_STATE', C => 'PRESENCE_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
+	'MULTI_MODE_INPUT_TRANSMITTER' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 1
 	},
-	'SMOKE_DETECTOR' => {
-		F => 3, S => 'BidCos-RF:STATE,SMOKE_DETECTOR_ALARM_STATUS', C => 'HmIP-RF:SMOKE_DETECTOR_COMMAND', V => '', P => 2
-	},
-	'LUXMETER' => {
-		F => 3, S => 'LUX', C => '', V => '', P => 2
-	},
-	'BRIGHTNESS_TRANSMITTER' => {
-		F => 3, S => 'CURRENT_ILLUMINATION', C => '', V => '', P => 2
+	'PASSAGE_DETECTOR_DIRECTION_TRANSMITTER' => {
+		F => 3, S => 'CURRENT_PASSAGE_DIRECTION', C => '', V => '', P => 1
 	},
 	'POWERMETER' => {
 		F => 3, S => 'CURRENT', C => '', V => '', P => 1
 	},
-	'ENERGIE_METER_TRANSMITTER' => {
-		F => 3, S => 'CURRENT', C => '', V => '', P => 1
+	'PRESENCEDETECTOR_TRANSCEIVER' => {
+		F => 3, S => 'PRESENCE_DETECTION_STATE', C => 'PRESENCE_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
 	},
-	'KEY' => {
-		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
+	'ROTARY_HANDLE_SENSOR' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 2
 	},
-	'KEY_TRANSCEIVER' => {
-		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
+	'ROTARY_HANDLE_TRANSCEIVER' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 2
+	},
+	'SHUTTER_CONTACT'  => {
+		F => 3, S => 'STATE', C => '', V => '', P => 2
+	},
+	'SHUTTER_CONTACT_TRANSCEIVER' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 2
+	},
+	'SMOKE_DETECTOR' => {
+		F => 3, S => 'BidCos-RF:STATE,SMOKE_DETECTOR_ALARM_STATUS', C => 'HmIP-RF:SMOKE_DETECTOR_COMMAND', V => '', P => 2
 	},
 	'VIRTUAL_KEY' => {
 		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
 	},
-	'BLIND' => {
-		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
-	},
-	'BLIND_VIRTUAL_RECEIVER' => {
-		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
+	'SHUTTER_TRANSMITTER' => {
+		F => 3, S => 'LEVEL', C => '', V => '', P => 1
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
@@ -118,35 +166,17 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	'SWITCH_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
 	},
-	'DIMMER' => {
-		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
+	'THERMALCONTROL_TRANSMIT' => {
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
 	},
-	'DIMMER_VIRTUAL_RECEIVER' => {
-		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
+	'WATER_DETECTION_TRANSMITTER' => {
+		F => 3, S => 'ALARMSTATE', C => '', V => '', P => 1
 	},
 	'WEATHER' => {
 		F => 3, S => 'TEMPERATURE', C => '', V => '', P => 1
 	},
 	'WEATHER_TRANSMIT' => {
-		F => 3, S => 'TEMPERATURE', C => '', V => '', P => 1
-	},
-	'CLIMATE_TRANSCEIVER' => {
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => '', V => '', P => 1
-	},
-	'THERMALCONTROL_TRANSMIT' => {
-		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
-	},
-	'CLIMATECONTROL_RT_TRANSCEIVER' => {
-		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
-	},
-	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
-		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_POINT_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
-	},
-	'CLIMATECONTROL_REGULATOR' => {
-		F => 3, S => 'LEVEL', C => 'SETPOINT', V => 'on:30.5,off:4.5', P => 2
-	},
-	'CLIMATECONTROL_VENT_DRIVE' => {
-		F => 3, S => 'VALVE_STATE', C => '', V => '', P => 2
 	}
 );
 
@@ -160,14 +190,30 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 %HMCCU_READINGS = (
 	'BLIND' =>
 		'(C#\.)?LEVEL$:+pct',
+	'BLIND_TRANSMITTER' =>
+		'(C#\.)?LEVEL$:+pct',
 	'BLIND_VIRTUAL_RECEIVER' =>
+		'(C#\.)?LEVEL$:+pct',
+	'SHUTTER_TRANSMITTER' =>
 		'(C#\.)?LEVEL$:+pct',
 	'SHUTTER_VIRTUAL_RECEIVER' =>
 		'(C#\.)?LEVEL$:+pct',
 	'DIMMER' =>
 		'(C#\.)?LEVEL$:+pct',
+	'DIMMER_TRANSMITTER' =>
+		'(C#\.)?LEVEL$:+pct;(C#\.)?COLOR$:+color',
 	'DIMMER_VIRTUAL_RECEIVER' =>
-		'(C#\.)?LEVEL$:+pct',
+		'(C#\.)?LEVEL$:+pct;(C#\.)?COLOR$:+color',
+	'DIMMER_WEEK_PROFILE' =>
+		'(C#\.)?WEEK_PROGRAM_CHANNEL_LOCKS$:+progMode',
+	'KEY' =>
+		'(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
+	'KEY_TRANSCEIVER' =>
+		'(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
+	'VIRTUAL_KEY' =>
+		'(C#\.)?PRESS_(SHORT|LONG)$:+pressed',
+	'ACCELERATION_TRANSCEIVER' =>
+		'(C#\.)?MOTION:motion',
 	'MOTION_DETECTOR' =>
 		'^(C#\.)?BRIGHTNESS$:brightness;(C#\.)?MOTION:motion',
 	'MOTIONDETECTOR_TRANSCEIVER' =>
@@ -209,23 +255,37 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 # Set commands related to channel role
 #   Role => { Command-Definition, ... }
 # Command-Defintion:
-#   Command[:InterfaceExpr] => 'Datapoint-Definition[:Function] [...]'
+#   Command[:InterfaceExpr] => [No:]Datapoint-Def[:Function] [...]'
+# No:
+#   Execution order of subcommands. By default subcommands are
+#   executed from left to right.
 # Function:
 #   A Perl function name
-# Datapoint-Definition:
-#   Paramset:Datapoint:[Parameter=]FixedValue
-#   Paramset:Datapoint:?Parameter
-#   Paramset:Datapoint:?Parameter=Default-Value
-#   Paramset:Datapoint:#Parameter[=FixedValue,[...]]
-#   Paramset:Datapoint:*Parameter=Default-Value
+# Datapoint-Def:
+#   Paramset:Datapoints:[Parameter=]FixedValue
+#   Paramset:Datapoints:?Parameter
+#   Paramset:Datapoints:?Parameter=Default-Value
+#   Paramset:Datapoints:#Parameter[=FixedValue,[...]]
+#   Paramset:Datapoints:*Parameter=Default-Value
 # Paramset:
 #   V=VALUES, M=MASTER (channel), D=MASTER (device), I=INTERNAL
+# Datapoints:
+#   List of parameter names separated by ','
 # Parameter characters:
 #   ? = any value is accepted
 #   # = If datapoint is of type ENUM, values are taken from
 #       parameter set description. Otherwise a list of values must
-#       be specified.
+#       be specified after '='.
 #   * = internal value $hash->{hmccu}{values}{parameterName}
+# FixedValue: Parameter values are detected in the following order:
+#   1. If command parameter name is identical with controldatapoint,
+#   option values are taken from controldatapoint definition {V}. The
+#   FixedValues are used as lookup key into HMCCU_STATECCONTROL.
+#   The command options are identical to the FixedValues.
+#   2. FixedValues are treated as option values. The option
+#   names are taken from HMCCU_CONVERSIONS by using FixedValues as
+#   lookup key.
+#   3. As a fallback command options and option values are identical.
 # If Default-Value is preceeded by + or -, value is added to or 
 # subtracted from current datapoint value
 ######################################################################
@@ -233,11 +293,14 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 %HMCCU_ROLECMDS = (
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		'detection' => 'V:MOTION_DETECTION_ACTIVE:#detection=inactive,active',
-		'reset' => 'V:RESET_MOTION:1'
+		'reset' => 'V:RESET_MOTION:true'
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		'detection' => 'V:PRESENCE_DETECTION_ACTIVE:#detection=inactive,active',
-		'reset' => 'V:RESET_PRESENCE:1'
+		'reset' => 'V:RESET_PRESENCE:true'
+	},
+	'PASSAGE_DETECTOR_DIRECTION_TRANSMITTER' => {
+		'detection' => 'M:PASSAGE_DETECTION,CHANNEL_OPERATION_MODE:#inactive,active'
 	},
 	'SMOKE_DETECTOR' => {
 		'command' => 'V:SMOKE_DETECTOR_COMMAND:#command'
@@ -247,12 +310,12 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 		'acousticAlarm' => 'V:ACOUSTIC_ALARM_SELECTION:#alarmMode V:OPTICAL_ALARM_SELECTION:0 V:DURATION_UNIT:0 V:DURATION_VALUE:10',
 		'duration' => 'I:DURATION_VALUE:?duration I:DURATION_UNIT:#unit'
 	},
-	'KEY' => {
-		'on' => 'V:PRESS_SHORT:1',
-		'off' => 'V:PRESS_SHORT:1',
-		'press' => 'V:PRESS_SHORT:1'
+	'DOOR_LOCK_STATE_TRANSMITTER' => {
+		'open' => 'V:LOCK_TARGET_LEVEL:2',
+		'unlock' => 'V:LOCK_TARGET_LEVEL:1',
+		'lock' => 'V:LOCK_TARGET_LEVEL:0'
 	},
-	'KEY_TRANSCEIVER' => {
+	'KEY' => {
 		'on' => 'V:PRESS_SHORT:1',
 		'off' => 'V:PRESS_SHORT:1',
 		'press' => 'V:PRESS_SHORT:1'
@@ -299,19 +362,27 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 		'on-till' => 'V:ON_TIME:?time V:STATE:1'
 	},
 	'DIMMER' => {
-		'pct' => 'V:LEVEL:?level V:ON_TIME:?time=0.0 V:RAMP_TIME:?ramp=0.5',
+		'pct' => '3:V:LEVEL:?level 1:V:ON_TIME:?time=0.0 2:V:RAMP_TIME:?ramp=0.5',
 		'on' => 'V:LEVEL:100',
 		'off' => 'V:LEVEL:0',
-		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
-		'on-till' => 'V:ON_TIME:?time V:STATE:1',
+		'on-for-timer' => 'V:ON_TIME:?duration V:LEVEL:100',
+		'on-till' => 'V:ON_TIME:?time V:LEVEL:100',
+		'up' => 'V:LEVEL:?delta=+10',
+		'down' => 'V:LEVEL:?delta=-10',
 		'stop' => 'V:RAMP_STOP:1'
 	},
 	'DIMMER_VIRTUAL_RECEIVER' => {
-		'pct' => 'V:LEVEL:?level V:ON_TIME:?time V:RAMP_TIME:?ramp',
+		'pct' => '5:V:LEVEL:?level 1:V:DURATION_UNIT:0 2:V:ON_TIME,DURATION_VALUE:?time=0.0 3:V:RAMP_TIME_UNIT:0 4:V:RAMP_TIME,RAMP_TIME_VALUE:?ramp=0.5',
 		'on' => 'V:LEVEL:100',
 		'off' => 'V:LEVEL:0',
-		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
-		'on-till' => 'V:ON_TIME:?time V:STATE:1'
+		'on-for-timer' => '1:V:DURATION_UNIT:0 2:V:ON_TIME,DURATION_VALUE:?duration 3:V:LEVEL:100',
+		'on-till' => '1:V:DURATION_UNIT:0 2:V:ON_TIME,DURATION_VALUE:?time 3:V:LEVEL:100',
+		'up' => 'V:LEVEL:?delta=+10',
+		'down' => 'V:LEVEL:?delta=-10',
+		'color' => 'V:COLOR:#color'
+	},
+	'DIMMER_WEEK_PROFILE' => {
+		'progMode' => 'V:WEEK_PROGRAM_TARGET_CHANNEL_LOCK:#progMode'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		'desired-temp' => 'V:SET_TEMPERATURE:?temperature',
@@ -355,11 +426,50 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 ######################################################################
 
 %HMCCU_ATTR = (
-	'SHUTTER_CONTACT'  => {
+	'ACCELERATION_TRANSCEIVER' => {
 		'_none_' => ''
 	},
-	'SHUTTER_CONTACT_TRANSCEIVER' => {
-		'_none_' => ''
+	'BLIND' => {
+		'substexcl' => 'pct',
+		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
+		'webCmd' => 'pct:open:close:stop',
+		'widgetOverride' => 'pct:slider,0,10,100'
+	},
+	'BLIND_TRANSMITTER' => {
+		'substexcl' => 'pct',
+	},
+	'BLIND_VIRTUAL_RECEIVER' => {
+		'substexcl' => 'pct',
+		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
+		'webCmd' => 'pct:open:close:stop',
+		'widgetOverride' => 'pct:slider,0,10,100'
+	},
+	'DIMMER' => {
+		'cmdIcon' => 'on:general_an off:general_aus',
+		'substexcl' => 'pct',
+		'webCmd' => 'pct:on:off',
+		'widgetOverride' => 'pct:slider,0,10,100'
+	},
+	'DIMMER_TRANSMITTER' => {
+		'substexcl' => 'pct'
+	},
+	'DIMMER_VIRTUAL_RECEIVER' => {
+		'cmdIcon' => 'on:general_an off:general_aus',
+		'substexcl' => 'pct',
+		'webCmd' => 'pct:on:off',
+		'widgetOverride' => 'pct:slider,0,10,100'
+	},
+	'DOOR_LOCK_STATE_TRANSMITTER' => {
+		'cmdIcon' => 'open:fts_door_open unlock:secur_open lock:secur_lock',
+		'webCmd' => 'lock:unlock:open'
+	},
+	'KEY' => {
+		'event-on-update-reading' => 'PRESS.*',
+		'cmdIcon' => 'press:taster',
+		'webCmd' => 'press'
+	},
+	'KEY_TRANSCEIVER' => {
+		'event-on-update-reading' => 'PRESS.*'
 	},
 	'MOTION_DETECTOR' => {
 		'_none_' => ''
@@ -368,31 +478,24 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 		'cmdIcon' => 'reset:rc_BACK',
 		'webCmd' => 'detection:reset'
 	},
+	'MULTI_MODE_INPUT_TRANSMITTER' => {
+		'_none_' => ''
+	},
+	'PASSAGE_DETECTOR_DIRECTION_TRANSMITTER' => {
+		'_none_' => ''
+	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		'cmdIcon' => 'reset:rc_BACK',
 		'webCmd' => 'detection:reset'
 	},
-	'KEY' => {
-		'event-on-update-reading' => 'PRESS.*',
-		'cmdIcon' => 'press:taster',
-		'webCmd' => 'press'
+	'SHUTTER_CONTACT'  => {
+		'_none_' => ''
 	},
-	'KEY_TRANSCEIVER' => {
-		'event-on-update-reading' => 'PRESS.*',
-		'cmdIcon' => 'press:taster',
-		'webCmd' => 'press'
+	'SHUTTER_CONTACT_TRANSCEIVER' => {
+		'_none_' => ''
 	},
-	'BLIND' => {
+	'SHUTTER_TRANSMITTER' => {
 		'substexcl' => 'pct',
-		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
-		'webCmd' => 'pct:open:close:stop',
-		'widgetOverride' => 'pct:slider,0,10,100'
-	},
-	'BLIND_VIRTUAL_RECEIVER' => {
-		'substexcl' => 'pct',
-		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
-		'webCmd' => 'pct:open:close:stop',
-		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'substexcl' => 'pct',
@@ -405,18 +508,6 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	},
 	'SWITCH_VIRTUAL_RECEIVER' => {
 		'cmdIcon' => 'on:general_an off:general_aus'
-	},
-	'DIMMER' => {
-		'cmdIcon' => 'on:general_an off:general_aus',
-		'substexcl' => 'pct',
-		'webCmd' => 'pct',
-		'widgetOverride' => 'pct:slider,0,10,100'
-	},
-	'DIMMER_VIRTUAL_RECEIVER' => {
-		'cmdIcon' => 'on:general_an off:general_aus',
-		'substexcl' => 'pct',
-		'webCmd' => 'pct',
-		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		'substexcl' => 'desired-temp',
@@ -444,6 +535,9 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	},
 	'CLIMATECONTROL_VENT_DRIVE' => {
 		'_none_' => ''
+	},
+	'WATER_DETECTION_TRANSMITTER' => {
+		'_none_' => ''
 	}
 );
 
@@ -456,16 +550,23 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 ######################################################################
 
 %HMCCU_CONVERSIONS = (
+	'ACCELERATION_TRANSCEIVER' => {
+		'MOTION' => { '0' => 'noMotion', 'false' => 'noMotion', '1' => 'motion', 'true' => 'motion' }
+	},
 	'MOTION_DETECTOR' => {
 		'MOTION' => { '0' => 'noMotion', 'false' => 'noMotion', '1' => 'motion', 'true' => 'motion' }
 	},
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		'MOTION' => { '0' => 'noMotion', 'false' => 'noMotion', '1' => 'motion', 'true' => 'motion' },
-		'MOTION_DETECTION_ACTIVE' => { '0' => 'inactive', 'false' => 'inactive', '1' => 'active', 'true', 'active' }
+		'MOTION_DETECTION_ACTIVE' => { '0' => 'inactive', 'false' => 'inactive', '1' => 'active', 'true' => 'active' }
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		'PRESENCE_DETECTION_STATE'  => { '0' => 'noPresence', 'false' => 'noPresence', '1' => 'presence', 'true' => 'presence' },
-		'PRESENCE_DETECTION_ACTIVE' => { '0' => 'inactive', 'false' => 'inactive', '1' => 'active', 'true', 'active' }
+		'PRESENCE_DETECTION_ACTIVE' => { '0' => 'inactive', 'false' => 'inactive', '1' => 'active', 'true' => 'active' }
+	},
+	'PASSAGE_DETECTOR_DIRECTION_TRANSMITTER' => {
+		'PASSAGE_DETECTION' => { '0' => 'inactive', 1 => 'active' },
+		'CHANNEL_OPERATION_MODE' => { '0' => 'inactive', 1 => 'active'}
 	},
 	'KEY' => {
 		'PRESS_SHORT' => { '1' => 'pressed', 'true' => 'pressed' },
@@ -508,15 +609,26 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
 	},
+	'BLIND_TRANSMITTER' => {
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
+	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' },
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
 	},
+	'SHUTTER_TRANSMITTER' => {
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
+	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'LEVEL' => { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
 	},
 	'DIMMER' => {
+		'LEVEL' =>     { '0' => 'off', '100' => 'on', 'off' => '0', 'on' => '100' },
+		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
+		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
+	},
+	'DIMMER_TRANSMITTER' => {
 		'LEVEL' =>     { '0' => 'off', '100' => 'on', 'off' => '0', 'on' => '100' },
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
@@ -540,6 +652,9 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	},
 	'CLIMATECONTROL_REGULATOR' => {
 		'SETPOINT' => { '4.5' => 'off', '30.5' => 'on' }		
+	},
+	'WATER_DETECTION_TRANSMITTER' => {
+		'ALARMSTATE' => { '0' => 'noAlarm', '1' => 'Alarm', 'false' => 'noAlarm', 'true' => 'alarm' }
 	},
 	'DEFAULT' => {
 		'AES_KEY' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' },
@@ -1505,7 +1620,7 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	eventMap         => "/datapoint 1.STATE 1:led-on/datapoint 1.STATE 0:led-off/datapoint 2.STATE 1:sound-on/datapoint 2.STATE 0:sound-off",
 	statedatapoint   => "1.STATE",
 	statevals        => "on:true,off:false",
-	substitute       => "STATE!(0|false):ledOff,(1|true):ledOn;2.STATE!(0|false):soundOff,(1|true):soundOn"
+	substitute       => "1.STATE!(0|false):ledOff,(1|true):ledOn;2.STATE!(0|false):soundOff,(1|true):soundOn"
 	},
 	"HM-PB-4Dis-WM" => {
 	_description     => "Funk-Display Wandtaster",
@@ -1667,7 +1782,7 @@ if (oSV) {
 		code        => qq(
 object osysvar;
 string ssysvarid;
-foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
+foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumIDs()) {
   osysvar = dom.GetObject(ssysvarid);
   Write(osysvar.Name());
   if(osysvar.ValueSubType() == 6) {
@@ -1686,7 +1801,7 @@ foreach (ssysvarid, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
 		parameters  => 0,
 		code        => qq(
 string sSysVarId;
-foreach (sSysVarId, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumUsedIDs()) {
+foreach (sSysVarId, (dom.GetObject(ID_SYSTEM_VARIABLES)).EnumIDs()) {
   object oSysVar = dom.GetObject(sSysVarId);
   Write(oSysVar.Name());               
   if (oSysVar.ValueSubType() == 6) {

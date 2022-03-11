@@ -32,9 +32,21 @@ FHEM2FHEM_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
-  $hash->{AttrList}= "addStateEvent:1,0 dummy:1,0 disable:0,1 ".
-                     "disabledForIntervals eventOnly:1,0 excludeEvents ".
-                     "setState";
+  no warnings 'qw';
+  my @attrList = qw(
+    addStateEvent:1,0
+    disable:0,1
+    disabledForIntervals
+    dummy:1,0
+    eventOnly:1,0
+    excludeEvents
+    loopThreshold
+    keepaliveInterval
+    reportConnected:1,0
+    setState
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
 }
 
 #####################################
@@ -112,12 +124,12 @@ FHEM2FHEM_Write($$)
     }
     return if(!$conn);  # Hopefuly it is reported elsewhere
     $hash->{TCPDev2} = $conn;
-    syswrite($hash->{TCPDev2}, $hash->{portpassword} . "\n")
+    F2F_sw($hash->{TCPDev2}, $hash->{portpassword} . "\n")
         if($hash->{portpassword});
   }
 
   my $rdev = $hash->{rawDevice};
-  syswrite($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
+  F2F_sw($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
 }
 
 #####################################
@@ -126,14 +138,14 @@ sub
 FHEM2FHEM_Read($)
 {
   my ($hash) = @_;
+  my $buf;
+  my $res = sysread($hash->{TCPDev}, $buf, 256);
 
-  my $buf = FHEM2FHEM_SimpleRead($hash);
-  my $name = $hash->{NAME};
-
-  ###########
-  # Lets' try again: Some drivers return len(0) on the first read...
-  if(defined($buf) && length($buf) == 0) {
-    $buf = FHEM2FHEM_SimpleRead($hash);
+  if($hash->{SSL} && !defined($res) && $! == EWOULDBLOCK) {
+    my $es = $hash->{TCPDev}->errstr;
+    $hash->{wantWrite} = 1 if($es == &IO::Socket::SSL::SSL_WANT_WRITE);
+    $hash->{wantRead}  = 1 if($es == &IO::Socket::SSL::SSL_WANT_READ);
+    return "";
   }
 
   if(!defined($buf) || length($buf) == 0) {
@@ -141,12 +153,35 @@ FHEM2FHEM_Read($)
     return;
   }
 
+  $buf = Encode::decode('UTF-8', $buf) if($unicodeEncoding);
+
+  my $name = $hash->{NAME};
   return if(IsDisabled($name));
   my $excl = AttrVal($name, "excludeEvents", undef);
+  my $threshold = AttrVal($name, "loopThreshold", 0); # 122300
 
   my $data = $hash->{PARTIAL};
   #Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
   $data .= $buf;
+
+  if($data =~ m/\0/) {
+    if($data !~ m/^(.*)\0(.*)\0(.*)$/s) {
+      $hash->{PARTIAL} = $data;
+      return;
+    }
+
+    my $resp = $2;
+    if($hash->{".lcmd"}) {
+      Log3 $name, 4, "Remote command response:$resp";
+      asyncOutput($hash->{".lcmd"}, $resp);
+      delete($hash->{".lcmd"});
+    } else {
+      Log3 $name, 3, "Remote command response:$resp";
+    }
+    $hash->{cmdResponse} = $resp;
+
+    $data = $1.$3; # Continue with the rest
+  }
 
   while($data =~ m/\n/) {
     my $rmsg;
@@ -175,14 +210,20 @@ FHEM2FHEM_Read($)
         if(AttrVal($name,"eventOnly",0)) {
           DoTrigger($rname, $msg);
         } else {
+          my $reading = "state";
           if($msg =~ m/^([^:]*): (.*)$/) {
-            readingsSingleUpdate($defs{$rname}, $1, $2, 1);
+            $reading = $1; $msg = $2;
+          }
+          my $age = ($threshold ? ReadingsAge($rname,$reading,undef) : 99999);
+          if(defined($age) && $age < $threshold) {
+            Log3 $name, 4, "$name: ignoring $rname $reading $msg, ".
+                           "threshold $threshold, age:$age";
+            next;
+          }
+          if($reading eq "state" && AttrVal($name, "setState", 0)) {
+            AnalyzeCommand($hash, "set $rname $msg");
           } else {
-            if(AttrVal($name,"setState",0)) {
-              AnalyzeCommand($hash, "set $rname $msg");
-            } else {
-              readingsSingleUpdate($defs{$rname}, "state", $msg, 1);
-            }
+            readingsSingleUpdate($defs{$rname}, $reading, $msg, 1);
           }
         }
 
@@ -271,12 +312,17 @@ FHEM2FHEM_OpenDev($$)
 
     $hash->{STATE}= "connected";
     DoTrigger($name, "CONNECTED") if($reopen);
-    syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
+    F2F_sw($hash->{TCPDev}, $hash->{portpassword} . "\n")
           if($hash->{portpassword});
     my $type = AttrVal($hash->{NAME},"addStateEvent",0) ? "onWithState" : "on";
     my $msg = $hash->{informType} eq "LOG" ? 
                   "inform $type $hash->{regexp}" : "inform raw";
-    syswrite($hash->{TCPDev}, $msg . "\n");
+    F2F_sw($hash->{TCPDev}, $msg . "\n");
+    F2F_sw($hash->{TCPDev}, "trigger global CONNECTED $name\n")
+      if(AttrVal($name, "reportConnected", 0));
+
+    my $ki = AttrVal($hash->{NAME}, "keepaliveInterval", 0);
+    InternalTimer(gettimeofday()+$ki, "FHEM2FHEM_keepalive", $hash) if($ki);
   };
 
   return HttpUtils_Connect({     # Nonblocking
@@ -309,31 +355,39 @@ FHEM2FHEM_Disconnected($)
   DoTrigger($name, "DISCONNECTED");
 }
 
-########################
+
 sub
-FHEM2FHEM_SimpleRead($)
+F2F_sw($$)
 {
-  my ($hash) = @_;
-  my $buf;
-  if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
-    FHEM2FHEM_Disconnected($hash);
-    return undef;
-  }
-  return $buf;
+  my ($io, $buf) = @_;
+  $buf = Encode::encode('UTF-8', $buf) if($unicodeEncoding);
+  return syswrite($io, $buf);
 }
 
 sub
 FHEM2FHEM_Set($@)
 {
   my ($hash, @a) = @_;
+  my %sets = ( reopen=>"noArg", cmd=>"textField" );
 
   return "set needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of reopen:noArg"
-  	if($a[1] ne "reopen");
-
+  return "Unknown argument $a[1], choose one of ".
+        join(" ", map {"$_:$sets{$_}"} sort keys %sets) if(!$sets{$a[1]});
+  return "$a[1] needs at least one parameter"
+  	if(@a < 3 && $sets{$a[1]} ne "noArg");
   
-  FHEM2FHEM_CloseDev($hash);
-  FHEM2FHEM_OpenDev($hash, 0);
+  if($a[1] eq "reopen") {
+    FHEM2FHEM_CloseDev($hash);
+    FHEM2FHEM_OpenDev($hash, 0);
+  }
+
+  if($a[1] eq "cmd") {
+    return "Not connected" if(!$hash->{TCPDev});
+    my $cmd = join(" ",@a[2..$#a]);
+    $cmd = '{my $r=fhem("'.$cmd.'");; defined($r) ? "\\0$r\\0" : $r}'."\n";
+    F2F_sw($hash->{TCPDev}, $cmd);
+    $hash->{".lcmd"} = $hash->{CL};
+  }
   return undef;
 }
 
@@ -343,11 +397,41 @@ FHEM2FHEM_Attr(@)
   my ($type, $devName, $attrName, @param) = @_;
   my $hash = $defs{$devName};
 
-  return undef if($attrName && $attrName ne "addStateEvent");
-  $attr{$devName}{$attrName} = 1;
-  FHEM2FHEM_CloseDev($hash);
-  FHEM2FHEM_OpenDev($hash, 1);
+  if($attrName eq "addStateEvent") {
+    $attr{$devName}{$attrName} = 1;
+    FHEM2FHEM_CloseDev($hash);
+    FHEM2FHEM_OpenDev($hash, 1);
+  }
+
+  if($attrName eq "keepaliveInterval") {
+    return "Numeric argument expected" if($param[0] !~ m/^\d+$/);
+    InternalTimer(gettimeofday()+$param[0], "FHEM2FHEM_keepalive", $hash)
+      if($param[0] && $hash->{TCPDev});
+  }
+
   return undef;
+}
+
+sub
+FHEM2FHEM_keepalive($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $ki = AttrVal($name, "keepaliveInterval", 0);
+  return if(!$ki || !$hash->{TCPDev});
+
+  HttpUtils_Connect({
+    url => "http://$hash->{Host}/", noConn2 => 1,
+    callback=> sub {
+      my ($h, $err, undef) = @_;
+      if($err) {
+        Log3 $name, 4, "$name keepalive: $err";
+        return FHEM2FHEM_Disconnected($hash);
+      }
+      $h->{conn}->close();
+      InternalTimer(gettimeofday()+$ki, "FHEM2FHEM_keepalive", $hash);
+    }
+  });
 }
 
 1;
@@ -358,12 +442,12 @@ FHEM2FHEM_Attr(@)
 =item summary_DE verbindet zwei FHEM Installationen
 =begin html
 
-<a name="FHEM2FHEM"></a>
+<a id="FHEM2FHEM"></a>
 <h3>FHEM2FHEM</h3>
 <ul>
   FHEM2FHEM is a helper module to connect separate FHEM installations.
   <br><br>
-  <a name="FHEM2FHEMdefine"></a>
+  <a id="FHEM2FHEM-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL]
@@ -439,39 +523,60 @@ FHEM2FHEM_Attr(@)
   </ul>
   <br>
 
-  <a name="FHEM2FHEMset"></a>
+  <a id="FHEM2FHEM-set"></a>
   <b>Set </b>
   <ul>
     <li>reopen<br>
 	Reopens the connection to the device and reinitializes it.</li><br>
+    <li>cmd &lt;FHEM-command&gt;<br>
+        issues the FHEM-command on the remote machine. Note: a possible answer
+        can be seen if it is issued in a telnet session or in the FHEMWEB
+        "command execution window", but not when issued in the other FHEMWEB
+        input lines. </li><br>
+
   </ul>
 
-  <a name="FHEM2FHEMget"></a>
+  <a id="FHEM2FHEM-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="FHEM2FHEMattr"></a>
+  <a id="FHEM2FHEM-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-    <li><a name="#FHEM2FHEMeventOnly">eventOnly</a><br>
+    <li><a id="FHEM2FHEM-eventOnly">eventOnly</a><br>
       if set, generate only events, do not set corresponding readings.
       This is a compatibility feature, available only for LOG-Mode.
       </li>
-    <li><a name="#FHEM2FHEMaddStateEvent">addStateEvent</a><br>
+    <li><a id="FHEM2FHEM-attr-addStateEvent">addStateEvent</a><br>
       if set, state events are transmitted correctly. Notes: this is relevant
       only with LOG mode, setting it will generate an additional "reappeared"
       Log entry, and the remote FHEM must support inform onWithState (i.e. must
       be up to date).
       </li>
-    <li><a name="#FHEM2FHEMexcludeEvents">excludeEvents &lt;regexp&gt;</a>
-      do not publish events matching &lt;regexp&gt;
+    <li><a id="FHEM2FHEM-attr-excludeEvents">excludeEvents &lt;regexp&gt;</a>
+      do not publish events matching &lt;regexp&gt;. Note: ^ and $ are
+      automatically added to the regexp, like in notify, FileLog, etc.
       </li>
-    <li><a name="#FHEM2FHEMsetState">setState</a>
+     <li><a id="FHEM2FHEM-attr-keepaliveInterval">keepaliveInterval &lt;sec&gt
+         </a><br>
+       issues an empty command regularly in order to detect a stale TCP
+       connection faster than the OS.</li>
+     <li><a id="FHEM2FHEM-attr-loopThreshold">loopThreshold</a><br>
+       helps avoiding endless loops. If set, the last update of a given
+       reading must be older than the current value in seconds. Take care if
+       event-on-* attributes are also set.
+       </li>
+    <li><a id="FHEM2FHEM-attr-setState">setState</a>
       if set to 1, and there is a local device with the same name, then remote
       set commands will be executed for the local device.
       </li>
+     <li><a id="FHEM2FHEM-attr-reportConnected">reportConnected</a>
+       if set (to 1), a  "global CONNECTED &lt;name&gt;" Event will be generated
+       after connection established on the telnet server. This might be used to
+       resend changed values.
+       </li> 
   </ul>
 
 </ul>
@@ -480,12 +585,12 @@ FHEM2FHEM_Attr(@)
 
 =begin html_DE
 
-<a name="FHEM2FHEM"></a>
+<a id="FHEM2FHEM"></a>
 <h3>FHEM2FHEM</h3>
 <ul>
    FHEM2FHEM ist ein Hilfsmodul, um mehrere FHEM-Installationen zu verbinden.
    <br><br>
-   <a name="FHEM2FHEMdefine"></a>
+   <a id="FHEM2FHEM-define"></a>
    <b>Define</b>
    <ul>
     <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL] [LOG:regexp|RAW:devicename] {portpassword}
@@ -572,43 +677,61 @@ FHEM2FHEM_Attr(@)
    </ul>
    <br>
 
-   <a name="FHEM2FHEMset"></a>
+   <a id="FHEM2FHEM-set"></a>
    <b>Set </b>
    <ul>
      <li>reopen<br>
  	&Ouml;ffnet die Verbindung erneut.</li>
+    <li>cmd &lt;FHEM-command&gt;<br>
+        f&uuml;rt FHEM-command auf dem entfernten Rechner aus. Achtung: eine
+        Fehlermeldung ist nur dann sichtbar, falls der Befehl in einer
+        Telnet-Sitzung oder in der mehrzeiligen FHEMWEB Befehlsdialog
+        eingegeben wurde.</li><br>
    </ul>
 
-   <a name="FHEM2FHEMget"></a>
+   <a id="FHEM2FHEM-get"></a>
    <b>Get</b> <ul>N/A</ul><br>
 
-   <a name="FHEM2FHEMattr"></a>
+   <a id="FHEM2FHEM-attr"></a>
    <b>Attribute</b>
    <ul>
      <li><a href="#dummy">dummy</a></li>
      <li><a href="#disable">disable</a></li>
      <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-     <li><a name="#FHEM2FHEMeventOnly">eventOnly</a><br>
+     <li><a id="FHEM2FHEM-attr-eventOnly">eventOnly</a><br>
        falls gesetzt, werden nur die Events generiert, und es wird kein
        Reading aktualisiert. Ist nur im LOG-Mode aktiv.
        </li>
-     <li><a name="#FHEM2FHEMaddStateEvent">addStateEvent</a><br>
+     <li><a id="FHEM2FHEM-attr-addStateEvent">addStateEvent</a><br>
        falls gesetzt, werden state Events als solche uebertragen. Zu beachten:
        das Attribut ist nur f&uuml;r LOG-Mode relevant, beim Setzen wird eine
        zus&auml;tzliche reopened Logzeile generiert, und die andere Seite muss
        aktuell sein.
        </li>
-     <li><a name="#FHEM2FHEMexcludeEvents">excludeEvents &lt;regexp&gt;</a>
+     <li><a id="FHEM2FHEM-attr-excludeEvents">excludeEvents &lt;regexp&gt;</a>
        die auf das &lt;regexp&gt; zutreffende Events werden nicht
-       bereitgestellt.
+       bereitgestellt. Achtung: ^ und $ werden automatisch hinzugefuuml;gt, wie
+       bei notify, FileLog, usw.
        </li>
-     <li><a name="#FHEM2FHEMsetState">setState</a>
+     <li><a id="FHEM2FHEM-attr-keepaliveInterval">keepaliveInterval &lt;sec&gt
+         </a><br>
+       setzt regelmaessig einen leeren Befehl ab, um einen Verbindungsabbruch
+       frueher als das OS feststellen zu koennen.</li>
+     <li><a id="FHEM2FHEM-attr-loopThreshold">loopThreshold</a><br>
+       hilft Endlosschleifen zu vermeiden. Falls gesetzt, muss die letzte
+       &Auml;nderung des gleichen Readings mehr als der Wert in Sekunden alt
+       sein. Achtung bei gesetzten event-on-* Attributen.</li>
+     <li><a id="FHEM2FHEM-attr-setState">setState</a>
        falls gesetzt (auf 1), und ein lokales Ger&auml;t mit dem gleichen Namen
        existiert, dann werden set Befehle vom entfernten Ger&auml;t als Solches
        &uuml;bertragen.
        </li>
+     <li><a id="FHEM2FHEM-attr-reportConnected">reportConnected</a>
+       falls gesetzt (auf 1), dann wird auf dem Telnet-Server nach dem
+       Verbinden das "global CONNECTED &lt;name&gt;" Event erzeugt. Das
+       erm&ouml;glicht z.Bsp. das erneute Senden ge&auml;nderter Zust&auml;nde.
+       </li> 
    </ul>
-
 </ul>
 
 =end html_DE

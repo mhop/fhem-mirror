@@ -175,9 +175,10 @@ sub OBIS_Define($$)
     "VSM102"	=> 	["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E110"		=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
-    "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)]
+    "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "MT382"	=> 	["/?!".chr(13).chr(10),    20,    chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)] #this line added by alkazaa
     );
-  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
+  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110, E350USB, AS1440, MT382'};
   $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
   $hash->{helper}{DEVICES} =$devs{$type};
   $hash->{helper}{RULECACHE} = {};
@@ -409,6 +410,7 @@ sub OBIS_Parse_List
 			$str=$SML_specialities{"HEX2"}[1]->($str)
 		  } else {
 			$str=~s/([A-F0-9]{2})/chr(hex($1))/eg;
+			$str=~s/[[:cntrl:]]//g;
 			$str=~s/[^!-~\s\r\n\t]//g;
           }
         }
@@ -457,11 +459,24 @@ sub OBIS_Parse_List
     $result[3] = $repl // "var";
   }
   if (looks_like_number($result[1])) {
-    $result[5] = (($result[1] == 0xA2) ? "<" : (($result[1] == 0x82) ? ">" : "")) . $result[5];
+    my $direction = "";
+    # Direction: Bit 5 Version 1.0, Bit 11 later
+    if (($result[1] & 0xE2) == 0xA2 || ($result[1] & 0x807) == 0x804) {
+      $direction = "<";
+    } elsif (($result[1] & 0xE2) == 0x82 || ($result[1] & 0x807) == 0x004) {
+      $direction = ">";
+    }
+    $result[5] = $direction . $result[5];
+    $hash->{helper}{DIRECTIONSUM} = $direction;
   }
 
+  if ($result[0]=~/^1-0:16\.7\.0/ && $hash->{helper}{HLYHACK} && $result[5]>0 && $hash->{helper}{DIRECTIONSUM} eq "<") {
+    $result[5] = -$result[5];
+  }
   my $line = $result[0] . "(" . $result[5] . ($result[3] eq "" ? "" : "*".$result[3]) . ")\r\n";
-  $hash->{helper}{DZGHACK} = 1 if ($line=~/^1-0:96\.50\.1\*.*\(DZG/);
+  if ($line=~/^1-0:96\.50\.1\*.*\((DZG|HLY)/) {
+    $hash->{helper}{$1 . "HACK"} = 1;
+  }
   $_[1] .= $line;
   return undef;
 
@@ -939,6 +954,7 @@ sub OBIS_CRC16($$) {
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
       <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
+      <li>MT382 -&gt; ISKRA MT382</li>
       <li>Standard -&gt; Data comes as plainText</li>
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
@@ -1026,6 +1042,7 @@ sub OBIS_CRC16($$) {
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
       <li>E110 -&gt; Landis&&;Gyr E110</li>
       <li>E350USB -&gt; Landis&&;Gyr E350 USB-Version</li>
+      <li>MT382 -&gt; ISKRA MT382</li>
       <li>Standard -&gt; Daten kommen als plainText</li>
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>

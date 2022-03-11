@@ -3,6 +3,7 @@
 # Corresponding FileLog definition:
 # define ememlog FileLog /var/log/fhem/emem-%Y.log emem:power.*
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

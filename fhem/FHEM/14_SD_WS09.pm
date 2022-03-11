@@ -65,7 +65,7 @@ sub SD_WS09_Define($$) {
 	$hash->{MODEL} = $model;
 
 	my $name= $hash->{NAME};
-	return undef;
+	return ;
 }
 
 #####################################
@@ -75,7 +75,7 @@ sub SD_WS09_Undef($$) {
 	delete($modules{SD_WS09}{defptr}{$hash->{CODE}})
 		if(defined($hash->{CODE}) &&
 			defined($modules{SD_WS09}{defptr}{$hash->{CODE}}));
-	return undef;
+	return ;
 }
 
 ###################################
@@ -151,7 +151,7 @@ sub SD_WS09_Parse($$) {
 
 		if ($syncpos ==-1 || length($bitData)-$syncpos < $minL2) {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse EXIT: msg=$rawData syncp=$syncpos length:".length($bitData) ;
-			return undef;
+			return ;
 		}
 	}
 
@@ -285,7 +285,7 @@ sub SD_WS09_Parse($$) {
 		} else {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_Ex Exit: msg=$rawData length:".length($sensdata) ;
 			Log3 $iohash, 4, "$name: SD_WS09_WH10 Exit:  Model=$model " ;
-			return undef;
+			return ;
 		}
 	} else {
 		# es wird eine CTW600 angenommen 
@@ -317,7 +317,7 @@ sub SD_WS09_Parse($$) {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_17 ".$model." Rain bit: ".substr($sensdata,46,16)." Dec: " . $rain ;           
 		} else {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_18 CTW600 EXIT: msg=$bitData length:".length($bitData) ;
-			return undef;
+			return ;
 		}
 	}
 
@@ -326,11 +326,11 @@ sub SD_WS09_Parse($$) {
 
 	if($hum > 100 || $hum < 0) {
 		Log3 $iohash, 4, "$name: SD_WS09_Parse HUM: hum=$hum msg=$rawData " ;
-		return undef;
+		return ;
 	} 
 	if($temp > 60 || $temp < -40) {
 		Log3 $iohash, 4, "$name: SD_WS09_Parse TEMP: Temp=$temp msg=$rawData " ;
-		return undef;
+		return ;
 	} 
 
 	my $longids = AttrVal($iohash->{NAME},'longids',0);
@@ -357,7 +357,7 @@ sub SD_WS09_Parse($$) {
 		my $minsecs = AttrVal($iohash->{NAME},'minsecs',0);
 		if($hash->{lastReceive} && (time() - $hash->{lastReceive} < $minsecs)) {
 			Log3 $hash, 4, "SD_WS09_Parse_End $deviceCode Dropped due to short time. minsecs=$minsecs";
-			return undef;
+			return ;
 		}
 	}
 
@@ -484,7 +484,7 @@ sub SD_WS09_Attr(@) {
 	my $cde = $hash->{CODE};
 	delete($modules{SD_WS09}{defptr}{$cde});
 	$modules{SD_WS09}{defptr}{$iohash->{NAME} . "." . $cde} = $hash;
-	return undef;
+	return ;
 }
 
 ###################################

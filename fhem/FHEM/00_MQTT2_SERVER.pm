@@ -33,7 +33,9 @@ MQTT2_SERVER_Initialize($)
   no warnings 'qw';
   my @attrList = qw(
     SSL:0,1
+    allowfrom
     autocreate:no,simple,complex
+    binaryTopicRegexp
     clientId
     clientOrder
     disable:1,0
@@ -172,6 +174,17 @@ MQTT2_SERVER_Attr(@)
     }
   }
 
+  if($attrName eq "binaryTopicRegexp") {
+    if($type eq "set") {
+      return "Bad regexp $param[0]: starting with *" if($param[0] =~ m/^\*/);
+      eval { "hallo" =~ m/^$param[0]$/ };
+      return "Error checking regexp $param[0]:$@" if($@);
+      $hash->{binaryTopicRegexp} = $param[0];
+    } else {
+      delete($hash->{binaryTopicRegexp});
+    }
+  }
+
   return undef;
 } 
 
@@ -240,20 +253,20 @@ sub
 MQTT2_SERVER_out($$$;$)
 {
   my ($hash, $msg, $dump, $callback) = @_;
-  addToWritebuffer($hash, $msg, $callback);
+  addToWritebuffer($hash, $msg, $callback) if(defined($hash->{FD}));
   if($dump) {
     my $cpt = $cptype{ord(substr($msg,0,1)) >> 4};
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $dump, 5, "out: $cpt: $msg";
+    Log3 $dump, 5, "out\@$hash->{PEER}:$hash->{PORT} $cpt: $msg";
   }
 }
 
 sub
 MQTT2_SERVER_Read($@)
 {
-  my ($hash, $reread, $debug) = @_;
+  my ($hash, $reread) = @_;
 
-  if(!$debug && $hash->{SERVERSOCKET}) {   # Accept and create a child
+  if($hash->{SERVERSOCKET}) {   # Accept and create a child
     my $nhash = TcpServer_Accept($hash, "MQTT2_SERVER");
     return if(!$nhash);
     $nhash->{CD}->blocking(0);
@@ -262,9 +275,9 @@ MQTT2_SERVER_Read($@)
     return;
   }
 
-  my $sname = ($debug ? $hash->{NAME} : $hash->{SNAME});
+  my $sname = $hash->{SNAME};
+  my $shash = $defs{$sname};
   my $cname = $hash->{NAME};
-  $hash->{cid} = "debug" if($debug);
   my $c = $hash->{CD};
 
   if(!$reread) {
@@ -311,7 +324,7 @@ MQTT2_SERVER_Read($@)
   if($dump) {
     my $msg = substr($hash->{BUF}, 0, $off+$tlen);
     $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $sname, 5, "in:  $cpt: $msg";
+    Log3 $sname, 5, "in\@$hash->{PEER}:$hash->{PORT} $cpt: $msg";
   }
 
   $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
@@ -326,13 +339,16 @@ MQTT2_SERVER_Read($@)
     # V3:MQIsdb V4:MQTT
     if(ord($fb) & 0xf) { # lower nibble must be zero
       Log3 $sname, 3, "$cname with bogus CONNECT (".ord($fb)."), disconnecting";
+      Log3 $sname, 3, "TLS activated on the client but not on the server?"
+        if(!AttrVal($sname,"TLS",0) && ord($fb) == 22);
       return CommandDelete(undef, $cname);
     }
     ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
     $hash->{protoNum}  = unpack('C*', substr($pl,$off++,1)); # 3 or 4
     $hash->{cflags}    = unpack('C*', substr($pl,$off++,1));
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
-    ($hash->{cid}, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
+    my $cid;
+    ($cid, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
     if($hash->{protoNum} > 4) {
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump,
@@ -361,12 +377,14 @@ MQTT2_SERVER_Read($@)
 
     my $ret = Authenticate($hash, "basicAuth:".encode_base64("$usr:$pwd"));
     if($ret == 2) { # CONNACK, Error
+      delete($hash->{lwt}); # Avoid autocreate, #121587
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 4), $dump, 
                                 sub{ CommandDelete(undef, $hash->{NAME}); });
     }
 
     $hash->{subscriptions} = {};
-    $defs{$sname}{clients}{$cname} = 1;
+    $shash->{clients}{$cname} = 1;
+    $hash->{cid} = $cid; #124699
 
     Log3 $sname, 4, "  $cname cid:$hash->{cid} $cpt V:$hash->{protoNum} $desc";
     MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 0), $dump); # CONNACK+OK
@@ -382,10 +400,15 @@ MQTT2_SERVER_Read($@)
       $off += 2;
     }
     $val = (length($pl)>$off ? substr($pl, $off) : "");
+    if($unicodeEncoding) {
+      if(!$shash->{binaryTopicRegexp} || $tp !~ m/^$shash->{binaryTopicRegexp}$/) {
+        $val = Encode::decode('UTF-8', $val);
+      }
+    }
     Log3 $sname, 4, "  $cname $hash->{cid} $cpt $tp:$val";
     # PUBACK
     MQTT2_SERVER_out($hash, pack("CCnC*", 0x40, 2, $pid), $dump) if($qos);
-    MQTT2_SERVER_doPublish($hash, $defs{$sname}, $tp, $val, $cf & 0x01);
+    MQTT2_SERVER_doPublish($hash, $shash, $tp, $val, $cf & 0x01);
 
   ####################################
   } elsif($cpt eq "PUBACK") { # ignore it
@@ -404,16 +427,16 @@ MQTT2_SERVER_Read($@)
       push @ret, ($qos > 1 ? 1 : 0);    # max qos supported is 1
     }
     # SUBACK
-    MQTT2_SERVER_out($hash, pack("CCnC*", 0x90, 3, $pid, maxNum(@ret)), $dump);
+    MQTT2_SERVER_out($hash, pack("CCnC*", 0x90, 2+@ret, $pid, @ret), $dump);
 
     if(!$hash->{answerScheduled}) {
       $hash->{answerScheduled} = 1;
       InternalTimer($hash->{lastMsgTime}+1, sub(){
         return if(!$hash->{FD}); # Closed in the meantime, #114425
         delete($hash->{answerScheduled});
-        my $r = $defs{$sname}{retain};
+        my $r = $shash->{retain};
         foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
-          MQTT2_SERVER_sendto($defs{$sname}, $hash, $tp, $r->{$tp}{val});
+          MQTT2_SERVER_sendto($shash, $hash, $tp, $r->{$tp}{val});
         }
       }, undef, 0);
     }
@@ -491,7 +514,7 @@ MQTT2_SERVER_doPublish($$$$;$)
 
   my $serverName = $server->{NAME};
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
-  next if(defined($ir) && "$tp:$val" =~ m/$ir/);
+  return if(defined($ir) && "$tp:$val" =~ m/$ir/);
 
   my $cid = $src->{cid};
   $tp =~ s/:/_/g; # 96608
@@ -503,7 +526,8 @@ MQTT2_SERVER_doPublish($$$$;$)
     $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
 
     $cid = AttrVal($serverName, "clientId", $cid);
-    Dispatch($server, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no"); 
+    my %addvals = (CONN => $src->{NAME});
+    Dispatch($server, "autocreate=$ac\0$cid\0$tp\0$val",\%addvals, $ac eq "no"); 
     my $re = AttrVal($serverName, "rawEvents", undef);
     DoTrigger($server->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
   }
@@ -518,6 +542,14 @@ MQTT2_SERVER_sendto($$$$)
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
   my $dump = (AttrVal($shash->{NAME},"verbose",1)>=5) ? $shash->{NAME} :undef;
+
+  my $ltopic = $topic;
+  my $lval = $val;
+  if($unicodeEncoding) {
+    $ltopic = Encode::encode('UTF-8', $topic);
+    $lval   = Encode::encode('UTF-8', $val);
+  }
+
   foreach my $s (keys %{$hash->{subscriptions}}) {
     my $re = $s;
     $re =~ s,^#$,.*,g;
@@ -527,9 +559,9 @@ MQTT2_SERVER_sendto($$$$)
       Log3 $shash, 5, "  $hash->{NAME} $hash->{cid} => $topic:$val";
       MQTT2_SERVER_out($hash,                  # PUBLISH
         pack("C",0x30).
-        MQTT2_SERVER_calcRemainingLength(2+length($topic)+length($val)).
-        pack("n", length($topic)).
-        $topic.$val, $dump);
+        MQTT2_SERVER_calcRemainingLength(2+length($ltopic)+length($lval)).
+        pack("n", length($ltopic)).
+        $ltopic.$lval, $dump);
       last;       # send a message only once
     }
   }
@@ -596,18 +628,23 @@ MQTT2_SERVER_getStr($$$)
   my $l = unpack("n", substr($in, $off, 2));
   my $r = substr($in, $off+2, $l);
   $hash->{stringError} = 1 if(index($r, "\0") >= 0);
+  $r = Encode::decode('UTF-8', $r) if($unicodeEncoding);
   return ($r, $off+2+$l);
 }
 
-#{MQTT2_SERVER_ReadDebug($defs{m2s}, '(162)(50)(164)(252)(0).7c:2f:80:97:b0:98/GenericAc(130)(26)(212)4(0)(21)BLE2MQTT/OTA/')}
+# {MQTT2_SERVER_ReadDebug("m2s", '0(12)(0)(5)HelloWorld')}
 sub
 MQTT2_SERVER_ReadDebug($$)
 {
-  my ($hash, $s) = @_;
+  my ($name, $s) = @_;
   $s =~ s/\((\d{1,3})\)/chr($1)/ge;
-  $hash->{BUF} = $s;
   Log 1, "Debug len:".length($s);
-  MQTT2_SERVER_Read($hash, 1, 1);
+  my $cName = $name."_debugClient";
+  $defs{$cName} = { NAME=>$cName, SNAME=>$name, cid=>$name,
+                    TYPE=>"MQTT2_SERVER", PEER=>"", PORT=>"", BUF=>$s };
+  MQTT2_SERVER_Read($defs{$cName}, 1);
+  delete($attr{$cName});
+  delete($defs{$cName});
 }
 
 1;
@@ -663,6 +700,34 @@ MQTT2_SERVER_ReadDebug($$)
   <a id="MQTT2_SERVER-attr"></a>
   <b>Attributes</b>
   <ul>
+
+    <li><a href="#allowfrom">allowfrom</a>
+      </li><br>
+
+    <a id="MQTT2_SERVER-attr-autocreate"></a>
+    <li>autocreate [no|simple|complex]<br>
+      MQTT2_DEVICES will be automatically created upon receiving an
+      unknown message. Set this value to no to disable autocreating, the
+      default is simple.<br>
+      With simple the one-argument version of json2nameValue is added:
+      json2nameValue($EVENT), with complex the full version:
+      json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
+      on the attached devices and on the personal taste, and it is only
+      relevant for json payload. For non-json payload there is no difference
+      between simple and complex.
+      </li><br>
+
+    <a id="MQTT2_SERVER-attr-binaryTopicRegexp"></a>
+    <li>binaryTopicRegexp &lt;regular-expression&gt;<br>
+      this attribute is only relevant, if the global attribute "encoding
+      unicode" is set.<br>
+      In this case the MQTT payload is automatically assumed to be UTF-8, which
+      may cause conversion-problems if the payload is binary. This conversion
+      wont take place, if the topic matches the regular expression specified.
+      Note: as is the case with other modules, ^ and $ is added to the regular
+      expression.
+    </li><br>
+
 
     <a id="MQTT2_SERVER-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>
@@ -720,7 +785,8 @@ MQTT2_SERVER_ReadDebug($$)
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
     <li>SSL<br>
-      Enable SSL (i.e. TLS).
+      Enable SSL (i.e. TLS). Note: after deleting this attribute FHEM must be
+      restarted.
       </li><br>
 
     <li>sslVersion<br>
@@ -731,19 +797,6 @@ MQTT2_SERVER_ReadDebug($$)
        Set the prefix for the SSL certificate, default is certs/server-, see
        also the SSL attribute.
        </li><br>
-
-    <a id="MQTT2_SERVER-attr-autocreate"></a>
-    <li>autocreate [no|simple|complex]<br>
-      MQTT2_DEVICES will be automatically created upon receiving an
-      unknown message. Set this value to no to disable autocreating, the
-      default is simple.<br>
-      With simple the one-argument version of json2nameValue is added:
-      json2nameValue($EVENT), with complex the full version:
-      json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
-      on the attached devices and on the personal taste, and it is only
-      relevant for json payload. For non-json payload there is no difference
-      between simple and complex.
-      </li><br>
 
   </ul>
 </ul>

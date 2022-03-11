@@ -29,6 +29,7 @@ package main;
 
 use strict;
 use warnings;
+use JSON;
 use Data::Dumper;
 
 my $VERSION = "0.9.9";

@@ -4,11 +4,11 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.013
+#  Version 5.0
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
-#  (c) 2020 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2021 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.013';
+my $HMCCURPCPROC_VERSION = '5.0 212941907';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -126,6 +126,17 @@ my %RPC_METHODS = (
 );
 
 # RPC event types
+# EV = Event
+# ND = New device
+# DD = Delete device
+# RD = Replace device
+# RA = Readded device
+# UD = Update device
+# IN = Init RPC connection
+# EX = Exit RPC process
+# SL = Server loop
+# ST = Statistics (not in list of event types)
+# TO = Timeout
 my @RPC_EVENT_TYPES = ('EV', 'ND', 'DD', 'RD', 'RA', 'UD', 'IN', 'EX', 'SL', 'TO');
 
 
@@ -138,6 +149,7 @@ sub HMCCURPCPROC_Initialize ($);
 sub HMCCURPCPROC_Define ($$);
 sub HMCCURPCPROC_InitDevice ($$);
 sub HMCCURPCPROC_Undef ($$);
+sub HMCCURPCPROC_Rename ($$);
 sub HMCCURPCPROC_DelayedShutdown ($);
 sub HMCCURPCPROC_Shutdown ($);
 sub HMCCURPCPROC_Attr ($@);
@@ -235,8 +247,11 @@ sub HMCCURPCPROC_Initialize ($)
 {
 	my ($hash) = @_;
 
+	$hash->{version} = $HMCCURPCPROC_VERSION;
+	
 	$hash->{DefFn}             = 'HMCCURPCPROC_Define';
 	$hash->{UndefFn}           = 'HMCCURPCPROC_Undef';
+	$hash->{RenameFn}          = 'HMCCURPCPROC_Rename';
 	$hash->{SetFn}             = 'HMCCURPCPROC_Set';
 	$hash->{GetFn}             = 'HMCCURPCPROC_Get';
 	$hash->{ReadFn}            = 'HMCCURPCPROC_Read';
@@ -266,14 +281,15 @@ sub HMCCURPCPROC_Define ($$)
 	my $rpcip = '';
 	my $iface;
 	my $usage = 'Usage: define $name HMCCURPCPROC { CCUHost | iodev={device} } { RPCPort | RPCInterface }';
+	my $errSource = "HMCCURPCPROC [$name]";
 	
 	$hash->{version} = $HMCCURPCPROC_VERSION;
 
 	if (exists($h->{iodev})) {
 		$ioname = $h->{iodev};
 		return $usage if (scalar(@$a) < 3);
-		return "HMCCU I/O device $ioname not found" if (!exists($defs{$ioname}));
-		return "Device $ioname is not a HMCCU device" if ($defs{$ioname}->{TYPE} ne 'HMCCU');
+		return "$errSource HMCCU I/O device $ioname not found" if (!exists($defs{$ioname}));
+		return "$errSource Device $ioname is not a HMCCU device" if ($defs{$ioname}->{TYPE} ne 'HMCCU');
 		$ioHash = $defs{$ioname};
 		if (scalar(@$a) < 4) {
 			$hash->{host} = $ioHash->{host};
@@ -310,8 +326,10 @@ sub HMCCURPCPROC_Define ($$)
 		foreach my $d (keys %defs) {
 			my $dh = $defs{$d};
 			next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}) || $dh->{TYPE} ne 'HMCCU');
-			if ($dh->{ccuip} eq $rpcip) { $ioHash = $dh;	last; }
+			if ($dh->{ccuip} eq $rpcip) { $ioHash = $dh; last; }
 		}
+		
+		return $errSource."HMCCU I/O device not found" if (!defined($ioHash));
 	}
 
 	# Store some definitions for delayed initialization
@@ -322,15 +340,15 @@ sub HMCCURPCPROC_Define ($$)
 		# Interactive define command while CCU not ready or no IO device defined
 		if (!defined($ioHash)) {
 			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
-			return $ccuinactive > 0 ?
-				'CCU and/or IO device not ready. Please try again later' :
-				'Cannot detect IO device';
+			return $errSource.($ccuinactive > 0 ?
+				' CCU and/or IO device not ready. Please try again later' :
+				' Cannot detect IO device');
 		}
 	}
 	else {
 		# CCU not ready during FHEM start
-		if (!defined ($ioHash) || $ioHash->{ccustate} ne 'active') {
-			HMCCU_Log ($hash, 2, 'Cannot detect IO device, maybe CCU not ready. Trying later ...');
+		if ($ioHash->{ccustate} ne 'active') {
+			HMCCU_Log ($hash, 2, 'CCU not ready. Trying later ...');
 			readingsSingleUpdate ($hash, 'state', 'Pending', 1);
 			$hash->{ccudevstate} = 'pending';
 			return undef;
@@ -339,11 +357,11 @@ sub HMCCURPCPROC_Define ($$)
 
 	# Initialize FHEM device, set IO device
 	my $rc = HMCCURPCPROC_InitDevice ($ioHash, $hash);
-	return "Invalid port or interface $iface" if ($rc == 1);
-	return "Can't assign I/O device $ioname" if ($rc == 2);
-	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if ($rc == 3);
-	return "RPC device for CCU/port already exists" if ($rc == 4);
-	return "Cannot connect to CCU ".$hash->{host}." interface $iface" if ($rc == 5);
+	return "$errSource Invalid port or interface $iface" if ($rc == 1);
+	return "$errSource Can't assign I/O device $ioname" if ($rc == 2);
+	return "$errSource Invalid local IP address ".$hash->{hmccu}{localaddr} if ($rc == 3);
+	return "$errSource RPC device for CCU/port already exists" if ($rc == 4);
+	return "$errSource Cannot connect to CCU ".$hash->{host}." interface $iface" if ($rc == 5);
 
 	return undef;
 }
@@ -445,6 +463,21 @@ sub HMCCURPCPROC_Undef ($$)
 }
 
 ######################################################################
+# Rename device
+######################################################################
+
+sub HMCCURPCPROC_Rename ($$)
+{
+	my ($newName, $oldName) = @_;
+	my $hash = $defs{$newName};
+
+	my $ioHash = $hash->{IODev};
+	my $ifName = $hash->{rpcinterface};
+
+	$ioHash->{hmccu}{interfaces}{$ifName}{device} = $newName;
+}
+
+######################################################################
 # Delayed shutdown FHEM
 ######################################################################
 
@@ -528,7 +561,9 @@ sub HMCCURPCPROC_Attr ($@)
 			$hash->{hmccu}{localaddr} = $hash->{hmccu}{defaultaddr};
 		}
 	}
-	
+
+	HMCCU_LogDisplay ($hash, 2, 'Please restart RPC server to apply attribute changes') if ($init_done);
+
 	return undef;
 }
 
@@ -1127,7 +1162,9 @@ sub HMCCURPCPROC_GetPeers ($;$)
 }
 
 ######################################################################
-# Get RPC device descriptions from CCU
+# Get RPC device descriptions from CCU recursively. Add devices to
+# IO device.
+# If address is not specified, fetch description of all devices.
 # Return number of devices and channels read from CCU.
 ######################################################################
 
@@ -1467,15 +1504,15 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	$hash->{hmccu}{sockparent} = $sockparent;
 	$hash->{hmccu}{sockchild} = $sockchild;
 
-	# Enable FHEM I/O
+	# Enable FHEM I/O, calculate RPC server port
 	my $pid = $$;
 	$hash->{FD} = fileno $sockchild;
 	$selectlist{"RPC.$name.$pid"} = $hash; 
+	my $callbackport = $rpcserverport+$rpcport+($ccunum*10);
 	
 	# Initialize RPC server
-	my $err = '';
-	my %srvprocpar;
-	my $callbackport = $rpcserverport+$rpcport+($ccunum*10);
+#	my $err = '';
+#	my %srvprocpar;
 
 	# Start RPC server process
 	my $rpcpid = fhemFork ();
@@ -1514,7 +1551,7 @@ sub HMCCURPCPROC_StartRPCServer ($)
 	$hash->{RPCPID} = $rpcpid;
 
 	# Trigger Timer function for checking successful RPC start
-	# Timer will be removed before execution if event 'IN' is reveived
+	# Timer will be removed before first execution if event 'IN' is reveived
 	InternalTimer (gettimeofday()+$HMCCURPCPROC_INIT_INTERVAL3, "HMCCURPCPROC_IsRPCServerRunning",
 		$hash, 0);
 	
@@ -2400,6 +2437,11 @@ sub HMCCURPCPROC_HexDump ($$)
 {
 	my ($name, $data) = @_;
 	
+	if (!defined($data)) {
+		HMCCU_Log ($name, 4, 'HexDump called without data');
+		return;
+	}
+
 	my $offset = 0;
 
 	foreach my $chunk (unpack "(a16)*", $data) {

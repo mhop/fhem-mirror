@@ -8,6 +8,8 @@ maintainer.
 
 When adding a new file, add yourself as the maintainer.
 
+This file should be encoded as UTF-8 with BOM.
+
 File                         Maintainer           Forum
 =========================================================================
 fhem.pl                      rudolfkoenig         Sonstiges
@@ -26,6 +28,7 @@ FHEM/00_HMLAN.pm             martinp876           HomeMatic
 FHEM/00_HMUARTLGW.pm         mgernoth             HomeMatic
 FHEM/00_HXB.pm               neubert              Sonstige Systeme
 FHEM/00_KM271.pm             physikus             Sonstiges
+FHEM/00_KNXTUL               jewuma               KNX/EIB
 FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
 FHEM/00_MAXLAN.pm            Wzut		  MAX
 FHEM/00_MQTT.pm              hexenmeister         MQTT
@@ -56,18 +59,18 @@ FHEM/09_USF1000.pm           neubert              SlowRF
 FHEM/10_CUL_HM.pm            martinp876           HomeMatic
 FHEM/10_CUL_IR.pm            odroegehorn          SlowRF
 FHEM/10_DUOFERNSTICK         telekatz             Sonstige Systeme
-FHEM/10_EIB.pm               andi291              KNX/EIB
 FHEM/10_EnOcean.pm           klaus-schauer        EnOcean
 FHEM/10_EQ3BT.pm             dominikkarall        Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         FRITZ!Box
 FHEM/10_FRM.pm               jensb                Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         SlowRF
+FHEM/10_GFPROBT.pm           dominik              Sonstige Systeme
 FHEM/10_HXBDevice.pm         neubert              Sonstige Systeme
 FHEM/10_IT.pm                dancer0705/bjoernh   InterTechno
 FHEM/10_Itach_IR             ulimaass             Sonstige Systeme
-FHEM/10_KNX.pm               andi291              KNX/EIB
+FHEM/10_KNX.pm               erwin                KNX/EIB (Forum #122582) https://forum.fhem.de/index.php/topic,122582.0.html
 FHEM/10_KOPP_FC.pm           raspii               Sonstige Systeme
-FHEM/10_MAX.pm               Wzut		  MAX
+FHEM/10_MAX.pm               Wzut                 MAX
 FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
 FHEM/10_MQTT_BRIDGE          hexenmeister         MQTT
 FHEM/10_MQTT_DEVICE          hexenmeister         MQTT
@@ -95,16 +98,16 @@ FHEM/12_HProtocolGateway.pm  eisler               Sonstige Systeme
 FHEM/12_HProtocolTank.pm     eisler               Sonstige Systeme
 FHEM/12_OilFox.pm            eisler               Sonstige Systeme
 FHEM/13_KS300.pm             rudolfkoenig         SlowRF
-FHEM/14_CUL_MAX.pm           Wzut		  MAX
+FHEM/14_CUL_MAX.pm           Wzut                 MAX
 FHEM/14_CUL_REDIRECT.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TCM97001.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TX.pm            rudolfkoenig         SlowRF
 FHEM/14_CUL_WS.pm            rudolfkoenig         SlowRF
-FHEM/14_FLAMINGO.pm          HomeAuto_User        Sonstige Systeme
+FHEM/14_FLAMINGO.pm          HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_Hideki.pm            Sidey/Ralf9          Sonstige Systeme
-FHEM/14_SD_BELL.pm           HomeAuto_User        Sonstige Systeme
+FHEM/14_SD_BELL.pm           HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_SD_RSL.pm            Sidey/Ralf9          Sonstige Systeme
-FHEM/14_SD_UT.pm             HomeAuto_User        Sonstige Systeme
+FHEM/14_SD_UT.pm             HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_SD_WS.pm             Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS09.pm           Sidey/pejonp         Sonstige Systeme
@@ -129,7 +132,6 @@ FHEM/20_FRM_SERVO.pm         jensb                Sonstige Systeme
 FHEM/20_FRM_STEPPER.pm       jensb                Sonstige Systeme
 FHEM/20_GUEST.pm             loredo               Automatisierung
 FHEM/20_N4HBUS.pm            okoerber             Sonstige Systeme
-FHEM/20_OWFS.pm              mfr69bs              1Wire (deprecated)
 FHEM/20_PET.pm               loredo               Automatisierung
 FHEM/20_ROOMMATE.pm          loredo               Automatisierung
 FHEM/20_X10.pm               neubert              SlowRF
@@ -143,7 +145,6 @@ FHEM/21_OWID.pm              pahenning            1Wire
 FHEM/21_OWLCD.pm             pahenning            1Wire
 FHEM/21_OWMULTI.pm           pahenning            1Wire
 FHEM/21_OWSWITCH.pm          pahenning            1Wire
-FHEM/21_OWTEMP.pm            mfr69bs              1Wire (deprecated)
 FHEM/21_OWTHERM.pm           pahenning            1Wire
 FHEM/21_OWVAR.pm             pahenning            1Wire
 FHEM/21_SONOSPLAYER          Reinerlein           Multimedia
@@ -154,6 +155,7 @@ FHEM/23_LUXTRONIK2.pm        TH9                  Heizungssteuerung/Raumklima (l
 FHEM/24_Iluminize.pm         VolkerKettenbach     Sonstige Systeme
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  Sonstiges
 FHEM/24_TPLinkHS110.pm       VolkerKettenbach     Sonstige Systeme
+FHEM/26_KM273.pm             mike3436             Heizungssteuerung/Raumklima
 FHEM/26_tahoma.pm            mike3436             Sonstige Systeme
 FHEM/30_DUOFERN              telekatz             Sonstige Systeme
 FHEM/30_ENECSYSGW.pm         akw                  Sonstige Systeme
@@ -205,7 +207,7 @@ FHEM/36_PCA301.pm            justme1968           Sonstige Systeme
 FHEM/36_PrecipitationSensor.pm HCS                Sonstige Systeme
 FHEM/36_Shelly.pm            pahenning            Sonstige Systeme
 FHEM/36_ShellyMonitor.pm     gvzdus               Sonstige Systeme
-FHEM/36_Vallox.pm            Skjall               http://forum.fhem.de/index.php/topic,71325.0.html
+FHEM/36_Vallox.pm            Skjall               Sonstige Systeme http://forum.fhem.de/index.php/topic,71325.0.html
 FHEM/36_WMBUS.pm             kaihs                Sonstige Systeme
 FHEM/37_dash_dhcp.pm         justme1968           Sonstige Systeme
 FHEM/37_echodevice.pm        michael.winkler      Multimedia
@@ -217,10 +219,10 @@ FHEM/37_SHC.pm               rr2000               Sonstige Systeme
 FHEM/37_SHCdev.pm            rr2000               Sonstige Systeme
 FHEM/37_Spotify.pm           neumann              Multimedia
 FHEM/38_BEOK.pm              Wzut                 Heizungssteuerung/Raumklima
-FHEM/38_Broadlink.pm         daniel2311           http://forum.fhem.de/index.php/topic,71972.0.html
+FHEM/38_Broadlink.pm         daniel2311           Sonstige Systeme http://forum.fhem.de/index.php/topic,71972.0.html
 FHEM/38_CO20.pm              markus-m             Sonstiges
 FHEM/38_JawboneUp.pm         domschl              Sonstiges
-FHEM/38_netatmo.pm           markus-m             http://forum.fhem.de/index.php/topic,53500.0.html
+FHEM/38_netatmo.pm           markus-m             Sonstige Systeme http://forum.fhem.de/index.php/topic,53500.0.html
 FHEM/39_alexa.pm             justme1968           Frontends/Sprachsteuerung
 FHEM/39_gassistant.pm        dominik              Frontends/Sprachsteuerung
 FHEM/39_siri.pm              justme1968           Frontends/Sprachsteuerung
@@ -258,6 +260,7 @@ FHEM/46_TRX_LIGHT.pm         KernSani             RFXTRX
 FHEM/46_TRX_SECURITY.pm      KernSani             RFXTRX
 FHEM/46_TRX_WEATHER.pm       KernSani             RFXTRX
 FHEM/47_OBIS.pm              gvzdus               Sonstige Systeme
+FHEM/48_BlinkCamera.pm       viegener             Sonstige Systeme
 FHEM/48_MieleAtHome.pm       choenig              Sonstige Systeme
 FHEM/49_Arlo.pm              maluk                Sonstige Systeme
 FHEM/49_IPCAM.pm             delmar               Sonstiges
@@ -267,7 +270,9 @@ FHEM/49_TBot_List.pm         viegener             Unterstützende Dienste
 FHEM/50_HP1000.pm            loredo               Unterstützende Dienste/Wettermodule
 FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
 FHEM/50_SSChatBot.pm         DS_Starter           Sonstiges
+FHEM/50_SSFile.pm            DS_Starter           Sonstiges
 FHEM/50_TelegramBot.pm       viegener             Unterstützende Dienste
+FHEM/50_Signalbot.pm         Adimarantis          Unterstützende Dienste https://forum.fhem.de/index.php/topic,118370.msg1176583.html#new
 FHEM/50_WS300.pm             Dirk                 SlowRF
 FHEM/51_I2C_BH1750.pm        arnoaugustin         Einplatinencomputer (bitte auch PM)
 FHEM/51_I2C_BMP180.pm        Dirk                 Einplatinencomputer
@@ -302,11 +307,12 @@ FHEM/57_Calendar.pm          neubert              Unterstützende Dienste/Kalend
 FHEM/57_CALVIEW.pm           chris1284            Unterstützende Dienste/Kalendermodule
 FHEM/57_SSCal.pm             DS_Starter           Unterstützende Dienste/Kalendermodule
 FHEM/58_HVAC_DaikinAC.pm     roelb                Heizungssteuerung/Raumklima (preferably in English and a copy as PM)
+FHEM/58_RPI_1Wire.pm         Adimarantis          Einplatinencomputer  https://forum.fhem.de/index.php/topic,123499.0.html
 FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
-FHEM/59_LuftdatenInfo        igami                Bastelecke
+FHEM/59_LuftdatenInfo        rudolfkoenig/orphan  Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_PROPLANTA.pm         tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          Beta-User/orphan     https://forum.fhem.de/index.php/topic,114061.0.html
+FHEM/59_Twilight.pm          Beta-User/orphan     Unterstützende Dienste/Wettermodule (Forum Thread #114061)   https://forum.fhem.de/index.php/topic,114061.0.html
 FHEM/59_Weather.pm           neubert              Unterstützende Dienste/Wettermodule
 FHEM/59_Wunderground.pm      loredo               (deprecated)
 FHEM/59_WUup.pm              mahowi               Unterstützende Dienste/Wettermodule
@@ -329,14 +335,15 @@ FHEM/66_EseraOneWire.pm      pizmus               1Wire
 FHEM/66_EseraShutter.pm      pizmus               1Wire
 FHEM/66_EseraTemp.pm         pizmus               1Wire
 FHEM/67_ECMDDevice.pm        neubert              Sonstige Systeme
-FHEM/_69_SoftliqCloud.pm     KernSani             Unterstützende Dienste
+FHEM/69_SoftliqCloud.pm      KernSani             Unterstützende Dienste
 FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme
 FHEM/70_BRAVIA.pm            vuffiraa             Multimedia
 FHEM/70_CanOverEthernet.pm   delmar               Sonstige Systeme
 FHEM/70_DENON_AVR.pm         delmar               Multimedia
-FHEM/70_DENON_AVR_ZONE.pm    delmar               Multimedia
 FHEM/70_EGPM.pm              alexus               Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               Multimedia
+FHEM/70_ESCVP21net.pm        hapege               Multimedia
+FHEM/70_HYDRAWISE.pm         xasher               Hydrawise irrigation
 FHEM/70_Jabber.pm            BioS                 Unterstützende Dienste
 FHEM/70_JSONMETER.pm         tupol                Sonstiges (Link als PM an tupol)
 FHEM/70_KODI.pm              vbs                  Multimedia
@@ -365,6 +372,7 @@ FHEM/70_WINCONNECT.pm        michael.winkler      Sonstige Systeme
 FHEM/70_WS3600.pm            Josch                Sonstiges
 FHEM/70_ZoneMinder.pm        delmar               Sonstige Systeme
 FHEM/71_COE_Node.pm          delmar               Sonstige Systeme
+FHEM/71_DENON_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_ONKYO_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             Multimedia
 FHEM/71_PIONEERAVRZONE.pm    50watt               Multimedia
@@ -377,35 +385,40 @@ FHEM/72_FB_CALLLIST.pm       markusbloch          Frontends
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          Unterstützende Dienste
 FHEM/72_FRITZBOX.pm          tupol                FRITZ!Box (link als PM an tupol)
 FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
+FHEM/72_UBUS_CALL.pm         xenos1984            Sonstige Systeme
+FHEM/72_UBUS_CLIENT.pm       xenos1984            Sonstige Systeme
 FHEM/72_XiaomiDevice.pm      markus-m             Sonstige Systeme
 FHEM/73_AMADCommBridge.pm    CoolTux              Sonstige Systeme
 FHEM/73_AutoShuttersControl.pm CoolTux            Automatisierung
-FHEM/73_DoorBird.pm          Sailor               https://forum.fhem.de/index.php/topic,100758
-FHEM/73_ElectricityCalculator.pm Sailor           http://forum.fhem.de/index.php/topic,57106.0.html
+FHEM/73_DoorBird.pm          Sailor               Sonstige Systeme https://forum.fhem.de/index.php/topic,100758
+FHEM/73_ElectricityCalculator.pm Sailor           Unterstützende Dienste https://forum.fhem.de/index.php/topic,57106.0.html
 FHEM/73_GardenaSmartBridge.pm CoolTux             Sonstige Systeme
-FHEM/73_GasCalculator        Sailor               http://forum.fhem.de/index.php/topic,47909.0.html
-FHEM/73_km200.pm             Sailor               http://forum.fhem.de/index.php/topic,25540.0.html
+FHEM/73_GasCalculator        Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,47909.0.html
+FHEM/73_km200.pm             Sailor               Heizungssteuerung/Raumklima https://forum.fhem.de/index.php/topic,25540.0.html
 FHEM/73_MPD.pm               Wzut                 Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/73_PRESENCE.pm          markusbloch          Unterstützende Dienste
+FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
 FHEM/74_HOMBOT.pm            CoolTux              sonstige Systeme
 FHEM/74_HusqvarnaAutomower.pm krannich            Sonstige Systeme
-FHEM/74_Nmap.pm              igami                Unterstützende Dienste
+FHEM/74_Nmap.pm              rudolfkoenig/orphan  Unterstützende Dienste
 FHEM/74_NUKIDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_THINKINGCLEANER.pm   loredo               Unterstützende Dienste
 FHEM/74_Unifi.pm             rapster/wuehler      Automatisierung
 FHEM/74_UnifiSwitch.pm       wuehler              Automatisierung
 FHEM/74_UnifiClient.pm       wuehler              Automatisierung
+FHEM/74_UnifiProtect.pm      justme1968           Sonstiges
 FHEM/74_UnifiVideo.pm        justme1968           Sonstiges
 FHEM/74_XiaomiBTLESens       CoolTux              Sonstige Systeme
 FHEM/75_MSG.pm               loredo               Automatisierung
 FHEM/75_msgConfig.pm         loredo               Automatisierung
-FHEM/76_msgDialog.pm         igami                Frontends/Sprachsteuerung
+FHEM/76_msgDialog.pm         orphan/Beta-User     Frontends/Sprachsteuerung https://forum.fhem.de/index.php/topic,125710.0.html
 FHEM/76_MSGFile.pm           gandy                Automatisierung
 FHEM/76_MSGMail.pm           gandy                Automatisierung
-FHEM/76_SMAInverter.pm       sct14675/DS_Starter  Sonstige Systeme
+FHEM/76_SMAEVCharger.pm      jual                 Sonstige Systeme
+FHEM/76_SMAInverter.pm       MadMax/DS_Starter    Sonstige Systeme
 FHEM/77_SMAEM.pm             VolkerKettenbach     Sonstige Systeme
 FHEM/77_SMASTP.pm            VolkerKettenbach     Sonstige Systeme
 FHEM/77_UWZ.pm               CoolTux              Unterstützende Dienste/Wettermodule
@@ -426,9 +439,12 @@ FHEM/88_HMCCURPC.pm          zap                  HomeMatic
 FHEM/88_HMCCURPCPROC.pm      zap                  HomeMatic
 FHEM/88_IPWE.pm              tdressler            Sonstiges
 FHEM/88_Itach_IRDevice       ulimaass             Sonstige Systeme
-FHEM/88_Timer.pm             HomeAuto_User/elektron-bbs        Automatisierung
-FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme
-FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme
+FHEM/88_Timer.pm             HomeAuto_User/elektron-bbs        Automatisierung (Link als PM an HomeAuto_User)
+FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
+FHEM/88_xs1Dev.pm            HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
+FHEM/89_AndroidDB.pm         zap                  Multimedia
+FHEM/89_AndroidDBHost.pm     zap                  Multimedia
+FHEM/89_ESPEInk.pm           eki                  Sonstige Systeme
 FHEM/89_FULLY.pm             zap                  Frontends
 FHEM/89_HEATRONIC.pm         heikoranft           Sonstige Systeme
 FHEM/89_VCLIENT.pm           andies               Heizungssteuerung/Raumklima
@@ -460,10 +476,11 @@ FHEM/95_YAAHM.pm             pahenning            Unterstützende Dienste
 FHEM/96_allowed.pm           rudolfkoenig         Automatisierung
 FHEM/96_SIP.pm               Wzut,plin            Sonstiges
 FHEM/96_Snapcast.pm          rudolfkoenig/orphan  Multimedia
+FHEM/97_PiXtendV2            PiXtend              Sonstige Systeme https://forum.fhem.de/index.php/topic,116308.0.html
 FHEM/97_TrashCal.pm          Tobias               Unterstützende Dienste
 FHEM/98_alarmclock.pm        FlorianZ             Unterstützende Dienste
 FHEM/98_apptime.pm           martinp876           Sonstiges
-FHEM/98_archetype.pm         igami                Automatisierung
+FHEM/98_archetype.pm         orphan/Beta-User     Automatisierung https://forum.fhem.de/index.php/topic,125930.0.html
 FHEM/98_ArduCounter.pm       StefanStrobel        Sonstiges
 FHEM/98_autocreate.pm        rudolfkoenig         Automatisierung
 FHEM/98_average.pm           rudolfkoenig         Automatisierung
@@ -483,7 +500,7 @@ FHEM/98_DOIF.pm              damian-s             Automatisierung/DOIF
 FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        Sonstige Systeme
 FHEM/98_dummy.pm             rudolfkoenig         Automatisierung
-FHEM/98_DSBMobile 			 KernSani 			  https://forum.fhem.de/index.php/topic,107104.0.html
+FHEM/98_DSBMobile 			 KernSani 			  Codeschnipsel https://forum.fhem.de/index.php/topic,107104.0.html
 FHEM/98_expandJSON.pm        dev0                 Unterstützende Dienste
 FHEM/98_feels_like.pm        hotbso               Wettermodule
 FHEM/98_fhemdebug.pm         rudolfkoenig         Sonstiges
@@ -497,6 +514,7 @@ FHEM/98_GoogleAuth.pm        betateilchen         Unterstützende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
+FHEM/98_HMtemplate.pm        martinp876           HomeMatic
 FHEM/98_HourCounter.pm       john                 MAX
 FHEM/98_HTTPMOD.pm           StefanStrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
@@ -504,10 +522,11 @@ FHEM/98_IF.pm                damian-s             Automatisierung
 FHEM/98_inotify.pm           marvin78             Automatisierung
 FHEM/98_Installer.pm         loredo               Unterstützende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
+FHEM/98_JsonMod.pm           herrmannj            Automatisierung
 FHEM/98_livetracking.pm      markus-m             Unterstützende Dienste
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
 FHEM/98_search.pm            loredo               Unterstützende Dienste
-FHEM/98_MAX_Temperature.pm   Wzut/Bismosa	  MAX
+FHEM/98_MAX_Temperature.pm   Wzut/Bismosa         MAX
 FHEM/98_MaxScanner.pm        john                 MAX
 FHEM/98_MediaList.pm         Tobias               Multimedia
 FHEM/98_Modbus.pm            StefanStrobel        Sonstiges
@@ -515,17 +534,17 @@ FHEM/98_ModbusAttr.pm        StefanStrobel        Sonstiges
 FHEM/98_ModbusElsnerWS.pm    klaus.schauer        Sonstiges
 FHEM/98_ModbusSET.pm         StefanStrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
-FHEM/98_monitoring.pm        igami                Automatisierung
+FHEM/98_monitoring.pm        Beta-User            Automatisierung
 FHEM/98_notice.pm            mfr69bs              Sonstiges
 FHEM/98_PHC.pm               StefanStrobel        Sonstiges
 FHEM/98_PID20.pm             John                 Automatisierung
 FHEM/98_pilight.pm           andreas-fey          Unterstützende Dienste
 FHEM/98_ping                 mattwire             Sonstiges
-FHEM/98_powerMap             igami                Unterstützende Dienste
+FHEM/98_powerMap             rudolfkoenig/orphan  Unterstützende Dienste
 FHEM/98_QRCode.pm            Benni                Unterstützende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
 FHEM/98_RandomTimer.pm       Beta-User            Unterstützende Dienste/Kalendermodule
-FHEM/98_readingsWatcher	     Wzut		  Sonstiges
+FHEM/98_readingsWatcher	     Wzut                 Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
 FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
 FHEM/98_serviced.pm          DeeSPe               Unterstützende Dienste
@@ -534,6 +553,7 @@ FHEM/98_structure.pm         rudolfkoenig         Automatisierung
 FHEM/98_SVG.pm               rudolfkoenig         Frontends/SVG/Plots/logProxy
 FHEM/98_systemd_watchdog.pm  hexenmeister         Unterstützende Dienste
 FHEM/98_telnet.pm            rudolfkoenig         Automatisierung
+FHEM/98_template.pm          neubert              Sonstiges
 FHEM/98_Text2Speech.pm       Tobias               Unterstützende Dienste
 FHEM/98_THRESHOLD.pm         damian-s             Automatisierung
 FHEM/98_todoist.pm           marvin78             Unterstützende Dienste
@@ -541,11 +561,12 @@ FHEM/98_TRAFFIC.pm           jmike                Unterstützende Dienste
 FHEM/98_UbiquitiMP.pm        Wzut                 Sonstige Systeme
 FHEM/98_UbiquitiOut.pm       Wzut                 Sonstige Systeme
 FHEM/98_update.pm            rudolfkoenig         Sonstiges
+FHEM/98_uptime.pm            betateilchen         Sonstiges
 FHEM/98_Verkehrsinfo.pm      martins              Unterstützende Dienste
 FHEM/98_version.pm           markusbloch          Sonstiges
 FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
-FHEM/98_WeekdayTimer.pm      Beta-User            Unterstützende Dienste
+FHEM/98_WeekdayTimer.pm      Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_weekprofile.pm       risiko               Frontends
 FHEM/98_WOL.pm               KernSani             Unterstützende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
@@ -563,7 +584,7 @@ FHEM/HMCCUConf.pm            zap                  HomeMatic
 FHEM/HMConfig.pm             martinp876           HomeMatic
 FHEM/HOMESTATEtk.pm          loredo               Automatisierung
 FHEM/HttpUtils.pm            rudolfkoenig         Automatisierung
-FHEM/MaxCommon.pm            Wzut		  MAX
+FHEM/MaxCommon.pm            Wzut                 MAX
 FHEM/Meta.pm                 loredo               FHEM Development
 FHEM/msgSchema.pm            loredo               Automatisierung
 FHEM/ONKYOdb.pm              delmar               Multimedia
@@ -583,30 +604,32 @@ FHEM/TR064Utils.pm           rudolfkoenig         Automatisierung
 FHEM/UConv.pm                loredo               FHEM Development
 FHEM/Unit.pm                 loredo               FHEM Development
 FHEM/WMBus.pm                kaihs                Sonstige Systeme
+FHEM/Winservice.pm           rudolfkoenig         Sonstige Systeme
+FHEM/ZWLib.pm                rudolfkoenig         ZWave
+FHEM/myUtilsTemplate.pm      rudolfkoenig         Sonstige Systeme
 FHEM/wundergroundAPI.pm      loredo               Unterstützende Dienste/Wettermodule
 FHEM/YahooWeatherAPI.pm      neubert              (deprecated)
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
 FHEM/holiday/*               betateilchen         Sonstiges
 FHEM/lib/*deviceconfig.xml.gz        krikan       ZWave
 FHEM/lib/*manufacturer_specific.xml  krikan       ZWave
-FHEM/lib/AttrTemplate/huedevice.template Shojo    https://forum.fhem.de/index.php/topic,101829.html
-FHEM/lib/AttrTemplate/httpmod.template amenomade  https://forum.fhem.de/index.php/topic,97694.0.html
-FHEM/lib/AttrTemplate/mqtt2.template Beta-User/Otto123    https://forum.fhem.de/index.php/topic,94494.0.html
+FHEM/lib/AttrTemplate/huedevice.template Shojo    Zigbee https://forum.fhem.de/index.php/topic,101829.html
+FHEM/lib/AttrTemplate/httpmod.template amenomade  Sonstiges https://forum.fhem.de/index.php/topic,97694.0.html
+FHEM/lib/AttrTemplate/mqtt2.template Beta-User/Otto123 MQTT https://forum.fhem.de/index.php/topic,94494.0.html
 FHEM/lib/AttrTemplate/mysensors.template Beta-User Bastelecke/MySensors
-FHEM/lib/Device/Firmata/*    jensb                Sonstige Systeme
-FHEM/lib/Device/MySensors/*  Beta-User            Bastelecke/MySensors
 FHEM/lib/MP3/*               Reinerlein           Multimedia
-FHEM/lib/Net/MQTT.pod        hexenmeister         MQTT
-FHEM/lib/Net/MQTT/*          hexenmeister         MQTT
 FHEM/lib/ProtoThreads.pm     ntruchsess           FHEM Development
 FHEM/lib/SHC_packet_layout.xml  rr2000            Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
-lib/FHEM/Core/Timer/Helper.pm sidey79             FHEM Development
+lib/FHEM/Core/Timer/Helper.pm    sidey79          FHEM Development
+lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
 lib/FHEM/SynoModules/API.pm      DS_Starter       Sonstiges
 lib/FHEM/SynoModules/SMUtils.pm  DS_Starter       Sonstiges
 lib/FHEM/SynoModules/ErrCodes.pm DS_Starter       Sonstiges
+lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
+lib/FHEM/Utility/CTZ.pm          DS_Starter       Sonstiges
 
 contrib/sacha_gloor/*        rudolfkoenig/orphan  Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
@@ -618,7 +641,7 @@ contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
 contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
-contrib/AttrTemplate/99_sonos2mqttUtils.pm Otto123 https://forum.fhem.de/index.php/topic,111711
+contrib/AttrTemplate/99_sonos2mqttUtils.pm Otto123 MQTT
 contrib/commandref*          rudolfkoenig         Sonstiges
 contrib/pre-commit           rudolfkoenig         Sonstiges
 contrib/DEBIAN/*             betateilchen         Sonstiges
@@ -631,6 +654,7 @@ contrib/META.json.full.txt   loredo               FHEM Development
 contrib/META.json.txt        loredo               FHEM Development
 contrib/PRESENCE             markusbloch          Unterstützende Dienste
 contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
+contrib/RHASSPY/*            drhirn/Beta-User     Frontends/Sprachsteuerung
 contrib/SIP/*                Wzut                 Sonstiges
 contrib/WebViewControl/*     Dirk                 Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          Frontends

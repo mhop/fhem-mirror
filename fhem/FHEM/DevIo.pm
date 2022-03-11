@@ -19,8 +19,19 @@ sub
 DevIo_setStates($$)
 {
   my ($hash, $val) = @_;
-  $hash->{STATE} = $val;
   setReadingsVal($hash, "state", $val, TimeNow());
+  if($hash->{devioNoSTATE}) {
+    evalStateFormat($hash);
+  } else {
+    $hash->{STATE} = $val;
+  }
+}
+
+sub
+DevIo_getState($)
+{
+  my ($hash) = @_;
+  return ReadingsVal($hash->{NAME}, "state", "disconnected")
 }
 
 ########################
@@ -67,6 +78,13 @@ DevIo_SimpleRead($)
 {
   my ($hash) = @_;
   my $buf = DevIo_DoSimpleRead($hash);
+
+  if(length($buf) == 0 && $! == EWOULDBLOCK && $hash->{SSL} && $hash->{TCPDev}) {
+    my $es = $hash->{TCPDev}->errstr;
+    $hash->{wantWrite} = 1 if($es == &IO::Socket::SSL::SSL_WANT_WRITE);
+    $hash->{wantRead}  = 1 if($es == &IO::Socket::SSL::SSL_WANT_READ);
+    return "";
+  }
 
   ###########
   # Lets' try again: Some drivers return len(0) on the first read...
@@ -213,7 +231,10 @@ DevIo_DecodeWS($$)
 
   # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
   Log3 $hash, 5, "Websocket msg: OP:$op LEN:$len MASK:$mask FIN:$fin";
-  if($op == 8) {         # Close
+  if($op == 1) {              # Text
+    $data = Encode::decode('UTF-8', $data) if($unicodeEncoding);
+
+  } elsif($op == 8) {         # Close
     my $clCode = unpack("n", substr($data,0,2));
     $clCode = "$clCode ($wsCloseCode{$clCode})" if($wsCloseCode{$clCode});
     $clCode .= " ".substr($data, 2) if($len > 2);
@@ -250,7 +271,7 @@ DevIo_SimpleWrite($$$;$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  Log3 ($name, 5, $type ? "SW: $msg" : "SW: ".unpack("H*",$msg));
+  Log3 $name, 5, "DevIo_SimpleWrite $name: ".($type ? $msg : unpack("H*",$msg));
 
   $msg = pack('H*', $msg) if($type && $type == 1);
   $msg .= "\n" if($addnl);
@@ -258,7 +279,10 @@ DevIo_SimpleWrite($$$;$)
     $hash->{USBDev}->write($msg);
 
   } elsif($hash->{TCPDev}) {
-    $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg) if($hash->{WEBSOCKET});
+    if($hash->{WEBSOCKET}) {
+      $msg = Encode::encode('UTF-8', $msg) if($unicodeEncoding && !$hash->{binary});
+      $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg)
+    }
     syswrite($hash->{TCPDev}, $msg);
 
   } elsif($hash->{DIODev}) { 
@@ -281,7 +305,7 @@ DevIo_Expect($$$)
   my ($hash, $msg, $timeout) = @_;
   my $name= $hash->{NAME};
   
-  my $state= $hash->{STATE};
+  my $state= DevIo_getState($hash);
   if($state ne "opened") {
     Log3 $name, 2, "Attempt to write to $state device.";
     return undef;

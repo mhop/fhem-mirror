@@ -154,18 +154,18 @@ setreading DEVICE attrTemplateVersion 20201206
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,107189.msg1055334.html#msg1055334
 name:fuel_oil_check_heizoel24
 filter:TYPE=HTTPMOD
-desc: checks fuel oil prices via heizoel24.de<br />Define a HTTPMOD device like<br />https://www.heizoel24.de/heizoelpreise-direkt/%%PLZ%%/%%MENGE%%/%%ENTLADESTELLEN%% 3600<br />Maintain Attributes for ZIP (PLZ), order volume (Bestellmenge) and unloading points (Entladestellen) before senseful values can be retrieved.<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,107189.msg1055334.html#msg1055334">this FHEM forum thread</a>
+desc: checks fuel oil prices via heizoel24.de<br />Define a HTTPMOD device like<br />https://www.heizoel24.de/DailyPriceXml.ashx?zipcode=%%PLZ%%&litre=%%MENGE%%&unloadingpoints=%%ENTLADESTELLEN%%&oilgrade=standard 3600<br />Maintain Attributes for ZIP (PLZ), order volume (Bestellmenge) and unloading points (Entladestellen) before senseful values can be retrieved.<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,107189.msg1163471.html#msg1163471">this FHEM forum thread</a>
 order:FUEL04
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
 par:ZIPCODE;German ZIP Code / deutsche Postleitzahl; {AttrVal("DEVICE","replacement01Value",undef)}
 par:ORDERVOLUME;fuel order volume in litre / Bestellmenge in Liter; {AttrVal("DEVICE","replacement02Value",undef)}
-defmod DEVICE HTTPMOD https://www.heizoel24.de/heizoelpreise-direkt/%%PLZ%%/%%MENGE%%/%%ENTLADESTELLEN%% INTERVAL
+defmod DEVICE HTTPMOD https://www.heizoel24.de/DailyPriceXml.ashx?zipcode=%%PLZ%%&litre=%%MENGE%%&unloadingpoints=%%ENTLADESTELLEN%%&oilgrade=standard INTERVAL
 attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value:1,2,3,4,5,6,7,8,9,10
 attr DEVICE enableControlSet 1
 attr DEVICE reading010Name Heizoelpreis
 attr DEVICE reading010OExpr $val =~ s/,/\./; $val;
-attr DEVICE reading010Regex <span class="unitprice">([\d\,]+)[\s]+<span
+attr DEVICE reading010Regex ([\d\,]+)<\/price
 attr DEVICE replacement01Mode text
 attr DEVICE replacement01Regex %%PLZ%%
 attr DEVICE replacement01Value ZIPCODE
@@ -178,13 +178,14 @@ attr DEVICE replacement03Value 1
 attr DEVICE room WHICHROOM
 attr DEVICE stateFormat {	my $price = 0.0;\
 	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;\
-	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));\
+	my $lastCheck = ReadingsTimestamp($name,"Heizoelpreis","");\
 	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";\
-	my $link = "https://www.heizoel24.de/heizoelpreise-direkt";\
-		$link .= "/".AttrVal($name,"replacement01Value","");\
-		$link .= "/".AttrVal($name,"replacement02Value","");\
-		$link .= "/".AttrVal($name,"replacement03Value","");\
-	$ret .= "&nbsp;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;\">";\
+	my $link = "https://www.heizoel24.de/heizoel/angebotsliste?";\
+		$link .= "zipCode=".AttrVal($name,"replacement01Value","");\
+		$link .= "&amount=".AttrVal($name,"replacement02Value","");\
+		$link .= "&stations=".AttrVal($name,"replacement03Value","");\
+		$link .= "&product=1";\
+	$ret .= "&nbsp;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;;\">";\
 	$ret .= ReadingsVal($name,"Heizoelpreis","-");\
 	$ret .= "&euro;</a>/100l";\
 	$ret .= "&nbsp;(".AttrVal($name,"replacement02Value","0")."l = ";\
@@ -194,8 +195,8 @@ attr DEVICE stateFormat {	my $price = 0.0;\
 }
 attr DEVICE timeout 10
 attr DEVICE webCmd reread
-attr DEVICE model fuel_oil_check_heizoel24
-setreading DEVICE attrTemplateVersion 20201206
+attr DEVICE model fuel_oil_check_heizoel24_v2
+setreading DEVICE attrTemplateVersion 20210626
 
 #German weather warnings from DWD, Forum: https://forum.fhem.de/index.php/topic,45176.msg905879.html#msg905879
 name:DWD_weather_warnings

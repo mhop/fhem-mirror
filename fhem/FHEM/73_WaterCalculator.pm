@@ -8,7 +8,7 @@
 #     Written and best viewed with Notepad++ v.6.8.6; Language Markup: Perl
 #	  This is based on "ElectricityCalulator" from Matthias Deeke. All rights to him.
 #
-#     Author                     : Matthias Deeke; Jürgen Brugger 
+#     Author                     : Matthias Deeke; J&uuml;rgen Brugger 
 #     e-mail                     : matthias.deeke(AT)deeke(DOT)eu; juergen.brugger(AT)gmail(DOT)com
 #     Fhem Forum                 : https://forum.fhem.de/index.php?topic=58579.0;topicseen
 #     Fhem Wiki                  : Not yet implemented
@@ -54,6 +54,7 @@ use strict;
 use warnings;
 use Time::Local;
 use FHEM::Meta;
+use Data::Dumper;
 my %WaterCalculator_gets;
 my %WaterCalculator_sets;
 
@@ -422,7 +423,7 @@ sub WaterCalculator_Set($@)
 		$attr{$WaterCalcName}{WaterCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $WaterCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $WaterCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " " . $attr{$hash}{WFRUnit};
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
@@ -455,29 +456,41 @@ sub WaterCalculator_MidnightTimer($)
 	my ($WaterCountName, $WaterCountReadingRegEx) = split(":", $RegEx, 2);
 	my $WaterCountDev							  = $defs{$WaterCountName};
 	$WaterCountReadingRegEx						  =~ s/[\.\*]+$//;
+	$WaterCountReadingRegEx						  =~ s/[:]+$//;
 	my $WaterCountReadingRegExNeg				  = $WaterCountReadingRegEx . "_";
 
 	my @WaterCountReadingNameListComplete = keys(%{$WaterCountDev->{READINGS}});
 	my @WaterCountReadingNameListFiltered;
 
 	### Create Log entries for debugging purpose
-	Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegEx        : " . $WaterCountReadingRegEx;
-	Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegExNeg     : " . $WaterCountReadingRegExNeg;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer WaterCountName      : " . $WaterCountName;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer RegEx               : " . $RegEx;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegEx        : " . $WaterCountReadingRegEx;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegExNeg     : " . $WaterCountReadingRegExNeg;
 
 	### If no RegEx is available, leave routine
 	if (($WaterCountReadingRegEx eq "") || ($WaterCountReadingRegExNeg eq "")) { 
-		Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
-		Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegEx        : " . $WaterCountReadingRegEx;
-		Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegExNeg     : " . $WaterCountReadingRegExNeg;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegEx        : " . $WaterCountReadingRegEx;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegExNeg     : " . $WaterCountReadingRegExNeg;
 		return;
 	}
 	
-	foreach my $WaterCountReadingName (@WaterCountReadingNameListComplete) {
-		if (($WaterCountReadingName =~ m[$WaterCountReadingRegEx]) && ($WaterCountReadingName !~ m[$WaterCountReadingRegExNeg])) {
-			push(@WaterCountReadingNameListFiltered, $WaterCountReadingName);
+	### Check whether system failure threat is given or log error message
+	eval {
+		### For each valid RegEx entry given in the list of existing devices
+		foreach my $WaterCountReadingName (@WaterCountReadingNameListComplete) {
+			if (($WaterCountReadingName =~ m[$WaterCountReadingRegEx]) && ($WaterCountReadingName !~ m[$WaterCountReadingRegExNeg])) {
+				push(@WaterCountReadingNameListFiltered, $WaterCountReadingName);
+			}
 		}
-	}
-
+		1;
+	} or do {
+		my $ErrorMessage = $@;
+		Log3 $WaterCalcName, 2, $WaterCalcName. " : Something went wrong with the RegEx : " . $ErrorMessage;
+		return;
+	};
+	
 	### Create Log entries for debugging purpose
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer__________________________________________________________";
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : MidnightTimer initiated";
@@ -1445,7 +1458,7 @@ sub WaterCalculator_Notify($$)
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYear          </code></li></td><td> : Wasserverbrauch seit Beginn des aktuellen Kalenderjahres.                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYearLast      </code></li></td><td> : Wasserverbrauch in qm des vorherigen Kalenderjahres.                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve           </code></li></td><td> : Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Wasserversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.                                                                                                                                                                  <BR>     </ul></ul></td></tr>
-		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading        </code></li></td><td> : Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading        </code></li></td><td> : Anzahl der Monate seit der letzten Z&auml;hlerablesung. Der Monat der Z&auml;hlerablesung ist der erste Monat = 1.                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRCurrent               </code></li></td><td> : Aktueller Wasserdurchsatz. (Wasserdurchsatz basierend auf aktueller und letzter Messung)                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayAver               </code></li></td><td> : Mittlerer Wasserdurchsatz seit Mitternacht.                                                                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMax                </code></li></td><td> : Maximale Wasserdurchsatz seit Mitternacht.                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>

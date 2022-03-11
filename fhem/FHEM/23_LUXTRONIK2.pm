@@ -3,6 +3,7 @@
 #
 #  23_LUXTRONIK2.pm 
 #
+#  (c) 2020-2021 Thomas Heiser
 #  (c) 2012-2017 Torsten Poitzsch
 #  (c) 2012-2013 Jan-Hinrich Fessel (oskar at fessel . org)
 #
@@ -52,8 +53,8 @@ sub LUXTRONIK2_readData ($);
 
 
 #List of firmware versions that are known to be compatible with this modul
-my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#";
-my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#";
+my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#V1.86.2#";
+my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#V1.86.2#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -240,7 +241,7 @@ LUXTRONIK2_Set($$@)
    }
 
   #Check Firmware and Set-Parameter-lock 
-  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater|opModeVentilation)$/i ) 
+  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater|opModeVentilation|opModeHeating)$/i ) 
    {
     my $firmware = ReadingsVal($name,"firmware","");
     my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
@@ -277,6 +278,7 @@ LUXTRONIK2_Set($$@)
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
             || $cmd eq 'opModeVentilation'
+            || $cmd eq 'opModeHeating'
             || $cmd eq 'returnTemperatureHyst'
             || $cmd eq 'returnTemperatureSetBack'
             || $cmd eq 'heatingCurveEndPoint'
@@ -292,14 +294,15 @@ LUXTRONIK2_Set($$@)
    }
    # Einstellung->Entlüftung
    elsif( int(@_)==4 && 
-          ( $cmd eq 'hotWaterCircPumpDeaerate' || $cmd eq 'heatingSystemCircPumpDeaerate' ) ) { 
+          ( $cmd eq 'hotWaterCircPumpDeaerate' || $cmd eq 'heatingSystemCircPumpDeaerate' || $cmd eq 'ventBOSUPCircPumpDeaerate' ) ) { 
         Log3 $name, 3, "set $name $cmd $val";
         return "$name Error: Wrong parameter given - use on,off"     if $val !~ /on|off/;
         $hash->{LOCAL} = 1;
         $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
         if( $val eq "on" 
             || ReadingsVal( $name, "heatingSystemCircPumpDeaerate", "off" ) eq "on"
-            || ReadingsVal( $name, "hotWaterCircPumpDeaerate", "off" ) eq "on" ) {    
+            || ReadingsVal( $name, "hotWaterCircPumpDeaerate", "off" ) eq "on"
+            || ReadingsVal( $name, "ventBOSUPCircPumpDeaerate", "off" ) eq "on" ) {    
           $resultStr .= LUXTRONIK2_SetParameter ($hash, "runDeaerate", 1);    
         } 
         # only send "0" if no Deaerate checkbox is selected at all.   
@@ -316,6 +319,7 @@ LUXTRONIK2_Set($$@)
           ." heatingCurveEndPoint"
           ." heatingCurveOffset"
           ." heatingSystemCircPumpDeaerate:on,off"
+          ." ventBOSUPCircPumpDeaerate:on,off"
           ." heatSourceDefrostAirEnd"
           ." heatSourceDefrostAirThreshold"
           ." hotWaterCircPumpDeaerate:on,off"
@@ -325,6 +329,7 @@ LUXTRONIK2_Set($$@)
           ." returnTemperatureSetBack "
           ." opModeHotWater:Auto,Party,Off"
           ." opModeVentilation:Auto,Off"
+          ." opModeHeating:Auto,Party,Off"
           ." synchronizeClockHeatPump:noArg"
           ." INTERVAL ";
           
@@ -623,6 +628,8 @@ sub LUXTRONIK2_DoUpdate($)
   $return_str .= "|".($heatpump_visibility[4]==1 ? $heatpump_parameters[894] : "no");;
   # 80 - heatingSystemCircPumpDeaerate
   $return_str .= "|". ($heatpump_visibility[161]==1 ? $heatpump_parameters[678] : "no");
+  # 81 - ventBOSUPCircPumpDeaerate
+  $return_str .= "|". ($heatpump_visibility[161]==1 ? $heatpump_parameters[681] : "no");
   
    return $return_str;
 }
@@ -1059,6 +1066,7 @@ LUXTRONIK2_UpdateDone($)
    # Deaerate Function
      readingsBulkUpdate( $hash, "hotWaterCircPumpDeaerate",$a[61]?"on":"off")    unless $a[61] eq "no";
      readingsBulkUpdate( $hash, "heatingSystemCircPumpDeaerate",$a[80]?"on":"off")    unless $a[80] eq "no";
+     readingsBulkUpdate( $hash, "ventBOSUPCircPumpDeaerate",$a[81]?"on":"off")    unless $a[81] eq "no";
 
    # bivalentLevel
      readingsBulkUpdate($hash,"bivalentLevel",$a[43]);
@@ -1478,6 +1486,14 @@ sub LUXTRONIK2_SetParameter ($$$)
      $setParameter = 894;
      $setValue = $opVentMode{$realValue};
   }
+
+  elsif ($parameterName eq "opModeHeating") {
+    if (! exists($opMode{$realValue})) {
+      return "$name Error: Wrong parameter given for opModeHeating, use Automatik,Off"
+     }
+     $setParameter = 3;
+     $setValue = $opMode{$realValue};
+  }
   
   elsif ($parameterName eq "returnTemperatureHyst") {
      #parameter number
@@ -1507,6 +1523,10 @@ sub LUXTRONIK2_SetParameter ($$$)
    }
    elsif ($parameterName eq "hotWaterCircPumpDeaerate") { #isVisible(167) 
      $setParameter = 684;
+     $setValue = $realValue eq "on" ? 1 : 0;
+   }
+   elsif ($parameterName eq "ventBOSUPCircPumpDeaerate") { #isVisible(167) 
+     $setParameter = 681;
      $setValue = $realValue eq "on" ? 1 : 0;
    }
    elsif ($parameterName eq "runDeaerate") {
@@ -2294,6 +2314,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          <br>
          NOTE! It uses the deaerate function of the controller. So, the pump alternates always 5 minutes on and 5 minutes off.
          </li><br>
+      <li><code>ventBOSUPCircPumpDeaerate &lt;on | off&gt;</code><br>
+         Switches the BOSUP circuit circulation pump on or off.
+         <br>
+         NOTE! It uses the deaerate function of the controller. So, the pump alternates always 5 minutes on and 5 minutes off.
+         </li><br>
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in °C
          </li><br>
@@ -2302,6 +2327,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
        <li><code>opModeVentilation &lt;Mode&gt;</code><br>
          Operating Mode of Ventilation (Auto | Off)
+         </li><br>
+       <li><code>opModeHeating &lt;Mode&gt;</code><br>
+         Operating Mode of Heating (Auto | Off)
          </li><br>
      <li><code>resetStatistics &lt;statReadings&gt;</code>
          <br>
@@ -2457,6 +2485,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          <br>
          Achtung! Es wird die Entlüftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
          </li><br>
+      <li><code>ventBOSUPCircPumpDeaerate &lt;on | off&gt;</code><br>
+         Schaltet die Umwälzpumpe des BOSUP an oder aus.
+         <br>
+         Achtung! Es wird die Entlüftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
+         </li><br>
      <li><code>hotWaterTemperatureTarget &lt;Temperatur&gt;</code>
          <br>
          Soll-Temperatur des Heißwasserspeichers in °C
@@ -2468,6 +2501,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       <li><code>opModeVentilation &lt;Betriebsmodus&gt;</code>
          <br>
          Betriebsmodus der Lueftung ( Auto | Off )
+         </li><br>
+      <li><code>opModeHeating &lt;Betriebsmodus&gt;</code>
+         <br>
+         Betriebsmodus der Heizung ( Auto | Off )
          </li><br>
      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>

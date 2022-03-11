@@ -22,6 +22,8 @@ order:Z00001
 desc:template to set associatedWith reading for multichannel devices; call e.g. with CHANNELS=4.
 par:CHANNELS;CHANNELS: Nr. of channels to configure, defaults to 2;{ 2 }
 par:MAKECOPIES;MAKECOPIES: boolean, if set, device will be copied to other channel devices , defaults to 0;{ 0 }
+par:IODEVATTR;IODEVATTR: attribute value if set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) }
+par:IODEVREADING;IODEVREADING: reading value if set and no attribute is set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) ? 0 : ReadingsVal('DEVICE','IODev',0)}
 
 # 2 channels
 option:{return 1 if CHANNELS==2 && MAKECOPIES==1;;return 0}
@@ -99,7 +101,7 @@ setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5
 
 # 8 channels
-option:{return 1 if CHANNELS==8 && MAKECOPIES==1;;return 0}
+option:{return 1 if CHANNELS==8 && MAKECOPIES==1;return 0}
 copy DEVICE DEVICE_CH2
 copy DEVICE DEVICE_CH3
 copy DEVICE DEVICE_CH4
@@ -124,8 +126,21 @@ setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
 setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
 setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
-
 option:{1}
 show DEVICE.*
 
 
+#####
+name:set_IODev_in_channels
+filter:NAME=speechrecognTesting
+order:Z00002
+desc:template to set attribute IODev or reading IODev for multichannel devices; call e.g. with set xyz attrTemplate set_IODev_in_channels SUBCHANNELS=DEVICE.
+par:SUBCHANNELS;SUBCHANNELS: Regex for devices to copy value to, defaults to DEVICE_CH.*;{ undef }
+par:IODEVATTR;IODEVATTR: attribute value if set, will be copied to other channel devices, defaults to 0;{ AttrVal('DEVICE','IODev',0) }
+par:IODEVREADING;IODEVREADING: reading value if set and no attribute is set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) ? 0 : ReadingsVal('DEVICE','IODev',0)}
+
+option:{ return 0 if "IODEVATTR" eq "0"; return 1 }
+attr SUBCHANNELS IODev IODEVATTR
+
+option:{ return 0 if "IODEVREADING" eq "0"; return 1 }
+setreading SUBCHANNELS IODev IODEVREADING

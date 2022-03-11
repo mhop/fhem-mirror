@@ -224,8 +224,9 @@ SISPM_Undef($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
 
-  if(defined($hash->{FD})) {
-      close($hash->{FD});
+  if(defined($hash->{FH})) {
+      close($hash->{FH});
+      delete $hash->{FH};
       delete $hash->{FD};
   }
   delete $selectlist{"$name.pipe"};
@@ -263,7 +264,8 @@ SISPM_GetStatus($)
 	return "SISPM Can't open pipe: $dev: $!";
     }
 
-    $hash->{FD}=$FH;
+    $hash->{FD}=fileno($FH);
+    $hash->{FH}=$FH;	
     $selectlist{"$name.pipe"} = $hash;
     Log 4, "SISPM pipe opened";
     $hash->{STATE} = "running";
@@ -293,7 +295,7 @@ SISPM_Read($)
 	Log 3, "Oops, SISPM FD empty";
 	return undef;
     }
-    $FH = $hash->{FD};
+    $FH = $hash->{FH};
 
     Log 4, "SISPM reading started";
 
@@ -434,6 +436,7 @@ SISPM_Read($)
 
     if($eof) {
 	close($FH);
+	delete $hash->{FH};
 	delete $hash->{FD};
 	delete $selectlist{"$name.pipe"};
 	InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);

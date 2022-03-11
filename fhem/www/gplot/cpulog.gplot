@@ -4,6 +4,7 @@
 # We need a fake FileLog definition: 
 # define cpulog FileLog test2/temperature-history cpufake
 
+set readonly
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

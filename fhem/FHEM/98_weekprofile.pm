@@ -12,10 +12,8 @@ use strict;
 use warnings;
 
 use JSON;         #libjson-perl
-use Data::Dumper;
 use Time::HiRes qw(gettimeofday);
 use Storable qw(dclone);
-use List::Util qw[min max];
 
 use vars qw(%defs);
 use vars qw($FW_ME);
@@ -31,7 +29,7 @@ my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
 my %LAST_SEND;
 
-my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","weekprofile","dummyWT","WeekdayTimer","MQTT2_DEVICE");
+my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","HMCCUCHN","weekprofile","dummyWT","WeekdayTimer","MQTT2_DEVICE");
 
 my $CONFIG_VERSION = "1.1";
 
@@ -54,7 +52,8 @@ $DEV_READINGS{"Fri"}{"CUL_HM"} = "6_tempListFri";
 $DEV_READINGS{"Sat"}{"CUL_HM"} = "0_tempListSat";
 $DEV_READINGS{"Sun"}{"CUL_HM"} = "1_tempListSun";
 
-# HMCCUDEV HMIP
+# TYPE=HMCCUDEV or HMCCUCHN
+# ccutype=HmIP.*
 $DEV_READINGS{"Mon"}{"HMCCU_IP"} = "MONDAY";
 $DEV_READINGS{"Tue"}{"HMCCU_IP"} = "TUESDAY";
 $DEV_READINGS{"Wed"}{"HMCCU_IP"} = "WEDNESDAY";
@@ -63,7 +62,8 @@ $DEV_READINGS{"Fri"}{"HMCCU_IP"} = "FRIDAY";
 $DEV_READINGS{"Sat"}{"HMCCU_IP"} = "SATURDAY";
 $DEV_READINGS{"Sun"}{"HMCCU_IP"} = "SUNDAY";
 
-# HMCCUDEV HM
+# TYPE=HMCCUDEV or HMCCUCHN
+# ccutype = HM-.*
 $DEV_READINGS{"Mon"}{"HMCCU_HM"} = "MONDAY";
 $DEV_READINGS{"Tue"}{"HMCCU_HM"} = "TUESDAY";
 $DEV_READINGS{"Wed"}{"HMCCU_HM"} = "WEDNESDAY";
@@ -171,7 +171,7 @@ sub weekprofile_getDeviceType($$;$)
   elsif ( ($devType =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
-  elsif ( $devType =~ /HMCCUDEV/){
+  elsif ( $devType =~ /HMCCUDEV/ or $devType =~/HMCCUCHN/){
     my $readonly = AttrVal($device,"readOnly",0);
     if ($readonly) {
       Log3($me, 4, "$me(getDeviceType): $devHash->{NAME} is readonly - ignored");
@@ -184,9 +184,9 @@ sub weekprofile_getDeviceType($$;$)
       return undef if (!defined($model));
     }
     Log3($me, 5, "$me(getDeviceType): $devHash->{NAME}, $model");
-	$type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
+	  $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
     $type = "HMCCU_HM" if ( $model =~ m/HM-.*/ );
-  }
+  }  
 
   return $type if ($sndrcv eq "RCV");
   
@@ -459,7 +459,7 @@ sub weekprofile_sendDevProfile(@)
     eval { $prfData = $json->decode($json_text) };
   }
   
-  my $cmd;
+  my $cmd="";
   if($type eq "MAX") {
     $cmd = "set $device weekProfile ";
     foreach my $day (@dayToTransfer){
@@ -490,13 +490,12 @@ sub weekprofile_sendDevProfile(@)
       $k++;
     }
   } elsif ($type =~ /HMCCU.*/){ 
-    $cmd .= "set $device config" if ($type eq "HMCCU_HM");
+    $cmd .= "set $device config device" if ($type eq "HMCCU_HM");
     $cmd .= "set $device config 1" if ($type eq "HMCCU_IP");
     my $k=0;
     my $dayCnt = scalar(@dayToTransfer);
     my $prefix = weekprofile_get_prefix_HM($device,"ENDTIME_SUNDAY_1",$me);
-    $prefix = "" if ($type eq "HMCCU_HM"); # no prefix by set see topic,46117.msg1104569.html#msg1104569
-    $prefix = ""; # TEST always no prefix by set #msg1113658 
+    $prefix = ""; # always no prefix by set #msg1113658 
     if (!defined($prefix)) {
       Log3($me, 3, "$me(sendDevProfile): no prefix found"); 
       $prefix = ""; 
@@ -510,6 +509,7 @@ sub weekprofile_sendDevProfile(@)
       for (my $i = 0; $i < $tmpCnt; $i++) {
         $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prfData->{$day}->{"temp"}[$i];
         $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prfData->{$day}->{"time"}[$i]);
+        $cmd .= ":" if ($type eq "HMCCU_HM"); # ':' after time see #msg1191311
       }
       $k++;
     }
@@ -566,6 +566,9 @@ sub weekprofile_refreshSendDevList($)
   
   splice(@{$hash->{SNDDEVLIST}});
   
+  my $useTopics = AttrVal($me,"useTopics",0);
+  Log3($me, 5, "$me(weekprofile_refreshSendDevList): start");
+  
   foreach my $d (keys %defs)   
   {
     next if ($defs{$d}{NAME} eq $me);
@@ -583,7 +586,12 @@ sub weekprofile_refreshSendDevList($)
     $dev->{NAME} = $defs{$d}{NAME};
     $dev->{ALIAS} = AttrVal($dev->{NAME},"alias",$dev->{NAME});
     
+    # add userattr weekprofile to device
+    # help of attr weekprofile will come from module weekprofile
+    addToDevAttrList($dev->{NAME},"weekprofile","weekprofile") if ($useTopics);
+    
     push @{$hash->{SNDDEVLIST}} , $dev;
+    Log3($me, 5, "$me(weekprofile_refreshSendDevList): add device $dev->{NAME}");
   }
   my $cnt = scalar(@{$hash->{SNDDEVLIST}});
   Log3($me, 5, "$me(weekprofile_refreshSendDevList): $cnt devices in list");
@@ -775,6 +783,8 @@ sub sort_by_name
 ############################################## 
 sub dumpData($$$) 
 {
+	require Data::Dumper;
+	
 	my ($hash,$prefix,$data) = @_;
 	
 	my $me = $hash->{NAME};	 
@@ -1390,7 +1400,7 @@ sub weekprofile_Attr($$$)
   return undef;
 }
 ############################################## 
-sub weekprofile_createTempMap($) {
+sub weekprofile_createTempMap($;$) {
     my ($hash, $attrMap) = @_;
     my $me = $hash->{NAME};
     
@@ -1511,8 +1521,9 @@ sub weekprofile_createTempList($) {
   }
   
   if (scalar(@values)>0) {
-    $defMin = min(@values);
-    $defMax = max(@values);
+    require List::Util;
+    $defMin = List::Util::min(@values);
+    $defMax = List::Util::max(@values);
   }
   my $attrRange = AttrVal($me, "widgetTempRange", "$defMin:$defMax:$defStep");
   my @rangV = split(':',$attrRange);
@@ -1752,22 +1763,25 @@ sub weekprofile_getEditLNK_MasterDev($$)
 }
 1;
 
+__END__
+
 =pod
+=encoding utf8
 =item summary    administration of weekprofiles
 =item summary_DE Verwaltung von Wochenprofilen
 
 =item helper
 =begin html
 
-<a name="weekprofile"></a>
+<a id="weekprofile"></a>
 <h3>weekprofile</h3>
 <ul>
   With this module you can manage and edit different weekprofiles. You can send the profiles to different devices.<br>
   Currently the following devices will by supported:<br>
   <li>MAX</li>
   <li>other weekprofile modules</li>
-  <li>Homematic channel _Clima or _Climate</li>
-  <li>Homematic via HMCCU and HM-IP)</li>
+  <li>Homematic via HM_CUL and channel _Clima or _Climate</li>
+  <li>Homematic via HMCCUDEV, HMCCUCHN)</li>
   <br>
   Additionally, also the following module types can be used as logical intermediates<br> 
   <li>WeekdayTimer</li>
@@ -1800,13 +1814,14 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <br>
   If the maste device is Homatic HM-TC-IT-WM-W-EU then only the first profile (R_P1_...) will be used!
   <br>
-  <b>For this module libjson-perl have to be installed</b>
+  <b>For this module <i>libjson-perl</i> have to be installed</b>
   <br><br>
+  <a id="weekprofile-events"></a>
   <b>Events:</b><br>
   Currently the following event will be created:<br>
   <li>PROFILE_TRANSFERED: if a profile or a part of a profile (changes) is send to a device</li>
   <li>PROFILES_SAVED: the profile are stored in the config file (also if there are no changes)</li>
-  <a name="weekprofiledefine"></a>
+  <a id="weekprofile-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; weekprofile [master device]</code><br>
@@ -1821,66 +1836,79 @@ sub weekprofile_getEditLNK_MasterDev($$)
     Without a master device a 'default' profile will be created
   </ul>
   
-  <a name="weekprofileset"></a>
+  <a id="weekprofile-set"></a>
   <b>Set</b>
   <ul>
+    <a id="weekprofile-set-profile_data"></a>
     <li>profile_data<br>
        <code>set &lt;name&gt; profile_data &lt;profilename&gt; &lt;json data&gt; </code><br>
        The profile 'profilename' will be changed. The data have to be in json format.
     </li>
+    <a id="weekprofile-set-send_to_device"></a>
     <li>send_to_device<br>
       <code>set &lt;name&gt; send_to_device &lt;profilename&gt; [devices] </code><br>
       The profile 'profilename' will be transfered to one or more the devices. Without the parameter device the profile 
       will be transferd to the master device. 'devices' is a comma seperated list of device names
     </li>
+    <a id="weekprofile-set-copy_profile"></a>
     <li>copy_profile<br>
       <code>set &lt;name&gt; copy_profile &lt;source&gt; &lt;destination&gt; </code><br>
       Copy from source to destination. The destination will be overwritten
     </li>
+    <a id="weekprofile-set-remove_profile"></a>
     <li>remove_profile<br>
       <code>set &lt;name&gt; remove_profile &lt;profilename&gt; </code><br>
       Delete profile 'profilename'.
     </li>
+    <a id="weekprofile-set-reference_profile"></a>
     <li>reference_profile<br>
       <code>set &lt;name&gt; reference_profile &lt;source&gt; &lt;destination&gt; </code><br>
       Create a reference from destination to source. The destination will be overwritten if it exits.
     </li>
+    <a id="weekprofile-set-restore_topic"></a>
     <li>restore_topic<br>
       <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
       All weekprofiles from the topic will be transfered to the correcponding devices.
       Therefore a user attribute 'weekprofile' with the weekprofile name <b>without the topic name</b> have to exist in the device.
     </li>
+    <a id="weekprofile-set-reread_master"></a>
     <li>reread_master<br>
-		Refresh (reread) the master profile from the master device.
+      Refresh (reread) the master profile from the master device.
     </li>
+    <a id="weekprofile-set-import_profile"></a>
     <li>import_profile<br>
     <code>set &lt;name&gt; import_profile &lt;device&gt; &lt;[profilename]&gt;</code><br>
-		Importing a profile from a supported device 
+        Importing a profile from a supported device 
     </li>
   </ul>
   
-  <a name="weekprofileget"></a>
+  <a id="weekprofile-get"></a>
   <b>Get</b>
   <ul>
+    <a id="weekprofile-get-profile_data"></a>
     <li>profile_data<br>
        <code>get &lt;name&gt; profile_data &lt;profilename&gt; </code><br>
        Get the profile data from 'profilename' in json-Format
     </li>
+    <a id="weekprofile-get-profile_names"></a>
     <li>profile_names<br>
       <code>set &lt;name&gt; profile_names [topicname]</code><br>
       Get a comma seperated list of weekprofile profile names from the topic 'topicname'
       If topicname is not set, 'default' will be used
       If topicname is '*', all weekprofile profile names are returned.
     </li>
+    <a id="weekprofile-get-profile_references"></a>
     <li>profile_references [name]<br>
       If name is '*', a comma seperated list of all references in the following syntax
       <code>ref_topic:ref_profile>dest_topic:dest_profile</code>
       are returned
       If name is 'topicname:profilename', '0' or the reference name is returned.
     </li>
+    <a id="weekprofile-get-topic_names"></a>
     <li>topic_names<br>
      Return a comma seperated list of topic names.
     </li>
+    <a id="weekprofile-get-associations"></a>
     <li>associations [ReturnType (0|1)]<br>
     Returns a list of supported devices with the associated profile.<br>
     ReturnType 0: HTML table</br>
@@ -1888,7 +1916,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
   </ul>
   
-  <a name="weekprofilereadings"></a>
+  <a id="weekprofile-readings"></a>
   <p><b>Readings</b></p>
   <ul>
     <li>active_topic<br>
@@ -1902,66 +1930,90 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
   </ul>
   
-  <a name="weekprofileattr"></a>
+  <a id="weekprofile-attr"></a>
   <b>Attributes</b>
   <ul>
+    <a id="weekprofile-attr-widgetTranslations"></a>
     <li>widgetTranslations<br>
     Comma seperated list of texts translations <german>:<translation>
     <code>attr name widgetTranslations Abbrechen:Cancel,Speichern:Save</code> 
     </li>
+    <a id="weekprofile-attr-widgetWeekdays"></a>
     <li>widgetWeekdays<br>
       Comma seperated list of week days starting at Monday
       <code>attr name widgetWeekdays Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday</code>
     </li>
+    <a id="weekprofile-attr-widgetEditOnNewPage"></a>
     <li>widgetEditOnNewPage<br>
       Editing the profile on a new html page if it is set to '1'
     </li>
+    <a id="weekprofile-attr-widgetEditDaysInRow"></a>
     <li>widgetEditDaysInRow<br>
     Count of visible days in on row during Edit. Default 2.<br>
     </li>
+    <a id="weekprofile-attr-widgetTempRange"></a>
     <li>widgetTempRange<br>
     Set the temperature range of the dropdown list in the FHEM widget
     Syntax: min:max:step e.g. 5:30:0.5
     </li>
+    <a id="weekprofile-attr-tempMap"></a>
     <li>tempMap<br>
     Temperature key value pair
-    Syntax: <key_1>:<value 1>,<key_2>:<value 2><br>
-    e.g. off:5.0,on:30.0
+    Syntax: <key_1>:<value 1>,<key_2>:<value 2> e.g. off:5.0,on:30.0
     </li>
+    <a id="weekprofile-attr-tempON"></a>
+    <li>tempON<br>
+    deprecated - please use tempMap
+    </li>
+    <a id="weekprofile-attr-tempOFF"></a>
+    <li>tempOFF<br>
+    deprecated - please use tempMap
+    </li>
+    <a id="weekprofile-attr-sendKeywordsToDevices"></a>
     <li>sendKeywordsToDevices<br>
     Send temperatur keywords instead of temparture values to device
     Default: 0
     </li>
+    <a id="weekprofile-attr-configFile"></a>
     <li>configFile<br>
       Path and filename of the configuration file where the profiles will be stored
       Default: ./log/weekprofile-<name>.cfg
     </li>
+    <a id="weekprofile-attr-icon"></a>
     <li>icon<br>
       icon for edit<br>
       Default: edit_settings
     </li>
+    <a id="weekprofile-attr-useTopics"></a>
     <li>useTopics<br>
       Enable topics.<br>
       Default: 0
     </li>
+    <a id="weekprofile-attr-sendDelay"></a>
     <li>sendDelay<br>
     Default: 0
     Delay in seconds between sending profile data the same type of device.
     This is usefull to avoid messages like "queue is full, dropping packet" by HM devices
     </li>
+    <a id="weekprofile-attr-forceCompleteProfile"></a>
     <li>forceCompleteProfile<br>
     Default: 0
     Force to send the complete profile to the device instead of only the changes.
     Possibility to resend a complete week profile
     </li>
+    <a id="weekprofile-attr-weekprofile"></a>
+    <li>weekprofile<br>    
+    This attribute can be a userattr of supported modules of weekprofile to receive a specific profile with the
+    defined name at the <i>restore_topic</i> command. See topics for further information    
+    </li>
+    
   </ul>
-  
 </ul>
 =end html
 
 =begin html_DE
 
-<a name="weekprofile"></a>
+<a id="weekprofile"></a>
 <h3>weekprofile</h3>
 <ul>
   Beschreibung im Wiki: http://www.fhemwiki.de/wiki/Weekprofile<br><br> 
@@ -1970,8 +2022,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   übertragen werden. Aktuell wird folgende Hardware unterstützt:
   <li>alle MAX Thermostate</li>
   <li>andere weekprofile Module</li>
-  <li>Homematic (Kanal _Clima bzw. _Climate)</li>
-  <li>Homematic via HMCCU und HM-IP</li>
+  <li>Homematic via CUL_HM (Kanal _Clima bzw. _Climate)</li>
+  <li>Homematic via HMCCUDEV und HMCCUCHN</li>
   <br>
   Weiter können die folgenden Modul-Typen als logische Zwischenschicht eingesetzt werden:<br> 
   <li>WeekdayTimer</li>
@@ -2003,13 +2055,14 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <br>
   Beim Homatic HM-TC-IT-WM-W-EU wird nur das 1. Profil (R_P1_...) genommen!
   <br>
-  <b>Für das Module wird libjson-perl benötigt</b>
+  <b>Für das Modul wird <i>libjson-perl</i> benötigt</b>
   <br><br>
+  <a id="weekprofile-events"></a>
   <b>Events:</b><br>
   Aktuell werden folgende Events erzeugt:<br>
   <li>PROFILE_TRANSFERED: wenn ein Profil oder Teile davon zu einem Gerät gesended wurden</li>
   <li>PROFILES_SAVED: wenn Profile in die Konfigurationsdatei gespeichert wurden (auch wenn es keine Änderung gab!)</li>
-  <a name="weekprofiledefine"></a>
+  <a id="weekprofile-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; weekprofile [master device]</code><br>
@@ -2024,56 +2077,67 @@ sub weekprofile_getEditLNK_MasterDev($$)
     Wird kein 'Master-Geräte' angegeben, wird ein 'default' Profil angelegt.
   </ul>
   
-  <a name="weekprofileset"></a>
+  <a id="weekprofile-set"></a>
   <b>Set</b>
   <ul>
+    <a id="weekprofile-set-profile_data"></a>
     <li>profile_data<br>
        <code>set &lt;name&gt; profile_data &lt;profilname&gt; &lt;json data&gt; </code><br>
        Es wird das Profil 'profilname' geändert. Die Profildaten müssen im json-Format übergeben werden.
     </li>
+    <a id="weekprofile-set-send_to_device"></a>
     <li>send_to_device<br>
       <code>set &lt;name&gt; send_to_device &lt;profilname&gt; [devices] </code><br>
       Das Profil wird an ein oder mehrere Geräte übertragen. Wird kein Gerät angegeben, wird das 'Master-Gerät' verwendet.
       'Devices' ist eine kommagetrennte Auflistung von Geräten
     </li>
+    <a id="weekprofile-set-copy_profile"></a>
     <li>copy_profile<br>
       <code>set &lt;name&gt; copy_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
       Kopiert das Profil 'quelle' auf 'ziel'. 'ziel' wird überschrieben oder neu angelegt.
     </li>
+    <a id="weekprofile-set-remove_profile"></a>
     <li>remove_profile<br>
       <code>set &lt;name&gt; remove_profile &lt;profilname&gt; </code><br>
       Das Profil 'profilname' wird gelöscht.
     </li>
+    <a id="weekprofile-set-reference_profile"></a>
     <li>reference_profile<br>
       <code>set &lt;name&gt; reference_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
       Referenziert das Profil 'ziel'auf 'quelle'. 'ziel' wird überschrieben oder neu angelegt.
     </li>
+    <a id="weekprofile-set-restore_topic"></a>
     <li>restore_topic<br>
       <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
       Alle Wochenpläne in der Topic werden zu den entsprechenden Geräten übertragen.
       Dazu muss im Gerät ein Userattribut 'weekprofile' mit dem Namen des Wochenplans <b>ohne</b> Topic gesetzt sein.
     </li>
+    <a id="weekprofile-set-reread_master"></a>
     <li>reread_master<br>
     Aktualisiert das master profile indem das 'Master-Geräte' neu ausgelesen wird.
     </li>
+    <a id="weekprofile-set-import_profile"></a>
     <li>import_profile<br>
     <code>set &lt;name&gt; import_profile &lt;device&gt; &lt;[profilename]&gt;</code><br>
     Profil von einem Gerät importieren. 
     </li>
   </ul>
   
-  <a name="weekprofileget"></a>
+  <a id="weekprofile-get"></a>
   <b>Get</b>
   <ul>
+    <a id="weekprofile-get-profile_data"></a>
     <li>profile_data<br>
        <code>get &lt;name&gt; profile_data &lt;profilname&gt; </code><br>
        Liefert die Profildaten von 'profilname' im json-Format
     </li>
+    <a id="weekprofile-get-profile_names"></a>
     <li>profile_names<br>
       <code>set &lt;name&gt; profile_names [topic_name]</code><br>
       Liefert alle Profilnamen getrennt durch ',' einer Topic 'topic_name'
       Ist 'topic_name' gleich '*' werden alle Profilnamen zurück gegeben.
     </li>
+    <a id="weekprofile-get-profile_references"></a>
     <li>profile_references [name]<br>
       Liefert eine Liste von Referenzen der Form <br>
       <code>
@@ -2081,6 +2145,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
       </code>
       Ist name 'topicname:profilename' wird  '0' der Name der Referenz zurück gegeben.
     </li>
+    <a id="weekprofile-get-associations"></a>
     <li>associations [Rückgabetyp (0|1)]<br>
       Gibt eine Liste der unterstützten Geräte mit dem verbundenen\zugeordnetem Profilnamen zurück.<br>
       Rückgabetyp 0: HTML Tabelle</br>
@@ -2088,7 +2153,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
   </ul>
   
-  <a name="weekprofilereadings"></a>
+  <a id="weekprofile-readings"></a>
   <p><b>Readings</b></p>
   <ul>
     <li>active_topic<br>
@@ -2102,60 +2167,84 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
   </ul>
   
-  <a name="weekprofileattr"></a>
+  <a id="weekprofile-attr"></a>
   <b>Attribute</b>
   <ul>
+    <a id="weekprofile-attr-widgetTranslations"></a>
     <li>widgetTranslations<br>
-    Liste von Übersetzungen der Form <german>:<Übersetzung> getrennt durch ',' um Texte im Widget zu übersetzen.
+    Liste von Übersetzungen der Form <german>:<Übersetzung> getrennt durch ',' um Texte im Widget zu Übersetzen.
     <code>attr name widgetTranslations Abbrechen:Abbr,Speichern:Save</code> 
     </li>
+    <a id="weekprofile-attr-widgetWeekdays"></a>
     <li>widgetWeekdays<br>
       Liste von Wochentagen getrennt durch ',' welche im Widget angzeigt werden. 
       Beginnend bei Montag. z.B.
       <code>attr name widgetWeekdays Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag</code>
     </li>
+    <a id="weekprofile-attr-widgetEditDaysInRow"></a>
     <li>widgetEditDaysInRow<br>
     Anzahl in der in einer Reihe dargestellten Tage während der Bearbeitung. Default 2.<br>
     </li>
+    <a id="weekprofile-attr-widgetEditOnNewPage"></a>
     <li>widgetEditOnNewPage<br>
       Wenn gesetzt ('1'), dann wird die Bearbeitung auf einer separaten\neuen Webseite gestartet.
     </li>
+    <a id="weekprofile-attr-widgetTempRange"></a>
     <li>widgetTempRange<br>
     Bereich der Temperatur Dropdown-Box im FHEM widget
     Syntax: min:max:step z.B. 5:30:0.5
     </li>
+    <a id="weekprofile-attr-tempMap"></a>
     <li>tempMap<br>
     Temperatur Schlüssel-Werte-Paare
     Syntax: <schlüsselwort_1>:<wert_1>,<schlüsselwort_2>:<wert_2><br>
     z.B. off:5.0,on:30.0
     </li>
+    <a id="weekprofile-attr-tempOn"></a>
+    <li>tempOn<br>
+    Veraltet - bitte tempMap benutzen
+    </li>
+    <a id="weekprofile-attr-tempOff"></a>
+    <li>tempOff<br>
+    Veraltet - bitte tempMap benutzen
+    </li>
+    <a id="weekprofile-attr-sendKeywordsToDevices"></a>
     <li>sendKeywordsToDevices<br>
     Sende Temperatur-Schlüsselwort zum Gerät anstatt der Werte
     Default: 0
     </li>
+    <a id="weekprofile-attr-configFile"></a>
     <li>configFile<br>
       Pfad und Dateiname wo die Profile gespeichert werden sollen.
       Default: ./log/weekprofile-<name>.cfg
     </li>
+    <a id="weekprofile-attr-icon"></a>
     <li>icon<br>
       Änders des Icons zum Bearbeiten
       Default: edit_settings
     </li>
+    <a id="weekprofile-attr-useTopics"></a>
     <li>useTopics<br>
       Verwendung von Topic aktivieren.
     </li>
+    <a id="weekprofile-attr-sendDelay"></a>
     <li>sendDelay<br>
     Default: 0
     Verzögerungszweit in Sekunden zwischen dem Senden von Profildaten an ein Thermostat gleichen Typs.
     Hilfreich zur Vermeidung von Meldungen wie "queue is full, dropping packet".
     </li>
+    <a id="weekprofile-attr-forceCompleteProfile"></a>
     <li>forceCompleteProfile<br>
     Default: 0
     Ezwingt das Senden eines komplettes Wochenprofiles anstatt der Änderungen
     Es besteht somit die Möglichkeit eines erneuten Senden der Daten an das Thermostats
     </li>
+    <a id="weekprofile-attr-weekprofile"></a>
+    <li>weekprofile<br>
+    Kann ein userattr eines unterstützten Moduls von weekprofile sein, um ein spezifisches Profil mit dem angegeben Namen
+    beim Befehl <i>restore_topic</i> zu empfangen. Siehe auch 'Topics'.    
+    </li>
   </ul>
-  
 </ul>
 =end html_DE
 

@@ -102,14 +102,14 @@ FBDECT_SetHttp($@)
   }
   if($p =~ m/actuator/) {
     $cmd{"desired-temp"} = "slider,7.5,0.5,28.5,1";
-    $cmd{open} = $cmd{closed} = "noArg";
+    $cmd{open} = $cmd{close} = "noArg";
     $cmd{windowopen} = $cmd{boost} = "textField";
   }
   if($p =~ m/dimmer/) {
     $cmd{"dim"} = "slider,0,1,100,1";
   }
   if($p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
-    $cmd{open} = $cmd{closed} = $cmd{stop} = "noArg";
+    $cmd{open} = $cmd{close} = $cmd{stop} = "noArg";
   }
   if($p =~ m/HANFUNUnit/ && $unittype eq "DIMMABLE_COLOR_BULB") {
     $cmd{"color"} = "select,red,orange,yellow,lawngreen,green,turquoise,".
@@ -139,7 +139,7 @@ FBDECT_SetHttp($@)
     return undef;
   }
 
-  if($cmd =~ m/^(open|closed|desired-temp)$/ && $p =~ m/actuator/) {
+  if($cmd =~ m/^(open|close|desired-temp)$/ && $p =~ m/actuator/) {
     if($cmd eq "desired-temp") { 
       return "Usage: set $name desired-temp value" if(int(@a) != 3);
       return "desired-temp must be between 7.5 and 28.5"
@@ -147,7 +147,7 @@ FBDECT_SetHttp($@)
     }
     my $a2 = ($a[2] ? $a[2] : 0);
     my $val = ($cmd eq "open"  || $a2==28.5) ? 254 :
-              ($cmd eq "closed"|| $a2== 7.5) ? 253: int(2*$a2);
+              ($cmd eq "close"|| $a2== 7.5) ? 253: int(2*$a2);
     IOWrite($hash, $ain,"sethkrtsoll&param=$val");
     return undef;
   }
@@ -177,7 +177,7 @@ FBDECT_SetHttp($@)
     return undef;
   }
 
-  if($cmd =~ m/^(open|closed|stop)$/ &&
+  if($cmd =~ m/^(open|close|stop)$/ &&
     $p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
     IOWrite($hash, $ain,"setblind&target=$cmd");
     return undef;

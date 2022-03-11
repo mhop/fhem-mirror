@@ -32,6 +32,7 @@ allowed_Initialize($)
     basicAuthExpiry
     basicAuthMsg
     disable:1,0
+    disabledForIntervals
     globalpassword
     password
     reportAuthAttempts
@@ -95,7 +96,7 @@ allowed_Authorize($$$$;$)
 {
   my ($me, $cl, $type, $arg, $silent) = @_;
 
-  return 0 if($me->{disabled});
+  return 0 if($me->{disabled} && IsDisabled($me->{NAME}));
   my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
   return 0 if(!$me->{".validFor"}{$vName});
   my $mName = $me->{NAME};
@@ -108,7 +109,7 @@ allowed_Authorize($$$$;$)
     # Return 0: allow stacking with other instances, see Forum#46380
     return 0 if($me->{".allowedCommands"} =~ m/\b\Q$arg\E\b/);
     Log3 $me, 3, "Forbidden command $arg for $cl->{NAME}";
-    stacktrace() if(AttrVal($me, "verbose", 5));
+    stacktrace() if(AttrVal($me->{NAME}, "verbose", 0) == 5);
     return 2;
   }
 
@@ -121,7 +122,7 @@ allowed_Authorize($$$$;$)
                 $arg =~ m/^$me->{".allowedDevicesRegexp"}$/);
     if(!$silent) {
       Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
-      stacktrace() if(AttrVal($me, "verbose", 5));
+      stacktrace() if(AttrVal($me->{NAME}, "verbose", 0) == 5);
     }
     return 2;
   }
@@ -150,7 +151,7 @@ allowed_Authenticate($$$$)
     return $r;
   };
 
-  return 0 if($me->{disabled});
+  return 0 if($me->{disabled} && IsDisabled($aName));
   my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
   return 0 if(!$me->{".validFor"}{$vName});
 
@@ -306,8 +307,10 @@ allowed_Attr(@)
 
   my $set = ($type eq "del" ? 0 : (!defined($param[0]) || $param[0]) ? 1 : 0);
 
-  if($attrName eq "disable") {
-    readingsSingleUpdate($hash, "state", $set ? "disabled" : "active", 1);
+  if($attrName eq "disable" ||
+     $attrName eq "disabledForIntervals") {
+    readingsSingleUpdate($hash, "state", $set ? "disabled" : "active", 1)
+      if($attrName eq "disable");
     if($set) {
       $hash->{disabled} = 1;
     } else {
@@ -338,7 +341,8 @@ allowed_Attr(@)
            $attrName eq "password" || $attrName eq "globalpassword") &&
           $type eq "set") {
     foreach my $d (devspec2array("TYPE=(FHEMWEB|telnet)")) {
-      delete $defs{$d}{Authenticated} if($defs{$d});
+      my $sname = $defs{$d}{SNAME};
+      delete $defs{$d}{Authenticated} if($sname && $hash->{".validFor"}{$sname});
     }
     InternalTimer(1, "SecurityCheck", 0) if($init_done);
   
@@ -454,8 +458,6 @@ EOF
   <a name="allowedattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#disable">disable</a></li><br>
-
     <a name="allowedCommands"></a>
     <li>allowedCommands<br>
         A comma separated list of commands allowed from the matching frontend
@@ -510,6 +512,9 @@ EOF
         after the given period.
         Only valid if basicAuth is set.
     </li><br>
+
+    <li><a href="#disable">disable</a></li></br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li></br>
 
     <a name="password"></a>
     <li>password<br>
@@ -605,9 +610,6 @@ EOF
   <a name="allowedattr"></a>
   <b>Attribute</b>
   <ul>
-    <li><a href="#disable">disable</a>
-      </li><br>
-
     <a name="allowedCommands"></a>
     <li>allowedCommands<br>
         Eine Komma getrennte Liste der erlaubten Befehle des passenden
@@ -655,6 +657,9 @@ EOF
         &Uuml;berschrift angezeigt.<br>
     </li><br>
 
+
+    <li><a href="#disable">disable</a><br>disable</li></br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li></br>
 
     <a name="password"></a>
     <li>password<br>

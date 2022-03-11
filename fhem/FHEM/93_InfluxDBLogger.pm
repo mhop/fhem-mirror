@@ -1,4 +1,4 @@
-# $Id$
+﻿# $Id$
 # 93_InfluxDBLogger.pm
 #
 package main;
@@ -23,7 +23,7 @@ sub InfluxDBLogger_Initialize($) {
     $hash->{NotifyFn} = "InfluxDBLogger_Notify";
     $hash->{SetFn} = "InfluxDBLogger_Set";
     $hash->{RenameFn} = "InfluxDBLogger_Rename";
-    $hash->{AttrList} = "disable:1,0 security:basic_auth,none,token username readingInclude readingExclude conversions deviceTagName measurement tags fields api:v1,v2 org precision:ms,s,us,ns " . $readingFnAttributes;
+    $hash->{AttrList} = "readingTimeStamps:1,0 stringValuesAllowed:1,0 disable:1,0 security:basic_auth,none,token username readingInclude readingExclude conversions deviceTagName measurement tags fields api:v1,v2 org precision:ms,s,us,ns " . $readingFnAttributes;
     Log3 undef, 2, "InfluxDBLogger: Initialized new";
 }
 
@@ -159,10 +159,11 @@ sub InfluxDBLogger_BuildMap($$$)
     my $devName = $dev_hash->{NAME};
     my %map = ();
 
+    my $readingInclude = AttrVal($name, "readingInclude", undef);
+    my $readingExclude = AttrVal($name, "readingExclude", undef);
+
     foreach my $event (@{$events}) {
         $event = "" if(!defined($event));
-        my $readingInclude = AttrVal($name, "readingInclude", undef);
-        my $readingExclude = AttrVal($name, "readingExclude", undef);
         if ( (!defined($readingInclude) || $event =~ /$readingInclude/) && (!defined($readingExclude) || !($event =~ /$readingExclude/)) ) {
             Log3 $name, 4, "InfluxDBLogger: [$name] notified from device $devName about $event";
             InfluxDBLogger_Map($own_hash, $dev_hash, $event, \%map);
@@ -177,49 +178,79 @@ sub InfluxDBLogger_BuildData($$$$)
     my ($own_hash, $dev_hash, $map, $incompatible) = @_;
     my $name = $own_hash->{NAME};
     my $data = "";
+    my $stringValuesAllowed =  AttrVal($name, "stringValuesAllowed", 0);
 
     my $rows = 0;
     my %m = %{$map};
-    my %measuremnts = ();
-    foreach my $device (keys %m) {
-        my $readings = $m{$device};
-        my %r = %{$readings};
-        foreach my $reading (keys %r) {
-            my $value_map = $r{$reading};
-            my $value = $value_map->{"value"};
-            my $numeric = $value_map->{"numeric"};
-            if ($numeric) {
-                my ($measurementAndTagSet,$fieldset) = InfluxDBLogger_BuildDataDynamic($own_hash, $dev_hash, $device, $reading, $value);
-                if (defined $measuremnts{$measurementAndTagSet}) {
-                  $measuremnts{$measurementAndTagSet} .= "," . $fieldset;
-                } else {
-                  $measuremnts{$measurementAndTagSet} = $fieldset;
+
+    my $readingTimeStamps =  AttrVal($name, "readingTimeStamps", 0);
+
+    if ($readingTimeStamps) {
+        foreach my $device (keys %m) {
+            my $readings = $m{$device};
+            my %r = %{$readings};
+            foreach my $reading (keys %r) {
+                my $value_map = $r{$reading};
+                my $value = $value_map->{"value"};
+                my $numeric = $value_map->{"numeric"};
+                if (($numeric) || ($stringValuesAllowed)) {
+                    my ($measurementAndTagSet,$fieldset,$timestamp) = InfluxDBLogger_BuildDataDynamic($own_hash, $dev_hash, $device, $reading, $value, $numeric);
+                    $data .= $measurementAndTagSet . " " . $fieldset;
+                    if(defined($timestamp)) {
+                        $data .= " " . $timestamp ."000000000" # nanoseconds
+                    }
+                    $data .= "\n";
+                    $rows++;
                 }
-                $rows++;
-            }
-            else {
-                push(@{$incompatible}, $device ." ". $reading . " " . $value);
+                else {
+                    push(@{$incompatible}, $device ." ". $reading . " " . $value);
+                }
             }
         }
     }
-    foreach my $measurementAndTagSet ( keys %measuremnts ) {
-        $data .= $measurementAndTagSet . " " . $measuremnts{$measurementAndTagSet} . "\n";
+    else {
+        my %measuremnts = ();
+        foreach my $device (keys %m) {
+            my $readings = $m{$device};
+            my %r = %{$readings};
+            foreach my $reading (keys %r) {
+                my $value_map = $r{$reading};
+                my $value = $value_map->{"value"};
+                my $numeric = $value_map->{"numeric"};
+                if (($numeric) || ($stringValuesAllowed)) {
+                    my ($measurementAndTagSet,$fieldset,$timestamp) = InfluxDBLogger_BuildDataDynamic($own_hash, $dev_hash, $device, $reading, $value, $numeric);
+                    if (defined $measuremnts{$measurementAndTagSet}) {
+                      $measuremnts{$measurementAndTagSet} .= "," . $fieldset;
+                    } else {
+                      $measuremnts{$measurementAndTagSet} = $fieldset;
+                    }
+                    $rows++;
+                }
+                else {
+                    push(@{$incompatible}, $device ." ". $reading . " " . $value);
+                }
+            }
+        }
+        foreach my $measurementAndTagSet ( keys %measuremnts ) {
+            $data .= $measurementAndTagSet . " " . $measuremnts{$measurementAndTagSet} . "\n";
+        }
     }
 
     return $data, $rows;
 }
 
-sub InfluxDBLogger_BuildDataDynamic($$$$$)
+sub InfluxDBLogger_BuildDataDynamic($$$$$$)
 {
-    my ($hash, $dev_hash, $device, $reading, $value) = @_;
+    my ($hash, $dev_hash, $device, $reading, $value, $numeric) = @_;
     my $name = $hash->{NAME};
 
     my $measurement =  InfluxDBLogger_GetMeasurement($hash, $dev_hash, $device, $reading, $value);
     my $tag_set = InfluxDBLogger_GetTagSet($hash, $dev_hash, $device, $reading, $value);
-    my $field_set = InfluxDBLogger_GetFieldSet($hash, $dev_hash, $device, $reading, $value);
+    my $field_set = InfluxDBLogger_GetFieldSet($hash, $dev_hash, $device, $reading, $value, $numeric);
+    my $timestamp = InfluxDBLogger_GetTimeStamp($hash, $dev_hash, $device, $reading, $value);
 
     my $measurementAndTagSet = defined $tag_set ? $measurement . "," . $tag_set : $measurement;
-    return ($measurementAndTagSet,$field_set);
+    return ($measurementAndTagSet,$field_set,$timestamp);
 }
 
 sub InfluxDBLogger_GetMeasurement($$$$$)
@@ -260,16 +291,40 @@ sub InfluxDBLogger_GetTagSet($$$$$)
     return $tags_set;
 }
 
-sub InfluxDBLogger_GetFieldSet($$$$$)
+sub InfluxDBLogger_GetFieldSet($$$$$$)
 {
-    my ($hash, $dev_hash, $device, $reading, $value) = @_;
+    my ($hash, $dev_hash, $device, $reading, $value, $numeric) = @_;
     my $name = $hash->{NAME};
 
     my $field_set =  AttrVal($name, "fields", "value=\$READINGVALUE");
     $field_set =~ s/\$READINGNAME/$reading/ei;
+    if (!$numeric) {
+      $value = "\"" . $value . "\""
+    }
     $field_set =~ s/\$READINGVALUE/$value/ei;
 
     return $field_set;
+}
+
+sub InfluxDBLogger_GetTimeStamp($$$$$)
+{
+    my ($hash, $dev_hash, $device, $reading, $value) = @_;
+    my $name = $hash->{NAME};
+
+    my $readingTimeStamps =  AttrVal($name, "readingTimeStamps", 0);
+    my $timeStamp = undef;
+    if ($readingTimeStamps) {
+        my $readingsTimestamp = ReadingsTimestamp($device, $reading,undef);
+        if(defined($readingsTimestamp))
+        {
+            my $readingsTimestampNum = time_str2num($readingsTimestamp);
+            # ?? $timeStamp= $readingsTimestampNum+-2208992400
+            $timeStamp=$readingsTimestampNum
+        }
+    }
+
+
+    return $timeStamp;
 }
 
 sub InfluxDBLogger_BuildUrl($)
@@ -303,7 +358,7 @@ sub InfluxDBLogger_Map($$$$)
     my ($hash, $dev_hash, $event, $map) = @_;
     my $name = $hash->{NAME};
     my $deviceName = $dev_hash->{NAME};
-    my @readingAndValue = split(":[ \t]*", $event);
+    my @readingAndValue = split(":[ \t]*", $event, 2);
     my $readingName = $readingAndValue[0];
     my $readingValue = $readingAndValue[1];
 
@@ -610,7 +665,7 @@ sub InfluxDBLogger_Rename($$) {
         Sets all statistical counters to zero and removes the last error message.
         </li>
         <li><b>write</b>
-        <code>set &lt;name&gt; set</code><br />
+        <code>set &lt;name&gt; write</code><br />
         Writes the current values of the configured readings(readingInclude,readingExclude) of the configured devices(devspec) to the database.
         This is useful e.g. for clean start of the day and end of the day values.
         Note that the timestamp of the readings are not stored in the database, but the timestamp of the write operation.
@@ -639,6 +694,8 @@ sub InfluxDBLogger_Rename($$) {
         </li>
         <li><b>conversions</b> <code>attr &lt;name&gt; conversions &lt;conv1,conv2&gt;</code><br />
             Comma seperated list of replacements e.g. open=1,closed=0,tilted=2 or true|on|yes=1,false|off|no=0
+            Right side can be any perl expression and thus used to replace regular expression groups like this: ([0-9]+)%=$1
+            which extract the number out of a percentage value.
         </li>
         <li><b>measurement</b> <code>attr &lt;name&gt; measurement &lt;string&gt;</code><br />
             Name of the measurement to use. This can be any string.
@@ -671,6 +728,17 @@ sub InfluxDBLogger_Rename($$) {
         </li>
         <li><b>precision</b> <code>attr &lt;name&gt; precision [ms|s|us|ns]</code><br />
             The time precision is specified by this. Default is none.
+        </li>
+        <li><b>stringValuesAllowed</b> <code>attr &lt;name&gt; stringValuesAllowed [0|1]</code><br />
+           If enabled (1) it allows to write strings as value, if disabled(0) non-numeric values will be blocked (dropped).
+           Conversions are always processed first. Put conversion to string in double quotes like: 1="open"
+           Note: InfluxDB cannot change the datatype of a field. Changing this attribute after some data is already written might lead to error messages.
+           Default: 0 (non-numeric values are blocked)
+        </li>
+        <li><b>readingTimeStamps</b> <code>attr &lt;name&gt; readingTimeStamps [0|1]</code><br />
+           If enabled(1) the ReadingTimestamp from FHEM is send to InfluxDB, Default is off(0).
+           This is useful for devices that publish the values later with the original timestamp delayed.
+           Default: 0 (InfluxDB determines the timestamp on its own)
         </li>
     </ul>
 
@@ -738,7 +806,7 @@ sub InfluxDBLogger_Rename($$) {
         Setzt alle statistischen Zähler auf 0 und entfernt die letzte Fehlermeldung
         </li>
         <li><b>write</b>
-        <code>set &lt;name&gt; set</code><br />
+        <code>set &lt;name&gt; write</code><br />
         Schreibt die aktuellen Werte der konfigurierten Readings(readingInclude,readingExclude) der konfigurierten Geräte(devspec) in die Datenbank.
         Dies ist zum Beispiel nützlich für saubere Tagesstart und Tagesendwerte.
         Hinweis: Der Zeitstempel des Readings wird nicht in der Datenbank gespeichert, sondern der Zeitstempel des Schreibzeitpunktes.
@@ -767,6 +835,9 @@ sub InfluxDBLogger_Rename($$) {
         </li>
         <li><b>conversions</b> <code>attr &lt;name&gt; conversions &lt;conv1,conv2&gt;</code><br />
             Kommagetrennte Liste von Ersetzungen e.g. open=1,closed=0,tilted=2 oder true|on|yes=1,false|off|no=0
+            Die rechte Seite kann ein Perlausdruck und dadurch auch genutzt werden um Gruppen in regulären Ausdrücken zu nutzen.
+            z.B. ([0-9]+)%=$1
+            Dies extrahiert die Zahlen aus einer Prozentangabe.
         </li>
         <li><b>measurement</b> <code>attr &lt;name&gt; measurement &lt;string&gt;</code><br />
             Name des zu verwendenen measurements. Dies kann ein freie Zeichenkette sein.
@@ -799,6 +870,17 @@ sub InfluxDBLogger_Rename($$) {
         </li>
         <li><b>precision</b> <code>attr &lt;name&gt; precision [ms|s|us|ns]</code><br />
             Die Zeit-Präzision wird hiermit angegeben. Standard ist keine Vorgabe.
+        </li>
+        <li><b>stringValuesAllowed</b> <code>attr &lt;name&gt; stringValuesAllowed [0|1]</code><br />
+           Erlaubt bei 1 das Senden von Zeichenketten an die Datenbank, oder verhindert es bei 0 aktiv.
+           Konvertierung werden immer zuerst verarbeitet. Setze Konvertierungen in Zeichenkette in doppele Anfürungszeichen. z.B. 1="offen"
+           Hinweis: Influx kann den Datentyp eines Felder nicht wechseln. Das Ändern dieses Attributes kann somit zu Fehlermeldungen führen.
+           Standard: 0 (keine Zeichenketten, nur Zahlen)
+        </li>
+        <li><b>readingTimeStamps</b> <code>attr &lt;name&gt; readingTimeStamps [0|1]</code><br />
+           Sendet wenn angeschaltet (1) den Reading Zeitstempel vom FHEM an die InfluxDB, andernfalls(0) wird der Zeitstempel von der InfluxDB bestimmt.
+           Diese Funktion ist nützlich für Geräte die Werte nachmelden mit dem Originalzeitstempel.
+           Default: 0 (InfluxDB bestimmt den Zeitstempel, es wird keiner mitgesendet)
         </li>
     </ul>
 

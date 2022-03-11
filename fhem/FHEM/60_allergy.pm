@@ -1,4 +1,4 @@
-##############################################
+﻿##############################################
 # $Id$$$
 #
 #  60_allergy.pm
@@ -22,8 +22,6 @@ use strict;
 use warnings;
 use Time::Local;
 use Encode;
-
-use XML::Simple;
 
 use utf8;
 
@@ -80,7 +78,7 @@ sub allergy_Initialize($) {
                           "updateEmpty:1,0 ".
                           "levelsFormat ".
                           "weekdaysFormat ".
-                          "extended5Day:1,0 ".
+                          #"extended5Day:1,0 ".
                           $readingFnAttributes;
 }
 
@@ -107,7 +105,9 @@ sub allergy_Define($$$) {
 
   if($req)
   {
-    InternalTimer( gettimeofday() + 60, "allergy_GetUpdate", $hash, 0);
+    use XML::Simple;
+    use JSON;
+    InternalTimer( gettimeofday() + 60, "allergy_GetUpdate", $hash);
     if (!defined($attr{$name}{stateFormat}))
     {
       $attr{$name}{stateFormat} = 'fc1_maximum';
@@ -162,18 +162,15 @@ sub allergy_GetUpdate($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  if(AttrVal($name, "disable", 0) eq 1) {
+  if(IsDisabled($name)) {
     $hash->{STATE} = "disabled";
     Log3 ($name, 2, "allergy $name is disabled, data update cancelled.");
     return undef;
   }
 
-
-
-
   my $url="http://www.allergie.hexal.de/pollenflug/xml-interface-neu/pollen_de_7tage.php?plz=".$hash->{helper}{ZIPCODE};
 
-  if(AttrVal($name, "extended5Day", 0) eq 1) {
+  if(AttrVal($name, "extended5Day", "0") eq "DEPRECATED") {
     $url="https://pollenwarner-live.herokuapp.com/pollen/".$hash->{helper}{ZIPCODE};
   Log3 ($name, 4, "Getting URL $url");
     HttpUtils_NonblockingGet({
@@ -214,7 +211,7 @@ sub allergy_Parse($$$)
   {
     Log3 $name, 1, "$name: URL error (".($hash->{ERROR}+1)."): ".$err;
     my $nextupdate = gettimeofday()+( (900*$hash->{ERROR}) + 90 );
-    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash);
     $hash->{STATE} = "error" if($hash->{ERROR} > 1);
     $hash->{ERROR} = $hash->{ERROR}+1;
     return undef;
@@ -230,7 +227,7 @@ sub allergy_Parse($$$)
   {
     Log3 $name, 2, "$name: XML error ".$@;
     my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
-    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash);
     return undef;
   }
 
@@ -290,7 +287,7 @@ sub allergy_Parse($$$)
   $hash->{UPDATED} = FmtDateTime(time());
 
   my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
-  InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+  InternalTimer($nextupdate, "allergy_GetUpdate", $hash);
 
   return undef;
 }
@@ -305,7 +302,7 @@ sub allergy_ParseExtended($$$)
   {
     Log3 $name, 1, "$name: URL error (".($hash->{ERROR}+1)."): ".$err;
     my $nextupdate = gettimeofday()+( (900*$hash->{ERROR}) + 90 );
-    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash);
     $hash->{STATE} = "error" if($hash->{ERROR} > 1);
     $hash->{ERROR} = $hash->{ERROR}+1;
     return undef;
@@ -319,7 +316,7 @@ sub allergy_ParseExtended($$$)
   {
     Log3 $name, 2, "$name: JSON error ".$@;
     my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
-    InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+    InternalTimer($nextupdate, "allergy_GetUpdate", $hash);
     return undef;
   }
 
@@ -392,7 +389,7 @@ sub allergy_ParseExtended($$$)
   $hash->{UPDATED} = FmtDateTime(time());
 
   my $nextupdate = gettimeofday()+$hash->{helper}{INTERVAL};
-  InternalTimer($nextupdate, "allergy_GetUpdate", $hash, 1);
+  InternalTimer($nextupdate, "allergy_GetUpdate", $hash);
 
   return undef;
 }
@@ -629,10 +626,6 @@ sub allergy_utf8clean($) {
       <li><code>updateIgnored (1)</code>
          <br>
          Aktualisierung von Allergenen, die sonst durch die ignoreList entfernt werden.
-      </li><br>
-      <li><code>extended5Days (1)</code>
-         <br>
-         Alternative Datenquelle mit 5 Tagen Vorhersage für mehr Allergene
       </li><br>
       <li><code>levelsFormat (Standard: -,low,moderate,high,extreme)</code>
          <br>

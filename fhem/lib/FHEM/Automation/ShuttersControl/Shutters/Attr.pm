@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -46,24 +46,12 @@ use utf8;
 
 use FHEM::Automation::ShuttersControl::Helper qw (IsAdv PerlCodeCheck);
 
-use GPUtils qw(GP_Import);
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(
-          AttrVal
-          CommandAttr
-          gettimeofday)
-    );
-}
-
 sub _setAttributs {
     my $shuttersDev = shift;
     my $attr        = shift;
     my $attrVal     = shift;
 
-    CommandAttr( undef, $shuttersDev . ' ' . $attr . ' ' . $attrVal );
+    ::CommandAttr( undef, $shuttersDev . ' ' . $attr . ' ' . $attrVal );
 
     return;
 }
@@ -77,28 +65,28 @@ sub _getPosition {
     return $self->{ $self->{shuttersDev} }->{$attr}->{position}
       if (
         exists( $self->{ $self->{shuttersDev} }->{$attr}->{LASTGETTIME} )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{$attr}->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{$attr}->{LASTGETTIME} =
-      int( gettimeofday() );
+      int( ::gettimeofday() );
 
     my $position;
     my $posAssignment;
 
     if (
-        AttrVal( $self->{shuttersDev}, $attr,
+        ::AttrVal( $self->{shuttersDev}, $attr,
             $FHEM::Automation::ShuttersControl::userAttrList{$userAttrList}
-              [ AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ] ) =~
+              [ ::AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ] ) =~
         m{\A\{.+\}\z}xms
       )
     {
         my $response = PerlCodeCheck(
-            AttrVal(
+            ::AttrVal(
                 $self->{shuttersDev},
                 $attr,
                 $FHEM::Automation::ShuttersControl::userAttrList{$userAttrList}
-                  [ AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
+                  [ ::AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
             )
         );
 
@@ -108,14 +96,14 @@ sub _getPosition {
               $position =~ m{\A\d+(\.\d+)?\z}xms
             ? $position
             : $FHEM::Automation::ShuttersControl::userAttrList{$userAttrList}
-              [ AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
+              [ ::AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
         );
 
         $posAssignment = (
-                defined($posAssignment)
-            &&  $posAssignment =~ m{\A\d+(\.\d+)?\z}xms
-              ? $posAssignment
-              : 'none'
+            defined($posAssignment)
+              && $posAssignment =~ m{\A\d+(\.\d+)?\z}xms
+            ? $posAssignment
+            : 'none'
         );
     }
     else {
@@ -124,7 +112,7 @@ sub _getPosition {
             $self->{shuttersDev},
             $attr,
             $FHEM::Automation::ShuttersControl::userAttrList{$userAttrList}
-              [ AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
+              [ ::AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
           );
     }
 
@@ -145,8 +133,7 @@ sub _getPosition {
       )
     {
         $self->{ $self->{shuttersDev} }->{$attr}->{position} =
-          PerlCodeCheck(
-            $self->{ $self->{shuttersDev} }->{$attr}->{position} );
+          PerlCodeCheck( $self->{ $self->{shuttersDev} }->{$attr}->{position} );
     }
 
     return (
@@ -154,7 +141,7 @@ sub _getPosition {
           m{^\d+(\.\d+)?$}xms
         ? $self->{ $self->{shuttersDev} }->{$attr}->{position}
         : $FHEM::Automation::ShuttersControl::userAttrList{$userAttrList}
-          [ AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
+          [ ::AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ]
     );
 }
 
@@ -167,7 +154,7 @@ sub _getPositionAssignment {
     return $self->{ $self->{shuttersDev} }->{$attr}->{posAssignment}
       if (
         exists( $self->{ $self->{shuttersDev} }->{$attr}->{LASTGETTIME} )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{$attr}->{LASTGETTIME} ) < 2
       );
     $FHEM::Automation::ShuttersControl::shutters->$getFn;
@@ -213,7 +200,7 @@ sub setShuttersPlace {
 sub getShuttersPlace {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_ShuttersPlace', 'window' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_ShuttersPlace', 'window' );
 }
 
 sub setSlatPosCmd {
@@ -236,15 +223,15 @@ sub getSlatPosCmd {
             $self->{ $self->{shuttersDev} }->{ASC_SlatPosCmd_SlatDevice}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_SlatPosCmd_SlatDevice}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_SlatPosCmd_SlatDevice}->{LASTGETTIME}
-      = int( gettimeofday() );
+      = int( ::gettimeofday() );
     my ( $slatPosCmd, $slatDevice ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_SlatPosCmd_SlatDevice', 'none:none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_SlatPosCmd_SlatDevice', 'none:none' );
 
     ## Erwartetes Ergebnis
     # upTime:upBrightnessVal
@@ -268,7 +255,7 @@ sub getSlatDevice {
             $self->{ $self->{shuttersDev} }->{ASC_SlatPosCmd_SlatDevice}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_SlatPosCmd_SlatDevice}
             ->{LASTGETTIME} ) < 2
       );
@@ -299,15 +286,15 @@ sub getPrivacyUpTime {
             $self->{ $self->{shuttersDev} }->{ASC_PrivacyUpValue_beforeDayOpen}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_PrivacyUpValue_beforeDayOpen}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_PrivacyUpValue_beforeDayOpen}
-      ->{LASTGETTIME} = int( gettimeofday() );
+      ->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $upTime, $upBrightnessVal ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_PrivacyUpValue_beforeDayOpen', '-1:-1' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_PrivacyUpValue_beforeDayOpen', '-1:-1' );
 
     ## Erwartetes Ergebnis
     # upTime:upBrightnessVal
@@ -341,7 +328,7 @@ sub getPrivacyUpBrightnessVal {
             $self->{ $self->{shuttersDev} }->{ASC_PrivacyUpValue_beforeDayOpen}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_PrivacyUpValue_beforeDayOpen}
             ->{LASTGETTIME} ) < 2
       );
@@ -378,14 +365,15 @@ sub getPrivacyDownTime {
             $self->{ $self->{shuttersDev} }
               ->{ASC_PrivacyDownValue_beforeNightClose}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }
             ->{ASC_PrivacyDownValue_beforeNightClose}->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_PrivacyDownValue_beforeNightClose}
-      ->{LASTGETTIME} = int( gettimeofday() );
+      ->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $downTime, $downBrightnessVal ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev},
         'ASC_PrivacyDownValue_beforeNightClose', '-1:-1' );
 
     ## Erwartetes Ergebnis
@@ -420,7 +408,7 @@ sub getPrivacyDownBrightnessVal {
             $self->{ $self->{shuttersDev} }
               ->{ASC_PrivacyDownValue_beforeNightClose}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }
             ->{ASC_PrivacyDownValue_beforeNightClose}->{LASTGETTIME} ) < 2
       );
@@ -497,7 +485,7 @@ sub setSelfDefenseMode {
 sub getSelfDefenseMode {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Self_Defense_Mode', 'gone' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Self_Defense_Mode', 'gone' );
 }
 
 sub setSelfDefenseAbsentDelay {
@@ -513,7 +501,14 @@ sub setSelfDefenseAbsentDelay {
 sub getSelfDefenseAbsentDelay {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Self_Defense_AbsentDelay', 300 );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Self_Defense_AbsentDelay',
+        300 );
+}
+
+sub getCommandTemplate {
+    my $self = shift;
+
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_CommandTemplate', 'none' );
 }
 
 sub setWiggleValue {
@@ -528,7 +523,7 @@ sub setWiggleValue {
 sub getWiggleValue {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_WiggleValue', 5 );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_WiggleValue', 5 );
 }
 
 sub setAdv {
@@ -544,7 +539,7 @@ sub getAdv {
     my $self = shift;
 
     return (
-        AttrVal( $self->{shuttersDev}, 'ASC_Adv', 'off' ) eq 'on'
+        ::AttrVal( $self->{shuttersDev}, 'ASC_Adv', 'off' ) eq 'on'
         ? ( IsAdv == 1 ? 1 : 0 )
         : 0
     );
@@ -587,7 +582,7 @@ sub setShadingMode {
 sub getShadingMode {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Shading_Mode', 'off' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Shading_Mode', 'off' );
 }
 
 sub _getTempSensor {
@@ -598,15 +593,15 @@ sub _getTempSensor {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_TempSensor}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_TempSensor}->{LASTGETTIME} )
         < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_TempSensor}->{LASTGETTIME} =
-      int( gettimeofday() );
+      int( ::gettimeofday() );
     my ( $device, $reading ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_TempSensor', 'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_TempSensor', 'none' );
 
     ### erwartetes Ergebnis
     # DEVICE:READING
@@ -625,7 +620,7 @@ sub getTempSensorReading {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_TempSensor}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_TempSensor}->{LASTGETTIME} )
         < 2
       );
@@ -658,15 +653,15 @@ sub _getIdleDetectionReading {
             $self->{ $self->{shuttersDev} }->{ASC_Shutter_IdleDetection}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_Shutter_IdleDetection}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_Shutter_IdleDetection}->{LASTGETTIME}
-      = int( gettimeofday() );
+      = int( ::gettimeofday() );
     my ( $reading, $value ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_Shutter_IdleDetection', 'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_Shutter_IdleDetection', 'none' );
 
     ### erwartetes Ergebnis
     # READING:VALUE
@@ -688,7 +683,7 @@ sub getIdleDetectionValue {
             $self->{ $self->{shuttersDev} }->{ASC_Shutter_IdleDetection}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_Shutter_IdleDetection}
             ->{LASTGETTIME} ) < 2
       );
@@ -722,15 +717,15 @@ sub _getBrightnessSensor {
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{LASTGETTIME} =
-      int( gettimeofday() );
+      int( ::gettimeofday() );
     my ( $device, $reading, $max, $min ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_BrightnessSensor', 'none' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_BrightnessSensor', 'none' );
 
     ### erwartetes Ergebnis
     # DEVICE:READING MAX:MIN
@@ -754,7 +749,7 @@ sub getBrightnessReading {
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
             ->{LASTGETTIME} ) < 2
       );
@@ -779,7 +774,7 @@ sub getShadingAzimuthLeft {
             $self->{ $self->{shuttersDev} }->{ASC_Shading_InOutAzimuth}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_Shading_InOutAzimuth}
             ->{LASTGETTIME} ) < 2
       );
@@ -808,15 +803,15 @@ sub getShadingAzimuthRight {
             $self->{ $self->{shuttersDev} }->{ASC_Shading_InOutAzimuth}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_Shading_InOutAzimuth}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_Shading_InOutAzimuth}->{LASTGETTIME}
-      = int( gettimeofday() );
+      = int( ::gettimeofday() );
     my ( $left, $right ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_Shading_InOutAzimuth', '95:265' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_Shading_InOutAzimuth', '95:265' );
 
     ### erwartetes Ergebnis
     # MIN:MAX
@@ -843,8 +838,8 @@ sub setShadingMinOutsideTemperature {
 sub getShadingMinOutsideTemperature {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Shading_Min_OutsideTemperature',
-        18 );
+    return ::AttrVal( $self->{shuttersDev},
+        'ASC_Shading_Min_OutsideTemperature', 18 );
 }
 
 sub setShadingMinMaxElevation {
@@ -867,15 +862,15 @@ sub getShadingMinElevation {
             $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
-      ->{LASTGETTIME} = int( gettimeofday() );
+      ->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $min, $max ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_Shading_MinMax_Elevation', '25.0:100.0' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_Shading_MinMax_Elevation', '25.0:100.0' );
 
     ### erwartetes Ergebnis
     # MIN:MAX
@@ -899,7 +894,7 @@ sub getShadingMaxElevation {
             $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
             ->{LASTGETTIME} ) < 2
       );
@@ -937,15 +932,15 @@ sub getShadingStateChangeSunny {
             $self->{ $self->{shuttersDev} }
               ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }
             ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_Shading_StateChange_SunnyCloudy}
-      ->{LASTGETTIME} = int( gettimeofday() );
+      ->{LASTGETTIME} = int( ::gettimeofday() );
     my ( $sunny, $cloudy, $maxBrightnessAverageArrayObjects ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_Shading_StateChange_SunnyCloudy',
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_Shading_StateChange_SunnyCloudy',
         '35000:20000' );
 
     ### erwartetes Ergebnis
@@ -976,7 +971,7 @@ sub getShadingStateChangeCloudy {
             $self->{ $self->{shuttersDev} }
               ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }
             ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME} ) < 2
       );
@@ -996,7 +991,7 @@ sub getMaxBrightnessAverageArrayObjects {
             $self->{ $self->{shuttersDev} }
               ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }
             ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME} ) < 2
       );
@@ -1019,7 +1014,7 @@ sub setShadingWaitingPeriod {
 sub getShadingWaitingPeriod {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Shading_WaitingPeriod', 1200 );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Shading_WaitingPeriod', 1200 );
 }
 ### Ende Beschattung
 sub setExternalTrigger {
@@ -1040,16 +1035,16 @@ sub getExternalTriggerDevice {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{LASTGETTIME} =
-      int( gettimeofday() );
+      int( ::gettimeofday() );
     my ( $device, $reading, $valueActive, $valueInactive, $posActive,
         $posInactive, $valueActive2, $posActive2 )
-      = FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_ExternalTrigger', 'none' );
+      = FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_ExternalTrigger', 'none' );
 
     ### erwartetes Ergebnis
 # DEVICE:READING VALUEACTIVE:VALUEINACTIVE POSACTIVE:POSINACTIVE VALUEACTIVE2:POSACTIVE2
@@ -1064,10 +1059,11 @@ sub getExternalTriggerDevice {
       $valueInactive;
     $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{posactive} =
       $posActive;
-    $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{posinactive} =
-      (   $posInactive ne 'none'
+    $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{posinactive} = (
+          $posInactive ne 'none'
         ? $posInactive
-        : $FHEM::Automation::ShuttersControl::shutters->getLastPos );
+        : $FHEM::Automation::ShuttersControl::shutters->getLastPos
+    );
     $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{valueactive2} =
       $valueActive2;
     $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{posactive2} =
@@ -1086,7 +1082,7 @@ sub getExternalTriggerReading {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1104,7 +1100,7 @@ sub getExternalTriggerValueActive {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1124,7 +1120,7 @@ sub getExternalTriggerValueActive2 {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1144,7 +1140,7 @@ sub getExternalTriggerValueInactive {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1163,7 +1159,7 @@ sub getExternalTriggerPosActive {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1181,7 +1177,7 @@ sub getExternalTriggerPosActive2 {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1199,7 +1195,7 @@ sub getExternalTriggerPosInactive {
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
             ->{LASTGETTIME} ) < 2
       );
@@ -1221,7 +1217,7 @@ sub setDelay {
 sub getDelay {
     my $self = shift;
 
-    my $val = AttrVal( $self->{shuttersDev}, 'ASC_Drive_Delay', -1 );
+    my $val = ::AttrVal( $self->{shuttersDev}, 'ASC_Drive_Delay', -1 );
     return ( $val =~ m{^\d+$}xms ? $val : -1 );
 }
 
@@ -1237,7 +1233,7 @@ sub setDelayStart {
 sub getDelayStart {
     my $self = shift;
 
-    my $val = AttrVal( $self->{shuttersDev}, 'ASC_Drive_DelayStart', -1 );
+    my $val = ::AttrVal( $self->{shuttersDev}, 'ASC_Drive_DelayStart', -1 );
     return ( ( $val > 0 && $val =~ m{^\d+$}xms ) ? $val : -1 );
 }
 
@@ -1254,7 +1250,7 @@ sub setBlockingTimeAfterManual {
 sub getBlockingTimeAfterManual {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_BlockingTime_afterManual',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_BlockingTime_afterManual',
         1200 );
 }
 
@@ -1271,7 +1267,7 @@ sub setBlockingTimeBeforNightClose {
 sub getBlockingTimeBeforNightClose {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_BlockingTime_beforNightClose',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_BlockingTime_beforNightClose',
         3600 );
 }
 
@@ -1288,7 +1284,7 @@ sub setBlockingTimeBeforDayOpen {
 sub getBlockingTimeBeforDayOpen {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_BlockingTime_beforDayOpen',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_BlockingTime_beforDayOpen',
         3600 );
 }
 
@@ -1304,9 +1300,9 @@ sub setPosCmd {
 sub getPosCmd {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Pos_Reading',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Pos_Reading',
         $FHEM::Automation::ShuttersControl::userAttrList{'ASC_Pos_Reading'}
-          [ AttrVal( $self->{shuttersDev}, 'ASC', 1 ) ] );
+          [ ::AttrVal( $self->{shuttersDev}, 'ASC', 1 ) ] );
 }
 
 sub setOpenPos {
@@ -1371,7 +1367,7 @@ sub setVentilatePosAfterDayClosed {
 sub getVentilatePosAfterDayClosed {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_WindowRec_PosAfterDayClosed',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_WindowRec_PosAfterDayClosed',
         'open' );
 }
 
@@ -1436,7 +1432,7 @@ sub setVentilateOpen {
 sub getVentilateOpen {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Ventilate_Window_Open', 'on' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Ventilate_Window_Open', 'on' );
 }
 
 sub setComfortOpenPos {
@@ -1476,7 +1472,7 @@ sub setPartyMode {
 sub getPartyMode {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Partymode', 'off' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Partymode', 'off' );
 }
 
 sub setRoommates {
@@ -1491,7 +1487,7 @@ sub setRoommates {
 sub getRoommates {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Roommate_Device', 'none' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Roommate_Device', 'none' );
 }
 
 sub setRoommatesReading {
@@ -1506,7 +1502,7 @@ sub setRoommatesReading {
 sub getRoommatesReading {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Roommate_Reading', 'state' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Roommate_Reading', 'state' );
 }
 
 sub getWindPos {
@@ -1519,7 +1515,7 @@ sub getWindPos {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME}
         ) < 2
       );
@@ -1538,15 +1534,15 @@ sub getWindMax {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME}
         ) < 2
       );
     $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME} =
-      int( gettimeofday() );
+      int( ::gettimeofday() );
     my ( $max, $hyst, $pos ) =
-      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
-        'ASC_WindParameters', '50:20' );
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
+        $self->{shuttersDev}, 'ASC_WindParameters', '50:20' );
 
     ## Erwartetes Ergebnis
     # max:hyst pos
@@ -1554,10 +1550,11 @@ sub getWindMax {
     $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{triggermax} = $max;
     $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{triggerhyst} =
       ( $hyst ne 'none' ? $max - $hyst : $max - 20 );
-    $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{closedPos} =
-      (   $pos ne 'none'
+    $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{closedPos} = (
+          $pos ne 'none'
         ? $pos
-        : $FHEM::Automation::ShuttersControl::shutters->getOpenPos );
+        : $FHEM::Automation::ShuttersControl::shutters->getOpenPos
+    );
 
     return $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{triggermax};
 }
@@ -1581,7 +1578,7 @@ sub getWindMin {
         exists(
             $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME}
         ) < 2
       );
@@ -1602,7 +1599,7 @@ sub setWindProtection {
 sub getWindProtection {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_WindProtection', 'off' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_WindProtection', 'off' );
 }
 
 sub setRainProtection {
@@ -1617,7 +1614,7 @@ sub setRainProtection {
 sub getRainProtection {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_RainProtection', 'off' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_RainProtection', 'off' );
 }
 
 sub setModeUp {
@@ -1632,7 +1629,7 @@ sub setModeUp {
 sub getModeUp {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Mode_Up', 'always' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Mode_Up', 'always' );
 }
 
 sub setModeDown {
@@ -1647,7 +1644,7 @@ sub setModeDown {
 sub getModeDown {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Mode_Down', 'always' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Mode_Down', 'always' );
 }
 
 sub setLockOut {
@@ -1662,7 +1659,7 @@ sub setLockOut {
 sub getLockOut {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_LockOut', 'off' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_LockOut', 'off' );
 }
 
 sub setLockOutCmd {
@@ -1677,7 +1674,7 @@ sub setLockOutCmd {
 sub getLockOutCmd {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_LockOut_Cmd', 'none' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_LockOut_Cmd', 'none' );
 }
 
 sub setAntiFreeze {
@@ -1692,7 +1689,7 @@ sub setAntiFreeze {
 sub getAntiFreeze {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Antifreeze', 'off' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Antifreeze', 'off' );
 }
 
 sub setAutoAstroModeMorning {
@@ -1707,7 +1704,8 @@ sub setAutoAstroModeMorning {
 sub getAutoAstroModeMorning {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeMorning', 'none' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeMorning',
+        'none' );
 }
 
 sub setAutoAstroModeEvening {
@@ -1722,7 +1720,8 @@ sub setAutoAstroModeEvening {
 sub getAutoAstroModeEvening {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeEvening', 'none' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeEvening',
+        'none' );
 }
 
 sub setAutoAstroModeMorningHorizon {
@@ -1738,7 +1737,7 @@ sub setAutoAstroModeMorningHorizon {
 sub getAutoAstroModeMorningHorizon {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeMorningHorizon',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeMorningHorizon',
         0 );
 }
 
@@ -1755,7 +1754,7 @@ sub setAutoAstroModeEveningHorizon {
 sub getAutoAstroModeEveningHorizon {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeEveningHorizon',
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeEveningHorizon',
         0 );
 }
 
@@ -1771,7 +1770,7 @@ sub setUp {
 sub getUp {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Up', 'astro' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Up', 'astro' );
 }
 
 sub setDown {
@@ -1786,14 +1785,15 @@ sub setDown {
 sub getDown {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Down', 'astro' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Down', 'astro' );
 }
 
 sub setShadingBetweenTheTime {
     my $self    = shift;
     my $attrVal = shift;
 
-    _setAttributs( $self->{shuttersDev}, 'ASC_Shading_BetweenTheTime', $attrVal );
+    _setAttributs( $self->{shuttersDev}, 'ASC_Shading_BetweenTheTime',
+        $attrVal );
 
     return;
 }
@@ -1801,7 +1801,8 @@ sub setShadingBetweenTheTime {
 sub getShadingBetweenTheTime {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_Shading_BetweenTheTime', '00:00-24:00' );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_Shading_BetweenTheTime',
+        '00:00-24:00' );
 }
 
 sub setTimeUpEarly {
@@ -1816,7 +1817,7 @@ sub setTimeUpEarly {
 sub getTimeUpEarly {
     my $self = shift;
 
-    my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_Early', '05:00' );
+    my $val = ::AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_Early', '05:00' );
 
     if ( defined( PerlCodeCheck($val) ) ) {
         $val = PerlCodeCheck($val);
@@ -1841,7 +1842,7 @@ sub setTimeUpLate {
 sub getTimeUpLate {
     my $self = shift;
 
-    my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_Late', '08:30' );
+    my $val = ::AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_Late', '08:30' );
 
     if ( defined( PerlCodeCheck($val) ) ) {
         $val = PerlCodeCheck($val);
@@ -1866,7 +1867,7 @@ sub setTimeDownEarly {
 sub getTimeDownEarly {
     my $self = shift;
 
-    my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Down_Early', '16:00' );
+    my $val = ::AttrVal( $self->{shuttersDev}, 'ASC_Time_Down_Early', '16:00' );
 
     if ( defined( PerlCodeCheck($val) ) ) {
         $val = PerlCodeCheck($val);
@@ -1891,7 +1892,7 @@ sub setTimeDownLate {
 sub getTimeDownLate {
     my $self = shift;
 
-    my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Down_Late', '22:00' );
+    my $val = ::AttrVal( $self->{shuttersDev}, 'ASC_Time_Down_Late', '22:00' );
 
     if ( defined( PerlCodeCheck($val) ) ) {
         $val = PerlCodeCheck($val);
@@ -1917,7 +1918,7 @@ sub getTimeUpWeHoliday {
     my $self = shift;
 
     my $val =
-      AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_WE_Holiday', '01:25' );
+      ::AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_WE_Holiday', '01:25' );
 
     if ( defined( PerlCodeCheck($val) ) ) {
         $val = PerlCodeCheck($val);
@@ -1939,7 +1940,7 @@ sub getBrightnessMinVal {
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
             ->{LASTGETTIME} ) < 2
       );
@@ -1958,7 +1959,7 @@ sub getBrightnessMaxVal {
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
               ->{LASTGETTIME}
         )
-        && ( gettimeofday() -
+        && ( ::gettimeofday() -
             $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}
             ->{LASTGETTIME} ) < 2
       );
@@ -1980,7 +1981,7 @@ sub setDriveUpMaxDuration {
 sub getDriveUpMaxDuration {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_DriveUpMaxDuration', 60 );
+    return ::AttrVal( $self->{shuttersDev}, 'ASC_DriveUpMaxDuration', 60 );
 }
 
 1;

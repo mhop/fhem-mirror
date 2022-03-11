@@ -474,7 +474,9 @@ attribute list if you want to know if a device supports these attributes.  <br>
     reading if such a reading for the current device exists. If the value of
     this attribute is enclosed in {}, then it is evaluated. This attribute is
     evaluated each time a reading is updated.<br>
-    The "set magic" described <a href="#set">here</a> is also applied.
+    The "set magic" described <a href="#set">here</a> is also applied.<br>
+    Note: some FHEM modules are setting STATE directly (against the guidelines),
+    in this case the attribute may not work as expected.
     </li>
     <p>
 
@@ -539,7 +541,7 @@ attribute list if you want to know if a device supports these attributes.  <br>
     <tr><td>max</td><td>the largest value encountered</td></tr>
     <tr><td>mean</td><td>the arithmetic mean of all values</td></tr>
     <tr><td>sd</td><td>the standard deviation from the mean</td></tr>
-    <tr><td>median</td><td>the median of all values (requires holdTime and function none)</td></tr>
+    <tr><td>median</td><td>the median of all values (requires holdTime and method none)</td></tr>
     <tr><td>integral</td><td>the arithmetic sum (if not time-weighted) or integral area (if time-weighted) of all values</td></tr>
     <tr><td>n</td><td>number of samples</td></tr>
     <tr><td>t</td><td>timestamp of the last value</td></tr>
@@ -584,7 +586,7 @@ attribute list if you want to know if a device supports these attributes.  <br>
     </li>
     <p>
 
-    <a name="event-min-interval">bla</a>
+    <a name="event-min-interval"></a>
     <li>event-min-interval<br>
     This attribute takes a comma-separated list of reading:minInterval pairs.
     You may use regular expressions for reading. Events will only be
@@ -843,7 +845,7 @@ The following local attributes are used by a wider range of devices:
 <a name="deleteattr"></a>
 <h3>deleteattr</h3>
 <ul>
-  <code>deleteattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
+  <code>deleteattr [-silent] &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
   <br>
   Delete either a single attribute (see the <a href="#attr">attr</a> command)
   or all attributes for a device (if no &lt;attrname&gt; is defined).
@@ -1473,7 +1475,7 @@ The following local attributes are used by a wider range of devices:
       contains configuration errors and security issues collected at FHEM
       startup.
     </li><br>
-  <ul><br>
+  </ul><br>
 
   <b>Attributes</b>
   <ul>
@@ -1566,10 +1568,10 @@ The following local attributes are used by a wider range of devices:
 
     <a name="commandref"></a>
     <li>commandref<br>
-        If set to "full" (default), then a full commandref will be generated
-        after each update. If set to modular, there is only a short description
-        at the beginning, and the module documentation is loaded from FHEM
-        dynamically.
+        If set to "full", then a full commandref will be generated after each
+        update. If set to modular (default since FHEM 6.1), there is only a
+        short description at the beginning, and the module documentation is
+        loaded from FHEM dynamically.
     </li><br>
 
     <a name="globaldisableFeatures"></a>
@@ -1601,6 +1603,18 @@ The following local attributes are used by a wider range of devices:
         attribute is set, then FHEM specific nonblocking code will be used to
         resolve the given address. If this attribute is not set, the blocking
         OS implementation (inet_aton and gethostbyname) will be used.
+    </li><br>
+
+    <a name="encoding"></a>
+    <li>encoding<br>
+        Set the internal encoding used for storing strings.
+        Possible values: bytestream (default) and unicode.<br>
+        Notes:
+        <ul>
+          <li>Since not all modules were checked, if they work correctly with
+              the internal unicode encoding, this feature is experimental.</li>
+          <li>Changing the attribute value triggers a save and a shutdown restart</li>
+        </ul>
     </li><br>
 
     <a name="featurelevel"></a>
@@ -1921,7 +1935,7 @@ The following local attributes are used by a wider range of devices:
     </ul>
     $we is equivalent to calling IsWe(), which optionally takes the arguments
     "today", "yesterday", "tomorrow", MM-DD or YYYY-MM-DD. Note: for everything
-    else "today" is assumed without an error message.
+    else the state reading is evaluated, and no error message is issued.
     </li><br>
 
   <li>
@@ -1933,30 +1947,31 @@ The following local attributes are used by a wider range of devices:
     <br>
     <ul>
       <li>Value(&lt;devicename&gt;)<br>
-        returns the state of the device (the string you see in paranthesis in
+        Returns the state of the device (the string you see in parenthesis in
         the output of the list command).
         </li><br>
       <li>OldValue(&lt;devicename&gt;)
       <li>OldTimestamp(&lt;devicename&gt;)<br>
-        returns the old value/timestamp of the device.
+        Returns the old value/timestamp of the device.
         </li><br>
       <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
-        Return the reading (the value in the Readings section of "list device")
+        Returns the reading (the value in the Readings section of "list device")
         </li><br>
       <li>
         ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,
                     &lt;defaultvalue&gt;,&lt;round&gt;)<br>
-        Return the first number from a reading value.
-        Round id to &lt;round&gt; devimal places (optional parameter).
+        Returns the first number from a reading value.
+        Round it to &lt;round&gt; decimal places (optional parameter). If &lt;round&gt; exeeds the length of
+          the factional part, 0's will be padded.
         </li><br>
       <li>ReadingsTimestamp(&lt;devicename&gt;,&lt;reading&gt;,&lt;
         defaultvalue&gt;)<br>
-        returns the timestamp of the reading.
+        Returns the timestamp of a reading.
         </li><br>
       <li>ReadingsAge(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)
         <br>
-        returns the age of the reading in seconds.
+        Returns the age of a reading in seconds.
         </li><br>
 
       <li>
@@ -1974,7 +1989,7 @@ The following local attributes are used by a wider range of devices:
 
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
-        Return the attribute of the device
+        Returns the attribute of a device
         <br><br>
         { Value("wz") }<br>
         { OldValue("wz") }<br>
@@ -1999,7 +2014,8 @@ The following local attributes are used by a wider range of devices:
         InternalNum(&lt;devicename&gt;,&lt;property&gt;,
                     &lt;defaultvalue&gt;,&lt;round&gt;)<br>
         Return the first number from an internal value.
-        Round id to &lt;round&gt; devimal places (optional parameter).
+        Round it to &lt;round&gt; decimal places (optional parameter). If &lt;round&gt; exeeds the length of
+        the factional part, 0's will be padded.
         </li><br>
       </ul>
       </li><br>

@@ -6,6 +6,7 @@
 # 2013-11-17_21:35:57 sysmon wlan0_diff: Received: 23.54 MB, Sent: 42.64 MB, Total: 66.18 MB
 #
 
+set readonly
 set terminal png transparent size <SIZE> crop
 
 set output '<OUT>.png'

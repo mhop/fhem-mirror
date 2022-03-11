@@ -76,6 +76,7 @@ use vars qw($FW_wname);   # Web instance
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw(%FW_pos);     # scroll position
 use vars qw($FW_cname);   # Current connection name
+use vars qw($FW_chash);   # client fhem hash
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
@@ -120,10 +121,10 @@ my $FW_XHR;        # Data only answer, no HTML
 my $FW_id="";      # id of current page
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
 my $FW_headerlines; #
-my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
 my $FW_styleStamp=time();
 my %FW_svgData;
+my $FW_encodedByPlugin; # unicodeEncoding: data is encoded by plugin
 
 
 #####################################
@@ -218,7 +219,7 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } (
+  map { addToAttrList($_, "FHEMWEB") } (
     "cmdIcon",
     "devStateIcon:textField-long",
     "devStateStyle",
@@ -358,6 +359,8 @@ FW_Read($$)
     # Data from HTTP Client
     my $buf;
     my $ret = sysread($c, $buf, 1024);
+    $buf = Encode::decode($hash->{encoding}, $buf)
+                if($unicodeEncoding && $hash->{encoding});
 
     if(!defined($ret) && $! == EWOULDBLOCK ){
       $hash->{wantWrite} = 1
@@ -423,6 +426,8 @@ FW_Read($$)
       $data = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $data));
     }
 
+    $data = Encode::decode('UTF-8', $data) if($unicodeEncoding && $op == 1);
+
     my $ret = FW_fC($data);
     FW_addToWritebuffer($hash,
                        FW_longpollInfo("JSON", defined($ret) ? $ret : "")."\n");
@@ -461,6 +466,10 @@ FW_Read($$)
                          $k =~ s/(\w+)/\u$1/g; #39203
                          $k=>(defined($v) ? $v : 1);
                        } @FW_httpheader;
+  if(!$hash->{encoding}) {
+    my $ct = $FW_httpheader{"Content-Type"};
+    $hash->{encoding} = ($ct && $ct =~ m/charset\s*=\s*(\S*)/i ? $1 : $FW_encoding);
+  }
   delete($hash->{HDR});
 
   my @origin = grep /Origin/i, @FW_httpheader;
@@ -556,6 +565,7 @@ FW_Read($$)
       $FW_headerlines.
        "\r\n" );
     $FW_chash->{websocket} = 1;
+    $FW_chash->{encoding} = 'UTF-8'; # WS specifies its own encoding
 
     my $me = $FW_chash;
     my ($cmd, $cmddev) = FW_digestCgi($arg);
@@ -616,8 +626,11 @@ FW_finishRead($$$)
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use{zlib}) {
-    utf8::encode($FW_RET)
-        if(utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/ );
+    $FW_RET = Encode::encode($hash->{encoding}, $FW_RET)
+        if(!$FW_encodedByPlugin &&
+           ($unicodeEncoding ||
+           (utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/)));
+
     eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
     if($@) {
       Log 1, "memGzip: $@"; $FW_RET=""; #Forum #29939
@@ -625,6 +638,7 @@ FW_finishRead($$$)
       $compressed = "Content-Encoding: gzip\r\n";
     }
   }
+  $FW_encodedByPlugin = undef;
 
   my $length = length($FW_RET);
   my $expires = ($cacheable ?
@@ -638,7 +652,7 @@ FW_finishRead($$$)
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
-           $FW_RET, "FW_closeConn", 1) ){
+           $FW_RET, "FW_closeConn", "nolimit", "encoded") ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
       if(!$hash->{isChild});
     FW_closeConn($hash);
@@ -713,8 +727,11 @@ FW_initInform($$)
 sub
 FW_addToWritebuffer($$@)
 {
-  my ($hash, $txt, $callback, $nolimit) = @_;
+  my ($hash, $txt, $callback, $nolimit, $encoded) = @_;
 
+  $txt = Encode::encode($hash->{encoding}, $txt)
+          if($hash->{encoding} && !$encoded && ($unicodeEncoding ||
+                            (utf8::is_utf8($txt) && $txt =~ m/[^\x00-\xFF]/)));
   if( $hash->{websocket} ) {
     my $len = length($txt);
     if( $len < 126 ) {
@@ -817,6 +834,7 @@ FW_answerCall($)
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
+  $FW_encodedByPlugin = undef;
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
   FW_setStylesheet();
@@ -988,6 +1006,7 @@ FW_answerCall($)
       $FW_contentFunc = $h->{CONTENTFUNC};
       next if($h !~ m/HASH/ || !$h->{FUNC});
       #Returns undef as FW_RETTYPE if it already sent a HTTP header
+      $FW_encodedByPlugin = 1;
       no strict "refs";
       ($FW_RETTYPE, $FW_RET) = &{$h->{FUNC}}($arg);
       if(defined($FW_RETTYPE) && $FW_RETTYPE =~ m,text/html,) {
@@ -1269,6 +1288,10 @@ FW_digestCgi($)
     next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
     $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
+    if($unicodeEncoding) {
+      $pv = Encode::decode('UTF-8', $pv);
+      $pv =~ s/\x{2424}/\n/g; # revert fhemweb.js hack
+    }
     my ($p,$v) = split("=",$pv, 2);
     $v = "" if(!defined($v));
 
@@ -1408,7 +1431,11 @@ FW_makeTable($$$@)
           FW_pO "<td><div $ifidts>$t</div></td>";
         }
       } else {
-        $val = FW_htmlEscape($val);
+        if($val =~ m,^<html>(.*)</html>$,s) {
+          $val = $1;
+        } else {
+          $val = FW_htmlEscape($val);
+        }
         my $tattr = "informId=\"$name-$prefix$n\" class=\"dval\"";
 
         # if possible provide some links
@@ -1897,7 +1924,7 @@ FW_makeDeviceLine($$$$$)
       }
 
       if($htmlTxt) {
-        $htmlTxt =~ s,^<td[^>]*>(.*)</td>$,$1,;
+        $htmlTxt =~ s,^<td[^>]*>(.*)</td>$,$1,s;
       } else {
         my $nCmd = $cmdIcon{$cmd} ?
                       FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
@@ -1911,7 +1938,7 @@ FW_makeDeviceLine($$$$$)
           FW_pO "</tr><tr>"          if($wcl[$i1] =~ m/\n/);
           FW_pO "</tr></table></td>" if($i1 == @cl-1);
         } else {
-          FW_pO  "<td><div class='col3'>$wcl[$i1]$ htmlTxt</div></td>";
+          FW_pO  "<td><div class='col3'>$wcl[$i1]$htmlTxt</div></td>";
         }
 
       } else {
@@ -2300,6 +2327,7 @@ FW_select($$$$$@)
     next if($processed{$v});
     if($typeHash) {
       my $newType = $typeHash->{$v};
+      $newType =~ s/^#//; #124538, see also getAllAttr
       if($newType ne $oldType) {
         $s .= "</optgroup>" if($oldType);
         $s .= "<optgroup label='$newType'>" if($newType);
@@ -2385,18 +2413,24 @@ FW_fileNameToPath($)
   my $cfgFileName = $1;
   if($name eq $cfgFileName) {
     return $attr{global}{configfile};
+
   } elsif($name =~ m/.*(js|css|_defs.svg)$/) {
     return "$FW_cssdir/$name";
+
   } elsif($name =~ m/.*(png|svg)$/) {
     my $d="";
     map { $d = $_ if(!$d && -d "$FW_icondir/$_") } @FW_iconDirs;
     return "$FW_icondir/$d/$name";
+
   } elsif($name =~ m/.*gplot$/) {
     return "$FW_gplotdir/$name";
+
   } elsif($name =~ m/.*log$/) {
     return Logdir()."/$name";
+
   } else {
     return "$MW_dir/$name";
+
   }
 }
 
@@ -2712,7 +2746,7 @@ FW_makeImage(@)
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
       $data =~ s/<svg/<svg class="$class" data-txt="$txt"/; #52967
-      if($name =~ m/@([^:]*)(:(.*))?$/) {
+      if($name =~ m/@([^:@]*)([:@](.*))?$/) {
         my ($fill, $stroke) = ($1, $3);
         if($fill ne "") {
           $fill = "#$fill" if($fill =~ m/^([A-F0-9]{6})$/);
@@ -3800,8 +3834,9 @@ FW_log($$)
                               off:control_building_filled:278727
         </ul>
         If the cmd is noFhemwebLink, then no HTML-link will be generated, i.e.
-        nothing will happen when clicking on the icon or text.
-
+        nothing will happen when clicking on the icon or text.<br>
+        Note: if you need stroke coloring in the devStateIcon, you have to use
+        the alternative @fill@stroke syntax.
         </ul>
         Second form:<br>
         <ul>
@@ -4572,6 +4607,9 @@ FW_log($$)
         </ul>
         Falls cmd noFhemwebLink ist, dann wird kein HTML-Link generiert, d.h.
         es passiert nichts, wenn man auf das Icon/Text klickt.
+        Achtung: falls im devStateIcons das &Auml;ndern der Stiftfarbe
+        ben&oumltigt wird, dann ist die alternative @fill@stroke Syntax zu
+        verwenden.
         </ul>
         Zweite Variante:<br>
         <ul>

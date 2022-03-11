@@ -427,7 +427,8 @@ FBAHAHTTP_Write($$$)
     is 300). This command forces a state-refresh.
     </li>
   <li>template &lt;templateName&gt;<br>
-    Set the the template. Note: currently not working, for unknown reason.
+    Set the the template. Note: reported to work for templates without space
+    characters (Forum #98913)
     </li>
   </ul>
   <br>

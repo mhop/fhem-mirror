@@ -423,6 +423,10 @@ sub _ProcessingRetrieveData {
                             sprintf( "%.1f", ( $data->{wind}->{speed} * 3.6 ) )
                               + 0.5
                         ),
+                        'wind_gust' => int(
+                            sprintf( "%.1f", ( $data->{wind}->{gust} * 3.6 ) )
+                              + 0.5
+                        ),
                         'wind_direction' => $data->{wind}->{deg},
                         'cloudCover'     => $data->{clouds}->{all},
                         'code'       => $codes{ $data->{weather}->[0]->{id} },
@@ -553,6 +557,15 @@ sub _ProcessingRetrieveData {
                                             )
                                         ) + 0.5
                                     ),
+                                    'wind_gust' => int(
+                                        sprintf(
+                                            "%.1f",
+                                            (
+                                                $data->{list}->[$i]->{wind}
+                                                  ->{gust} * 3.6
+                                            )
+                                        ) + 0.5
+                                    ),
                                     'cloudCover' =>
                                       $data->{list}->[$i]->{clouds}->{all},
                                     'code' => $codes{
@@ -660,7 +673,7 @@ sub strftimeWrapper {
       "abstract": "Wetter API für OpenWeatherMap"
     }
   },
-  "version": "v1.0.2",
+  "version": "v1.0.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

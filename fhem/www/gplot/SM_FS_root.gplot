@@ -8,6 +8,7 @@
 # 2013-11-21_20:00:54 sysmon fs_root: Total: 7404 MB, Used: 3292 MB, 47 %, Available: 3787 MB
 #
 
+set readonly
 set terminal png transparent size <SIZE> crop
 
 set output '<OUT>.png'
