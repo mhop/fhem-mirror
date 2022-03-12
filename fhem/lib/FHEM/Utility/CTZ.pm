@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 0.0.2  12.03.2022 check required Perl modules 
 # 0.0.1  10.03.2022 initial
 
 package FHEM::Utility::CTZ;                                          
@@ -34,11 +35,12 @@ use strict;
 use warnings;
 use utf8;
 
- use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/Utility/CTZ.pm
+# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/Utility/CTZ.pm
 
 use GPUtils qw( GP_Import GP_Export );
-use DateTime;
-use DateTime::Format::Strptime;
+
+eval "use DateTime;1"                    or my $abs0 = 'DateTime';
+eval "use DateTime::Format::Strptime;1"  or my $abs1 = 'DateTime::Format::Strptime';
 
 use version 0.77; our $VERSION = version->declare('0.0.1');
 
@@ -81,6 +83,9 @@ sub convertTimeZone {
      $err = "function convertTimeZone got no data or data type is not of type HASH";
      return $err;
   }
+  
+  my $abs = modabsent();
+  return $abs if($abs);
 
   my $name      = $paref->{name}      // $pkg;
   my $dtstring  = $paref->{dtstring}  // q{};
@@ -127,9 +132,32 @@ return $valid;
 # returns an array reference list of all possible time zone names
 ###############################################################################
 sub getTZNames {
+  
+  if(modabsent()) {
+      return [qw()];
+  }
+  
   my $atz = DateTime::TimeZone->all_names;
           
 return $atz;
+}
+
+###############################################################################
+# Check required Perl modules
+###############################################################################
+sub modabsent {
+  
+  if ($abs0 || $abs1) {
+      $abs0 //= q{};
+      $abs1 //= q{};
+      
+      my $err = qq{the perl module "$abs0" and/or "$abs1" is not installed};
+      Log (1, "$pkg - ERROR - $err");
+      
+      return $err;
+  }
+          
+return;
 }
 
 1;
