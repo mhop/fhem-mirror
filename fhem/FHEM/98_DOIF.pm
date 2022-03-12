@@ -1292,9 +1292,7 @@ sub ReadingValDoIf
            $hours=$num;
          }
         }
-#       $hash->{collect}{"$name $reading"}{$hours}{value}=$r;
-#       $hash->{collect}{"$name $reading"}{$hours}{time}=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
-        setValue_collect(\%{$hash->{collect}{"$name $reading"}{$hours}});
+        setValue_collect($hash,\%{$hash->{collect}{"$name $reading"}{$hours}});
         return (\%{$hash->{collect}{"$name $reading"}{$hours}});
       } elsif ($regExp =~ /^d(\d)?/) {
         my $round=$1;
@@ -1355,23 +1353,23 @@ sub DOIF_collect_save_values {
 } 
 
 
-##sub collect_setValue
-##{
-##  my ($hash,$name,$reading,$hours)=@_;
-##  my $collect=\%{$hash->{collect}{"$name $reading"}{$hours}};
-##  setValue_collect ($collect);
-##}
-
 sub setValue_collect
 {
-  my ($collect)=@_;
+  my ($hash,$collect)=@_;
   my $name=${$collect}{name};
   my $reading=${$collect}{reading};
   my $hours=${$collect}{hours};
 
   my $r=ReadingsVal($name,$reading,0);
+  if (defined ${$collect}{output}) {
+    $_=$r;
+    $r=eval(${$collect}{output});
+    if ($@) {
+      Log3 ($hash->{NAME},4 , "$hash->{NAME}: $@");
+      readingsSingleUpdate ($hash, "error", "${$collect}{output}, ".$@,1);
+    }
+  }
   my ($seconds, $microseconds) = gettimeofday();
-  ##my $seconds=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
   $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : "N/A");
   ${$collect}{value}=$r;
   ${$collect}{time}=$seconds;
@@ -1673,11 +1671,12 @@ sub ReplaceReadingDoIf
              $hash->{accu}{"$name $reading"}{dim}=$dim;
              @{$hash->{accu}{"$name $reading"}{value}}=();
            }
-        } elsif ($format =~ /^((\d*)col(\d*)(.?))/) {
+        } elsif ($format =~ /^((\d*)col(\d*)(\w?))(?::(.*))?/) {
            $regExp =$1;
            my $dim= $2 eq "" ? 72:$2;           
            my $num=$3;
            my $time=$4;
+           $output=$5;
            my $hours=24;
            if ($num ne "") {
              if($time eq "d") {
@@ -1706,9 +1705,9 @@ sub ReplaceReadingDoIf
              $hash->{collect}{"$name $reading"}{$hours}{dim}=$dim;
              $hash->{collect}{"$name $reading"}{$hours}{name}=$name;
              $hash->{collect}{"$name $reading"}{$hours}{reading}=$reading;
-             setValue_collect(\%{$hash->{collect}{"$name $reading"}{$hours}});
-             ##collect_setValue($hash,$name,$reading,$hours);
            }
+           $hash->{collect}{"$name $reading"}{$hours}{output}=$output if ($output);
+           setValue_collect($hash,\%{$hash->{collect}{"$name $reading"}{$hours}});
         } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
           $regExp =$1;
           $output=$2;
@@ -2918,8 +2917,7 @@ DOIF_Notify($$)
       my $readingregex=CheckRegexpDoIf($hash,"collect",$dev->{NAME},"collect",$eventa,$eventas,$reading);
       if (defined $readingregex) {
         foreach my $hours (keys %{$hash->{collect}{"$device $readingregex"}}){
-          setValue_collect(\%{$hash->{collect}{"$device $readingregex"}{$hours}});
-          ## collect_setValue($hash,$device,$readingregex,$hours);
+          setValue_collect($hash,\%{$hash->{collect}{"$device $readingregex"}{$hours}});
         }
       }
     }
@@ -6388,6 +6386,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_setList__readingList">Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
   <a href="#DOIF_cmdState">Status des Moduls</a><br>
   <a href="#DOIF_uiTable">uiTable, DOIF Web-Interface</a><br>
+  <a href="#DOIF_uiState">uiState, DOIF Web-Interface im Status</a><br>
   <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
   <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
   <a href="#DOIF_DOIF_Readings">Erzeugen berechneter Readings<br>
@@ -6431,6 +6430,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_timerevent">timerevent</a> &nbsp;
   <a href="#DOIF_timerWithWait">timerWithWait</a> &nbsp;
   <a href="#DOIF_uiTable">uiTable</a> &nbsp;
+  <a href="#DOIF_uiState">uiState</a> &nbsp;
   <a href="#DOIF_wait">wait</a> &nbsp;
   <a href="#DOIF_waitdel">waitdel</a> &nbsp;
   <a href="#DOIF_waitsame">waitsame</a> &nbsp;
@@ -6569,8 +6569,8 @@ Beispiele für Regex-Angaben: <br>
 ["FS"] triggert auf alle Devices, die "FS" im Namen beinhalten <br>
 ["^FS"] triggert auf alle Devices, die mit "FS" im Namen anfangen <br>
 ["FS:temp"] triggert auf alle Devices, die "FS" im Namen und "temp" im Event beinhalten <br>
-([":^temp"]) triggert auf beliebige Devices, die im Event mit "temp" beginnen <br>
-(["^FS$:^temp$"] triggert auf Devices, die genau "FS" heißen und im Event genau "temp" vorkommt <br>
+[":^temp"] triggert auf beliebige Devices, die im Event mit "temp" beginnen <br>
+["^FS$:^temp$"] triggert auf Devices, die genau "FS" heißen und im Event genau "temp" vorkommt <br>
 [""] triggert auf alles<br>
 <br>
 In der Bedingung und im Ausführungsteil werden die Schlüsselwörter $SELF durch den eigenen Namen des DOIF-Moduls, $DEVICE durch das aktuelle Device, $EVENT durch die passende Eventzeile, $EVENTS kommagetrennt durch alle Eventzeilen des Triggers ersetzt.<br>
@@ -7657,9 +7657,7 @@ Anwendungsbeispiele für Fortgeschrittene: <a href="https://wiki.fhem.de/wiki/DO
 <b>uiState</a></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 <a name="uiState"></a>
-Die Syntax des uiState-Attributes entspicht der des uiTable-Attributes. Die definierte Tabelle wird jedoch in der Statuszeile des DOIF-Devices dargestellt.<br>
-<br> 
-Dieses Attribut ist nur im Perl-Modus verfügbar.<br>
+Die Syntax des uiState-Attributes entspricht der des uiTable-Attributes. Die definierte Tabelle wird jedoch in der Statuszeile des DOIF-Devices dargestellt.<br>
 <br> 
 Siehe Dokumentation: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable/uiState Dokumentation</a><br>
 <br>
