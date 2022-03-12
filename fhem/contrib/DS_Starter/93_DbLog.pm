@@ -8956,7 +8956,10 @@ attr SMA_Energymeter DbLogValueFn
        </code><br>
      
        UTC - der lokale Timestamp des Events wird nach UTC konvertiert. <br>
-       (default: none)
+       (default: none) <br><br>
+       
+       <b>Hinweis:</b> <br>
+       Die Perl-Module 'DateTime' und 'DateTime::Format::Strptime' müssen installiert sein !
      </ul>
      </li>
   </ul>
