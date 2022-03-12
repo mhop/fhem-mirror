@@ -50,11 +50,11 @@ my %device_types = (  0 => "User related",
                      32 => "Sleep Monitor",
                      64 => "Thermometer", );
 
-my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "Smart Kid Scale", 4 => "Smart Body Analyzer", 5 => "WiFi Body Scale", 6 => "Cardio Scale", 7 => "Body Scale", },
-                       2 => { 21 => "Smart Baby Monitor", 22 => "Home", 23 => "Home v2", },
-                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM Core", 45 => "BPM Connect"},
-                      16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", 58 => "Pulse HR", 59 => "Steel HR Sport", 90 => "Move", 91 => "Move ECG", 93 => "ScanWatch", },
-                      32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Aura v2", 63 => "Sleep", },
+my %device_models = (  1 => { 1 => "Withings WBS01", 2 => "WS30", 3 => "Kid Scale", 4 => "Smart Body Analyzer", 5 => "Body+", 6 => "Body Cardio", 7 => "Body", 9 => "Body Pro", 10 => "WBS08", 11 => "WBS10", 12 => "WBS11", },
+                       2 => { 21 => "Smart Baby Monitor", 22 => "Withings Home", 23 => "Home v2", },
+                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM Core", 45 => "BPM Connect", 46 => "BPM Connect Pro"},
+                      16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite (Pop, Steel)", 54 => "Withings Go", 55 => "Steel HR", 58 => "Pulse HR", 59 => "Steel HR Sport", 90 => "Move", 91 => "Move ECG", 92 => "Move ECG", 93 => "ScanWatch", },
+                      32 => { 60 => "Aura Dock", 61 => "Aura Sensor", 62 => "Aura Sensor V2", 63 => "Sleep", },
                       64 => { 70 => "Thermo", }, );
 
                       #Firmware files: cdnfw_withings_net
@@ -115,7 +115,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       59 => { name => "unknown 59", reading => "unknown59", }, # activity #vasistas activity scanwatch
                       60 => { name => "PIM movement", reading => "movementPIM", }, # aura mat #measure vasistas 20-200 peak 800 #vasistas
                       61 => { name => "Maximum movement", reading => "movementMaximum", }, # aura mat #measure vasistas 10-60 peak 600 #vasistas
-                      62 => { name => "unknown 62", reading => "unknown62", }, # aura mat #measure vasistas 20-100 #vasistas
+                      62 => { name => "unknown 62", reading => "unknown62", }, # aura mat #measure vasistas 20-100 #vasistas, watch ecg
                       63 => { name => "unknown 63", reading => "unknown63", }, # aura mat #measure vasistas 0-90 #vasistas
                       64 => { name => "unknown 64", reading => "unknown64", }, # aura mat #measure vasistas 30-150 #vasistas
                       65 => { name => "unknown 65", reading => "unknown65", }, # aura mat #measure vasistas 500-4000 peak 5000 #vasistas
@@ -135,8 +135,8 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       86 => { name => "unknown 86", reading => "unknown86", }, # body scale
                       87 => { name => "Active Calories (kcal)", reading => "caloriesActive", dailyreading => "dailyCaloriesActive", }, # measures list sleepreading! #vasistas
                       88 => { name => "Bone Mass (kg)", reading => "boneMassWeight", },
-                      89 => { name => "unknown 89", reading => "unknown89", }, #vasistas scanwatch meas w/ spo2
-                      90 => { name => "unknown 90", reading => "unknown90", }, #pulse #vasistas activity scanwatch
+                      89 => { name => "SpO2 Quality", reading => "spo2Quality", }, #vasistas scanwatch meas w/ spo2 quality! static
+                      90 => { name => "unknown 90", reading => "unknown90", }, #pulse #vasistas activity scanwatch device
                       91 => { name => "Pulse Wave Velocity (m/s)", reading => "pulseWave", },
                       93 => { name => "Muscle Mass (%)", reading => "muscleRatio", }, # cardio scale
                       94 => { name => "Bone Mass (%)", reading => "boneRatio", }, # cardio scale
@@ -165,32 +165,32 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      117 => { name => "unknown 117", reading => "unknown117", }, #?
                      118 => { name => "unknown 118", reading => "unknown118", }, #?
                      119 => { name => "unknown 119", reading => "unknown119", }, #?
-                     120 => { name => "unknown 120", reading => "unknown120", }, #pulse, vasistas, scanwatch activity
+                     120 => { name => "unknown 120", reading => "unknown120", }, #pulse, vasistas, scanwatch activity device
                      121 => { name => "Snoring", reading => "snoring", }, # sleep #vasistas
                      122 => { name => "Lean Mass (%)", reading => "fatFreeRatio", },
-                     123 => { name => "unknown 123", reading => "unknown123", },#
-                     124 => { name => "unknown 124", reading => "unknown124", },#
-                     125 => { name => "unknown 125", reading => "unknown125", },#
+                     123 => { name => "VO2max", reading => "VO2max", },#
+                     124 => { name => "workoutDuration", reading => "workoutDuration", },#workout
+                     125 => { name => "unknown 125", reading => "unknown125", },#workout vo2max time?
                      126 => { name => "unknown 126", reading => "unknown126", },#
-                     127 => { name => "unknown 127", reading => "unknown127", },#
+                     127 => { name => "fitnessLevel", reading => "fitnessLevel", },#scanwatch initial reading fitnesslevel
                      128 => { name => "unknown 128", reading => "unknown128", },#vasistas invalid for trackers from 2020/09
                      129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep, scanwatch *
                      130 => { name => "ECG", reading => "heartECG", },#bpm core
                      131 => { name => "Heart Sounds", reading => "heartSounds", },#bpm core
-                     132 => { name => "unknown 132", reading => "unknown132", },#vasistas, scanwatch
+                     132 => { name => "unknown 132", reading => "unknown132", },#vasistas, scanwatch spo2/hr
                      133 => { name => "unknown 133", reading => "unknown133", },# scanwatch
                      134 => { name => "unknown 134", reading => "unknown134", },#
                      135 => { name => "ecgQRS", reading => "ecgQRS", },# scanwatch ecg
                      136 => { name => "ecgPR", reading => "ecgPR", },# scanwatch ecg
                      137 => { name => "ecgQT", reading => "ecgQT", },# scanwatch ecg
                      138 => { name => "ecgQTc", reading => "ecgQTc", },# scanwatch ecg
-                     139 => { name => "unknown 139", reading => "unknown139", },# scanwatch
+                     139 => { name => "afibPPG", reading => "afibPPG", },# scanwatch
                      140 => { name => "unknown 140", reading => "unknown140", },#
-                     141 => { name => "unknown 141", reading => "unknown141", },# scanwatch meas
-                     142 => { name => "unknown 142", reading => "unknown142", },# scanwatch meas
-                     143 => { name => "unknown 143", reading => "unknown143", },#
-                     144 => { name => "unknown 144", reading => "unknown144", },#
-                     145 => { name => "unknown 145", reading => "unknown145", },#
+                     141 => { name => "unknown 141", reading => "unknown141", },# scanwatch meas hrstate
+                     142 => { name => "unknown 142", reading => "unknown142", },# scanwatch meas hrlevel
+                     143 => { name => "unknown 143", reading => "unknown143", },#hr level min
+                     144 => { name => "unknown 144", reading => "unknown144", },#hr level max
+                     145 => { name => "afibECG", reading => "afibECG", },#
                      146 => { name => "unknown 146", reading => "unknown146", },#
                      147 => { name => "unknown 147", reading => "unknown147", },#
                      148 => { name => "unknown 148", reading => "unknown148", },#
@@ -198,11 +198,11 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      150 => { name => "unknown 150", reading => "unknown150", },#
                      151 => { name => "unknown 151", reading => "unknown151", },#
                      152 => { name => "unknown 152", reading => "unknown152", },#
-                     153 => { name => "unknown 153", reading => "unknown153", },#
-                     154 => { name => "unknown 154", reading => "unknown154", },#
-                     155 => { name => "Vascular Age", reading => "vascularAge", },#
+                     153 => { name => "unknown 153", reading => "unknown153", },#watch ecg?
+                     154 => { name => "unknown 154", reading => "unknown154", },#watch ecg?
+                     155 => { name => "Vascular Age", reading => "vascularAge", },#scale
                      156 => { name => "unknown 156", reading => "unknown156", },#
-                     157 => { name => "unknown 157", reading => "unknown157", },#
+                     157 => { name => "unknown 157", reading => "unknown157", },#vascularage!
                      158 => { name => "unknown 158", reading => "unknown158", },#
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
@@ -299,6 +299,18 @@ my %aggregate_range = (  1 => "day",
                          3 => "month",
                          4 => "year",
                          5 => "alltime", );
+
+my %appli_types = (  1 => "user.metrics,      Weight",
+                     2 => "user.metrics, Temperature",
+                     4 => "user.metrics,    Pressure",
+                    16 => "users.activity,  Activity",
+                    44 => "users.activity,     Sleep",
+                    46 => "user.info,        Account",
+                    50 => "user.sleepevents,  Bed In",
+                    51 => "user.sleepevents, Bed Out",
+                    52 => "user.sleepevents, Inflate",
+                    54 => "user.metrics,     ECG New",
+                    55 => "user.metrics,    ECG Fail", );
 
 my %event_types = (  10 => { name => "Noise", reading => "alertNoise", threshold => "levelNoise", duration => "durationNoise", unit => 0, },
                      11 => { name => "Motion", reading => "alertMotion", threshold => "levelMotion", duration => "durationMotion", unit => -2, },
@@ -973,6 +985,7 @@ sub withings_connect($) {
     if( defined($modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"}) ) {
       my $d = $modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"};
       $d->{association} = $device->{association} if($device->{association});
+      $d->{devicehash} = $device->{hash_deviceid} if($device->{hash_deviceid});
 
       #get user from association
       if(defined($device->{deviceproperties})){
@@ -1059,6 +1072,7 @@ sub withings_autocreate($) {
     if( defined($modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"}) ) {
       my $d = $modules{$hash->{TYPE}}{defptr}{"D$device->{deviceid}"};
       $d->{association} = $device->{association} if($device->{association});
+      $d->{devicehash} = $device->{hash_deviceid} if($device->{hash_deviceid});
 
       #get user from association
       if(defined($device->{deviceproperties})){
@@ -3694,7 +3708,7 @@ sub withings_removeExtension($) {
   $name = $hash->{NAME} if(!defined($name));
   Log3 $name, 2, "Disabling Withings webcall for $name ";
   delete $data{FWEXT}{$url};
-  delete $modules{"livetracking"}{defptr}{"webcall"};
+  delete $modules{"withings"}{defptr}{"webcall"};
 }
 
 #########################
@@ -3994,6 +4008,8 @@ sub withings_AuthList($) {
     next if( !defined($profile->{appli}) );
     $ret .= $profile->{appli};
     $ret .= "\t";
+    $ret .= $appli_types{$profile->{appli}};
+    $ret .= "\t";
     $ret .= $profile->{comment};
     $ret .= "\t";
     $ret .= $profile->{callbackurl};
@@ -4061,9 +4077,9 @@ sub withings_AuthSubscribe($) {
 
   my $ret = "Please open the following URLs in your browser to subscribe:\n\n";
   foreach my $appli (@applis) {
-
+    $ret.='Appli Type '.$appli." (".$appli_types{$appli}.")\n";
     $ret.='https://wbsapi.withings.net/notify?action=subscribe&access_token='.$acc.'&appli='.$appli.'&comment=FHEM&callbackurl='.$cb;
-    $ret .= "\n";
+    $ret .= "\n\n";
     next;
 
     my $ua = LWP::UserAgent->new;
@@ -4134,6 +4150,11 @@ sub withings_DbLog_splitFn($) {
     $reading = 'sleepstate';
     $unit = '';
   }
+  elsif($event =~ m/ecgQT/)
+  {
+    $reading = 'VO2max';
+    $unit = 'ml/kg/min';
+  }
   elsif($event =~ m/ecgQRS/)
   {
     $reading = 'ecgQRS';
@@ -4154,7 +4175,6 @@ sub withings_DbLog_splitFn($) {
     $reading = 'ecgQT';
     $unit = 'ms';
   }
-
   elsif($event =~ m/pulseWaveRaw/)
   {
     $reading = 'pulseWaveRaw';
