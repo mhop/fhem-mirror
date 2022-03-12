@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 24440 2021-05-15 06:43:56Z DS_Starter $
+# $Id: 93_DbLog.pm 25800 2022-03-08 20:07:32Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2021 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2022 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster)
@@ -28,8 +28,14 @@ use Encode qw(encode_utf8);
 use HttpUtils;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
+use FHEM::Utility::CTZ qw(:all);
+
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.13.0"  => "12.03.2022 new Attr convertTimezone",
+  "4.12.7"  => "08.03.2022 \$data{firstvalX} doesn't work, forum: https://forum.fhem.de/index.php/topic,126631.0.html ",
+  "4.12.6"  => "17.01.2022 change log message deprecated to outdated, forum:#topic,41089.msg1201261.html#msg1201261 ",
+  "4.12.5"  => "31.12.2021 standard unit assignment for readings beginning with 'temperature' and removed, forum:#125087 ",
   "4.12.4"  => "27.12.2021 change ParseEvent for FBDECT, warning messages for deprecated commands added ",
   "4.12.3"  => "20.04.2021 change sub DbLog_ConnectNewDBH for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
   "4.12.2"  => "08.04.2021 change standard splitting ",
@@ -277,6 +283,7 @@ sub DbLog_Initialize {
                                "colEvent ".
                                "colReading ".
                                "colValue ".
+                               "convertTimezone:UTC,none ".
                                "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
                                "DbLogType:Current,History,Current/History,SampleFill/History ".
                                "SQLiteJournalMode:WAL,off ".
@@ -659,7 +666,7 @@ sub DbLog_Set {
     my $ret;
 
     if ($a[1] eq 'reduceLog') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> reduceLog" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
         my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
         if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
         if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
@@ -675,7 +682,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'reduceLogNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> reduceLog" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
         my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
         if ($nd && $nd <= $od) {return "The second day value must be greater than the first one ! ";}
         if (defined($a[3]) && $a[3] !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
@@ -933,7 +940,7 @@ sub DbLog_Set {
         return;
     }
     elsif ($a[1] eq 'count') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> countEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
         $dbh = DbLog_ConnectNewDBH($hash);
         
         if(!$dbh) {
@@ -952,7 +959,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'countNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> countEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
         if ($hash->{HELPER}{COUNT_PID} && $hash->{HELPER}{COUNT_PID}{pid} !~ m/DEAD/){  
             $ret = "DbLog count already in progress. Please wait until the running process is finished.";
         } 
@@ -963,7 +970,7 @@ sub DbLog_Set {
         }           
     }
     elsif ($a[1] eq 'deleteOldDays') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> delEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
         Log3 ($name, 3, "DbLog $name -> Deletion of records older than $a[2] days in database $db requested");
         my ($c, $cmd);
         
@@ -993,7 +1000,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'deleteOldDaysNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> delEntries" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
         if (defined $a[2] && $a[2] =~ /^\d+$/) {
             if ($hash->{HELPER}{DELDAYS_PID} && $hash->{HELPER}{DELDAYS_PID}{pid} !~ m/DEAD/) {  
                 $ret = "deleteOldDaysNbl already in progress. Please wait until the running process is finished.";
@@ -1011,7 +1018,7 @@ sub DbLog_Set {
         }
     }
     elsif ($a[1] eq 'userCommand') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is deprecated. Please use DbRep "set <Name> sqlCmd" instead.});
+        Log3($name, 2, qq{DbLog $name - WARNING - "$a[1]" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
         $dbh = DbLog_ConnectNewDBH($hash);
         if(!$dbh) {
             Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB connect not possible");
@@ -1116,11 +1123,13 @@ sub DbLog_ParseEvent {
       } 
   }
 
-  #globales Abfangen von 
+  #globales Abfangen von                                                  # changed in Version 4.12.5
   # - temperature
   # - humidity
-  if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
-  elsif($reading =~ m(^humidity))    { $unit = "%"; }                    # wenn reading mit humidity beginnt
+  #if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
+  #elsif($reading =~ m(^humidity))    { $unit = "%"; }                    # wenn reading mit humidity beginnt
+  if($reading =~ m(^humidity))    { $unit = "%"; }                        # wenn reading mit humidity beginnt
+  
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -1440,12 +1449,32 @@ sub DbLog_Log {
           my $event = $events->[$i];
           $event    = "" if(!defined($event));
           $event    = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
-          Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
+          Log3 ($name, 4, "DbLog $name -> check Device: $dev_name , Event: $event") if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
       
           if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
               my $timestamp = $ts_0;
-              $timestamp = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
-              $event =~ s/\|/_ESC_/gxs;                                                               # escape Pipe "|"
+              $timestamp    = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
+              
+              my $ctz = AttrVal($name, 'convertTimezone', 'none');                                           # convert time zone
+              if($ctz ne 'none') {
+                  my $err;
+                  my $params = {
+                      name      => $name,
+                      dtstring  => $timestamp,
+                      tzcurrent => 'local',
+                      tzconv    => $ctz,
+                      writelog  => 0
+                  };
+                  
+                  ($err, $timestamp) = convertTimeZone ($params);
+                  
+                  if ($err) {
+                      Log3 ($name, 1, "DbLog $name - ERROR while converting time zone: $err - exit log loop !");
+                      last;
+                  }
+              }
+              
+              $event        =~ s/\|/_ESC_/gxs;                                                               # escape Pipe "|"
               
               my @r = DbLog_ParseEvent($name,$dev_name, $dev_type, $event);
               $reading = $r[0];
@@ -1634,6 +1663,7 @@ sub DbLog_Log {
                       else {
                           Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
                       }
+                      
                       $dev_name  = $DEVICE     if($DEVICE ne '');
                       $dev_type  = $DEVICETYPE if($DEVICETYPE ne '');
                       $reading   = $READING    if($READING ne '');
@@ -2620,8 +2650,9 @@ sub DbLog_PushAsync {
               # ohne PK
               $sqlins = "INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
           } 
-          no warnings 'uninitialized';          
-          foreach my $row (@row_array) {
+          no warnings 'uninitialized'; 
+          
+          for my $row (@row_array) {
               my @a = split("\\|",$row);       
               s/_ESC_/\|/gxs for @a;                  # escaped Pipe return to "|"
               Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";
@@ -2632,7 +2663,8 @@ sub DbLog_PushAsync {
               $a[5] =~ s/\\/\\\\/g;                   # escape \ with \\
               $a[6] =~ s/\\/\\\\/g;                   # escape \ with \\
               $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
-          }   
+          }  
+          
           use warnings;
           
           chop($sqlins);
@@ -2645,9 +2677,9 @@ sub DbLog_PushAsync {
           if ($@) {
               Log3($name, 2, "DbLog $name -> Error start transaction for $history - $@");
           }
+          
           eval { $sth_ih = $dbh->prepare($sqlins);
-                 if($tl) {
-                     # Tracelevel setzen       
+                 if($tl) {                                                 # Tracelevel setzen       
                      $sth_ih->{TraceLevel} = "$tl|$tf";
                  }            
                  my $ins_hist = $sth_ih->execute();
@@ -3504,7 +3536,7 @@ sub DbLog_Get {
   my ($retval,$retvaldummy,$hour,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
   my @ReturnArray;
   my $writeout = 0;
-  my (@min, @max, @sum, @cnt, @lastv, @lastd, @mind, @maxd);
+  my (@min, @max, @sum, @cnt, @firstv, @firstd, @lastv, @lastd, @mind, @maxd);
   my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval, $deltacalc);   # fuer delta-h/d Berechnung
 
   # extract the Device:Reading arguments into @readings array
@@ -3602,17 +3634,19 @@ sub DbLog_Get {
   for(my $i=0; $i<int(@readings); $i++) {
       # ueber alle Readings
       # Variablen initialisieren
-      $min[$i]   =  (~0 >> 1);
-      $max[$i]   = -(~0 >> 1);
-      $sum[$i]   = 0;
-      $cnt[$i]   = 0;
-      $lastv[$i] = 0;
-      $lastd[$i] = "undef";                                          
-      $mind[$i]  = "undef";
-      $maxd[$i]  = "undef";
-      $minval    =  (~0 >> 1);                               # ist "9223372036854775807"
-      $maxval    = -(~0 >> 1);                               # ist "-9223372036854775807"
-      $deltacalc = 0;
+      $min[$i]    =  (~0 >> 1);
+      $max[$i]    = -(~0 >> 1);
+      $sum[$i]    = 0;
+      $cnt[$i]    = 0;
+      $firstv[$i] = 0;
+      $firstd[$i] = "undef";
+      $lastv[$i]  = 0;
+      $lastd[$i]  = "undef";                                          
+      $mind[$i]   = "undef";
+      $maxd[$i]   = "undef";
+      $minval     =  (~0 >> 1);                               # ist "9223372036854775807"
+      $maxval     = -(~0 >> 1);                               # ist "-9223372036854775807"
+      $deltacalc  = 0;
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
@@ -3773,20 +3807,22 @@ sub DbLog_Get {
                   $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
-
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
                   $out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;
-
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
                   # Berechung der vergangen Sekunden seit dem letzten Logeintrag
                   # zb. die Zeit zwischen on/off
                   my @a = split("[- :]", $sql_timestamp);
                   my $akt_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+                  
                   if($lastd[$i] ne "undef") {
                       @a = split("[- :]", $lastd[$i]);
                   }
+                  
                   my $last_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
                   $out_tstamp = $sql_timestamp;
                   $out_value  = sprintf("%02d", $akt_ts - $last_ts);
@@ -3797,8 +3833,8 @@ sub DbLog_Get {
                   else {
                       $writeout = 1;
                   }
-
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
                   if($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
@@ -3865,8 +3901,8 @@ sub DbLog_Get {
                       $minval     = $maxval;               
                       Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
-            
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {          # Berechnung eines Tages-Deltas
+              } 
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {          # Berechnung eines Tages-Deltas
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
                 
                   if($lastd[$i] eq "undef") {
@@ -3903,7 +3939,8 @@ sub DbLog_Get {
                       $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
                       $retval .= $retvaldummy;
                 
-                  } elsif ($outf =~ m/(array)/) {
+                  } 
+                  elsif ($outf =~ m/(array)/) {
                       push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                   } 
                   else {                                                         # generating plots
@@ -3929,14 +3966,21 @@ sub DbLog_Get {
                       $maxval = $sql_value;
                   } 
                   else {
+                      if($firstd[$i] eq "undef") {
+                          $firstv[$i] = $sql_value;
+                          $firstd[$i] = $sql_timestamp;
+                      }
+                      
                       if($sql_value < $min[$i]) {
                           $min[$i] = $sql_value;
                           $mind[$i] = $sql_timestamp;
                       }
+                      
                       if($sql_value > $max[$i]) {
                           $max[$i] = $sql_value;
                           $maxd[$i] = $sql_timestamp;
                       }
+                      
                       $sum[$i] += $sql_value;
                       $minval = $sql_value if($sql_value < $minval);
                       $maxval = $sql_value if($sql_value > $maxval);
@@ -3957,6 +4001,7 @@ sub DbLog_Get {
               else {
                   $lastv[$i] = $out_value if($out_value);
               }
+              
               $lastd[$i] = $sql_timestamp;
           }
       } 
@@ -3979,6 +4024,7 @@ sub DbLog_Get {
           }  
           $sum[$i] += $out_value;
           $cnt[$i]++;
+          
           if($outf =~ m/(all)/) {
               $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
           } 
@@ -4010,15 +4056,17 @@ sub DbLog_Get {
   # Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
       my $k = $j+1;
-      $data{"min$k"}      = $min[$j];
-      $data{"max$k"}      = $max[$j];
-      $data{"avg$k"}      = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
-      $data{"sum$k"}      = $sum[$j];
-      $data{"cnt$k"}      = $cnt[$j];
-      $data{"currval$k"}  = $lastv[$j];
-      $data{"currdate$k"} = $lastd[$j];
-      $data{"mindate$k"}  = $mind[$j];
-      $data{"maxdate$k"}  = $maxd[$j];
+      $data{"min$k"}       = $min[$j];
+      $data{"max$k"}       = $max[$j];
+      $data{"avg$k"}       = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
+      $data{"sum$k"}       = $sum[$j];
+      $data{"cnt$k"}       = $cnt[$j];
+      $data{"firstval$k"}  = $firstv[$j];
+      $data{"firstdate$k"} = $firstd[$j];
+      $data{"currval$k"}   = $lastv[$j];
+      $data{"currdate$k"}  = $lastd[$j];
+      $data{"mindate$k"}   = $mind[$j];
+      $data{"maxdate$k"}   = $maxd[$j];
   }
 
   # cleanup (plotfork) connection
@@ -4029,8 +4077,8 @@ sub DbLog_Get {
   if($internal) {
       $internal_data = \$retval;
       return undef;
-
-  } elsif($outf =~ m/(array)/) {
+  } 
+  elsif($outf =~ m/(array)/) {
       return @ReturnArray;
   } 
   else {
@@ -4842,15 +4890,16 @@ sub DbLog_AddLog {
       $value_fn = '';
   }
   
-  my $now  = gettimeofday(); 
-  
+  my $now    = gettimeofday(); 
   my $rdspec = (split ":",$devrdspec)[-1];
-  my @dc = split(":",$devrdspec);
+  my @dc     = split(":",$devrdspec);
   pop @dc;
   my $devspec = join(':',@dc);
 
   my @exdvs = devspec2array($devspec);
+  
   Log3 $name, 4, "DbLog $name -> Addlog known devices by devspec: @exdvs";
+  
   foreach (@exdvs) {
       $dev_name = $_;
       if(!$defs{$dev_name}) {
@@ -4863,6 +4912,7 @@ sub DbLog_AddLog {
       my $DbLogInclude = AttrVal($dev_name, "DbLogInclude", undef);
       my @exrds;
       my $found = 0;
+      
       foreach my $rd (sort keys %{$r}) {                                      # jedes Reading des Devices auswerten           
            my $do = 1;
            $found = 1 if($rd =~ m/^$rdspec$/);                                # Reading gefunden
@@ -4886,6 +4936,7 @@ sub DbLog_AddLog {
            next if(!$do);
            push @exrds,$rd if($rd =~ m/^$rdspec$/);    
       }
+      
       Log3 $name, 4, "DbLog $name -> Readings extracted from Regex: @exrds";
 
       if(!$found) {
@@ -4904,7 +4955,7 @@ sub DbLog_AddLog {
       no warnings 'uninitialized'; 
       foreach (@exrds) {
           $dev_reading = $_;
-          $read_val = $value ne ""?$value:ReadingsVal($dev_name,$dev_reading,"");
+          $read_val = $value ne "" ? $value : ReadingsVal($dev_name,$dev_reading,"");
           $dev_type = uc($defs{$dev_name}{TYPE});
           
           # dummy-Event zusammenstellen
@@ -4915,14 +4966,35 @@ sub DbLog_AddLog {
           $dev_reading = $r[0];
           $read_val    = $r[1];
           $ut          = $r[2];
-          if(!defined $dev_reading) {$dev_reading = "";}
-          if(!defined $read_val) {$read_val = "";}
+          if(!defined $dev_reading)     {$dev_reading = "";}
+          if(!defined $read_val)        {$read_val = "";}
           if(!defined $ut || $ut eq "") {$ut = AttrVal("$dev_name", "unit", "");}   
+          
           $event       = "addLog";
            
           $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{TIME}  = $now;
           $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{VALUE} = $read_val;
+          
           $ts = TimeNow();
+          
+          my $ctz = AttrVal($name, 'convertTimezone', 'none');                                               # convert time zone
+          if($ctz ne 'none') {
+              my $err;
+              my $params = {
+                  name      => $name,
+                  dtstring  => $ts,
+                  tzcurrent => 'local',
+                  tzconv    => $ctz,
+                  writelog  => 0
+              };
+              
+              ($err, $ts) = convertTimeZone ($params);
+              
+              if ($err) {
+                  Log3 ($name, 1, "DbLog $name - ERROR while converting time zone: $err - exit log loop !");
+                  last;
+              }
+          }
           
           # Anwender spezifische Funktion anwenden 
           if($value_fn ne '') {
@@ -4939,7 +5011,7 @@ sub DbLog_AddLog {
               my $LASTVALUE     = $lastv // "";                                                  # patch Forum:#111423
               my $UNIT          = $ut;
               my $IGNORE        = 0;
-              my $CN            = $cn?$cn:"";
+              my $CN            = $cn ? $cn : "";
 
               eval $value_fn;
               Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
@@ -4958,6 +5030,7 @@ sub DbLog_AddLog {
               else {
                   Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
               }
+              
               $dev_name     = $DEVICE     if($DEVICE ne '');
               $dev_type     = $DEVICETYPE if($DEVICETYPE ne '');
               $dev_reading  = $READING    if($READING ne '');
@@ -4983,7 +5056,11 @@ sub DbLog_AddLog {
               $data{DbLog}{$name}{cache}{index}++;
               my $index = $data{DbLog}{$name}{cache}{index};
               $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
-              my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
+              
+              my $memcount = $data{DbLog}{$name}{cache}{memcache} ? 
+                             scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 
+                             0;
+              
               if($ce == 1) {
                   readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
               } 
@@ -4998,6 +5075,7 @@ sub DbLog_AddLog {
       }
       use warnings;
   }
+  
   if(!$async) {    
       if(@row_array) {
           # synchoner Mode
@@ -6580,13 +6658,13 @@ sub DbLog_setVersionInfo {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 24440 2021-05-15 06:43:56Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 25800 2022-03-08 20:07:32Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 24440 2021-05-15 06:43:56Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 25800 2022-03-08 20:07:32Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -7035,7 +7113,7 @@ sub DbLog_showChildHandles {
         Performs simple sql select statements on the connected database. Usercommand and result will be written into 
         corresponding readings.</br>
         The result can only be a single line. 
-        The execution of SQL-Statements in DbLog is deprecated. Therefore the analysis module 
+        The execution of SQL-Statements in DbLog is outdated. Therefore the analysis module 
         <a href=https://fhem.de/commandref.html#DbRep>DbRep</a> should be used.</br>
       </ul><br/>
 
@@ -8440,7 +8518,7 @@ attr SMA_Energymeter DbLogValueFn
         Führt einfache sql select Befehle auf der Datenbank aus. Der Befehl und ein zurückgeliefertes 
         Ergebnis wird in das Reading "userCommand" bzw. "userCommandResult" geschrieben. Das Ergebnis kann nur 
         einzeilig sein. 
-        Die Ausführung von SQL-Befehlen in DbLog sind deprecated. Dafür sollte das Auswertungsmodul 
+        Die Ausführung von SQL-Befehlen in DbLog ist veraltet. Dafür sollte das Auswertungsmodul 
         <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden.</br>
       </ul><br>
 
@@ -8735,30 +8813,6 @@ attr SMA_Energymeter DbLogValueFn
   <br>
   
   <ul>
-    <a name="commitMode"></a>
-    <li><b>commitMode</b>
-    <ul>
-      <code>attr &lt;device&gt; commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on]
-      </code><br>
-      
-      Ändert die Verwendung der Datenbank Autocommit- und/oder Transaktionsfunktionen. 
-      Wird Transaktion "aus" verwendet, werden im asynchronen Modus nicht gespeicherte Datensätze nicht an den Cache zurück
-      gegeben.      
-      Dieses Attribut ist ein advanced feature und sollte nur im konkreten Bedarfs- bzw. Supportfall geändert werden.<br><br>
-      
-      <ul>
-      <li>basic_ta:on   - Autocommit Servereinstellung / Transaktion ein (default) </li>
-      <li>basic_ta:off  - Autocommit Servereinstellung / Transaktion aus </li>
-      <li>ac:on_ta:on   - Autocommit ein / Transaktion ein </li>
-      <li>ac:on_ta:off  - Autocommit ein / Transaktion aus </li>
-      <li>ac:off_ta:on  - Autocommit aus / Transaktion ein (Autocommit "aus" impliziert Transaktion "ein") </li>
-      </ul>  
-    </ul>
-    </li>
-  </ul>
-  <br>
-
-  <ul>
     <a name="cacheEvents"></a>
     <li><b>cacheEvents</b>
     <ul>
@@ -8864,6 +8918,45 @@ attr SMA_Energymeter DbLogValueFn
        VALUE nicht gefüllt. <br>
        <b>Hinweis:</b> <br>
        Mit gesetztem Attribut gelten alle Feldlängenbegrenzungen auch für SQLite DB wie im Internal COLUMNS angezeigt !  <br>
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
+    <a name="commitMode"></a>
+    <li><b>commitMode</b>
+    <ul>
+      <code>attr &lt;device&gt; commitMode [basic_ta:on | basic_ta:off | ac:on_ta:on | ac:on_ta:off | ac:off_ta:on]
+      </code><br>
+      
+      Ändert die Verwendung der Datenbank Autocommit- und/oder Transaktionsfunktionen. 
+      Wird Transaktion "aus" verwendet, werden im asynchronen Modus nicht gespeicherte Datensätze nicht an den Cache zurück
+      gegeben.      
+      Dieses Attribut ist ein advanced feature und sollte nur im konkreten Bedarfs- bzw. Supportfall geändert werden.<br><br>
+      
+      <ul>
+      <li>basic_ta:on   - Autocommit Servereinstellung / Transaktion ein (default) </li>
+      <li>basic_ta:off  - Autocommit Servereinstellung / Transaktion aus </li>
+      <li>ac:on_ta:on   - Autocommit ein / Transaktion ein </li>
+      <li>ac:on_ta:off  - Autocommit ein / Transaktion aus </li>
+      <li>ac:off_ta:on  - Autocommit aus / Transaktion ein (Autocommit "aus" impliziert Transaktion "ein") </li>
+      </ul>  
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
+     <a name="convertTimezone"></a>
+     <li><b>convertTimezone</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; convertTimezone [UTC | none] 
+       </code><br>
+     
+       UTC - der lokale Timestamp des Events wird nach UTC konvertiert. <br>
+       (default: none)
      </ul>
      </li>
   </ul>
@@ -9513,12 +9606,13 @@ attr SMA_Energymeter DbLogValueFn
         "Time::HiRes": 0,
         "Time::Local": 0,
         "HttpUtils": 0,
-        "Encode": 0        
+        "Encode": 0,
+        "FHEM::Utility::CTZ": 0        
       },
       "recommends": {
         "FHEM::Meta": 0,
-        "Devel::Size": 0,
-        "Data::Peek": 0
+        "DateTime": 0,
+        "DateTime::Format::Strptime": 0
       },
       "suggests": {
         "DBD::Pg" :0,
