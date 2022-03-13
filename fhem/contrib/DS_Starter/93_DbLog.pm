@@ -472,6 +472,11 @@ sub DbLog_Attr {
       if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {   
           InternalTimer(gettimeofday()+1.0, "DbLog_attrForSQLite", $hash, 0);
           InternalTimer(gettimeofday()+1.5, "DbLog_attrForSQLite", $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
+      }
+
+      if ($aName eq "convertTimezone") {
+          my $rmf = reqModFail();
+          return "You have to install the required perl module: ".$rmf if($rmf);
       }      
   }
  
