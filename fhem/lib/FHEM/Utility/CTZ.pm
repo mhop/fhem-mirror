@@ -87,7 +87,7 @@ sub convertTimeZone {
   }
   
   my $rmf = reqModFail();
-  return $rmf if($rmf);
+  return "required perl module not installed: ".$rmf if($rmf);
 
   my $name      = $paref->{name}      // $pkg;
   my $dtstring  = $paref->{dtstring}  // q{};
@@ -136,8 +136,9 @@ return $valid;
 sub getTZNames {
   
   my $rmf = reqModFail();
+  
   if($rmf) {
-      $rmf = "ERROR - ".$rmf;
+      $rmf = "ERROR - required perl module not installed: ".$rmf;
       Log (1, "$pkg - $rmf");
       return [($rmf)];
   }
@@ -157,7 +158,7 @@ sub reqModFail {
       push @ma, $abs0 if($abs0);
       push @ma, $abs1 if($abs1);
       
-      my $err = "required perl module not installed: ".join ", ", @ma;
+      my $err = join ", ", @ma;
       
       return $err;
   }
