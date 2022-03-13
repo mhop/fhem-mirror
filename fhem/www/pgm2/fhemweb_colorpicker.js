@@ -28,27 +28,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     mode = vArr[1]
   //console.log( "mode: "+mode );
 
-  //preset ?
-  if( params && params.length ) {
-    var color = params[0];
-    if( mode == 'CT' )
-      color = colorpicker_ct2rgb(color);
-    else if( mode == 'BRI' ) {
-      color = parseInt(255 * color / vArr[4]);
-      color = colorpicker_rgb2hex(color,color,color);
-    } else if( mode == 'HUE' ) {
-      var h = 255 * params[0] / vArr[4];
-      var s = 1;
-      var v = 1;
-      var color = colorpicker_hsv2rgb(h,s,v);
-    }
-
-    var newEl = $('<div informID="###" style="width:32px;height:19px;border:1px solid #fff;border-radius:8px;background-color:#'+color+'" >').get(0);
-    $(newEl).click(function(arg) { cmd(params[0]) });
-    return newEl;
-  }
-
-  var cmds = [];     // the 3 commands für hue, sat, bri
+  var cmds = [];   // the 3 commands für hue, sat, bri
   var ranges = []; // the 3 slider ranges
   var is_real_hsv = false;
   if( vArr.length == 14 ) { // hsv:colorpicker,HSV,hue,0,1,360,sat,0,1,100,bri,0,1,100
@@ -60,6 +40,26 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     ranges[1] = [vArr[7],vArr[8],vArr[9]];
     cmds[2] = function(arg) { FW_cmd(FW_root+"?cmd=set "+devName+" "+vArr[10]+" "+arg+"&XHR=1"); };
     ranges[2] = [vArr[11],vArr[12],vArr[13]];
+  }
+
+  //preset ?
+  if( params && params.length ) {
+    var color = params[0];
+    if( mode == 'CT' )
+      color = colorpicker_ct2rgb(color);
+    else if( mode == 'BRI' ) {
+      color = parseInt(255 * color / vArr[4]);
+      color = colorpicker_rgb2hex(color,color,color);
+    } else if( mode == 'HUE' ) {
+      var h = params[0] / vArr[4];
+      var s = 1;
+      var v = 1;
+      var color = colorpicker_hsv2rgb(h,s,v);
+    }
+
+    var newEl = $('<div informID="###" style="width:32px;height:19px;border:1px solid #fff;border-radius:8px;background-color:#'+color+'" >').get(0);
+    $(newEl).click(function(arg) { cmd(params[0]) });
+    return newEl;
   }
 
   function value2hsv(value) {
