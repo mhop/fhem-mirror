@@ -63,6 +63,7 @@
 #             add clear PID helper structure when PWM or PWMR object gets disabled
 # 31.01.21 GA fix wrong time logged for "desired-temp was manualy set until"
 # 02.02.21 GA fix handle access to not yet defined iodev on startup
+# 13.03.22 GA fix handle error in attr desiredTempFrom when device is not yet defined during startup 
 
 # module for PWM (Pulse Width Modulation) calculation
 # this module defines a room for calculation 
@@ -1644,7 +1645,12 @@ PWMR_Attr(@)
 
     # check if device exist 
     unless (defined($defs{$hash->{d_name}})) {
-      return "error: $hash->{d_name} does not exist.";
+      my $msg = "error: $hash->{d_name} does not exist.";
+      if ($init_done == 1) {
+        return $msg;
+      } else { # during startup only log error because device maybe defined later
+        Log3 ($hash, 3, "PWMR_Attr desiredTempFrom $msg (maybe defined later)");
+      }
     }
     PWMR_NormalizeRules($hash);
 
