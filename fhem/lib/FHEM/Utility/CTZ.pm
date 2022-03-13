@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 0.0.3  13.03.2022 publish func reqModFail
 # 0.0.2  12.03.2022 check required Perl modules 
 # 0.0.1  10.03.2022 initial
 
@@ -48,6 +49,7 @@ use Exporter ('import');
 our @EXPORT_OK = qw(
                      convertTimeZone
                      getTZNames
+                     reqModFail
                    );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -84,8 +86,8 @@ sub convertTimeZone {
      return $err;
   }
   
-  my $abs = modabsent();
-  return $abs if($abs);
+  my $rmf = reqModFail();
+  return $rmf if($rmf);
 
   my $name      = $paref->{name}      // $pkg;
   my $dtstring  = $paref->{dtstring}  // q{};
@@ -133,8 +135,11 @@ return $valid;
 ###############################################################################
 sub getTZNames {
   
-  if(modabsent()) {
-      return [qw()];
+  my $rmf = reqModFail();
+  if($rmf) {
+      $rmf = "ERROR - ".$rmf;
+      Log (1, "$pkg - $rmf");
+      return [($rmf)];
   }
   
   my $atz = DateTime::TimeZone->all_names;
@@ -145,14 +150,14 @@ return $atz;
 ###############################################################################
 # Check required Perl modules
 ###############################################################################
-sub modabsent {
+sub reqModFail {
   
   if ($abs0 || $abs1) {
-      $abs0 //= q{};
-      $abs1 //= q{};
+      my @ma;
+      push @ma, $abs0 if($abs0);
+      push @ma, $abs1 if($abs1);
       
-      my $err = qq{the perl module "$abs0" and/or "$abs1" is not installed};
-      Log (1, "$pkg - ERROR - $err");
+      my $err = "required perl module not installed: ".join ", ", @ma;
       
       return $err;
   }
