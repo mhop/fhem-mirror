@@ -361,7 +361,7 @@ sub TimerStatusRequest {
 
     }
     else {
-        ::readingsSingleUpdate( $hash, 'state', 'off', 1 )
+        ::readingsBulkUpdateIfChanged( $hash, 'state', 'off' )
           if ( ::ReadingsVal( $name, 'state', 'off' ) ne 'off' );
 
         Presence($hash)

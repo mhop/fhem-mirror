@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  82_LGTV_WebOS: fix uninitialized value
  - feature: 32_withings: added new ecg readings previously unknown
  - change:  82_LGTV_WebOS: split in to packages
  - bugfix:  93_DbLog: $data{firstvalX} now usable, forum:#126631
