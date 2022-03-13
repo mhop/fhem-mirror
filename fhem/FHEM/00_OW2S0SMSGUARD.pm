@@ -84,6 +84,7 @@ sub Initialize {
 
     $hash->{Clients}    = ':OW2S0SMSGUARD:';
     $hash->{MatchList}  = { '1:OW2S0SMSGUARD' => '^OW.*' };
+    $hash->{Match}      = 'OW';
     $hash->{ReadFn}     = \&ReadFn;
     $hash->{DefFn}      = \&DefineFn;
     $hash->{UndefFn}    = \&UndefFn;
