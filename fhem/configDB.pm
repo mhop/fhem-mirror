@@ -564,27 +564,27 @@ sub cfgDB_SaveState {
 			foreach my $c (sort keys %{$r}) {
 				$rd = $r->{$c};
 				if(!defined($rd->{TIME})) {
-					Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
+					Log 5, "WriteStatefile $d $c: Missing TIME, using current time";
 					$rd->{TIME} = TimeNow();
 				}
 				if(!defined($rd->{VAL})) {
-					Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
+					Log 5, "WriteStatefile $d $c: Missing VAL, setting it to 0";
 					$rd->{VAL} = 0;
 				}
 				$val = $rd->{VAL};
 				$val =~ s/;/;;/g;
                 $val =~ s/\n/\$xyz\$/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
-				Log 4, "configDB: $out"; 
+				Log 5, "configDB: $out"; 
                 push @rowList, $out; 
 			}
 		}
 	}
 
     my $fileName = defined($data{saveID}) ? $data{saveID} : $configDB{loaded};
-       $fileName =~ s/^\s+|\s+$//g;
+       $fileName =~ s/^\s+|\s+$//g; # trim filename
        $fileName .= ".fhem.save";
-    Log 4, "configDB save state  $fileName";
+    Log 4, "configDB save state $fileName with ".$#rowList." entries";
     cfgDB_FileWrite($fileName,@rowList);
 
 	return;
