@@ -1283,6 +1283,12 @@ sub _cfgDB_deleteRF {
 }
 
 sub _cfgDB_deleteStatefiles {
+
+if ($configDB{type} eq "POSTGRESQL") {
+Log 1, "configDB: deletion of statefiles currently not supported for postgresql!";
+return;
+} 
+
    my $filename;
    my $fhem_dbh = _cfgDB_Connect;
    my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
