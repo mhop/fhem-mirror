@@ -1293,11 +1293,11 @@ sub _cfgDB_deleteStatefiles {
        $uuid = substr($filename,0,32);
        my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
        $found //= -1; # to prevent perl warning
-       Debug "file:  >$filename<";
-       Debug "uuid:  >$uuid<";
-       Debug "found: >$found<";
+       Log 1, "file:  >$filename<";
+       Log 1, "uuid:  >$uuid<";
+       Log 1, "found: >$found<";
        unless ($uuid eq $found) {
-       Debug "del >$filename<";
+       Log 1, "del >$filename<";
 #         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
        }
    }
