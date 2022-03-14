@@ -1,4 +1,5 @@
-# $Id: configDB.pm 25836 2022-03-14 13:19:34Z betateilchen $
+# $Id$
+
 
 =for comment (License)
 
@@ -685,7 +686,7 @@ sub cfgDB_MigrationImport {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId { 
-	return "# ".'$Id: configDB.pm 25836 2022-03-14 13:19:34Z betateilchen $' 
+	return "# ".'$Id$' 
 }
 
 # return filelist depending on directory and regexp
