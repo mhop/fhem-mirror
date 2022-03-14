@@ -556,7 +556,7 @@ sub cfgDB_SaveState {
 			$val =~ s/;/;;/g;
             $val =~ s/\n/\$xyz\$/g;
 			$out = "setstate $d $val";
-			Log 4, "configDB: $out";
+			Log 5, "configDB: $out";
 			push @rowList, $out;
 		}
 		$r = $defs{$d}{READINGS};
