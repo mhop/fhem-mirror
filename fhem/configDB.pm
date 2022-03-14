@@ -838,7 +838,7 @@ sub _cfgDB_ReadState {
 sub _cfgDB_Rotate {
 	my ($fhem_dbh,$newversion) = @_;
     my $uuid = $data{saveID};
-       $uuid = =~ s/^\s+|\s+$//g;
+       $uuid =~ s/^\s+|\s+$//g;
     delete $data{saveID}; # no longer needed in memory
 	$configDB{loaded} = $uuid;
 	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
