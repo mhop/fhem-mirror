@@ -176,6 +176,8 @@
 # 2022-02-20 - added     statefile versioning - begin
 # 2022-03-03             statefile versioning - completed
 #
+# 2022-03-14 - fixed     statefile problems with POSTGRESQL
+#
 ##############################################################################
 =cut
 
@@ -350,7 +352,7 @@ sub cfgDB_Init {
 	}
 
 #	create TABLE fhemstate if nonexistent
-#	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
 #	create TABLE fhemb64filesave if nonexistent
 	if($cfgDB_dbtype eq "MYSQL") {
@@ -442,7 +444,7 @@ sub cfgDB_FileUpdate {
 	return;
 }
 
-# read and execute fhemconfig and fhemstate
+# read and execute fhemconfig and statefile
 sub cfgDB_ReadAll {  ## prototype used in fhem.pl
 	my ($cl) = @_;
 	my ($ret, @dbconfig);
@@ -807,7 +809,7 @@ sub _cfgDB_ReadState {
 	my $stateFileName = $configDB{loaded}.".fhem.save";
     my ($err,@state) = cfgDB_FileRead($stateFileName);
     if ($err eq "") {
-      Log 4, "configDB read state  ".$stateFileName;
+      Log 4, "configDB read state ".$stateFileName;
       map { my $a = $_; $a =~ s/\$xyz\$/\\n/g; push @dbconfig, $a } @state;
 	  my $fhem_dbh = _cfgDB_Connect;
          $fhem_dbh->do("delete from fhemstate");
