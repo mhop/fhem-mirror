@@ -582,6 +582,7 @@ sub cfgDB_SaveState {
 	}
 
     my $fileName = defined($data{saveID}) ? $data{saveID} : $configDB{loaded};
+       $fileName =~ s/^\s+|\s+$//g;
        $fileName .= ".fhem.save";
     Log 4, "configDB save state  $fileName";
     cfgDB_FileWrite($fileName,@rowList);
