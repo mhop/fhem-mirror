@@ -784,6 +784,7 @@ sub _cfgDB_ReadCfg {
 
 # maybe this will be done with join later
 	my $uuid = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE version = '$version'");
+	$uuid =~ s/^\s+|\s+$//g;
     $configDB{loaded} = $uuid;
     Log 4, "configDB read config ".$configDB{loaded};
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb' order by version" );  
@@ -837,6 +838,7 @@ sub _cfgDB_ReadState {
 sub _cfgDB_Rotate {
 	my ($fhem_dbh,$newversion) = @_;
     my $uuid = $data{saveID};
+       $uuid = =~ s/^\s+|\s+$//g;
     delete $data{saveID}; # no longer needed in memory
 	$configDB{loaded} = $uuid;
 	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
