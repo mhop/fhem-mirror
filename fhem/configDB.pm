@@ -930,6 +930,7 @@ sub _cfgDB_Info {
 		push @r, " dbsize: $size";
 	}
 	push @r, $l;
+	push @r, " loaded:       ".$configDB{loaded};
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($sql, $sth, @line, $row);
 
@@ -1285,22 +1286,26 @@ sub _cfgDB_deleteRF {
 }
 
 sub _cfgDB_deleteStatefiles {
-
-if ($configDB{type} eq "POSTGRESQL") {
-Log 1, "configDB: deletion of statefiles currently not supported for postgresql!";
-return;
-} 
-
    my $filename;
    my $fhem_dbh = _cfgDB_Connect;
    my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
    $sth->execute();
    while ($filename = $sth->fetchrow_array()) {
+       Log 5, "configDB: statefile  filename >$filename<";
+       if (length($filename) > 42) { # malformed filename from postgresql
+         Log 5, "configDB: statefile del1 >$filename<";
+         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+         next;       
+       }
        my $uuid  = "";
        $uuid = substr($filename,0,32);
+       Log 5, "configDB: statefile uuid:  >$uuid<";
        my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
-       $found //= -1; # to prevent perl warning
+       $found //= 'notfound'; # to prevent perl warning
+       $found = substr($found,0,32);
+       Log 5, "configDB: statefile found: >$found<";
        unless ($uuid eq $found) {
+         Log 5, "configDB: statefile del2 >$filename<";
          $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
        }
    }
