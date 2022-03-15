@@ -1290,23 +1290,22 @@ sub _cfgDB_deleteStatefiles {
    my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
    $sth->execute();
    while ($filename = $sth->fetchrow_array()) {
-       Log 1, "file:  >$filename<";
+       Log 5, "configDB: statefile  filename >$filename<";
        if (length($filename) > 42) { # malformed filename from postgresql
-         Log 1, "del1 >$filename<";
-#         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+         Log 5, "configDB: statefile del1 >$filename<";
+         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
          next;       
        }
        my $uuid  = "";
        $uuid = substr($filename,0,32);
-       Log 1, "uuid:  >$uuid<";
+       Log 5, "configDB: statefile uuid:  >$uuid<";
        my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
        $found //= 'notfound'; # to prevent perl warning
-       Log 1, "found: >$found<";
        $found = substr($found,0,32);
-       Log 1, "found: >$found<";
+       Log 5, "configDB: statefile found: >$found<";
        unless ($uuid eq $found) {
-         Log 1, "del2 >$filename<";
-#         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+         Log 5, "configDB: statefile del2 >$filename<";
+         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
        }
    }
    $fhem_dbh->commit();
