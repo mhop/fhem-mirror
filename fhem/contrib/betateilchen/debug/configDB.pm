@@ -930,7 +930,7 @@ sub _cfgDB_Info {
 		push @r, " dbsize: $size";
 	}
 	push @r, $l;
-	push @r, " loaded: ".$configDB{loaded};
+	push @r, " loaded:       ".$configDB{loaded};
 	my $fhem_dbh = _cfgDB_Connect;
 	my ($sql, $sth, @line, $row);
 
