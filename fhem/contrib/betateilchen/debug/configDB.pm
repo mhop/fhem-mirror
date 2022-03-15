@@ -1,6 +1,5 @@
 # $Id$
 
-
 =for comment (License)
 
 ##############################################################################
@@ -177,6 +176,8 @@
 # 2022-02-20 - added     statefile versioning - begin
 # 2022-03-03             statefile versioning - completed
 #
+# 2022-03-14 - fixed     statefile problems with POSTGRESQL
+#
 ##############################################################################
 =cut
 
@@ -351,7 +352,7 @@ sub cfgDB_Init {
 	}
 
 #	create TABLE fhemstate if nonexistent
-#	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
 #	create TABLE fhemb64filesave if nonexistent
 	if($cfgDB_dbtype eq "MYSQL") {
@@ -443,7 +444,7 @@ sub cfgDB_FileUpdate {
 	return;
 }
 
-# read and execute fhemconfig and fhemstate
+# read and execute fhemconfig and statefile
 sub cfgDB_ReadAll {  ## prototype used in fhem.pl
 	my ($cl) = @_;
 	my ($ret, @dbconfig);
@@ -808,7 +809,7 @@ sub _cfgDB_ReadState {
 	my $stateFileName = $configDB{loaded}.".fhem.save";
     my ($err,@state) = cfgDB_FileRead($stateFileName);
     if ($err eq "") {
-      Log 4, "configDB read state  ".$stateFileName;
+      Log 4, "configDB read state ".$stateFileName;
       map { my $a = $_; $a =~ s/\$xyz\$/\\n/g; push @dbconfig, $a } @state;
 	  my $fhem_dbh = _cfgDB_Connect;
          $fhem_dbh->do("delete from fhemstate");
@@ -1289,15 +1290,22 @@ sub _cfgDB_deleteStatefiles {
    my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhemb64filesave where filename like '%.fhem.save'" );  
    $sth->execute();
    while ($filename = $sth->fetchrow_array()) {
+       Log 1, "file:  >$filename<";
+       if (length($filename) > 42) { # malformed filename from postgresql
+         Log 1, "del1 >$filename<";
+#         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
+         next;       
+       }
        my $uuid  = "";
        $uuid = substr($filename,0,32);
-       my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
-       $found //= -1; # to prevent perl warning
-       Log 1, "file:  >$filename<";
        Log 1, "uuid:  >$uuid<";
+       my $found = $fhem_dbh->selectrow_array("SELECT versionuuid FROM fhemversions WHERE versionuuid = '$uuid'");
+       $found //= 'notfound'; # to prevent perl warning
+       Log 1, "found: >$found<";
+       $found = substr($found,0,32);
        Log 1, "found: >$found<";
        unless ($uuid eq $found) {
-       Log 1, "del >$filename<";
+         Log 1, "del2 >$filename<";
 #         $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
        }
    }
