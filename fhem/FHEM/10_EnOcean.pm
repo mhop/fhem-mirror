@@ -4617,10 +4617,10 @@ sub EnOcean_Set($@) {
         $angleMin = -180 if ($angleMin < -180);
         ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
         $angleMax ++ if ($angleMin == $angleMax);
-        $angleTime = 6 if ($angleTime !~ m/^[+-]?\d+$/);
+        $angleTime = 6 if ($angleTime !~ m/^\d+(\.\d)?$/);
         $angleTime = 6 if ($angleTime > 6);
         $angleTime = 0 if ($angleTime < 0);
-        $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
+        $shutTime = 255 if ($shutTime !~ m/^\d+$/);
         $shutTime = 255 if ($shutTime > 255);
         $shutTime = 1 if ($shutTime < 1);
         if ($cmd =~ m/^\d+$/) {
@@ -4670,7 +4670,7 @@ sub EnOcean_Set($@) {
         } elsif ($cmd eq "up") {
           # up
           if (defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d*[.]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+            if ($a[1] =~ m/^\d*[.]?\d*$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart - $a[1] / $shutTime * 100;
               if ($angleTime) {
                 $anglePos = $anglePosStart - ($angleMax - $angleMin) * $a[1] / $angleTime;
@@ -4706,7 +4706,7 @@ sub EnOcean_Set($@) {
         } elsif ($cmd eq "down") {
           # down
           if (defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d*[.]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
+            if ($a[1] =~ m/^\d*[.]?\d*$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart + $a[1] / $shutTime * 100;
               if ($angleTime) {
                 $anglePos = $anglePosStart + ($angleMax - $angleMin) * $a[1] / $angleTime;
@@ -4759,7 +4759,7 @@ sub EnOcean_Set($@) {
             if ($positionStart <= $angleTime * $angleMax / ($angleMax - $angleMin) / $shutTimeSet * 100) {
               $anglePosStart = $angleMax;
             }
-            if (defined $a[1] && $a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
+            if (defined $a[1] && $a[1] =~ m/^\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
               if ($positionStart < $a[1]) {
                 # down
                 $angleTime = $angleTime * ($angleMax - $anglePos) / ($angleMax - $angleMin);
@@ -4801,12 +4801,14 @@ sub EnOcean_Set($@) {
                 if ($anglePosStart > $anglePos) {
                   # up >> reduce slats angle
                   $shutTime = $angleTime * ($anglePosStart - $anglePos)/($angleMax - $angleMin);
+                  $shutTime = 0.1 if ($shutTime < 0.1);
                   # round up
                   $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                   $shutCmd = 1;
                 } elsif ($anglePosStart < $anglePos) {
                   # down >> enlarge slats angle
                   $shutTime = $angleTime * ($anglePos - $anglePosStart) /($angleMax - $angleMin);
+                  $shutTime = 0.1 if ($shutTime < 0.1);
                   # round up
                   $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                   $shutCmd = 2;
@@ -4879,14 +4881,14 @@ sub EnOcean_Set($@) {
             shift(@a);
           }
           $updateState = 0;
-          $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy), $shutCmd, $setCmd;
+          $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy + 0.5), $shutCmd, $setCmd;
 
         } else {
           return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down local:learn opens:noArg stop:noArg teach:noArg up"
         }
         if ($shutCmd || $cmd eq "stop") {
           #$updateState = 0;
-          $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy), $shutCmd, $setCmd;
+          $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy + 0.5), $shutCmd, $setCmd;
         }
         Log3 $name, 3, "EnOcean set $name $cmd";
       }
@@ -11157,8 +11159,8 @@ sub EnOcean_Parse($$) {
         if ($model eq "Eltako_FRM60") {
           my ($position, $state);
           # invert position
-          $position = 200 - $db[3];
           $position = $db[3] == 1 ? 1 : int($db[3] / 2);
+          $position = 100 - $db[3];
           if ($position == 100) {
             push @event, "3:endPosition:closed";
             $state = "closed";
@@ -11190,10 +11192,10 @@ sub EnOcean_Parse($$) {
           $angleMin = -180 if ($angleMin < -180);
           ($angleMax, $angleMin) = ($angleMin, $angleMax) if ($angleMin > $angleMax);
           $angleMax ++ if ($angleMin == $angleMax);
-          $angleTime = 0 if ($angleTime !~ m/^[+-]?\d+$/);
+          $angleTime = 0 if ($angleTime !~ m/^\d+(\.\d)?$/);
           $angleTime = 6 if ($angleTime > 6);
           $angleTime = 0 if ($angleTime < 0);
-          $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
+          $shutTime = 255 if ($shutTime !~ m/^\d+$/);
           $shutTime = 255 if ($shutTime > 255);
           $shutTime = 1 if ($shutTime < 1);
 
@@ -14037,7 +14039,7 @@ sub EnOcean_Attr(@) {
       }
 
     } elsif (AttrVal($name, "subType", "") eq "manufProfile" && AttrVal($name, "manufID", "") eq "00D" &&
-             $attrVal =~ m/^[+-]?\d+?$/ && $attrVal >= 1 && $attrVal <= 6) {
+             $attrVal =~ m/^\d+(\.\d)?$/ && $attrVal >= 1 && $attrVal <= 6) {
 
     } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
@@ -19331,20 +19333,20 @@ sub EnOcean_Delete($$) {
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-    <li>colourAll RRGGBB<br>
+    <li>colourAll &lt;RRGGBB&gt;<br>
       set all colour displays to RGB value</li>
-    <li>colourAO RRGGBB<br>
+    <li>colourA0 &lt;RRGGBB&gt;<br>
       set colour display A0 to RGB value</li>
-    <li>colourAI RRGGBB<br>
+    <li>colourAI &lt;RRGGBB&gt;<br>
       set colour display AI to RGB value</li>
-    <li>colourBO RRGGBB<br>
+    <li>colourB0 &lt;RRGGBB&gt;<br>
       set colour display B0 to RGB value</li>
-    <li>colourBI RRGGBB<br>
+    <li>colourBI &lt;RRGGBB&gt;<br>
       set colour display BI to RGB value</li>
     </ul><br>
     [RR] = 00 ... FF red color intensity in HEX notation<br>
-    [GG] = 00 ... FF green color intensity in HEX notation<<br>
-    [BB] = 00 ... FF blue color intensity in HEX notation<<br>
+    [GG] = 00 ... FF green color intensity in HEX notation<br>
+    [BB] = 00 ... FF blue color intensity in HEX notation<br>
     The attr subType must be set to switch, manufID to 00D and attr model to Eltako_F4CT55. This is done if the device was
     created by the <a href="#EnOcean-eltako-msc">Eltako MSC autocreate</a>. However, the device can also be created with the help
     of the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> G6-02-01. If the released state is to be displayed after the end
@@ -21791,11 +21793,11 @@ sub EnOcean_Delete($$) {
              one of the above, e.g. A0,BI</li>
          <li>released</li>
          <li>buttons: pressed|released</li>
-         <li>colourAll: &lt;RRGGBBY&gt;</li>
-         <li>colourAI: &lt;RRGGBBY&gt;</li>
-         <li>colourAO: &lt;RRGGBBY&gt;</li>
-         <li>colourBI: &lt;RRGGBBY&gt;</li>
-         <li>colourBO: &lt;RRGGBBY&gt;</li>
+         <li>colourAll: &lt;RRGGBB&gt;</li>
+         <li>colourAI: &lt;RRGGBB&gt;</li>
+         <li>colourA0: &lt;RRGGBB&gt;</li>
+         <li>colourBI: &lt;RRGGBB&gt;</li>
+         <li>colourB0: &lt;RRGGBB&gt;</li>
          <li>state: &lt;BtnX&gt;[,&lt;BtnY&gt;] [released]</li>
      </ul><br>
          The attr subType must be set to switch, manufID to 00D and attr model to Eltako_F4CT55.
