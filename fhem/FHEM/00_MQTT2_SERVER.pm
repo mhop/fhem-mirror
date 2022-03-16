@@ -40,6 +40,7 @@ MQTT2_SERVER_Initialize($)
     clientOrder
     disable:1,0
     disabledForIntervals
+    hideRetain:1,0
     ignoreRegexp
     keepaliveFactor
     rePublish:1,0
@@ -185,6 +186,21 @@ MQTT2_SERVER_Attr(@)
     }
   }
 
+  if($attrName eq "hideRetain") {
+    my $hide = ($type eq "set" && $param[0]);
+    if($hide) {
+      if($hash->{READINGS}{RETAIN}) {
+        $hash->{READINGS}{".RETAIN"} = $hash->{READINGS}{RETAIN};
+        delete($hash->{READINGS}{RETAIN});
+      }
+    } else {
+      if($hash->{READINGS}{".RETAIN"}) {
+        $hash->{READINGS}{RETAIN} = $hash->{READINGS}{".RETAIN"};
+        delete($hash->{READINGS}{".RETAIN"});
+      }
+    }
+  }
+
   return undef;
 } 
 
@@ -192,11 +208,13 @@ sub
 MQTT2_SERVER_Set($@)
 {
   my ($hash, @a) = @_;
-  my %sets = ( publish=>1 );
+  my %sets = ( publish=>":textField,[-r]&nbsp;topic&nbsp;message",
+               clearRetain=>":noArg" );
   shift(@a);
 
-  return "Unknown argument ?, choose one of ".join(" ", keys %sets)
-        if(!$a[0] || !$sets{$a[0]});
+  return "Unknown argument ?, choose one of ".
+                    join(" ", map { "$_$sets{$_}" } keys %sets)
+        if(!$a[0] || !defined($sets{$a[0]}));
 
   if($a[0] eq "publish") {
     shift(@a);
@@ -211,6 +229,12 @@ MQTT2_SERVER_Set($@)
     readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 1);
     MQTT2_SERVER_doPublish($hash->{CL}, $hash, $tp, $val, $retain);
   }
+
+  if($a[0] eq "clearRetain") {
+    my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? "RETAIN" : ".RETAIN";
+    delete($hash->{READINGS}{$rname});
+    delete($hash->{retain});
+  }
 }
 
 sub
@@ -218,12 +242,20 @@ MQTT2_SERVER_State()
 {
   my ($hash, $ts, $name, $val) = @_;
 
-  if($name eq "RETAIN") {
+  if($name eq "RETAIN" || $name eq ".RETAIN") {
     my $now = gettimeofday;
     my $ret = json2nameValue($val);
     for my $k (keys %{$ret}) {
       my %h = ( ts=>$now, val=>$ret->{$k} );
       $hash->{retain}{$k} = \%h;
+    }
+
+    my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? "RETAIN" : ".RETAIN";
+    if($name ne $rname) {
+      InternalTimer(0, sub {
+        $hash->{READINGS}{$rname} = $hash->{READINGS}{$name};
+        delete($hash->{READINGS}{$name});
+      }, undef);
     }
   }
   return undef;
@@ -505,7 +537,8 @@ MQTT2_SERVER_doPublish($$$$;$)
     # Save it
     my %nots = map { $_ => $server->{retain}{$_}{val} }
                keys %{$server->{retain}};
-    setReadingsVal($server,"RETAIN",toJSON(\%nots),FmtDateTime(gettimeofday()));
+    my $rname = AttrVal($server->{NAME}, "hideRetain", 0) ? ".RETAIN" : "RETAIN";
+    setReadingsVal($server, $rname, toJSON(\%nots), FmtDateTime(gettimeofday()));
   }
 
   foreach my $clName (keys %{$server->{clients}}) {
@@ -687,8 +720,13 @@ MQTT2_SERVER_ReadDebug($$)
   <a id="MQTT2_SERVER-set"></a>
   <b>Set</b>
   <ul>
-    <li>publish -r topic value<br>
+    <a id="MQTT2_SERVER-set-publish"></a>
+    <li>publish [-r] topic value<br>
       publish a message, -r denotes setting the retain flag.
+      </li>
+    <a id="MQTT2_SERVER-set-clearRetain"></a>
+    <li>clearRetain<br>
+      delete all the retained topics.
       </li>
   </ul>
   <br>
@@ -728,7 +766,6 @@ MQTT2_SERVER_ReadDebug($$)
       expression.
     </li><br>
 
-
     <a id="MQTT2_SERVER-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>
       set the MQTT clientId for all connections, for setups with clients
@@ -751,6 +788,12 @@ MQTT2_SERVER_ReadDebug($$)
       disable distribution of messages. The server itself will accept and store
       messages, but not forward them.
       </li><br>
+
+    <a id="MQTT2_SERVER-attr-hideRetain"></a>
+    <li>hideRetain [0|1]<br>
+      if set to 1, the RETAIN reading will be named .RETAIN, i.e. hidden by
+      default.
+      </li>
 
     <a id="MQTT2_SERVER-attr-ignoreRegexp"></a>
     <li>ignoreRegexp<br>

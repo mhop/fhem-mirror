@@ -1509,7 +1509,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
       vArr[0] != "textFieldNL-long") ||
      (params && params.length))
     return undefined;
-  
+
   var is_long = (vArr[0].indexOf("long") > 0);
 
   var newEl = $("<div style='display:inline-block'>").get(0);
@@ -1521,6 +1521,8 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $(inp).attr('name', elName);
   if(currVal != undefined)
     $(inp).val(currVal);
+  if(vArr.length == 2 && !is_long)
+    $(inp).attr("placeholder", vArr[1]);
 
   function addBlur() { if(cmd) $(inp).blur(function() { cmd($(inp).val()) }); };
 
@@ -2173,9 +2175,9 @@ FW_checkNotifydev(reName)
   <li>noArg - show no input field.</li>
   <li>time - show a JavaScript driven timepicker.<br>
       Example: attr FS20dev widgetOverride on-till:time</li>
-  <li>textField - show an input field.<br>
+  <li>textField[,placeholder] - show an input field.<br>
       Example: attr WEB widgetOverride room:textField</li>
-  <li>textFieldNL - show the input field and hide the label.</li>
+  <li>textFieldNL[,placeholder] - show the input field and hide the label.</li>
   <li>textField-long[,sizePct] - show an input-field, but upon
       clicking on the input field open a textArea.
       sizePct specifies the size of the dialog relative to the screen, in
@@ -2208,9 +2210,9 @@ FW_checkNotifydev(reName)
   <li>noArg - es wird kein weiteres Eingabefeld angezeigt.</li>
   <li>time - zeigt ein Zeitauswahlmen&uuml;.
       Beispiel: attr FS20dev widgetOverride on-till:time</li>
-  <li>textField - zeigt ein Eingabefeld.<br>
+  <li>textField[,placeholder] - zeigt ein Eingabefeld.<br>
       Beispiel: attr WEB widgetOverride room:textField</li>
-  <li>textFieldNL - Eingabefeld ohne Label.</li>
+  <li>textFieldNL[,placeholder] - Eingabefeld ohne Label.</li>
   <li>textField-long[,sizePct] - ist wie textField, aber beim Click im
       Eingabefeld wird ein Dialog mit einer HTML textarea wird
       ge&ouml;ffnet.  sizePct ist die relative Gr&ouml;&szlig;e des Dialogs,
