@@ -896,6 +896,7 @@ SVG_substcfg($$$$$$)
         $pr->{$k} = eval $cmdFromAnalyze;
       }
       $gplot_script =~ s/<$k>/$pr->{$k}/g;
+      $plot =~ s/<$k>/$pr->{$k}/g if($splitret);
     }
   }
 
