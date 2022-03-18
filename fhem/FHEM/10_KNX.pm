@@ -73,6 +73,9 @@
 # MH 20220108  fix KNX_scan sub (export-problem)
 # MH 202201xx  E05.02 fix dpt14 "0"
 #              avoid undefined event when autocreate ignoreTypes is set
+# MH 20220313  fix dpt20_decode
+#              new dpt22.101 receive only
+#              changed unit encoding to UTF8 eg: dpt9.030 from: &mu;g/m&sup3; to: µg/m³
 
 
 package FHEM::KNX; ## no critic 'package'
@@ -208,7 +211,8 @@ my %dpttypes = (
 	'dpt5'          => {CODE=>'dpt5', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/ix, MIN=>0, MAX=>255,
                             DEC=>\&dec_dpt5,ENC=>\&enc_dpt5,},
 	'dpt5.001'      => {CODE=>'dpt5', UNIT=>q{%}, FACTOR=>100/255, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/ix, MIN=>0, MAX=>100},  
-	'dpt5.003'      => {CODE=>'dpt5', UNIT=>q{&deg;}, FACTOR=>360/255, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/ix, MIN=>0, MAX=>360},
+	'dpt5.003'      => {CODE=>'dpt5', UNIT=>q{°}, FACTOR=>360/255, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/ix, MIN=>0, MAX=>360},
+#	'dpt5.003'      => {CODE=>'dpt5', UNIT=>q{&deg;}, FACTOR=>360/255, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/ix, MIN=>0, MAX=>360},
 	'dpt5.004'      => {CODE=>'dpt5', UNIT=>q{%}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,3}/ix, MIN=>0, MAX=>255},
 
 	# 1-Octet signed value
@@ -233,12 +237,14 @@ my %dpttypes = (
                             DEC=>\&dec_dpt8,ENC=>\&enc_dpt8,},
 	'dpt8.005'      => {CODE=>'dpt8', UNIT=>q{s},     FACTOR=>1,    OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/ix, MIN=>-32768, MAX=>32767},
 	'dpt8.010'      => {CODE=>'dpt8', UNIT=>q{%},     FACTOR=>0.01, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/ix, MIN=>-327.68, MAX=>327.67}, # min/max
-	'dpt8.011'      => {CODE=>'dpt8', UNIT=>q{&deg;}, FACTOR=>1,    OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/ix, MIN=>-32768, MAX=>32767},
+	'dpt8.011'      => {CODE=>'dpt8', UNIT=>q{°},     FACTOR=>1,    OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/ix, MIN=>-32768, MAX=>32767},
+#	'dpt8.011'      => {CODE=>'dpt8', UNIT=>q{&deg;}, FACTOR=>1,    OFFSET=>0, PATTERN=>qr/[+-]?\d{1,5}/ix, MIN=>-32768, MAX=>32767},
 
 	# 2-Octet Float value
 	'dpt9'          => {CODE=>'dpt9', UNIT=>q{},     FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760,
                             DEC=>\&dec_dpt9,ENC=>\&enc_dpt9,},
-	'dpt9.001'      => {CODE=>'dpt9', UNIT=>q{&deg;C}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-274, MAX=>670760},
+	'dpt9.001'      => {CODE=>'dpt9', UNIT=>q{°C},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-274, MAX=>670760},
+#	'dpt9.001'      => {CODE=>'dpt9', UNIT=>q{&deg;C}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-274, MAX=>670760},
 	'dpt9.002'      => {CODE=>'dpt9', UNIT=>q{K},    FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.003'      => {CODE=>'dpt9', UNIT=>q{K/h},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.004'      => {CODE=>'dpt9', UNIT=>q{lux},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
@@ -246,19 +252,23 @@ my %dpttypes = (
 	'dpt9.006'      => {CODE=>'dpt9', UNIT=>q{Pa},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.007'      => {CODE=>'dpt9', UNIT=>q{%},    FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.008'      => {CODE=>'dpt9', UNIT=>q{ppm},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
-	'dpt9.009'      => {CODE=>'dpt9', UNIT=>q{m&sup3;/h}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
+	'dpt9.009'      => {CODE=>'dpt9', UNIT=>q{m³/h}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
+#	'dpt9.009'      => {CODE=>'dpt9', UNIT=>q{m&sup3;/h}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.010'      => {CODE=>'dpt9', UNIT=>q{s},    FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.011'      => {CODE=>'dpt9', UNIT=>q{ms},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.020'      => {CODE=>'dpt9', UNIT=>q{mV},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.021'      => {CODE=>'dpt9', UNIT=>q{mA},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
-	'dpt9.022'      => {CODE=>'dpt9', UNIT=>q{W/m&sup2;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
+	'dpt9.022'      => {CODE=>'dpt9', UNIT=>q{W/m²}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
+#	'dpt9.022'      => {CODE=>'dpt9', UNIT=>q{W/m&sup2;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.023'      => {CODE=>'dpt9', UNIT=>q{K/%},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.024'      => {CODE=>'dpt9', UNIT=>q{kW},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.025'      => {CODE=>'dpt9', UNIT=>q{l/h},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.026'      => {CODE=>'dpt9', UNIT=>q{l/h},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
 	'dpt9.028'      => {CODE=>'dpt9', UNIT=>q{km/h}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760},
-	'dpt9.029'      => {CODE=>'dpt9', UNIT=>q{g/m&sup3;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760}, # Abs. Luftfeuchte
-	'dpt9.030'      => {CODE=>'dpt9', UNIT=>q{&mu;g/m&sup3;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760}, # Dichte
+	'dpt9.029'      => {CODE=>'dpt9', UNIT=>q{g/m³}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760}, # Abs. Luftfeuchte
+#	'dpt9.029'      => {CODE=>'dpt9', UNIT=>q{g/m&sup3;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760}, # Abs. Luftfeuchte
+	'dpt9.030'      => {CODE=>'dpt9', UNIT=>q{µg/m³}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760}, # Dichte
+#	'dpt9.030'      => {CODE=>'dpt9', UNIT=>q{&mu;g/m&sup3;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>-670760, MAX=>670760}, # Dichte
 
 	# Time of Day
 	'dpt10'         => {CODE=>'dpt10', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/($PAT_TIME|now)/ix, MIN=>undef, MAX=>undef,
@@ -279,15 +289,14 @@ my %dpttypes = (
 	'dpt13.013'     => {CODE=>'dpt13', UNIT=>q{kWh}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,10}/ix, MIN=>-2147483648, MAX=>2147483647},
 
 	# 4-Octet single precision float
-#E05.02	'dpt14'         => {CODE=>'dpt14', UNIT=>q{},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/ix, MIN=>undef, MAX=>undef,
 	'dpt14'         => {CODE=>'dpt14', UNIT=>q{},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef,
                             DEC=>\&dec_dpt14,ENC=>\&enc_dpt14,},
 	'dpt14.019'     => {CODE=>'dpt14', UNIT=>q{A},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 	'dpt14.027'     => {CODE=>'dpt14', UNIT=>q{V},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 	'dpt14.033'     => {CODE=>'dpt14', UNIT=>q{Hz}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 	'dpt14.056'     => {CODE=>'dpt14', UNIT=>q{W},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
-	'dpt14.068'     => {CODE=>'dpt14', UNIT=>q{&deg;C},   FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
-	'dpt14.076'     => {CODE=>'dpt14', UNIT=>q{m&sup3;},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.068'     => {CODE=>'dpt14', UNIT=>q{°C}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.076'     => {CODE=>'dpt14', UNIT=>q{m³}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 	'dpt14.057'     => {CODE=>'dpt14', UNIT=>q{cos&Phi;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 
 	# 14-Octet String
@@ -316,6 +325,11 @@ my %dpttypes = (
                             SETLIST=>'Auto,Comfort,Standby,Economy,Protection', DEC=>\&dec_dpt20,ENC=>\&enc_dpt20,},
 	'dpt20.102'     => {CODE=>'dpt20', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/(auto|comfort|standby|(economy|night)|(protection|frost|heat))/ix, MIN=>undef, MAX=>undef, ## no critic (RegularExpressions::ProhibitComplexRegexes)
                             SETLIST=>'Auto,Comfort,Standby,Economy,Protection'},
+
+	# HVAC mode RHCC Status, 2Byte - receive only!!!
+	'dpt22'         => {CODE=>'dpt22', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/noset/ix, MIN=>undef, MAX=>undef,
+                            DEC=>\&dec_dpt22,},
+	'dpt22.101'     => {CODE=>'dpt22', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/noset/ix, MIN=>undef, MAX=>undef},
 
 	# Color-Code
 	'dpt232'        => {CODE=>'dpt232', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/[0-9a-f]{6}/ix, MIN=>undef, MAX=>undef, SETLIST=>'colorpicker',
@@ -384,6 +398,11 @@ sub KNX_Define {
 		my $found = undef;
 		foreach my $tuls (@tulList) {
 			if ($tuls eq $iodevCandidate) {
+				if ((IsDisabled($iodevCandidate) == 1) || IsDummy($iodevCandidate)) { # IO - device is disabled or dummy
+#					delete $attr{$name}{IODev};
+					Log3 ($name, 3, "KNX_define ($name): IODev $iodevCandidate not used - because IODev is disabled or dummy");
+					next;
+				}
 				$found = 1;
 				$attr{$name}{IODev} = $iodevCandidate;
 				Log3 ($name, 3, "KNX_define ($name): specifying IODev $iodevCandidate is deprecated in define - see cmd-ref");
@@ -553,7 +572,6 @@ sub KNX_Define {
 					$getString .= q{ } . $key . ':noArg';
 				}
 				elsif ($option eq 'set') {
-#					$setString .= ' on:noArg off:noArg toggle:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x));
 					$setString .= ' on:noArg off:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x)); 
 					$setString .= q{ } . $key . $hash->{GADDETAILS}{$key}{SETLIST};
 				}
@@ -561,7 +579,6 @@ sub KNX_Define {
 			}
 			else {  # no option def, select all
 				$getString .= q{ } . $key . ':noArg';
-#				$setString .= ' on:noArg off:noArg toggle:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x));
 				$setString .= ' on:noArg off:noArg' if (($hash->{GADDETAILS}{$key}{NO} == 1) && ($hash->{GADDETAILS}{$key}{MODEL} =~ /^(dpt1|dpt1.001)$/x));
 				$setString .= q{ } . $key . $hash->{GADDETAILS}{$key}{SETLIST};
 			}
@@ -1037,10 +1054,10 @@ sub KNX_Parse {
 		my $gad = KNX_hexToName($gadCode);
 		#create name
 		my $newDevName = sprintf("KNX_%.2d%.2d%.3d",split (/\//x, $gad));
-		#E05.02 check if any autocreate device has ignoretype "KNX..." set
+		# check if any autocreate device has ignoretype "KNX..." set
 		my @acList = devspec2array('TYPE=autocreate');
 		foreach my $acdev (@acList) {
-			my $igntypes = AttrVal($acdev,'ignoreTypes','');
+			my $igntypes = AttrVal($acdev,'ignoreTypes',q{});
 			return q{} if($newDevName =~ /$igntypes/x);
 		}
 		return "UNDEFINED $newDevName KNX $gad:$MODELERR";
@@ -1339,7 +1356,6 @@ sub KNX_replaceByRegex {
 			#cut value
 			Log3 ($name, 5, "KNX_replaceByRegex: $name - replaced $rdName value from: $input to undefined");
 			return;
-#			$retVal = undef;
 		}
 		elsif ($regPair[0] eq $tempVal) { # complete match
 			$retVal = $regPair[1];
@@ -1380,8 +1396,8 @@ sub KNX_limit {
 	#determine direction of scaling, do only if defined
 	if ($direction =~ m/^encode/ix) {
 		#limitValue
-		$retVal = $min if (defined ($min) and ($retVal < $min));
-		$retVal = $max if (defined ($max) and ($retVal > $max));
+		$retVal = $min if (defined ($min) && ($value < $min));
+		$retVal = $max if (defined ($max) && ($value > $max));
 		#correct value
 		$retVal /= $factor if (defined ($factor));
 		$retVal -= $offset if (defined ($offset));
@@ -1391,16 +1407,11 @@ sub KNX_limit {
 		$retVal += $offset if (defined ($offset));
 		$retVal *= $factor if (defined ($factor));
 		#limitValue
-		$retVal = $min if (defined ($min) and ($retVal < $min));
-		$retVal = $max if (defined ($max) and ($retVal > $max));
+		$retVal = $min if (defined ($min) && ($retVal < $min));
+		$retVal = $max if (defined ($max) && ($retVal > $max));
 	}
 
-	my $logString = "DIR: $direction";
-	$logString   .= " FACTOR: $factor" if (defined ($factor));
-	$logString   .= " OFFSET: $offset" if (defined ($offset));
-	$logString   .= " MIN: $min" if (defined ($min));
-	$logString   .= " MAX: $max" if (defined ($max));
-	Log3 ($name, 5, "KNX_limit: $logString");
+	Log3 ($name, 5, "KNX_limit: $name DIR= $direction INPUT= $value OUTPUT= $retVal");
 
 	return $retVal;
 }
@@ -1471,7 +1482,8 @@ sub KNX_decodeByDpt {
 	Log3 ($name, 5, "KNX_decodeByDpt -enter: model: $model, code: $code, value: $value, length-value: " . length($value));
 
 	if (ref($dpttypes{$code}->{DEC}) eq 'CODE') {
-		$state = $dpttypes{$code}->{DEC}->($value, $model);
+		$state = $dpttypes{$code}->{DEC}->($value, $model, $hash);
+#		$state = $dpttypes{$code}->{DEC}->($value, $model);
 		my $unit = $dpttypes{$model}{UNIT};
 		$state = $state . q{ } . $unit if (defined ($unit) && ($unit ne q{})); #append unit, if supplied
 
@@ -1654,6 +1666,10 @@ sub enc_dpt20 { # HVAC 1Byte
 	return sprintf("00%.2x",$numval);
 }
 
+#sub enc_dpt22 { # HVAC dpt22.101 only no encoding - receive only!!!
+#	my $value = shift;
+#}
+
 sub enc_dpt232 { #RGB-Code
 	return "00" . shift;
 }
@@ -1661,9 +1677,10 @@ sub enc_dpt232 { #RGB-Code
 ############################
 ### decode sub functions ###
 sub dec_dpt1 { #Binary value
-	my $value = shift;
+	my $numval = hex (shift);
+#	my $value = shift;
 	my $model = shift;
-	my $numval = hex ($value);
+#	my $numval = hex ($value);
 	$numval = ($numval & 0x01);
 	my $state = $dpttypes{"$model"}{MIN}; # default
 	$state = $dpttypes{"$model"}{MAX} if ($numval == 1);
@@ -1817,10 +1834,19 @@ sub dec_dpt19 { #DateTime
 
 sub dec_dpt20 { #HVAC
 	my $numval = hex (shift);
-	$numval = ($numval & 0xff);
+	$numval = ($numval & 0x07); # mask any non-std bits!
 	my @dpt20_102txt = qw(Auto Comfort Standby Economy Protection reserved);
 	$numval = 5 if ($numval > 4); # dpt20.102
 	return $dpt20_102txt[$numval];
+}
+
+sub dec_dpt22 { #HVAC dpt22.101 only
+	my $numval = hex (shift);
+	return 'error' if (($numval & 0x01) == 1);
+	my $state = (($numval & 0x0100) != 0x100)?'heating':'cooling';
+	$state .= '_Frostalarm' if (($numval & 0x2000) != 0);
+	$state .= '_Overtempalarm' if (($numval & 0x4000) != 0);
+	return $state;
 }
 
 sub dec_dpt232 { #RGB-Code
@@ -2090,7 +2116,7 @@ The answer from the bus-device updates reading and state.</p>
 <br/>
 <a id="KNX-attr-listenonly"></a><li>listenonly - This attr is deprecated - do not use - see cmdref device definition for alternatives</li> 
 <a id="KNX-attr-readonly"></a><li>readonly - This attr is deprecated - do not use - see cmdref device definition for alternatives</li>
-<a id="KNX-attr-slider"></a><li>slider - This attr is deprecated - do not use - see slider example in cmdref for alternatives</li>
+<a id="KNX-attr-slider"></a><li>slider - This attr is deprecated - do not use - use attribute widgetOverride &lt;readingname&gt; Slider:x,y,z instead</li>
 <a id="KNX-attr-useSetExtensions"></a><li>useSetExtensions - This attr is deprecated - do not use</li>
 </ul>
 
@@ -2190,7 +2216,7 @@ The answer from the bus-device updates reading and state.</p>
 <li><b>dpt19    </b>     01.12.2020_01:02:03 (Date&Time)</li>
 <li><b>dpt19.001</b>  01.12.2020_01:02:03</li>
 <li><b>dpt20.102</b>  HVAC mode</li>
-<li><b>dpt22.101</b>  not yet implemented</li>
+<li><b>dpt22.101</b>  HVAC RHCC Status</li>
 <li><b>dpt232   </b>     RGB-Value RRGGBB</li>
 </ul>
 
