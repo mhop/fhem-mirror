@@ -1212,7 +1212,11 @@ FW_doUpdate(evt)
       continue;
 
     if( d[0].match(/^#FHEMWEB:/) ) {
-      eval(d[1]);
+      try {
+        eval(d[1]);
+      } catch(e) {
+        FW_okDialog("#FHEMWEB notification:<br>"+d[1]+"<br>"+e);
+      }
 
     } else {
       setValue(d);
