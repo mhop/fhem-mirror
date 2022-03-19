@@ -42,16 +42,14 @@ use List::Util 1.45 qw(max min uniq);
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
-#use Data::Dumper;
 use FHEM::Core::Timer::Register qw(:ALL);
 #use FHEM::Meta;
 
 sub ::RHASSPY_Initialize { goto &Initialize }
 
-#Beta-User: no GefFn defined...?
 my %gets = (
-    version => q{},
-    status  => q{}
+    test_file     => [],
+    test_sentence => []
 );
 
 my %sets = (
@@ -259,10 +257,11 @@ BEGIN {
     HttpUtils_NonblockingGet
     FmtDateTime
     makeReadingName
-    FileRead
+    FileRead FileWrite
     getAllSets
     notifyRegexpChanged setNotifyDev
     deviceEvents
+    asyncOutput
     trim
   ) )
 };
@@ -288,6 +287,7 @@ sub Initialize {
     $hash->{DeleteFn}    = \&Delete;
     #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
+    $hash->{GetFn}       = \&Get;
     $hash->{AttrFn}      = \&Attr;
     $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long rhasspySTT:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes; #rhasspyTTS:textField-long 
     $hash->{Match}       = q{.*};
@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.20';
+    $hash->{MODULE_VERSION} = '0.5.22';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -595,6 +595,67 @@ sub Set {
 
     return;
 }
+
+
+sub Get {
+    my $hash    = shift;
+    my $anon    = shift;
+    my $h       = shift;
+
+    my $name    = shift @{$anon};
+    my $command = shift @{$anon} // q{};
+    my @values  = @{$anon};
+    return "Unknown argument $command, choose one of " 
+    . join(q{ }, map {
+        @{$gets{$_}} ? $_
+                      .q{:}
+                      .join q{,}, @{$gets{$_}} : $_} sort keys %gets)
+
+    if !defined $gets{$command};
+
+    if ($command eq 'test_file') {
+        return 'provide a filename' if !@values;
+        if ( $values[0] ne 'stop' && !defined $hash->{testline} ) {
+            if($hash->{CL}) {
+                my $start = gettimeofday();
+                my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> 'testResult', start=>$start};
+                $hash->{asyncGet} = $tHash;
+                InternalTimer(gettimeofday()+4, sub {
+                  asyncOutput($tHash->{CL}, "Test file $values[0] is initiated. See if internal 'testline' is rising and check testResult reading later");
+                  delete($hash->{asyncGet});
+                }, $tHash, 0);
+            }
+            return testmode_start($hash, $values[0]);
+        }
+    }
+
+    if ($command eq 'test_sentence') {
+        return 'provide a sentence' if !@values;
+        if ( !defined $hash->{testline} ) {
+            if($hash->{CL}) {
+                my $start = gettimeofday();
+                my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> 'testResult', start=>$start};
+                $hash->{asyncGet} = $tHash;
+                InternalTimer(gettimeofday()+4, sub {
+                  asyncOutput($tHash->{CL}, "Timeout for test sentence - most likely this is no problem, check testResult reading later, but your system seems to be rather slow...");
+                  delete($hash->{asyncGet});
+                }, $tHash, 0);
+            }
+            my $test = join q{ }, @values;
+            $hash->{testline} = 0;
+            $hash->{helper}->{test}->{content} = [$test];
+            $hash->{helper}->{test}->{filename} = 'none';
+            return testmode_next($hash);
+        }
+    }
+
+    delete $hash->{testline};
+    delete $hash->{helper}->{test};
+    readingsSingleUpdate($hash,'testResult','Test mode stopped (might have been running already)',1);
+    return 'Test mode stopped (might have been running already)';
+}
+
+
 
 # Attribute setzen / löschen
 sub Attr {
@@ -2585,6 +2646,125 @@ sub sayFinished {
 }
 
 
+#Make globally available to allow later use by other functions, esp.  handleIntentConfirmAction
+my $dispatchFns = {
+    Shortcuts           => \&handleIntentShortcuts, 
+    SetOnOff            => \&handleIntentSetOnOff,
+    SetOnOffGroup       => \&handleIntentSetOnOffGroup,
+    SetTimedOnOff       => \&handleIntentSetTimedOnOff,
+    SetTimedOnOffGroup  => \&handleIntentSetTimedOnOffGroup,
+    GetOnOff            => \&handleIntentGetOnOff,
+    SetNumeric          => \&handleIntentSetNumeric,
+    SetNumericGroup     => \&handleIntentSetNumericGroup,
+    GetNumeric          => \&handleIntentGetNumeric,
+    GetState            => \&handleIntentGetState,
+    MediaControls       => \&handleIntentMediaControls,
+    MediaChannels       => \&handleIntentMediaChannels,
+    SetColor            => \&handleIntentSetColor,
+    SetColorGroup       => \&handleIntentSetColorGroup,
+    SetScene            => \&handleIntentSetScene,
+    GetTime             => \&handleIntentGetTime,
+    GetDate             => \&handleIntentGetDate,
+    SetTimer            => \&handleIntentSetTimer,
+    ConfirmAction       => \&handleIntentConfirmAction,
+    CancelAction        => \&handleIntentCancelAction,
+    ChoiceRoom          => \&handleIntentChoiceRoom,
+    ChoiceDevice        => \&handleIntentChoiceDevice,
+    MsgDialog           => \&handleIntentMsgDialog,
+    ReSpeak             => \&handleIntentReSpeak
+};
+
+
+#reference: https://forum.fhem.de/index.php/topic,124952.msg1213902.html#msg1213902
+sub testmode_start {
+    my $hash    = shift // return;
+    my $file    = shift // return;
+
+    my ($ret, @content) = FileRead( { FileName => $file, ForceType => 'file' } );
+    return $ret if $ret;
+    return 'file contains no content!' if !@content;
+    $hash->{testline} = 0;
+    $hash->{helper}->{test}->{content} = \@content;
+    $hash->{helper}->{test}->{filename} = $file;
+    return testmode_next($hash);
+}
+
+sub testmode_next {
+    my $hash = shift // return;
+
+    my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
+    if ( !$line || $line =~ m{\A\s*[#]}x || $line =~ m{\A\s*\z}x) {
+        $line //= '';
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] = "$line";
+        $hash->{testline}++;
+        return testmode_next($hash) if $hash->{testline} <= @{$hash->{helper}->{test}->{content}};
+    }
+
+    if ( $hash->{testline} < @{$hash->{helper}->{test}->{content}} ) {
+        my @ca_strings = split m{,}, ReadingsVal($hash->{NAME},'intents','');
+        my $sendData =  { 
+            input        => $line,
+            sessionId    => "$hash->{siteId}_$hash->{testline}_testmode",
+            id           => "$hash->{siteId}_$hash->{testline}",
+            siteId       => $hash->{siteId},
+            intentFilter => [@ca_strings]
+        };
+
+        my $json = _toCleanJSON($sendData);
+        return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
+    }
+
+    my $filename = $hash->{helper}->{test}->{filename};
+    $filename =~ s{[.]txt\z}{}i;
+    $filename = "${filename}_result.txt";
+
+    my $result = $hash->{helper}->{test}->{passed} // 0;
+    my $fails = $hash->{helper}->{test}->{notRecogn} // 0;
+    $result = "tested $result sentences, failed: $fails.";
+
+    if ( $filename ne 'none_result.txt' ) {
+        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
+        $result .= " See $filename for detailed results."
+    } else {
+        $result = $fails ? 'Test failed, ' : 'Test ok, ';
+        $result .= "result is: $hash->{helper}->{test}->{result}->[0]"
+    }
+    readingsSingleUpdate($hash,'testResult',$result,1);
+    if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult' ) {
+          my $duration = sprintf( "%.2f", (gettimeofday() - $hash->{asyncGet}{start})*1);
+          RemoveInternalTimer($hash->{asyncGet});
+          asyncOutput($hash->{asyncGet}{CL}, "test(s) passed successfully. Summary: $result, duration: $duration s");
+          delete($hash->{asyncGet});
+    }
+    delete $hash->{testline};
+    delete $hash->{helper}->{test};
+    return;
+}
+
+sub testmode_parse {
+    my $hash   = shift // return;
+    my $intent = shift // return;
+    my $data   = shift // return;
+
+    my $line = $hash->{helper}->{test}->{content}->[$hash->{testline}];
+    my $result;
+    $hash->{helper}->{test}->{passed}++;
+    if ( $intent eq 'intentNotRecognized' ) {
+        $result = $line;
+        $hash->{helper}->{test}->{notRecogn}++;
+    } else { 
+        my $json = toJSON($data);
+        $result = "$line => $intent $json";
+    }
+    $hash->{helper}->{test}->{result}->[$hash->{testline}] = $result;
+    if (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate\z}) {
+        $result = $dispatchFns->{$intent}->($hash, $data);
+        return;
+    }
+    $hash->{testline}++;
+    return testmode_next($hash);
+}
+
 sub RHASSPY_msgDialogTimeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
@@ -2673,7 +2853,6 @@ sub msgDialog_progress {
 
     my $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
-    return;
 }
 
 sub msgDialog_respond {
@@ -2857,36 +3036,6 @@ sub updateLastIntentReadings {
     return;
 }
 
-
-#Make globally available to allow later use by other functions, esp.  handleIntentConfirmAction
-my $dispatchFns = {
-    Shortcuts           => \&handleIntentShortcuts, 
-    SetOnOff            => \&handleIntentSetOnOff,
-    SetOnOffGroup       => \&handleIntentSetOnOffGroup,
-    SetTimedOnOff       => \&handleIntentSetTimedOnOff,
-    SetTimedOnOffGroup  => \&handleIntentSetTimedOnOffGroup,
-    GetOnOff            => \&handleIntentGetOnOff,
-    SetNumeric          => \&handleIntentSetNumeric,
-    SetNumericGroup     => \&handleIntentSetNumericGroup,
-    GetNumeric          => \&handleIntentGetNumeric,
-    GetState            => \&handleIntentGetState,
-    MediaControls       => \&handleIntentMediaControls,
-    MediaChannels       => \&handleIntentMediaChannels,
-    SetColor            => \&handleIntentSetColor,
-    SetColorGroup       => \&handleIntentSetColorGroup,
-    SetScene            => \&handleIntentSetScene,
-    GetTime             => \&handleIntentGetTime,
-    GetDate             => \&handleIntentGetDate,
-    SetTimer            => \&handleIntentSetTimer,
-    ConfirmAction       => \&handleIntentConfirmAction,
-    CancelAction        => \&handleIntentCancelAction,
-    ChoiceRoom          => \&handleIntentChoiceRoom,
-    ChoiceDevice        => \&handleIntentChoiceDevice,
-    MsgDialog           => \&handleIntentMsgDialog,
-    ReSpeak             => \&handleIntentReSpeak
-};
-
-
 # Daten vom MQTT Modul empfangen -> Device und Room ersetzen, dann erneut an NLU übergeben
 sub analyzeMQTTmessage {
     my $hash    = shift;# // return;
@@ -2954,6 +3103,7 @@ sub analyzeMQTTmessage {
     }
 
     if ($topic =~ m{\Ahermes/intent/.*[:_]SetMute}x && defined $siteId) {
+        return testmode_parse($hash, 'SetMute', $data) if defined $hash->{testline};
         $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
         $data->{requestType} = $type;
 
@@ -3001,9 +3151,12 @@ sub analyzeMQTTmessage {
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
+        return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline};
         handleIntentNotRecognized($hash, $data) if $hash->{experimental};
         return;
     }
+
+    return testmode_parse($hash, $data->{intent}, $data) if defined $hash->{testline};
 
     my $command = $data->{input};
     $type = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
@@ -3041,6 +3194,12 @@ sub respond {
     my $response = shift // return;
     my $topic    = shift // q{endSession};
     my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
+
+    if ( defined $hash->{testline} ) {
+        $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Response: $response";
+        $hash->{testline}++;
+        return testmode_next($hash);
+    }
 
     my $type      = $data->{requestType} // return;
 
@@ -5225,45 +5384,18 @@ __END__
 
 =begin ToDo
 
-# Farben:
-  Warum die Abfrage nach rgb? <code>if ( defined $data->{Colortemp} && defined $mapping->{rgb} && looks_like_number($data->{Colortemp}) ) {</code>
-  Gibt auch Lampen, die können nur ct (Beta-User: unklare Frage: der fragliche Zweig wird nur bei "falschem ct" angesteuert, ansonsten wird schon vorher "nativ" ct verwendet)
-
-# Custom Intents
- - Bei Verwendung des Dialouges wenn man keine Antwort spricht, bricht Rhasspy ab. Die voice response "Tut mir leid, da hat etwas zu lange gedauert" wird
-   also gar nicht ausgegeben und: (Beta-User: klingt nach "silent cancelation", grade keine Idee).
-
-   PERL WARNING: Use of uninitialized value $cmd in pattern match (m//) at fhem.pl line 5868. (Beta-User: nicht mehr zuordenbar)
-
-# Sonstiges, siehe insbes. https://forum.fhem.de/index.php/topic,119447.msg1148832.html#msg1148832
-- kein "match in room" bei GetNumeric
-- "kind" und wie man es füllen könnte (mehr Dialoge)
-- Bestätigungsdialoge - weitere Anwendungsfelder
-- gDT: mehr und bessere mappings?
-- Farbe und Farbtemperatur (fast fertig?)
-- Hat man in einem Raum einen Satelliten aber kein Device mit der siteId/Raum, kann man den Satelliten bei z.B. dem Timer nicht ansprechen, weil der Raum nicht in den Slots ist.
-  Irgendwie müssen wir die neue siteId in den Slot Rooms bringen (erl. mit extrarooms?)
-
-# Parameter-Check für define? Anregung DrBasch aus https://forum.fhem.de/index.php/topic,119447.msg1157700.html#msg1157700 (erl.)
-
-# Doku zu den "üblichen Formaten" (z.B. JSON-Keywords beginnen mit Großbuchstaben)? (erl. (?))
-
-=end ToDo
-
-=begin ToClarify
-
-#defaultRoom (JensS):
-- überhaupt erforderlich?
-- Schreibweise: RHASSPY ist raus, Rhasspy scheint der überkommene Raumname für die devspec zu sein => ist erst mal weiter beides drin
+# Continous mode? (Wackelig, mehr oder weniger ungetestet...)
 
 # GetTimer implementieren?
 https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
 
-# Wetterdurchsage
-Ist möglich. Dazu hatte ich einen rudimentären Intent in diesem Thread erstellt. Müsste halt nur erweitert werden.
-https://forum.fhem.de/index.php/topic,113180.msg1130754.html#msg1130754 (evtl. ersetzt durch STATE-Abfrage/gDT info?)
+# Rückmeldung zu den AMAD.*-Schnittstellen 
+- v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
 
-=end ToClarify
+# auto-training
+Tests/Rückmeldungen fehlen bisher
+
+=end ToDo
 
 =encoding utf8
 =item device
@@ -5445,7 +5577,21 @@ After changing something relevant within FHEM for either the data structure in</
   </li>
   <li>
     <a id="RHASSPY-set-activateVoiceInput"></a><b>activateVoiceInput</b>
-    <p>Activate a satellite for voice input. <i>siteId</i>, <i>hotword</i> and <i>modelId</i> may be provided (either in order of appearance or as named arguments), otherwise some defaults will be used.
+    <p>Activate a satellite for voice input. <i>siteId</i>, <i>hotword</i> and <i>modelId</i> may be provided (either in order of appearance or as named arguments), otherwise some defaults will be used.</p>
+  </li>
+</ul>
+
+<a id="RHASSPY-get"></a>
+<h4>Get</h4>
+<p>Note: To get test results, RHASSPY's siteId has to be configured for intent recognition in Rhasspy as well.</p>
+<ul>
+  <li>
+    <a id="RHASSPY-get-test_file"></a><b>test_file</b>
+    <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to the file '&lt;input without ending.txt&gt;_result.txt'. "stop" as filename will stop test mode if sth. goes wrong. No actions will be derived while test mode is active.</p>
+  </li>
+  <li>
+    <a id="RHASSPY-get-test_sentence"></a><b>test_sentence</b>
+    <p>Checks the provided sentence for recognition by Rhasspy NLU. No actions will be derived upon detected content.</p>
   </li>
 </ul>
 
@@ -5655,16 +5801,17 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         By default, all incoming messages from AMADDevice/AMADCommBridge will be forwarded to Rhasspy. For better interaction with <a href="#Babble ">Babble</a> you may opt to ignore all messages not matching the <i>filterFromBabble</i> by their starting words (case-agnostic, will be converted to a regex compatible notation). You additionally have to set a <i>Babble</i> key in <a href="#RHASSPY-define">DEF</a> pointing to the Babble device. All regular messages (start sequence not matching filter) then will be forwarded to Babble using <code>Babble_DoIt()</code> function.</li>
         <li><i>&lt;allowed AMAD-device&gt;</i> A list of key=value pairs to tweak default behaviours:
         <ul>
-         <li><i>wakeword</i> If set, a wakeword detected message for this wakeword will lead to an 
+        <li><i>wakeword</i> If set, a wakeword detected message for this wakeword will lead to an 
          "activateVoiceInput" command towards this AMADDevice</li>
-         <li><i>sessionTimeout</i> timeout (in seconds) used if a request (e.g. for confirmation) is open for this AMADDevice (if not set, global default value is used)</li>
-         <li> Remark: This may contain additional keys in the future, e.g., to restrict wakeword effect to a specific siteId.</li>
+        <li><i>sessionTimeout</i> timeout (in seconds) used if a request (e.g. for confirmation) is open for this AMADDevice (if not set, global default value is used)</li>
+        <li> Remark: This may contain additional keys in the future, e.g., to restrict wakeword effect to a specific siteId.</li>
         </ul>
+        </li>
       </ul>
       Example:<br>
         <p><code>allowed=AMADDev_A <br>
                  filterFromBabble=tell rhasspy <br>
-                 &lt;AMAD-device&gt;=wakeword=alexa sessionTimeout=20</code></p>
+                 AMADDev_A=wakeword=alexa sessionTimeout=20</code></p>
   </li>
   <li>
     <a id="RHASSPY-attr-forceNEXT"></a><b>forceNEXT</b>
@@ -5874,7 +6021,7 @@ yellow=rgb FFFF00</code></p>
   <li>sessionTimeout_&lt;siteId&gt;</li>
   RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
   <li>siteId2ttsDevice_&lt;siteId&gt;</li>
-  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspyTTS">rhasspyTTS</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
 </ul>
 =end html
 =cut
