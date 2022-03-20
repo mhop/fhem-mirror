@@ -469,6 +469,7 @@ HCS_getValues($$) {
                     || ($attr{$d}{model} eq "HmIP-WTH-2" && !$defs{$d}{device})
                     || ($attr{$d}{model} eq "HmIP-eTRV" && !$defs{$d}{device}) 
                     || ($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}) )) );
+    next if($t eq "ZWave" && !$attr{$d}{classes});
     next if($t eq "ZWave" && $attr{$d}{classes} !~ m/THERMOSTAT_SETPOINT/);
 
     $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a")      if($t =~ m/(HMCCUDEV|HMCCUCHN|FHT|CUL_HM|ZWave)/);
