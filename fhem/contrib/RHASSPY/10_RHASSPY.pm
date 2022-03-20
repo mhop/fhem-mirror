@@ -320,7 +320,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.22';
+    $hash->{MODULE_VERSION} = '0.5.23';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -620,7 +620,7 @@ sub Get {
                 my $start = gettimeofday();
                 my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> 'testResult', start=>$start};
                 $hash->{asyncGet} = $tHash;
-                InternalTimer(gettimeofday()+4, sub {
+                InternalTimer(gettimeofday()+30, sub {
                   asyncOutput($tHash->{CL}, "Test file $values[0] is initiated. See if internal 'testline' is rising and check testResult reading later");
                   delete($hash->{asyncGet});
                 }, $tHash, 0);
@@ -3196,6 +3196,7 @@ sub respond {
     my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
     if ( defined $hash->{testline} ) {
+        $response = $response->{text} if ref $response eq 'HASH';
         $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Response: $response";
         $hash->{testline}++;
         return testmode_next($hash);
