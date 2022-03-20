@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 24 / 2019-01-05
+# Release 25 / 2022-03-2
 
 package main;
 
@@ -607,7 +607,7 @@ netatmo_Set($$@)
     $list = "setpoint_mode:off,hg,away,program,manual,max program:".$hash->{schedulenames}." setpoint_temp:5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10.0,10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0,14.5,15.0,15.5,16.0,16.5,17.0,17.5,18.0,18.5,19.0,19.5,20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5,24.0,24.5,25.0,25.5,26.0,26.5,27.0,27.5,28.0,28.5,29.0,29.5,30.0" if(defined($hash->{schedulenames}));
   }
   $list = "clear:noArg webhook:add,drop" if ($hash->{SUBTYPE} eq "WEBHOOK");
-  #$list .= " checkBan:noArg" if( $hash->{SUBTYPE} eq "WEBHOOK" );
+  #$list .= " checkban:noArg unban:noArg" if( $hash->{SUBTYPE} eq "WEBHOOK" );
 
   return undef if( $list eq "" );
   $cmd = "(undefined)" if(!defined($cmd));
@@ -723,9 +723,13 @@ netatmo_Set($$@)
     }
     return undef;
   }
-  if( $cmd eq 'checkBan' )# checkBan:noArg
+  if( $cmd eq 'checkban' )
   {
     return netatmo_checkDev($hash);
+  }
+  if( $cmd eq 'unban' )
+  {
+    return netatmo_checkBan($hash);
   }
 
 
@@ -763,7 +767,6 @@ netatmo_getAppToken($)
   return Log3 $name, 1, "$name: No username was found! (getAppToken)" if(!defined($hash->{helper}{username}));
   return Log3 $name, 1, "$name: No password was found! (getAppToken)" if(!defined($hash->{helper}{password}));
 
-  #my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmMxOTNaV3hqYjIxbE9qaGhZalU0TkdRMk1tTmhNbUUzTjJVek4yTmpZelppTW1NM1pUUm1Namxs";
   my $auth = "QXV0aG9yaXphdGlvbjogQmFzaWMgYm1GZlkyeHBaVzUwWDJsdmN6bzFObU5qTmpSaU56azBOak5oT1RrMU9HSTNOREF4TkRjeVpEbGxNREUxT0E9PQ==";
   $auth = decode_base64($auth);
 
@@ -1100,7 +1103,7 @@ netatmo_parseApp($$$)
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   
-  Log3 $name, 3, "$name got dev app data to check ban state";
+  Log3 $name, 4, "$name got dev app data to check ban state";
 
   my $json = eval { JSON->new->utf8(0)->decode($data) };
   if($@)
@@ -1112,9 +1115,19 @@ netatmo_parseApp($$$)
   if(defined($json->{body}) && defined($json->{body}{temporary_ban})) {
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "banned", (($json->{body}{temporary_ban})?"yes":"no") );
+    readingsBulkUpdate( $hash, "unban_count", $json->{body}{usage_unbanapp_count} );
+    my @scopes;
+    foreach my $scope (@{$json->{body}{allowed_scopes}}) {
+      push( @scopes, $scope );
+    }
+    my $scopelist =  join(', ',@scopes);
+    readingsBulkUpdate( $hash, "scope", $scopelist );
+
     readingsBulkUpdate( $hash, "activated", (($json->{body}{activated})?"yes":"no") );
     readingsBulkUpdate( $hash, "usage_1", $json->{body}{usage_1} );
     readingsBulkUpdate( $hash, "usage_2", $json->{body}{usage_2} );
+    readingsBulkUpdate( $hash, "id", $json->{body}{_id} );
+
     readingsEndUpdate($hash,1);
   }
   Log3 $name, 5, "$name app data:\n".Dumper($json);
@@ -1122,6 +1135,80 @@ netatmo_parseApp($$$)
   return undef;
 }
 
+sub
+netatmo_checkDev($)
+{
+  my ($hash) = @_;
+  my $iohash = $hash->{IODev};
+  my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash,"netatmo_checkDev");
+  InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>0);
+
+  if(!defined($iohash->{access_token_app})||!defined($iohash->{access_token_app})){
+    Log3 $name, 2, "$name: checkDev internals missing";
+    return undef;
+  }
+  HttpUtils_NonblockingGet({
+    url => "https://app.netatmo.net/api/createdapplist",
+    timeout => 30,
+    hash => $hash,
+    type => 'checkdev',
+    method => "POST",
+    #data => $json,
+    header => "Referer: https://dev.netatmo.com/dev/myaccount\r\nAuthorization: Bearer ".$iohash->{access_token_app}."\r\nContent-Type: application/json;charset=utf-8",#\r\nCookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US; netatmocomacces_token=".$accesstoken,
+    callback => \&netatmo_parseDev,
+  });
+  Log3 $name, 3, "$name: checking for dev apps";
+
+
+  return undef;
+}
+
+sub
+netatmo_checkBan($)
+{
+  my ($hash) = @_;
+  my $iohash = $hash->{IODev};
+  my $name = $hash->{NAME};
+
+  return "not banned" if(ReadingsVal($name,"banned","no") ne "yes");
+  my $appid = ReadingsVal($name,"id",undef);
+
+  HttpUtils_NonblockingGet({
+    url => "https://app.netatmo.net/api/unbanapp",
+    timeout => 10,
+    hash => $hash,
+    type => 'checkban',
+    method => "POST",
+    data => "application_id=".$appid,
+    header => "Referer: https://dev.netatmo.com/apps/".$appid."\r\nAuthorization: Bearer ".$iohash->{access_token_app}."\r\nContent-Type: application/x-www-form-urlencoded\r\nDNT: 1\r\nHost: app.netatmo.net\r\nOrigin: https://dev.netatmo.com\r\nSec-Fetch-Dest: empty\r\nSec-Fetch-Mode: cors\r\nSec-Fetch-Site: cross-site\r\nAccept: application/json, text/plain, */*\r\nAccept-Encoding: gzip, deflate, br\r\nAccept-Language: en-US,en;q=0.5",
+    callback => \&netatmo_parseBan,
+  });
+  Log3 $name, 2, "$name: unbanning";
+
+
+  return undef;
+}
+
+sub
+netatmo_parseBan($$$)
+{
+  my ($param,$err,$data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: invalid json evaluation on unban ".$@;
+    return undef;
+  }
+
+  Log3 $name, 2, "$name: unban: ".Dumper($json);
+
+  return undef;
+}
 
 
 sub
@@ -1170,8 +1257,8 @@ netatmo_initDevice($)
   $hash->{last_seen} = FmtDateTime($device->{last_seen}) if(defined($device->{last_seen}));
   $hash->{wifi_status} = $device->{wifi_status} if(defined($device->{wifi_status}));
   $hash->{rf_status} = $device->{rf_status} if(defined($device->{rf_status}));
-  #$hash->{battery_percent} = $device->{battery_percent} if(defined($device->{battery_percent}));
-  #$hash->{battery_vp} = $device->{battery_vp} if(defined($device->{battery_vp}));
+  $hash->{battery_percent} = $device->{battery_percent} if(defined($device->{battery_percent}));
+  $hash->{battery_vp} = $device->{battery_vp} if(defined($device->{battery_vp}));
 
   if( $device->{place} ) {
     $hash->{country} = $device->{place}{country};
@@ -2628,7 +2715,7 @@ netatmo_poll($)
     InternalTimer(gettimeofday()+150, "netatmo_poll", $hash);
     $hash->{status} = "delayed update";
     #netatmo_checkConnection($hash->{IODev});
-    readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data");
+    readingsSingleUpdate( $hash, "active", $hash->{status}, 1 ) if($hash->{status} ne "no data" && $hash->{SUBTYPE} ne "WEBHOOK");
     Log3 $name, 5, "$name: DEVICE network error: ".$hash->{IODev}->{network};
     return undef;
   }
@@ -3252,8 +3339,25 @@ netatmo_parseDeviceList($$)
       $module->{main_device} = $device->{_id};
       push( @devices, $module );
 
-
+      # my $moduledef = $modules{$hash->{TYPE}}{defptr}{"M$module->{_id}"};
+      # if (!defined($moduledef)){
+      #   Log3 $name, 1, "$name: nomodule ".$module->{_id};
+      #   next;
+      # }
+      # readingsSingleUpdate($moduledef, "batteryState", ($module->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($module->{battery_percent}));
+      # readingsSingleUpdate($moduledef, "batteryPercent", $module->{battery_percent}, 1) if(defined($module->{battery_percent}));
+      # readingsSingleUpdate($moduledef, "batteryVoltage", $module->{battery_vp}/1000, 1) if(defined($module->{battery_vp}));
     }
+
+    # my $devicedef = $modules{$hash->{TYPE}}{defptr}{"D$device->{_id}"};
+    # if (!defined($devicedef)){
+    #   Log3 $name, 1, "$name: nodevice ".$device->{_id};
+    #   next;
+    # }
+    # readingsSingleUpdate($devicedef, "batteryState", ($device->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($device->{battery_percent}));
+    # readingsSingleUpdate($devicedef, "batteryPercent", $device->{battery_percent}, 1) if(defined($device->{battery_percent}));
+    # readingsSingleUpdate($devicedef, "batteryVoltage", $device->{battery_vp}/1000, 1) if(defined($device->{battery_vp}));
+
   }
 
   $hash->{helper}{devices} = \@devices;
@@ -3707,8 +3811,8 @@ netatmo_parseGlobal($$)
         $device->{last_seen} = FmtDateTime($devicedata->{last_seen}) if(defined($devicedata->{last_seen}));
         $device->{wifi_status} = $devicedata->{wifi_status} if(defined($devicedata->{wifi_status}));
         $device->{rf_status} = $devicedata->{rf_status} if(defined($devicedata->{rf_status}));
-        #$device->{battery_percent} = $devicedata->{battery_percent} if(defined($devicedata->{battery_percent}));
-        #$device->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
+        $device->{battery_percent} = $devicedata->{battery_percent} if(defined($devicedata->{battery_percent}));
+        $device->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
 
         readingsSingleUpdate($device, "batteryState", ($devicedata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($devicedata->{battery_percent}));
         readingsSingleUpdate($device, "batteryPercent", $devicedata->{battery_percent}, 1) if(defined($devicedata->{battery_percent}));
@@ -3813,8 +3917,8 @@ netatmo_parseGlobal($$)
             $module->{last_seen} = FmtDateTime($moduledata->{last_seen}) if(defined($moduledata->{last_seen}));
             $module->{wifi_status} = $moduledata->{wifi_status} if(defined($moduledata->{wifi_status}));
             $module->{rf_status} = $moduledata->{rf_status} if(defined($moduledata->{rf_status}));
-            #$module->{battery_percent} = $moduledata->{battery_percent} if(defined($moduledata->{battery_percent}));
-            #$module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
+            $module->{battery_percent} = $moduledata->{battery_percent} if(defined($moduledata->{battery_percent}));
+            $module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
 
             readingsSingleUpdate($module, "batteryState", ($moduledata->{battery_percent} > 20) ? "ok" : "low", 1) if(defined($moduledata->{battery_percent}));
             readingsSingleUpdate($module, "batteryPercent", $moduledata->{battery_percent}, 1) if(defined($moduledata->{battery_percent}));
@@ -5004,8 +5108,8 @@ netatmo_parseThermostatReadings($$;$)
         $hash->{last_therm_seen} = FmtDateTime($devicedata->{last_therm_seen}) if(defined($devicedata->{last_therm_seen}));
         $hash->{wifi_status} = $devicedata->{wifi_status} if(defined($devicedata->{wifi_status}));
         $hash->{rf_status} = $devicedata->{rf_status} if(defined($devicedata->{rf_status}));
-        #$hash->{battery_percent} = $devicedata->{battery_percent} if(defined($devicedata->{battery_percent}));
-        #$hash->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
+        $hash->{battery_percent} = $devicedata->{battery_percent} if(defined($devicedata->{battery_percent}));
+        $hash->{battery_vp} = $devicedata->{battery_vp} if(defined($devicedata->{battery_vp}));
         $hash->{therm_orientation} = $devicedata->{therm_orientation} if(defined($devicedata->{therm_orientation}));
         $hash->{therm_relay_cmd} = $devicedata->{therm_relay_cmd} if(defined($devicedata->{therm_relay_cmd}));
         $hash->{udp_conn} = $devicedata->{udp_conn} if(defined($devicedata->{udp_conn}));
@@ -5053,8 +5157,8 @@ netatmo_parseThermostatReadings($$;$)
             $module->{last_therm_seen} = FmtDateTime($moduledata->{last_therm_seen}) if(defined($moduledata->{last_therm_seen}));
             $module->{wifi_status} = $moduledata->{wifi_status} if(defined($moduledata->{wifi_status}));
             $module->{rf_status} = $moduledata->{rf_status} if(defined($moduledata->{rf_status}));
-            #$module->{battery_percent} = $moduledata->{battery_percent} if(defined($moduledata->{battery_percent}));
-            #$module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
+            $module->{battery_percent} = $moduledata->{battery_percent} if(defined($moduledata->{battery_percent}));
+            $module->{battery_vp} = $moduledata->{battery_vp} if(defined($moduledata->{battery_vp}));
             $module->{therm_orientation} = $moduledata->{therm_orientation} if(defined($moduledata->{therm_orientation}));
             #$module->{therm_relay_cmd} = $moduledata->{therm_relay_cmd} if(defined($moduledata->{therm_relay_cmd}));
             $module->{udp_conn} = $moduledata->{udp_conn} if(defined($moduledata->{udp_conn}));
@@ -5440,29 +5544,40 @@ netatmo_parsePublic($$)
           $min_gust = $val if($val < $min_gust);
           $max_gust = $val if($val > $max_gust);
         }
+        my $anglescount=0;
         my $angle_wind_x = 0;
         my $angle_wind_y = 0;
         foreach my $val (@readings_wind_angle)
         {
           next if($val == -1);
-          Log3 $name, 5, "$name: wind angle ".$val;
-          $angle_wind_x += cos($val);
-          $angle_wind_y += sin($val);
+          Log3 $name, 4, "$name: wind angle ".$val;
+          $val = $val*pi/180;
+          $angle_wind_x += sin($val);
+          $angle_wind_y += cos($val);
+          $anglescount++;
         }
-        my $angle_wind = atan2($angle_wind_x,$angle_wind_y);
-        $angle_wind = ($angle_wind >= 0 ? $angle_wind : (2* pi + $angle_wind)) * 180/ pi;
+        my $angle_wind = (atan2($angle_wind_x,$angle_wind_y));
+        $angle_wind += 2*pi while $angle_wind < 0;
+        $angle_wind -= 2*pi while $angle_wind > 2*pi;
+        $angle_wind = $angle_wind*180/pi;
+
         Log3 $name, 4, "$name: wind angle avg ".$angle_wind;
         my $angle_gust_x = 0;
         my $angle_gust_y = 0;
+        $anglescount=0;
         foreach my $val (@readings_gust_angle)
         {
           next if($val == -1);
-          Log3 $name, 5, "$name: gust angle ".$val;
-          $angle_gust_x += cos($val);
-          $angle_gust_y += sin($val);
+          Log3 $name, 4, "$name: gust angle ".$val;
+          $val = $val*pi/180;
+          $angle_gust_x += sin($val);
+          $angle_gust_y += cos($val);
+          $anglescount++;
         }
-        my $angle_gust = atan2($angle_gust_x,$angle_gust_y);
-        $angle_gust = ($angle_gust >= 0 ? $angle_gust : (2* pi + $angle_gust)) * 180/ pi;
+        my $angle_gust = (atan2($angle_gust_x,$angle_gust_y));
+        $angle_gust += 2*pi while $angle_gust < 0;
+        $angle_gust -= 2*pi while $angle_gust > 2*pi;
+        $angle_gust = $angle_gust*180/pi;
         Log3 $name, 4, "$name: gust angle avg ".$angle_gust;
         my $avgtime_wind = 0;
         foreach my $val (@timestamps_wind)
@@ -6224,7 +6339,7 @@ netatmo_registerWebhook($)
   my $webhookurl = AttrVal($name,"webhookURL",undef);
   return undef if(!defined($webhookurl));
   
-  InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>=0);
+  InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>0);
 
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/addwebhook",
@@ -6314,7 +6429,7 @@ sub netatmo_Webhook() {
     netatmo_checkDev($hash);
   } else {
     RemoveInternalTimer($hash,"netatmo_checkDev");
-    InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>=0);
+    InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>0);
   }
 
   Log3 $name, 5, "Netatmo webhook JSON:\n".$data;
