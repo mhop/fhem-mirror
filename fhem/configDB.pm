@@ -1138,6 +1138,7 @@ if($svinternal != -1) {
 	$sth = $fhem_dbh->prepare( $sql);
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
+	    $line[3] //= "";
 		$ret .= "$line[0] $line[1] $line[2] $line[3]\n";
 	}
 	return $ret;
