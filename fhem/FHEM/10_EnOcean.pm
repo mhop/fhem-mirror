@@ -393,6 +393,8 @@ my %EnO_eepConfig = (
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
   "D2.05.01" => {attr => {subType => "blindsCtrl.01", webCmd => "opens:stop:closes:position"}},
   "D2.05.02" => {attr => {subType => "blindsCtrl.00", defaultChannel => 1, webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
+  "D2.05.04" => {attr => {subType => "blindsCtrl.00", defaultChannel => 1, webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
+  "D2.05.05" => {attr => {subType => "blindsCtrl.01", webCmd => "opens:stop:closes:position"}},
   "D2.06.01" => {attr => {subType => "multisensor.01"}, GPLOT => "EnO_temp4humi4:Temp/Humi,EnO_brightness4:Brightness,"},
   "D2.06.50" => {attr => {subType => "multisensor.50"}},
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
@@ -11809,42 +11811,38 @@ sub EnOcean_Parse($$) {
       if ($cmd == 4) {
         # actuator status response
         if ($db[3] == 0) {
-          push @event, "3:state:open";
-          push @event, "3:endPosition" . sprintf('%02d', $channel) . ":open";
-          push @event, "3:position" . sprintf('%02d', $channel) . ":" . $db[3];
-          push @event, "3:position:" . $db[3];
+          push @event, "1:state:open";
+          push @event, "1:endPosition" . sprintf('%02d', $channel) . ":open";
+          push @event, "1:position" . sprintf('%02d', $channel) . ":" . $db[3];
+          push @event, "1:position:" . $db[3];
         } elsif ($db[3] == 100) {
-          push @event, "3:state:closed";
-          push @event, "3:endPosition" . sprintf('%02d', $channel) . ":closed";
-          push @event, "3:position" . sprintf('%02d', $channel) . ":" . $db[3];
-          push @event, "3:position:" . $db[3];
+          push @event, "1:state:closed";
+          push @event, "1:endPosition" . sprintf('%02d', $channel) . ":closed";
+          push @event, "1:position" . sprintf('%02d', $channel) . ":" . $db[3];
+          push @event, "1:position:" . $db[3];
        } elsif ($db[3] == 127) {
-          push @event, "3:state:unknown";
-          push @event, "3:endPosition" . sprintf('%02d', $channel) . ":unknown";
-          push @event, "3:position" . sprintf('%02d', $channel) . ":unknown";
-          push @event, "3:position:unknown";
+          push @event, "1:state:unknown";
+          push @event, "1:endPosition" . sprintf('%02d', $channel) . ":unknown";
+          push @event, "1:position" . sprintf('%02d', $channel) . ":unknown";
+          push @event, "1:position:unknown";
         } else {
-          push @event, "3:state:" . $db[3];
-          push @event, "3:endPosition" . sprintf('%02d', $channel) . ":not_reached";
-          push @event, "3:position" . sprintf('%02d', $channel) . ":" . $db[3];
-          push @event, "3:position:" . $db[3];
+          push @event, "1:state:" . $db[3];
+          push @event, "1:endPosition" . sprintf('%02d', $channel) . ":not_reached";
+          push @event, "1:position" . sprintf('%02d', $channel) . ":" . $db[3];
+          push @event, "1:position:" . $db[3];
         }
         if ($db[2] == 127) {
-          push @event, "3:anglePos" . sprintf('%02d', $channel) . ":unknown";
-          push @event, "3:anglePos:unknown";
+          push @event, "1:anglePos" . sprintf('%02d', $channel) . ":unknown";
+          push @event, "1:anglePos:unknown";
         } else {
-          push @event, "3:anglePos" . sprintf('%02d', $channel) . ":" . $db[2];
-          push @event, "3:anglePos:" . $db[2];
+          push @event, "1:anglePos" . sprintf('%02d', $channel) . ":" . $db[2];
+          push @event, "1:anglePos:" . $db[2];
         }
-        if ($db[1] == 0) {
-          push @event, "3:block" . sprintf('%02d', $channel) . ":unlock";
-        } elsif ($db[1] == 1) {
-          push @event, "3:block" . sprintf('%02d', $channel) . ":lock";
-        } elsif ($db[1] == 2) {
-          push @event, "3:block" . sprintf('%02d', $channel) . ":alarm";
-        } else {
-          push @event, "3:block" . sprintf('%02d', $channel) . ":reserved";
-        }
+        my %block = (0 => 'unlock', 1 => 'lock', 2 => 'alarm');
+        my $block = exists($block{$db[1] & 7}) ? $block{$db[1] & 7} : 'reserved';
+        push @event, "1:block" . sprintf('%02d', $channel) . ":" . $block;
+        my %currentRun = (0 => 'stopped', 1 => 'up', 2 => 'down', 3 => 'unknown');
+        push @event, "1:currentRun" . sprintf('%02d', $channel) . ":" . $currentRun{($db[1] & 24) >> 3};
 
       } else {
         # unknown response
@@ -20309,8 +20307,8 @@ sub EnOcean_Delete($$) {
     </li>
     <br><br>
 
-    <li>Blind Control for Position and Angle (D2-05-00 - D2-05-01)<br>
-        [AWAG Elektrotechnik AG OMNIO UPJ 230/12, REGJ12/04M ]<br>
+    <li>Blind Control for Position and Angle (D2-05-00, D2-05-01, D2-05-02, D2-05-04, D2-05-05)<br>
+        [AWAG Elektrotechnik AG OMNIO UPJ 230/12, REGJ12/04M, miniJ01]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -20776,8 +20774,8 @@ sub EnOcean_Delete($$) {
     </li>
     <br><br>
 
-    <li>Blind Control for Position and Angle (D2-05-00)<br>
-        [AWAG Elektrotechnik AG OMNIO UPJ 230/12, REGJ12/04M]<br>
+    <li>Blind Control for Position and Angle (D2-05-00, D2-05-01, D2-05-02, D2-05-04, D2-05-05)<br>
+        [AWAG Elektrotechnik AG OMNIO UPJ 230/12, REGJ12/04M, miniJ01]<br>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -23400,8 +23398,8 @@ sub EnOcean_Delete($$) {
      </li>
      <br><br>
 
-     <li>Blind Control for Position and Angle (D2-05-00)<br>
-         [AWAG Elektrotechnik AG OMNIO UPJ 230/12]<br>
+    <li>Blind Control for Position and Angle (D2-05-00, D2-05-01, D2-05-02, D2-05-04, D2-05-05)<br>
+        [AWAG Elektrotechnik AG OMNIO UPJ 230/12, REGJ12/04M, miniJ01]<br>
      <ul>
         <li>open<br>
             The status of the device will become "open" after the TOP endpoint is
@@ -23415,6 +23413,7 @@ sub EnOcean_Delete($$) {
             The status of the device become "not_reached" between one of the endpoints.</li>
         <li>pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
         <li>anglePos&lt;channel&gt;: &alpha;/% (Sensor Range: &alpha; = 0 % ... 100 %)</li>
+        <li>currentRun&lt;channel&gt;: down|stopped|up|unknown</li>
         <li>block&lt;channel&gt;: unlock|lock|alarm</li>
         <li>endPosition&lt;channel&gt;: open|closed|not_reached|unknown</li>
         <li>position&lt;channel&gt;: unknown|pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
