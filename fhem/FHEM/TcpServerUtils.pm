@@ -7,6 +7,26 @@ use warnings;
 use IO::Socket;
 use vars qw($SSL_ERROR);
 
+my ($joinGroup, $leaveGroup, $multiCastLoop, $addMembership, $dropMembership);
+
+# Perl 5.16 / wheezy compatibility mode / #126290
+eval "Socket::IPV6_JOIN_GROUP";
+if($@) {
+  $joinGroup      = 20;
+  $leaveGroup     = 21;
+  $multiCastLoop  = 34;
+  $addMembership  = 35;
+  $dropMembership = 36;
+
+} else {
+  $joinGroup      = eval "Socket::IPV6_JOIN_GROUP";
+  $leaveGroup     = eval "Socket::IPV6_LEAVE_GROUP";
+  $multiCastLoop  = eval "Socket::IP_MULTICAST_LOOP";
+  $addMembership  = eval "Socket::IP_ADD_MEMBERSHIP";
+  $dropMembership = eval "Socket::IP_DROP_MEMBERSHIP";
+
+}
+
 sub
 TcpServer_Open($$$;$)
 {
@@ -71,8 +91,7 @@ TcpServer_SetLoopbackMode($$)
 
   my $old;
   if( !$hash->{IPV6} && $sock->sockdomain() == AF_INET ) {
-    my $packed = getsockopt($sock, Socket::IPPROTO_IP,
-                            Socket::IP_MULTICAST_LOOP);
+    my $packed = getsockopt($sock, Socket::IPPROTO_IP, $multiCastLoop);
     if( !$packed ) {
       Log3 $name, 1, "$name: failed to get loopback mode: $!";
       return undef;
@@ -80,7 +99,7 @@ TcpServer_SetLoopbackMode($$)
     $old = unpack("I", $packed);
 
     if( !setsockopt($sock, Socket::IPPROTO_IP,
-                    Socket::IP_MULTICAST_LOOP, pack("I", $loopback ) ) ) {
+                    $multiCastLoop, pack("I", $loopback ) ) ) {
       Log3 $name, 1, "$name: could not set loopback mode: $!";
       return undef;
     }
@@ -123,17 +142,13 @@ TcpServer_MCastAdd($$)
 
   # add multicast address
   if(!$hash->{IPV6} && $sock->sockdomain() == AF_INET) {
-    # should we allow to specify the interfache instead of using any?
     my $ip_mreq = Socket::pack_ip_mreq( inet_aton( $addr ), INADDR_ANY );
-
-    setsockopt($sock, Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP, $ip_mreq )
+    setsockopt($sock, Socket::IPPROTO_IP, $addMembership, $ip_mreq )
       or return "$name: could not set IP_ADD_MEMBERSHIP socket option: $!";
 
   } elsif($hash->{IPV6} && $sock->sockdomain() == AF_INET6) {
-    # should we allow to specify the interfache instead of using any?
     my $ipv6_mreq = Socket::pack_ipv6_mreq( inet_pton( AF_INET6, $addr ), 0 );
-
-    setsockopt($sock, Socket::IPPROTO_IPV6, Socket::IPV6_JOIN_GROUP, $ipv6_mreq )
+    setsockopt($sock, Socket::IPPROTO_IPV6, $joinGroup, $ipv6_mreq )
       or return "$name: could not set IPV6_JOIN_GROUP socket option: $!";
 
   } else {
@@ -165,7 +180,7 @@ TcpServer_MCastRecv($$$;$)
     return $peer_host, $peer_port;
 
   } else {
-    Log3 $name, 1, "$name: TcpServer_MCastRecv failed: unsupported socket family";
+    Log3 $name, 1,"$name: TcpServer_MCastRecv failed: unsupported socket family";
     return undef;
   }
 }
@@ -214,17 +229,13 @@ TcpServer_MCastRemove($$)
   delete $hash->{ADDR};
 
   if(!$hash->{IPV6} && $sock->sockdomain() == AF_INET) {
-    # should we allow to specify the interfache instead of using any?
     my $ip_mreq = Socket::pack_ip_mreq( inet_aton( $addr ), INADDR_ANY );
-
-    setsockopt($sock, Socket::IPPROTO_IP, Socket::IP_DROP_MEMBERSHIP, $ip_mreq )
+    setsockopt($sock, Socket::IPPROTO_IP, $dropMembership, $ip_mreq )
       or return "$name: could not set IP_DROP_MEMBERSHIP socket option: $!";
 
   } elsif($hash->{IPV6} && $sock->sockdomain() == AF_INET6) {
-    # should we allow to specify the interfache instead of using any?
     my $ipv6_mreq = Socket::pack_ipv6_mreq( inet_pton( AF_INET6, $addr ), 0 );
-
-    setsockopt($sock, Socket::IPPROTO_IPV6, Socket::IPV6_LEAVE_GROUP, $ipv6_mreq)
+    setsockopt($sock, Socket::IPPROTO_IPV6, $leaveGroup, $ipv6_mreq) 
       or return "$name: could not set IPV6_LEAVE_GROUP socket option: $!";
 
   } else {
@@ -233,7 +244,6 @@ TcpServer_MCastRemove($$)
   }
 
   readingsSingleUpdate($hash, "state", "Multicast listen stopped", 0);
-
   return undef;
 }
 
