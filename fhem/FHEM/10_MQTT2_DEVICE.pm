@@ -985,10 +985,9 @@ zigbee2mqtt_devStateIcon255($;$$)
           <ul><code>Var1=Var1Value Var2="Value with space" Var3=...</code></ul>
           and $Var1,$Var2,$Var3 are replaced in the readingList, setList and
           getList attributes with the corresponding value.<br>
-          Note: the name Var1,etc must only contain the letters A-Za-z0-9_.
-        If the attribute is not set, $DEVICETOPIC will be replaced with the
-        name of the device in the attributes mentioned above.
-        </li>
+          Note: the name Var1,etc must only contain the letters A-Za-z0-9_.</li>
+        <li>If the attribute is not set, $DEVICETOPIC will be replaced with the
+          name of the device in the attributes mentioned above.</li>
       </ul>
       </li><br>
 
