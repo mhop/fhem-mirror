@@ -228,12 +228,12 @@ MQTT2_SERVER_Set($@)
     my $val = join(" ", @a);
     readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 1);
     MQTT2_SERVER_doPublish($hash->{CL}, $hash, $tp, $val, $retain);
-  }
 
-  if($a[0] eq "clearRetain") {
+  } elsif($a[0] eq "clearRetain") {
     my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? "RETAIN" : ".RETAIN";
     delete($hash->{READINGS}{$rname});
     delete($hash->{retain});
+
   }
 }
 
