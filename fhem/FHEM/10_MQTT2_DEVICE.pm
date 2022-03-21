@@ -73,7 +73,8 @@ MQTT2_DEVICE_Define($$)
 
   return "wrong syntax for $name: define <name> MQTT2_DEVICE [clientid]"
         if(int(@a));
-  $hash->{DEVICETOPIC} = $name if(!AttrVal($name, "devicetopic", 0));
+  $hash->{".DT"} = ();
+  $hash->{".DT"}{DEVICETOPIC} = $name if(!AttrVal($name, "devicetopic", 0));
   if($hash->{CID}) {
     my $dpc = $modules{MQTT2_DEVICE}{defptr}{cid};
     if(!$dpc->{$hash->{CID}}) {
@@ -163,7 +164,7 @@ MQTT2_DEVICE_Parse($$)
 
     foreach my $re (keys %{$dp}) {
       my $reAll = $re;
-      $reAll =~ s/\$DEVICETOPIC/\.\*/g;
+      $reAll =~ s/\$[a-z0-9_]+/\.\*/gi;
 
       next if(!("$topic:$value" =~ m/^$reAll$/s ||
                 "$cid:$topic:$value" =~ m/^$reAll$/s));
@@ -172,7 +173,7 @@ MQTT2_DEVICE_Parse($$)
         my $hash = $defs{$dev};
         next if(!$hash);
         my $reRepl = $re;
-        $reRepl =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+        map { $reRepl =~ s/\$$_/$hash->{".DT"}{$_}/g } keys %{$hash->{".DT"}};
         next if(!("$topic:$value" =~ m/^$reRepl$/s ||
                   "$cid:$topic:$value" =~ m/^$reRepl$/s));
         next if(IsDisabled($dev));
@@ -180,9 +181,10 @@ MQTT2_DEVICE_Parse($$)
         Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
 
         if($code =~ m/^{.*}$/s) {
-          $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value,
-                   "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME},
-                   "%CID"=>$cid, "%JSONMAP","\$defs{\"$dev\"}{JSONMAP}"));
+          my %v = ("%TOPIC"=>$topic, "%EVENT"=>$value, "%NAME"=>$hash->{NAME},
+                   "%CID"=>$cid, "%JSONMAP","\$defs{\"$dev\"}{JSONMAP}");
+          map { $v{"%$_"} = $hash->{".DT"}{$_} } keys %{$hash->{".DT"}};
+          $code = EvalSpecials($code, %v);
           my $ret = AnalyzePerlCommand(undef, $code);
           if($ret && ref $ret eq "HASH") {
             readingsBeginUpdate($hash);
@@ -329,10 +331,10 @@ MQTT2_buildCmd($$$)
 
   shift @{$a};
   if($cmd =~ m/^{.*}\s*$/) {
-    $cmd = EvalSpecials($cmd,
-      ("%EVENT"       => join(" ",@{$a}),
-       "%NAME"        => $hash->{NAME},
-       "%DEVICETOPIC" => $hash->{DEVICETOPIC}));
+    my %v = ("%EVENT"       => join(" ",@{$a}),
+             "%NAME"        => $hash->{NAME});
+    map { $v{"%$_"} = $hash->{".DT"}{$_} } keys %{$hash->{".DT"}};
+    $cmd = EvalSpecials($cmd,%v);
     $cmd = AnalyzeCommandChain($hash->{CL}, $cmd);
     return if(!$cmd);
 
@@ -349,7 +351,7 @@ MQTT2_buildCmd($$$)
       $cmd .= " ".join(" ",@{$a}) if(@{$a});
     }
     $cmd =~ s/\$NAME/$hash->{NAME}/g;
-    $cmd =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+    map { $cmd =~ s/\$$_/$hash->{".DT"}{$_}/g } keys %{$hash->{".DT"}};
   }
 
   return $cmd;
@@ -438,7 +440,19 @@ MQTT2_DEVICE_Attr($$)
   $attrName = "" if(!$attrName);
 
   if($attrName eq "devicetopic") {
-    $hash->{DEVICETOPIC} = ($type eq "del" ? $hash->{NAME} : $param);
+    $hash->{".DT"} = ();
+    if($type eq "del") {
+      $hash->{".DT"}{DEVICETOPIC} = $hash->{NAME};
+    } elsif($param !~ m/=/) {
+      $hash->{".DT"}{DEVICETOPIC} = $param
+    } else {
+      my ($a, $h) = parseParams($param); #126679
+      foreach my $key (keys %{$h}) {
+        return "$key is not valid, must only contain a-zA-z0-9_"
+                if($key !~ m/[a-z0-9_]/);
+      }
+      $hash->{".DT"} = $h;
+    }
     MQTT2_DEVICE_addReading($dev, AttrVal($dev, "readingList", ""));
     return undef;
   }
@@ -461,11 +475,10 @@ MQTT2_DEVICE_Attr($$)
 
       if($atype eq "reading") {
         if($par2 =~ m/^{.*}\s*$/) {
-          my $ret = perlSyntaxCheck($par2, 
-                ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
-                 "%NAME"=>$dev, "%CID"=>"clientId",
-                 "%DEVICETOPIC"=>$hash->{DEVICETOPIC},
-                 "%JSONMAP"=>""));
+          my %v = ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
+                 "%NAME"=>$dev, "%CID"=>"clientId", "%JSONMAP"=>"");
+          map { $v{"%$_"} = $hash->{".DT"}{$_} } keys %{$hash->{".DT"}};
+          my $ret = perlSyntaxCheck($par2, %v);
           return $ret if($ret);
         } else {
           return "$dev: bad reading name $par2 ".
@@ -474,10 +487,9 @@ MQTT2_DEVICE_Attr($$)
         }
 
       } else {
-        my $ret = perlSyntaxCheck($par2,
-                ("%NAME"=>$dev,
-                 "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
-                 "%DEVICETOPIC"=>$dev));
+        my %v = ("%NAME"=>$dev, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9");
+        map { $v{"%$_"} = $hash->{".DT"}{$_} } keys %{$hash->{".DT"}};
+        my $ret = perlSyntaxCheck($par2, %v);
         return $ret if($ret);
 
       }
@@ -603,8 +615,8 @@ MQTT2_DEVICE_addReading($$)
 {
   my ($name, $param) = @_;
   MQTT2_DEVICE_delReading($name);
+  my $hash = $defs{$name};
   my $cid = $defs{$name}{CID};
-  my $dt = $defs{$name}{DEVICETOPIC};
   foreach my $line (split("\n", $param)) {
     next if($line eq "");
     my ($re,$code) = split(" ", $line,2);
@@ -612,7 +624,7 @@ MQTT2_DEVICE_addReading($$)
     my $errMsg = CheckRegexp($re, "readingList attribute for $name");
     return $errMsg if($errMsg);
 
-    $re =~ s/\$DEVICETOPIC/$dt/g;
+    map { $re =~ s/\$$_/$hash->{".DT"}{$_}/g } keys %{$hash->{".DT"}};
     if($cid && $re =~ m/^$cid:/) {
       if($re =~ m/^$cid:([^\\\?.*\[\](|)]+):\.\*$/) { # cid:topic:.*
         $modules{MQTT2_DEVICE}{defptr}{"re:$cid:$1"}{$re}{"$name,$code"} = 1;
@@ -652,8 +664,7 @@ MQTT2_DEVICE_Rename($$)
   my ($new, $old) = @_;
   MQTT2_DEVICE_delReading($old);
   MQTT2_DEVICE_addReading($new, AttrVal($new, "readingList", ""));
-  $defs{$new}{DEVICETOPIC} = $new
-    if($defs{$new}{DEVICETOPIC} eq $old && !AttrVal($new,"devicetopic",undef));
+  $defs{$new}{".DT"}{DEVICETOPIC} = $new if(!AttrVal($new,"devicetopic",undef));
   MQTT2_DEVICE_setBridgeRegexp();
   return undef;
 }
@@ -931,7 +942,7 @@ zigbee2mqtt_devStateIcon255($;$$)
       if set to 0, disables extending the readingList, when the IODev
       autocreate is also set. Default is 1, i.e. new topics will be
       automatically added to the readingList. 
-      </li>
+      </li><br>
 
     <a id="MQTT2_DEVICE-attr-bridgeRegexp"></a>
     <li>bridgeRegexp &lt;regexp&gt; newClientId ...<br>
@@ -965,9 +976,20 @@ zigbee2mqtt_devStateIcon255($;$$)
 
     <a id="MQTT2_DEVICE-attr-devicetopic"></a>
     <li>devicetopic value<br>
-      replace $DEVICETOPIC in the topic part of readingList, setList and
-      getList with value. if not set, $DEVICETOPIC will be replaced with the
-      name of the device.
+      <ul>
+        <li>if value does <b>not</b> contain an equal sign (=),
+          replace $DEVICETOPIC in the topic part of the readingList, setList and
+          getList attributes with value.</li>
+        <li>if the value <b>does</b> contain an equal sign (=), then it is
+          interpreted as
+          <ul><code>Var1=Var1Value Var2="Value with space" Var3=...</code></ul>
+          and $Var1,$Var2,$Var3 are replaced in the readingList, setList and
+          getList attributes with the corresponding value.<br>
+          Note: the name Var1,etc must only contain the letters A-Za-z0-9_.
+        If the attribute is not set, $DEVICETOPIC will be replaced with the
+        name of the device in the attributes mentioned above.
+        </li>
+      </ul>
       </li><br>
 
     <a id="MQTT2_DEVICE-attr-devPos"></a>
