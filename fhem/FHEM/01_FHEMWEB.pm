@@ -2997,7 +2997,9 @@ FW_dev2image($;$)
 
   my ($icon, $rlink);
   if(defined($devStateIcon) && $devStateIcon =~ m/^{.*}$/s) {
+    $cmdFromAnalyze = $devStateIcon; # help the __WARN__ sub
     my ($html, $link) = eval $devStateIcon;
+    $cmdFromAnalyze = undef;
     Log3 $FW_wname, 1, "devStateIcon $name: $@" if($@);
     return ($html, $link, 1) if(defined($html) && $html =~ m/^<.*>$/s);
     $devStateIcon = $html;
