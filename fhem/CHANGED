@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_SVDRP.pm: bugfix in NextTimer
  - bugfix:  38_netatmo: fixed average wind angle calculation for PUBLIC
  - feature: 10_KNX.pm: new dpt22.101, fixes: (UTF8) & dpt20 encode 
  - new:     70_SVDRP.pm: basic control for VDR
