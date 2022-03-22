@@ -8,6 +8,7 @@
 #
 # version history
 #    1.01.01      first released version
+#    1.01.02      bugfix for single-digit NextTimer 
 #
 ########################################################################################
 #
@@ -39,7 +40,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.01";
+my $version = "1.01.02";
 
 my %SVDRP_gets = (
   #
@@ -132,6 +133,8 @@ sub SVDRP_Define {
   $hash->{devioNoSTATE} = 1;
   # subscribe only to notify from global and self
   $hash->{NOTIFYDEV} = "global,TYPE=SVDRP";
+  # set version
+  $hash->{version} = $version;  
   
   my $name = $hash->{NAME}; 
   
@@ -522,7 +525,7 @@ sub SVDRP_parseMessage {
     SVDRP_parseDiskStatus($hash, $reading, $msg);
     #Log3 $name, 5, "[$name] Parse: updated $reading with '$msg'";    
   }
-  elsif ($msg =~ /^250[ ]\d+[ ][A-Za-z]{3}[ ][A-Za-z]{3}[ ][1-9]{2}[ ][0-9]{2}:[0-9]{2}:[0-9]{2}[ ][0-9]{4}\s$/){  
+  elsif ($msg =~ /^250[ ]\d+[ ][A-Za-z]{3}[ ][A-Za-z]{3}[ ]{1,2}[0-9]{1,2}[ ][0-9]{2}:[0-9]{2}:[0-9]{2}[ ][0-9]{4}\s$/){  
     # next timer format: 250 1 Tue Mar 15 09:50:00 2022
     $reading = "NextTimer";
     (my $code, $msg) = split (/ /, $msg, 2);
