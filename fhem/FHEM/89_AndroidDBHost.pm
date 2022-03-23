@@ -4,7 +4,7 @@
 #
 # 89_AndroidDBHost
 #
-# Version 0.6
+# Version 0.7
 #
 # FHEM Integration for Android Debug Bridge
 #
@@ -23,6 +23,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 sub AndroidDBHost_Initialize ($)
 {
@@ -35,18 +36,18 @@ sub AndroidDBHost_Initialize ($)
    $hash->{NotifyFn}   = "AndroidDBHost::Notify";
    $hash->{ShutdownFn} = "AndroidDBHost::Shutdown";
 
-	$hash->{parseParams} = 1;
+   $hash->{parseParams} = 1;
 }
 
 package AndroidDBHost;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 # use Data::Dumper;
 use IPC::Open3;
 
-use SetExtensions;
 # use POSIX;
 
 use GPUtils qw(:all); 
@@ -58,7 +59,7 @@ BEGIN {
         readingsBulkUpdateIfChanged
         readingsBeginUpdate
         readingsEndUpdate
-		  devspec2array
+		devspec2array
         Log3
         AttrVal
         ReadingsVal
