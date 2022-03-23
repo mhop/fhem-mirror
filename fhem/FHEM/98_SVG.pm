@@ -1393,6 +1393,17 @@ SVG_getSteps($$$)
 }
 
 sub
+SVG_escape($)
+{
+  my ($txt) = @_;
+  $txt =~ s/&/&amp;/g;
+  $txt =~ s/</&lt;/g;
+  $txt =~ s/>/&gt;/g;
+  $txt =~ s/'/&apos;/g;
+  return $txt;
+}
+
+sub
 SVG_render($$$$$$$$$$)
 {
   my $name = shift;  # e.g. wl_8
@@ -1489,9 +1500,7 @@ SVG_render($$$$$$$$$$)
         "fill='none' class='border'/>";
 
   my ($off1,$off2) = ($x+$w/2, 3*$y/4);
-  my $title = ($conf{title} ? $conf{title} : " ");
-  $title =~ s/</&lt;/g;
-  $title =~ s/>/&gt;/g;
+  my $title = SVG_escape($conf{title} ? $conf{title} : " ");
   SVG_pO "<text id='svg_title' x='$off1' y='$off2' " .
         "class='title' text-anchor='middle'>$title</text>";
 
@@ -2247,6 +2256,7 @@ SVG_render($$$$$$$$$$)
     }
     my $style = $conf{lStyle}[$i];
     $style =~ s/class="/class="legend /;
+    $desc = SVG_escape($desc);
     SVG_pO "<text line_id=\"line_$i\" x=\"$txtoff1\" y=\"$txtoff2\" ".
         "text-anchor=\"$caption_anchor\" $style>$t<title>$desc</title></text>";
 
