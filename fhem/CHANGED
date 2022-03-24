@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 89_AndroidDB: Added creation of readings for shell commands
  - feature: 98_archetype: new option for FILTER in actual_.* attributes
  - change:  98_archetype: now packaged, extend commandref
  - feature: 89_AndroidDB: Added FHEM reading attributes

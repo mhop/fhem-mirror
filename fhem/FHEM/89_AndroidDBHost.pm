@@ -4,7 +4,7 @@
 #
 # 89_AndroidDBHost
 #
-# Version 0.7
+# Version 0.8
 #
 # FHEM Integration for Android Debug Bridge
 #
