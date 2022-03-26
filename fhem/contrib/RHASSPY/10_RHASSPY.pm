@@ -660,8 +660,8 @@ sub Get {
                 my $start = gettimeofday();
                 my $tHash = { hash=>$hash, CL=>$hash->{CL}, reading=> 'testResult', start=>$start};
                 $hash->{asyncGet} = $tHash;
-                InternalTimer(gettimeofday()+4, sub {
-                  asyncOutput($tHash->{CL}, "Timeout for test sentence - most likely this is no problem, check testResult reading later, but your system seems to be rather slow...");
+                InternalTimer(gettimeofday()+4, sub { delete $hash->{testline};
+                  asyncOutput($tHash->{CL}, "Timeout for test sentence - most likely this is no problem, check testResult reading later, but either intent was not recognized, RHASSPY's siteId is not configured for NLU or your system seems to be rather slow...");
                   delete($hash->{asyncGet});
                 }, $tHash, 0);
             }
@@ -2817,10 +2817,17 @@ sub testmode_next {
         };
 
         my $json = _toCleanJSON($sendData);
+        resetRegIntTimer( 'testmode_end', time + 10, \&RHASSPY_testmode_timeout, $hash ) if $hash->{helper}->{test}->{filename} ne 'none';
         return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
     }
+    return testmode_end($hash);
+}
 
-    my $filename = $hash->{helper}->{test}->{filename};
+sub testmode_end {
+    my $hash = shift // return;
+    my $fail = shift // 0;
+
+    my $filename = $hash->{helper}->{test}->{filename} // q{none};
     $filename =~ s{[.]txt\z}{}i;
     $filename = "${filename}_result.txt";
 
@@ -2832,8 +2839,11 @@ sub testmode_next {
     if ( $filename ne 'none_result.txt' ) {
         my $duration = '';
         $duration = sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
-        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$hash->{helper}->{test}->{result}} );
-        $result .= "$duration See $filename for detailed results."
+        my $result = $hash->{helper}->{test}->{result};
+        push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
+        FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
+        $result .= "$duration See $filename for detailed results." if !$fail;
+        $result = "Test ended incomplete with timeout. See $filename for results up to failure." if $fail;
     } else {
         $result = $fails ? 'Test failed, ' : 'Test ok, ';
         $result .= "result is: $hash->{helper}->{test}->{result}->[0]"
@@ -2842,11 +2852,14 @@ sub testmode_next {
     if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult' ) {
           my $duration = sprintf( "%.2f", (gettimeofday() - $hash->{asyncGet}{start})*1);
           RemoveInternalTimer($hash->{asyncGet});
-          asyncOutput($hash->{asyncGet}{CL}, "test(s) passed successfully. Summary: $result, duration: $duration s");
+          my $suc = $fail ? 'not completely passed!' : 'passed successfully.';
+          asyncOutput($hash->{asyncGet}{CL}, "test(s) $suc Summary: $result duration: $duration s");
           delete($hash->{asyncGet});
     }
     delete $hash->{testline};
     delete $hash->{helper}->{test};
+    deleteSingleRegIntTimer('testmode_end', $hash); 
+
     return;
 }
 
@@ -2860,6 +2873,7 @@ sub testmode_parse {
     $hash->{helper}->{test}->{passed}++;
     if ( $intent eq 'intentNotRecognized' ) {
         $result = $line;
+        $result .= " => Intent not recognized." if $hash->{helper}->{test}->{filename} eq 'none';
         $hash->{helper}->{test}->{notRecogn}++;
         $hash->{helper}->{test}->{notRecognInDialogue}++ if defined $hash->{helper}->{test}->{isInDialogue};
     } else { 
@@ -2882,6 +2896,17 @@ sub testmode_parse {
     $hash->{testline}++;
     return testmode_next($hash);
 }
+
+sub RHASSPY_testmode_timeout {
+    my $fnHash = shift // return;
+    my $hash = $fnHash->{HASH} // $fnHash;
+    return if !defined $hash;
+    my $identiy = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identiy, $hash, 1); 
+
+    return testmode_end($hash, 1);
+}
+
 
 sub _isUnexpectedInTestMode {
     my $hash   = shift // return;
@@ -4495,9 +4520,9 @@ sub handleIntentSetNumeric {
     if ( defined $specials ) {
         my $vencmd = $specials->{setter} // $cmd;
         my $vendev = $specials->{device} // $device;
-        if ( $change ne 'cmdStop' ) {
+        if ( defined $change && $change ne 'cmdStop' ) {
             analyzeAndRunCmd($hash, $vendev, defined $specials->{CustomCommand} ? $specials->{CustomCommand} :$vencmd , $newVal) if $device ne $vendev || $cmd ne $vencmd;
-        } elsif ( defined $specials->{stopCommand} ) {
+        } elsif ( defined $change && $change eq 'cmdStop' && defined $specials->{stopCommand} ) {
             analyzeAndRunCmd($hash, $vendev, $specials->{stopCommand});
         }
     }
@@ -5819,7 +5844,6 @@ After changing something relevant within FHEM for either the data structure in</
 
 <a id="RHASSPY-get"></a>
 <h4>Get</h4>
-<p>Note: To get test results, RHASSPY's siteId has to be configured for intent recognition in Rhasspy as well.</p>
 <ul>
   <li>
     <a id="RHASSPY-get-export_mapping"></a><b>export_mapping &lt;devicename&gt;</b>
@@ -5828,10 +5852,12 @@ After changing something relevant within FHEM for either the data structure in</
   <li>
     <a id="RHASSPY-get-test_file"></a><b>test_file &lt;path and filename&gt;</b>
     <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to the file '&lt;input without ending.txt&gt;_result.txt'. <i><b>stop</i></b> as filename will stop test mode if sth. goes wrong. No commands will be executed towards FHEM devices while test mode is active.</p>
+    <p>Note: To get test results, RHASSPY's siteId has to be configured for intent recognition in Rhasspy as well.</p>
   </li>
   <li>
     <a id="RHASSPY-get-test_sentence"></a><b>test_sentence &lt;sentence to be analyzed&gt;</b>
     <p>Checks the provided sentence for recognition by Rhasspy NLU. No commands to be executed as well.</p>
+    <p>Note: wrt. to RHASSPY's siteId for NLU see remark get test_file.</p>
   </li>
 </ul>
 
