@@ -4438,13 +4438,13 @@ attr OMG_BT_ID readingList\
 attr OMG_BT_ID event-min-interval .*:300
 attr OMG_BT_ID event-on-change-reading temperature:0.2,moisture:0.2,rssi:5,distance:5,fertility:5,lux:5
 attr OMG_BT_ID icon temperature_humidity
-attr OMG_BT_ID jsonMap tem:temperature hum:humidity moi:moisture fer:fertility servicedatauuid:0 servicedata:0
+attr OMG_BT_ID jsonMap tempc:temperature tempf:0 hum:humidity moi:moisture fer:fertility servicedatauuid:0 servicedata:0
 attr OMG_BT_ID stateFormat T: temperature°C, M: moisture%, L: lux, F: fertility
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_mi_flora_sensor
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220307
+setreading OMG_BT_ID attrTemplateVersion 20220326
 
 
 name:OpenMQTTGateway_simple_RF433_switch
