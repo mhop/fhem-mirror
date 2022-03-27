@@ -761,6 +761,8 @@ MQTT2_DEVICE_nlData($)
 
   my $div = ($FW_userAgent =~ m/WebKit/ ? "<br>" : " ");
   my $gv = ReadingsVal($d, ".graphviz", ReadingsVal($d, "graphviz", ""));
+  $gv =~ s/\\n/\n/g; #126970
+  $gv =~ s/\\"/"/g;
   for my $l (split(/[\r\n]/, $gv)) {
 
     if($l =~ m/^\s*"([^"]+)"\s*\[.*label="([^"]+)"\]/) {
