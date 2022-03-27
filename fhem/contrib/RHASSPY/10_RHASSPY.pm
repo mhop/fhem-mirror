@@ -1239,7 +1239,7 @@ sub _analyze_genDevType {
     }
 
     if ( $gdt eq 'thermostat' ) {
-        my $desTemp = $allset =~ m{\b(desiredTemp)([\b:\s]|\Z)}xms ? $1 : 'desired-temp';
+        my $desTemp = $allset =~ m{\b(desiredTemp|desired)([\b:\s]|\Z)}xms ? $1 : 'desired-temp';
         my $measTemp = InternalVal($device, 'TYPE', 'unknown') eq 'CUL_HM' ? 'measured-temp' : 'temperature';
         $currentMapping = 
             { GetNumeric => { 'desired-temp' => {currentVal => $desTemp, type => 'desired-temp'},
@@ -2037,13 +2037,13 @@ sub getDeviceByIntentAndType {
     my $room   = shift;
     my $intent = shift;
     my $type   = shift; #Beta-User: any necessary parameters...?
-    #my $inBulk = shift // 0;
+    my $subType = shift // $type;
 
     #rem. Beta-User: atm function is only called by GetNumeric!
     my $device;
 
     # Devices sammeln
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
     Log3($hash->{NAME}, 5, "matches in room: @{$matchesInRoom}, matches outside: @{$matchesOutsideRoom}");
     my ($response, $last_item, $first_items);
 
@@ -2057,7 +2057,7 @@ sub getDeviceByIntentAndType {
             for my $dev (@{$matchesInRoom}) {
                 push @aliases, $hash->{helper}{devicemap}{devices}{$dev}->{alias};
                 if (defined $hash->{helper}{devicemap}{devices}{$dev}->{prio} && defined $hash->{helper}{devicemap}{devices}{$dev}{prio}->{inRoom}) {
-                    push @priority, $dev if $hash->{helper}{devicemap}{devices}{$dev}{prio}->{inRoom} =~ m{\b$type\b}xms;
+                    push @priority, $dev if $hash->{helper}{devicemap}{devices}{$dev}{prio}->{inRoom} =~ m{\b$subType\b}xms;
                 }
             }
             if (@priority) { 
@@ -2135,9 +2135,10 @@ sub getActiveDeviceForIntentAndType {
     my $room   = shift;
     my $intent = shift;
     my $type   = shift; #Beta-User: any necessary parameters...?
+    my $subType = shift // $type;
 
     my $device;
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type);
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
 
     # Anonyme Funktion zum finden des aktiven Geräts
     my $activeDevice = sub ($$) {
@@ -4382,9 +4383,12 @@ sub handleIntentSetNumeric {
     my $unit   = $data->{Unit};
     my $change = $data->{Change};
     my $type   = $data->{Type};
+    my $subType= $data->{Type};
+    
     if ( !defined $type && defined $change ){
         $type   = $internal_mappings->{Change}->{$change}->{Type};
         $data->{Type} = $type if defined $type;
+        $subType = 'desired-temp' if $data->{Type} eq 'temperature';
     }
     my $value  = $data->{Value};
     my $room   = getRoomName($hash, $data);
@@ -4398,7 +4402,7 @@ sub handleIntentSetNumeric {
             getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
     } else {
-        $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type);
+        $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $subType);
     }
 
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !defined $device;
