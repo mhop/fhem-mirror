@@ -55,7 +55,7 @@ notify_Define($$)
   # Checking for misleading regexps
   return "Bad regexp: starting with *" if($re =~ m/^\*/);
   eval { "Hallo" =~ m/^$re$/ };
-  return "Bad regexp: $@" if($@);
+  return "Bad regexp in $name definition: $@" if($@);
   $hash->{REGEXP} = $re;
   my %specials= (
     "%NAME" => $name,
