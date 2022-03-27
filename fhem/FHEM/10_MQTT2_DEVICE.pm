@@ -474,10 +474,6 @@ MQTT2_DEVICE_Attr($$)
       return "$dev attr $attrName: more parameters needed" if(!$par2);
 
       if($atype eq "reading") {
-        $par1 =~ s/\$[a-z0-9_]+/\.\*/gi;
-        eval { "Hallo" =~ m/^$par1$/ };
-        return "Bad regexp in $dev readingList: $@" if($@);
-
         if($par2 =~ m/^{.*}\s*$/) {
           my %v = ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
                  "%NAME"=>$dev, "%CID"=>"clientId", "%JSONMAP"=>"");
@@ -625,10 +621,11 @@ MQTT2_DEVICE_addReading($$)
     next if($line eq "");
     my ($re,$code) = split(" ", $line,2);
     return "ERROR: empty code in line >$line< for $name" if(!defined($code));
+
+    map { $re =~ s/\$$_/$hash->{".DT"}{$_}/g } keys %{$hash->{".DT"}};
     my $errMsg = CheckRegexp($re, "readingList attribute for $name");
     return $errMsg if($errMsg);
 
-    map { $re =~ s/\$$_/$hash->{".DT"}{$_}/g } keys %{$hash->{".DT"}};
     if($cid && $re =~ m/^$cid:/) {
       if($re =~ m/^$cid:([^\\\?.*\[\](|)]+):\.\*$/) { # cid:topic:.*
         $modules{MQTT2_DEVICE}{defptr}{"re:$cid:$1"}{$re}{"$name,$code"} = 1;

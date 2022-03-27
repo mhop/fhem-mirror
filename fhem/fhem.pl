@@ -6396,8 +6396,15 @@ CheckRegexp($$)
   my ($re,$context) = @_;
   return "Empty regexp in $context" if(!defined($re));
   return "Bad regexp >$re< in $context" if($re =~ m/^[*+]/);
+
+  my $warn;
+  my $osig = $SIG{__WARN__};
+  $SIG{__WARN__} = sub { $warn = @_[0]};
   eval { "Hallo" =~ m/^$re$/ };
+  $SIG{__WARN__} = $osig;
+
   return "Bad regexp >$re< in $context: $@" if($@);
+  return "Bad regexp >$re< in $context: $warn" if($warn);
   return undef;
 }
 
