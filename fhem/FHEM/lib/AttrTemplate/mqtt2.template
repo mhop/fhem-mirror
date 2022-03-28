@@ -155,7 +155,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/extensions:.* extensions
 attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
-  permit_join:true,false $\DEVICETOPIC/bridge/config/permit_join $EVTPART1\
+  permit_join:true,false $\DEVICETOPIC/bridge/request/permit_join $EVTPART1\
   remove:textField $\DEVICETOPIC/bridge/config/remove $EVTPART1\
   ota_update:textField $\DEVICETOPIC/bridge/ota_update/update $EVTPART1\
   ota_update_check:textField $\DEVICETOPIC/bridge/ota_update/check $EVTPART1\
@@ -178,7 +178,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20220218
+setreading DEVICE attrTemplateVersion 20220328
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 

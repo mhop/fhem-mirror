@@ -87,6 +87,7 @@ my $languagevars = {
     'DefaultError' => "Sorry but something seems not to work as expected",
     'NoValidResponse' => 'Error. respond function called without valid response!',
     'NoValidIntentResponse' => 'Error. respond function called by $intent without valid response!',
+    'NoIntentRecognized' => 'Your input could not be assigned to one of the known intents!',
     'NoValidData' => "Sorry but the received data is not sufficient to derive any action",
     'NoDeviceFound' => "Sorry but I could not find a matching device",
     'NoTimedOnDeviceFound' => "Sorry but device does not support requested timed on or off command",
@@ -113,7 +114,8 @@ my $languagevars = {
         '2' => '$label in room $room has been set to $minutes minutes',
         '3' => '$label in room $room has been set to $hours hours $minutetext',
         '4' => '$label in room $room has been set to $hour o clock $minutes',
-        '5' => '$label in room $room has been set to tomorrow $hour o clock $minutes'
+        '5' => '$label in room $room has been set to tomorrow $hour o clock $minutes',
+        '6' => '$label in room $room is not existent',
     },
     'timerEnd'   => {
         '0' => '$label expired',
@@ -556,7 +558,7 @@ sub Set {
         if ($values[0] eq 'devicemap') {
             initialize_devicemap($hash);
             $hash->{'.needTraining'} = 1;
-            deleteSingleRegIntTimer('autoTraining', $hash, 1);
+            deleteSingleRegIntTimer('autoTraining', $hash);
             return updateSlots($hash);
         }
         if ($values[0] eq 'devicemap_only') {
@@ -564,7 +566,7 @@ sub Set {
         }
         if ($values[0] eq 'slots') {
             $hash->{'.needTraining'} = 1;
-            deleteSingleRegIntTimer('autoTraining', $hash, 1);
+            deleteSingleRegIntTimer('autoTraining', $hash);
             return updateSlots($hash);
         }
         if ($values[0] eq 'slots_no_training') {
@@ -577,7 +579,7 @@ sub Set {
         if ($values[0] eq 'all') {
             initialize_Language($hash, $hash->{LANGUAGE});
             initialize_devicemap($hash);
-            deleteSingleRegIntTimer('autoTraining', $hash, 1);
+            deleteSingleRegIntTimer('autoTraining', $hash);
             $hash->{'.needTraining'} = 1;
             updateSlots($hash);
             return fetchIntents($hash);
@@ -1669,15 +1671,15 @@ sub RHASSPY_DialogTimeout {
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
 
-    my $identiy = $fnHash->{MODIFIER};
+    my $identity = $fnHash->{MODIFIER};
 
-    my $data     = shift // $hash->{helper}{'.delayed'}->{$identiy};
+    my $data     = shift // $hash->{helper}{'.delayed'}->{$identity};
     my $siteId = $data->{siteId};
 
-    deleteSingleRegIntTimer($identiy, $hash, 1);
+    deleteSingleRegIntTimer($identity, $hash, 1);
 
     respond( $hash, $data, getResponse( $hash, 'DefaultConfirmationTimeout' ) );
-    delete $hash->{helper}{'.delayed'}{$identiy};
+    delete $hash->{helper}{'.delayed'}{$identity};
 
     return;
 }
@@ -1691,12 +1693,12 @@ sub setDialogTimeout {
 
     my $siteId = $data->{siteId};
     $data->{'.ENABLED'} = $toEnable; #dialog 
-    my $identiy = qq($data->{sessionId});
+    my $identity = qq($data->{sessionId});
 
     $response = getResponse($hash, 'DefaultConfirmationReceived') if ref $response ne 'HASH' && $response eq 'default';
-    $hash->{helper}{'.delayed'}{$identiy} = $data;
+    $hash->{helper}{'.delayed'}{$identity} = $data;
 
-    resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_DialogTimeout, $hash, 0);
+    resetRegIntTimer( $identity, time + $timeout, \&RHASSPY_DialogTimeout, $hash, 0);
 
     #interactive dialogue as described in https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_continuesession and https://docs.snips.ai/articles/platform/dialog/multi-turn-dialog
     my @ca_strings;
@@ -2854,7 +2856,7 @@ sub testmode_end {
           my $duration = sprintf( "%.2f", (gettimeofday() - $hash->{asyncGet}{start})*1);
           RemoveInternalTimer($hash->{asyncGet});
           my $suc = $fail ? 'not completely passed!' : 'passed successfully.';
-          asyncOutput($hash->{asyncGet}{CL}, "test(s) $suc Summary: $result duration: $duration s");
+          asyncOutput($hash->{asyncGet}{CL}, "test(s) $suc Summary: $result");
           delete($hash->{asyncGet});
     }
     delete $hash->{testline};
@@ -2889,7 +2891,7 @@ sub testmode_parse {
                     q{can't identify any device in group and room} 
                   : join q{,}, keys %{$devices};
         $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Devices in group and room: $result";
-    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor\z}) {
+    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor|SetTimer\z}) {
         #missing: MediaChannels SetTimer
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
@@ -2902,8 +2904,8 @@ sub RHASSPY_testmode_timeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
-    my $identiy = $fnHash->{MODIFIER};
-    deleteSingleRegIntTimer($identiy, $hash, 1); 
+    my $identity = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identity, $hash, 1); 
 
     return testmode_end($hash, 1);
 }
@@ -2924,9 +2926,9 @@ sub RHASSPY_msgDialogTimeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
-    my $identiy = $fnHash->{MODIFIER};
-    deleteSingleRegIntTimer($identiy, $hash, 1); 
-    return msgDialog_close($hash, $identiy);
+    my $identity = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identity, $hash, 1); 
+    return msgDialog_close($hash, $identity);
 }
 
 sub setMsgDialogTimeout {
@@ -2935,10 +2937,10 @@ sub setMsgDialogTimeout {
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
-    my $identiy = (split m{_${siteId}_}, $data->{sessionId},3)[0] // return;
-    $hash->{helper}{msgDialog}->{$identiy}->{data} = $data;
+    my $identity = (split m{_${siteId}_}, $data->{sessionId},3)[0] // return;
+    $hash->{helper}{msgDialog}->{$identity}->{data} = $data;
 
-    resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
+    resetRegIntTimer( $identity, time + $timeout, \&RHASSPY_msgDialogTimeout, $hash, 0);
     return;
 }
 
@@ -3067,9 +3069,9 @@ sub RHASSPY_ttsDialogTimeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
-    my $identiy = $fnHash->{MODIFIER};
-    deleteSingleRegIntTimer($identiy, $hash, 1); 
-    return ttsDialog_close($hash, $identiy);
+    my $identity = $fnHash->{MODIFIER};
+    deleteSingleRegIntTimer($identity, $hash, 1); 
+    return ttsDialog_close($hash, $identity);
 }
 
 sub setTtsDialogTimeout {
@@ -3078,10 +3080,10 @@ sub setTtsDialogTimeout {
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
-    my $identiy = (split m{_${siteId}_}, $data->{sessionId},3)[0] // return;
-    $hash->{helper}{ttsDialog}->{$identiy}->{data} = $data;
+    my $identity = (split m{_${siteId}_}, $data->{sessionId},3)[0] // return;
+    $hash->{helper}{ttsDialog}->{$identity}->{data} = $data;
 
-    resetRegIntTimer( $identiy, time + $timeout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
+    resetRegIntTimer( $identity, time + $timeout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
     return;
 }
 
@@ -3230,14 +3232,14 @@ sub analyzeMQTTmessage {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
         } elsif ( $topic =~ m{sessionEnded}x ) {
             readingsSingleUpdate($hash, 'listening_' . makeReadingName($room), 0, 1);
-            my $identiy = qq($data->{sessionId});
-            my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
+            my $identity = qq($data->{sessionId});
+            my $data_old = $hash->{helper}{'.delayed'}->{$identity};
             if (defined $data_old) {
                 $data->{text} = getResponse( $hash, 'DefaultCancelConfirmation' );
                 $data->{intentFilter} = 'null' if !defined $data->{intentFilter}; #dialog II
                 sendTextCommand( $hash, $data );
-                delete $hash->{helper}{'.delayed'}{$identiy};
-                deleteSingleRegIntTimer($identiy, $hash);
+                delete $hash->{helper}{'.delayed'}{$identity};
+                deleteSingleRegIntTimer($identity, $hash);
             }
         }
         push @updatedList, $hash->{NAME};
@@ -3246,7 +3248,7 @@ sub analyzeMQTTmessage {
     # Hotword detection
     if ($topic =~ m{\Ahermes/hotword/toggle(O[nf]+)}x) {
         my $active = $1 eq 'On' ? 1 : 0;
-        my $siteId = $data->{siteId} // return;
+        return if !$siteId;
         $active = $data->{reason} if $active && defined $data->{reason};
         readingsSingleUpdate($hash, "hotwordAwaiting_" . makeReadingName($siteId), $active, 1);
 
@@ -3270,7 +3272,6 @@ sub analyzeMQTTmessage {
 
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
         my $hotword = $1;
-        my $siteId = $data->{siteId};
         if ( 0 && $siteId ) { #Beta-User: deactivated
             my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
             #$device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
@@ -3305,9 +3306,10 @@ sub analyzeMQTTmessage {
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
+        return if !$hash->{siteId} || $siteId ne $hash->{siteId};
         return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline};
-        handleIntentNotRecognized($hash, $data) if $hash->{experimental};
-        return;
+        handleIntentNotRecognized($hash, $data);
+        return $hash->{NAME};
     }
 
     return testmode_parse($hash, $data->{intent}, $data) if defined $hash->{testline};
@@ -5132,7 +5134,7 @@ sub handleIntentSetTimer {
     Log3($name, 5, 'handleIntentSetTimer called');
 
     return respond( $hash, $data, getResponse( $hash, 'duration_not_understood' ) ) 
-    if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec} && !defined $data->{CancelTimer};
+    if !defined $data->{Hourabs} && !defined $data->{Hour} && !defined $data->{Min} && !defined $data->{Sec} && !defined $data->{CancelTimer} && !defined $data->{GetTimer};;
 
     my $room = getRoomName($hash, $data);
 
@@ -5171,7 +5173,7 @@ sub handleIntentSetTimer {
 
     my $roomReading = "timer_".makeReadingName($room);
     my $label = $data->{Label} // q{};
-    $roomReading .= "_$label" if $label ne ''; 
+    $roomReading .= "_" . makeReadingName($label) if $label ne ''; 
 
     my $response;
     if (defined $data->{CancelTimer}) {
@@ -5184,34 +5186,40 @@ sub handleIntentSetTimer {
         return $name;
     }
 
-    if( $value && $timerRoom ) {
+    if (defined $data->{GetTimer}) {
+        $value = InternalVal($roomReading, 'TRIGGERTIME', undef) // return respond( $hash, $data, getResponse( $hash, 'timerSet', 6 ) );
+    }
+
+    if ( $value && $timerRoom ) {
         my $seconds = $value - $now;
-        my $diff = $seconds;
-        my $attime = strftime( '%H', gmtime $diff );
-        $attime += 24 if $tomorrow;
-        $attime .= strftime( ':%M:%S', gmtime $diff );
-        my $readingTime = strftime( '%H:%M:%S', localtime (time + $seconds));
+        if ( !defined $data->{GetTimer} && !defined $hash->{testline}) {
+            my $diff = $seconds;
+            my $attime = strftime( '%H', gmtime $diff );
+            $attime += 24 if $tomorrow;
+            $attime .= strftime( ':%M:%S', gmtime $diff );
+            my $readingTime = strftime( '%H:%M:%S', localtime (time + $seconds));
 
-        $responseEnd =~ s{(\$\w+)}{$1}eegx;
+            $responseEnd =~ s{(\$\w+)}{$1}eegx;
 
-        my $soundoption = $hash->{helper}{tweaks}{timerSounds}->{$label} // $hash->{helper}{tweaks}{timerSounds}->{default};
+            my $soundoption = $hash->{helper}{tweaks}{timerSounds}->{$label} // $hash->{helper}{tweaks}{timerSounds}->{default};
 
-        my $addtrigger =    qq{; trigger $name timerEnd $siteId $room};
-        $addtrigger .= " $label" if defined $label;
+            my $addtrigger = qq{; trigger $name timerEnd $siteId $room};
+            $addtrigger   .=    " $label" if defined $label;
 
-        if ( !defined $soundoption ) {
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
-        } else {
-            $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;
-            my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return respond( $hash, $data, getResponse( $hash, 'DefaultError' ) );
-            my $repeats = $+{repeats} // 5;
-            my $duration = $+{duration} // 15;
-            CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
+            if ( !defined $soundoption ) {
+                CommandDefMod($hash, "-temporary $roomReading at +$attime set $name speak siteId=\"$timerRoom\" text=\"$responseEnd\";deletereading $name ${roomReading}$addtrigger");
+            } else {
+                $soundoption =~ m{((?<repeats>[0-9]*)[:]){0,1}((?<duration>[0-9.]*)[:]){0,1}(?<file>(.+))}x;
+                my $file = $+{file} // Log3($hash->{NAME}, 2, "no WAV file for $label provided, check attribute rhasspyTweaks (item timerSounds)!") && return respond( $hash, $data, getResponse( $hash, 'DefaultError' ) );
+                my $repeats = $+{repeats} // 5;
+                my $duration = $+{duration} // 15;
+                CommandDefMod($hash, "-temporary $roomReading at +$attime set $name play siteId=\"$timerRoom\" path=\"$file\" repeats=$repeats wait=$duration id=${roomReading}$addtrigger");
+            }
+
+            readingsSingleUpdate($hash, $roomReading, $readingTime, 1);
+
+            Log3($name, 5, "Created timer: $roomReading at $readingTime");
         }
-
-        readingsSingleUpdate($hash, $roomReading, $readingTime, 1);
-
-        Log3($name, 5, "Created timer: $roomReading at $readingTime");
 
         my ($range, $minutes, $hours, $minutetext);
         my @timerlimits = $hash->{helper}->{tweaks}->{timerLimits} // (91, 9*MINUTESECONDS, HOURSECONDS, 1.5*HOURSECONDS, HOURSECONDS );
@@ -5253,12 +5261,22 @@ sub handleIntentNotRecognized {
     my $data = shift // return;
 
     Log3( $hash, 5, "[$hash->{NAME}] handleIntentNotRecognized called, input is $data->{input}" );
-    my $identiy = qq($data->{sessionId});
-    my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
+    my $identity = qq($data->{sessionId});
+    my $siteId = $hash->{siteId};
+    my $msgdev = (split m{_${siteId}_}, $identity,3)[0];
+
+    if ($msgdev) {
+        $data->{text} = getResponse( $hash, 'NoIntentRecognized' );
+        handleTtsMsgDialog($hash,$data);
+    }
+
+    return if !$hash->{experimental};
+
+    my $data_old = $hash->{helper}{'.delayed'}->{$identity};
     return if !defined $data_old;
     return if !defined $data->{input} || length($data->{input}) < 12; #Beta-User: silence chuncks or single words, might later be configurable
-    $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized} = $data->{input};
-    Log3( $hash->{NAME}, 5, "data_old is: " . toJSON( $hash->{helper}{'.delayed'}->{$identiy} ) );
+    $hash->{helper}{'.delayed'}->{$identity}->{intentNotRecognized} = $data->{input};
+    Log3( $hash->{NAME}, 5, "data_old is: " . toJSON( $hash->{helper}{'.delayed'}->{$identity} ) );
     my $response = getResponse($hash, 'DefaultChangeIntentRequestRawInput');
     my $rawInput = $data->{input};
     $response =~ s{(\$\w+)}{$1}eegx;
@@ -5275,15 +5293,15 @@ sub handleIntentCancelAction {
 
     #my $toDisable = defined $data->{'.ENABLED'} ? $data->{'.ENABLED'} : [qw(ConfirmAction CancelAction)]; #dialog
 
-    my $identiy = qq($data->{sessionId});
-    my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
+    my $identity = qq($data->{sessionId});
+    my $data_old = $hash->{helper}{'.delayed'}->{$identity};
     if ( !defined $data_old ) {
         respond( $hash, $data, getResponse( $hash, 'SilentCancelConfirmation' ), undef, 0 );
         return configure_DialogManager( $hash, $data->{siteId}, undef, undef, 1 ); #global intent filter seems to be not working!
     }
 
-    deleteSingleRegIntTimer($identiy, $hash);
-    delete $hash->{helper}{'.delayed'}->{$identiy};
+    deleteSingleRegIntTimer($identity, $hash);
+    delete $hash->{helper}{'.delayed'}->{$identity};
     respond( $hash, $data, getResponse( $hash, 'DefaultCancelConfirmation' ), undef, 0 );
 
     return $hash->{NAME};
@@ -5301,10 +5319,10 @@ sub handleIntentConfirmAction {
     return handleIntentCancelAction($hash, $data) if !$mode || $mode ne 'OK' && $mode ne 'Back' && $mode ne 'Next';
 
     #confirmed case
-    my $identiy = qq($data->{sessionId});
+    my $identity = qq($data->{sessionId});
 
-    deleteSingleRegIntTimer($identiy, $hash);
-    my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
+    deleteSingleRegIntTimer($identity, $hash);
+    my $data_old = $hash->{helper}{'.delayed'}->{$identity};
 
     if ( !defined $data_old ) {
         respond( $hash, $data, getResponse( $hash, 'DefaultConfirmationNoOutstanding' ) );
@@ -5318,7 +5336,7 @@ sub handleIntentConfirmAction {
              || $mode eq 'Next' ) ) {
         Log3($hash->{NAME}, 5, "ConfirmAction in $data->{Mode} after intentNotRecognized");
         if ($mode eq 'Back') {
-            delete $hash->{helper}{'.delayed'}->{$identiy}->{intentNotRecognized};
+            delete $hash->{helper}{'.delayed'}->{$identity}->{intentNotRecognized};
             return respond( $hash, $data, {text => getResponse( $hash,'DefaultConfirmationBack')} );
         }
 
@@ -5337,7 +5355,7 @@ sub handleIntentConfirmAction {
             #sessionId: string? = null - current session ID
             #asrConfidence: float? = null
             my $json = _toCleanJSON($sendData);
-            delete $hash->{helper}{'.delayed'}->{$identiy};
+            delete $hash->{helper}{'.delayed'}->{$identity};
             IOWrite($hash, 'publish', qq{$topic $json});
             return respond( $hash, $data, {text => getResponse( $hash,'DefaultConfirmation')} );
         }
@@ -5357,7 +5375,7 @@ sub handleIntentConfirmAction {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    delete $hash->{helper}{'.delayed'}{$identiy};
+    delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5368,10 +5386,10 @@ sub handleIntentChoiceRoom {
 
     Log3($hash->{NAME}, 5, 'handleIntentChoiceRoom called');
 
-    my $identiy = qq($data->{sessionId});
-    my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
-    delete $hash->{helper}{'.delayed'}{$identiy};
-    deleteSingleRegIntTimer($identiy, $hash);
+    my $identity = qq($data->{sessionId});
+    my $data_old = $hash->{helper}{'.delayed'}->{$identity};
+    delete $hash->{helper}{'.delayed'}{$identity};
+    deleteSingleRegIntTimer($identity, $hash);
 
     return respond( $hash, $data, getResponse( $hash, 'DefaultChoiceNoOutstanding' ) ) if !defined $data_old;
 
@@ -5398,10 +5416,10 @@ sub handleIntentChoiceDevice {
     Log3($hash->{NAME}, 5, 'handleIntentChoiceDevice called');
 
     #my $data_old = $data->{customData};
-    my $identiy = qq($data->{sessionId});
-    my $data_old = $hash->{helper}{'.delayed'}->{$identiy};
-    delete $hash->{helper}{'.delayed'}{$identiy};
-    deleteSingleRegIntTimer($identiy, $hash);
+    my $identity = qq($data->{sessionId});
+    my $data_old = $hash->{helper}{'.delayed'}->{$identity};
+    delete $hash->{helper}{'.delayed'}{$identity};
+    deleteSingleRegIntTimer($identity, $hash);
 
     return respond( $hash, $data, getResponse( $hash, 'DefaultChoiceNoOutstanding' ) ) if ! defined $data_old;
 
@@ -5656,9 +5674,13 @@ Minimum Level (pro Intent?) festlegen können. (muss getestet werden)
 
 # Testsuite: 
 - "Kenner" Dialoge etc. einbauen (vorl. erledigt)
-- Mehr Info zu adressierten Geräten (getDevicesByGroup?) 
+- Mehr Info zu adressierten Geräten (getDevicesByGroup) 
 -- OK für Gruppen;
--- Nacharbeit erforderlich für Eizel-Intents (vorbereitet).
+-- Nacharbeit erforderlich für Einzel-Intents (paßt soweit).
+
+# https://forum.fhem.de/index.php/topic,119447.msg1215408.html#msg1215408
+- die "not recognized"-Fälle sollte man bei den "echten" Messenger-Fällen vermutlich auch noch gesondert mit einer Antwort bedenken, damit der Anfragende jedenfalls eine Rückmeldung bekommt; (VB: 28.03.?)
+- die doppelte Zeitausgabe muss nicht sein...(VB: 28.03.)
 
 =end ToDo
 
