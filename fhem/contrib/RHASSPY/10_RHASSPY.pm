@@ -2891,8 +2891,7 @@ sub testmode_parse {
                     q{can't identify any device in group and room} 
                   : join q{,}, keys %{$devices};
         $hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Devices in group and room: $result";
-    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor|SetTimer\z}) {
-        #missing: MediaChannels SetTimer
+    } elsif (ref $dispatchFns->{$intent} eq 'CODE' && $intent =~m{\AGetOnOff|GetNumeric|GetState|GetTime|GetDate|MediaControls|SetNumeric|SetOnOff|SetTimedOnOff|SetScene|SetColor|SetTimer|MediaChannels|Shortcuts\z}) {
         $result = $dispatchFns->{$intent}->($hash, $data);
         return;
     }
@@ -5177,9 +5176,11 @@ sub handleIntentSetTimer {
 
     my $response;
     if (defined $data->{CancelTimer}) {
-        CommandDelete($hash, $roomReading);
-        readingsDelete($hash, $roomReading);
-        Log3($name, 5, "deleted timer: $roomReading");
+        if ( !defined $hash->{testline} ) {
+            CommandDelete($hash, $roomReading);
+            readingsDelete($hash, $roomReading);
+            Log3($name, 5, "deleted timer: $roomReading");
+        }
         $response = getResponse($hash, 'timerCancellation');
         $response =~ s{(\$\w+)}{$1}eegx;
         respond( $hash, $data, $response );
@@ -5660,27 +5661,11 @@ __END__
 
 # Continous mode? (Wackelig, mehr oder weniger ungetestet...)
 
-# GetTimer implementieren?
-https://forum.fhem.de/index.php/topic,113180.msg1130139.html#msg1130139
-
 # Rückmeldung zu den AMAD.*-Schnittstellen 
 - v.a. auch kontinuierliche Dialoge/Rückfragen, wann Input aufmachen
 
 # auto-training
 Tests/Rückmeldungen fehlen bisher; sieht nicht funktional aus...
-
-# probability:
-Minimum Level (pro Intent?) festlegen können. (muss getestet werden)
-
-# Testsuite: 
-- "Kenner" Dialoge etc. einbauen (vorl. erledigt)
-- Mehr Info zu adressierten Geräten (getDevicesByGroup) 
--- OK für Gruppen;
--- Nacharbeit erforderlich für Einzel-Intents (paßt soweit).
-
-# https://forum.fhem.de/index.php/topic,119447.msg1215408.html#msg1215408
-- die "not recognized"-Fälle sollte man bei den "echten" Messenger-Fällen vermutlich auch noch gesondert mit einer Antwort bedenken, damit der Anfragende jedenfalls eine Rückmeldung bekommt; (VB: 28.03.?)
-- die doppelte Zeitausgabe muss nicht sein...(VB: 28.03.)
 
 =end ToDo
 
