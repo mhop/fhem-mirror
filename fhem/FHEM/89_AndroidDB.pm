@@ -4,7 +4,7 @@
 #
 # 89_AndroidDB
 #
-# Version 0.8
+# Version 0.9
 #
 # FHEM Integration for Android Devices
 #
@@ -25,23 +25,24 @@ use strict;
 use warnings;
 use SetExtensions;
 
-sub AndroidDB_Initialize ($)
-{
-    my ($hash) = @_;
+sub AndroidDB_Initialize ($) {
+   my ($hash) = @_;
 
-    $hash->{DefFn}      = "AndroidDB::Define";
-    $hash->{UndefFn}    = "AndroidDB::Undef";
-    $hash->{SetFn}      = "AndroidDB::Set";
-    $hash->{GetFn}      = "AndroidDB::Get";
-    $hash->{AttrFn}     = "AndroidDB::Attr";
-    $hash->{ShutdownFn} = "AndroidDB::Shutdown";
+   $hash->{DefFn}      = "AndroidDB::Define";
+   $hash->{UndefFn}    = "AndroidDB::Undef";
+   $hash->{SetFn}      = "AndroidDB::Set";
+   $hash->{GetFn}      = "AndroidDB::Get";
+   $hash->{AttrFn}     = "AndroidDB::Attr";
+   $hash->{ShutdownFn} = "AndroidDB::Shutdown";
 
-    $hash->{parseParams} = 1;
-    $hash->{AttrList} = 'connect:0,1 createReadings macros:textField-long preset presetFile '.$readingFnAttributes;
+   $hash->{parseParams} = 1;
+   $hash->{AttrList} =
+     'connect:0,1 createReadings macros:textField-long preset presetFile '
+     . $readingFnAttributes;
 
-    $data{RC_layout}{MagentaTVStick} = "AndroidDB::RCLayoutMagentaTVStick";
-    $data{RC_layout}{MagentaOne} = "AndroidDB::RCLayoutMagentaOne";
-    $data{RC_layout}{MagentaTVExtended} = "AndroidDB::RCLayoutMagentaTVExt";
+   $data{RC_layout}{MagentaTVStick}    = "AndroidDB::RCLayoutMagentaTVStick";
+   $data{RC_layout}{MagentaOne}        = "AndroidDB::RCLayoutMagentaOne";
+   $data{RC_layout}{MagentaTVExtended} = "AndroidDB::RCLayoutMagentaTVExt";
 }
 
 package AndroidDB;
@@ -50,10 +51,12 @@ use strict;
 use warnings;
 use SetExtensions;
 use Storable qw(dclone);
-use GPUtils qw(:all); 
+use GPUtils qw(:all);
+
 
 BEGIN {
-    GP_Import(qw(
+   GP_Import(
+      qw(
         readingsSingleUpdate
         readingsBulkUpdate
         readingsBulkUpdateIfChanged
@@ -77,273 +80,297 @@ BEGIN {
         modules
         data
         init_done
-    ))
-};
+      )
+   );
+}
+
 
 # Remote control presets
 my $PRESET = {
-    'MagentaTVStick' => {
-       'ASSISTANT'  => 'KEYCODE_ASSIST',
-        'APPS'       => 'KEYCODE_ALL_APPS',
-        'BACK'       => 'KEYCODE_BACK',
-        'EPG'        => 'KEYCODE_TV_INPUT_HDMI_2',
-        'HOME'       => 'KEYCODE_HOME',
-        'LEFT'       => 'KEYCODE_DPAD_LEFT',
-        'RIGHT'      => 'KEYCODE_DPAD_RIGHT',
-        'UP'         => 'KEYCODE_DPAD_UP',
-        'DOWN'       => 'KEYCODE_DPAD_DOWN',
-        'INFO'       => 'KEYCODE_INFO',
-        'MEGATHEK'   => 'KEYCODE_TV_INPUT_HDMI_3',
-        'MUTE'       => 'KEYCODE_VOLUME_MUTE',
-        'OK'         => 'KEYCODE_DPAD_CENTER',
-        'PLAYPAUSE'  => 'KEYCODE_MEDIA_PLAY_PAUSE',
-        'POWER'      => 'KEYCODE_POWER',
-        'PROG+'      => 'KEYCODE_CHANNEL_UP',
-        'PROG-'      => 'KEYCODE_CHANNEL_DOWN',
-        'RECORD'     => 'KEYCODE_MEDIA_RECORD',
-        'SEARCH'     => 'KEYCODE_TV_INPUT_HDMI_1',
-        'STREAMINFO' => '--longpress,KEYCODE_INFO',
-        'TV'         => 'KEYCODE_TV_INPUT_HDMI_4',
-        'VOL+'       => 'KEYCODE_VOLUME_UP',
-        'VOL-'       => 'KEYCODE_VOLUME_DOWN'
-    },
-    'MagentaOne' => {
-       'ASSISTANT'  => 'KEYCODE_ASSIST',
-        'APPS'       => 'KEYCODE_ALL_APPS',
-        'BACK'       => 'KEYCODE_BACK',
-        'EPG'        => 'KEYCODE_TV_INPUT_HDMI_2',
-        'HOME'       => 'KEYCODE_HOME',
-        'LEFT'       => 'KEYCODE_DPAD_LEFT',
-        'RIGHT'      => 'KEYCODE_DPAD_RIGHT',
-        'UP'         => 'KEYCODE_DPAD_UP',
-        'DOWN'       => 'KEYCODE_DPAD_DOWN',
-        'INFO'       => 'KEYCODE_INFO',
-        'MEGATHEK'   => 'KEYCODE_TV_INPUT_HDMI_3',
-        'MUTE'       => 'KEYCODE_VOLUME_MUTE',
-        'OK'         => 'KEYCODE_DPAD_CENTER',
-        'PLAYPAUSE'  => 'KEYCODE_MEDIA_PLAY_PAUSE',
-        'POWER'      => 'KEYCODE_POWER',
-        'PROG+'      => 'KEYCODE_CHANNEL_UP',
-        'PROG-'      => 'KEYCODE_CHANNEL_DOWN',
-        'RECORD'     => 'KEYCODE_MEDIA_RECORD',
-        'SEARCH'     => 'KEYCODE_TV_INPUT_HDMI_1',
-        'STREAMINFO' => '--longpress,KEYCODE_INFO',
-        'TV'         => 'KEYCODE_TV_INPUT_HDMI_4',
-        'VOL+'       => 'KEYCODE_VOLUME_UP',
-        'VOL-'       => 'KEYCODE_VOLUME_DOWN'
-    },
-    'AndroidTV' => {
-        'APPS'       => 'KEYCODE_ALL_APPS',
-        'BACK'       => 'KEYCODE_BACK',
-        'EPG'        => 'KEYCODE_GUIDE',
-        'HOME'       => 'KEYCODE_HOME',
-        'LEFT'       => 'KEYCODE_DPAD_LEFT',
-        'RIGHT'      => 'KEYCODE_DPAD_RIGHT',
-        'UP'         => 'KEYCODE_DPAD_UP',
-        'DOWN'       => 'KEYCODE_DPAD_DOWN',
-        'INFO'       => 'KEYCODE_INFO',
-        'MUTE'       => 'KEYCODE_VOLUME_MUTE',
-        'OK'         => 'KEYCODE_DPAD_CENTER',
-        'PLAYPAUSE'  => 'KEYCODE_MEDIA_PLAY_PAUSE',
-        'POWER'      => 'KEYCODE_POWER',
-        'PROG+'      => 'KEYCODE_CHANNEL_UP',
-        'PROG-'      => 'KEYCODE_CHANNEL_DOWN',
-        'RECORD'     => 'KEYCODE_MEDIA_RECORD',
-        'SEARCH'     => 'KEYCODE_SEARCH',
-        'VOL+'       => 'KEYCODE_VOLUME_UP',
-        'VOL-'       => 'KEYCODE_VOLUME_DOWN',
-        'RED'        => 'KEYCODE_PROG_RED',
-        'GREEN'      => 'KEYCODE_PROG_GREEN',
-        'BLUE'       => 'KEYCODE_PROG_BLUE',
-        'YELLOW'     => 'KEYCODE_PROG_YELLOW'
-    }
+   'MagentaTVStick' => {
+      'ASSISTANT'  => 'KEYCODE_ASSIST',
+      'APPS'       => 'KEYCODE_ALL_APPS',
+      'BACK'       => 'KEYCODE_BACK',
+      'EPG'        => 'KEYCODE_TV_INPUT_HDMI_2',
+      'HOME'       => 'KEYCODE_HOME',
+      'LEFT'       => 'KEYCODE_DPAD_LEFT',
+      'RIGHT'      => 'KEYCODE_DPAD_RIGHT',
+      'UP'         => 'KEYCODE_DPAD_UP',
+      'DOWN'       => 'KEYCODE_DPAD_DOWN',
+      'INFO'       => 'KEYCODE_INFO',
+      'MEGATHEK'   => 'KEYCODE_TV_INPUT_HDMI_3',
+      'MUTE'       => 'KEYCODE_VOLUME_MUTE',
+      'OK'         => 'KEYCODE_DPAD_CENTER',
+      'PLAYPAUSE'  => 'KEYCODE_MEDIA_PLAY_PAUSE',
+      'POWER'      => 'KEYCODE_POWER',
+      'PROG+'      => 'KEYCODE_CHANNEL_UP',
+      'PROG-'      => 'KEYCODE_CHANNEL_DOWN',
+      'RECORD'     => 'KEYCODE_MEDIA_RECORD',
+      'SEARCH'     => 'KEYCODE_TV_INPUT_HDMI_1',
+      'STREAMINFO' => '--longpress,KEYCODE_INFO',
+      'TV'         => 'KEYCODE_TV_INPUT_HDMI_4',
+      'VOL+'       => 'KEYCODE_VOLUME_UP',
+      'VOL-'       => 'KEYCODE_VOLUME_DOWN'
+   },
+   'MagentaOne' => {
+      'ASSISTANT'  => 'KEYCODE_ASSIST',
+      'APPS'       => 'KEYCODE_ALL_APPS',
+      'BACK'       => 'KEYCODE_BACK',
+      'EPG'        => 'KEYCODE_TV_INPUT_HDMI_2',
+      'HOME'       => 'KEYCODE_HOME',
+      'LEFT'       => 'KEYCODE_DPAD_LEFT',
+      'RIGHT'      => 'KEYCODE_DPAD_RIGHT',
+      'UP'         => 'KEYCODE_DPAD_UP',
+      'DOWN'       => 'KEYCODE_DPAD_DOWN',
+      'INFO'       => 'KEYCODE_INFO',
+      'MEGATHEK'   => 'KEYCODE_TV_INPUT_HDMI_3',
+      'MUTE'       => 'KEYCODE_VOLUME_MUTE',
+      'OK'         => 'KEYCODE_DPAD_CENTER',
+      'PLAYPAUSE'  => 'KEYCODE_MEDIA_PLAY_PAUSE',
+      'POWER'      => 'KEYCODE_POWER',
+      'PROG+'      => 'KEYCODE_CHANNEL_UP',
+      'PROG-'      => 'KEYCODE_CHANNEL_DOWN',
+      'RECORD'     => 'KEYCODE_MEDIA_RECORD',
+      'SEARCH'     => 'KEYCODE_TV_INPUT_HDMI_1',
+      'STREAMINFO' => '--longpress,KEYCODE_INFO',
+      'TV'         => 'KEYCODE_TV_INPUT_HDMI_4',
+      'VOL+'       => 'KEYCODE_VOLUME_UP',
+      'VOL-'       => 'KEYCODE_VOLUME_DOWN'
+   },
+   'AndroidTV' => {
+      'APPS'      => 'KEYCODE_ALL_APPS',
+      'BACK'      => 'KEYCODE_BACK',
+      'EPG'       => 'KEYCODE_GUIDE',
+      'HOME'      => 'KEYCODE_HOME',
+      'LEFT'      => 'KEYCODE_DPAD_LEFT',
+      'RIGHT'     => 'KEYCODE_DPAD_RIGHT',
+      'UP'        => 'KEYCODE_DPAD_UP',
+      'DOWN'      => 'KEYCODE_DPAD_DOWN',
+      'INFO'      => 'KEYCODE_INFO',
+      'MUTE'      => 'KEYCODE_VOLUME_MUTE',
+      'OK'        => 'KEYCODE_DPAD_CENTER',
+      'PLAYPAUSE' => 'KEYCODE_MEDIA_PLAY_PAUSE',
+      'POWER'     => 'KEYCODE_POWER',
+      'PROG+'     => 'KEYCODE_CHANNEL_UP',
+      'PROG-'     => 'KEYCODE_CHANNEL_DOWN',
+      'RECORD'    => 'KEYCODE_MEDIA_RECORD',
+      'SEARCH'    => 'KEYCODE_SEARCH',
+      'VOL+'      => 'KEYCODE_VOLUME_UP',
+      'VOL-'      => 'KEYCODE_VOLUME_DOWN',
+      'RED'       => 'KEYCODE_PROG_RED',
+      'GREEN'     => 'KEYCODE_PROG_GREEN',
+      'BLUE'      => 'KEYCODE_PROG_BLUE',
+      'YELLOW'    => 'KEYCODE_PROG_YELLOW'
+   }
 };
+
 
 # Command presets
 my $MACRO = { };
 
-sub Define ($$$)
-{
-   my ($hash, $a, $h) = @_;
+sub Define ($$$) {
+   my ( $hash, $a, $h ) = @_;
 
    my $usage = "define $hash->{NAME} AndroidDB {NameOrIP[:Port]}";
 
-   return $usage if (scalar(@$a) < 3);
+   return $usage if ( scalar(@$a) < 3 );
 
    # Set parameters
-   my ($devName, $devPort) = split (':', $$a[2]);
-   $hash->{ADBDevice} = $devName.':'.($devPort // '5555');
+   my ( $devName, $devPort ) = split( ':', $$a[2] );
+   $hash->{ADBDevice} = $devName . ':' . ( $devPort // '5555' );
 
-   AssignIoPort ($hash);
+   AssignIoPort($hash);
 
-   $attr{$hash->{NAME}}{webCmd} = 'remoteControl';
+   $attr{ $hash->{NAME} }{webCmd} = 'remoteControl';
 
    # Clone predefined presets and macros
    $hash->{adb}{preset} = dclone $PRESET;
-   $hash->{adb}{macro} = dclone $MACRO;
+   $hash->{adb}{macro}  = dclone $MACRO;
 
-   InitAfterStart ($hash) if ($init_done);
+   InitAfterStart($hash) if ($init_done);
 
    return undef;
 }
 
-sub InitAfterStart ($)
-{
-    my ($hash) = @_;
-    
-    my @presets = map { $_ eq '_custom_' ? () : $_ } keys %{$hash->{adb}{preset}};
+sub InitAfterStart ($) {
+   my ($hash) = @_;
 
-    if (scalar(@presets) > 0) {
-        my $attrPreset = 'preset:select,'.join(',',@presets);
-        my $attributes = $modules{AndroidDB}{AttrList};
-        $attributes =~ s/preset/$attrPreset/;
-        setDevAttrList ($hash->{NAME}, $attributes);
-    }
+   my @presets =
+     map { $_ eq '_custom_' ? () : $_ } keys %{ $hash->{adb}{preset} };
+
+   if ( scalar(@presets) > 0 ) {
+      my $attrPreset = 'preset:select,' . join( ',', @presets );
+      my $attributes = $modules{AndroidDB}{AttrList};
+      $attributes =~ s/preset/$attrPreset/;
+      setDevAttrList( $hash->{NAME}, $attributes );
+   }
 }
 
-sub Undef ($$)
-{
-   my ($hash, $name) = @_;
+sub Undef ($$) {
+   my ( $hash, $name ) = @_;
 
-    AndroidDBHost::Disconnect ($hash);
-   
+   AndroidDBHost::Disconnect($hash);
+
    return undef;
 }
 
-sub Shutdown ($)
-{
-    my ($hash) = @_;
-    
-    AndroidDBHost::Disconnect ($hash);
+
+sub Shutdown ($) {
+   my ($hash) = @_;
+
+   AndroidDBHost::Disconnect($hash);
 }
 
-sub Set ($@)
-{
-    my ($hash, $a, $h) = @_;
-    
-    my $name = shift @$a;
-    my $opt = shift @$a // return 'No set command specified';
+sub Set ($@) {
+   my ( $hash, $a, $h ) = @_;
 
-    #
-    # Preprare list of available commands
-    #
-    
-    # Standard commands
-    my $options = 'exportPresets reboot rollHorz rollVert sendKey sendNumKeys sendText shell tap';
-    
-    # Add remote control key presets to command remoteControl
-    my @presetList = ();
-    my $preset   = AttrVal ($name, 'preset', '');
-    push @presetList, sort keys %{$hash->{adb}{preset}{$preset}} if ($preset ne '' && exists($hash->{adb}{preset}{$preset}));
-    push @presetList, sort keys %{$hash->{adb}{preset}{_custom_}} if (exists($hash->{adb}{preset}{_custom_}));
-    my %e1;
-    $options .= ' remoteControl:'.join(',', sort grep { !$e1{$_}++ } @presetList) if (scalar(@presetList) > 0);
-    
-    # Add remote control layouts to command createRemote
-    my @layouts = keys %{$data{RC_layout}};
-    $options .= ' createRemote:'.join(',', sort @layouts) if (scalar(@layouts) > 0);
-    
-    # Add command macros to command list
-    my @macroList = ();
-    push @macroList, sort keys %{$hash->{adb}{macro}{$preset}} if ($preset ne '' && exists($hash->{adb}{macro}{$preset}));
-    push @macroList, sort keys %{$hash->{adb}{macro}{_custom_}} if (exists($hash->{adb}{macro}{_custom_}));
-    my %e2;
-    $options .= ' '.join(' ', sort grep { !$e2{$_}++ } @macroList) if (scalar(@macroList) > 0);
+   my $name = shift @$a;
+   my $opt  = shift @$a // return 'No set command specified';
 
-    my $lcopt = lc($opt);
+   #
+   # Preprare list of available commands
+   #
 
-    if ($lcopt eq 'sendkey') {
-        return "Usage: set $name $opt [--longpress] KeyCode [...]" if (scalar(@$a) == 0);
-        return "Only one KeyCode allowed when option '--longpress' is specified"
-            if ($$a[0] eq '--longpress' && scalar(@$a) > 2);
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, 'shell', '.*', 'input', 'keyevent', @$a);
-        return $error if ($rc == 0);
-    }
-    elsif ($lcopt eq 'sendnumkeys') {
-        my $number = shift @$a // return "Usage: set $name $opt Number";
-        return 'Parameter Number must be in range 1-9999' if ($number !~ /^[0-9]+$/ || $number < 1 || $number > 9999);
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, 'shell', '.*', 'input', 'text', $number);
-        return $error if ($rc == 0);
-    }
-    elsif ($lcopt eq 'sendtext') {
-        return "Usage: set $name $opt Text" if (scalar(@$a) < 1);
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, 'shell', '.*', 'input', 'text', join(' ',@$a));
-        return $error if ($rc == 0);
-    }
-    elsif ($lcopt eq 'reboot') {
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, $opt);
-        return $error if ($rc == 0);
-    }
-    elsif ($lcopt eq 'shell') {
-        return "Usage: set $name $opt ShellCommand" if (scalar(@$a) == 0);
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, $opt, '.*', @$a);
-        return $error if ($rc == 0);
-        my $createReadings = AttrVal ($name, 'createReadings', '');
-        return $result if ($createReadings eq '' || $createReadings !~ /$createReadings/);
-        UpdateReadings ($hash, $result);
-    }
-    elsif ($lcopt eq 'remotecontrol') {
-        my $macroName = shift @$a // return "Usage: set $name $opt MacroName";
-        $preset = '_custom_' if (exists($hash->{adb}{preset}{_custom_}) && exists($hash->{adb}{preset}{_custom_}{$macroName}));
-        return "Preset and/or macro $macroName not defined in preset $preset"
-            if ($preset eq '' || !exists($hash->{adb}{preset}{$preset}{$macroName}));
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, 'shell', '.*', 'input', 'keyevent',
-            split (',', $hash->{adb}{preset}{$preset}{$macroName}));
-        return $error if ($rc == 0);
-    }
-    elsif ($lcopt eq 'tap') {
-        my ($x, $y) = @$a;
-        return "Usage: set $name $opt tap X Y" if (!defined($y));
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, 'shell', '.*', 'input', 'tap', $x, $y);
-        return $error if ($rc == 0);		
-    }
-    elsif ($lcopt eq 'rollhorz' || $lcopt eq 'rollvert') {
-        my $delta = shift @$a // return "Usage: set $name $opt Delta";
-        my ($dx, $dy) = $opt eq 'rollhorz' ? ($delta, 0) : (0, $delta);
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, 'shell', '.*', 'input', 'roll', $dx, $dy);
-        return $error if ($rc == 0);
-    }
-    elsif ($lcopt eq 'createremote') {
-        my $layout = shift @$a // return "Usage: set $name $opt LayoutName";
-        my $rcName = $name.'_RC';
-        return "$name: Can't create remotecontrol device $rcName"
-            if (CommandDefine (undef, "$rcName remotecontrol"));
-        Log3 $name, 2, "$name: Created remotecontrol device $rcName";
-        return "$name: Can't select layout $layout for remotecontrol device $rcName"
-            if (CommandSet (undef, "$rcName layout $layout"));
-        Log3 $name, 2, "Selected layout $layout for $rcName";
-        my $room = AttrVal ($name, 'room', '');
-        if ($room ne '') {
-            Log3 $name, 2, "$name: Assigning $rcName to room $room";
-            CommandAttr (undef, "$rcName room $room");
-        }
-        CommandSet (undef, "$rcName makenotify $name");
-        CommandAttr (undef, "$name group $name");
-        CommandAttr (undef, "$rcName group $name");
-        Log3 $name, 2, "Created notify device notify_$rcName";
-    }
-    elsif ($lcopt eq 'exportpresets') {
-        my $filename = shift @$a // return "Usage: set $name $opt Filename";
-        my $rc = ExportPresets ($hash, $filename);
-        return "Error while saving presets to file $filename" if ($rc == 0);
-        return "Presets saved to file $filename";
-    }
-    elsif (exists($hash->{adb}{macro}{_custom_}) && exists($hash->{adb}{macro}{_custom_}{$opt})) {
-        my ($args, $pars) = parseParams ($hash->{adb}{macro}{_custom_}{$opt});
-        my $cmd = shift @$args;
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, $cmd, '.*', @$args);
-        return $rc == 0 ? $error : $result;	
-    }
-    elsif ($preset ne '' && exists($hash->{adb}{macro}{$preset}) && exists($hash->{adb}{macro}{$preset}{$opt})) {
-        my ($args, $pars) = parseParams ($hash->{adb}{macro}{$preset}{$opt});
-        my $cmd = shift @$args;
-        my ($rc, $result, $error) = AndroidDBHost::Run ($hash, $cmd, '.*', @$args);
-        return $rc == 0 ? $error : $result;	
-    }
-    else {
-        return "Unknown argument $opt, choose one of $options";
-    }
+   # Standard commands
+   my $options =
+      'exportPresets reboot rollHorz rollVert sendKey sendNumKeys sendText shell tap';
+
+   # Add remote control key presets to command remoteControl
+   my @presetList = ();
+   my $preset     = AttrVal( $name, 'preset', '' );
+   push @presetList, sort keys %{ $hash->{adb}{preset}{$preset} }
+     if ( $preset ne '' && exists( $hash->{adb}{preset}{$preset} ) );
+   push @presetList, sort keys %{ $hash->{adb}{preset}{_custom_} }
+     if ( exists( $hash->{adb}{preset}{_custom_} ) );
+   my %e1;
+   $options .=
+     ' remoteControl:' . join( ',', sort grep { !$e1{$_}++ } @presetList )
+     if ( scalar(@presetList) > 0 );
+
+   # Add remote control layouts to command createRemote
+   my @layouts = keys %{ $data{RC_layout} };
+   $options .= ' createRemote:' . join( ',', sort @layouts )
+     if ( scalar(@layouts) > 0 );
+
+   # Add command macros to command list
+   my @macroList = ();
+   push @macroList, sort keys %{ $hash->{adb}{macro}{$preset} }
+     if ( $preset ne '' && exists( $hash->{adb}{macro}{$preset} ) );
+   push @macroList, sort keys %{ $hash->{adb}{macro}{_custom_} }
+     if ( exists( $hash->{adb}{macro}{_custom_} ) );
+   my %e2;
+   $options .= ' ' . join( ' ', sort grep { !$e2{$_}++ } @macroList )
+     if ( scalar(@macroList) > 0 );
+
+   my $lcopt = lc($opt);
+
+   if ( $lcopt eq 'sendkey' ) {
+      return "Usage: set $name $opt [--longpress] KeyCode [...]"
+        if ( scalar(@$a) == 0 );
+      return "Only one KeyCode allowed when option '--longpress' is specified"
+        if ( $$a[0] eq '--longpress' && scalar(@$a) > 2 );
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, 'shell', '.*', 'input', 'keyevent', @$a );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'sendnumkeys' ) {
+      my $number = shift @$a // return "Usage: set $name $opt Number";
+      return 'Parameter Number must be in range 1-9999'
+        if ( $number !~ /^[0-9]+$/ || $number < 1 || $number > 9999 );
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, 'shell', '.*', 'input', 'text', $number );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'sendtext' ) {
+      return "Usage: set $name $opt Text" if ( scalar(@$a) < 1 );
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, 'shell', '.*', 'input', 'text', join( ' ', @$a ) );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'reboot' ) {
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, $opt );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'shell' ) {
+      return "Usage: set $name $opt ShellCommand" if ( scalar(@$a) == 0 );
+      my $shellCommand = @$a[0];
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, $opt, '.*', @$a );
+      return $error if ( $rc == 0 );
+      my $createReadings = AttrVal( $name, 'createReadings', '' );
+      return $result
+        if ( $createReadings eq '' || $shellCommand !~ /$createReadings/ );
+      UpdateReadings( $hash, $result );
+   }
+   elsif ( $lcopt eq 'remotecontrol' ) {
+      my $macroName = shift @$a // return "Usage: set $name $opt MacroName";
+      $preset = '_custom_'
+        if (exists( $hash->{adb}{preset}{_custom_} )
+         && exists( $hash->{adb}{preset}{_custom_}{$macroName} ) );
+      return "Preset and/or macro $macroName not defined in preset $preset"
+        if ( $preset eq ''
+         || !exists( $hash->{adb}{preset}{$preset}{$macroName} ) );
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, 'shell', '.*', 'input', 'keyevent',
+         split( ',', $hash->{adb}{preset}{$preset}{$macroName} ) );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'tap' ) {
+      my ( $x, $y ) = @$a;
+      return "Usage: set $name $opt tap X Y" if ( !defined($y) );
+      my ( $rc, $result, $error ) =
+        AndroidDBHost::Run( $hash, 'shell', '.*', 'input', 'tap', $x, $y );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'rollhorz' || $lcopt eq 'rollvert' ) {
+      my $delta = shift @$a // return "Usage: set $name $opt Delta";
+      my ( $dx, $dy ) = $opt eq 'rollhorz' ? ( $delta, 0 ) : ( 0, $delta );
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, 'shell', '.*', 'input', 'roll', $dx, $dy );
+      return $error if ( $rc == 0 );
+   }
+   elsif ( $lcopt eq 'createremote' ) {
+      my $layout = shift @$a // return "Usage: set $name $opt LayoutName";
+      my $rcName = $name . '_RC';
+      return "$name: Can't create remotecontrol device $rcName"
+        if ( CommandDefine( undef, "$rcName remotecontrol" ) );
+      Log3 $name, 2, "$name: Created remotecontrol device $rcName";
+      return
+        "$name: Can't select layout $layout for remotecontrol device $rcName"
+        if ( CommandSet( undef, "$rcName layout $layout" ) );
+      Log3 $name, 2, "Selected layout $layout for $rcName";
+      my $room = AttrVal( $name, 'room', '' );
+      if ( $room ne '' ) {
+         Log3 $name, 2, "$name: Assigning $rcName to room $room";
+         CommandAttr( undef, "$rcName room $room" );
+      }
+      CommandSet( undef, "$rcName makenotify $name" );
+      CommandAttr( undef, "$name group $name" );
+      CommandAttr( undef, "$rcName group $name" );
+      Log3 $name, 2, "Created notify device notify_$rcName";
+   }
+   elsif ( $lcopt eq 'exportpresets' ) {
+      my $filename = shift @$a // return "Usage: set $name $opt Filename";
+      my $rc       = ExportPresets( $hash, $filename );
+      return "Error while saving presets to file $filename" if ( $rc == 0 );
+      return "Presets saved to file $filename";
+   }
+   elsif ( exists( $hash->{adb}{macro}{_custom_} )
+      && exists( $hash->{adb}{macro}{_custom_}{$opt} ) )
+   {
+      my ( $args, $pars ) = parseParams( $hash->{adb}{macro}{_custom_}{$opt} );
+      my $cmd = shift @$args;
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, $cmd, '.*', @$args );
+      return $rc == 0 ? $error : $result;
+   }
+   elsif ( $preset ne ''
+      && exists( $hash->{adb}{macro}{$preset} )
+      && exists( $hash->{adb}{macro}{$preset}{$opt} ) )
+   {
+      my ( $args, $pars ) = parseParams( $hash->{adb}{macro}{$preset}{$opt} );
+      my $cmd = shift @$args;
+      my ( $rc, $result, $error ) = AndroidDBHost::Run( $hash, $cmd, '.*', @$args );
+      return $rc == 0 ? $error : $result;
+   }
+   else {
+      return "Unknown argument $opt, choose one of $options";
+   }
 }
+
 
 sub Get ($@)
 {
@@ -389,43 +416,44 @@ sub Get ($@)
 
 sub Attr ($@)
 {
-    my ($cmd, $name, $attrName, $attrVal) = @_;
-    my $hash = $defs{$name};
+   my ($cmd, $name, $attrName, $attrVal) = @_;
+   my $hash = $defs{$name};
 
-    if ($cmd eq 'set') {
-        if ($attrName eq 'macros') {
-           delete $hash->{adb}{preset}{_custom_} if (exists($hash->{adb}{preset}{_custom_}));
-           delete $hash->{adb}{macro}{_custom_} if (exists($hash->{adb}{macro}{_custom_}));
-            foreach my $macroDef (split /;/, $attrVal) {
-                my ($macroName, $macroPar) = split (':', $macroDef, 2);
-                if (!defined($macroDef)) {
-                    Log3 $name, 2, "Missing defintion for macro $macroName";
-                    return "Missing definition for macro $macroName";
-                }
-                if ($macroPar =~ /^[0-9]+/ || $macroPar =~ /^KEYCODE_/) {
-                    $hash->{adb}{preset}{_custom_}{$macroName} = $macroPar;
-                }
-                else {
-                    $hash->{adb}{macro}{_custom_}{$macroName} = $macroPar;
-                }
+   if ($cmd eq 'set') {
+      if ($attrName eq 'macros') {
+         delete $hash->{adb}{preset}{_custom_} if (exists($hash->{adb}{preset}{_custom_}));
+         delete $hash->{adb}{macro}{_custom_} if (exists($hash->{adb}{macro}{_custom_}));
+         foreach my $macroDef (split /;/, $attrVal) {
+            my ($macroName, $macroPar) = split (':', $macroDef, 2);
+            if (!defined($macroDef)) {
+               Log3 $name, 2, "Missing defintion for macro $macroName";
+               return "Missing definition for macro $macroName";
             }
-        }
-        elsif ($attrName eq 'presetFile') {
-            if (!LoadPresets ($hash, $attrVal)) {
-                return "Cannot load presets from file $attrVal";
+            if ($macroPar =~ /^[0-9]+/ || $macroPar =~ /^KEYCODE_/) {
+               $hash->{adb}{preset}{_custom_}{$macroName} = $macroPar;
             }
-        }
-        elsif ($attrName eq 'connect') {
-            AndroidDBHost::Connect ($hash) if (!$init_done && $attrVal eq '1');
-        }
-    }
-    elsif ($cmd eq 'del') {
-        delete $hash->{adb}{preset}{_custom_} if (exists($hash->{adb}{preset}{_custom_}));
-        delete $hash->{adb}{macro}{_custom_} if (exists($hash->{adb}{macro}{_custom_}));
-    }
+            else {
+               $hash->{adb}{macro}{_custom_}{$macroName} = $macroPar;
+            }
+         }
+      }
+      elsif ($attrName eq 'presetFile') {
+         if (!LoadPresets ($hash, $attrVal)) {
+            return "Cannot load presets from file $attrVal";
+         }
+      }
+      elsif ($attrName eq 'connect') {
+         AndroidDBHost::Connect ($hash) if (!$init_done && $attrVal eq '1');
+      }
+   }
+   elsif ($cmd eq 'del') {
+      delete $hash->{adb}{preset}{_custom_} if (exists($hash->{adb}{preset}{_custom_}));
+      delete $hash->{adb}{macro}{_custom_} if (exists($hash->{adb}{macro}{_custom_}));
+   }
 
-    return undef;
+   return undef;
 }
+
 
 ##############################################################################
 # Load macro definitions from file

@@ -37,6 +37,7 @@ sub AndroidDBHost_Initialize ($)
    $hash->{ShutdownFn} = "AndroidDBHost::Shutdown";
 
    $hash->{parseParams} = 1;
+   $hash->{AttrList} = $readingFnAttributes;
 }
 
 package AndroidDBHost;
@@ -53,13 +54,14 @@ use IPC::Open3;
 use GPUtils qw(:all); 
 
 BEGIN {
-    GP_Import(qw(
+   GP_Import(
+      qw(
         readingsSingleUpdate
         readingsBulkUpdate
         readingsBulkUpdateIfChanged
         readingsBeginUpdate
         readingsEndUpdate
-		devspec2array
+        devspec2array
         Log3
         AttrVal
         ReadingsVal
@@ -69,32 +71,33 @@ BEGIN {
         deviceEvents
         gettimeofday
         defs
-    ))
+      )
+   )
 };
 
 sub Define ($$$)
 {
    my ($hash, $a, $h) = @_;
-   
-	my $name = $hash->{NAME};
-	my $usage = "define $name AndroidDB [server={host}[:{port}]] [adb={path}]";
-	
-	# Set parameters
-	my ($host, $port) = split (':', $h->{ADB} // 'localhost:5037');
-	$hash->{adb}{host} = $host;
-	$hash->{adb}{port} = $port // 5037;
-	$hash->{adb}{cmd}  = $h->{adb} // '/usr/bin/adb';
-	$hash->{Clients}   = ':AndroidDB:';
-	$hash->{NOTIFYDEV} = 'global,TYPE=AndroidDBHost';
-	
-	# Check path and rights of platform tools
-	return "ADB command not found or is not executable in $hash->{adb}{pt}" if (! -x "$hash->{adb}{cmd}");
-	
-	# Check ADB settings, start adb server
-	CheckADBServer ($hash);
-	
-	return "ADB server not running or cannot be started on host $hash->{adb}{host}" if ($hash->{STATE} eq 'stopped');
-	
+
+   my $name = $hash->{NAME};
+   my $usage = "define $name AndroidDB [server={host}[:{port}]] [adb={path}]";
+
+   # Set parameters
+   my ($host, $port) = split (':', $h->{ADB} // 'localhost:5037');
+   $hash->{adb}{host} = $host;
+   $hash->{adb}{port} = $port // 5037;
+   $hash->{adb}{cmd}  = $h->{adb} // '/usr/bin/adb';
+   $hash->{Clients}   = ':AndroidDB:';
+   $hash->{NOTIFYDEV} = 'global,TYPE=AndroidDBHost';
+
+   # Check path and rights of platform tools
+   return "ADB command not found or is not executable in $hash->{adb}{pt}" if (! -x "$hash->{adb}{cmd}");
+
+   # Check ADB settings, start adb server
+   CheckADBServer ($hash);
+
+   return "ADB server not running or cannot be started on host $hash->{adb}{host}" if ($hash->{STATE} eq 'stopped');
+
    return undef;
 }
 
