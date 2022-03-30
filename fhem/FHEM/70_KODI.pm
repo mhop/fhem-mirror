@@ -158,28 +158,54 @@ sub KODI_Define($$)
   
   $attr{$hash->{NAME}}{"updateInterval"} = 60;
   
-  return KODI_Connect( $hash, 0 );
+  my $ret = undef;
+  $ret = KODI_Connect( $hash, 0 ) if (!AttrVal($hash->{NAME}, 'disable', 0));
+  return $ret;
 }
 
 sub KODI_Attr($$$$)
 {
-  my ($cmd, $name, $attr, $value) = @_;
-  my $hash = $defs{$name};
-  
-  if($attr eq "disable") {
-    if($cmd eq "set" && ($value || !defined($value))) {
-      KODI_Disconnect($hash);
-      $hash->{STATE} = "Disabled";
-    } else {
-      if (AttrVal($hash->{NAME}, 'disable', 0)) {
-        $hash->{STATE} = "Initialized";
-        
-        my $dev = $hash->{DeviceName};
-        $readyfnlist{"$name.$dev"} = $hash;
+  my ($mode, $devName, $attrName, $attrValue) = @_;
+  my $hash = $defs{$devName};
+
+  # handling for "disable" borrowed from 70_MEDIAPORTAL, thanks
+
+  my $disableChange = 0;
+  if($mode eq 'set') {
+    if ($attrName eq 'disable') {
+      if ($attrValue && AttrVal($devName, $attrName, 0) != 1) {
+        $disableChange = 1;
+      }
+      
+      if (!$attrValue && AttrVal($devName, $attrName, 0) != 0) {
+        $disableChange = 1;
+      }
+    }
+  } elsif ($mode eq 'del') {
+    if ($attrName eq 'disable') {
+      if (AttrVal($devName, $attrName, 0) != 0) {
+        $disableChange = 1;
+        $attrValue = 0;
       }
     }
   }
-
+  
+  if ($disableChange) {
+    # Wenn die Verbindung beendet werden muss...
+    if ($attrValue) {
+      Log3($devName, 3, "$devName: Call AttributeFn: Stop Connection...");
+      DevIo_CloseDev($hash);
+      $hash->{STATE} = "Disabled";
+    }
+    
+    # Wenn die Verbindung gestartet werden muss...
+    if (!$attrValue) {
+      Log3($devName, 3, "$devName: Call AttributeFn: Start Connection...");
+      $hash->{STATE} = "Initialized";
+      KODI_Connect($hash, 0);
+    }
+  }
+  
   return undef;
 }
 
@@ -250,7 +276,7 @@ sub KODI_OnConnect($)
   return undef;
 }
 
-sub KODI_OnConnectError($$) {
+sub KODI_OnConnectError($$) { 
   my ( $hash, $err ) = @_;
 
   if ($err) {
@@ -265,8 +291,6 @@ sub KODI_Undefine($$)
   my $name = $hash->{NAME};
   Log3($name, 4, "$name: KODI_Undefine");
 
-  RemoveInternalTimer($hash);
-  
   KODI_Disconnect($hash);
   
   return undef;
@@ -276,6 +300,7 @@ sub KODI_Disconnect($)
 {
   my ($hash) = @_;
   if($hash->{Protocol} eq 'tcp') {
+    RemoveInternalTimer($hash);
     DevIo_CloseDev($hash); 
   }
 }
@@ -713,10 +738,10 @@ sub KODI_ProcessNotification($$)
   elsif($obj->{method} eq "Player.OnStop") {
     Log3($name, 5, "$name: KODI_ProcessNotification: player stopped");
     readingsSingleUpdate($hash,"playStatus",'stopped',1);
-	
-	#HACK: We want to fetch GUI.Properties here to update for example stereoscopicmode.
-	# When doing this here we still get the in-movie stereo mode. So we define a timer
-	# to invoke the update in some (tm) seconds
+  
+  #HACK: We want to fetch GUI.Properties here to update for example stereoscopicmode.
+  # When doing this here we still get the in-movie stereo mode. So we define a timer
+  # to invoke the update in some (tm) seconds
     KODI_QueueIntervalUpdate($hash, 2);
   }
   elsif($obj->{method} eq "Player.OnPause") {
@@ -727,7 +752,7 @@ sub KODI_ProcessNotification($$)
     Log3($name, 5, "$name: KODI_ProcessNotification: player started playing");
     KODI_ResetMediaReadings($hash);
     KODI_PlayerOnPlay($hash, $obj);
-	KODI_Update($hash);
+  KODI_Update($hash);
   }
   elsif($obj->{method} eq "Player.OnResume") {
     Log3($name, 5, "$name: KODI_ProcessNotification: player resumed");
@@ -749,7 +774,7 @@ sub KODI_ProcessNotification($$)
         #and force a connection check in some seconds when we think KODI actually has shut down
         $hash->{LAST_RECV} = 0;
         RemoveInternalTimer($hash);
-        KODI_QueueIntervalUpdate($hash,  5);
+        KODI_QueueIntervalUpdate($hash, 5);
       }
     }
   }
@@ -1363,11 +1388,11 @@ sub KODI_Set_Seek($@)
   my $obj = {
     'method'  => 'Player.Seek',
     'params' => { 
-	  'value' => {
-	  'seconds' => $seconds + 0,
-	  'minutes' => $minutes + 0 ,
-	  'hours' => $hours + 0
-	  },
+    'value' => {
+    'seconds' => $seconds + 0,
+    'minutes' => $minutes + 0 ,
+    'hours' => $hours + 0
+    },
       'playerid' => 0 #will be replaced with the active player
     }
   };
@@ -1940,7 +1965,7 @@ sub KODI_HTTP_Request($$@)
   <li><b>audiolibrary</b> - Possible values: cleanfinished, cleanstarted, remove, scanfinished, scanstarted, update</li>
   <li><b>currentAlbum</b> - album of the current song/musicvideo</li>
   <li><b>currentArtist</b> - artist of the current song/musicvideo</li>
-  <li><b>currentAudioStream_*</b> - informations about currently active audio stream</li>
+  <li><b>currentAudioStream_*</b> - information about currently active audio stream</li>
   <li><b>currentMedia</b> - file/URL of the media item being played</li>
   <li><b>currentTitle</b> - title of the current media item</li>
   <li><b>currentTrack</b> - track of the current song/musicvideo</li>
