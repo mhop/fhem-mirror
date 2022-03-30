@@ -6402,7 +6402,7 @@ CheckRegexp($$)
 
   my $warn;
   my $osig = $SIG{__WARN__};
-  $SIG{__WARN__} = sub { $warn = @_[0]};
+  $SIG{__WARN__} = sub { $warn = $_[0]};
   eval { "Hallo" =~ m/^$re$/ };
   $SIG{__WARN__} = $osig;
 
