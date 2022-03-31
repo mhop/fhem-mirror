@@ -10828,7 +10828,8 @@ sub EnOcean_Parse($$) {
         # Direction exchange (EEP A5-13-05)
         my $elevation = $db[3] - 90;
         push @event, "3:sunElevation:$elevation";
-        push @event, "3:sunAzimuth:" . hex(substr($data, 2, 4));
+        #push @event, "3:sunAzimuth:" . hex(substr($data, 2, 4));
+        push @event, "3:sunAzimuth:" . (($db[2] & 1) << 8 | $db[1]);
         my $twilight = ($elevation + 12) / 18 * 100;
         $twilight = 0 if ($twilight < 0);
         $twilight = 100 if ($twilight > 100);
@@ -11162,7 +11163,7 @@ sub EnOcean_Parse($$) {
           my ($position, $state);
           # invert position
           $position = $db[3] == 1 ? 1 : int($db[3] / 2);
-          $position = 100 - $db[3];
+          $position = 100 - $position;
           if ($position == 100) {
             push @event, "3:endPosition:closed";
             $state = "closed";
