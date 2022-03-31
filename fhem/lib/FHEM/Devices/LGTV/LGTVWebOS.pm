@@ -704,7 +704,24 @@ sub Write {
       unless ( $hash->{CD} );
 
     ::Log3( $name, 4, "LGTV_WebOS ($name) - $string" );
-    syswrite( $hash->{CD}, $string );
+
+    try {
+        syswrite( $hash->{CD}, $string );
+    }
+    catch {
+        if ( $_->isa('autodie::exception') && $_->matches(':io') ) {
+            ::Log3( $name, 2,
+"LGTV_WebOS ($name) - can't write to socket, autodie exception: $_"
+            );
+            return;
+        }
+        else {
+            ::Log3( $name, 2,
+                "LGTV_WebOS ($name) - can't write to socket: $_" );
+            return;
+        }
+    };
+
     return;
 }
 
@@ -736,7 +753,23 @@ sub Read {
 
     $hash->{helper}->{lastResponse} =
       int( ::gettimeofday() );    # Check Socket KeepAlive
-    $len = sysread( $hash->{CD}, $buf, 10240 );
+
+    try {
+        $len = sysread( $hash->{CD}, $buf, 10240 );
+    }
+    catch {
+        if ( $_->isa('autodie::exception') && $_->matches(':io') ) {
+            ::Log3( $name, 2,
+"LGTV_WebOS ($name) - can't read from socket, autodie exception: $_"
+            );
+            return;
+        }
+        else {
+            ::Log3( $name, 2,
+                "LGTV_WebOS ($name) - can't read from socket: $_" );
+            return;
+        }
+    };
 
     if ( !defined($len) || !$len ) {
 
