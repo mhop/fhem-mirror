@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 31_LightScene: support for configDB (by Beta-User)
  - bugfix:  72_FB_CALLMONITOR: create reading "internal_connection" also
             for unknown connection type values
  - bugfix:  73_GasCalculator: German CommandRef fixed

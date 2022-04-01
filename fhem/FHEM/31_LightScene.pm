@@ -1,4 +1,3 @@
-
 # $Id$
 
 package main;
@@ -348,6 +347,8 @@ myStatefileName()
   return $statefile ."LightScenes.dd.save" if( $LightScene_hasDataDumper );
 }
 my $LightScene_LastSaveTime="";
+
+
 sub
 LightScene_Save()
 {
@@ -367,29 +368,28 @@ LightScene_Save()
     $hash->{$d} = $defs{$d}{SCENES} if( keys(%{$defs{$d}{SCENES}}) );
   }
 
-  if(open(FH, ">$statefile")) {
-    my $t = localtime;
-    print FH "#$t\n";
+  my @content;
+  my $t = localtime;
+  push @content, "#$t";
 
-    if( $LightScene_hasJSON ) {
-      print FH encode_json($hash) if( defined($hash) );
-    } elsif( $LightScene_hasDataDumper ) {
-      my $dumper = Data::Dumper->new([]);
-      $dumper->Terse(1);
-
-      $dumper->Values([$hash]);
-      print FH $dumper->Dump;
-    }
-
-    close(FH);
-  } else {
-
-    my $msg = "LightScene_Save: Cannot open $statefile: $!";
-    Log3 undef, 1, $msg;
+  if( $LightScene_hasJSON ) {
+    push @content, encode_json($hash) if defined $hash;
+  } elsif( $LightScene_hasDataDumper ) {
+    my $dumper = Data::Dumper->new([]);
+    $dumper->Terse(1);
+    $dumper->Values([$hash]);
+    push @content, $dumper->Dump;
   }
 
-  return undef;
+  return if @content < 2;
+  my $dbused = configDBUsed();
+  my $ret = FileWrite($statefile,@content);
+  if ($ret){
+    Log3( undef, 1, "LightScene_Save: Write $statefile [DB: $dbused] failed $ret");
+  }
+  return;
 }
+
 sub
 LightScene_Load($)
 {
@@ -398,29 +398,34 @@ LightScene_Load($)
   return "No statefile specified" if(!$attr{global}{statefile});
   my $statefile = myStatefileName();
 
-  if(open(FH, "<$statefile")) {
-    my $encoded;
-    while (my $line = <FH>) {
-      chomp $line;
-      next if($line =~ m/^#.*$/);
-      $encoded .= $line;
+  my ($ret, @content) = FileRead($statefile);
+  if ($ret) {
+    if (configDBUsed()){
+      Log3( $hash, 1, "LightScene_Load: please import your config file $statefile into configDB!");
+      ($ret, @content) = FileRead( { FileName => $statefile, ForceType => 'file' } );
+      Log3( $hash, 1, "LightScene_Load: Cannot open $statefile: $ret") if $ret;
+    } else {
+      Log3( $hash, 1, "LightScene_Load: Cannot open $statefile: $ret");
     }
-    close(FH);
-
-    return if( !defined($encoded) );
-
-    my $decoded;
-    if( $LightScene_hasJSON ) {
-      $decoded = eval { decode_json($encoded) };
-    } elsif( $LightScene_hasDataDumper ) {
-      $decoded = eval $encoded;
-    }
-    $hash->{SCENES} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
-  } else {
-    my $msg = "LightScene_Load: Cannot open $statefile: $!";
-    Log3 undef, 1, $msg;
+    return if $ret;
   }
-  return undef;
+  my $encoded;
+  for my $line (@content) {
+    #chomp $line;
+    next if($line =~ m/^#.*$/);
+    $encoded .= $line;
+  }
+
+  return if( !defined($encoded) );
+
+  my $decoded;
+  if( $LightScene_hasJSON ) {
+    $decoded = eval { decode_json($encoded) };
+  } elsif( $LightScene_hasDataDumper ) {
+    $decoded = eval $encoded;
+  }
+  $hash->{SCENES} = $decoded->{$hash->{NAME}} if( defined($decoded->{$hash->{NAME}}) );
+  return;
 }
 
 sub
