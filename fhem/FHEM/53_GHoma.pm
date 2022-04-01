@@ -249,7 +249,11 @@ sub GHoma_moveclient($$) {			# Handles von temporaerem Client zu Statischem uebe
 	delete($selectlist{$thash->{NAME}});
 	delete $thash->{FD};
 	CommandDelete(undef, $thash->{NAME});
-	syswrite( $chash->{CD}, GHoma_BuildString($init2) );
+	eval { syswrite( $chash->{CD}, GHoma_BuildString($init2) ); };
+	if ($@) {
+		Log3 ($thash, 3, "$thash->{TYPE} ($thash->{NAME}) syswrite error: $@\cnHash: $chash->{CD}");
+		return
+	}
 	InternalTimer(gettimeofday()+ $timeout, "GHoma_Timer", $chash,0);
 }
 #####################################
