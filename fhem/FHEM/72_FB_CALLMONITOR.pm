@@ -505,7 +505,7 @@ FB_CALLMONITOR_Read($)
         if($array[1] eq "CALL")
         {
             $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[6];
-            $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
+            $hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"} = $array[3];
             $hash->{helper}{TEMP}{$array[2]}{direction} = "outgoing";
         }
        
@@ -516,10 +516,9 @@ FB_CALLMONITOR_Read($)
             $hash->{helper}{TEMP}{$array[2]}{".deflected"} = FB_CALLMONITOR_checkNumberForDeflection($hash, $external_number);
         }
        
-        if($array[1] eq "CONNECT" and not exists($hash->{helper}{TEMP}{$array[2]}{internal_connection}))
+        if($array[1] eq "CONNECT" and not exists($hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"}))
         {
-            $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
-            $hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"} = $array[3] if(defined($connection_type{$array[3]}));
+            $hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"} = $array[3]; 
         }    
         
         if($array[1] eq "DISCONNECT")
@@ -534,6 +533,20 @@ FB_CALLMONITOR_Read($)
                 }
             }
         }    
+        
+        if($array[1] eq "CONNECT" or $array[1] eq "CALL")
+        {        
+            my $connection_id = $hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"};
+            
+            if(defined($connection_type{$connection_id})) {
+                $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_type{$connection_id}
+            }
+            else 
+            {
+                $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_id;
+                Log3 $name, 3 , "FB_CALLMONITOR ($name) - internal connection value '".$connection_id."' not known. Please report this value to FHEM community together with a description how exactly you have taken this call (via VoIP/ISDN/FON/DECT/...)"
+            }
+        }
         
         $hash->{helper}{TEMP}{$array[2]}{".last-event"} = $array[1];
         
