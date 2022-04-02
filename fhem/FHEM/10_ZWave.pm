@@ -1858,6 +1858,10 @@ ZWave_meterParse($$)
   $meter_type_text = "power"   if ($unit_text eq "W");
   $meter_type_text = "voltage" if ($unit_text eq "V");
   $meter_type_text = "current" if ($unit_text eq "A");
+  if ($unit_text eq "PowerFactor") {
+    $meter_type_text = "powerFactor";
+    $unit_text = "";
+  }
 
   my $mv = hex(substr($v3, 0, 2*$size));
   $mv = ($mv >> 31 ? $mv - 2 ** 32 : $mv) if($size == 4);
@@ -6253,7 +6257,7 @@ ZWave_entryControlParse($$)
 =item summary_DE Anbindung von ZWave Ger&auml;ten
 =begin html
 
-<a name="ZWave"></a>
+<a id="ZWave"></a>
 <h3>ZWave</h3>
 <ul>
   This module is used to control ZWave devices via FHEM, see <a
@@ -6266,7 +6270,7 @@ ZWave_entryControlParse($$)
   module, which is directly attached to the controller via USB or TCP/IP.  To
   use the SECURITY features, the Crypt-Rijndael perl module is needed.
   <br><br>
-  <a name="ZWavedefine"></a>
+  <a id="ZWavedefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; ZWave &lt;homeId&gt; &lt;id&gt; [classes]</code>
@@ -6296,7 +6300,7 @@ ZWave_entryControlParse($$)
   corresponding readings will be updated.
   <br><br>
 
-  <a name="ZWaveset"></a>
+  <a id="ZWave-set"></a>
   <b>Set</b>
   <ul>
   <br>
@@ -6907,7 +6911,7 @@ ZWave_entryControlParse($$)
   </ul>
   <br>
 
-  <a name="ZWaveget"></a>
+  <a id="ZWave-get"></a>
   <b>Get</b>
   <ul>
   <br><br><b>All</b>
@@ -7358,18 +7362,18 @@ ZWave_entryControlParse($$)
   </ul>
   <br>
 
-  <a name="ZWaveattr"></a>
+  <a id="ZWave-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#IODev">IODev</a></li>
-    <li><a name="WNMI_delay">WNMI_delay</a><br>
+    <li><a id="ZWave-attr-WNMI_delay">WNMI_delay</a><br>
       This attribute sets the time delay between the last message sent to an
       WakeUp device and the sending of the WNMI Message
       (WakeUpNoMoreInformation) that will set the device to sleep mode.  Value
       is in seconds, subseconds my be specified. Values outside of 0.2-5.0 are
       probably harmful.
       </li>
-    <li><a name="classes">classes</a><br>
+    <li><a id="ZWave-attr-classes">classes</a><br>
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
@@ -7379,11 +7383,11 @@ ZWave_entryControlParse($$)
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#dummy">dummy</a></li>
-    <li><a name="eventForRaw">eventForRaw</a><br>
+    <li><a id="ZWave-attr-eventForRaw">eventForRaw</a><br>
       Generate an an additional event for the RAW message.  Can be used if
       someone fears that critical notifies won't work, if FHEM changes the event
       text after an update.  </li>
-    <li><a name="extendedAlarmReadings">extendedAlarmReadings</a><br>
+    <li><a id="ZWave-attr-extendedAlarmReadings">extendedAlarmReadings</a><br>
       Some devices support more than one alarm type, this attribute
       selects which type of reading is used for the reports of the ALARM
       (or NOTIFICATION) class:<br>
@@ -7402,7 +7406,7 @@ ZWave_entryControlParse($$)
       if really needed as duplicate events are generated.
       </li>
 
-    <li><a name="generateRouteInfoEvents">generateRouteInfoEvents</a><br>
+    <li><a id="ZWave-attr-generateRouteInfoEvents">generateRouteInfoEvents</a><br>
       if set (to 1) a timeToCb event with additional information regarding the
       controller to device communication is generated, after sending data to
       the device.<br>
@@ -7418,16 +7422,16 @@ ZWave_entryControlParse($$)
     </li>
 
     <li><a href="#ignore">ignore</a></li>
-    <li><a name="ignoreDupMsg">ignoreDupMsg</a><br>
+    <li><a id="ZWave-attr-ignoreDupMsg">ignoreDupMsg</a><br>
       Experimental: if set (to 1), ignore duplicate wakeup messages, or
       multiple responses to a single get due to missing lowlevel ACK.
       </li>
     <li><a href="#neighborListPos">neighborListPos</a></li>
-    <li><a name="noExplorerFrames">noExplorerFrames</a><br>
+    <li><a id="ZWave-attr-noExplorerFrames">noExplorerFrames</a><br>
       turn off the use of Explorer Frames
       </li>
 
-    <li><a name="noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a>
+    <li><a id="ZWave-attr-noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a>
         <br>
       some devices (notable the Aeotec Multisensor 6) are only awake after an
       APPLICATION UPDATE telegram for a very short time. If this attribute is
@@ -7436,17 +7440,17 @@ ZWave_entryControlParse($$)
       </li>
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a name="secure_classes">secure_classes</a><br>
+    <li><a id="ZWave-attr-secure_classes">secure_classes</a><br>
       This attribute is the result of the "set DEVICE secSupportedReport"
       command. It contains a space seperated list of the the command classes
       that are supported with SECURITY.
       </li>
 
-    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+    <li><a id="ZWave-attr-setExtensionsEvent">setExtensionsEvent</a><br>
       If set, the event will contain the command implemented by SetExtensions
       (e.g. on-for-timer 10), else the executed command (e.g. on).</li><br>
 
-    <li><a name="ZWavesetList">setList</a><br>
+    <li><a id="ZWave-attr-setList">setList</a><br>
       Some devices interpret SENSOR_MULTILEVEL events, e.g. to react to an
       external temperature sensor. To enable FHEM to send such messages,
       specify the list of the desired readings, comma separated, with an sml_
@@ -7460,24 +7464,24 @@ ZWave_entryControlParse($$)
       </li><br>
 
     <li><a href="#showtime">showtime</a></li>
-    <li><a name="vclasses">vclasses</a><br>
+    <li><a id="ZWave-attr-vclasses">vclasses</a><br>
       This is the result of the "get DEVICE versionClassAll" command, and
       contains the version information for each of the supported classes.
       </li>
 
-    <li><a name="useCRC16">useCRC16</a><br>
+    <li><a id="ZWave-attr-useCRC16">useCRC16</a><br>
       Experimental: if a device supports CRC_16_ENCAP, then add CRC16 to the
       command. Note: this is not available to SECURITY ENABLED devices, as
       security has its own CRC.
       </li>
 
-    <li><a name="useMultiCmd">useMultiCmd</a><br>
+    <li><a id="ZWave-attr-useMultiCmd">useMultiCmd</a><br>
       Experimental: if a device supports MULTI_CMD and WAKE_UP, then pack
       multiple get messages on the SendStack into a single MULTI_CMD to save
       radio transmissions.
       </li>
 
-    <li><a name="zwaveRoute">zwaveRoute</a><br>
+    <li><a id="ZWave-attr-zwaveRoute">zwaveRoute</a><br>
       space separated list of (ZWave) device names. They will be used in the
       given order to route messages from the controller to this device. Specify
       them in the order from the controller to the device. Do not specify the
@@ -7487,7 +7491,7 @@ ZWave_entryControlParse($$)
   </ul>
   <br>
 
-  <a name="ZWaveevents"></a>
+  <a id="ZWave-events"></a>
   <b>Generated events:</b>
   <ul>
 
