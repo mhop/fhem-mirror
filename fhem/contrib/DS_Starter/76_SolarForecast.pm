@@ -120,6 +120,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.57.2 "=> "03.04.2022  area factor for 25° added ",
+  "0.57.1 "=> "28.02.2022  new attr flowGraphicShowConsumerPower and flowGraphicShowConsumerRemainTime (Consumer remainTime in flowGraphic)",                                                                                                                                
   "0.56.11"=> "01.12.2021  comment: 'next if(\$surplus <= 0);' to resolve consumer planning problem if 'mode = must' and the ".
                            "current doesn't have suplus ",
   "0.56.10"=> "14.11.2021  change sub _flowGraphic (Max), https://forum.fhem.de/index.php/topic,117864.msg1186970.html#msg1186970, new reset consumerMaster ",
@@ -296,8 +298,9 @@ my %htr = (                                                                  # H
 my %hff = (                                                                                           # Flächenfaktoren 
   "0"  => { N => 100, NE => 100, E => 100, SE => 100, S => 100, SW => 100, W => 100, NW => 100 },     # http://www.ing-büro-junge.de/html/photovoltaik.html
   "10" => { N => 90,  NE => 93,  E => 100, SE => 105, S => 107, SW => 105, W => 100, NW => 93  },
-  "20" => { N => 80,  NE => 84,  E => 97,  SE => 109, S => 114, SW => 109, W => 97,  NW => 84  },
-  "30" => { N => 69,  NE => 76,  E => 94,  SE => 110, S => 116, SW => 110, W => 94,  NW => 76  },
+  "20" => { N => 80,  NE => 84,  E => 97,  SE => 108, S => 114, SW => 108, W => 97,  NW => 84  },
+  "25" => { N => 75,  NE => 80,  E => 95,  SE => 109, S => 115, SW => 109, W => 95,  NW => 80  },
+  "30" => { N => 69,  NE => 76,  E => 94,  SE => 110, S => 117, SW => 110, W => 94,  NW => 76  },
   "40" => { N => 59,  NE => 68,  E => 90,  SE => 109, S => 117, SW => 109, W => 90,  NW => 68  },
   "45" => { N => 55,  NE => 65,  E => 87,  SE => 108, S => 115, SW => 108, W => 87,  NW => 65  },
   "50" => { N => 49,  NE => 62,  E => 85,  SE => 107, S => 113, SW => 107, W => 85,  NW => 62  },
@@ -305,7 +308,7 @@ my %hff = (                                                                     
   "70" => { N => 37,  NE => 50,  E => 74,  SE => 95,  S => 104, SW => 95,  W => 74,  NW => 50  },
   "80" => { N => 35,  NE => 46,  E => 67,  SE => 86,  S => 95,  SW => 86,  W => 67,  NW => 46  },
   "90" => { N => 33,  NE => 43,  E => 62,  SE => 78,  S => 85,  SW => 78,  W => 62,  NW => 43  },
-);                                                                                          # mt  = default mintime (Minuten)
+);                                                                                          
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
   cfd    => { EN => qq{Please select the Weather forecast device with "set LINK currentForecastDev"}, 
@@ -547,7 +550,7 @@ my %hef = (                                                                     
   "dishwasher"     => { tot => 0.13, f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # f   = Faktor Energieverbrauch in erster Stunde
   "dryer"          => { tot => 1.00, f => 0.40, m => 0.40, l => 0.20, mt => 75          },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
   "washingmachine" => { tot => 0.18, f => 0.30, m => 0.40, l => 0.30, mt => 120         },    # l   = Faktor Energieverbrauch in letzter Stunde
-); 
+);                                                                                            # mt  = default mintime (Minuten)
 
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{circular}                                                  # Ringspeicher
@@ -602,6 +605,8 @@ sub Initialize {
                                 "flowGraphicAnimate:1,0 ".
                                 "flowGraphicShowConsumer:1,0 ".
                                 "flowGraphicShowConsumerDummy:1,0 ".      
+                                "flowGraphicShowConsumerPower:0,1 ". 
+                                "flowGraphicShowConsumerRemainTime:0,1 ".                                                                                 
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast,none ".                                     
@@ -2743,7 +2748,7 @@ sub _manageConsumerData {
       $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
       
       #################################################
-      # onoff funktioniert nur züverlässig wenn powerthreshold hier nochmal abgefragt wird ?!?
+      # onoff funktioniert nur zuverlässig wenn powerthreshold hier nochmal abgefragt wird ?!?
       # $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 1); 
       #################################################
       
@@ -2944,13 +2949,13 @@ sub ___csmSpecificEpieces {
                 $t - $data{$type}{$name}{consumers}{$c}{lastOnTime}    :
                 99;
 
-  if($offTime < 300) {																	                # erst nach 60s ist das Gerät aus
+  if($offTime < 300) {                                                                                  # erst nach 60s ist das Gerät aus
       my $epiecHist        = "";
       my $epiecHist_hours  = "";
-	   
-      if(ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {  	                                            # neue Aufzeichnung
+       
+      if(ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                                # neue Aufzeichnung
           $data{$type}{$name}{consumers}{$c}{epiecStartTime} = $t;
-		  $data{$type}{$name}{consumers}{$c}{epiecHist}     += 1;  
+          $data{$type}{$name}{consumers}{$c}{epiecHist}     += 1;  
           $data{$type}{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
             
           $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
@@ -2960,12 +2965,12 @@ sub ___csmSpecificEpieces {
       $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Namen fürs Speichern
       $epiecHist_hours = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0)."_hours"; 
       my $epiecHour    = floor (($t - ConsumerVal ($hash, $c, "epiecStartTime", $t)) / 60 / 60) + 1;    # aktuelle Betriebsstunde ermitteln, ( / 60min) mögliche wäre auch durch 15min        /Minute /Stunde
-        	
+            
       if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                       # Stundenwechsel? Differenz von etot noch auf die vorherige Stunde anrechnen                       
           my $epiecHour_last = $epiecHour - 1;
           
           $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
-          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;		  
+          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;        
       }
       
       my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
@@ -2983,22 +2988,22 @@ sub ___csmSpecificEpieces {
             
           $hours                                             = ceil ($hours / $epiecHCounts);
           $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
-       	       
+               
           delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                           # Durchschnitt für epics ermitteln     
           
-          for my $hour (1..$hours) {												                     # jede Stunde durchlaufen
-			  my $hoursE = 1;
-		  
-              for my $h (1..$epiecHCounts) {											                 # jedes epiec durchlaufen
+          for my $hour (1..$hours) {                                                                     # jede Stunde durchlaufen
+              my $hoursE = 1;
+          
+              for my $h (1..$epiecHCounts) {                                                             # jedes epiec durchlaufen
                   my $epiecHist = "epiecHist_".$h;
-				  
+                  
                   if(defined $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour}) {
-				      if($data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour} > 5) {
-						  $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour}; 
-						  $hoursE += 1;
-					  }
-				  }
-				  
+                      if($data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour} > 5) {
+                          $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} += $data{$type}{$name}{consumers}{$c}{$epiecHist}{$hour}; 
+                          $hoursE += 1;
+                      }
+                  }
+                  
               }
               
               $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = sprintf('%.2f',$data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $hoursE);    # Durchschnitt ermittelt und in epiecAVG schreiben
@@ -3294,6 +3299,20 @@ sub __switchConsumer {
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   } 
+  
+  ## Restlaufzeit Verbraucher ermitteln
+  ######################################
+  my ($planstate,$startstr,$stoptstr) = __planningStateAndTimes ($paref);
+  my $isConsRecommended               = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);
+  my $costate                         = ConsumerVal ($hash, $c, "state", "off");
+  
+  $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
+  
+  if ($isConsRecommended && $planstate eq "started" && $costate eq "on") {
+      my $remainTime                                 = $stopts - $t ;
+      $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
+  } 
+  
   
   $paref->{state} = $state;
   
@@ -4076,42 +4095,44 @@ sub entryGraphic {
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
   
   my $paref = {
-      hash       => $hash,
-      name       => $name,
-      ftui       => $ftui,
-      maxhours   => $maxhours,
-      modulo     => 1,
-      dstyle     => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
-      offset     => AttrNum ($name,    'historyHour',                 0),
-      hourstyle  => AttrVal ($name,    'hourStyle',                  ''),
-      colorfc    => AttrVal ($name,    'beam1Color',           '000000'),
-      colorc     => AttrVal ($name,    'beam2Color',           'C4C4A7'),
-      fcolor1    => AttrVal ($name,    'beam1FontColor',       'C4C4A7'),
-      fcolor2    => AttrVal ($name,    'beam2FontColor',       '000000'),  
-      beam1cont  => AttrVal ($name,    'beam1Content',     'pvForecast'),
-      beam2cont  => AttrVal ($name,    'beam2Content',     'pvForecast'), 
-      caicon     => AttrVal ($name,    'consumerAdviceIcon', $caicondef),                      # Consumer AdviceIcon
-      clegend    => AttrVal ($name,    'consumerLegend',     'icon_top'),                      # Lage und Art Cunsumer Legende
-      lotype     => AttrVal ($name,    'layoutType',           'single'),
-      kw         => AttrVal ($name,    'Wh/kWh',                   'Wh'),
-      height     => AttrNum ($name,    'beamHeight',                200),
-      width      => $width,
-      fsize      => AttrNum ($name,    'spaceSize',                  24),
-      maxVal     => AttrNum ($name,    'maxValBeam',                  0),                      # dyn. Anpassung der Balkenhöhe oder statisch ?
-      show_night => AttrNum ($name,    'showNight',                   0),                      # alle Balken (Spalten) anzeigen ?
-      show_diff  => AttrVal ($name,    'showDiff',                 'no'),                      # zusätzliche Anzeige $di{} in allen Typen
-      weather    => AttrNum ($name,    'showWeather',                 1),
-      colorw     => $colorw,
-      colorwn    => AttrVal ($name,    'weatherColorNight',     $colorw),                      # Wetter Icon Farbe Nacht
-      wlalias    => AttrVal ($name,    'alias',                   $name),
-      header     => AttrNum ($name,    'showHeader',                  1), 
-      hdrDetail  => AttrVal ($name,    'headerDetail',            'all'),                      # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      lang       => AttrVal ("global", 'language',                 'EN'),
-      flowgh     => AttrVal ($name,    'flowGraphicSize', $defflowGSize),                      # Größe Energieflußgrafik
-      flowgani   => AttrVal ($name,    'flowGraphicAnimate',          0),                      # Animation Energieflußgrafik
-      flowgcons  => AttrVal ($name,    'flowGraphicShowConsumer',     1),                      # Verbraucher in der Energieflußgrafik anzeigen
-      flowgconX  => AttrVal ($name,    'flowGraphicShowConsumerDummy',1),                      # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
-      css        => AttrVal ($name,    'Css',                   $cssdef),                      # Css Styles
+      hash           => $hash,
+      name           => $name,
+      ftui           => $ftui,
+      maxhours       => $maxhours,
+      modulo         => 1,
+      dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
+      offset         => AttrNum ($name,    'historyHour',                       0),
+      hourstyle      => AttrVal ($name,    'hourStyle',                        ''),
+      colorfc        => AttrVal ($name,    'beam1Color',                 '000000'),
+      colorc         => AttrVal ($name,    'beam2Color',                 'C4C4A7'),
+      fcolor1        => AttrVal ($name,    'beam1FontColor',             'C4C4A7'),
+      fcolor2        => AttrVal ($name,    'beam2FontColor',             '000000'),  
+      beam1cont      => AttrVal ($name,    'beam1Content',           'pvForecast'),
+      beam2cont      => AttrVal ($name,    'beam2Content',           'pvForecast'), 
+      caicon         => AttrVal ($name,    'consumerAdviceIcon',       $caicondef),            # Consumer AdviceIcon
+      clegend        => AttrVal ($name,    'consumerLegend',           'icon_top'),            # Lage und Art Cunsumer Legende
+      lotype         => AttrVal ($name,    'layoutType',                 'single'),
+      kw             => AttrVal ($name,    'Wh/kWh',                         'Wh'),
+      height         => AttrNum ($name,    'beamHeight',                      200),
+      width          => $width,
+      fsize          => AttrNum ($name,    'spaceSize',                        24),
+      maxVal         => AttrNum ($name,    'maxValBeam',                        0),            # dyn. Anpassung der Balkenhöhe oder statisch ?
+      show_night     => AttrNum ($name,    'showNight',                         0),            # alle Balken (Spalten) anzeigen ?
+      show_diff      => AttrVal ($name,    'showDiff',                       'no'),            # zusätzliche Anzeige $di{} in allen Typen
+      weather        => AttrNum ($name,    'showWeather',                       1),
+      colorw         => $colorw,
+      colorwn        => AttrVal ($name,    'weatherColorNight',           $colorw),            # Wetter Icon Farbe Nacht
+      wlalias        => AttrVal ($name,    'alias',                         $name),
+      header         => AttrNum ($name,    'showHeader',                        1), 
+      hdrDetail      => AttrVal ($name,    'headerDetail',                  'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      lang           => AttrVal ("global", 'language',                       'EN'),
+      flowgh         => AttrVal ($name,    'flowGraphicSize',       $defflowGSize),            # Größe Energieflußgrafik
+      flowgani       => AttrVal ($name,    'flowGraphicAnimate',                0),            # Animation Energieflußgrafik
+      flowgcons      => AttrVal ($name,    'flowGraphicShowConsumer',           1),            # Verbraucher in der Energieflußgrafik anzeigen
+      flowgconX      => AttrVal ($name,    'flowGraphicShowConsumerDummy',      1),            # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
+      flowgconsPower => AttrVal ($name,    'flowGraphicShowConsumerPower'     , 1),            # Verbraucher Leistung in der Energieflußgrafik anzeigen
+      flowgconsTime  => AttrVal ($name,    'flowGraphicShowConsumerRemainTime', 1),            # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen                                                                                                                                                         
+      css            => AttrVal ($name,    'Css',                         $cssdef),            # Css Styles
   };
   
   my $ret = q{};
@@ -5284,30 +5305,25 @@ return $ret;
 #                  Energieflußgrafik
 ################################################################
 sub _flowGraphic {
-  my $paref      = shift;
-  my $hash       = $paref->{hash};
-  my $name       = $paref->{name};
-  my $flowgh     = $paref->{flowgh};
-  my $flowgani   = $paref->{flowgani};
-  my $flowgcons  = $paref->{flowgcons};
-  my $flowgconX  = $paref->{flowgconX};
-  my $css        = $paref->{css};
-    
-  my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
-
-  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
-
-  my $cpv        = ReadingsNum($name, 'Current_PV', 0);
-
-  my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
-
-  my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn', 0);
-
-  my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
+  my $paref         = shift;
+  my $hash          = $paref->{hash};
+  my $name          = $paref->{name};
+  my $flowgh        = $paref->{flowgh};
+  my $flowgani      = $paref->{flowgani};
+  my $flowgcons     = $paref->{flowgcons};
+  my $flowgconX     = $paref->{flowgconX};
+  my $flowgconPower = $paref->{flowgconsPower};
+  my $flowgconTime  = $paref->{flowgconsTime};                                          
+  my $css           = $paref->{css};
   
+  my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
+  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
+  my $cpv        = ReadingsNum($name, 'Current_PV', 0);
+  my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
+  my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn', 0);
+  my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
   my $cc         = ReadingsNum($name, 'Current_Consumption', 0);
   my $cc_dummy   = $cc;
-
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
   my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
@@ -5329,7 +5345,7 @@ sub _flowGraphic {
   }
   
   my $grid_color    = $cgfi   ? 'flowg grid_color1'               : 'flowg grid_color2';
-  $grid_color       = 'flowg grid_color3'                                                 if (!$cgfi && !$cgc && $batout);     # dritte Farbe
+  $grid_color       = 'flowg grid_color3'  if (!$cgfi && !$cgc && $batout);                    # dritte Farbe
   my $cgc_style     = $cgc    ? 'flowg active_in'                 : 'flowg inactive_in';
   my $batout_style  = $batout ? 'flowg active_out active_bat_out' : 'flowg inactive_in';
   
@@ -5531,6 +5547,9 @@ END3
       } 
   }
   
+  ## Angaben Dummy-Verbraucher 
+  #############################
+  
   $cc_dummy = sprintf("%.0f",$cc_dummy);
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="800" y="15"  style="text-anchor: start;">$cpv</text>}        if ($cpv);
@@ -5540,24 +5559,27 @@ END3
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="525" y="420" style="text-anchor: end;">$cgc</text>}          if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="865" y="420" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="865" y="200" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
-  $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: end;">$cc</text>};                                    # Current_Consumption Anlage
-  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1070" y="620" style="text-anchor: start;">$cc_dummy</text>}  if ($flowgconX);          # Current_Consumption Dummy
+  $ret .= qq{<text class="flowg text" id="home-txt"      x="600" y="620" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
+  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1070" y="620" style="text-anchor: start;">$cc_dummy</text>}  if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
   
-  ## get consumer list and display it in Graphics
-  ################################################
+  ## Anzeigedetails auswählen
+  ############################
   if ($flowgcons) {
       $pos_left = ($consumer_start * 2) - 50;
       
       for my $c2 (@consumers) {      
-          $currentPower = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
-          my $swstate   = ConsumerVal ($hash, $c2, "state", "undef");                                 # Schaltzustand des Consumerdevices
-          my $rpcurr    = ConsumerVal ($hash, $c2, "rpcurr",     "");                                 # Readingname f. current Power
+          $currentPower     = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
+          
+          my $consumerTime  = ConsumerVal ($hash, $c2, "remainTime", "");                             # Restlaufzeit                                    
+          my $swstate       = ConsumerVal ($hash, $c2, "state", "undef");                             # Schaltzustand des Consumerdevices
+          my $rpcurr        = ConsumerVal ($hash, $c2, "rpcurr",     "");                             # Readingname f. current Power
           
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = $swstate eq "on" ? 'on' : 'off';
           }
           
-          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1090" style="text-anchor: start;">$currentPower</text>};                          # Current_Consumption Consumer
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1090" style="text-anchor: start;">$currentPower</text>}      if ($flowgconPower);    # Current_Consumption Consumer
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_time_$c2"     x="$pos_left" y="1150" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Consumer Restlaufzeit                                                                                                                                                                                                    
           $pos_left  += ($consumer_distance * 2);
       }
   }
@@ -7472,7 +7494,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br><br>  
       
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
-      Mögliche Neigungswinkel sind: 0,10,20,30,40,45,50,60,70,80,90 (0 = waagerecht, 90 = senkrecht). <br><br>
+      Mögliche Neigungswinkel sind: 0,10,20,25,30,40,45,50,60,70,80,90 (0 = waagerecht, 90 = senkrecht). <br><br>
       
       <ul>
         <b>Beispiel: </b> <br>
@@ -7972,6 +7994,20 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          (default: 1)
        </li>
        <br>    
+       
+       <a id="SolarForecast-attr-flowGraphicShowConsumerPower"></a>
+       <li><b>flowGraphicShowConsumerPower </b><br>
+         Zeigt bzw. unterdrückt den Energieverbrauch der Verbraucher in der Energieflußgrafik. <br> 
+         (default: 1)
+       </li>
+       <br> 
+       
+       <a id="SolarForecast-attr-flowGraphicShowConsumerRemainTime"></a>
+       <li><b>flowGraphicShowConsumerRemainTime </b><br>
+         Zeigt bzw. unterdrückt die Restlaufzeit (in Minuten) der Verbraucher in der Energieflußgrafik. <br> 
+         (default: 1)
+       </li>
+       <br> 
        
        <a id="SolarForecast-attr-flowGraphicSize"></a>
        <li><b>flowGraphicSize &lt;Pixel&gt; </b><br>
