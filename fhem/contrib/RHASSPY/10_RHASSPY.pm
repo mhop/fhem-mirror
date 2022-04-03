@@ -335,7 +335,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.5.26a';
+    $hash->{MODULE_VERSION} = '0.5.27';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -2864,7 +2864,7 @@ sub testmode_end {
     if ( $filename ne 'none_result.txt' ) {
         my $duration = '';
         $duration = sprintf( " Testing time: %.2f seconds.", (gettimeofday() - $hash->{asyncGet}{start})*1) if $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'testResult';
-        my $result = $hash->{helper}->{test}->{result};
+        $result = $hash->{helper}->{test}->{result};
         push @{$result}, "test ended with timeout! Last request was $hash->{helper}->{test}->{content}->[$hash->{testline}]" if $fail;
         FileWrite({ FileName => $filename, ForceType => 'file' }, @{$result} );
         $result .= "$duration See $filename for detailed results." if !$fail;
@@ -3294,7 +3294,7 @@ sub analyzeMQTTmessage {
     if ( $topic =~ m{\Ahermes/hotword/([^/]+)/detected}x ) {
         my $hotword = $1;
         if ( 0 && $siteId ) { #Beta-User: deactivated
-            my $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
+            $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
             #$device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
             $device //= $hash->{helper}->{STT}->{config}->{wakeword}->{$hotword} if defined $hash->{helper}->{STT} && defined $hash->{helper}->{STT}->{config} && defined $hash->{helper}->{STT}->{config}->{wakeword};
             if ($device) {
@@ -4447,7 +4447,7 @@ sub handleIntentSetNumeric {
     if ( ref $device eq 'ARRAY' ) {
         #until now: only extended test code
         my $first = $device->[0];
-        my $response = $device->[1];
+        $response = $device->[1];
         my $all = $device->[2];
         my $choice = $device->[3];
         $data->{customData} = $all;
@@ -4545,9 +4545,10 @@ sub handleIntentSetNumeric {
     # limit to min/max  (if set)
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
+    $data->{Value} //= $newVal;
 
     #check if confirmation is required
-    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric' );
+    return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
 
     # execute Cmd
     !defined $change || $change ne 'cmdStop' || !defined $mapping->{cmdStop} 
