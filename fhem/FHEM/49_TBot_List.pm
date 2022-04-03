@@ -85,14 +85,24 @@
 #   new attribute deleteOnly to have deleteonly lists / no changes or adds
 #   document deleteOnly
 # 0.7 2018-03-11   deleteonly lists / internal changes
-  
 #   show entry content in response for add/del 
 #   start list with peerid und chatid als Parameter
 #   add silentstart as additional set option to start the chat silent
 #   
+
+# 0.8 2022-03-10   acknowledge and categories
+#   list allows optiona parameter specifying limits of content
+#   attribute acknowledge adds the button for done entries 
+#   acknoledge category string (prefix) is attr value
+#   allow categories for setting to different entries
+#   no ack for done entries
+#   doc for acknowledge - categories
+#   change sequence on kat entries
+#   
+#   
+#   
 ##############################################################################
 # TASKS 
-#   
 #   
 #   Make texts and addtl buttons configurable
 #   
@@ -117,6 +127,11 @@ use warnings;
 use URI::Escape;
 
 use Scalar::Util qw(reftype looks_like_number);
+
+
+my $categorymatch = "[[:alnum:] _]";
+
+
 
 #########################
 # Forward declaration
@@ -158,9 +173,11 @@ sub TBot_List_Initialize($) {
           "optionDouble:0,1 ".
           "handleUnsolicited:0,1 ".
           "confirmDelete:0,1 ".
+          "acknowledge:textField ".
           "confirmUnsolicited:0,1 ".
           "deleteOnly:0,1 ".
           "allowedPeers:textField ".
+          "categories:textField ".
           $readingFnAttributes;           
 }
 
@@ -304,7 +321,7 @@ sub TBot_List_Set($@)
 
   } elsif($cmd eq 'end') {
     Log3 $name, 4, "TBot_List_Set $name: end of dialog requested ";
-    $ret = "end requires a telegrambot and optionally a peer" if ( $numberOfArgs != 3 );
+    $ret = "end requires a telegrambot" if ( $numberOfArgs != 3 );
     
     my $tbot;
     my $tpeer;
@@ -357,8 +374,13 @@ sub TBot_List_Get($@)
     
   } elsif($cmd eq "list") {
     my @list = TBot_List_getList( $hash );
+    
     $ret = "";
-    $ret = join("\n", @list ) if ( scalar( @list ) != 0 );
+    if ( scalar( @list ) != 0 ) {
+      splice @list, 10 if ( $numberOfArgs == 2 );
+      $ret = join("\n", @list ) if ( scalar( @list ) != 0 );
+    }
+    
     
   } elsif($cmd eq "count") {
     my @list = TBot_List_getList( $hash );
@@ -435,6 +457,12 @@ sub TBot_List_Attr(@) {
 
     } elsif ($aName eq 'allowedPeers') {
       return "\"TBot_List_Attr: \" $aName needs to be given in digits - and space only" if ( $aVal !~ /^[[:digit:] -]*$/ );
+
+    } elsif ($aName eq 'categories') {
+      return "\"TBot_List_Attr: \" $aName needs to be given separated by comma (,) only with letters, numbers and spaces" if ( $aVal !~ /^($categorymatch+,?)+$/ );
+
+    } elsif ($aName eq 'acknowledge') {
+      return "\"TBot_List_Attr: \" $aName needs to be given only with letters, numbers and spaces" if ( $aVal !~ /^($categorymatch+)$/ );
 
     }
 
@@ -838,8 +866,11 @@ sub TBot_List_handler($$$$;$)
       $inline .=  "|".TBot_List_inlinekey( $hash, "Leeren", "list_askclr" ).")";
     } else {
       $inline .=  "|".TBot_List_inlinekey( $hash, "ändern", "list_menu" )."|".
-                  TBot_List_inlinekey( $hash, "hinzu", "list_askadd" ).")";
+                  TBot_List_inlinekey( $hash, "hinzu", "list_askadd" );
+      $inline .= ")";
+      
     }
+    Log3 $name, 4, "TBot_List_handler: inline values :".$inline.":";
     
     my $textmsg = "Liste ".$lname;
     $textmsg .= " ist leer " if ( scalar(@list) == 0 );
@@ -886,16 +917,49 @@ sub TBot_List_handler($$$$;$)
       # post new msg to ask for change
       if ( defined($msgId ) ) {
         # show ask for removal
-        my $textmsg = "Liste ".$lname."\nEintrag ".($no+1)." (".$list[$no].") ?";
+        my $textmsg = "Liste ".$lname."\nEintrag ".($no+1)." : ".$list[$no];
         # show ask msgs (depending on attr)
         my $indata = ( AttrVal($name,'confirmDelete',1) ? "list_rem-$no" : "list_remyes-$no" );
         my $inline = "(".TBot_List_inlinekey( $hash, "Entfernen", $indata );
         
-        if ( ! $donly ) {
+        # 4 cases 1) donly --> all in one line // 2) !donly no ack no cat --> all in one line 
+        #         3) !donly ack no cat --> all in one line // 4) donly and cat --> cat and ack separate line
+        if ( $donly ) {
+          # #1
+          $inline .= "|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
+        } else {
           $inline .= "|".TBot_List_inlinekey( $hash, "Aendern", "list_askchg-$no" )."|".
                         TBot_List_inlinekey( $hash, "Nach Oben", "list_totop-$no" );
-        }
-        $inline .= "|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
+
+          my $catattr = AttrVal($name,'categories',undef);
+          my $ack = AttrVal($name,'acknowledge',undef);
+          my $catentry = $list[$no];
+          if ( ! defined( $catattr ) ) {
+            # #2 and #3
+            if ( defined($ack) ) {
+              $inline .= "|".TBot_List_inlinekey( $hash, "Erledigt", "list_askack-$no" ) if ( ( $catentry !~ /^($categorymatch+) -> / ) || ( $1 ne $ack ) ); 
+            } 
+            $inline .= "|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
+            
+          } else {
+            # #4
+           $inline .= "|".TBot_List_inlinekey( $hash, "Zurueck", "list_edit" ).")";
+            
+            $inline .= " (".TBot_List_inlinekey( $hash, "Ohne Kat", "list_askcatrem-".$no );
+            
+            if ( defined( $ack ) ) {
+              $inline .= "|".TBot_List_inlinekey( $hash, "Erledigt", "list_askack-$no" ) if ( ( $catentry !~ /^($categorymatch+) -> / ) || ( $1 ne $ack ) ); 
+            }  
+            my @cats = split( /,/, $catattr);
+            foreach my $cat ( @cats ) { 
+              $cat =~ s/\s//g;
+              $inline .=  "|".TBot_List_inlinekey( $hash, "Kat ".$cat, "list_setcat-,".$cat.",-=-".$no );
+            }
+            $inline .= ")";
+          } 
+
+        } 
+        Log3 $name, 4, "TBot_List_handler: inline values :".$inline.":";
         
         AnalyzeCommandChain( $hash, "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
       } else {
@@ -903,6 +967,61 @@ sub TBot_List_handler($$$$;$)
       }
     
     }
+
+  #####################  
+  } elsif ( $cmd =~ /^list_setcat-,($categorymatch*),-([+-=])-(\d+)$/ ) {
+    # setcat means entry will be prefixed with text
+    
+    my $cat = $1;
+    my $plumin = $2;
+    my $no = $3;
+
+    Log3 $name, 4, "TBot_List_handler: list setcat  cat:".$cat.":   no : ".$no.":   type : ".$plumin;
+    
+    if ( ( $no >= 0 ) && ( $no < scalar(@list) ) ) {
+      # remove from array the entry with the index 
+      my $catentry = $list[$no];
+
+
+      my $ack = AttrVal($name,'acknowledge',"");
+      $catentry =~ s/^$categorymatch+ -> //;
+      if ( length( $cat ) != 0 ) {
+        if ( $cat eq $ack ) {
+          $ret = "Erledigt Kennzeichen hinzugefügt"
+        } else {
+          $ret = "Kategorie ".$cat." hinzugefügt";
+        }
+        
+        $catentry = $cat." -> ".$catentry;
+      } else {
+        $ret .= "Kategorie entfernt";
+      }
+      
+      if ( $plumin eq "=" ) {
+        $list[$no] = $catentry ;
+      } elsif ( $plumin eq "-" ) { 
+        splice( @list, $no, 1 );
+        unshift( @list, $catentry );
+      } else {
+        splice( @list, $no, 1 );
+        push( @list, $catentry );
+      }
+
+      my $text = join(",", @list );
+      
+      AnalyzeCommandChain( $hash, "set ".TBot_List_getConfigPostMe($hash)." clear $lname " );
+      AnalyzeCommandChain( $hash, "set ".TBot_List_getConfigPostMe($hash)." add $lname $text" );
+    }
+    
+    if ( defined($msgId ) ) {
+      # show new list -> call recursively
+      TBot_List_handler( $hash,  "list", $tbot, $peer, $ret );
+      $ret = undef;
+      
+    } else {
+      $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
+    }
+        
     
   #####################  
   } elsif ( $cmd =~ /^list_totop-(\d+)$/ ) {
@@ -968,6 +1087,46 @@ sub TBot_List_handler($$$$;$)
     }
     
   #####################  
+  } elsif ( $cmd =~ /^list_askack-(\d+)$/ ) {
+    # means acknowledge a numbered entry from list - i.e. change entry to DONE at the end - first ask
+    my $no = $1;
+    
+    if ( ( $no >= 0 ) && ( $no < scalar(@list) ) ) {
+    
+      # post new msg to ask for acknowledge
+      if ( defined($msgId ) ) {
+        my $ack = AttrVal($name,'acknowledge',undef);
+        # show ask for acknowledge
+        my $textmsg = "Liste ".$lname."\nIst der Eintrag ".($no+1)." (".$list[$no].") Erledigt?";
+        # show ask msg 
+        my $inline = "(".TBot_List_inlinekey( $hash, "Ja", "list_setcat-,".$ack.",-+-".$no )."|".TBot_List_inlinekey( $hash, "Nein", "list_idx-".$no ).")";
+        AnalyzeCommandChain( $hash, "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
+      } else {
+        $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
+      }
+    }
+    
+  #####################  
+  } elsif ( $cmd =~ /^list_askcatrem-(\d+)$/ ) {
+    # means aksing to remove category assignment (also for done acknowledgment)
+    my $no = $1;
+    
+    if ( ( $no >= 0 ) && ( $no < scalar(@list) ) ) {
+    
+      # post new msg to ask for acknowledge
+      if ( defined($msgId ) ) {
+        my $ack = AttrVal($name,'acknowledge',undef);
+        # show ask for acknowledge
+        my $textmsg = "Liste ".$lname."\nSoll die Kategorie von ".$list[$no]." entfernt werden?";
+        # show ask msg 
+        my $inline = "(".TBot_List_inlinekey( $hash, "Ja", "list_setcat-,,---".$no )."|".TBot_List_inlinekey( $hash, "Nein", "list_idx-".$no ).")";
+        AnalyzeCommandChain( $hash, "set ".$tbot." queryEditInline $msgId ".'@'.$chatId." $inline $textmsg" );
+      } else {
+        $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
+      }
+    }
+    
+  #####################  
   } elsif ( $cmd eq "list_menu" ) {
     # post new msg to ask what to do on list
     if ( defined($msgId ) ) {
@@ -1003,9 +1162,9 @@ sub TBot_List_handler($$$$;$)
     # sort depending on stype
     if ( scalar(@list) > 0 )  {
       if ( $stype == 1 ) {
-        @list = sort {$a cmp $b} @list;
+        @list = sort { "\L$a" cmp "\L$b" }  @list;
       } else {
-        @list = sort {$b cmp $a} @list;
+        @list = sort { "\L$b" cmp "\L$a" }  @list;
       }
       my $text = join( ",", @list );
       AnalyzeCommandChain( $hash, "set ".TBot_List_getConfigPostMe($hash)." clear $lname " );
@@ -1039,6 +1198,7 @@ sub TBot_List_handler($$$$;$)
     
           
   #####################  
+  } elsif ( $cmd =~ /^list_askadd-(\d+)$/ ) {
   } elsif ( $cmd eq "list_askadd" ) {
     TBot_List_setMsgId( $hash, $tbot, $chatId, $msgId, "store" );
 
@@ -1411,6 +1571,12 @@ sub TBot_List_Setup($) {
     </li> 
     
     <li><code>deleteOnly &lt;1 or 0&gt;</code><br>If set to 1 the bot will only allow deletion of entries or the complete list (no new entries or entry text can be changed - neither sorting or similar will be possible). Default is 0 (all changes allowed).
+    </li> 
+    
+    <li><code>acknowledge &lt;text&gt;</code><br>If set entries can be marked as done (acknowledged) adding the corresponding prefix to the entry text (e.g. "DONE" will add "DONE ->" to the entry when marked done).
+    </li> 
+    
+    <li><code>categories &lt;list of categories separated by ,&gt;</code><br>Allows assigning different categories to entries. When modifying single entries each category will be separately offered for assigning to the entry. Assigning another category from the list means the former category assignment ill be removed. Entries with categories assigned are prefixed with the category. So for category "ABC" the entry will be prefixed with "ABC -> ".  
     </li> 
     
   </ul>
