@@ -1,6 +1,6 @@
-REV 25913
+REV 25918
 DIR unused
-UPD 2022-04-03_07:45:02 379074 ./CHANGED
+UPD 2022-04-04_07:45:03 379127 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-03-11_07:45:02 45475 ./MAINTAINER.txt
 UPD 2022-03-21_07:45:02 45304 ./configDB.pm
@@ -258,7 +258,7 @@ UPD 2022-02-28_07:45:03 72729 FHEM/49_Arlo.pm
 UPD 2021-09-07_07:45:05 36141 FHEM/49_IPCAM.pm
 UPD 2022-01-25_07:45:02 763375 FHEM/49_SSCam.pm
 UPD 2022-01-02_07:45:03 59954 FHEM/49_SSCamSTRM.pm
-UPD 2021-01-05_07:45:03 47251 FHEM/49_TBot_List.pm
+UPD 2022-04-04_07:45:03 54307 FHEM/49_TBot_List.pm
 UPD 2021-06-05_07:45:02 64219 FHEM/50_HP1000.pm
 UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
 UPD 2020-11-29_07:45:02 103026 FHEM/50_SSChatBot.pm
@@ -716,7 +716,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2022-03-22_07:45:02 33430 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2022-03-22_07:45:02 150811 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2022-04-04_07:45:03 152103 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2020-11-09_07:45:03 33380 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -740,12 +740,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-04-03_07:45:06 4679240 docs/commandref.html
+UPD 2022-04-04_07:45:07 4679939 docs/commandref.html
 UPD 2022-04-03_07:45:09 2840157 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-04-03_07:45:10 271607 docs/commandref_modular.html
-UPD 2022-04-03_07:45:11 282691 docs/commandref_modular_DE.html
+UPD 2022-04-04_07:45:11 271607 docs/commandref_modular.html
+UPD 2022-04-04_07:45:12 282691 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
