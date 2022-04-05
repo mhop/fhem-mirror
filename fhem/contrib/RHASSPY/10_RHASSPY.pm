@@ -33,8 +33,7 @@ use strict;
 use warnings;
 use Carp qw(carp);
 use GPUtils qw(GP_Import);
-#use JSON qw(decode_json);
-use JSON (); # qw(decode_json encode_json);
+use JSON ();
 use Encode;
 use HttpUtils;
 use utf8;
@@ -304,7 +303,7 @@ sub Initialize {
     $hash->{SetFn}       = \&Set;
     $hash->{GetFn}       = \&Get;
     $hash->{AttrFn}      = \&Attr;
-    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long rhasspySTT:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes; #rhasspyTTS:textField-long 
+    $hash->{AttrList}    = "IODev rhasspyIntents:textField-long rhasspyShortcuts:textField-long rhasspyTweaks:textField-long response:textField-long rhasspyHotwords:textField-long rhasspyMsgDialog:textField-long rhasspySpeechDialog:textField-long forceNEXT:0,1 disable:0,1 disabledForIntervals languageFile " . $readingFnAttributes; #rhasspyTTS:textField-long 
     $hash->{Match}       = q{.*};
     $hash->{ParseFn}     = \&Parse;
     $hash->{NotifyFn}    = \&Notify;
@@ -335,7 +334,6 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    #$hash->{MODULE_VERSION} = '0.5.27a';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -347,8 +345,9 @@ sub Define {
     $hash->{siteId} = $h->{siteId} // qq{${language}$hash->{fhemId}};
     $hash->{encoding} = $h->{encoding} // q{utf8};
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
+    $hash->{autoTraining} = $h->{autoTraining} // 60;
 
-    for my $key (qw( experimental handleHotword sessionTimeout Babble autoTraining)) {
+    for my $key (qw( experimental handleHotword sessionTimeout Babble )) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -393,7 +392,7 @@ sub firstInit {
         && InternalVal( InternalVal($name, 'IODev',undef)->{NAME}, 'IODev', 'none') eq 'MQTT2_CLIENT';
     initialize_devicemap($hash);
     initialize_msgDialog($hash);
-    initialize_STT($hash);
+    initialize_SpeechDialog($hash);
     if ( 0 && $hash->{Babble} ) { #deactivated
         InternalVal($hash->{Babble},'TYPE','none') eq 'Babble' ? $sets{Babble} = [qw( optionA optionB )] 
         : Log3($name, 1, "[$name] error: No Babble device available with name $hash->{Babble}!");
@@ -755,10 +754,10 @@ sub Attr {
         return initialize_TTS($hash, $value, $command);
     }
 
-    if ( $attribute eq 'rhasspySTT' ) {
-        delete $hash->{helper}{STT};
+    if ( $attribute eq 'rhasspySpeechDialog' ) {
+        delete $hash->{helper}{SpeechDialog};
         return if !$init_done;
-        return initialize_STT($hash, $value, $command);
+        return initialize_SpeechDialog($hash, $value, $command);
     }
 
     return;
@@ -1474,41 +1473,10 @@ sub initialize_rhasspyHotwords {
     return;
 }
 
-sub initialize_TTS {
+
+sub initialize_SpeechDialog {
     my $hash    = shift // return;
-    my $attrVal = shift // AttrVal($hash->{NAME},'rhasspyTTS',undef) // return;
-    my $mode    = shift // 'set';
-
-    for my $line (split m{\n}x, $attrVal) {
-        next if !length $line;
-        my ($keywd, $values) = split m{=}x, $line, 2;
-        $values = trim($values);
-        next if !$values;
-        $keywd  = trim($keywd);
-        if ( !defined $defs{$keywd} ) {
-            return "$keywd is no valid FHEM device!" if $init_done;
-            Log3($hash, 2, "[RHASSPY] $keywd in rhasspyTTS is no valid FHEM device!");
-        }
-
-        my($unnamedParams, $namedParams) = parseParams($values);
-
-        if ( InternalVal($keywd,'TYPE','unknown') eq 'AMADDevice' ) {
-            my $siteId = $namedParams->{siteId} // shift @{$unnamedParams }// $keywd;
-            $hash->{helper}->{TTS}->{$siteId} = $keywd;
-            $hash->{helper}->{TTS}->{config}->{$keywd} = $namedParams;
-            $hash->{helper}->{TTS}->{config}->{$keywd}->{ttsCommand} //= 'set $DEVICE ttsMsg $message';
-        }
-    }
-    if ( keys %{$hash->{helper}->{TTS}} ) {
-        $sets{sayFinished} = [] ;
-    }
-
-    return;
-}
-
-sub initialize_STT {
-    my $hash    = shift // return;
-    my $attrVal = shift // AttrVal($hash->{NAME},'rhasspySTT',undef) // return;
+    my $attrVal = shift // AttrVal($hash->{NAME},'rhasspySpeechDialog',undef) // return;
     my $mode    = shift // 'set';
 
     for my $line (split m{\n}x, $attrVal) {
@@ -1522,51 +1490,36 @@ sub initialize_STT {
             for my $amads (split m{[\b]*,[\b]*}x,$values) {
                 if ( InternalVal($amads,'TYPE','unknown') ne 'AMADDevice' ) {
                     return "$amads is not an AMADDevice!" if $init_done;
-                    Log3($hash, 2, "[RHASSPY] $amads in rhasspySTT is not an AMADDevice!");
+                    Log3($hash, 2, "[RHASSPY] $amads in rhasspySpeechDialog is not an AMADDevice!");
                 }
             }
-            $hash->{helper}->{STT}->{config}->{$keywd} = $values;
-            $hash->{helper}->{STT}->{config}->{AMADCommBridge} = 1;
+            $hash->{helper}->{SpeechDialog}->{config}->{$keywd} = $values;
+            $hash->{helper}->{SpeechDialog}->{config}->{AMADCommBridge} = 1;
             disable_msgDialog( $hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
             next;
         }
-=pod
-        if ( $keywd =~ m{\AAMADCommBridge\z}xms ) {
-            for my $bridge (split m{,}, $values) {
-                if ( InternalVal($bridge,'TYPE','unknown') ne 'AMADCommBridge' ) {
-                    return "$bridge is not an AMADCommBridge!" if $init_done;
-                    Log3($hash, 2, "[RHASSPY] $bridge in rhasspySTT is not an AMADCommBridge!");
-                }
-            }
-            $hash->{helper}->{STT}->{config}->{$keywd} = $values;
-            disable_msgDialog( $hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
-            next;
-        }
-=cut
 
         if ( $keywd =~ m{\AfilterFromBabble\z}xms ) {
             if ( !defined $hash->{Babble} ) {
                 return "Babble useage has to be activated in DEF first!" if $init_done;
-                Log3($hash, 2, "[RHASSPY] filterFromBabble in rhasspySTT not activated, Babble useage has to be activated in DEF first!");
+                Log3($hash, 2, "[RHASSPY] filterFromBabble in rhasspySpeechDialog not activated, Babble useage has to be activated in DEF first!");
             }
-            $hash->{helper}->{STT}->{config}->{$keywd} = _toregex($values);
+            $hash->{helper}->{SpeechDialog}->{config}->{$keywd} = _toregex($values);
             next;
         }
 
-        if ( $keywd =~ m{\b$hash->{helper}->{STT}->{config}->{allowed}(?:[\b:\s]|\Z)}xms ) {
+        if ( $keywd =~ m{\b$hash->{helper}->{SpeechDialog}->{config}->{allowed}(?:[\b:\s]|\Z)}xms ) {
             my($unnamedParams, $namedParams) = parseParams($values);
-            #my $siteId = $namedParams->{siteId} // shift @{$unnamedParams }// $keywd;
-            $hash->{helper}->{STT}->{config}->{$keywd} = $namedParams;
-            #$hash->{helper}->{STT}->{config}->{$keywd}->{ttsCommand} //= 'set $DEVICE ttsMsg $message';
-            $hash->{helper}->{STT}->{config}->{wakeword}->{$namedParams->{wakeword}} = $keywd if defined $namedParams->{wakeword};
+            $hash->{helper}->{SpeechDialog}->{config}->{$keywd} = $namedParams;
+            $hash->{helper}->{SpeechDialog}->{config}->{wakeword}->{$namedParams->{wakeword}} = $keywd if defined $namedParams->{wakeword};
             $sets{sayFinished} = [];
         }
     }
 
-    if ( !defined $hash->{helper}->{STT}->{config}->{allowed} ) {
-        delete $hash->{helper}->{STT};
+    if ( !defined $hash->{helper}->{SpeechDialog}->{config}->{allowed} ) {
+        delete $hash->{helper}->{SpeechDialog};
         disable_msgDialog($hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
-        return 'Setting the allowed key in rhasspySTT is mandatory!' if $init_done;
+        return 'Setting the allowed key in rhasspySpeechDialog is mandatory!' if $init_done;
     }
 
     return;
@@ -1581,7 +1534,7 @@ sub initialize_msgDialog {
 
     return disable_msgDialog($hash) if $mode ne 'set';
 
-    return 'No global configuration device defined: Please define a msgConfig device first' if !$modules{msgConfig}{defptr};
+    return 'No global configuration device defined: Please define a msgConfig device first' if !$modules{msgConfig}{defptr} && $attrVal;
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
@@ -1595,7 +1548,7 @@ sub initialize_msgDialog {
         }
     }
 
-    return disable_msgDialog($hash) if !keys %{$hash->{helper}->{msgDialog}->{config}};
+    return disable_msgDialog($hash) if !$attrVal || !keys %{$hash->{helper}->{msgDialog}->{config}};
     if ( !defined $hash->{helper}->{msgDialog}->{config}->{allowed} ) {
         delete $hash->{helper}->{msgDialog};
         return 'Setting the allowed key is mandatory!' ;
@@ -1626,9 +1579,9 @@ sub disable_msgDialog {
     return initialize_msgDialog($hash) if $enable && !$fromSTT;
 
     my $devsp;
-    if ( defined $hash->{helper}->{STT} 
-        && defined $hash->{helper}->{STT}->{config}
-        && defined $hash->{helper}->{STT}->{config}->{AMADCommBridge} ) {
+    if ( defined $hash->{helper}->{SpeechDialog} 
+        && defined $hash->{helper}->{SpeechDialog}->{config}
+        && defined $hash->{helper}->{SpeechDialog}->{config}->{AMADCommBridge} ) {
             $devsp = 'TYPE=AMADCommBridge';
     }
     if ( $enable ) { 
@@ -2715,16 +2668,17 @@ sub notifySTT {
         next if $event !~ m{(?:receiveVoiceCommand):.(.+)}xms;
         my $msgtext = trim($1);         ##no critic qw(Capture)
         my $client = ReadingsVal($device,'receiveVoiceDevice',undef) // return;
-        return if $hash->{helper}->{STT}->{config}->{allowed} !~ m{\b(?:$client|everyone)(?:\b|\z)}xms;
+        return if $hash->{helper}->{SpeechDialog}->{config}->{allowed} !~ m{\b(?:$client|everyone)(?:\b|\z)}xms;
 
         Log3($name, 4 , qq($name received $msgtext from $client (triggered by $device) ));
 
-        my $tocheck = $hash->{helper}->{STT}->{config}->{filterFromBabble};
+        my $tocheck = $hash->{helper}->{SpeechDialog}->{config}->{filterFromBabble};
         if ( $tocheck ) {
             return AnalyzePerlCommand( undef, Babble_DoIt($hash->{Babble},$msgtext) ) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}ix;
             $msgtext =~ s{\A[\b]*$tocheck}{}ix;
         }
-        return ttsDialog_open($hash, $client, $msgtext);
+        return SpeechDialog_progress($hash, $client, $msgtext) if defined $hash->{helper}{SpeechDialog}->{$client} && defined $hash->{helper}{SpeechDialog}->{$client}->{data}; #session already opened!
+        return SpeechDialog_open($hash, $client, $msgtext);
     }
 
     return;
@@ -3079,55 +3033,55 @@ sub handleTtsMsgDialog {
         && defined $hash->{helper}->{msgDialog}->{$recipient} ) {
         msgDialog_respond($hash,$recipient,$message);
         sayFinished($hash, $data->{id}, $hash->{siteId});
-    } elsif ( defined $hash->{helper}->{STT} 
-        && defined $hash->{helper}->{STT}->{config}->{$recipient} ) {
-        ttsDialog_respond($hash,$recipient,$message,0);
+    } elsif ( defined $hash->{helper}->{SpeechDialog} 
+        && defined $hash->{helper}->{SpeechDialog}->{config}->{$recipient} ) {
+        SpeechDialog_respond($hash,$recipient,$message,0);
         sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
     }
 
     return $recipient;
 }
 
-sub RHASSPY_ttsDialogTimeout {
+sub RHASSPY_SpeechDialogTimeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
     my $identity = $fnHash->{MODIFIER};
     deleteSingleRegIntTimer($identity, $hash, 1); 
-    return ttsDialog_close($hash, $identity);
+    return SpeechDialog_close($hash, $identity);
 }
 
-sub setTtsDialogTimeout {
+sub setSpeechDialogTimeout {
     my $hash     = shift // return;
     my $data     = shift // return;
     my $timeout  = shift // _getDialogueTimeout($hash);
 
     my $siteId = $data->{siteId};
     my $identity = (split m{_${siteId}_}x, $data->{sessionId},3)[0] // return;
-    $hash->{helper}{ttsDialog}->{$identity}->{data} = $data;
+    $hash->{helper}{SpeechDialog}->{$identity}->{data} = $data;
 
-    resetRegIntTimer( $identity, time + $timeout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
+    resetRegIntTimer( $identity, time + $timeout, \&RHASSPY_SpeechDialogTimeout, $hash, 0);
     return;
 }
 
-sub ttsDialog_close {
+sub SpeechDialog_close {
     my $hash     = shift // return;
     my $device   = shift // return;
-    Log3($hash, 5, "ttsDialog_close called with $device");
+    Log3($hash, 5, "SpeechDialog_close called with $device");
 
     deleteSingleRegIntTimer($device, $hash);
     readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
 
-    delete $hash->{helper}{ttsDialog}->{$device};
+    delete $hash->{helper}{SpeechDialog}->{$device};
     return;
 }
 
-sub ttsDialog_open {
+sub SpeechDialog_open {
     my $hash    = shift // return;
     my $device  = shift // return;
     my $msgtext = shift // return;
 
-    Log3($hash, 5, "ttsDialog_open called with $device and $msgtext");
+    Log3($hash, 5, "SpeechDialog_open called with $device and $msgtext");
 
     my $siteId   = $hash->{siteId};
     my $id       = "${device}_${siteId}_" . time;
@@ -3137,23 +3091,23 @@ sub ttsDialog_open {
         customData   => $device
     };
 
-    my $tout = $hash->{helper}->{STT}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
-    setTtsDialogTimeout($hash, $sendData, $tout);
-    return ttsDialog_progress($hash, $device, $msgtext, $sendData);
+    my $tout = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+    setSpeechDialogTimeout($hash, $sendData, $tout);
+    return SpeechDialog_progress($hash, $device, $msgtext, $sendData);
 }
 
 #handle messages from FHEM/messenger side
-sub ttsDialog_progress {
+sub SpeechDialog_progress {
     my $hash    = shift // return;
     my $device  = shift // return;
     my $msgtext = shift // return;
-    my $data    = shift // $hash->{helper}->{ttsDialog}->{$device}->{data};
+    my $data    = shift // $hash->{helper}{SpeechDialog}->{$device}->{data};
 
     #atm. this just hands over incoming text to Rhasspy without any additional logic. 
     #This is the place to add additional logics and decission making...
     #my $data    = $hash->{helper}->{msgDialog}->{$device}->{data}; # // msgDialog_close($hash, $device);
-    Log3($hash, 5, "ttsDialog_progress called with $device and text $msgtext");
-    Log3($hash, 5, 'ttsDialog_progress called without DATA') if !defined $data;
+    Log3($hash, 5, "SpeechDialog_progress called with $device and text $msgtext");
+    Log3($hash, 5, 'SpeechDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
 
@@ -3170,17 +3124,17 @@ sub ttsDialog_progress {
     return IOWrite($hash, 'publish', qq{hermes/nlu/query $json});
 }
 
-sub ttsDialog_respond {
+sub SpeechDialog_respond {
     my $hash       = shift // return;
     my $device     = shift // return;
     my $message    = shift // return;
     my $keepopen   = shift // 1;
 
-    Log3($hash, 5, "ttsDialog_respond called with $device and text $message");
+    Log3($hash, 5, "SpeechDialog_respond called with $device and text $message");
     trim($message);
     return if !$message; # empty?
 
-    my $msgCommand = $hash->{helper}->{STT}->{config}->{$device}->{ttsCommand};
+    my $msgCommand = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{ttsCommand};
     $msgCommand //= 'set $DEVICE ttsMsg $message' if InternalVal($device, 'TYPE', '') eq 'AMADDevice';
     return if !$msgCommand;
     my %specials = (
@@ -3191,12 +3145,12 @@ sub ttsDialog_respond {
     $msgCommand  = EvalSpecials($msgCommand, %specials);
     AnalyzeCommandChain($hash, $msgCommand);
     if ( $keepopen ) {
-        my $tout = $hash->{helper}->{STT}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
-        resetRegIntTimer( $device, time + $tout, \&RHASSPY_ttsDialogTimeout, $hash, 0);
+        my $tout = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
+        resetRegIntTimer( $device, time + $tout, \&RHASSPY_SpeechDialogTimeout, $hash, 0);
         readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'open', 1);
     } else {
         deleteSingleRegIntTimer($device, $hash);
-        delete $hash->{helper}->{ttsDialog}->{$device};
+        delete $hash->{helper}->{SpeechDialog}->{$device};
         readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
     }
     return $device;
@@ -3298,7 +3252,7 @@ sub analyzeMQTTmessage {
         if ( 0 && $siteId ) { #Beta-User: deactivated
             $device = ReadingsVal($hash->{NAME}, "siteId2ttsDevice_$siteId",undef);
             #$device //= $hash->{helper}->{TTS}->{$siteId} if defined $hash->{helper}->{TTS} && defined $hash->{helper}->{TTS}->{$siteId};
-            $device //= $hash->{helper}->{STT}->{config}->{wakeword}->{$hotword} if defined $hash->{helper}->{STT} && defined $hash->{helper}->{STT}->{config} && defined $hash->{helper}->{STT}->{config}->{wakeword};
+            $device //= $hash->{helper}->{SpeechDialog}->{config}->{wakeword}->{$hotword} if defined $hash->{helper}->{SpeechDialog} && defined $hash->{helper}->{SpeechDialog}->{config} && defined $hash->{helper}->{SpeechDialog}->{config}->{wakeword};
             if ($device) {
                 AnalyzeCommand( $hash, "set $device activateVoiceInput" );
                 push @updatedList, $device;
@@ -3372,7 +3326,7 @@ sub analyzeMQTTmessage {
 sub respond {
     my $hash     = shift // return;
     my $data     = shift // return;
-    my $response = shift // getResponse( $hash, 'NoValidResponse' ); 
+    my $response = shift // getResponse( $hash, 'NoValidResponse' );
     my $topic    = shift // q{endSession};
     my $delay    = shift // ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
@@ -3383,7 +3337,7 @@ sub respond {
         return testmode_next($hash);
     }
 
-    my $type      = $data->{requestType} // return;
+    my $type      = $data->{requestType} // return; #voice or text
 
     my $sendData;
 
@@ -3421,26 +3375,22 @@ sub respond {
     readingsEndUpdate($hash,1);
     Log3($hash->{NAME}, 5, "Response is: $response");
 
-    #check for msgDialog or ttsDialog sessions
+    #check for msgDialog or SpeechDialog sessions
     my $identity = (split m{_$hash->{siteId}_}xms, $data->{sessionId},3)[0];
     if ( defined $hash->{helper}->{msgDialog} 
       && defined $hash->{helper}->{msgDialog}->{$identity} ){
         Log3($hash, 5, "respond deviated to msgDialog_respond for $identity.");
         return msgDialog_respond($hash, $identity, $response);
-    } elsif (defined $hash->{helper}->{STT} 
-        && defined $hash->{helper}->{STT}->{config}->{$identity} ) {
-        Log3($hash, 5, "respond deviated to ttsDialog_respond for $identity.");
-        $hash->{helper}->{ttsDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
-        return ttsDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
+    } elsif (defined $hash->{helper}->{SpeechDialog} 
+        && defined $hash->{helper}->{SpeechDialog}->{config}->{$identity} ) {
+        Log3($hash, 5, "respond deviated to SpeechDialog_respond for $identity.");
+        #$hash->{helper}->{SpeechDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
+        return SpeechDialog_respond($hash,$identity,$response,$topic eq 'continueSession');
     }
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
     Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
-    #setDialogTimeout( $hash, $data, $delay, getResponse( $hash, 'SilentCancelConfirmation' ) ) if $delay;
 
-    #no audio output in msgDialog session
-    #return if defined $hash->{helper}->{msgDialog} 
-    #    && defined $hash->{helper}->{msgDialog}->{(split m{_$hash->{siteId}_}, $data->{sessionId},3)[0]};
     my $secondAudio = ReadingsVal($hash->{NAME}, "siteId2doubleSpeak_$data->{siteId}",undef) // return $hash->{NAME};
     sendSpeakCommand( $hash, { 
             siteId => $secondAudio, 
@@ -5495,6 +5445,7 @@ sub handleIntentChoice {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
+    delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5796,11 +5747,10 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
     </ul>
   </li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
-  <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a> for details.</li>
+  <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
   <li><b>sessionTimeout</b> <a href="#RHASSPY-experimental"><b>experimental!</b></a> timout limit in seconds. By default, RHASSPY will close a sessions immediately once a command could be executed. Setting a timeout will keep session open until timeout expires. NOTE: Setting this key may result in confusing behaviour. Atm not recommended for regular useage, <b>testing only!</b> May require some non-default settings on the Rhasspy side to prevent endless self triggering.</li>
-  <li><b>autoTraining</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
- activated by setting a timeout (in seconds). RHASSPY then will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. If something ist changed at runtime, training will be initiated if timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
+  <li><b>autoTraining</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
@@ -5849,13 +5799,13 @@ After changing something relevant within FHEM for either the data structure in</
     <p>Various options to update settings and data structures used by RHASSPY and/or Rhasspy. Choose between one of the following:</p>
     <ul>
       <li><b>devicemap</b><br>
-      When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is mandatory (unless the "autoTraining" feature is enabled), to get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
+      When having finished the configuration work to RHASSPY and the subordinated devices, issuing a devicemap-update is required. You may do that manually in case you have deactivated the "autoTraining" feature or do not want to wait untill timeout is reached. Issueing that command will get the RHASSPY data structure updated, inform Rhasspy on changes that may have occured (update slots) and initiate a training on updated slot values etc., see <a href="#RHASSPY-list">remarks on data structure above</a>.
       </li>
       <li><b>devicemap_only</b><br>
-      This may be helpfull to make an intermediate check, whether attribute changes have found their way to the data structure. This will neither update slots nor initiate any training towards Rhasspy.
+      This may be helpfull to make an intermediate check, whether attribute changes have found their way to the data structure. This will neither update slots nor (immediately) initiate any training towards Rhasspy.
       </li>
       <li><b>slots</b><br>
-      This may be helpfull after checks on the FHEM side to send all data to Rhasspy and initiate training.
+      This may be helpfull after checks on the FHEM side to immediately send all data to Rhasspy and initiate training.
       </li>
       <li><b>slots_no_training</b><br>
       This may be helpfull to make checks, whether all data is sent to Rhasspy. This will not initiate any training.
@@ -5944,7 +5894,7 @@ After changing something relevant within FHEM for either the data structure in</
 <ul>
   <li>
     <a id="RHASSPY-get-export_mapping"></a><b>export_mapping &lt;devicename&gt;</b>
-    <p><a href="#RHASSPY-experimental"><b>experimental!</b></a> Exports a "classical" rhasspyMapping attribute value for the provided device. You may find this usefull to adopt that further to your individual needs. Will not completely work in all cases, especially wrt. to SetScene and HUEBridge formated scenes.</p>
+    <p>Exports a "classical" rhasspyMapping attribute value for the provided device. You may find this usefull to adopt that further to your individual needs. May not completely work in all cases, especially wrt. to SetScene and HUEBridge formated scenes.</p>
   </li>
   <li>
     <a id="RHASSPY-get-test_file"></a><b>test_file &lt;path and filename&gt;</b>
@@ -6046,7 +5996,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   <br>
   <li>
     <a id="RHASSPY-attr-rhasspyTweaks"></a><b>rhasspyTweaks</b>
-    <p>Currently sets additional settings for timers and slot-updates to Rhasspy. May contain further custom settings in future versions like siteId2room info or code links, allowed commands, confirmation requests etc.</p>
+    <p>Place for additional settings to influence RHASSPY's global behavior on certain aspects.</p>
     <ul>
       <li><b>timerLimits</b>
         <p>Used to determine when the timer should response with e.g. "set to 30 minutes" or with "set to 10:30"</p>
@@ -6062,17 +6012,15 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <i>repeats</i> defaults to 5, <i>wait</i> to 15<br>
         If only one number is set, this will be taken as <i>repeats</i>.</p>
       </li>
-      <li><b>updateSlots</b>
-        <p>Changes aspects on slot generation and updates.</p>
-        <p><code>noEmptySlots=1</code></p>
-        <p>By default, RHASSPY will generate an additional slot for each of the genericDeviceType it recognizes, regardless, if there's any devices marked to belong to this type. If set to <i>1</i>, no empty slots will be generated.</p>
-        <p><code>overwrite_all=false</code></p>
-        <p>By default, RHASSPY will overwrite all generated slots. Setting this to <i>false</i> will change this.</p>
-      </li>
       <li><b>timeouts</b>
         <p>Atm. keywords <i>confirm</i> and/or <i>default</i> can be used to change the corresponding defaults (15 seconds / 20 seconds) used for dialogue timeouts.</p>
         <p>Example:</p>
         <p><code>timeouts: confirm=25 default=30</code></p>
+      </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-confidenceMin"></a>
+      <li><b>confidenceMin</b>
+        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of <i>0.66</i>, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
+        Example: <p><code>confidenceMin= default=0.6 SetMute=0.4 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-confirmIntents"></a>
       <li><b>confirmIntents</b>
@@ -6099,10 +6047,6 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         Example: <p><code>confirmIntentResponses=SetOnOffGroup="really switch group $target $Value" SetOnOff="confirm setting $target $Value" </code></p>
         <i>$Value</i> may be translated with defaults from a <i>words</i> key in languageFile, for more options on <i>$Value</i> and/or more specific settings in single devices see also <i>confirmValueMap</i> key in <a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a>.</p>
       </li>
-      <a id="RHASSPY-attr-rhasspyTweaks-intentFilter"></a>
-      <li><b>intentFilter</b>
-        <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
-      </li>
       <a id="RHASSPY-attr-rhasspyTweaks-ignoreKeywords"></a>
       <li><b>ignoreKeywords</b>
         <p>You may have also some technically motivated settings in the attributes RHASSPY uses to generate slots, e.g. <i>MQTT, alexa, homebridge</i> or <i>googleassistant</i> in <i>room</i> attribute. The key-value pairs will sort the given <i>value</i> out while generating the content for the respective <i>slot</i> for <i>key</i> (atm. only <i>rooms</i> and <i>group</i> are supported). <i>value</i> will be treated as (case-insensitive) regex with need to exact match.<br>
@@ -6113,23 +6057,28 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <p>You may want to assign some default groupnames to all devices with the same genericDeviceType without repeating it in all single devices.<br>
         Example: <p><code>gdt2groups= blind=rollläden,rollladen thermostat=heizkörper light=lichter,leuchten</code>
       </li>
+      <a id="RHASSPY-attr-rhasspyTweaks-mappingOverwrite"></a>
+      <li><b>mappingOverwrite</b>
+        <p>If set, any value set in rhasspyMapping attribute will delete all content detected by automated mapping analysis (default: only overwrite keys set in devices rhasspyMapping attributes.</p>
+        <p>Example: <p><code>mappingOverwrite=1</code></p>
+      </li>
       <a id="RHASSPY-attr-rhasspyTweaks-extrarooms"></a>
       <li><b>extrarooms</b>
         <p>You may want to add more rooms to what Rhasspy can recognize as room. Using this key, the comma-separated items will be sent as rooms for preparing the room and mainrooms slots.<br>
         Example: <p><code>extrarooms= barn,music collection,cooking recipies</code><br>
         Note: Only do this in case you really know what you are doing! Additional rooms only may be usefull in case you have some external application knowing what to do with info assinged to these rooms!
       </li>
-      <a id="RHASSPY-attr-rhasspyTweaks-confidenceMin"></a>
-      <li><b>confidenceMin</b>
-        <p>By default, RHASSPY will use a minimum <i>confidence</i> level of <i>0.66</i>, otherwise no command will be executed. You may change this globally (key: default) or more granular for each intent specified.<br>
-        Example: <p><code>confidenceMin= default=0.6 SetMute=0.4 SetOnOffGroup=0.8 SetOnOff=0.8</code></p>
+      <li><b>updateSlots</b>
+        <p>Changes aspects on slot generation and updates.</p>
+        <p><code>noEmptySlots=1</code></p>
+        <p>By default, RHASSPY will generate an additional slot for each of the genericDeviceType it recognizes, regardless, if there's any devices marked to belong to this type. If set to <i>1</i>, no empty slots will be generated.</p>
+        <p><code>overwrite_all=false</code></p>
+        <p>By default, RHASSPY will overwrite all generated slots. Setting this to <i>false</i> will change this.</p>
       </li>
-      <a id="RHASSPY-attr-rhasspyTweaks-mappingOverwrite"></a>
-      <li><b>mappingOverwrite</b>
-        <p>If set, any value set in rhasspyMapping attribute will delete all content detected by automated mapping analysis (default: only overwrite keys set in devices rhasspyMapping attributes.</p>
-        <p>Example: <p><code>mappingOverwrite=1</code></p>
+      <a id="RHASSPY-attr-rhasspyTweaks-intentFilter"></a>
+      <li><b>intentFilter</b>
+        <p>Atm. Rhasspy will activate all known intents at startup. As some of the intents used by FHEM are only needed in case some dialogue is open, it will deactivate these intents (atm: <i>ConfirmAction, CancelAction, ChoiceRoom</i> and <i>ChoiceDevice</i>(including the additional parts derived from language and fhemId))) at startup or when no active filtering is detected. You may disable additional intents by just adding their names in <i>intentFilter</i> line or using an explicit state assignment in the form <i>intentname=true</i> (Note: activating the 4 mentionned intents is not possible!). For details on how <i>configure</i> works see <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy documentation</a>.</p>
       </li>
-
     </ul>
   </li>
   <li>
@@ -6160,14 +6109,14 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <br>
       </ul>
   </li>
-  <p><b>Remarks on rhasspySTT and Babble:</b><br><a id="RHASSPY-experimental"></a>
+  <p><b>Remarks on rhasspySpeechDialog and Babble:</b><br><a id="RHASSPY-experimental"></a>
     Interaction with Babble and AMAD.*-Devices is not approved to be propperly working yet. Further tests
     may be needed and functionality may be subject to changes!
   </p>
   <li>
-    <a id="RHASSPY-attr-rhasspySTT"></a><b>rhasspySTT</b>
+    <a id="RHASSPY-attr-rhasspySpeechDialog"></a><b>rhasspySpeechDialog</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>Optionally, you may want not to use the internal Rhasspy speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
+    <p>Optionally, you may want not to use the internal speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
     Keys that may be set in this attribute:
      <ul>
         <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
@@ -6192,7 +6141,6 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
     <p>If set to 1, RHASSPY will forward incoming messages also to further MQTT2-IO-client modules like MQTT2_DEVICE, even if the topic matches to one of it's own subscriptions. By default, these messages will not be forwarded for better compability with autocreate feature on MQTT2_DEVICE. See also <a href="#MQTT2_CLIENTclientOrder">clientOrder attribute in MQTT2 IO-type commandrefs</a>; setting this in one instance of RHASSPY might affect others, too.</p>
   </li>
 </ul>
-
 <p>&nbsp;</p>
 <a id="RHASSPY-attr-subdevice"></a>
 <p><b>For the subordinated devices</b>, a list of the possible attributes is automatically extended by several further entries</p>
@@ -6308,9 +6256,10 @@ yellow=rgb FFFF00</code></p>
         <p><code>attr lamp1 rhasspySpecials colorForceHue2rgb:1</code></p>
       </li>
       <li><b>priority</b>
-        <p>Keywords <i>inRoom</i> and <i>outsideRoom</i> can be used, each followed by comma separated types to give priority in <i>GetNumeric</i>. This may eleminate requests in case of several possible devices or rooms to deliver requested info type.</p>
+        <p>Keywords <i>inRoom</i> and <i>outsideRoom</i> can be used, each followed by comma separated types to give priority in <i>Set</i> or <i>Get</i> intents. This may eleminate requests in case of several possible devices or rooms to deliver requested info type.</p>
         <p>Example:</p>
         <p><code>attr sensor_outside_main rhasspySpecials priority:inRoom=temperature outsideRoom=temperature,humidity,pressure</code></p>
+        <p>Note: If there's a suitable "active" device, this will be given an even higher priority in most cases (e.g. "make music louder" may increase the volume on a switched on amplifier device and not go to an MPD device in the same room)</p>
       </li>
       <li><b>confirm</b>
         <p>This is the more granular alternative to <a href="#RHASSPY-attr-rhasspyTweaks-confirmIntents">confirmIntents key in rhasspyTweaks</a> (including <i>confirmIntentResponses</i>). You may provide intent names only or <i>&lt;Intent&gt;=&lt;response&gt;</i> pairs like <code>confirm: SetOnOff="$target shall be switched $Value" SetScene</code>. 
@@ -6359,7 +6308,7 @@ yellow=rgb FFFF00</code></p>
   <ul>
     <li>lightUp, lightDown (brightness)</li>
     <li>volUp, volDown (volume)</li>
-    <li>tempUp, tempDown (temperature)</li>
+    <li>tempUp, tempDown (temperature/desired-temp)</li>
     <li>setUp, setDown (setTarget)</li>
     <li>cmdStop (applies only for blinds)</li>
   </ul>
@@ -6404,7 +6353,7 @@ yellow=rgb FFFF00</code></p>
   <li>sessionTimeout_&lt;siteId&gt;</li>
   RHASSPY will by default automatically close every dialogue after an executable commandset is detected. By setting this type of reading, you may keep open the dialoge to wait for the next command to be spoken on a "by siteId" base; naming scheme is similar as for site2room. Intent <i>CancelAction</i> will close any session immedately.
   <li>siteId2ttsDevice_&lt;siteId&gt;</li>
-  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspySTT">rhasspySTT</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If an AMADDevice TYPE device is enabled for <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a>, RHASSPY will forward response texts to the device for own text-to-speach processing. Setting this type of reading allows redirection of adressed satellites to the given AMADDevice (device name as reading value, 0 to disable); naming scheme is the same as for site2room.
 </ul>
 =end html
 =cut
