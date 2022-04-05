@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2020
+#  (c) 2005-2022
 #  Copyright: Rudolf Koenig (rudolf dot koenig at fhem dot de)
 #  All rights reserved
 #
@@ -27,7 +27,7 @@ use warnings;
 use lib '.';
 use IO::Socket;
 use IO::Socket::INET;
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday time);
 use Scalar::Util qw(looks_like_number);
 use POSIX;
 use File::Copy qw(copy);
