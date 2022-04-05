@@ -2044,6 +2044,18 @@ FW_createWidgetList(elName, devName, vArr, currVal, set, params, cmd)
     return undefined;
 
   var newEl = $('<span><span>').get(0);
+
+  function
+  setCmd()
+  {
+    cmd($(newEl).find("[name^=val]")
+                .map( function(){return $(this).val()} )
+                .get()
+                .join(","));
+  }
+
+  if(!elName)
+    elName = "val."+Math.random().toString(36).substr(2);
   for(var i1=1; i1<vArr.length; i1++) {
     var lvArr = vArr.slice(i1+1,i1+1+parseInt(vArr[i1]));
     for(var wn in FW_widgets) {
@@ -2052,6 +2064,8 @@ FW_createWidgetList(elName, devName, vArr, currVal, set, params, cmd)
       var subEl = FW_widgets[wn].createFn(elName, devName, lvArr);
       if(subEl) {
         $(newEl).append(subEl);
+        if(cmd)
+          $(subEl).change(setCmd);
         break;
       }
     }
