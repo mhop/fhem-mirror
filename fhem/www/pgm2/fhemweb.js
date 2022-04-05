@@ -40,7 +40,8 @@ var FW_widgets = {
   textFieldNL:       { createFn:FW_createTextField, second:true },
   "textField-long":  { createFn:FW_createTextField, second:true },
   "textFieldNL-long":{ createFn:FW_createTextField, second:true },
-  bitfield:          { createFn:FW_createBitfield },
+  bitfield:          { createFn:FW_createBitfield  },
+  widgetList:        { createFn:FW_createWidgetList },
 };
 
 window.onbeforeunload = function(e)
@@ -844,8 +845,9 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
   // Set and attr 
   $("div input.psc[type=submit]:not(.get)").click(function(e){
     e.preventDefault();
+    var frm = $(this).closest("form");
     var newDef = typeof cm !== 'undefined' ?
-                 cm.getValue() : $(this).closest("form").find("textarea").val();
+                 cm.getValue() : frm.find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
     var isDef = true, reloadIfOk = false;
 
@@ -854,11 +856,11 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       var div = $(this).closest("div.makeSelect");
       var devName = $(div).attr("dev"),
           cmd = $(div).attr("cmd");
-      var sel = $(this).closest("form").find("select");
+      var sel = frm.find("select");
       var arg = $(sel).val();
       var ifid = (devName+"-"+arg).replace(/([^_a-z0-9])/gi,
                                    function(m){ return "\\"+m });
-      if($(".dval[informid="+ifid+"]").length == 0) {
+      if($(".dval[informid="+ifid+"]").length == 0) {// No reading with this name
         if(cmd == "attr" || (cmd == "set" && arg == "attrTemplate")) {
           reloadIfOk = true;
         } else {
@@ -866,9 +868,9 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
           return;
         }
       }
-      newDef = $(this).closest("form").find("input:text").val();
-      if(newDef == undefined)
-        newDef = $(this).closest("form").find("[name^=val]").val();
+      // Make it similar to submit: values joined by ,
+      var nd=frm.find("[name^=val]").map(function(){return $(this).val()}).get();
+      newDef = nd.length ? nd.join(",") : frm.find("input:text").val();
       cmd = $(this).attr("name")+"="+cmd+" "+devName+" "+arg+" "+newDef;
     }
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
@@ -1393,6 +1395,13 @@ FW_detailSelect(selEl, mayMissing)
     });
 }
 
+// elName: HTML-Element-id
+// devName: FHEM-Device name
+// vArr: all parameters split by ,
+// current: the value of the current attribute
+// set: "cmd" attribute first value
+// params: "cmd" attribute other values, split by space
+// cmd: function to call, if value changes
 function
 FW_callCreateFn(elName, devName, vArr, currVal, set, params, cmd, finishFn)
 {
@@ -2024,6 +2033,43 @@ FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
   };
   return newEl;
 }
+
+// List of widgets, each one is prepended with its vArr.length
+// widgetList,4,select,f1,f2,f3,1,textField,3,select,s1,s2
+// No autoloading for subwidgets!
+function
+FW_createWidgetList(elName, devName, vArr, currVal, set, params, cmd)
+{
+  if(vArr[0] != "widgetList")
+    return undefined;
+
+  var newEl = $('<span><span>').get(0);
+  for(var i1=1; i1<vArr.length; i1++) {
+    var lvArr = vArr.slice(i1+1,i1+1+parseInt(vArr[i1]));
+    for(var wn in FW_widgets) {
+      if(!FW_widgets[wn].createFn || FW_widgets[wn].second)
+        continue;
+      var subEl = FW_widgets[wn].createFn(elName, devName, lvArr);
+      if(subEl) {
+        $(newEl).append(subEl);
+        break;
+      }
+    }
+    i1 += parseInt(vArr[i1]);
+  }
+
+  newEl.setValueFn = function(arg) { // , separated values for each widget
+    var wa = arg.split(","), idx=0;
+    $(newEl).find("[name^=val]").each(function(){
+      if(this.setValueFn)
+        this.setValueFn(wa[idx++]);
+      else
+        $(this).val(wa[idx++]);
+    });
+  };
+
+  return newEl;
+}
 /*************** WIDGETS END **************/
 
 
@@ -2206,6 +2252,11 @@ FW_checkNotifydev(reName)
       <b>NOTE</b>: this is also the fallback, if no modifier is found.</li>
   <li>bitfield,&lt;size&gt;&lt;mask&gt; - show a table of checkboxes (8 per
       line) to set single bits. Default for size is 8 and for mask 2^32-1</li>
+  <li>widgetList,... - show a list of widgets. The arguments are concatenated,
+      and separated be the length of the following argument list.<br>
+      Example: widgetList,3,select,opt1,opt2,1,textField<br>
+      Note: the values will be sent to FHEM as a comma separated list, and only
+      preloaded widgets can be referenced.</li>
 
 =end html
 
@@ -2244,7 +2295,12 @@ FW_checkNotifydev(reName)
   <li>bitfield,&lt;size&gt;,&lt;mask&gt; - zeigt eine Tabelle von
       Kontrollk&auml;stchen (8 pro Zeile), um einzelne Bits setzen zu koennen.
       Die Voreinstellung fuer size ist 8 und fuer mask 2^32-1.</li>
-
+  <li>widgetList,... - zeigt eine Liste von Widgets. Die Argumente aller
+      widgets sind durch die L&auml;ngenangabe der jeweiligen Argumentliste
+      getrennt.<br>
+      Beispiel: widgetList,3,select,opt1,opt2,1,textField<br>
+      Achtung: die Werte werden Komma separiert zu FHEM gesendet, und es
+      k&ouml;nnen nur bereits geladene widgets definiert werden.</li>
 
 =end html_DE
 
