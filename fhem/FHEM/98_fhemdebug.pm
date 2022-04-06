@@ -14,7 +14,8 @@ my $main_setReadingsVal;
 sub
 fhemdebug_Initialize($){
   $cmds{"fhemdebug"}{Fn} = "fhemdebug_Fn";
-  $cmds{"fhemdebug"}{Hlp} = "{enable|disable|status|timerList|utf8check}";
+  $cmds{"fhemdebug"}{Hlp} =
+      "{enable | disable | status | timerList | addTimerStacktrace | utf8check}";
 }
 
 sub fhemdebug_utf8check($$$$);
@@ -83,7 +84,8 @@ fhemdebug_Fn($$)
 
   } else {
     return "Usage: fhemdebug {enable | disable | status | ".
-              "timerList | addTimerStacktrace {0|1} | forceEvents {0|1} }";
+              "timerList | addTimerStacktrace {0|1} | forceEvents {0|1} | ".
+              " utf8check }";
   }
   return;
 }
