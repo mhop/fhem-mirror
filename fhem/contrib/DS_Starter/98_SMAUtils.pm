@@ -17,6 +17,7 @@
 #################################################################
 # Versions History
 #
+# 2.3       08.04.2022     SBFspot V3.9.4 support added by Obi-Wan
 # 2.2       16.09.2016     SMAUtils_Attr added
 # 2.1       16.09.2016     sub Define changed
 # 2.0       06.09.2016     attribute mode
@@ -306,7 +307,28 @@ readingsBeginUpdate($hash);
                     readingsBulkUpdate($hash,$readingsname,$readingsvalue); 
                 }
             }     
+	    $substr = 'mppt';
+      
+            if (index($readingsname, $substr) != -1) {  
+                my $linesreading= "string_".(substr $readingsname, 5,1);
+                my $linesvalue= substr $line, 7; 
+                my @line_readings = split("-",$linesvalue);
+  
+                foreach my $line_readings (@line_readings) {
+                    @reading = split(":",$line_readings);
+                    $readingsname = ltrim($reading[0]);
+                    $readingsname = $linesreading."_".$readingsname;
+                    $readingsname = rtrim($readingsname);
+                    $readingsname = lc($readingsname);
+                    $readingsname =~ s/ /_/g;
 
+                    $value = ltrim($reading[1]);
+                    $value =~ /(\d+(?:\.\d+)?)/;
+                    $readingsvalue = $1;
+                    
+                    readingsBulkUpdate($hash,$readingsname,$readingsvalue); 
+                }
+            }     
             $substr = 'starttime';
             
             if (index($readingsname, $substr) == -1) {
