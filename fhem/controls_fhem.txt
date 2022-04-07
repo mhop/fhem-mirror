@@ -1,4 +1,4 @@
-REV 25925
+REV 25929
 DIR unused
 UPD 2022-04-04_07:45:03 379127 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -534,7 +534,7 @@ UPD 2019-03-11_07:45:02 35510 FHEM/98_dewpoint.pm
 UPD 2022-02-02_07:45:02 5875 FHEM/98_dummy.pm
 UPD 2018-09-12_07:45:02 11093 FHEM/98_expandJSON.pm
 UPD 2018-07-17_07:45:04 49521 FHEM/98_feels_like.pm
-UPD 2022-02-09_07:45:02 6336 FHEM/98_fhemdebug.pm
+UPD 2022-04-07_07:45:02 6402 FHEM/98_fhemdebug.pm
 UPD 2021-10-17_07:45:03 11518 FHEM/98_fheminfo.pm
 UPD 2021-10-29_07:45:03 73956 FHEM/98_freezemon.pm
 UPD 2021-09-24_07:45:12 9349 FHEM/98_help.pm
@@ -744,8 +744,8 @@ UPD 2022-04-06_07:45:06 4680277 docs/commandref.html
 UPD 2022-04-06_07:45:09 2840530 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-04-06_07:45:10 271607 docs/commandref_modular.html
-UPD 2022-04-06_07:45:11 282691 docs/commandref_modular_DE.html
+UPD 2022-04-07_07:45:10 271607 docs/commandref_modular.html
+UPD 2022-04-07_07:45:12 282691 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1452,7 +1452,7 @@ UPD 2020-11-25_07:45:03 6480 www/images/fhemSVG/gasmeter1.svg
 UPD 2020-11-25_07:45:03 3712 www/images/fhemSVG/gasmeter2.svg
 UPD 2017-11-26_07:45:02 2381 www/images/fhemSVG/gasoline.svg
 UPD 2020-05-14_07:45:02 856 www/images/fhemSVG/gassistant.svg
-UPD 2020-04-27_07:45:02 941642 www/images/fhemSVG/gefrierschrank_icon.svg
+UPD 2022-04-07_07:45:02 1562 www/images/fhemSVG/gefrierschrank_icon.svg
 UPD 2015-07-28_14:05:32 2898 www/images/fhemSVG/general_an.svg
 UPD 2015-07-28_14:05:32 8074 www/images/fhemSVG/general_an_fuer_zeit.svg
 UPD 2015-07-28_14:05:32 5226 www/images/fhemSVG/general_aus.svg
@@ -1550,8 +1550,8 @@ UPD 2017-05-05_07:45:02 5178 www/images/fhemSVG/kindle.svg
 UPD 2020-07-26_07:45:03 4430 www/images/fhemSVG/kodi.svg
 UPD 2020-07-26_07:45:03 3135 www/images/fhemSVG/kodi_icon.svg
 UPD 2020-11-24_07:45:03 33643 www/images/fhemSVG/krippe.svg
-UPD 2020-04-27_07:45:02 177096 www/images/fhemSVG/kuehlschrank_big.svg
-UPD 2020-04-27_07:45:02 270578 www/images/fhemSVG/kuehlschrank_small.svg
+UPD 2022-04-07_07:45:02 916 www/images/fhemSVG/kuehlschrank_big.svg
+UPD 2022-04-07_07:45:02 12550 www/images/fhemSVG/kuehlschrank_small.svg
 UPD 2015-07-28_14:05:32 8487 www/images/fhemSVG/lan_rs485.svg
 UPD 2020-07-26_07:45:03 2301 www/images/fhemSVG/lan_switch.svg
 UPD 2020-07-26_07:45:03 1052 www/images/fhemSVG/laptop.svg
@@ -1716,11 +1716,11 @@ UPD 2015-07-28_14:05:32 3640 www/images/fhemSVG/security_password.svg
 UPD 2020-07-26_07:45:03 10065 www/images/fhemSVG/senseo_icon.svg
 UPD 2019-02-14_07:45:03 1921 www/images/fhemSVG/sketchup-layout.svg
 UPD 2015-07-28_14:05:32 5746 www/images/fhemSVG/socket_timer.svg
-UPD 2020-07-26_07:45:03 234856 www/images/fhemSVG/solar_icon.svg
+UPD 2022-04-07_07:45:02 1776 www/images/fhemSVG/solar_icon.svg
 UPD 2018-01-28_07:45:02 2742 www/images/fhemSVG/sonos_play1.svg
 UPD 2020-11-23_07:45:02 12098 www/images/fhemSVG/speach_control.svg
-UPD 2020-07-26_07:45:03 95779 www/images/fhemSVG/springbrunnen_icon.svg
-UPD 2020-07-26_07:45:03 423703 www/images/fhemSVG/sprinkler_icon.svg
+UPD 2022-04-07_07:45:02 48808 www/images/fhemSVG/springbrunnen_icon.svg
+UPD 2022-04-07_07:45:02 10736 www/images/fhemSVG/sprinkler_icon.svg
 UPD 2019-02-14_07:45:03 2375 www/images/fhemSVG/sqlite.svg
 UPD 2020-07-26_07:45:03 37685 www/images/fhemSVG/stromzaehler_icon.svg
 UPD 2015-08-10_07:45:11 29827 www/images/fhemSVG/sunblind_0.svg
@@ -1851,7 +1851,7 @@ UPD 2019-05-30_07:45:03 5071 www/images/fhemSVG/weather_rain_snow.svg
 UPD 2019-05-30_07:45:03 8697 www/images/fhemSVG/weather_rain_snow_heavy.svg
 UPD 2019-05-30_07:45:03 4173 www/images/fhemSVG/weather_rain_snow_light.svg
 UPD 2019-02-14_07:45:03 4752 www/images/fhemSVG/well.svg
-UPD 2020-07-26_07:45:03 187891 www/images/fhemSVG/wintergarten_icon.svg
+UPD 2022-04-07_07:45:02 16834 www/images/fhemSVG/wintergarten_icon.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2019-02-19_07:45:03 5808 www/images/fhemSVG/xiaomi_multi.svg
 UPD 2020-11-11_07:45:02 584 www/images/fhemSVG/zigbee.svg
