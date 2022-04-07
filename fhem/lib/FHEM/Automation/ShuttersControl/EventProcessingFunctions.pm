@@ -133,6 +133,10 @@ sub EventProcessingGeneral {
         }
     }
     else {    # alles was kein Devicenamen mit übergeben hat landet hier
+        ::Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessing: All without device name in the Event"
+        );
+
         if (
             $events =~ m{^ATTR\s(.*)
              \s(ASC_Roommate_Device|ASC_WindowRec|ASC_residentsDev|ASC_rainSensor
@@ -170,6 +174,10 @@ sub EventProcessingGeneral {
                 (.*)?}xms
           )
         {
+            ::Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessing: Morning and Evening Time Shedules"
+            );
+
             FHEM::Automation::ShuttersControl::CreateSunRiseSetShuttersTimer(
                 $hash, $2 )
               if (

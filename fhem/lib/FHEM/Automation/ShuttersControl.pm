@@ -485,16 +485,23 @@ sub Notify {
     }
     elsif ( $devname eq "global" )
     { # Kommt ein globales Event und beinhaltet folgende Syntax wird die Funktion zur Verarbeitung aufgerufen
+        ::Log3( $name, 4,
+"AutoShuttersControl ($name) - ShuttersControl: Devicename eq global"
+        );
+
         if (
             grep {
-/^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownValue_beforeNightClose|.*ASC_PrivacyUpValue_beforeDayOpen|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon|.*ASC_Roommate_Device|.*ASC_WindowRec|.*ASC_residentsDev|.*ASC_rainSensor|.*ASC_windSensor|.*ASC_tempSensor|.*ASC_BrightnessSensor|.*ASC_twilightDevice|.*ASC_ExternalTrigger|.*ASC_Shading_StateChange_SunnyCloudy|.*ASC_TempSensor|.*ASC_Shading_Mode)(\s.*|$) /
+/^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownValue_beforeNightClose|.*ASC_PrivacyUpValue_beforeDayOpen|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon|.*ASC_Roommate_Device|.*ASC_WindowRec|.*ASC_residentsDev|.*ASC_rainSensor|.*ASC_windSensor|.*ASC_tempSensor|.*ASC_BrightnessSensor|.*ASC_twilightDevice|.*ASC_ExternalTrigger|.*ASC_Shading_StateChange_SunnyCloudy|.*ASC_TempSensor|.*ASC_Shading_Mode)(\s.*|$) /x
             } @{$events}
           )
         {
+            ::Log3( $name, 4,
+"AutoShuttersControl ($name) - ShuttersControl: Event Attr or Deleteattr Time and Astro"
+            );
             EventProcessingGeneral( $hash, undef, join( ' ', @{$events} ) );
         }
     }
-    elsif ( grep { /^($posReading):\s\d{1,3}(\.\d{1,3})?$/ } @{$events} ) {
+    elsif ( grep { /^($posReading):\s\d{1,3}(\.\d{1,3})?$/x } @{$events} ) {
         ASC_Debug( 'Notify: '
               . ' ASC_Pos_Reading Event vom Rollo '
               . $devname

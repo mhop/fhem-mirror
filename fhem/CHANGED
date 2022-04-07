@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix awning value in shading conditions
  - feature: 49_TBot_List: acknowledge and categories
  - change:  98_monitoring: PBP code restructured (part I)
  - feature: 31_LightScene: support for configDB (by Beta-User)

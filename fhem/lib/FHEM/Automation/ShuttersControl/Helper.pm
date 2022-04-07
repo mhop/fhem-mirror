@@ -399,6 +399,8 @@ sub _IsDay {
                 or $FHEM::Automation::ShuttersControl::shutters->getRoommates
                 ne 'gotosleep' )
         )
+        or ( $FHEM::Automation::ShuttersControl::shutters->getShuttersPlace eq
+            'awning' )
       );
 
     return $respIsDay;
