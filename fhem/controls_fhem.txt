@@ -1,6 +1,6 @@
-REV 25929
+REV 25934
 DIR unused
-UPD 2022-04-04_07:45:03 379127 ./CHANGED
+UPD 2022-04-08_07:45:02 379202 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-03-11_07:45:02 45475 ./MAINTAINER.txt
 UPD 2022-03-21_07:45:02 45304 ./configDB.pm
@@ -60,7 +60,7 @@ UPD 2020-05-23_07:45:02 47669 FHEM/10_GFPROBT.pm
 UPD 2018-03-11_07:45:03 10293 FHEM/10_HXBDevice.pm
 UPD 2019-12-29_07:45:10 75957 FHEM/10_IT.pm
 UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
-UPD 2022-03-19_07:45:03 98011 FHEM/10_KNX.pm
+UPD 2022-04-08_07:45:02 97420 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2021-01-14_07:45:03 111779 FHEM/10_MAX.pm
 UPD 2022-03-28_07:45:03 37256 FHEM/10_MQTT2_DEVICE.pm
@@ -384,7 +384,7 @@ UPD 2022-02-20_07:45:02 15745 FHEM/72_UBUS_CALL.pm
 UPD 2022-03-08_07:45:02 17254 FHEM/72_UBUS_CLIENT.pm
 UPD 2020-10-26_07:45:03 225504 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2022-03-04_07:45:08 116240 FHEM/73_AutoShuttersControl.pm
+UPD 2022-04-08_07:45:02 116240 FHEM/73_AutoShuttersControl.pm
 UPD 2021-10-24_07:45:02 232046 FHEM/73_DoorBird.pm
 UPD 2022-01-02_07:45:03 147507 FHEM/73_ElectricityCalculator.pm
 UPD 2022-02-10_07:45:02 49582 FHEM/73_GardenaSmartBridge.pm
@@ -648,7 +648,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-04-05_07:45:02 378535 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-04-08_07:45:02 378535 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -740,23 +740,23 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-04-06_07:45:06 4680277 docs/commandref.html
+UPD 2022-04-08_07:45:07 4680301 docs/commandref.html
 UPD 2022-04-06_07:45:09 2840530 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-04-07_07:45:10 271607 docs/commandref_modular.html
-UPD 2022-04-07_07:45:12 282691 docs/commandref_modular_DE.html
+UPD 2022-04-08_07:45:10 271607 docs/commandref_modular.html
+UPD 2022-04-08_07:45:12 282691 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
-UPD 2022-03-04_07:45:08 76067 lib/FHEM/Automation/ShuttersControl.pm
+UPD 2022-04-08_07:45:02 76311 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2022-01-15_07:45:03 2735 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2022-01-15_07:45:03 11902 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2022-01-15_07:45:03 7314 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
-UPD 2022-03-03_07:45:02 112174 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
-UPD 2022-01-15_07:45:03 40650 lib/FHEM/Automation/ShuttersControl/Helper.pm
+UPD 2022-04-08_07:45:02 112427 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
+UPD 2022-04-08_07:45:02 40752 lib/FHEM/Automation/ShuttersControl/Helper.pm
 UPD 2022-01-15_07:45:03 7168 lib/FHEM/Automation/ShuttersControl/Rainprotection.pm
 UPD 2022-01-15_07:45:03 2726 lib/FHEM/Automation/ShuttersControl/Roommate.pm
 UPD 2022-01-15_07:45:03 25500 lib/FHEM/Automation/ShuttersControl/Shading.pm
