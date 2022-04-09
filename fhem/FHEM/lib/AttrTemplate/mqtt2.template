@@ -2685,7 +2685,7 @@ desc:Applies to single relay Shelly devices offering energy measuring like Shell
 par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
-par:NEWUSERREADINGS;NEWUSERREADINGS as set if relay_0_energy_total is included, otherwise it will be added;{ my $old = AttrVal('DEVICE','userReadings',undef); !defined $old ? 'relay_0_energy_total:relay_0_energy:.* monotonic {ReadingsNum($name,'relay_0_energy',0)}' : $old =~ m,relay_0_energy_total:relay_0_energy.*, ? $old : $old . q(, relay_0_energy_total:relay_0_energy:.* monotonic {ReadingsNum($name,'relay_0_energy',0)}) }
+par:NEWUSERREADINGS;NEWUSERREADINGS as set if relay_0_energy_total is included, otherwise it will be added;{ my $old = AttrVal('DEVICE','userReadings',undef); !defined $old ? q(relay_0_energy_total:relay_0_energy:.* monotonic {ReadingsNum($name,'relay_0_energy',0)}) : $old =~ m,relay_0_energy_total:relay_0_energy.*, ? $old : $old . q(, relay_0_energy_total:relay_0_energy:.* monotonic {ReadingsNum($name,'relay_0_energy',0)}) }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE setList\
   relay0:on,off,toggle shellies/DEVNAME/relay/0/command $EVTPART1\
@@ -2715,7 +2715,7 @@ attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly1_w_energy_measuring
-setreading DEVICE attrTemplateVersion 20220407
+setreading DEVICE attrTemplateVersion 20220408
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_switch
 option:{ RADIO_SETUSERREADING }
