@@ -44,8 +44,8 @@ use warnings;
 use POSIX qw(strftime SIGALRM);
 use Time::HiRes qw(gettimeofday tv_interval ualarm);
 use Scalar::Util qw(looks_like_number);
-eval "use DBI;1" or my $DbRepMMDBI = "DBI";
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+eval "use DBI;1"               or my $DbRepMMDBI = "DBI";
+eval "use FHEM::Meta;1"        or my $modMetaAbsent = 1;
 use DBI::Const::GetInfoType;
 use Blocking;
 use Color;                           # colorpicker Widget
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.48.3"  => "09.04.2022  minor code fix in DbRep_reduceLog ",
   "8.48.2"  => "22.02.2022  more code refacturing ",
   "8.48.1"  => "31.01.2022  minor fixes e.g. in file size determination, dump routines ",
   "8.48.0"  => "29.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ".
@@ -9362,8 +9363,8 @@ sub DbRep_reduceLog {
                         $deletedCount += $c;
                         $updateCount  += keys(%averageHash);
                         
-                        my ($id,$iu) = 0;
-                        my ($kd,$ku) = 1;
+                        my ($id,$iu) = (0,0);
+                        my ($kd,$ku) = (1,1);
                         my $thd      = ($c <= 2000)  ? 100  : 
                                        ($c <= 30000) ? 1000 : 
                                        10000;
