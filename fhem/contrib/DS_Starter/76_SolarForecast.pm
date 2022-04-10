@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.57.3 "=> "10.04.2022  some fixes (\$eavg in ___csmSpecificEpieces, useAutoCorrection switch to regex) ",
   "0.57.2 "=> "03.04.2022  area factor for 25° added ",
   "0.57.1 "=> "28.02.2022  new attr flowGraphicShowConsumerPower and flowGraphicShowConsumerRemainTime (Consumer remainTime in flowGraphic)",                                                                                                                                
   "0.56.11"=> "01.12.2021  comment: 'next if(\$surplus <= 0);' to resolve consumer planning problem if 'mode = must' and the ".
@@ -2200,6 +2201,7 @@ sub _specialActivities {
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
+          
           if(ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") eq "on") {
               for my $n (1..24) {
                   $n = sprintf "%02d", $n;
@@ -3006,7 +3008,11 @@ sub ___csmSpecificEpieces {
                   
               }
               
-              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = sprintf('%.2f',$data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} / $hoursE);    # Durchschnitt ermittelt und in epiecAVG schreiben
+              my $eavg = defined $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} ? 
+                         $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour}         :
+                         0;
+                         
+              $data{$type}{$name}{consumers}{$c}{epiecAVG}{$hour} = sprintf('%.2f', $eavg / $hoursE);    # Durchschnitt ermittelt und in epiecAVG schreiben
           }
       }
     
@@ -5777,7 +5783,7 @@ sub useAutoCorrection {
 
   my $dcauto = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');
 
-  return 1 if($dcauto eq 'on');
+  return 1 if($dcauto =~ /^on/xs);
   
 return;
 }
