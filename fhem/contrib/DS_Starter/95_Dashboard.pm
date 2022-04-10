@@ -1,10 +1,10 @@
-﻿# $Id: 95_Dashboard.pm 20323 2019-10-06 20:12:38Z DS_Starter $
+﻿# $Id: 95_Dashboard.pm 21180 2020-02-11 21:04:55Z DS_Starter $
 ########################################################################################
 #       95_Dashboard.pm
 #
 #       written and released by Sascha Hermann 2013
 #      
-#       maintained 2019 by Heiko Maaz
+#       maintained 2019-2022 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 # 
 #       This script is part of fhem.
@@ -56,6 +56,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.17.2" => "10.04.2022  fix perl warnings, Forum: #127216 ",
   "3.17.1" => "10.02.2020  fix perl warning, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004 ",
   "3.17.0" => "06.10.2019  Path handling of backgroundimage changed ",
   "3.16.0" => "04.10.2019  new attribute dashboard_hideGroupHeader, commandref revised ",   
@@ -182,13 +183,16 @@ sub Dashboard_Set($@) {
   if ( $cmd eq "lock" ) {
       readingsSingleUpdate ($hash, "lockstate", "lock", 0); 
 	  return;
-  } elsif ( $cmd eq "unlock" ) {
+  } 
+  elsif ( $cmd eq "unlock" ) {
 	  readingsSingleUpdate ($hash, "lockstate", "unlock", 0);
 	  return;
-  } elsif ( $cmd eq "activateTab" ) {
+  } 
+  elsif ( $cmd eq "activateTab" ) {
 	  Dashboard_activateTab ($name,$args[0]);
 	  return;
-  } else { 
+  } 
+  else { 
 	  return $setlist;
   }
   
@@ -220,30 +224,35 @@ sub Dashboard_Get($@) {
           my @iconFolders = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default:fhemSVG:openautomation"));	
           my $iconDirs = "";
           
-          foreach my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
+          for my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
           
           $res .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . Dashboard_GetTabCount($hash, 0). ", \"dashboard_homeTab\": " . Dashboard_GetActiveTab($name);
           $res .= ($i != $x) ? ",\n" : "\n";
           
-          foreach my $attr (sort keys %$attrdata) {
+          for my $attr (sort keys %$attrdata) {
               $i++;				
               @splitattr = split("@", $attrdata->{$attr});
+              
               if (@splitattr == 2) {
                   $res .= "    \"".Dashboard_Escape($attr)."\": \"".$splitattr[0]."\",\n";
                   $res .= "    \"".Dashboard_Escape($attr)."color\": \"".$splitattr[1]."\"";
-              } elsif ($attr ne "dashboard_homeTab") { 
+              } 
+              elsif ($attr ne "dashboard_homeTab") { 
                   $res .= "    \"".Dashboard_Escape($attr)."\": \"".$attrdata->{$attr}."\"";
-              } else {
+              } 
+              else {
                   next;
               }
+              
               $res .= ($i != $x) ? ",\n" : "\n";
           }
+          
           $res .= "  }\n";
           $res .= "}\n";			
           return $res;
-      }		
-  
-  } elsif ($arg eq "groupWidget") {
+      }
+  } 
+  elsif ($arg eq "groupWidget") {
         #### Comming Soon ######
         # For dynamic load of GroupWidgets from JavaScript  
 		#my $dbgroup = "";
@@ -255,18 +264,18 @@ sub Dashboard_Get($@) {
 		#$res .= Dashboard_BuildGroupWidgets(1,1,1212,trim($dbgroup),"t1c1,".trim($dbgroup).",true,0,0:"); 
 		#return $res;		
         #For dynamic loading of tabs
-  
-  } elsif ($arg eq "tab" && $arg2 =~ /^\d+$/) {
+  } 
+  elsif ($arg eq "tab" && $arg2 =~ /^\d+$/) {
       return Dashboard_BuildDashboardTab($arg2, $hash->{NAME});
-  
-  } elsif ($arg eq "icon") {
+  } 
+  elsif ($arg eq "icon") {
       shift @a;
       shift @a;
       return "Please provide only one icon whose path and full name is to show." if(!@a || $a[1]);
       my $icon = join (' ', @a);
-      return FW_iconPath($icon);
-      
-  } else {
+      return FW_iconPath($icon); 
+  } 
+  else {
       return "Unknown argument $arg choose one of config:noArg icon";
   }
 }
@@ -304,11 +313,14 @@ sub Dashboard_Attr($$$) {
   
   if ($aName =~ m/dashboard_(.*)backgroundimage/) {
       my $ct = "";
+      
       if (!$1) {
           $ct = "MAIN";
-      } else {
+      } 
+      else {
           $ct = $1;
       }
+      
       delete $hash->{HELPER}{BIMG}{$ct};
       if($cmd eq "set") {
           Dashboard_searchImage($name, "$FW_dir/images", $aVal,$ct); 
@@ -363,7 +375,7 @@ return $ret;
 #           Common Start
 #############################################################################################
 sub Dashboard_CGI($) {
-  my ($htmlarg) = @_;
+  my $htmlarg = shift;
 
   $htmlarg   =~ s/^\///;                                                           # eliminate leading /
   my @params = split(/\//,$htmlarg);                                               # split URL by /
@@ -378,12 +390,14 @@ sub Dashboard_CGI($) {
       if ($showfullsize) {
           if ($FW_RET =~ m/<body[^>]*class="([^"]+)"[^>]*>/) {
               $FW_RET =~ s/class="$1"/class="$1 dashboard_fullsize"/;
-          } else {
+          } 
+          else {
               $FW_RET =~ s/<body/<body class="dashboard_fullsize"/;
           }
       }
       $ret .= Dashboard_SummaryFN($FW_wname,$name,$FW_room,undef);
-  } else {
+  } 
+  else {
       $ret .= 'Dashboard "'.$name.'" not found';
   }
 
@@ -400,7 +414,7 @@ return 0;
 #           Dashboard als HTML-Ausgabe
 #############################################################################################
 sub DashboardAsHtml($) {
-	my ($d) = @_; 
+	my $d = shift;
 	Dashboard_SummaryFN($FW_wname,$d,$FW_room,undef);
 }
 
@@ -419,21 +433,21 @@ sub Dashboard_SummaryFN ($$$$) {
   my $id              = $defs{$d}{NR};
  
   ######################### Read Dashboard Attributes and set Default-Values ####################################
-  my $lockstate            = ReadingsVal($name, "lockstate", "unlock");
-  my $showhelper           = ($lockstate eq "unlock") ? 1 : 0; 
-  my $disable              = AttrVal($name, "disable", 0);
-  my $colcount             = AttrVal($name, "dashboard_colcount", 1);
-  my $colwidth             = AttrVal($name, "dashboard_rowcentercolwidth", 100);
-  my $colheight            = AttrVal($name, "dashboard_rowcenterheight", 400); 
-  my $rowtopheight         = AttrVal($name, "dashboard_rowtopheight", 250);
-  my $rowbottomheight      = AttrVal($name, "dashboard_rowbottomheight", 250);  
   my $showtabs             = AttrVal($name, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
-  my $showtogglebuttons    = AttrVal($name, "dashboard_showtogglebuttons", 1); 
-  my $showfullsize         = AttrVal($name, "dashboard_showfullsize", 0); 
-  my $flexible             = AttrVal($name, "dashboard_flexible", 0);
-  my $customcss            = AttrVal($name, "dashboard_customcss", "none");
+  my $lockstate            = ReadingsVal($name, "lockstate",          "unlock");
+  my $showhelper           = ($lockstate eq "unlock") ? 1 : 0;
+  my $disable              = AttrVal($name, "disable",                       0);
+  my $colcount             = AttrVal($name, "dashboard_colcount",            1);
+  my $colwidth             = AttrVal($name, "dashboard_rowcentercolwidth", 100);
+  my $colheight            = AttrVal($name, "dashboard_rowcenterheight",   400); 
+  my $rowtopheight         = AttrVal($name, "dashboard_rowtopheight",      250);
+  my $rowbottomheight      = AttrVal($name, "dashboard_rowbottomheight",   250);   
+  my $showtogglebuttons    = AttrVal($name, "dashboard_showtogglebuttons",   1); 
+  my $showfullsize         = AttrVal($name, "dashboard_showfullsize",        0); 
+  my $flexible             = AttrVal($name, "dashboard_flexible",            0);
+  my $customcss            = AttrVal($name, "dashboard_customcss",      "none");
   # my $row                  = AttrVal($name, "dashboard_row", "center");
-  my $debug                = AttrVal($name, "dashboard_debug", "0");
+  my $debug                = AttrVal($name, "dashboard_debug",             "0");
   my ($activetab,$tabname) = Dashboard_GetActiveTab($name,1);
   my $tabcount             = Dashboard_GetTabCount($hash, 1);
   my $dashboardversion     = $hash->{HELPER}{VERSION};
@@ -469,7 +483,8 @@ sub Dashboard_SummaryFN ($$$$) {
   for (my $i=0;$i<@tabsortings;$i++){ 
 	 if (($tabsortings[$i-1] !~ /[0-9]+/ || $tabsortings[$i-1] !~ /:/ || $tabsortings[$i-1] !~ /,/  ) && ($tabsortings[$i-1] ne "," && $tabsortings[$i-1] ne "")) {
 	     Log3 ($name, 3, "Dashboard $name - Value of attribut dashboard_tab".$i."sorting is wrong. Saved sorting can not be set. Fix Value or delete the Attribute. [".$tabsortings[$i-1]."]");
-	 } else {
+	 } 
+     else {
 		 Log3 ($name, 5, "Dashboard $name - Sorting OK or Empty: dashboard_tab".$i."sorting");
      }	
   }
@@ -546,8 +561,8 @@ sub Dashboard_SummaryFN ($$$$) {
 	  $ret .= "</div>";
       $ret .= "</td></tr>\n";
 	  $ret .= "</table>\n";
-      
-  } else { 
+  } 
+  else { 
       $ret .= "<table>";
 	  $ret .= "<tr><td><div class=\"devType\">".$hash->{TYPE}."</div></td></tr>";
 	  $ret .= "<tr><td><table id=\"TYPE_".$hash->{TYPE}."\" class=\"block wide\">";
@@ -575,7 +590,7 @@ sub Dashboard_BuildDashboardTab ($$) {
 	my $colwidths       = AttrVal($name, 'dashboard_tab'.($t+1).'rowcentercolwidth', AttrVal($name, "dashboard_rowcentercolwidth", 100));
     $colwidths          =~ tr/,/:/;
 	my $row             = AttrVal($name, "dashboard_row", "center");
-    my $tabgroups       = AttrVal($name, "dashboard_tab".($t+1)."groups", "");
+    my $tabgroups       = AttrVal($name, "dashboard_tab".($t+1)."groups",  "");
     my $tabsortings     = AttrVal($name, "dashboard_tab".($t+1)."sorting", "");
     my $tabdevicegroups = AttrVal($name, "dashboard_tab".($t+1)."devices", "");
     my $tabcount        = Dashboard_GetTabCount($hash, 1);
@@ -586,7 +601,7 @@ sub Dashboard_BuildDashboardTab ($$) {
 	}
     
     # Hintergrundbild bauen
-    my $ct = "tab".($t+1);
+    my $ct   = "tab".($t+1);
     my $bimg = $hash->{HELPER}{BIMG}{$ct}?"url(/fhem/images/$hash->{HELPER}{BIMG}{$ct})":"none";
 	
     my @temptabdevicegroup = split(' ', $tabdevicegroups);
@@ -596,23 +611,26 @@ sub Dashboard_BuildDashboardTab ($$) {
 	# separate groups for every device they are containing
     for my $devicegroup (@temptabdevicegroup) {
         my @groupparts = split(':', $devicegroup);
+        
         if (@groupparts == 1) {
             my @devices = map { $_ . '$$$' . $_ } devspec2array($groupparts[0]);
             push(@tabdevicegroups, @devices);
-        } else {
+        } 
+        else {
             push(@tabdevicegroups, $devicegroup);
         }
     }
 
 	my $groups       = Dashboard_GetGroupList();
     $groups          =~ s/#/ /g;
-    my @groups       = split(',', $groups);
-    my @temptabgroup = split(",", $tabgroups);
+    my @groups       = split ',', $groups;
+    my @temptabgroup = split ',', $tabgroups;
 	
     # resolve group names from regular expressions
 	for (my $i=0;$i<@temptabgroup;$i++) {
-	    my @stabgroup = split(":", trim($temptabgroup[$i]));		
-		my @index = grep { $groups[$_] eq $stabgroup[0] } (0 .. @groups-1);
+	    my @stabgroup = split ":", trim($temptabgroup[$i]);
+        next if(!$stabgroup[0]);		
+		my @index     = grep { $groups[$_] eq $stabgroup[0] } (0 .. @groups-1);
 
         if (@index == 0) {
 			my $matchGroup = '^'.$stabgroup[0] . '$';
@@ -623,10 +641,12 @@ sub Dashboard_BuildDashboardTab ($$) {
 			for (my $j=0; $j<@index;$j++) {
 				my $groupname = @groups[$index[$j]];
 				$groupname .= '$$$'.'a:group='.$groupname;
-				if (@stabgroup > 1) {
+				
+                if (@stabgroup > 1) {
 					$groupname .= '$$$'.$stabgroup[1];
 				}
-				push(@tabdevicegroups,$groupname);
+				
+                push(@tabdevicegroups,$groupname);
 			}
 		}
 	}
@@ -749,7 +769,7 @@ sub Dashboard_BuildGroupWidgets ($$$$$$) {
   my %groups     = ();
   my @groupnames = ();
 
-  foreach (split(":", $groupsorting)) {
+  for (split(":", $groupsorting)) {
       my @parts = split (',', $_);
       $sorting{$parts[1]} = $_;
       # add group names to a list to have the correct order afterwards in the foreach loop
@@ -760,7 +780,7 @@ sub Dashboard_BuildGroupWidgets ($$$$$$) {
   my @devicegroups = split('§§§', $devicegroups);
 
   # sort the devices into a hash to be able to access them via group name
-  foreach my $singlegroup (@devicegroups) {
+  for my $singlegroup (@devicegroups) {
       # make sure that splitting with colon is not destroying the devspec that might
 	  # also contain a colon followed by a filter
       my ($groupname, $groupdevices, $groupicon) = split(/\$\$\$/, $singlegroup);
@@ -771,7 +791,7 @@ sub Dashboard_BuildGroupWidgets ($$$$$$) {
 
 	  my $groupicon = ''; 
 
-      foreach my $groupname (@groupnames) {
+      for my $groupname (@groupnames) {
           next if (!defined($groups{$groupname}));
           my ($groupdevices, $groupicon) = @{$groups{$groupname}};
 
@@ -790,16 +810,16 @@ return $ret;
 #           
 #############################################################################################
 sub Dashboard_BuildGroupList ($) {
-  my @dashboardgroups = split(",", $_[0]); #array for all groups to build an widget
-  my %group = ();
+  my @dashboardgroups = split(",", $_[0]);           #array for all groups to build an widget
+  my %group           = ();
  
-  foreach my $d (sort keys %defs) {
-      foreach my $grp (split(",", AttrVal($d, "group", ""))) {
+  for my $d (sort keys %defs) {
+      for my $grp (split(",", AttrVal($d, "group", ""))) {
 	      $grp = trim($grp);
-		  foreach my $g (@dashboardgroups){ 
+		  for my $g (@dashboardgroups){ 
 		      my ($gtitle, $iconName) = split(":", trim($g));
-			  my $titleMatch = "^" . quotemeta($gtitle) . "\$";
-			  $group{$grp}{$d} = 1 if($grp =~ $titleMatch); 			
+			  my $titleMatch          = "^" . quotemeta($gtitle) . "\$";
+			  $group{$grp}{$d}        = 1 if($grp =~ $titleMatch); 			
 		  }
       }
   }  
@@ -812,9 +832,10 @@ return %group;
 #############################################################################################
 sub Dashboard_GetGroupList() {
   my %allGroups = ();
-  foreach my $d (keys %defs ) {
+  
+  for my $d (keys %defs ) {
       next if(IsIgnored($d));
-      foreach my $g (split(",", AttrVal($d, "group", ""))) { $allGroups{$g}{$d} = 1; }
+      for my $g (split(",", AttrVal($d, "group", ""))) { $allGroups{$g}{$d} = 1; }
   }  
   my $ret = join(",", sort map { $_ =~ s/ /#/g ;$_} keys %allGroups);
   
@@ -855,7 +876,7 @@ sub Dashboard_BuildGroup ($$$$$$) {
   # sort the devices in alphabetical order by sortby, alias, name
   @devices = sort { lc(AttrVal($a,'sortby',AttrVal($a,'alias',$a))) cmp lc(AttrVal($b,'sortby',AttrVal($b,'alias',$b))) } @devices;
 
-  foreach my $d (@devices) {	
+  for my $d (@devices) {	
       next if (!defined($defs{$d}));
       $foundDevices++;
 
@@ -870,7 +891,8 @@ sub Dashboard_BuildGroup ($$$$$$) {
 	  if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {                                        # Don't show Link for "atEnd"-devices
 	      if(AttrVal($name, "dashboard_noLinks", 0)) {
               $ret .= "<td>$icon$devName</td>";                                              # keine Links zur Detailansicht des Devices
-          } else {
+          } 
+          else {
               $ret .= FW_pH ("detail=$d", "$icon$devName", 1, "col1", 1);                    # FW_pH = add href (<link>, <Text>, <?>, <class>, <Wert zurückgeben>, <?>)
           } 
       }	     
@@ -887,13 +909,16 @@ sub Dashboard_BuildGroup ($$$$$$) {
 	      no strict "refs"; 
 		  my $devret = &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, $FW_room, \%extPage);
  		  $ret      .= "<td class=\"dashboard_dev_container\"";
-		  if ($devret !~ /informId/i) {
+		  
+          if ($devret !~ /informId/i) {
 		      $ret .= " informId=\"$d\"";
   		  }
-		  $ret .= ">$devret</td>";
+		  
+          $ret .= ">$devret</td>";
 		  use strict "refs"; 
 	  
-      } else  {
+      } 
+      else {
 		  $ret .= "<td informId=\"$d\">$txt</td>";
 	  }
 
@@ -902,29 +927,34 @@ sub Dashboard_BuildGroup ($$$$$$) {
 	  if((!$FW_ss || $smallscreenCommands) && $cmdlist) {	
 	      my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
 		  my %cmdIcon = @a;
-		  foreach my $cmd (split(":", $cmdlist)) {
+          
+		  for my $cmd (split(":", $cmdlist)) {
 		      my $htmlTxt;
 			  my @c = split(' ', $cmd);
-			  if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
+			  
+              if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
 			      my $values = $1;
-				  foreach my $fn (sort keys %{$data{webCmdFn}}) {
+				  for my $fn (sort keys %{$data{webCmdFn}}) {
 				      no strict "refs";
 					  $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname, $d, $FW_room, $cmd, $values);
 					  use strict "refs";
 					  last if(defined($htmlTxt));
 				  }	
 			  }
+              
 			  if($htmlTxt) {
 			      # add colspan to avoid squeezed table cells
 				  $htmlTxt =~ s/<td>/<td colspan="10">/;
 				  $ret .= $htmlTxt;
-			  } else {
+			  } 
+              else {
 				  my $nCmd = $cmdIcon{$cmd} ?
                   FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
 				  $ret .= FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3", 1;
 			  }
 		  }
 	  }
+      
 	  $ret .= "</tr>";
       if(AttrVal($name, "dashboard_noLinks", 0)) {   
           $ret   =~ s/(<a\s+href="\/fhem\?detail=$d">(.*)<\/a>)/$2/s;           # keine Links zur Detailansicht des Devices
@@ -965,7 +995,7 @@ return $maxcolid;
 #           
 #############################################################################################
 sub Dashboard_CheckDashboardEntry ($) {
-  my ($hash)     = @_;
+  my $hash       = shift;
   my $now        = time();
   my $timeToExec = $now + 5;
 	
@@ -979,7 +1009,7 @@ return;
 # replaces old disused attributes and their values | set minimal attributes
 #############################################################################################
 sub Dashboard_CheckDashboardAttributUssage($) { 
-  my ($hash) = @_;
+  my $hash             = shift;
   my $d                = $hash->{NAME};
   my $dashboardversion = $hash->{HELPER}{VERSION};
   my $detailnote       = "";
@@ -1050,7 +1080,7 @@ sub Dashboard_GetActiveTab ($;$) {
   my $maxTab = Dashboard_GetTabCount($defs{$name}, 1);
   my $activeTab = 1;
   
-  foreach my $key (%FW_httpheader) {
+  for my $key (%FW_httpheader) {
       Log3 ($name, 5, "Dashboard $name - FW_httpheader $key: ".$FW_httpheader{$key}) if(defined $FW_httpheader{$key});
   }
   
@@ -1059,14 +1089,16 @@ sub Dashboard_GetActiveTab ($;$) {
 
       # my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));	  
       my %cookie;                                                            # 10.02.2020, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004
-	  foreach (split(/; */, $FW_httpheader{Cookie})) {
+	  
+      for (split(/; */, $FW_httpheader{Cookie})) {
 	      my ($k,$v) = split('=', $_);
 		  next if(!defined $v);
 		  $cookie{$k} = $v;
 	  }
 	 
       Log3($name, 5, "Dashboard $name - Cookie Hash: ". Dumper %cookie);
-	  if (defined($cookie{dashboard_activetab})) {
+	  
+      if (defined($cookie{dashboard_activetab})) {
           $activeTab = $cookie{dashboard_activetab};
           $activeTab = ($activeTab <= $maxTab)?$activeTab:$maxTab;
       }
@@ -1080,7 +1112,8 @@ sub Dashboard_GetActiveTab ($;$) {
 
   if($gtn) {
       return ($tabno,$tabname);
-  } else {
+  } 
+  else {
       return $tabno;
   }
 }
@@ -1093,6 +1126,7 @@ sub Dashboard_possibleTabs ($) {
   my $f;
 
   my $maxTab = Dashboard_GetTabCount($defs{$name}, 1);
+  
   for my $i (1..$maxTab) { 
       $f .= "," if($f);
       $f .= $i;
@@ -1116,16 +1150,21 @@ sub Dashboard_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {   # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                    # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20323 2019-10-06 20:12:38Z DS_Starter $ im Kopf komplett! vorhanden )
+	  
+      if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 21180 2020-02-11 21:04:55Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
-	  } else {
+	  } 
+      else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20323 2019-10-06 20:12:38Z DS_Starter $ im Kopf komplett! vorhanden )
-	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                  # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+      
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 21180 2020-02-11 21:04:55Z DS_Starter $ im Kopf komplett! vorhanden )
+	  
+      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                  # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );   # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden                                       
       }
-  } else {
+  } 
+  else {
 	  $hash->{VERSION} = $v;                                                      # herkömmliche Modulstruktur
   }
   
@@ -1144,7 +1183,9 @@ sub Dashboard_activateTab ($$) {
   
   $tab--;
   my $web = AttrVal($name, "dashboard_webRefresh", $hash->{HELPER}{FW});
-  my @wa  = split(",", $web);
+  return if(!$web);
+  
+  my @wa  = split ',', $web;
   
   { map { FW_directNotify("#FHEMWEB:$_", 'dashboard_load_tab('."$tab".');$("#dashboardtabs").tabs("option", "active", '."$tab".')', "") } @wa }
   
@@ -1212,13 +1253,16 @@ sub Dashboard_searchImage($$$$) {
   opendir(DIR, $dir);
   my(@files) = grep {!/^\.\.?$/ } readdir(DIR);
   closedir(DIR);
-  foreach (@files) {
-      if (-d ($t = "$dir/$_")) {                           # -d returns true if the following string is a directory.
+  
+  for (@files) {
+      if (-d ($t = "$dir/$_")) {                                              # -d returns true if the following string is a directory.
           Dashboard_searchImage($name,$t,$file,$ct);
-      } else {
+      } 
+      else {
           next if ($_ ne $file);
-          $im = (split("images\/", $dir."/".$_))[1];
-          $hash->{HELPER}{BIMG}{$ct} = $im;         # Ergebnisfile in Container speichern wenn gefunden
+          $im                        = (split("images\/", $dir."/".$_))[1];
+          $hash->{HELPER}{BIMG}{$ct} = $im;                                   # Ergebnisfile in Container speichern wenn gefunden
+          
           Log3 ($name, 5, "Dashboard $name - Background image file found in: $dir/$_");
       }
   }
