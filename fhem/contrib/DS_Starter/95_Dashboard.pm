@@ -1201,28 +1201,29 @@ return;
 #                   initiale Routinen für Dashboard
 ######################################################################################
 sub Dashboard_init ($) {
-  my ($hash) = @_;
+  my $hash = shift;
   my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash, "Dashboard_init");
   
-  if ($init_done == 1) {
-      # die Argumente für das Attribut dashboard_webRefresh dynamisch ermitteln und setzen
-      my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  if ($init_done) {                                                                             # die Argumente für das Attribut dashboard_webRefresh dynamisch ermitteln und setzen
+      my $fwd             = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized"); 
       $hash->{HELPER}{FW} = $fwd;
-      my $atr = $attr{$name}{dashboard_webRefresh};
+      
+      my $atr = AttrVal($name, "dashboard_webRefresh", "");
+      
       delFromDevAttrList($name, "dashboard_webRefresh");
       addToDevAttrList  ($name, "dashboard_webRefresh:multiple-strict,$fwd");
-	  $attr{$name}{dashboard_webRefresh} = $atr if($atr);
 	  
-      # die Argumente für das Attribut dashboard_homeTab dynamisch ermitteln und setzen
-      my $f  = Dashboard_possibleTabs ($name);
-      my $at = $attr{$name}{dashboard_homeTab};
+      $attr{$name}{dashboard_webRefresh} = $atr if($atr);
+	  
+      my $f  = Dashboard_possibleTabs ($name);                                                  # die Argumente für das Attribut dashboard_homeTab dynamisch ermitteln und setzen
+      my $at = AttrVal($name, "dashboard_homeTab", "");
       delFromDevAttrList($name, "dashboard_homeTab");
       addToDevAttrList  ($name, "dashboard_homeTab:$f");
       $attr{$name}{dashboard_homeTab} = $at if($at);
-  
-  } else {
+  } 
+  else {
       InternalTimer(time()+3, "Dashboard_init", $hash, 0);
   }
   
