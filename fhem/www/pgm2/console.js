@@ -2,7 +2,7 @@
 FW_version["console.js"] = "$Id$";
 
 var consConn;
-var debug;
+var consName="#console";
 
 var consFilter, oldFilter, consFType="";
 var consLastIndex = 0;
@@ -77,14 +77,14 @@ consUpdate(evt)
     return "";
   });
 
-  var isTa = $("#console").is("textarea"); // 102773
+  var isTa = $(consName).is("textarea"); // 102773
   var ncA = new_content.split(/<br>[\r\n]/);
   for(var i1=0; i1<ncA.length; i1++)
     ncA[i1] = ncA[i1].replace(/[<> ]/g, function(a){return rTab[a]});
-  $("#console").append(logContent+ncA.join(isTa?"\n":"<br>"));
+  $(consName).append(logContent+ncA.join(isTa?"\n":"<br>"));
     
   if(mustScroll)
-    $("#console").scrollTop($("#console")[0].scrollHeight);
+    $(consName).scrollTop($(consName)[0].scrollHeight);
 }
 
 function
@@ -98,6 +98,7 @@ consFill()
   var query = "?XHR=1"+
        "&inform=type=raw;withLog="+withLog+";filter="+
        encodeURIComponent(consFilter)+consFType+
+       "&fw_id="+$("body").attr('fw_id')+
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
 
@@ -129,7 +130,7 @@ consFill()
 
   consLastIndex = 0;
   if(oldFilter != consFilter)  // only clear, when filter changes
-    $("#console").html("");
+    $(consName).html("");
   
   oldFilter = consFilter;
 }
@@ -137,9 +138,11 @@ consFill()
 function
 consStart()
 {
-  var el = document.getElementById("console");
+  if($(consName).length != 1)
+    return;
 
-  consFilter = $("a#eventFilter").html();
+  if($("a#eventFilter").length)
+    consFilter = $("a#eventFilter").html();
   if(consFilter == undefined)
     consFilter = ".*";
   oldFilter = consFilter;
@@ -148,7 +151,7 @@ consStart()
   
    $("#eventReset").click(function(evt){  // Event Monitor Reset
      log("Console resetted by user");
-     $("#console").html("");
+     $(consName).html("");
    });
   
   $("#eventFilter").click(function(evt){  // Event-Filter Dialog
@@ -192,10 +195,10 @@ consStart()
   });
   
   
-  $("#console").scroll(function() { // autoscroll check
+  $(consName).scroll(function() { // autoscroll check
     
-    if($("#console")[0].scrollHeight - $("#console").scrollTop() <=
-       $("#console").outerHeight() + 2) { 
+    if($(consName)[0].scrollHeight - $(consName).scrollTop() <=
+       $(consName).outerHeight() + 2) { 
       if(!mustScroll) {
         mustScroll = 1;
         log("Console autoscroll restarted");
@@ -337,4 +340,51 @@ consAddRegexpPart()
   });
 }
   
+function
+cons4dev(screenId, filter, feedFn, devName)
+{
+  $(screenId).find("a")
+    .blur()     // remove focus, so return wont open/close it
+    .unbind("click")
+    .click(toggleOpen);
+
+  consName = screenId+">div.console";
+  consFilter = filter;
+  var opened;
+
+  function
+  toggleOpen()
+  {
+    $(this).blur();
+    var cmd = FW_root+"?cmd="+encodeURIComponent("{"+feedFn+"('"+devName+"',"+
+                        (opened ? 0 : 1)+")}")+"&XHR=1";
+    if(!opened) {
+      $(screenId).append('<div class="console block"></div>');
+      $(consName)
+        .width( $("#content").width()-40)
+        .height($("#content").height()/2-20)
+        .css({overflow:"auto"});
+      $(screenId+">a").html($(screenId+">a").html().replace("Show", "Hide"));
+      FW_closeConn();
+      consStart();
+      // Leave time for establishing the connection, else the "feeder" may
+      // clear the flag
+      setTimeout(function(){ FW_cmd(cmd) }, 100);
+
+    } else {
+      FW_cmd(cmd);
+      $(consName).remove();
+      $(screenId+">a").html($(screenId+">a").html().replace("Hide", "Show"));
+      if(consConn) {
+        consConn.onclose = undefined;
+        cons_closeConn();
+      }
+      FW_longpoll();
+    }
+    opened = !opened;
+  }
+
+  toggleOpen();
+}
+
 window.onload = consStart;

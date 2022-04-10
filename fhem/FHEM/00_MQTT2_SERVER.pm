@@ -12,6 +12,7 @@ sub MQTT2_SERVER_Write($$$);
 sub MQTT2_SERVER_Undef($@);
 sub MQTT2_SERVER_doPublish($$$$;$);
 
+use vars qw(%FW_id2inform);
 
 # See also:
 # http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
@@ -50,6 +51,7 @@ MQTT2_SERVER_Initialize($)
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
+  $hash->{FW_detailFn} = "MQTT2_SERVER_fhemwebFn";
 }
 
 sub
@@ -564,6 +566,20 @@ MQTT2_SERVER_doPublish($$$$;$)
     my $re = AttrVal($serverName, "rawEvents", undef);
     DoTrigger($server->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
   }
+
+  my $fl = $server->{".feedList"};
+  if($fl) {
+    foreach my $fwid (keys %{$fl}) {
+      my $cl = $FW_id2inform{$fwid};
+      if(!$cl || !$cl->{inform}{filter} || $cl->{inform}{filter} ne '^$') {
+        delete($fl->{$fwid});
+        next;
+      }
+      FW_AsyncOutput($cl, "", 
+                  defined($cid) ? "RCVD: $tp $val<br>" : "SENT: $tp $val<br>");
+    }
+    delete($server->{".feedList"}) if(!keys %{$fl});
+  }
 }
 
 ######################################
@@ -663,6 +679,47 @@ MQTT2_SERVER_getStr($$$)
   $hash->{stringError} = 1 if(index($r, "\0") >= 0);
   $r = Encode::decode('UTF-8', $r) if($unicodeEncoding);
   return ($r, $off+2+$l);
+}
+
+sub
+MQTT2_SERVER_fhemwebFn()
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  return '' if($pageHash);
+
+  return << "JSEND"
+  <div id="m2s_cons"><a href="#">Show MQTT traffic</a></div>
+  <script type="text/javascript">
+    \$(document).ready(function() {
+      \$("#m2s_cons a")
+        .click(function(e){
+          loadScript("pgm2/console.js", function() {
+            cons4dev('#m2s_cons', '^\$', 'MQTT2_SERVER_addToFeedList', '$d');
+          });
+        });
+    });
+  </script>
+JSEND
+}
+
+sub
+MQTT2_SERVER_addToFeedList($$)
+{
+  my ($name, $turnOn) = @_;
+  my $hash = $defs{$name};
+  return if(!$hash);
+
+  my $fwid = $FW_chash->{FW_ID};
+  $hash->{".feedList"} = () if(!$hash->{".feedList"});
+  if($turnOn) {
+    $hash->{".feedList"}{$fwid} = 1;
+
+  } else {
+    delete($hash->{".feedList"}{$fwid});
+    delete($hash->{".feedList"}) if(!keys %{$hash->{".feedList"}});
+  }
+  return undef;
 }
 
 # {MQTT2_SERVER_ReadDebug("m2s", '0(12)(0)(5)HelloWorld')}

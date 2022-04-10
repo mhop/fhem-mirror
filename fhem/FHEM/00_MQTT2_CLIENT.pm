@@ -12,6 +12,8 @@ sub MQTT2_CLIENT_Undef($@);
 sub MQTT2_CLIENT_doPublish($@);
 sub MQTT2_CLIENT_Disco($;$$);
 
+use vars qw(%FW_id2inform);
+
 # See also:
 # http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
 
@@ -57,6 +59,7 @@ MQTT2_CLIENT_Initialize($)
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
+  $hash->{FW_detailFn} = "MQTT2_CLIENT_fhemwebFn";
 }
 
 sub
@@ -536,6 +539,7 @@ MQTT2_CLIENT_Read($@)
         DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);
       }
     }
+    MQTT2_CLIENT_feedTheList($hash, $tp, $val, 1);
 
   } else {
     Log 1, "M2: Unhandled packet $cpt, disconneting $name";
@@ -592,7 +596,8 @@ MQTT2_CLIENT_doPublish($@)
                                 length($pi)).
             pack("n", length($topic)).
             $topic.$pi.$val;
-  MQTT2_CLIENT_send($hash, $msg, $immediate)
+  MQTT2_CLIENT_send($hash, $msg, $immediate);
+  MQTT2_CLIENT_feedTheList($hash, $topic, $val);
 }
 
 sub
@@ -687,6 +692,65 @@ MQTT2_CLIENT_getStr($$)
   return ($r, $off+2+$l);
 }
 
+sub
+MQTT2_CLIENT_fhemwebFn()
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  return '' if($pageHash);
+
+  return << "JSEND"
+  <div id="m2s_cons"><a href="#">Show MQTT traffic</a></div>
+  <script type="text/javascript">
+    \$(document).ready(function() {
+      \$("#m2s_cons a")
+        .click(function(e){
+          loadScript("pgm2/console.js", function() {
+            cons4dev('#m2s_cons', '^\$', 'MQTT2_CLIENT_addToFeedList', '$d');
+          });
+        });
+    });
+  </script>
+JSEND
+}
+
+sub
+MQTT2_CLIENT_addToFeedList($$)
+{
+  my ($name, $turnOn) = @_;
+  my $hash = $defs{$name};
+  return if(!$hash);
+
+  my $fwid = $FW_chash->{FW_ID};
+  $hash->{".feedList"} = () if(!$hash->{".feedList"});
+  if($turnOn) {
+    $hash->{".feedList"}{$fwid} = 1;
+
+  } else {
+    delete($hash->{".feedList"}{$fwid});
+    delete($hash->{".feedList"}) if(!keys %{$hash->{".feedList"}});
+  }
+  return undef;
+}
+
+sub
+MQTT2_CLIENT_feedTheList($$$)
+{
+  my ($server, $tp, $val, $cid) = @_;
+  my $fl = $server->{".feedList"};
+  if($fl) {
+    foreach my $fwid (keys %{$fl}) {
+      my $cl = $FW_id2inform{$fwid};
+      if(!$cl || !$cl->{inform}{filter} || $cl->{inform}{filter} ne '^$') {
+        delete($fl->{$fwid});
+        next;
+      }
+      FW_AsyncOutput($cl, "", 
+                  defined($cid) ? "RCVD: $tp $val<br>" : "SENT: $tp $val<br>");
+    }
+    delete($server->{".feedList"}) if(!keys %{$fl});
+  }
+}
 1;
 
 =pod

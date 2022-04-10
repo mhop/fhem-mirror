@@ -92,6 +92,7 @@ use vars qw(@FW_httpheader); # HTTP header, line by line
 use vars qw(%FW_httpheader); # HTTP header, as hash
 use vars qw($FW_userAgent); # user agent string
 use vars qw($FW_addJs);     # Only for helper like AttrTemplate
+use vars qw(%FW_id2inform);
 
 $FW_formmethod = "post";
 
@@ -101,7 +102,6 @@ my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
 my $FW_lastHashUpdate = 0;
 my $FW_httpRetCode = "";
 my %FW_csrfTokenCache;
-my %FW_id2inform;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -360,7 +360,7 @@ FW_Read($$)
     my $buf;
     my $ret = sysread($c, $buf, 1024);
     $buf = Encode::decode($hash->{encoding}, $buf)
-                if($unicodeEncoding && $hash->{encoding});
+                if($unicodeEncoding && $hash->{encoding} && !$hash->{websocket});
 
     if(!defined($ret) && $! == EWOULDBLOCK ){
       $hash->{wantWrite} = 1
@@ -750,9 +750,9 @@ FW_addToWritebuffer($$@)
 }
 
 sub
-FW_AsyncOutput($$)
+FW_AsyncOutput($$;$)
 {
-  my ($hash, $ret) = @_;
+  my ($hash, $ret, $directData) = @_;
 
   return if(!$hash || !$hash->{FW_ID});
   if( $ret =~ m/^<html>(.*)<\/html>$/s ) {
@@ -766,6 +766,7 @@ FW_AsyncOutput($$)
 
   my $data = FW_longpollInfo('JSON',
                              "#FHEMWEB:$FW_wname","FW_okDialog('$ret')","");
+  $data = $directData if($directData);
 
   # find the longpoll connection with the same fw_id as the page that was the
   # origin of the get command
