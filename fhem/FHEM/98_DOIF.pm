@@ -445,6 +445,7 @@ sub parse_tpl
   $wcmd =~ s/\$SHOWNODEVICELINK/\$hash->{$table}{shownodevicelink}/;
   $wcmd =~ s/\$SHOWNODEVICELINE/\$hash->{$table}{shownodeviceline}/;
   $wcmd =~ s/\$SHOWNOUITABLE/\$hash->{$table}{shownouitable}/;
+  $wcmd =~ s/\$ANIMATE/\$hash->{card}{animate}/;
   $hash->{$table}{package} = "" if (!defined ($hash->{$table}{package}));
   if ($wcmd=~ /^\s*\{/) { # perl block
     my ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($wcmd,'[\{\}]');
@@ -1692,6 +1693,7 @@ sub ReplaceReadingDoIf
              delete $hash->{collect}{"$name $reading"}{$hours};
              $hash->{collect}{"$name $reading"}{$hours}{hours}=$hours;
              $hash->{collect}{"$name $reading"}{$hours}{dim}=$dim;
+             $hash->{collect}{"$name $reading"}{$hours}{animate}= (defined $hash->{card}{animate} and $hash->{card}{animate} eq "1") ? 1 :0;
              my $values=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_values","");
              my $times=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_times","");
              my $va;
@@ -4601,7 +4603,8 @@ sub plot {
   my $hours = ${$collect}{hours};
   my $time = ${$collect}{time};
   my $dim=${$collect}{dim};
-  
+  my $animate=(${$collect}{animate} eq "1") ? '<animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>':'</circle>';
+
   
   my $min;
   my $max;
@@ -4758,9 +4761,15 @@ sub plot {
   }
   $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-opacity:1" />',$xpos,$chart_dim,$xpos);
 
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$chart_dim,(50-int(($value*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($currColor,$ln)) if ($val ne "N/A");
+  ##$out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
+  my ($x1,$y1)=($maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10)-2.3);
+  $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.7"/>',$x1,$y1,$x1+2.4,$y1+4.3,$x1-2.4,$y1+4.3, defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
+ 
+ ##$out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
+  ($x1,$y1)=($minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10)+2.3);
+  $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.7"/>',$x1,$y1,$x1+2.4,$y1-4.3,$x1-2.4,$y1-4.3, defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
+  
+  $out.=sprintf(('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7">'.$animate),$chart_dim,(50-int(($value*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($currColor,$ln)) if ($val ne "N/A");
   
   my $footer="";
   
@@ -4968,7 +4977,7 @@ sub card
   $out.= sprintf('<svg width="%s" height="72">',$chart_dim+84);
   $out.= '<g transform="translate(35,8) scale(1) ">';
 
-  $out.= '<rect x="-2" y="-2" width="'.($chart_dim+4).'" height="54" rx="1" ry="1" fill="url(#gradcardback)"/>';
+  $out.= '<rect x="-2" y="-3" width="'.($chart_dim+4).'" height="56" rx="1" ry="1" fill="url(#gradcardback)"/>';
 
   for (my $i=1;$i<5;$i++) {
     my $y=$i*10;
