@@ -457,7 +457,7 @@ my %EnO_eepConfig = (
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "O5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR14", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
-  "G6.02.01" => {attr => {subType => "switch", eep => "F6-02-01", manufID => "00D", model => "Eltako_F4CT55", sensorMode => 'pushbutton'}},
+  "G6.02.01" => {attr => {subType => "switch", destinationID => "unicast", eep => "F6-02-01", manufID => "00D", model => "Eltako_F4CT55", sensorMode => 'pushbutton', subTypeSet => "switch"}},
   "L6.02.01" => {attr => {subType => "smokeDetector.02", eep => "F6-05-02", manufID => "00D"}},
   "ZZ.13.03" => {attr => {subType => "environmentApp", eep => "A5-13-03", devMode => "master", manufID => "7FF"}},
   "ZZ.13.04" => {attr => {subType => "environmentApp", eep => "A5-13-04", devMode => "master", manufID => "7FF"}},
@@ -1118,7 +1118,13 @@ sub EnOcean_Define($$) {
                     $attr{$name}{room} = $autocreateDeviceRoom;
                     $attr{$name}{subDef} = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000") if (!exists $attr{$name}{subDef});
                     foreach my $attrCntr (keys %{$EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}}) {
-                      $attr{$name}{$attrCntr} = $EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}{$attrCntr} if ($attrCntr ne "subDef");
+                      if ($attrCntr eq "subDef") {
+                        next;
+                      } elsif ($attrCntr eq "subType" && defined($attr{$name}{$attrCntr})) {
+                        next;
+                      } else {
+                        $attr{$name}{$attrCntr} = $EnO_eepConfig{$EnO_mscRefID{$refID}{attr}{eep}}{attr}{$attrCntr};
+                      }
                     }
                     EnOcean_CreateSVG(undef, $hash, $attr{$name}{eep});
                     readingsSingleUpdate($hash, "teach", "MSC teach-in EEP $attr{$name}{eep} requested Manufacturer " . $EnO_manuf{$attr{$name}{manufID}}, 1);
@@ -1327,9 +1333,9 @@ sub EnOcean_Get($@) {
   my $status = '00';
   my $st = AttrVal($name, "subType", "");
   my $stSet = AttrVal($name, "subTypeSet", undef);
-  if (defined $stSet) {$st = $stSet;}
+  $st = $stSet if (defined $stSet);
   my $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
-  if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
+  return "SenderID $subDef wrong, choose <8-digit-hex-code>." if ($subDef !~ m/^[\dA-F]{8}$/);
   my $timeNow = TimeNow();
   if (AttrVal($name, "remoteManagement", "off") eq "manager") {
     # Remote Management
@@ -18493,8 +18499,10 @@ sub EnOcean_sec_convertToSecure($$$$) {
   my ($err, $response, $loglevel);
   my $name = $hash->{NAME};
   my $secLevel = AttrVal($name, "secLevel", "off");
+  # no encryption with different set profile, required for the LED control of the model Eltako_F4CT55
+  my $subTypeSet = AttrVal($name, "subTypeSet", "");
   # encryption needed?
-  return ($err, $rorg, $data, $response, 5) if ($rorg =~ m/^F6|35$/ || $secLevel !~ m/^encapsulation|encryption$/);
+  return ($err, $rorg, $data, $response, 5) if ($rorg =~ m/^F6|35$/ || $secLevel !~ m/^encapsulation|encryption$/ || $subTypeSet eq "switch");
   return ("Cryptographic functions are not available", undef, undef, $response, 2) if ($cryptFunc == 0);
   my $dataEnc = AttrVal($name, "dataEnc", undef);
   my $subType = AttrVal($name, "subType", "");
@@ -18502,15 +18510,11 @@ sub EnOcean_sec_convertToSecure($$$$) {
   # subType specific actions
   if ($subType eq "switch.00" || $subType eq "windowHandle.10") {
     # securemode for D2-03-00 and D2-03-10
-    if (hex($data) > 15) {
-      return("wrong data byte", $rorg, $data, $response, 2);
-    }
-
+    return ("wrong data byte", $rorg, $data, $response, 2) if (hex($data) > 15);
     # set rorg to secure telegram
     $rorg = "30";
-
   } else {
-    return("Cryptographic functions for $subType not available", $rorg, $data, $response, 2);
+    return ("Cryptographic functions for $subType not available", $rorg, $data, $response, 2);
   }
 
   #Get and update RLC
