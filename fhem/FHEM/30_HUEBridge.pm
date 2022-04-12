@@ -2145,7 +2145,7 @@ HUEBridge_Autocreate($;$$)
     }
   }
 
-  sub sum { my $sum = 0; $sum += $_ for @_;  return $sum }
+  local *sum = sub { my $sum = 0; $sum += $_ for @_;  return $sum };
 
   my $created = join( '/', @created );
   my $ignored = join( '/', @ignored );
