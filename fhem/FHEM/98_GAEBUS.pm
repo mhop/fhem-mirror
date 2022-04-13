@@ -56,6 +56,10 @@
 # 05.02.2020 : A.Goebel : change substitute tilde by slash in attribute names (delimiter)
 # 16.02.2020 : A.Goebel : fix also request broadcast messages periodic call (fix from Tomy) 
 # 20.01.2021 : A.Goebel : fix remove deprecated attribute loglevel
+# 05.04.2022 : A.Goebel : fix support "_" in class names (eg. vr_70) / add $init_done
+# 11.04.2022 : A.Goebel : change attributes mapNames and mapClass to support "_" in class and variable names
+# 11.04.2022 : A.Goebel : add use helper hash to hold information for scheduled readings
+# 11.04.2022 : A.Goebel : del longAttributesCount (all installations should be migrated now)
 
 package main;
 
@@ -99,7 +103,7 @@ my $allGetParams           = "";
 my $allGetParamsForWriting = "";
 my $delimiter              = "_";
 
-my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 ebusWritesEnabled:0,1 valueFormat:textField-long $readingFnAttributes";
+my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 ebusWritesEnabled:0,1 valueFormat:textField-long $readingFnAttributes mapClass mapVar";
 my %ebusCmd  = ();
 
 #####################################
@@ -123,82 +127,151 @@ GAEBUS_Initialize($)
   %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
   %setsForWriting = ();
   %getsForWriting = ( "ebusd_hex" => [] );
-  
+
   GAEBUS_initParams($hash);
 
 }
 
 #####################################
 sub
+GAEBUS_splitAttribute (@)
+{
+  my ($hash, $oneattr) = @_;
+  my $name = $hash->{NAME};
+
+  my $mapClass = ((defined ($attr{$name}{mapClass}) and ($attr{$name}{mapClass} ne "")) ? $attr{$name}{mapClass} : "[^$delimiter]+");
+  my $mapVar   = ((defined ($attr{$name}{mapVar})   and ($attr{$name}{mapVar} ne ""))   ? $attr{$name}{mapVar}   : "[^$delimiter]+");
+
+  my @result = ("", "", "", "", "");
+  my @pattern = 
+    ("[^$delimiter]+",
+    $mapClass,
+    $mapVar,
+    "[^$delimiter]+"
+    );
+
+    #Log3 ($hash, 3, "$name splitAttribute params $oneattr");
+
+  for (my $i=0; $i <4; $i++) {
+    #Log3 ($hash, 5, "$name $i $oneattr $pattern[$i]\n");
+    if ( $oneattr =~ /^($pattern[$i])/ ) {
+      #Log3 ($hash, 5, "$name case 1 ");
+       $result[$i] = $1;
+       $oneattr =~ s/$result[$i]${delimiter}*//;
+     } elsif ( $oneattr =~ /^([^$delimiter]+)/ ) {
+       #Log3 ($hash, 5, "$name case 2 ");
+       $result[$i] = $1;
+       $oneattr =~ s/$result[$i]${delimiter}*//;
+     }
+
+     #Log3 ($hash, 5, "$name got $i >$result[$i]< rest $oneattr\n");
+
+  }
+
+  #Log3 ($hash, 3, "$name splitAttribute ".join("|", @result)."\n");
+  return (@result);
+
+}
+#####################################
+sub
 GAEBUS_initParams ($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   # bulid set and get Params and store them in 
   #   $allSetParams
   #   $allSetParamsForWriting
   #   $allGetParams
   #   $allGetParamsForWriting
+  #
+  # create helper for ebus commands
+  # store "r_", "u_" and "w_" attributes in helper structure
 
   $allSetParams = "";
   foreach my $setval (sort keys %sets) 
   {
-	Log3 ($hash, 4, "GAEBUS Initialize params for set: $setval");
-	if ( (@{$sets{$setval}}) > 0)
-	{
+    Log3 ($hash, 4, "$name Initialize params for set: $setval");
+    if ( (@{$sets{$setval}}) > 0)
+    {
           $allSetParams .= $setval.":".join (",", @{$sets{$setval}})." ";
-	}
-	else
-	{
+    }
+    else
+    {
           $allSetParams .= $setval." ";
-	}
-	#Log3 ($hash, 2, "GAEBUS Initialize: $setval:$allSetParams");
+    }
+    #Log3 ($hash, 2, "$name Initialize: $setval:$allSetParams");
   }
 
   $allSetParamsForWriting = "";
   foreach my $setval (sort keys %setsForWriting) 
   {
-	Log3 ($hash, 4, "GAEBUS Initialize params for setsForWriting: $setval");
-	if ( (@{$setsForWriting{$setval}}) > 0)
-	{
+    Log3 ($hash, 4, "$name Initialize params for setsForWriting: $setval");
+    if ( (@{$setsForWriting{$setval}}) > 0)
+    {
           $allSetParamsForWriting .= $setval.":".join (",", @{$setsForWriting{$setval}})." ";
-	}
-	else
-	{
+    }
+    else
+    {
           $allSetParamsForWriting .= $setval." ";
-	}
-	#Log3 ($hash, 2, "GAEBUS Initialize: $setval:$allSetParamsForWriting");
+    }
+    #Log3 ($hash, 2, "$name Initialize: $setval:$allSetParamsForWriting");
   }
 
   $allGetParams = "";
   foreach my $getval (sort keys %gets) 
   {
-	Log3 ($hash, 4, "GAEBUS Initialize params for get: $getval");
-	if ( (@{$gets{$getval}}) > 0)
-	{
+    Log3 ($hash, 4, "$name Initialize params for get: $getval");
+    if ( (@{$gets{$getval}}) > 0)
+    {
           $allGetParams .= $getval.":".join (",", @{$gets{$getval}})." ";
-	}
-	else
-	{
+    }
+    else
+    {
           $allGetParams .= $getval." ";
-	}
-	#Log3 ($hash, 2, "GAEBUS Initialize: $getval:$allGetParams");
+    }
+    #Log3 ($hash, 2, "$name Initialize: $getval:$allGetParams");
   }
 
 
   $allGetParamsForWriting = "";
   foreach my $setval (sort keys %getsForWriting) 
   {
-	Log3 ($hash, 4, "GAEBUS Initialize params for getsForWriting: $setval");
-	if ( (@{$getsForWriting{$setval}}) > 0)
-	{
+    Log3 ($hash, 4, "$name Initialize params for getsForWriting: $setval");
+    if ( (@{$getsForWriting{$setval}}) > 0)
+    {
           $allGetParamsForWriting .= $setval.":".join (",", @{$getsForWriting{$setval}})." ";
-	}
-	else
-	{
+    }
+    else
+    {
           $allGetParamsForWriting .= $setval." ";
-	}
-	#Log3 ($hash, 2, "GAEBUS Initialize: $setval:$allSetParamsForWriting");
+    }
+    #Log3 ($hash, 2, "$name Initialize: $setval:$allSetParamsForWriting");
+  }
+
+  # create helper for ebus commands
+  # store "r_", "u_" and "w_" attributes in helper structure
+  # $hash->{helper}{ebus}{<attributeName>}
+  # $hash->{helper}{ebus}{<attributeName>}{io} = "r|w"
+  # $hash->{helper}{ebus}{<attributeName>}{class} = "bai|mc|mc_1|..."
+  # $hash->{helper}{ebus}{<attributeName>}{var} = "simpleVar|varIncludingDelimiter"
+  #
+  
+  $hash->{helper}{ebus} = ();
+  foreach my $oneattr (sort keys %{$attr{$name}})
+  {
+    # only for "r" commands and broadcasts ("u")
+    if ($oneattr =~ /^[ru]$delimiter[^$delimiter]{1,}$delimiter.*/)
+    {
+      my ($io,$class,$var,$comment) = GAEBUS_splitAttribute ($hash, $oneattr);
+
+      $hash->{helper}{ebus}{$oneattr} = ();
+      $hash->{helper}{ebus}{$oneattr}{io} = $io;
+      $hash->{helper}{ebus}{$oneattr}{class} = $class;
+      $hash->{helper}{ebus}{$oneattr}{var} = $var;
+
+      Log3 ($hash, 4, "$name Initialize: $oneattr -> $io|$class|$var|$comment|");
+    }
   }
 
 }
@@ -230,9 +303,7 @@ GAEBUS_Define($$)
   my $ret = GAEBUS_OpenDev($hash, 0);
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+10, "GAEBUS_GetUpdates", $hash, 0);
-
-  $hash->{helper}{longAttributesCount} = 0;
+  InternalTimer(gettimeofday()+5, "GAEBUS_GetUpdates", $hash, 0);
 
   return undef;
 }
@@ -270,18 +341,11 @@ GAEBUS_Set($@)
   my $type = shift @a;
   my $arg = join(" ", @a);
 
-  # UTF-8 tilde replacement
-  #$type =~ s,\xe2\x88\xbc,$delimiter,g;
-  #$arg  =~ s,\xe2\x88\xbc,$delimiter,g;
-
-  #return "No $a[1] for dummies" if(IsDummy($name));
-
-  #Log3 ($hash, 3, "ebus1: reopen $name");
 
   #Log3 ($hash, 2, "$name: set $arg  $type invalid parameter");
 
   if ($type eq "reopen") {
-    Log3 ($hash, 3, "ebus1: reopen");
+    Log3 ($hash, 3, "$name reopen");
     GAEBUS_CloseDev($hash);
     GAEBUS_OpenDev($hash,0);
     return undef;
@@ -292,30 +356,33 @@ GAEBUS_Set($@)
 
   if (defined ($sets{$type}))
   {
-	unless (grep {$_ eq $arg} @{$sets{$type}})
-	{
-		return "invalid parameter";
-	}
+    unless (grep {$_ eq $arg} @{$sets{$type}})
+    {
+        return "invalid parameter";
+    }
 
-        my $attrname = $type.$delimiter.$arg;
-        $attrname =~ s/\#install/install/;
-        my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
-        my $shortAttrname = join ($delimiter, ($io, $class, $var));
+    my $attrname = $type.$delimiter.$arg;
+    $attrname =~ s/\#install/install/;
+    #my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
+    my ($io,$class,$var,$comment) = GAEBUS_splitAttribute ($hash, $attrname);
+    my $shortAttrname = join ($delimiter, ($io, $class, $var));
 
-	#Log3 ($hash, 3, "$name: set $attrname");
-	Log3 ($hash, 3, "$name: set for reading $attrname");
+    #Log3 ($hash, 3, "$name: set $attrname");
+    Log3 ($hash, 3, "$name: set for reading $attrname");
 
-        addToDevAttrList($name, $shortAttrname);
+    addToDevAttrList($name, $shortAttrname);
 
-	if (! defined $attr{$name}{$attrname}) {
-          if ($class eq "") {
-	    $attr{$name}{$shortAttrname} = $var;
-          } else {
-	    $attr{$name}{$shortAttrname} = join ("-", ($class, $var));
-          }
+    if (! defined $attr{$name}{$attrname}) {
+        if ($class eq "") {
+          #$attr{$name}{$shortAttrname} = $var;
+          GAEBUS_Attr("set", $name, $shortAttrname, $var);
+        } else {
+          #$attr{$name}{$shortAttrname} = join ("-", ($class, $var));
+          GAEBUS_Attr("set", $name, $shortAttrname, join ("-", ($class, $var)));
         }
+    }
 
-        return undef;
+    return undef;
   }
 
 
@@ -360,30 +427,30 @@ GAEBUS_Set($@)
 
     if (defined ($setsForWriting{$type}))
     {
-  	unless (grep {$_ eq $arg} @{$setsForWriting{$type}})
-	{
-		return "invalid parameter";
-	}
+      unless (grep {$_ eq $arg} @{$setsForWriting{$type}})
+      {
+        return "invalid parameter";
+      }
 
-        my $attrname = $type.$delimiter.$arg;
-        $attrname =~ s/\#install/install/;
-        my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
-        my $shortAttrname = join ($delimiter, ($io, $class, $var));
+      my $attrname = $type.$delimiter.$arg;
+      $attrname =~ s/\#install/install/;
+      #my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
+      my ($io,$class,$var,$comment) = GAEBUS_splitAttribute ($hash, $attrname);
+      my $shortAttrname = join ($delimiter, ($io, $class, $var));
 
-	Log3 ($hash, 3, "$name: set for writing $attrname");
-        #addToDevAttrList($name, $attrname);
+      Log3 ($hash, 3, "$name: set for writing $attrname");
 
-        addToDevAttrList($name, $shortAttrname);
+      addToDevAttrList($name, $shortAttrname);
 
-	if (! defined $attr{$name}{$attrname}) {
-          if ($class eq "") {
-	    $attr{$name}{$shortAttrname} = $var;
-          } else {
-	    $attr{$name}{$shortAttrname} = join ("-", ($class, $var));
-          }
+      if (! defined $attr{$name}{$attrname}) {
+        if ($class eq "") {
+          $attr{$name}{$shortAttrname} = $var;
+        } else {
+          $attr{$name}{$shortAttrname} = join ("-", ($class, $var));
         }
+      }
 
-        return undef;
+      return undef;
     }
 
     if (defined ($writings{$type}))
@@ -404,7 +471,7 @@ GAEBUS_Set($@)
 
   #$actSetParams =~ s,$delimiter,&sim;,g;
   return "Unknown argument $type, choose one of " . $actSetParams
-  	if(!defined($sets{$type}));
+    if(!defined($sets{$type}));
 
   return undef;
 }
@@ -434,38 +501,6 @@ GAEBUS_Get($@)
 
     return $answer;
   }
-
-  if ($type eq "removeCommentFromAttributeNames")
-  {
-    Log3 ($hash, 4, "$name Get $type $arg");
-    my $answer = "shortened the follwing attribute names\n"; 
-
-    foreach my $oneattr (sort keys %{$attr{$name}})
-    {
-      if ($oneattr =~ /$delimiter/) {
-        my ($io,$class,$var,$comment) = split ($delimiter, $oneattr, 4);
-        if (defined ($comment)) {
-
-          # attribute name contains comment as 4-th part
-
-          my $newattrname = join ($delimiter, ($io, $class, $var));
-
-          $answer .= $oneattr." to ".$newattrname."\n";
-
-          $attr{$name}{userattr} =~ s/$oneattr//;
-          addToDevAttrList($name, $newattrname);
-
-          $attr{$name}{$newattrname} = $attr{$name}{$oneattr};
-          delete ($attr{$name}{$oneattr});
-
-        }
-      }
-    }
-    $hash->{helper}{longAttributesCount} = 0;
-
-    return $answer;
-  }
-
 
   # extend possible parameters by the readings defined in attributes
 
@@ -503,9 +538,6 @@ GAEBUS_Get($@)
   }
   $actGetParams .= join (",", sort keys %readings);
 
-  if ($hash->{helper}{longAttributesCount} > 0) {
-    $actGetParams .= " removeCommentFromAttributeNames";
-  }
   my $ebusWritesEnabled = (defined($attr{$name}{"ebusWritesEnabled"})) ? $attr{$name}{"ebusWritesEnabled"} : 0;
 
   if ($ebusWritesEnabled) {
@@ -572,7 +604,7 @@ GAEBUS_Get($@)
 
   #$actGetParams =~ s,$delimiter,&sim;,g;
   return "Unknown argument $a[1], choose one of " . $actGetParams
-  	if(!defined($gets{$a[1]}));
+      if(!defined($gets{$a[1]}));
 
 
   #return "No $a[1] for dummies" if(IsDummy($varname));
@@ -622,8 +654,8 @@ GAEBUS_OpenDev($$)
   my $host = $hash->{DeviceAddress};
   my $port = 8888;
   if($host =~ m/^(.+):(.+)$/) { # host[:port]
-	$host = $1;
-	$port = $2;
+    $host = $1;
+    $port = $2;
   }
 
   $hash->{PARTIAL} = "";
@@ -641,16 +673,15 @@ GAEBUS_OpenDev($$)
   }
 
   my $conn = new IO::Socket::INET (
-	PeerAddr => "$host",
-	PeerPort => "$port",
-	Proto    => 'tcp',
-	Reuse    => 0,
-	Timeout  => 10
-	);
+    PeerAddr => "$host",
+    PeerPort => "$port",
+    Proto    => 'tcp',
+    Reuse    => 0,
+    Timeout  => 10
+    );
 
   if(defined ($conn)) {
     delete($hash->{NEXT_OPEN});
-
 
   } else {
     Log(3, "Can't connect to $dev: $!") if(!$reopen);
@@ -711,8 +742,9 @@ GAEBUS_Attr(@)
 {
   my @a = @_;
   my ($action, $name, $attrname, $attrval) = @a;
-
   my $hash = $defs{$name};
+
+  Log3 ($hash, 2, "$name GAEBUS_Attr($a[0],$a[1],$a[2],<$a[3]>)");
 
   $attrval = "" unless defined ($attrval);
 
@@ -755,6 +787,12 @@ GAEBUS_Attr(@)
       delete ($hash->{helper}{$attrname});
     }
 
+    # delete helper if attribute is removed
+    if ($attrname =~ /^[ru]$delimiter[^$delimiter]{1,}$delimiter.*/)
+    {
+      delete $hash->{helper}{ebus}{$attrname};
+    }
+
     return undef;
   }
   elsif ($action eq "set")
@@ -773,7 +811,6 @@ GAEBUS_Attr(@)
         foreach my $key (keys %{ $hash->{helper}{$attrname} }) {
           Log3 ($hash->{NAME}, 4, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
         }
-        #return "set HERE??";
 
       } else {
         # if valueFormat is not verified sucessfully ... the helper is deleted (=not used)
@@ -782,39 +819,9 @@ GAEBUS_Attr(@)
       return undef;
     } 
 
-    if ($attrname =~ /~/) {
-      # migration process after restart (processing statements from fhem.cfg)
-      # migrate attribute names containing tilde as delimiter to $delimiter
-      # migrate values from tilde as delimiter to $delimiter
-      # modify userattr to contain the new attribute name
-
-      my $oattrname = $attrname;
-      $attrval =~ s,~,$delimiter,g;
-      $attrname =~ s,~,$delimiter,g;
-      Log3 ($hash, 2, ">$oattrname<>$attrname<>$attrval<");
-
-      # adjust userattr
-      $attr{$name}{userattr} =~ s,$oattrname,$attrname,;
-
-      # set attribute with modified name and return an error
-      $attr{$name}{$attrname} = $attrval;
-      return "attribute containing invalid char migrated to $attrname ($attrval)";
-    }
-
     if ( " $userattr " =~ / $attrname / ) 
     {
       # this is an attribute form "userattr"
-
-      if (!defined $attr{$name}{$attrname}) 
-      {
-        # attribute is not yet defined	
-        if ( $attrname =~ /$delimiter/ )
-        {
-          my ($io,$class,$var,$comment) = split ($delimiter, $attrname, 4);
-          $hash->{helper}{longAttributesCount}++ if (defined($comment));
-          #Log3 ($hash->{NAME}, 1, "$hash->{NAME} helper longAttributesCount set to ".$hash->{helper}{longAttributesCount});
-        }
-      }
 
       if (defined $attr{$name}{$attrname}) 
       {
@@ -854,9 +861,34 @@ GAEBUS_Attr(@)
         }
       }
     }
+
+    # we are still in set
+    
+    # refresh helper if mapClass or mapVar is set
+    if ($attrname eq "mapClass" or $attrname eq "mapVar") 
+    {
+      Log3 ($hash, 4, "$name GAEBUS_Attr reinin helper");
+      $attr{$name}{$attrname} = $attrval;
+      GAEBUS_initParams($hash);
+    }
+
+    # attributes used for the update loop
+    if ($attrname =~ /^[ru]$delimiter[^$delimiter]{1,}$delimiter.*/)
+    {
+
+      $attr{$name}{$attrname} = $attrval;
+      Log3 ($hash, 4, "$name GAEBUS_Attr init helper for $attrname");
+      my ($io,$class,$var,$comment) = GAEBUS_splitAttribute ($hash, $attrname);
+
+      $hash->{helper}{ebus}{$attrname} = ();
+      $hash->{helper}{ebus}{$attrname}{io} = $io;
+      $hash->{helper}{ebus}{$attrname}{class} = $class;
+      $hash->{helper}{ebus}{$attrname}{var} = $var;
+    }
+ 
   }
 
-  Log3 (undef, 2, "called GAEBUS_Attr($a[0],$a[1],$a[2],<$a[3]>)");
+
  
   return undef;
 }
@@ -873,7 +905,7 @@ GAEBUS_State($)
   {
 
     my $timeout = 10;
-	
+    
     syswrite ($hash->{TCPDev}, "state\n");
     if ($hash->{SELECTOR}->can_read($timeout))
     {
@@ -933,7 +965,9 @@ GAEBUS_doEbusCmd($$$$$$$)
   $timeout = 10.0 if ($action eq "w");
 
 
-  my ($io,$class,$var,$comment) = split ($delimiter, $readingcmdname, 4);
+  #my ($io,$class,$var,$comment) = split ($delimiter, $readingcmdname, 4);
+  my ($io,$class,$var,$comment) = GAEBUS_splitAttribute ($hash, $readingcmdname);
+  #$class = $mapClass{$class} if (defined ($mapClass{$class}));
 
   my $cmd = "";
 
@@ -1050,24 +1084,42 @@ GAEBUS_doEbusCmd($$$$$$$)
     %setsForWriting = ();
     %getsForWriting = ( "ebusd_hex" => [] );
 
+    my %mapClass = ();
+    my %mapVar = ();
+
     my $cnt = 0;
     foreach my $line (split /\n/, $actMessage) {
       $cnt++;
 
       $line =~ s/ /./g; # no blanks in names and comments
+
+      #Log3 ($name, 3, "$name line $line");
+      # exract original values before the below substitute
+      my ($io, $class, $var, $o_comment, @o_params) = split (",", $line, 5);
+
       $line =~ s,$delimiter,.,g; # clean up the delimiter within the text
 
       #Log3 ($name, 5, "$name $line");
 
-      #my ($io,$class,$var) = split (",", $line, 3);
-      my ($io, $class, $var, $comment, @params) = split (",", $line, 5);
+      # only comment and params use substitution of $delimiter by "."
+      my ($t_io, $t_class, $t_var, $comment, @params) = split (",", $line, 5);
+
+      #Log3 ($name, 3, "$name class $class");
+      if ($class ne $t_class) 
+      {
+        # class contained $delimiter which was replaced by "." above
+        $mapClass{$class} = $t_class;
+      }
+      if ($var ne $t_var) 
+      {
+        # var contained $delimiter which was replaced by "." above
+        $mapVar{$var} = $t_var;
+      }
 
       $io =~ s/[0-9]//g;
 
-      # drop "memory"
-
+      # drop "memory" and "scan.*"
       next if ($class eq "memory");
-      #next if ($class eq "scan");
       next if ($class =~ /^scan/);
 
 
@@ -1080,6 +1132,11 @@ GAEBUS_doEbusCmd($$$$$$$)
       push @{$gets{"u".$delimiter.$class}}, $var.$delimiter.$comment if ($io =~ /u/);
 
     }
+
+    $attr{$name}{mapClass} = join ("|", keys(%mapClass));
+    $attr{$name}{mapVar} = join ("|", keys(%mapVar));
+    #Log3 ($name, 4, "$name mapClass $attr{$name}{mapClass}");
+    #Log3 ($name, 4, "$name mapVar $attr{$name}{mapVar}");
 
     GAEBUS_initParams($hash);
 
@@ -1103,30 +1160,29 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   if ($inBlockingCall)
   {
-    if ($actMessage =~ /^ERR: /) {
-      # readings will be updated in main fhem process
-      # really need to return nothing!
-      return "lasterror|$actMessage";
+    if ($actMessage =~ /^ERR: no data stored/) {
+      # handle below
+    } elsif ($actMessage =~ /^ERR: /) {
+      return ("lasterror|$actMessage");
+    } 
 
-    } else {
-      $actMessage = "";
+    $actMessage = "";
 
-      foreach my $r (@targetreading)
-      {
-        if ($r eq "dummy") {
-          shift @values;
-        } else {
-          # shift is done in GAEBUS_valueFormat
-          my $v = GAEBUS_valueFormat ($hash, $r, \@values);
-          $actMessage .= $r."|".$v."|";
-        }
+    foreach my $r (@targetreading)
+    {
+      if ($r eq "dummy") {
+        shift @values;
+      } else {
+        # shift is done in GAEBUS_valueFormat
+        my $v = GAEBUS_valueFormat ($hash, $r, \@values);
+        $actMessage .= $r."|".$v."|";
       }
-
-      $actMessage =~ s/\|$//;
-
-      # readings will be updated in main fhem process
-      return $actMessage;
     }
+
+    $actMessage =~ s/\|$//;
+
+    # readings will be updated in main fhem process
+    return $actMessage;
   }
 
   if ($action eq "r" and not $actMessage =~ /^ERR: /)
@@ -1161,6 +1217,8 @@ GAEBUS_GetUpdates($)
 
   if (defined($attr{$name}{disable}) and ($attr{$name}{disable} == 1)) {
     Log3 $hash, 4, "$name GetUpdates2 is disabled";
+
+    GAEBUS_CloseDev($hash) if (defined ($hash->{FD}));
  
     InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
     return;
@@ -1168,6 +1226,15 @@ GAEBUS_GetUpdates($)
   } else {
     Log3 $hash, 4, "$name start GetUpdates2";
  
+  }
+
+  # $init_done = 0 --> startup in progress
+  # $init_done = 1 --> startup finished
+
+  if ($init_done == 0) {
+    Log3 $hash, 3, "$name wait until init_done is set";
+    InternalTimer(gettimeofday()+5, "GAEBUS_GetUpdates", $hash, 0);
+    return;
   }
 
   $hash->{UpdateCnt} = $hash->{UpdateCnt} + 1;
@@ -1181,7 +1248,6 @@ sub
 GAEBUS_GetUpdatesDoit($)
 {
   my ($string) = (@_);
-  #my ($name, $nochwas)  = split ("|", $string);
   my ($name)   = $string;
   my ($hash) = $defs{$name};
 
@@ -1210,6 +1276,7 @@ GAEBUS_GetUpdatesDoit($)
   $actMessage =~ s/,.*//;
   $readingsToUpdate .= "|state_ebus|".$actMessage;
 
+  if (0) {
   foreach my $oneattr (keys %{$attr{$name}})
   {
     # only for "r" commands and broadcasts ("u")
@@ -1246,6 +1313,50 @@ GAEBUS_GetUpdatesDoit($)
 
     }
   }
+  }
+
+  # $hash->{helper}{ebus}{<attributeName>}
+  # $hash->{helper}{ebus}{<attributeName>}{io} = "r|w"
+  # $hash->{helper}{ebus}{<attributeName>}{class} = "bai|mc|mc_1|..."
+  # $hash->{helper}{ebus}{<attributeName>}{var} = "simpleVar|varIncludingDelimiter"
+  #
+  foreach my $oneread (sort keys %{ $hash->{helper}{ebus}})
+  {
+
+    if ($hash->{helper}{ebus}{$oneread}{io} eq "r" or $hash->{helper}{ebus}{$oneread}{io} eq "u") 
+    # only for "r" commands and broadcasts ("u")
+    {
+
+      my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneread}, 2);
+      $cmdaddon = "" unless (defined ($cmdaddon));
+
+      next unless defined ($readingnameX);
+      next if ($readingnameX =~ /^\s*$/);
+      next if ($readingnameX eq "1");
+
+      my ($readingname, $doCntNo) = split (":", $readingnameX, 2); # split name from cycle number
+      $doCntNo = 1 unless (defined ($doCntNo));
+
+      Log3 ($name, 5, "$name GetUpdates: $readingname:$doCntNo");
+
+      #Log3 ($name, 2, "$name check modulo ".$hash->{UpdateCnt}." mod $doCntNo -> ".($hash->{UpdateCnt} % $doCntNo));
+      if (($hash->{UpdateCnt} % $doCntNo) == 0)
+      {
+        $readingsToUpdate .= "|".GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneread, "", $cmdaddon, 1);
+      }
+
+      # limit number of reopens if ebusd cannot be reached
+      if (($hash->{STATE} ne "Connected") or (!$hash->{TCPDev}->connected()) )
+      {
+        if (--$tryOpenCnt <= 0) 
+        {
+          Log3 ($name, 2, "$name: not connected, stop GetUpdates loop");
+          last;
+        }
+      }
+    }
+  }
+
 
   # returnvalue for BlockingCall ... done routine
   return $name.$readingsToUpdate;
@@ -1277,7 +1388,6 @@ GAEBUS_GetUpdatesDone($)
   }
   readingsEndUpdate($hash, 1);
   
-#HERE
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
 
@@ -1295,6 +1405,19 @@ GAEBUS_GetUpdatesAborted($)
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
+}
+
+sub
+GAEBUS_getEbusParams(@)
+{
+  my ($hash, $attribute) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 ($name, 3, "GAEBUS_getEbusParams got $attribute");
+
+
+  return (undef);
+
 }
 
 sub
@@ -1422,12 +1545,6 @@ GAEBUS_valueFormat(@)
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         </li><br>
 
-    <li>removeCommentFromAttributeNames<br>
-        This will migrate the former used attribute names of format "[rw]_&lt;class&gt; &lt;variable-name&gt;_&lt;comment&gt;"
-        into the format "[rw]_&lt;class&gt;_&lt;variable-name&gt;".<br>
-	It is only available if such attributes are defined.<br>
-        </li><br>
-
   </ul>
   <br>
 
@@ -1444,18 +1561,24 @@ GAEBUS_valueFormat(@)
         See also description for Set and Get<br>
         If Attribute is missing, default value is 0 (disable writes)<br>
         </li><br>
+    <li>mapClass<br>
+        used to support "_" in class names. Set by ebusd_find.
+        </li><br>
+    <li>mapVar<br>
+        used to support "_" in variable names. Set by ebusd_find.
+        </li><br>
     <li>Attributes of the format<br>
         <code>[r]_&lt;class&gt;_&lt;variable-name&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
         If ebusd returns a list of semicolon separated values then several semicolon separated readings can be defined.<br>
-	"dummy" is a placeholder for a reading that will be ignored. (e.g.: temperature;dummy;pressure).<br>
+    "dummy" is a placeholder for a reading that will be ignored. (e.g.: temperature;dummy;pressure).<br>
         The name of the reading can be suffixed by "&lt;:number&gt;" which is a multiplicator for 
         the evaluation within the specified interval. (eg. OutsideTemp:3 will evaluate this reading every 3-th cycle)<br>
         All text followed the reading seperated by a blank is given as an additional parameter to ebusd. 
         This can be used to request a single value if more than one is retrieved from ebus.<br>
-	If "+f" is given as an additional parameter this will remove the "-f" option from the ebusd request. This will return the value stored in ebusd instead of requesting it freshly.<br>
+    If "+f" is given as an additional parameter this will remove the "-f" option from the ebusd request. This will return the value stored in ebusd instead of requesting it freshly.<br>
         </li><br>
     <li>Attributes of the format<br>
         <code>[w]_&lt;class&gt;_&lt;variable-name&gt;</code><br>
