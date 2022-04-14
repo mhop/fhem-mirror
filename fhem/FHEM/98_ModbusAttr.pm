@@ -61,7 +61,7 @@ sub Initialize {
 =begin html
 
 
-<a name="ModbusAttr"></a>
+<a id="ModbusAttr"></a>
 <h3>ModbusAttr</h3>
 <ul>
     ModbusAttr uses the low level Modbus module 98_Modbus.pm to provide a generic Modbus module (as master, slave, relay or passive listener) <br>
@@ -83,7 +83,7 @@ sub Initialize {
     </ul>
     <br>
 
-    <a name="ModbusAttrDefine"></a>
+    <a id="ModbusAttr-define"></a>
     <b>Define as Modbus master (=client)</b>
     <ul>
         <code>
@@ -209,7 +209,7 @@ sub Initialize {
     <br>
     
     
-    <a name="ModbusAttrConfiguration"></a>
+    <a id="ModbusAttr-configuration"></a>
     <b>Configuration of the module as master or passive listener</b>
     <ul>
         Data objects (holding registers, input registers, coils or discrete inputs) are defined using attributes. 
@@ -287,7 +287,7 @@ sub Initialize {
     </ul>
     <br>
     
-    <a name="ModbusAttrDataTypes"></a>
+    <a id="ModbusAttr-dataTypes"></a>
     <b>Handling Data Types</b>
     <ul>
         The Modbus protocol does not define data types. If the documentation of a device states that for example the current temperature is stored in holding register 102 this leaves room for many interpretations. Not only can the address 102 mean different things (actually decimal 102 or rather 101 if the vendor starts counting at 1 instead of 0 or even 257 or 258 if the vendor used hexadecimal addresses in his documentation ) also the data representation can be many different things. As in every programming language, there are many ways to represent numbers. They can be stored signed or unsigned, they can be integers or floating point numbers, the byte-order can be "big endian" or "small endian", the value can be stored in one holding register or in two holding registers (floating point numbers typically take four bytes which means two holding registers).<br>
@@ -332,7 +332,7 @@ sub Initialize {
     </ul>
     <br>
     
-    <a name="ModbusAttrConfigurationSlave"></a>
+    <a id="ModbusAttr-configurationSlave"></a>
     <b>Configuration of the module as Modbus slave (server)</b>
     <ul>
         Data objects that the module offers to external Modbus masters (holding registers, input registers, coils or discrete inputs) are defined using attributes. 
@@ -365,7 +365,7 @@ sub Initialize {
     </ul>
     <br>    
     
-    <a name="ModbusAttrSet"></a>
+    <a id="ModbusAttr-set"></a>
     <b>Set-Commands for Fhem as Modbus master operation</b>
     <ul>
         are created based on the attributes defining the data objects.<br>
@@ -407,7 +407,7 @@ sub Initialize {
         </ul>
     </ul>
     <br>
-    <a name="ModbusAttrGet"></a>
+    <a id="ModbusAttr-get"></a>
     <b>Get-Commands for Modbus master operation</b><br>
     <ul>
         All readings are also available as Get commands. Internally a Get command triggers the corresponding 
@@ -415,15 +415,18 @@ sub Initialize {
         To avoid huge option lists in FHEMWEB, the objects visible as Get in FHEMWEB can be defined by setting an attribute <code>obj-xy-showGet</code> to 1. 
     </ul>
     <br>
-    <a name="ModbusAttrattr"></a>
+    <a id="ModbusAttr-attr"></a>
     <b>Attributes</b><br><br>
     <ul>
-        <li><a href="#do_not_notify">do_not_notify</a></li>
-        <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        <li><a href="#do_not_notify">do_not_notify</a>
+        </li>
+        <li><a href="#readingFnAttributes">readingFnAttributes</a>
+        </li>
         <br>
-        <li><b>alignTime</b></li>
+        <li><a id="ModbusAttr-attr-alignTime">alignTime</a><br>
             Aligns each periodic read request for the defined interval to this base time. This is typcally something like 00:00 (see the Fhem at command)
-        <li><b>enableControlSet</b></li>
+        </li>
+        <li><a id="ModbusAttr-attr-enableControlSet">enableControlSet</a><br>
             enables the built in set commands like interval, stop, start and reread (see above).<br>
             Starting with Version 4 of the Modbus module enableControlSet defaults to 1. This attribute can however be used to disable the set commands by setting the attribute to 0<br>
         <br>
@@ -434,60 +437,90 @@ sub Initialize {
         the following list of attributes can be applied to any data object by specifying the objects type and address in the variable part. 
         For many attributes you can also specify default values per object type (see dev- attributes later) or you can specify an object attribute without type and address 
         (e.g. obj-len) which then applies as default for all objects:
-        <li><b>obj-[cdih][1-9][0-9]*-reading</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-reading" data-pattern="obj-.*-reading">obj-[cdih][0-9]+-reading</a><br> 
             define the name of a reading that corresponds to the modbus data object of type c,d,i or h and a decimal address (e.g. obj-h225-reading).<br>
             For master or passive operation this reading name will be used to create a reading for the modbus device itself. <br>
             For slave operation this can also be specified as deviceName:readingName to refer to the reading of another device inside Fhem whose value can be queried by an external Modbus master with the goven type and address.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-name</b></li> 
-            defines an optional internal name of this data object (this has no meaning for fhem and serves mainly documentation purposes.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-set</b></li> 
-            if set to 1 then this data object can be changed with a Fhem set command 
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-name" data-pattern="obj-.*-name">obj-[cdih][0-9]+-name</a><br> 
+            defines an optional internal name of the data object of type c,d,i or h and a decimal address (e.g. obj-h225-name).<br>
+            This has no meaning for fhem and serves mainly documentation purposes.<br>
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-set" data-pattern="obj-.*-set">obj-[cdih][0-9]+-set</a><br> 
+            if set to 1 then this data object (e.g. obj-h225) can be changed with a Fhem set command 
             which results in a modbus write request sent to the external slave device.<br>
             (works only if this device is a modbus master and for holding registers and coils 
             since discrete inputs and input registers can not be modified by definition).<br>
-        <li><b>obj-[cdih][1-9][0-9]*-min</b></li> 
-            this defines a lower limit to the value of this data object<br>
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-min" data-pattern="obj-.*-min">obj-[cdih][0-9]+-min</a><br> 
+            this defines a lower limit to the value of this data object (e.g. obj-h225-min).<br>
             If in master mode this applies to values written with a Fhem set command to an external slave device and is used for input validation.<br>
             If in slave mode this applies to values written by an external master device to Fhem readings.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-max</b></li> 
-            this defines an upper limit to the value of this data object<br>
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-max" data-pattern="obj-.*-max">obj-[cdih][0-9]+-max</a><br> 
+            this defines an upper limit to the value of this data object (e.g. obj-h225-max)<br>
             If in master mode this applies to values written with a Fhem set command to an external slave device and is used for input validation.<br>
             If in slave mode this applies to values written by an external master device to Fhem readings.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-hint</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-hint" data-pattern="obj-.*-hint">obj-[cdih][0-9]+-hint</a><br> 
             this is used in master mode for set options and tells fhemweb what selection to display for the set option (list or slider etc.)<br>
-        <li><b>obj-[cdih][1-9][0-9]*-expr</b></li> 
+            Example: attr MBTest obj-h225-hint slider,5,1,75
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-expr" data-pattern="obj-.*-expr">obj-[cdih][0-9]+-expr</a><br> 
             In master mode this defines a perl expression that converts the raw value read from an external slave device into a value that is stored in a Fhem reading.<br>
             In slave mode this defines a perl expression that converts the raw value written from an external master device into a value that is stored in a Fhem reading.<br>
             Inside the expression you can use $val to get the value or the array @val in case there are several values (e.g. when unpack produces more than one value)<br>
-        <li><b>obj-[cdih][1-9][0-9]*-setexpr</b></li> 
+            Example: attr MBTest obj-h225-expr $val * 2
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-setexpr" data-pattern="obj-.*-setexpr">obj-[cdih][0-9]+-setexpr</a><br> 
             In master mode this defines a perl expression that converts the user specified value from the set command 
             to a raw value that can be sent to the external slave device with a write function code.<br>
             In slave mode this defines a perl expression that converts the value of a reading inside Fhem to a raw value that can be sent to the device 
             as a response to the read function code received from the external master device.<br>
-            This is typically the inversion of -expr above.<br
+            This is typically the inversion of -expr above.<br>
             Inside the expression you can use $val to get the value or the array @val in case there are several values (e.g. when unpack produces more than one value)<br>
-        <li><b>obj-[cdih][1-9][0-9]*-allowWrite</b></li> 
+            Example: attr MBTest obj-h225-setexpr $val / 2
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-allowWrite" data-pattern="obj-.*-allowWrite">obj-[cdih][0-9]+-allowWrite</a><br> 
             this only applies to a Fhem Modbus device in slave mode. 
             If set to 1 it defines that a reading can be changed with a write function code by an external modbus master.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-ignoreExpr</b></li> 
+            Example: attr MBTest obj-h333-allowWrite 1
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-ignoreExpr" data-pattern="obj-.*-ignoreExpr">obj-[cdih][0-9]+-ignoreExpr</a><br> 
             defines a perl expression that returns 1 if a value should be ignored and the existing reading should not be modified<br>
             In master mode this applies to values read from an external slave device.<br>
             In slave mode this applies to values written to Fhem readings by an external master device.<br>
             Inside the expression you can use $val to get the value or the array @val in case there are several values (e.g. when unpack produces more than one value)<br>
-        <li><b>obj-[cdih][1-9][0-9]*-map</b></li> 
+            Example: attr MBTest obj-h333-ignoreExpr $val > 100
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-map" data-pattern="obj-.*-map">obj-[cdih][0-9]+-map</a><br> 
             In master mode defines a map to convert raw values read from an external device to more convenient strings that are then stored in Fhem readings
             or back (as reversed map) when a value to write has to be converted from the user set value to a raw value that can be written.<br>
             In slave mode defines a map to convert raw values received from an external device with a write function code to more convenient strings that are then stored in Fhem readings<br>
             or back (as reversed map) when a value to read has to be converted from the Fhem reading value to a raw value that can be sent back as response.<br>
-            Example: 0:mittig, 1:oberhalb, 2:unterhalb<br>
-        <li><b>obj-[cdih][1-9][0-9]*-format</b></li> 
+            Example: attr MBTest obj-h225-map 0:mittig, 1:oberhalb, 2:unterhalb
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-mapDefault" data-pattern="obj-.*-mapDefault">obj-[cdih][0-9]+-mapDefault</a><br> 
+            defines a default value to be used with a map (for output manipulation). This value will be returned if there is no match in the map<br>
+            Example: attr MBTest obj-h225-mapDefault other
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-rmapDefault" data-pattern="obj-.*-rmapDefault">obj-[cdih][0-9]+-rmapDefault</a><br> 
+            defines a default value to be used with a reverse map (e.g. for input validation). This value will be returned if there is no match in the map
+            Example: attr MBTest obj-h225-rmapDefault 0
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-format" data-pattern="obj-.*-format">obj-[cdih][0-9]+-format</a><br> 
             In master mode this defines a format string (see Perl sprintf) to format a value read from an external slave device before it is stored in a reading e.g. %.1f <br>
             In slave mode this defines a format string to format a value from a Fhem reading before it is sent back in a response to an external master <br>
-        <li><b>obj-[cdih][1-9][0-9]*-len</b></li> 
-            defines the length of the data object in registers. It defaults to 1. <br>
+            Example: attr MBTest obj-h225-format %.1f
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-len" data-pattern="obj-.*-len">obj-[cdih][0-9]+-len</a><br> 
+            defines the length of the data object in registers (16 Bits). It defaults to 1. <br>
             Some devices store e.g. 32 bit floating point values in two registers. In this case you should set this attribute to two.<br>
-            This setting is relevant both in master and in slave mode. The lenght has to match the length implied by the unpack code.
-        <li><b>obj-[cdih][1-9][0-9]*-unpack</b></li> 
+            This setting is relevant both in master and in slave mode. The lenght has to match the length implied by the unpack code. <br>
+            Example: attr MBTest obj-h225-len 2
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-unpack" data-pattern="obj-.*-unpack">obj-[cdih][0-9]+-unpack</a><br> 
             defines the pack / unpack code to convert data types.<br>
             In master mode it converts the raw data string read from the external slave device to a reading or to convert from a reading to a raw format when a write request is sent to the external slave device.<br>
             In slave mode it converts the value of a reading in Fhem to a raw format that can be sent as a response to an external Modbus master or it converts the raw data string read from the external master device to a reading when the master is using a write function code and writing has been allowed.<br>
@@ -496,20 +529,31 @@ sub Initialize {
             and for a 32 bit big endian float value this would be e.g. "f>". (see the perl documentation of the pack function for more codes and details).<br>
             Please note that you also have to set a -len attribute (for this object or for the device) if you specify an unpack code that consumes data from more than one register.<br>
             For a 32 bit float e.g. len should be 2.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-revRegs</b></li> 
+            Example: attr MBTest obj-h225-unpack n
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-revRegs" data-pattern="obj-.*-revRegs">obj-[cdih][0-9]+-revRegs</a><br> 
             this is only applicable to objects that span several input registers or holding registers. <br>
-            When they are received from an external device then the order of the registers will be reversed before further interpretation / unpacking of the raw register string. The same happens before data is sent to an external device<br>
-        <li><b>obj-[cdih][1-9][0-9]*-bswapRegs</b></li>
+            When they are received from an external device then the order of the registers will be reversed before further interpretation / unpacking 
+            of the raw register string. The same happens before data is sent to an external device<br>
+            Example: attr MBTest obj-h225-revRegs 1
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-bswapRegs" data-pattern="obj-.*-bswapRegs">obj-[cdih][0-9]+-bswapRegs</a><br>
             After registers have been received and before they are sent, the byte order of all 16-bit values are swapped. This changes big-endian to little-endian or vice versa. This functionality is most likely used for reading (ASCII) strings from devices where they are stored as big-endian 16-bit values. <br>
             Example: original reading is "324d3130203a57577361657320722020". After applying bswapRegs, the value will be "4d3230313a2057576173736572202020"
             which will result in the ASCII string "M201: WWasser   ". Should be used with "(a*)" as -unpack value.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-decode</b></li> 
+            Example: attr MBTest obj-h225-bswapRegs 1
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-decode" data-pattern="obj-.*-decode"></a><br> 
             defines an encoding to be used in a call to the perl function decode to convert the raw data string received from a device. 
             This can be used if the device delivers strings in an encoding like cp850 instead of utf8.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-encode</b></li> 
+            Example: attr MBTest obj-h225-decode cp850
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-encode" data-pattern="obj-.*-encode">obj-[cdih][0-9]+-encode</a><br> 
             defines an encoding to be used in a call to the perl function encode to convert raw data strings received from a device. 
             This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.<br>
-        <li><b>obj-[ih][1-9][0-9]*-type</b></li> 
+            Example: attr MBTest obj-h225-encode utf8
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[ih][0-9]+-type" data-pattern="obj-.*-type">obj-[ih][0-9]+-type</a><br> 
             defines that this object has a user defined data type. Data types can be defined using the dev-type- attribues.<br>
             If a device with many objects uses for example floating point values that span two swapped registers with the unpack code f>, then instead of specifying the -unpack, -revRegs, -len, -format and other attributes over and over again, you could define a data type with attributes that start with dev-type-VT_R4- and then 
             use this definition for each object as e.g. obj-h1234-type VT_R4<br>
@@ -524,15 +568,21 @@ sub Initialize {
             attr WP obj-h1234-type VT_R4
             </pre><br>
         
-        <li><b>obj-[cdih][1-9][0-9]*-showGet</b></li> 
-            If the Fhem Modbus device is in master mode, every reading can also be requested by a get command. However these get commands are not automatically offered in fhemweb. By specifying this attribute, the get will be visible in fhemweb.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-poll</b></li>
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-showGet" data-pattern="obj-.*-showGet">obj-[cdih][0-9]+-showGet</a><br> 
+            If the Fhem Modbus device is in master mode, every reading can also be requested by a get command. 
+            However these get commands are not automatically offered in fhemweb. By specifying this attribute, the get will be visible in fhemweb.<br>
+            Example: attr MBTest obj-h225-showGet 1
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-poll" data-pattern="obj-.*-poll">obj-[cdih][0-9]+-poll</a><br>
             If the Fhem Modbus device is in master mode, Fhem automatically creates read requests to the external modbus slave.
             If this attribute is set to 1 for an object then this obeject is included in the cyclic update request as specified in the define command for a Modbus master. 
             If not set, then the object can manually be requested with a get command, but it is not automatically updated each interval. 
             Note that this setting can also be specified as default for all objects with the dev- atributes described later.<br>
             This attribute is ignored in slave mode.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-polldelay</b></li> 
+            Example: attr MBTest obj-h225-poll 1
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-polldelay" data-pattern="obj-.*-pollDelay">obj-[cdih][0-9]+-polldelay</a><br> 
             this applies only to master mode. It allows to poll objects at a lower rate than the interval specified in the define command. 
             You can either specify a time in seconds or number prefixed by "x" which means a multiple of the interval of the define command.<br>
             If you specify a normal numer then it is interpreted as minimal time between the last read and another automatic read.<br>
@@ -540,7 +590,9 @@ sub Initialize {
             Instead the normal interval timer defined by the interval of the define command will check if this reading is due or not yet. 
             So the effective interval will always be a multiple of the interval of the define.<br>
             If this attribute is set to "once" then the object will only be requested once after a restart.<br>
-        <li><b>obj-[cdih][1-9][0-9]*-group</b></li> 
+            Example: attr MBTest obj-h225-pollDelay x3
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-group" data-pattern="obj-.*-group">obj-[cdih][0-9]+-group</a><br> 
             Allows control over the way how objects are combined in one request and in which order they are processed when the response comes in.<br>
             example:<br>
             <pre>            
@@ -561,120 +613,195 @@ sub Initialize {
             this will cause the holding registers 100 and 102 to be read together. When the response is received, 
             register 102 will be processed first so when register 100 is processed, its value can be multipied with the already updated reading for register 102.<br>
             This is helpful for devices where readings need to be computed out of several registers that need to be requested together and where the order of processing is important.
-           
-        <li><b>dev-([cdih]-)*read</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-obj-[cdih][0-9]+-overrideFCread" data-pattern="obj-.*-overrideFC.*">obj-[cdih][0-9]+-overrideFCread and obj-[cdih][0-9]+-overrideFCwrite</a><br>
+            allow overwriting a function call number to be used when reading or writing an individual object.<br>
+            Please do not use this attribute unless you understand the modbus protocol and its function codes.
+
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?read" data-pattern="dev-.*read">dev-([cdih]-)?read</a><br> 
             specifies the function code to use for reading this type of object in master mode.
             The default is 3 for holding registers, 1 for coils, 2 for discrete inputs and 4 for input registers.<br>
-        <li><b>dev-([cdih]-)*write</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?write" data-pattern="dev-.*write">dev-([cdih]-)?write</a><br> 
             specifies the function code (decimal) to use for writing this type of object in master mode. 
             The default is 6 for holding registers and 5 for coils. Discrete inputs and input registers can not be written by definition.<br>
-            Some slave devices might need function code 16 for writing holding registers. In this case dev-h-write can be set to 16.
-        <li><b>dev-([cdih]-)*combine</b></li> 
+            Some slave devices might need function code 16 for writing holding registers. In this case dev-h-write can be set to 16.<br>
+            Example: attr MBTest dev-h-write 16
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?combine" data-pattern="dev-.*combine">dev-([cdih]-)?combine</a><br> 
             This applies only to master mode. It defines how many adjacent objects of an external slave device can be read in one request. If not specified, the default is 1<br>
-
-        <li><b>dev-([cdih]-)*addressErrCode</b></li> 
+            If this value is too big, some data will not be read.<br>
+            Example: attr MBTest dev-h-combine 8
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?addressErrCode" data-pattern="dev-.*addressErrCode">dev-([cdih]-)?addressErrCode</a><br> 
             This applies only if the Fhem Modbus device is in slave mode.
             defines which error code to send back to a master that requests an object with an address that is not configured in Fhem.<br>
             If nothing is specified, the error code 2 is used. If 0 is specified, then no error is sent back.<br>
-        <li><b>dev-([cdih]-)*valueErrCode</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?valueErrCode" data-pattern="dev-.*valueErrCode">dev-([cdih]-)?valueErrCode</a><br> 
             This applies only if the Fhem Modbus device is in slave mode.
             It defines which error code to send back to a master that tries to write a value to an object / reading where the value is lower than the specified minimum value or higher than the specified maximum value. (this feature is not implemented yet)<br>
             If nothing is specified, the error code 1 is used. If 0 is specified, then no error is sent back.<br>
-        <li><b>dev-([cdih]-)*notAllowedErrCode</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?notAllowedErrCode" data-pattern="dev-.*notAllowedErrCode">dev-([cdih]-)?notAllowedErrCode</a><br> 
             This applies only if the Fhem Modbus device is in slave mode.
             It defines which error code to send back to a master that tries to write to an object / reading where writing has not been allowed with the .<br>
             If nothing is specified, the error code 1 is used. If 0 is specified, then no error is sent back.<br>
             
-        <li><b>dev-([cdih]-)*defLen</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defLen" data-pattern="dev-.*defLen">dev-([cdih]-)?defLen</a><br> 
             defines the default length for this object type. If not specified, the default is 1<br>
-        <li><b>dev-([cdih]-)*defFormat</b></li> 
+            Example: attr MBTest dev-h-defLen 2
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defFormat" data-pattern="dev-.*defFormat">dev-([cdih]-)?defFormat</a><br> 
             defines a default format string to use for this object type in a sprintf function on the values read from the device.<br>
-        <li><b>dev-([cdih]-)*defExpr</b></li> 
+            Example: attr MBTest dev-h-defFormat %.1f
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defExpr" data-pattern="dev-.*defExpr">dev-([cdih]-)?defExpr</a><br> 
             defines a default Perl expression to use for this object type to convert raw values read. (see obj-...-expr)<br>
-        <li><b>dev-([cdih]-)*defSetexpr</b></li> 
+            Example: attr MBTest dev-h-defExpr $val / 10
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defSetexpr" data-pattern="dev-.*defSetExpr">dev-([cdih]-)?defSetexpr</a><br> 
             defines a default Perl expression to use like -setexpr (see obj-...-setexpr)<br>
-        <li><b>dev-[cdih][1-9][0-9]*-defAllowWrite</b></li> 
+            Example: attr MBTest dev-h-defSetexpr $val * 10
+        </li>
+        <li><a id="ModbusAttr-attr-dev-[cdih][0-9]+-defAllowWrite" data-pattern="dev-.*defAllowWrite">dev-[cdih][0-9]+-defAllowWrite</a><br> 
             this only applies to a Fhem Modbus device in slave mode. <br>
             If set to 1 it defines that readings can be changed with a write function code by an external modbus master.<br>
-
-        <li><b>dev-([cdih]-)*defIgnoreExpr</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defIgnoreExpr" data-pattern="dev-.*defIgnoreExpr">dev-([cdih]-)?defIgnoreExpr</a><br> 
             defines a default Perl expression to decide when values should be ignored.<br>
-        <li><b>dev-([cdih]-)*defUnpack</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defUnpack" data-pattern="dev-.*-defUnpack">dev-([cdih]-)?defUnpack</a><br> 
             defines the default unpack code for this object type. <br>
-        <li><b>dev-([cdih]-)*defRevRegs</b></li> 
+            Example: attr MBTest dev-h-defUnpack f>
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defRevRegs" data-pattern="dev-.*-defRevRegs">dev-([cdih]-)?defRevRegs</a><br> 
             defines that the order of registers for objects that span several registers will be reversed before 
             further interpretation / unpacking of the raw register string<br>
-        <li><b>dev-([cdih]-)*defBswapRegs</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defBswapRegs" data-pattern="dev-.*defBswapRegs">dev-([cdih]-)?defBswapRegs</a><br> 
             per device default for swapping the bytes in Registers (see obj-bswapRegs above)<br>
-        <li><b>dev-([cdih]-)*defDecode</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defDecode" data-pattern="dev-.*defDecode">dev-([cdih]-)?defDecode</a><br> 
             defines a default for decoding the strings read from a different character set e.g. cp850<br>
-        <li><b>dev-([cdih]-)*defEncode</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defEncode" data-pattern="dev-.*defEncode">dev-([cdih]-)?defEncode</a><br> 
             defines a default for encoding the strings read (or after decoding from a different character set) e.g. utf8<br>
-        <li><b>dev-([cdih]-)*defPoll</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defPoll" data-pattern="dev-.*defPoll">dev-([cdih]-)?defPoll</a><br> 
             if set to 1 then all objects of this type will be included in the cyclic update by default. <br>
-        <li><b>dev-([cdih]-)*defShowGet</b></li> 
-            if set to 1 then all objects of this type will have a visible get by default. <br>
-        <li><b>dev-([cdih]-)*defHint</b></li> 
+            Example: attr MBTest dev-h-defPoll 1
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defPolldelay" data-pattern="dev-.*defPollDelay">dev-([cdih]-)?defPolldelay</a><br> 
+            sets a default for obj-x-polldelay attributes
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defShowGet" data-pattern="dev-.*defShowGet">dev-([cdih]-)?defShowGet</a><br> 
+            if set to 1 then all objects of this type will have a visible get by default.<br>
+            Example: attr MBTest dev-h-defShowGet 1
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defHint" data-pattern="dev-.*defHint">dev-([cdih]-)?defHint</a><br> 
             defines a default hint for all objects of this type
-        <li><b>dev-([cdih]-)*defSet</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?defSet" data-pattern="dev-.*defSet">dev-([cdih]-)?defSet</a><br> 
             defines a default for allowing set commands to all objects of this type
-        <li><b>dev-type-XYZ-unpack, -len, -encode, -decode, -revRegs, -bswapRegs, -format, -expr, -map</b></li> 
+            Example: attr MBTest dev-h-defSet 1
+        </li>
+        <li><a id="ModbusAttr-attr-dev-type-XYZ-unpack" data-pattern="dev-type.*">dev-type-XYZ-unpack, -len, -encode, -decode, -revRegs, -bswapRegs, -format, -expr, -map</a><br> 
             define the unpack code, length and other details of a user defined data type. XYZ has to be replaced with the name of a user defined data type.
             use obj-h123-type XYZ to assign this type to an object.<br>
-        <li><b>dev-([cdih]-)*allowShortResponses</b></li> 
+            see <a href="#ModbusAttr-attr-obj-[ih][0-9]+-type">here</a>
+        </li>
+        <li><a id="ModbusAttr-attr-dev-([cdih]-)?allowShortResponses" data-pattern="dev-.*allowShortResponses">dev-([cdih]-)?allowShortResponses</a><br> 
             if set to 1 the module will accept a response with valid checksum but data lengh < lengh in header<br>
-        <li><b>dev-h-brokenFC3</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-d-brokenFC2">dev-d-brokenFC2</a><br> 
+            if set to doepke the module will change the parsing of function code 2 responses for devices that 
+            send an additional dummy zero byte before the correct response data byte<br>
+        </li>
+        <li><a id="ModbusAttr-attr-dev-h-brokenFC3">dev-h-brokenFC3</a><br> 
             if set to 1 the module will change the parsing of function code 3 and 4 responses for devices that 
             send the register address instead of the length in the response<br>
-        <li><b>dev-c-brokenFC5</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-c-brokenFC5">dev-c-brokenFC5</a><br> 
             if set the module will use the hex value specified here instead of ff00 as value 1 for setting coils<br>
-        <li><b>dev-timing-timeout</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-timing-timeout">dev-timing-timeout</a><br> 
             timeout for the device when a Fhem master waits for a slave response (defaults to 2 seconds)<br>
-        <li><b>dev-timing-serverTimeout</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-timing-serverTimeout">dev-timing-serverTimeout</a><br> 
             timeout for a TCP connected Fhem slave before it closes a TCP connection after inactivity<br>
-        <li><b>dev-timing-sendDelay</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-timing-sendDelay">dev-timing-sendDelay</a><br> 
             delay to enforce between sending two requests to the device. Default ist 0.1 seconds.<br>
-        <li><b>dev-timing-commDelay</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-dev-timing-commDelay">dev-timing-commDelay</a><br> 
             delay between the last read and a next request. Default ist 0.1 seconds.<br>
-        <li><b>queueMax</b></li>
+        </li>
+        <li><a id="ModbusAttr-attr-queueMax">queueMax</a><br>
             max length of the queue for sending modbus requests as master, defaults to 200. <br>
             This atribute should be used with devices connected through TCP or on physical 
             devices that are connected via serial lines but not on logical modbus devices that use another physical device as IODev.<br>
-        <li><b>nextOpenDelay</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-nextOpenDelay">nextOpenDelay</a><br> 
             delay for Modbus-TCP connections. This defines how long the module should wait after a failed TCP connection attempt before the next reconnection attempt. This defaults to 60 seconds.
-        <li><b>nextOpenDelay2</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-nextOpenDelay2">nextOpenDelay2</a><br> 
             delay for Modbus-TCP connections. This defines how long the module should wait after any  TCP connection attempt before the next reconnection attempt. This defaults to 2 seconds.
-        <li><b>openTimeout</b></li>     
+        </li>
+        <li><a id="ModbusAttr-attr-openTimeout">openTimeout</a><br>     
             timeout to be used when opening a Modbus TCP connection (defaults to 3)
-        <li><b>timeoutLogLevel</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-timeoutLogLevel">timeoutLogLevel</a><br> 
             log level that is used when logging a timeout. Defaults to 3. 
-        <li><b>silentReconnect</b></li> 
-            if set to 1, then it will set the loglevel for "disconnected" and "reappeared" messages to 4 instead of 3
-        <li><b>maxTimeoutsToReconnect</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-silentReconnect">silentReconnect</a><br> 
+            if set to 1, then it will set the loglevel for "disconnected" and "reappeared" messages to 4 instead of 3. 
+            This is especially useful when TCP slaves discoonect after an inactivity timeout.
+        </li>
+        <li><a id="ModbusAttr-attr-maxTimeoutsToReconnect">maxTimeoutsToReconnect</a><br> 
             this attribute is only valid for TCP connected devices. In such cases a disconnected device might stay undetected and lead to timeouts until the TCP connection is reopened. This attribute specifies after how many timeouts an automatic reconnect is tried.
-        <li><b>nonPrioritizedSet</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-closeAfterResponse">closeAfterResponse</a><br> 
+            if set to 1, then Fhem as Master will close TCP connections to Slaves after it received the response 
+            and automatically reopen the connection to the slave when the next request has to be sent.
+        </li>
+        <li><a id="ModbusAttr-attr-nonPrioritizedSet">nonPrioritizedSet</a><br> 
             if set to 1, then set commands will not be sent on the bus before other queued requests and the response will not be waited for.
-        <li><b>sortUpdate</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-sortUpdate">sortUpdate</a><br> 
             this attribute has become obsolte. The requests during a getUpdate cycle will always be sorted before beeing queued.
+        </li>
+        <li><a id="ModbusAttr-attr-cacheUpdateHash">cacheUpdateHash</a><br> 
+            if this attribute is set to 1 then then Fhem as Modbus-Master will ignore any pollDelays, cache the list of combined objects to be requested 
+            and request this list in all subsequent getUpdate rounds in the defined interval. It has no effect on explicit get commands.<br>
+            This will result in increased memory usage and potentially some performance increase.
+        </li>
+        <li><a id="ModbusAttr-attr-cacheParseInfo">cacheParseInfo</a><br> 
+            if this attribute is set to 1 then then Fhem will cache the information regarding parsing each object in a hash 
+            which results in increased memory usage and potentially some performance increase.
+        </li>
 
-        <li><b>propagateVerbose</b></li> 
+        <li><a id="ModbusAttr-attr-propagateVerbose">propagateVerbose</a><br> 
             this attribute causes changes to the verbose attribute of a logical device to be propagated to the physical io device 
             or if the logical device is a relay device to the master device used by the relay.
-        <li><b>connectionsRoom</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-connectionsRoom">connectionsRoom</a><br> 
             defines to which room a TCP connection device for TCP slaves or relays is assigned to. 
             When a TCP slave accepts a connection then the new temporary connection device is by default assigned to the room "Connections".
             If this attribute is set to "none" then no room attribute is set for connection devices by the module 
             and fhem will automatically use the room 'hidden'.
 
-        <li><b>serverIdExpr</b></li> 
+        </li>
+        <li><a id="ModbusAttr-attr-serverIdExpr">serverIdExpr</a><br> 
             sets the server id response to be sent back as client if a server is requesting it via function code 17<br>
-            this is defiend as a perl expression for more flexibility.
-            
-        <li><b>disable</b></li>
+            this is defiend as a perl expression for more flexibility.            
+        </li>
+        <li><a id="ModbusAttr-attr-disable">disable</a><br>
             stop communication with the device while this attribute is set to 1. For Modbus over TCP this also closes the TCP connection.
-        <br>
-        </ul>
-    <br>
+        </li>
+    </ul>
 </ul>
 
 

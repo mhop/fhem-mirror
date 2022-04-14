@@ -23,7 +23,7 @@
 
 #
 #   ToDo / Ideas 
-#                   limit combine?!! (Max 7d / 125 Register read bzw. 7b write), bei coils read max 7d0, bei write 7b0
+#                   LastError Reading per logical device with error code and affected reading
 #                   verify that nextOpenDelay is integer and >= 1
 #                   set active results in error when tcp is already open
 #                   enforce nextOpenDelay even if slave immediately closes after open https://forum.fhem.de/index.php/topic,75638.570.html
@@ -43,12 +43,6 @@
 #                   at modify from tcp to serial iodev hash key and DeviceName key are kept and wrong
 #                   min / max checking as slave when we get write fcodes
 #
-#                   document serverTimeout, slave attributes, passive mode, reconnect,
-#
-#                   option to close a tcp connection after the response has been received and only open it
-#                       for the next request (connection handling in processRequestQueue instead of only readyfn
-#
-#                   put new connection in a special room (even hidden does not work reliably)
 #                   conflicting definitions of attrs for expr etc. when slave uses them 
 #                       to write and then to read and send response 
 #                   test requesting fc 15 multiple coils
@@ -219,7 +213,8 @@ BEGIN {                         # functions / variables needed from package main
         makeReadingName
         goodReadingName
         DoTrigger
-    
+        asyncOutput
+        
         Log3
         RemoveInternalTimer
         InternalTimer
@@ -256,7 +251,7 @@ BEGIN {                         # functions / variables needed from package main
         init_done
     ));
     
-    # function to be visible im package main as Modbus_Name
+    # function to be visible in package main as Modbus_Name
     GP_Export( qw(                  
         Initialize
     ));
@@ -272,7 +267,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.4.02 - 31.3.2021';
+my $Module_Version = '4.4.04 - 17.7.2021';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -303,6 +298,8 @@ my $LogAttrs = join (' ',
         'nonPrioritizedSet:0,1',
         'nonPrioritizedGet:0,1',
         'sortUpdate:0,1',
+        'cacheUpdateHash:0,1',
+        'cacheParseInfo:0,1',
         'propagateVerbose:0,1',
         'connectionsRoom',
         'serverIdExpr',
@@ -318,6 +315,8 @@ my $ObjAttrs = join (' ',
         'obj-[cdih][0-9]+-max',
         'obj-[cdih][0-9]+-hint',
         'obj-[cdih][0-9]+-map',
+        'obj-[cdih][0-9]+-mapDefault',
+        'obj-[cdih][0-9]+-rmapDefault',
         'obj-[cdih][0-9]+-set',
         'obj-[cdih][0-9]+-setexpr',
         'obj-[cdih][0-9]+-textArg',
@@ -335,7 +334,10 @@ my $ObjAttrs = join (' ',
         'obj-[cdih][0-9]+-allowWrite',
         'obj-[cdih][0-9]+-group',
         'obj-[cdih][0-9]+-poll',
-        'obj-[cdih][0-9]+-polldelay');
+        'obj-[cdih][0-9]+-polldelay',
+        'obj-[cdih][0-9]+-overrideFCread',
+        'obj-[cdih][0-9]+-overrideFCwrite'
+        );
         
 my $DevAttrs = join (' ',
         'dev-([cdih]-)?read',
@@ -362,7 +364,9 @@ my $DevAttrs = join (' ',
         'dev-([cdih]-)?defShowGet',
         'dev-([cdih]-)?defAllowWrite',
         'dev-([cdih]-)?defPoll',
+        'dev-([cdih]-)?defPolldelay',
         'dev-h-brokenFC3',
+        'dev-d-brokenFC2',
         'dev-c-brokenFC5',
         
         'dev-type-[A-Za-z0-9_]+-unpack',
@@ -458,7 +462,8 @@ my %attrDefaults = (
     'min'           => { default    =>  ''},
     'poll'          => { devDefault => 'defPoll',
                          default    => 0},
-    'polldelay'     => { default    => '0.5'},
+    'polldelay'     => { devDefault => 'defPolldelay',
+                         default    => '0.5'},
     'reading'       => {},
     'revRegs'       => { devDefault => 'defRevRegs'},
     'set'           => { devDefault => 'defSet'},
@@ -466,10 +471,16 @@ my %attrDefaults = (
     'showGet'       => { devDefault => 'defShowGet'},
     'textArg'       => {},
     'type'          => { default    => '***NoTypeInfo***'},
+    'mapDefault'    => { default    => undef},
+    'rmapDefault'   => { default    => undef},
     'unpack'        => { devDefault => 'defUnpack',
                          default    => 'n'},
 );
-    
+
+my $updateCache;        # hash ref to cache getUpdateHash after combine
+my $parseInfoCache;     # hash ref to cache obj parsing info
+
+
 ###########################################################
 # _initialize for the physical io device, 
 # exported as Modbus_Initialize 
@@ -534,13 +545,18 @@ sub DefineFn {
 
     return "wrong syntax: define <name> $type [tty-devicename|none]" if (!$dev);
 
+    if ($dev =~ /@[\d]+/ || $dev =~ /[Nn]one/) {
+        $ioHash->{SerialConn} = 1;   
+        delete $ioHash->{TCPConn};
+    } else {
+        $ioHash->{TCPConn} = 1;
+        $dev .= ':502' if ($dev !~ /.*:[0-9]/);   # add default port if no port specified
+        delete $ioHash->{SerialConn};
+    }
+
     $ioHash->{DeviceName} = $dev;       # needed by DevIo to get Device, Port, Speed etc.
     $ioHash->{IODev}      = $ioHash;    # point back to self to make getIOHash easier
-    $ioHash->{SerialConn} = 1;
     $ioHash->{NOTIFYDEV}  = 'global';   # NotifyFn nur aufrufen wenn global events (INITIALIZED)
-
-    # todo: check if tcp or serial to allow sharing of a tcp connection iodev for multiple devices
-    # e.g. to a gateway
 
     DoClose($ioHash, 1);                # close, set Expect, clear Buffer, but don't set state to disconnected
     Log3 $name, 3, "$name: defined as $dev";
@@ -749,6 +765,7 @@ sub AttrLDFn {
     my $aVal  = shift;                  # attribute value
     my $hash  = $defs{$name};           # reference to the Fhem device hash
     
+    #Log3 $name, 5, "$name: attr $aName " . ($aVal // 'undef') . " $cmd";
     if ($cmd eq 'set') {
         if ($aName =~ /expr/) {     # validate all Expressions
             return "Invalid Expression $aVal" 
@@ -804,7 +821,7 @@ sub AttrLDFn {
                 return "attribute $aName is only valid for physical Modbus devices or Modbus TCP - please use this attribute for your physical IO device" . ($hash->{IODev}{NAME} ? ' ' . $hash->{IODev}{NAME} : "");
             }
         } 
-        elsif ($aName =~ /(obj-[cdih])[0-9]+-reading/) {
+        elsif ($aName =~ /^(obj-[cdih])[0-9]+-reading/) {
             return "unsupported character in reading name $aName ".
                 "(not A-Za-z/\\d_\\.-)" if(!goodReadingName($aName));
         } 
@@ -813,14 +830,14 @@ sub AttrLDFn {
                 Log3 $name, 3, "$name: attr $aName is only valid Modbus TCP slaves (=servers)";
                 return "attribute $aName is only valid for Modbus TCP slaves (=servers)";
             }       
-            TcpServer_SetSSL($hash);            # todo: does this work? is tcp connection open yet? does it have to be?
+            TcpServer_SetSSL($hash);        # check libs and set flag
             if($hash->{CD}) {
                 my $ret = IO::Socket::SSL->start_SSL($hash->{CD});
                 Log3 $name, 3, "$hash->{NAME} start_SSL: $ret" if($ret);
             }
         }
         
-        if ($aName =~ /(obj-[cdih])(0+([0-9]+))-/) {
+        if ($aName =~ /^(obj-[cdih])(0+([0-9]+))-/) {
             # leading zero in obj-Attr detected
             if (length($2) > 5) {
                 my $new = $1 . substr("00000", 0, 5 - length ($3)) . $3;
@@ -850,6 +867,11 @@ sub AttrLDFn {
                 }
             }
         }
+    }
+
+    if ($aName =~ /(^obj-)|(^dev-)/) {
+        $updateCache = undef;                   # cached update hash needs to be recalculated when obj / dev info changes
+        $parseInfoCache = undef;                # cached ObjInfo and DevInfo results
     }
     $hash->{'.updateSetGet'} = 1;
     #Log3 $name, 5, "$name: attr change set updateGetSetList to 1";
@@ -1012,15 +1034,17 @@ sub FormatSetVal {
     my $unpack   = ObjInfo($hash, $objCombi, 'unpack');   
     my $len      = ObjInfo($hash, $objCombi, 'len'); 
     my $type     = substr($objCombi, 0, 1);
-    my $fCode    = GetFC($hash, {TYPE => $type, LEN => $len, OPERATION => 'write'});
+    my $adr      = substr($objCombi, 1);
+    my $fCode    = GetFC($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write'});
     my $rawVal   = $setVal;
 
-    # 1. Schritt: Map prüfen
+    # 1. step: use reverse map if defined, return error if no match
     $rawVal = MapConvert ($hash, {map => ObjInfo($hash, $objCombi, 'map'), 
+                                  default => ObjInfo($hash, $objCombi, 'rmapDefault'),  # default for rmapDefault is undef
                                   val => $rawVal, reverse => 1, undefIfNoMatch => 1});
     return (undef, "set value $setVal did not match defined map") if (!defined($rawVal));
     
-    # 2. Schritt: falls definiert Min- und Max-Werte prüfen
+    # 2. step: check min / max if defined
     if (!CheckRange($hash, {val => $rawVal, min => ObjInfo($hash, $objCombi, 'min'), max => ObjInfo($hash, $objCombi, 'max')} ) ) {
         return (undef, "value $rawVal is not within defined min/max range");
     }
@@ -1029,21 +1053,21 @@ sub FormatSetVal {
         return (undef, "Set Value $rawVal is not numeric and textArg not specified");
     }
     
-    # 3. Schritt: Konvertiere mit setexpr falls definiert
+    # 3. step: convert using setexpr if defined
     $rawVal = EvalExpr($hash, {expr => ObjInfo($hash, $objCombi, 'setexpr'), val => $rawVal});
     
-    # 4. Schritt: Pack value
+    # 4. step: pack value
     my $packedVal;
-    if ($fCode == 5) {                                      # special treatment when writing one coil
+    if ($type eq 'c' && $fCode == 5) {                      # special treatment when writing one coil (unless fc5 comes from overriding another type)
         my $oneCode = uc DevInfo($hash, 'c', 'brokenFC5', 'FF00');
         $packedVal = pack ('H4', ($rawVal ? $oneCode : '0000'));
         Log3 $name, 5, "$name: set packed coil to hex " . unpack ('H*', $packedVal);
     } 
-    else {                                                  # other function code
+    else {                                                  # other type or function code
         $packedVal = pack ($unpack, $rawVal);   
         Log3 $name, 5, "$name: set packed hex " . unpack ('H*', $rawVal) . " with $unpack to hex " . unpack ('H*', $packedVal);
     }
-    # 5. Schritt: RevRegs / SwapRegs if needed
+    # 5. step: RevRegs / SwapRegs if needed
     $packedVal = ReverseWordOrder($hash, $packedVal, $len) if (ObjInfo($hash, $objCombi, 'revRegs'));
     $packedVal = SwapByteOrder($hash, $packedVal, $len) if (ObjInfo($hash, $objCombi, 'bswapRegs'));
     return ($packedVal, undef);
@@ -1094,7 +1118,7 @@ sub SetLDFn {
     my $adr    = substr($objCombi, 1);
     my $len    = ObjInfo($hash, $objCombi, 'len');
     #my $fCode  = DevInfo($hash, $type, 'write', $defaultFCode{$type}{write});
-    my $fCode  = GetFC($hash, {TYPE => $type, LEN => $len, OPERATION => 'write'});
+    my $fCode  = GetFC($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write'});
     my $ioHash = GetIOHash($hash);                      # ioHash has been checked in GetSetChecks above already
     DoRequest($hash, {TYPE => $type, ADR => $adr, LEN => $len, OPERATION => 'write', VALUES => $packedVal, FORCE => !$async, DBGINFO => "set $setName"});
     StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # call processRequestQueue at next possibility (others waiting?)
@@ -1562,7 +1586,7 @@ sub DoOpen {
         Log3 $name, 5, "$name: open called from $caller, device is defined with none" if ($caller ne 'Ready'); 
         SetStates($hash, 'opened');
     } 
-    elsif (!$hash->{TCPConn} && $hash->{TYPE} ne 'Modbus') {
+    elsif (!$hash->{TCPConn} && $hash->{TYPE} ne 'Modbus') {        # only open physical devices or TCP
         Log3 $name, 3, "$name: open called from $caller for logical device - this should not happen";
         return;
     }
@@ -1584,7 +1608,7 @@ sub DoOpen {
             SetStates($hash, 'opened');
         }
     } 
-    else {
+    else {                                          # normal case, physical device or TCP
         my $timeOt = AttrVal($name, 'openTimeout', 3);
         my $delay2 = AttrVal($name, 'nextOpenDelay2', 1);
         my $nextOp = $hash->{NEXT_OPEN} // 0;
@@ -1707,9 +1731,9 @@ sub DoClose {
     SetStates($hash, 'disconnected') if (!$noState);
     ResetExpect($hash);
     DropBuffer($hash);
-    Profiler($hash, 'Idle');                   # set category to book following time, can be Delay, Fhem, Idle, Read, Send or Wait
+    Profiler($hash, 'Idle');                    # set category to book following time, can be Delay, Fhem, Idle, Read, Send or Wait
     StopQueueTimer($hash, {silent => 1});
-    RemoveInternalTimer ("timeout:$name");
+    RemoveInternalTimer ("timeout:$name");      # remove ResponseTimeout timer when connection is closed
     delete $hash->{nextTimeout};
     delete $hash->{QUEUE};
     return;
@@ -1853,7 +1877,7 @@ sub ReadFn {
         return if(!defined($buf));
     }
 
-    HandleGaps ($hash);                         # check timing / frameGap and remove old buffer if necessary
+    HandleGaps($hash);                          # check timing / frameGap and remove old buffer if necessary
     $hash->{READ}{BUFFER} .= $buf;              # now add new data to buffer
     $hash->{REMEMBER}{lrecv} = $now;            # rember time for physical side
     Log3 $name, 5, "$name: readFn buffer: " . ShowBuffer($hash);
@@ -1937,7 +1961,7 @@ sub ReadAnswer {
     # nextTimeout is set when a request is sent. This can be the last getUpdate or the get/set
     $hash->{nextTimeout} = $now + $timeout if (!$hash->{nextTimeout});  # just to be sure, should not happen. 
 
-    RemoveInternalTimer ("timeout:$name");              # remove timer, timeout is handled in here now
+    RemoveInternalTimer ("timeout:$name");              # remove potential existing ResponseTimeout timer, timeout is handled in here now
     Profiler($hash, 'Read');
 
     READLOOP:
@@ -2094,8 +2118,6 @@ sub ParseFrameStart {
         ($expectId ? " protocol $proto expecting id $expectId" : '');
     use bytes;
     if ($proto eq 'RTU') {
-        # Skip for RTU only works when expectId is passed (parsing Modbus responses from a known Id)
-        # todo: expectId could be a list of all ids of logical devices defined for this io dev
         $frameString = SkipGarbageCheck($hash, ($expectId ? pack('C', $expectId) : undef));     # pass undef if no $expectId
         return if ($frameString !~ /(..)(.*)(..)/s);            # (id fCode) (data) (crc), return if incomplete. fc17 has no data ...
         ($id, $fCode) = unpack ('CC', $1);
@@ -2197,7 +2219,11 @@ sub HandleResponse {
     return if (!ParseResponse($hash, $response, $masterHash));  # frame not complete - continue reading
     $hash->{RESPONSE} = $response;                              # save in receiving io hash for later parsing of response??
     
-    if ($request && !$frame->{ERROR}) {     # only proceed if we know the request - otherwise fall through and finish parsing
+    delete $hash->{nextTimeout};            # at least we didn't have a timeout now. Remove it to allow new requests while parsing
+    delete $hash->{TIMEOUTS};               # clear timeout counter
+    delete $hash->{RETRY};                  # retry counter (if retry after timeout is wanted)
+
+    if ($request && !$frame->{ERROR}) {     # only parse / relay if we know the request and no error (AddFrameError) - otherwise fall through and finish parsing
         Profiler($hash, 'Fhem');   
         if ($response->{ERRCODE}) {         # valid error message response
             my $errCode  = $errCodes{$response->{ERRCODE}};
@@ -2226,12 +2252,9 @@ sub HandleResponse {
     Statistics($hash, 'Timeouts', 0);       # damit bei Bedarf das Reading gesetzt wird
     ResetExpect($hash);                     # for master back to 'idle', otherwise back to 'request'
     Profiler($hash, 'Idle');
-    delete $hash->{nextTimeout};
-    delete $hash->{TIMEOUTS};
-    delete $hash->{RETRY};
-    delete $hash->{REQUEST};                    
+    delete $hash->{REQUEST};
     delete $hash->{RESPONSE};
-    RemoveInternalTimer ("timeout:$name");
+    RemoveInternalTimer ("timeout:$name");  # remove ResponseTimeout timer now that Response has arrived
     StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0});    # set  timer to call processRequestQueue asap
     return 1;                               # error or not, parsing is done.
 }
@@ -2266,6 +2289,11 @@ sub ParseResponse {
         return if ($dataLength) < 1;
         my ($len, $values) = unpack ('Ca*', $data);         # length of values data and values from frame
         $values = substr($values, 0, $len) if (length($values) > $len);
+        if ($fCode == 2 && $masterHash && DevInfo($masterHash, 'd', 'brokenFC2', '') eq 'doepke'
+                && length($values) > 1) {
+            Log3 $name, 5, "$name: ParseResponse uses fix for doepke's broken fcode 2";
+            $values = substr($values, 1, 1);
+        }
         $response->{VALUES}   = $values;
         $response->{TYPE}     = ($fCode == 1 ? 'c' : 'd');  # coils or discrete inputs
         $frame->{PDULEXP}     = $len + 2;                   # 1 Byte fCode + 1 Byte len + len of expected values  
@@ -2519,14 +2547,15 @@ sub SplitDataString {
     }
 
     use bytes;
-    my ($reading, $unpack, $objLen, $expr);
+    my ($reading, $unpack, $objLen, $byteLen, $expr);
     OBJLOOP:
     while (length($dataStr) > 0) {              # parse every field / object passed in $transPtr structure
         my $objCombi  = $type . $startAdr;
         $reading = ObjInfo($hash, $objCombi, 'reading');     # '' if nothing specified
         if ($type =~ '[cd]') {                  # coils or digital inputs
-            $unpack = 'a';                      # for coils just take the next byte with 0/1 from the string. 
-            $objLen = 1;                        # to be used in continue block (go to next coil/input in unpacked bit string)
+            $unpack  = 'a';                     # for coils just take the next byte with 0/1 from the string. 
+            $objLen  = 1;                       # to be used in continue block (go to next coil/input in unpacked bit string)
+            $byteLen = 1;                       # just take one byte from $dataStr
         } 
         else {                                  # holding / input register
             if ($op =~ /^scan/) {               # special handling / presentation if scanning
@@ -2539,6 +2568,7 @@ sub SplitDataString {
                 $objLen  = ObjInfo($hash, $objCombi, 'len');             # default to 1 (1 Reg / 2 Bytes) with global attrDefaults
                 $unpack  = ObjInfo($hash, $objCombi, 'unpack'); 
             }
+            $byteLen = $objLen * 2;             # one register is two bytes from $dataStr
         }
         if (!$reading) {                        # no parse information -> skip to next object
             Log3 $name, 5, "$name: SplitDataString has no information about handling $objCombi";
@@ -2551,7 +2581,7 @@ sub SplitDataString {
         $obj{unpack}     = $unpack;
         $obj{adr}        = $startAdr;
         $obj{len}        = $objLen;
-        $obj{data}       = substr($dataStr, 0, $objLen * 2);
+        $obj{data}       = substr($dataStr, 0, $byteLen);
         $obj{group}      = ObjInfo($hash, $objCombi, 'group');
         push @objList, \%obj;
     }
@@ -2563,7 +2593,7 @@ sub SplitDataString {
         } 
         else {
             $startAdr += $objLen;            
-            $dataStr = (length($dataStr) > ($objLen*2) ? substr($dataStr, $objLen * 2) : '');
+            $dataStr = (length($dataStr) > ($byteLen) ? substr($dataStr, $byteLen) : '');
         }
         #Log3 $name, 5, "$name: SplitDataString moves to next object, skip $objLen to $type$startAdr" if ($dataStr);
     }
@@ -2571,9 +2601,31 @@ sub SplitDataString {
 }
 
 
+sub CreateParseInfoCache {
+    my $hash     = shift;
+    my $objCombi = shift;
+    my $name     = $hash->{NAME};
+    Log3 $name, 5, "$name: CreateParseInfoCache called";
+    $parseInfoCache->{$objCombi} = 
+        {   'revRegs'     => ObjInfo($hash, $objCombi, 'revRegs'),
+            'bswapRegs'   => ObjInfo($hash, $objCombi, 'bswapRegs'),
+            'decode'      => ObjInfo($hash, $objCombi, 'decode'),
+            'encode'      => ObjInfo($hash, $objCombi, 'encode'),
+            'ignoreExpr'  => ObjInfo($hash, $objCombi, 'ignoreExpr'),
+            'expr'        => ObjInfo($hash, $objCombi, 'expr'),
+            'map'         => ObjInfo($hash, $objCombi, 'map'),
+            'mapDefault'  => ObjInfo($hash, $objCombi, 'mapDefault'),
+            'rmapDefault' => ObjInfo($hash, $objCombi, 'rmapDefault'),
+            'format'      => ObjInfo($hash, $objCombi, 'format'),
+        };
+    return;
+}
+
+
 #######################################################
 # create readings from a hash containing all data parts
 # with unpack, map, format and so on
+# called from ParseDataString which is called from HandleResponse
 sub CreateDataObjects {
     my $hash     = shift;
     my $objList  = shift;
@@ -2592,37 +2644,48 @@ sub CreateDataObjects {
         my $objCombi = $obj->{objCombi};
         my $objData  = $obj->{data};
 
-        $objData = ReverseWordOrder($hash, $objData, $obj->{len}) if (ObjInfo($hash, $objCombi, 'revRegs'));
-        $objData = SwapByteOrder   ($hash, $objData, $obj->{len}) if (ObjInfo($hash, $objCombi, 'bswapRegs'));
+        if ($parseInfoCache->{$objCombi}) {
+            #Log3 $name, 5, "$name: Cached parse info exists for $objCombi";
+            CreateParseInfoCache($hash, $objCombi) if (!AttrVal($name, 'cacheParseInfo', 0));
+        } else {
+            CreateParseInfoCache($hash, $objCombi);
+        }
+        my $pi = $parseInfoCache->{$objCombi};
 
-        my @val = unpack ($obj->{unpack}, $objData);      # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
-        if (!defined($val[0])) {                # undefined value as result of unpack -> skip to next object
+        $objData = ReverseWordOrder($hash, $objData, $obj->{len}) if ($pi->{'revRegs'});
+        $objData = SwapByteOrder   ($hash, $objData, $obj->{len}) if ($pi->{'bswapRegs'});
+
+        # todo: put eval around unpack to catch silly unpack codes that could crash Fhem
+        my @val = unpack ($obj->{unpack}, $objData);  # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
+        if (!defined($val[0])) {                      # undefined value as result of unpack -> skip to next object
             my $logLvl = AttrVal($name, 'timeoutLogLevel', 3);
             Log3 $name, $logLvl, "$name: CreateDataObjects unpack of " . unpack ('H*', $objData) . " with $obj->{unpack} for $obj->{reading} resulted in undefined value";
             next OBJLOOP;
         } 
         Log3 $name, 5, "$name: CreateDataObjects unpacked " . unpack ('H*', $objData) . " with $obj->{unpack} to " . ReadableArray(\@val);
-        arrayEncoding($hash, \@val, ObjInfo($hash, $objCombi, 'decode'), ObjInfo($hash, $objCombi, 'encode'));
+        arrayEncoding($hash, \@val, $pi->{'decode'}, $pi->{'encode'}) if ($pi->{'decode'} || $pi->{'encode'});
         my $val = $val[0];
 
-        next OBJLOOP if (EvalExpr($hash,        # ignore exp results true -> skip to next object
-            {expr => ObjInfo($hash, $objCombi, 'ignoreExpr'), val => $val,, '@val' => \@val, 
+        next OBJLOOP if ($pi->{'ignoreExpr'} && EvalExpr($hash,         # ignore exp results true -> skip to next object
+            {expr => $pi->{'ignoreExpr'}, val => $val,, '@val' => \@val, 
              nullIfNoExp => 1, action => "ignoreExpr for $obj->{reading}"}));
 
         if ($transPtr->{OPERATION} && $transPtr->{OPERATION} =~ /^scan/) {
-            $val = ScanFormat($hash, $val);     # interpretations with diferent unpack codes
+            $val = ScanFormat($hash, $val);                             # interpretations with diferent unpack codes
         } 
         else {
-            $val = EvalExpr($hash,   {val => $val, expr => ObjInfo($hash, $objCombi, 'expr'), '%val' => \@val});   
-            $val = MapConvert($hash, {val => $val, map => ObjInfo($hash, $objCombi, 'map'),  undefIfNoMatch => 0});
-            $val = FormatVal($hash,  {val => $val, format => ObjInfo($hash, $objCombi, 'format')});
+            $val = EvalExpr($hash,   {val => $val, expr => $pi->{'expr'}, '%val' => \@val})     if ($pi->{'expr'});
+            $val = MapConvert($hash, {val => $val, map => $pi->{'map'}, 
+                                        default => $pi->{'mapDefault'}, 
+                                        undefIfNoMatch => 0})                                   if ($pi->{'map'});
+            $val = FormatVal($hash,  {val => $val, format => $pi->{'format'}})                  if ($pi->{'format'});
         }
 
         if ($hash->{MODE} eq 'slave') {
             WriteObject($hash, $transPtr, $transPtr->{TYPE}, $obj->{adr}, $val);     # do slave write
         }
         else {
-            if (!TryCall($hash, 'ModbusReadingsFn', $obj->{reading}, $val)) {    
+            if (!TryCall($hash, 'ModbusReadingsFn', $obj->{reading}, $val)) {       # unless a user module defined ModbusReadingsFn
                 Log3 $name, 4, "$name: CreateDataObjects assigns value $val to $obj->{reading}";
                 readingsBulkUpdate($hash, $obj->{reading}, $val);
             }
@@ -3067,16 +3130,19 @@ sub CreateResponse {
 # get the correct function code
 # called from DoRequest
 sub GetFC {
-    my $hash    = shift;
-    my $request = shift;
-    my $type    = $request->{TYPE};
-    my $len     = $request->{LEN};
-    my $op      = $request->{OPERATION};
-    my $name    = $hash->{NAME};                # name of logical device
-    my $fcKey   = ($op =~ /^scan/ ? 'read' : $op);
+    my $hash     = shift;
+    my $request  = shift;
+    my $type     = $request->{TYPE};
+    my $objCombi = $request->{TYPE} . $request->{ADR};
+    my $len      = $request->{LEN};
+    my $op       = $request->{OPERATION} // 'read';
+    my $name     = $hash->{NAME};                # name of logical device
+    my $fcKey    = ($op =~ /^scan/ ? 'read' : $op);
 
     #my $defFC   = $defaultFCode{$type}{$fcKey};
     my $defFC   = 3;
+
+    # find default function code first
     SEARCH:
     foreach my $fc (keys %fcMap) {
         if ($fcMap{$fc}{type} && $fcMap{$fc}{type} eq $type && exists $fcMap{$fc}{$op} && exists $fcMap{$fc}{default}) {
@@ -3084,16 +3150,23 @@ sub GetFC {
             last SEARCH;
         }
     }
-    $defFC    = 16 if ($defFC == 6 && $request->{LEN} > 1);
-    my $fCode = DevInfo($hash, $type, $fcKey, $defFC); 
+    $defFC    = 16 if ($defFC == 6 && $len > 1);
+    my $fCode = DevInfo($hash, $type, $fcKey, $defFC);              # attribute or devInfo Hash to get fc for "read" or "write"
+    
+    my $override = ObjInfo($hash, $objCombi, 'overrideFC'.$op);     # attr to override fc for read / write
+    $fCode = $override if ($override);
+
     if (!$fCode) {
         Log3 $name, 3, "$name: GetFC called from " . FhemCaller() . " did not find fCode for $fcKey type $type";
     } 
-    elsif ($fCode == 6 && $request->{LEN} > 1) {
+    elsif ($fCode == 6 && $len > 1) {
         Log3 $name, 3, "$name: GetFC called from " . FhemCaller() . ' tries to use function code 6 to write more than one register. This will not work!';
     }
     elsif ($fCode !~ /^[0-9]+$/) {
         Log3 $name, 3, "$name: GetFC called from " . FhemCaller() . ' get fCode $fCode which is not numeric. This will not work!';
+    } 
+    else {
+        #Log3 $name, 5, "$name: GetFC called from " . FhemCaller() . " returns fCode $fCode for $fcKey $objCombi len $len";
     }
     return $fCode;
 }
@@ -3359,29 +3432,34 @@ sub ProcessRequestQueue {
     }
 
     return if (CheckDelays($ioHash, $maHash, $request));    # might set Profiler to delay
-                
-    my $pdu   = PackRequest($ioHash, $request);
-    my $frame = PackFrame($ioHash, $reqId, $pdu, $request->{TID});
-    LogFrame ($ioHash, "ProcessRequestQueue (V$Module_Version) qlen $qlen, sending " 
-        . ShowBuffer($ioHash, $frame) . " via $ioHash->{DeviceName}", 4, $request);
 
-    $request->{SENT}   = $now;
-    $request->{FRAME}  = $frame;            # frame as data string for echo detection
-    $ioHash->{REQUEST} = $request;          # save for later handling incoming response
-    $ioHash->{EXPECT}  = 'response';        # expect to read a response
-    
     DropBuffer($ioHash);    
-    Statistics($ioHash, 'Requests');
-    SendFrame($ioHash, $reqId, $frame, $maHash);  # send the request, set Profiler key to 'Send'
-    Profiler($ioHash, 'Wait');              # wait for response to our request
+    RemoveInternalTimer ("timeout:$name");      # remove potential existing ResponseTimeout timer - will be set later
 
-    my $timeout = DevInfo($maHash, 'timing', 'timeout', ($request->{RELAYHASH} ? 1.5 : 2));
-    my $toTime  = $now+$timeout;
-    RemoveInternalTimer ("timeout:$name");
-    InternalTimer($toTime, \&Modbus::ResponseTimeout, "timeout:$name", 0);
-    $ioHash->{nextTimeout} = $toTime;       # to be able to calculate remaining timeout time in ReadAnswer
+    my $pdu = PackRequest($ioHash, $request);
+    if ($pdu) {
+        my $frame = PackFrame($ioHash, $reqId, $pdu, $request->{TID});
+        LogFrame ($ioHash, "ProcessRequestQueue (V$Module_Version) qlen $qlen, sending " 
+            . ShowBuffer($ioHash, $frame) . " via $ioHash->{DeviceName}", 4, $request);
+
+        $request->{SENT}   = $now;
+        $request->{FRAME}  = $frame;            # frame as data string for echo detection
+        $ioHash->{REQUEST} = $request;          # save for later handling incoming response
+        $ioHash->{EXPECT}  = 'response';        # expect to read a response
         
-    shift(@{$queue});                       # remove first element from queue
+        Statistics($ioHash, 'Requests');
+        SendFrame($ioHash, $reqId, $frame, $maHash);  # send the request, set Profiler key to 'Send'
+        Profiler($ioHash, 'Wait');              # wait for response to our request
+
+        my $timeout = DevInfo($maHash, 'timing', 'timeout', ($request->{RELAYHASH} ? 1.5 : 2));
+        my $toTime  = $now+$timeout;
+        InternalTimer($toTime, \&Modbus::ResponseTimeout, "timeout:$name", 0);
+        $ioHash->{nextTimeout} = $toTime;       # to be able to calculate remaining timeout time in ReadAnswer
+    } else {
+        Log3 $name, 3, "ProcessRequestQueue (V$Module_Version) qlen $qlen cant send empty pdu";
+    }
+
+    shift(@{$queue});                           # remove first element from queue
     readingsSingleUpdate($ioHash, 'QueueLength', ($queue ? scalar(@{$queue}) : 0), 1) if (AttrVal($name, 'enableQueueLengthReading', 0));
     StartQueueTimer($ioHash, \&Modbus::ProcessRequestQueue);    # schedule next call if there are more items in the queue
     return;
@@ -3390,13 +3468,12 @@ sub ProcessRequestQueue {
 
 ###########################################################
 # Pack holding / input register / coil Data for a response, 
-# only called from createResponse which is only called from HandleRequest
+# only called from createResponse which is only called from HandleRequest (slave mode)
 # with logical device hash and the response hash
-
+#
 # two lengths:
 # one (valuesLen) from the response hash LEN (copied from the request length)
 # and one (len) from the objInfo for the current object
-#
 sub PackObj {
     my $logHash   = shift;
     my $response  = shift;
@@ -3452,10 +3529,12 @@ sub PackObj {
             Log3 $name, 4, "$name: PackObj for $objCombi is using reading $rname of device $device with value $val";
         }
 
-        $val = EvalExpr($logHash, {expr => $expr, val => $val, '$type' => $type, '%startAdr' => $startAdr} );
-        $val = FormatVal($logHash, {val => $val, format => ObjInfo($logHash, $objCombi, 'format')});        
-        $val = MapConvert($logHash, {map => ObjInfo($logHash, $objCombi, 'map'), 
-                                      val => $val, reverse => 1, undefIfNoMatch => 1});
+        $val = EvalExpr($logHash,   {expr => $expr, val => $val, '$type' => $type, '%startAdr' => $startAdr} );
+        $val = FormatVal($logHash,  {val => $val, format => ObjInfo($logHash, $objCombi, 'format')});        
+        $val = MapConvert($logHash, {map => ObjInfo($logHash, $objCombi, 'map'),        # convert with reverse map
+                                     default => ObjInfo($logHash, $objCombi, 'rmapDefault'), 
+                                     val => $val, reverse => 1, undefIfNoMatch => 1});  # undef if no match and no default
+        $val = 0 if (!defined($val));                           # avoid working with undef when reverse map did not match
         $val = decode($decode, $val) if ($decode);              # decode
         $val = encode($encode, $val) if ($encode);              # encode again
 
@@ -3464,12 +3543,12 @@ sub PackObj {
             $counter++;
         } 
         else {
+            my $valLog = (defined ($val) ? "value $val" : "undefined value");
             local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PackObj pack for $objCombi " .
-                (defined ($val) ? "value $val" : "undefined value") . 
-                " $val with code $unpack created warning: @_"; };
+                "$valLog with code $unpack created warning: @_"; };
             my $dataPart = pack ($unpack, $val);                # use unpack code, might create warnings
-            Log3 $name, 5, "$name: PackObj packed $val with pack code $unpack to " . unpack ('H*', $dataPart);
-            $dataPart =  substr ($dataPart . pack ('x' . $len * 2, undef), 0, $len * 2);
+            Log3 $name, 5, "$name: PackObj packed $valLog with pack code $unpack to " . unpack ('H*', $dataPart);
+            $dataPart =  substr ($dataPart . pack ('x' . $len * 2, undef), 0, $len * 2);    # pad with \0 bytes created by pack
             Log3 $name, 5, "$name: PackObj padded / cut object to " . unpack ('H*', $dataPart);
             $counter += $len; 
             Log3 $name, 5, "$name: PackObj revRegs = $revRegs, dplen = " . length($dataPart);
@@ -3699,6 +3778,7 @@ sub CreateUpdateHash {
     my $devInfo   = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
     my $intvl     = $hash->{Interval};
     my $now       = gettimeofday();
+    my $ignDelay  = AttrVal($name, 'cacheUpdateHash', 0);
 
     my @RawObjList;
     foreach my $attribute (keys %{$attr{$name}}) {     # add all reading attributes to a list unless they are also in parseInfo
@@ -3707,7 +3787,7 @@ sub CreateUpdateHash {
         }
     };
     push @RawObjList, keys (%{$parseInfo});     # add all parseInfo readings to the list
-    Log3 $name, 5, "$name: CreateUpdateList full object list: " . join (' ',  sort @RawObjList);
+    Log3 $name, 5, "$name: CreateUpdateHash full object list: " . join (' ',  sort @RawObjList);
 
     my @objList;
     my %objHash;
@@ -3715,7 +3795,6 @@ sub CreateUpdateHash {
     foreach my $objCombi (sort compObjCombi @RawObjList) {   # sorted by type+adr
         my $reading    = ObjInfo($hash, $objCombi, 'reading');
         my $poll       = ObjInfo($hash, $objCombi, 'poll');
-        my $delay      = ObjInfo($hash, $objCombi, 'polldelay');
         my $group      = ObjInfo($hash, $objCombi, 'group');
         my $len        = ObjInfo($hash, $objCombi, 'len');
         my $lastRead   = $hash->{lastRead}{$objCombi} // 0;
@@ -3723,31 +3802,35 @@ sub CreateUpdateHash {
         my $adr        = substr($objCombi, 1);
         my $maxLen     = DevInfo($hash, $type, 'combine', 0);
         my $objText    = "$objCombi len $len $reading";
-        #Log3 $name, 5, "$name: CreateUpdateList check $objCombi reading $reading, poll = $poll, polldelay = $delay, last = $lastRead";
+        my $delay      = ($ignDelay ? 0 : ObjInfo($hash, $objCombi, 'polldelay'));  # ignore Polldelay when caching update hash
+        $maxLen        = 125 if ($maxLen > 125 && $type =~ /[hi]/);                 # max allowed combine for modbus holding registers or input
+        $maxLen        = 2000 if ($maxLen > 2000 && $type =~ /[cd]/);               # max allowed combine for coils / digital inputs
+        
+        #Log3 $name, 5, "$name: CreateUpdateHash check $objCombi reading $reading, poll = $poll, polldelay = $delay, last = $lastRead";
         my $groupNr;
         $groupNr = $1 if ($group && $group =~ /(\d+)-(\d+)/);
-        if ($groupNr) {                                 # handle group
+        if ($groupNr) {                                 # handle group - objects to be requested together
             my $objRef = $grpHash{'g'.$groupNr};
             my $span   = 0;
             if ($objRef) {
                 $span = $adr - $objRef->{adr} + $len;
                 if ($objRef->{type} ne $type) {
-                    Log3 $name, 3, "$name: CreateUpdateList found incompatible types in group $groupNr (so far $objRef->{type}, now $type";
+                    Log3 $name, 3, "$name: CreateUpdateHash found incompatible types in group $groupNr (so far $objRef->{type}, now $type";
                 } 
                 elsif ($objRef->{adr} > $adr) {
-                    Log3 $name, 3, "$name: CreateUpdateList found wrong adr sorting in group $groupNr. Old $objRef->{adr}, new $adr. Please report this bug";
+                    Log3 $name, 3, "$name: CreateUpdateHash found wrong adr sorting in group $groupNr. Old $objRef->{adr}, new $adr. Please report this bug";
                 } 
                 elsif ($maxLen && $span > $maxLen) {
-                    Log3 $name, 3, "$name: CreateUpdateList found group $groupNr span $span is longer than defined maximum $maxLen";
+                    Log3 $name, 3, "$name: CreateUpdateHash found group $groupNr span $span is longer than defined maximum $maxLen";
                 } 
                 else {              # add to group
                     $objRef->{len} = $span;
                     $objRef->{groupInfo} .= ($objRef->{groupInfo} ? ' and ' : '') . $objText;
-                    #Log3 $name, 5, "$name: CreateUpdateList adds $objText to group $groupNr";
+                    #Log3 $name, 5, "$name: CreateUpdateHash adds $objText to group $groupNr";
                 }
             } 
             else {                  # new object for group
-                #Log3 $name, 5, "$name: CreateUpdateList creates new hash for group $groupNr with $objText";
+                #Log3 $name, 5, "$name: CreateUpdateHash creates new hash for group $groupNr with $objText";
                 $objRef = {type => $type, adr => $adr, len => $len, reading => $reading, 
                         groupInfo => $objText, group => $group, objCombi => 'g'.$groupNr};
                 $grpHash{'g'.$groupNr} = $objRef;
@@ -3757,23 +3840,23 @@ sub CreateUpdateHash {
             if (!$delay || ($delay && $delay ne 'once') || ($delay eq 'once' && !$lastRead)) {
                 $delay = 0 if ($delay eq 'once' || !$delay);
                 $delay = $1 * ($intvl ? $intvl : 1) if ($delay =~ /^x([0-9]+)/);    # delay as multiplyer if starts with x
-                if ($now >= $lastRead + $delay) {           # this object is due to be requested
+                if ($now >= $lastRead + $delay) {               # this object is due to be requested
                     if ($groupNr) {
                         $objHash{'g'.$groupNr} = $grpHash{'g'.$groupNr};
-                        Log3 $name, 5, "$name: CreateUpdateList will request group $groupNr because of $objText";
+                        Log3 $name, 5, "$name: CreateUpdateHash will request group $groupNr because of $objText";
                     } 
-                    else {                                  # no group
+                    else {                                      # no group
                         $objHash{$objCombi} = {objCombi => $objCombi, type => $type, adr => $adr, reading => $reading, len => $len};
-                        Log3 $name, 5, "$name: CreateUpdateList will request $objText";
+                        Log3 $name, 5, "$name: CreateUpdateHash will request $objText";
                     }
                 }
                 else {                                          # delay not over
                     if ($groupNr && $objHash{'g'.$groupNr}) {   # but part of a group to be requested
-                        Log3 $name, 5, "$name: CreateUpdateList will request $reading because it is part of group $groupNr";
+                        Log3 $name, 5, "$name: CreateUpdateHash will request $reading because it is part of group $groupNr";
                     } 
                     else {                                      # delay not over and not in a group to be requested
                         my $passed = $now - $lastRead;
-                        Log3 $name, 5, "$name: CreateUpdateList will skip $reading, delay not over (delay $delay, $passed passed)";
+                        Log3 $name, 5, "$name: CreateUpdateHash will skip $reading, delay not over (delay $delay, $passed passed)";
                     }
                 }
             }
@@ -3802,17 +3885,20 @@ sub CombineUpdateHash {
     COMBINELOOP:
     foreach my $nextObj (sort compObjTA values %{$objHash}) {       # sorting type/adr 
         $maxLen = DevInfo($hash, $nextObj->{type}, 'combine', 1);
-        next COMBINELOOP if (!$lastObj);            # initial round
+        next COMBINELOOP if ($maxLen < 2 || !$lastObj);             # initial round or no combination wanted
         $reason = '';
         $lastText = $lastObj->{groupInfo} ? "$lastObj->{objCombi} len $lastObj->{len} ($lastObj->{groupInfo})" 
             : "$lastObj->{objCombi} len $lastObj->{len} $lastObj->{reading}";
         $nextText = $nextObj->{groupInfo} ? "$nextObj->{objCombi} len $nextObj->{len} ($nextObj->{groupInfo})" 
             : "$nextObj->{objCombi} len $nextObj->{len} $nextObj->{reading}";            
         $nextSpan = ($nextObj->{adr} + $nextObj->{len}) - $lastObj->{adr};   # combined length
-        if ($nextObj->{adr} <= $lastObj->{adr}) {
+
+        if (GetFC($hash, {TYPE => $nextObj->{type}, ADR => $nextObj->{adr}, LEN => $nextObj->{len}, OPERATION => 'read'}) != 
+            GetFC($hash, {TYPE => $lastObj->{type}, ADR => $lastObj->{adr}, LEN => $lastObj->{len}, OPERATION => 'read'})) {
+
+            $reason = "different function codes";
+        } elsif ($nextObj->{adr} <= $lastObj->{adr}) {
             $reason = 'wrong order defined';
-        } elsif ($nextObj->{type} ne $lastObj->{type}) {
-            $reason = 'different types';
         } elsif ($nextSpan > $maxLen) {
             $reason = "span $nextSpan would be bigger than max $maxLen";
         }
@@ -3866,8 +3952,16 @@ sub GetUpdate {
     my $ioHash = GetIOHash($hash);              # only needed for profiling, availability id checked in CheckDisable    
     Profiler($ioHash, 'Fhem');
     
-    my $objHash = CreateUpdateHash($hash);    
-    CombineUpdateHash($hash, $objHash);
+    my $objHash;
+    if (!AttrVal($name, 'cacheUpdateHash', 0) || !$updateCache) {
+        $objHash = CreateUpdateHash($hash);    
+        CombineUpdateHash($hash, $objHash);
+        $updateCache = $objHash;
+    }
+    else {
+        Log3 $name, 4, "$name: GetUpdate is using cached object list";
+        $objHash = $updateCache;
+    }
 
     # now create the requests
     foreach my $obj (sort compObjTA values %{$objHash}) {       # sorted by type / adr
@@ -3877,7 +3971,7 @@ sub GetUpdate {
                         DBGINFO => "getUpdate for " . 
                         ($obj->{combine} ? "combined $obj->{combine}" : "$obj->{reading} len $obj->{len}")});
     }
-    Profiler($ioHash, 'Idle');   
+    Profiler($ioHash, 'Idle');
     return;
 }
 
@@ -4009,7 +4103,6 @@ sub CheckChecksum {
     delete $frame->{CHECKSUMERROR};
     
     if ($proto eq 'RTU') {
-        # todo: optimize
         my $frameLen = $frame->{PDULEXP} + $PDUOverhead{$hash->{PROTOCOL}}; # everything including id to crc
         # for RTU Overhead is 3 (id ... 2 Bytes CRC)
         my $crcInputLen = ($readLen < $frameLen ? $readLen : $frameLen) - 2; # frame without 2 bytes crc
@@ -4474,8 +4567,6 @@ sub RegisterAtIODev {
 # or when device is deleted
 # see attr, notify or directly from undef
 ################################################################
-# todo: Tests for register / unregister with several modes / protocols
-# todo: Tests with relays, rename MasterSlave1 to OpenDelays
 sub UnregAtIODev {
     my $hash   = shift;
     my $silent = shift;
@@ -4646,7 +4737,7 @@ sub ResetExpect {
 
 ########################################
 # used for sorting and combine checking
-sub compObjCombi ($$) {                      ## no critic - seems to be required here
+sub compObjCombi ($$) {                      ## no critic - seems to be required here when used for sort
     my ($a,$b) = @_;
     my $aType  = substr($a, 0, 1);
     my $aStart = substr($a, 1);
@@ -4662,7 +4753,7 @@ sub compObjCombi ($$) {                      ## no critic - seems to be required
 ##############################################################################
 # used for sorting hashes that contain data objects for reading creation
 # compare $obj{$objCombi}{group} group-order values
-sub compObjGroups ($$) {                    ## no critic - seems to be required here
+sub compObjGroups ($$) {                    ## no critic - seems to be required here when used for sort
     my ($a, $b) = @_;
     my $aGrp = $a->{group} // 0;
     my $bGrp = $b->{group} // 0;
@@ -4769,13 +4860,13 @@ sub ObjInfo {
     my $oName       = shift;
    
     my $defName     = $attrDefaults{$oName}{devDefault};
-    my $lastDefault = $attrDefaults{$oName}{default};
+    
     $hash = $hash->{CHILDOF} if ($hash->{CHILDOF});                     # take info from parent device if TCP server conn (TCP slave)
     my $name        = $hash->{NAME};
     my $modHash     = $modules{$hash->{TYPE}};
     my $parseInfo   = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
     #Log3 $name, 5, "$name: ObjInfo called from " . FhemCaller() . " for $key, object $oName" . 
-    #   ($defName ? ", defName $defName" : '') . ($lastDefault ? ", lastDefault $lastDefault" : '');
+    #   ($defName ? ", defName $defName" : '');
         
     my $reading = ObjAttr($hash, $key, 'reading');
     if (!defined($reading) && $parseInfo->{$key} && $parseInfo->{$key}{reading}) {
@@ -4783,7 +4874,7 @@ sub ObjInfo {
     }
     if (!defined($reading)) {
         #Log3 $name, 5, "$name: ObjInfo could not find a reading name";
-        return (defined($lastDefault) ? $lastDefault : '');
+        return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
     }
     
     #Log3 $name, 5, "$name: ObjInfo now looks at attrs for oName $oName / reading $reading / $key";
@@ -4836,7 +4927,8 @@ sub ObjInfo {
         return $devInfo->{$type}{$defName}
             if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$defName}));
     }
-    return (defined($lastDefault) ? $lastDefault : '');
+    # todo: the final return expression seems redundant
+    return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
 }
 
 
@@ -4919,13 +5011,15 @@ sub TryCall {
 =item summary_DE Basismodul für Geräte mit Modbus-Interface
 =begin html
 
-<a name="Modbus"></a>
+<a id="Modbus"></a>
 <h3>Modbus</h3>
 <ul>
-    Modbus defines a physical modbus interface and functions to be called from other logical modules / devices.
+    Modbus defines a shared modbus i/o interface and functions to be called from other logical modules / devices.
     This low level module takes care of the communication with modbus devices and provides Get, Set and cyclic polling 
     of Readings as well as formatting and input validation functions.
-    The logical device modules for individual machines only need to define the supported modbus function codes and objects of the machine with the modbus interface in data structures. These data structures are then used by this low level module to implement Set, Get and automatic updateing of readings in a given interval.
+    The logical device modules for individual machines only need to define the supported modbus function codes and objects of the machine 
+    with the modbus interface in data structures. 
+    These data structures are then used by this low level module to implement Set, Get and automatic updateing of readings in a given interval.
     <br>
     This version of the Modbus module supports Modbus RTU and ASCII over serial / RS485 lines as well as Modbus TCP and Modbus RTU or RTU over TCP.
     It defines read / write functions for Modbus holding registers, input registers, coils and discrete inputs.
@@ -4939,12 +5033,14 @@ sub TryCall {
     </ul>
     <br>
 
-    <a name="ModbusDefine"></a>
+    <a id="Modbus-define"></a>
     <b>Define</b>
     <ul>
         <code>define &lt;name&gt; Modbus &lt;device&gt; </code>
         <br><br>
-        A define of a physical device based on this module is only necessary if a shared physical device like a RS485 USB adapter is used. In the case of Modbus TCP this module will be used as a library for other modules that define all the data objects and no define of the base module is needed.
+        A define of a low level io device based on this module is only necessary if a shared device like a RS485 USB adapter is used 
+        or if you need to pass several logical connections through a shared tcp connection e.g. to a gateway.
+        This module will also be used as a library for other high level modules that define all the data objects.
         <br>
         Example:<br>
         <br>
@@ -4958,47 +5054,85 @@ sub TryCall {
     </ul>
     <br>
 
-    <a name="ModbusSet"></a>
+    <a id="Modbus-set"></a>
     <b>Set-Commands</b><br>
     <ul>
         this low level device module doesn't provide set commands for itself but implements set 
         for logical device modules that make use of this module. See ModbusAttr for example.
     </ul>
     <br>
-    <a name="ModbusGet"></a>
+
+    <a id="Modbus-get"></a>
     <b>Get-Commands</b><br>
     <ul>
         this low level device module doesn't provide get commands for itself but implements get 
         for logical device modules that make use of this module.
     </ul>
     <br>
-    <a name="ModbusAttr"></a>
+
+    <a id="Modbus-attr"></a>
     <b>Attributes</b><br><br>
     <ul>
-        <li><a href="#do_not_notify">do_not_notify</a></li>
-        <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        <li><a href="#do_not_notify">do_not_notify</a>
+        </li>
+        <li><a href="#readingFnAttributes">readingFnAttributes</a>
+        </li>
         <br>
-        <li><b>queueMax</b></li> 
+        <li><a id="Modbus-attr-queueMax">queueMax</a><br>
             max length of the queue used for sending requests, defaults to 200.
-        <li><b>queueDelay</b></li> 
+        </li>
+        <li><a id="Modbus-attr-queueDelay">queueDelay</a><br> 
             modify the delay used when sending requests to the device from the internal queue, defaults to 1 second
-        <li><b>queueTimeout</b></li> 
+        </li>
+        <li><a id="Modbus-attr-queueTimeout">queueTimeout</a><br> 
             modify the timeout used to remove old entries in the send queue for requests. By default entries that cound not be sent for more than 20 seconds will be deleted from the queue
-        <li><b>enableQueueLengthReading</b></li> 
-            if set to 1 the physical device will create a reading with the length of the queue ued internally to send requests.<br>
+        </li>
+        <li><a id="Modbus-attr-enableQueueLengthReading">enableQueueLengthReading</a><br> 
+            if set to 1 the physical device will create a reading with the length of the queue used internally to send requests.<br>
             
-        <li><b>busDelay</b></li> 
+        </li>
+        <li><a id="Modbus-attr-busDelay">busDelay</a><br> 
             defines a delay that is always enforced between the last read from the bus and the next send to the bus for all connected devices
-        <li><b>clientSwitchDelay</b></li> 
+        </li>
+        <li><a id="Modbus-attr-clientSwitchDelay">clientSwitchDelay</a><br> 
             defines a delay that is always enforced between the last read from the bus and the next send to the bus for all connected devices but only if the next send goes to a different device than the last one
-        <li><b>frameGap</b></li> 
+        </li>
+        <li><a id="Modbus-attr-frameGap">frameGap</a><br> 
             defines the time after which the read buffer is discarded if no frame has been received. This defaults to 1.5 seconds.
-        <li><b>dropQueueDoubles</b></li> 
+        </li>
+        <li><a id="Modbus-attr-dropQueueDoubles">dropQueueDoubles</a><br> 
             prevents new request to be queued if the same request is already in the send queue
-        <li><b>retriesAfterTimeout</b></li> 
-            tbd.    
+        </li>
+        <li><a id="Modbus-attr-retriesAfterTimeout">retriesAfterTimeout</a><br> 
+            defines how often the module will try to resend a request after a timeout. This defaults to 0
+        </li>
+        <li><a id="Modbus-attr-maxTimeoutsToReconnect">maxTimeoutsToReconnect</a><br> 
+            defines that the module will disconnect and reconnect a connection after the given number of successive timeouts
+        </li>
+        <li><a id="Modbus-attr-timeoutLogLevel">maxTimeoutstimeoutLogLevelToReconnect</a><br> 
+            defines at which log level timeout messages will be logged. It defaults to 3 and could e.g. be set to 4.
+        </li>
+        <li><a id="Modbus-attr-closeAfterResponse">closeAfterResponse</a><br> 
+            if this attribute is set to 1 then the module will only open a connection when it needs to send a request. 
+            After receiving the response the connection is closed unless the send queue contains more requests to be sent. 
+            This might be helpful if modbus TCP slaves have to be queried by multiple masters but the slave is unable to handle more than one connection at a time.
+        </li>
+        <li><a id="Modbus-attr-nextOpenDelay">nextOpenDelay</a><br> 
+            delay in seconds that is passed to DevIo. It is enforced between successive calls to DevIo_Open.
+        </li>
+        <li><a id="Modbus-attr-nextOpenDelay2">nextOpenDelay2</a><br> 
+            delay in seconds to override nextOpenDelay in DevIo. This delay is enforced inside to Modbus module. Normally this attribute should never be needed.
+        </li>
+        <li><a id="Modbus-attr-openTimeout">openTimeout</a><br> 
+            timeout in seconds that is passed to DevIo.
+        </li>
+        <li><a id="Modbus-attr-silentReconnect">silentReconnect</a><br>
+            this attribute controls at what loglevel reconnect messages from devIO will be logged. Without this attribute they will be logged at level 3.
+            If this attribute is set to 1 then such messages will be logged at level 4.
+        </li>
+
             
-        <li><b>skipGarbage</b></li> 
+        <li><a id="Modbus-attr-skipGarbage">skipGarbage</a><br> 
             If the module is used as master or if it is using Modbus ASCII as protocol, then the module will skip bytes received 
             that can not be the start of correct frames.<br>
             For Modbus ASCII it skips bytes until the expected starting byte ":" is seen.
@@ -5008,8 +5142,9 @@ sub TryCall {
             Or if the last frame was a request, then it skips everything until the modbus id of this request is seen as the start of a response.
             Setting this attribuet to 1 might lead to more robustness, however when there are other slaves on the same bus, it might als create trouble when other slaves do not send responses.
             <br>
+        </li>
             
-        <li><b>profileInterval</b></li> 
+        <li><a id="Modbus-attr-profileInterval">profileInterval</a><br> 
             if set to something non zero it is the time period in seconds for which the module will create bus usage statistics. 
             Please note that this number should be at least twice as big as the interval used for requesting values in logical devices that use this physical device<br>
             The bus usage statistics create the following readings:
@@ -5030,9 +5165,10 @@ sub TryCall {
                     number of requests sent
                 <li><b>Statistics_Timeouts</b></li>
                     timeouts encountered
+        
             </ul>   
+        </li>
     </ul>
-    <br>
 </ul>
 
 =end html
