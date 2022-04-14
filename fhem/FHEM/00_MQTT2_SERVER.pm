@@ -12,6 +12,7 @@ sub MQTT2_SERVER_Write($$$);
 sub MQTT2_SERVER_Undef($@);
 sub MQTT2_SERVER_doPublish($$$$;$);
 
+use vars qw($FW_chash);   # client fhem hash
 use vars qw(%FW_id2inform);
 
 # See also:

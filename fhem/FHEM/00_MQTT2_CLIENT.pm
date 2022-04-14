@@ -12,6 +12,7 @@ sub MQTT2_CLIENT_Undef($@);
 sub MQTT2_CLIENT_doPublish($@);
 sub MQTT2_CLIENT_Disco($;$$);
 
+use vars qw($FW_chash);   # client fhem hash
 use vars qw(%FW_id2inform);
 
 # See also:
