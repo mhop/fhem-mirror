@@ -297,7 +297,6 @@ my $readingsUpdateDelayTrigger; # needed internally
 my $gotSig;                     # non-undef if got a signal
 my %oldvalue;                   # Old values, see commandref.html
 my $wbName = ".WRITEBUFFER";    # Buffer-name for delayed writing via select
-my $wbPartial = ".PARTIALWRITE";# Partial-Write name, #126946
 my %comments;                   # Comments from the include files
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
@@ -820,7 +819,6 @@ while (1) {
         } else {
           if($ret >= length($wb)) { # for the > see Forum #29963
             delete($hash->{$wbName});
-            delete($hash->{$wbPartial});
             if($hash->{WBCallback}) {
               no strict "refs";
               my $ret = &{$hash->{WBCallback}}($hash);
@@ -829,7 +827,6 @@ while (1) {
             }
           } else {
             $hash->{$wbName} = substr($wb, $ret);
-            $hash->{$wbPartial} = 1;
           }
         }
       }
@@ -5537,7 +5534,7 @@ addToWritebuffer($$@)
   $hash->{WBCallback} = $callback;
   if(!defined($hash->{$wbName})) {
     $hash->{$wbName} = $txt;
-  } elsif($nolimit || length($hash->{$wbName}) < 1024000 || !$hash->{$wbPartial}) {
+  } elsif($nolimit || length($hash->{$wbName}) < 1024000) {
     $hash->{$wbName} .= $txt;
   } else {
     return 0;
