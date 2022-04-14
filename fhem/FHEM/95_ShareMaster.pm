@@ -202,7 +202,21 @@ sub ShareMaster_Attr(@)
   return undef;
 }
 
+#########################################################################################
+#
+# ShareMaster_Undefine 
+# 
+# Parameter hash = hash of device addressed 
+#
+#########################################################################################
 
+sub ShareMaster_Undefine($$){
+  my ($hash, $arg) = @_;
+
+  RemoveInternalTimer($hash);
+
+  return undef;
+}
 #########################################################################################
 #
 # ShareMaster_ClearReadings 
