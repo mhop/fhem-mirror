@@ -18,93 +18,18 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-#   Changelog:
-#
-#   2014-2-4    initial version
-#   2014-3-12   added documentation
-#   2015-02-08  renamed ACNT to ArduCounter
-#   2016-01-01  added attributes for reading names
-#   2016-10-15  fixed bug in handling Initialized / STATE
-#               added attribute for individual factor for each pin
-#   2016-10-29  added option to receive additional Message vom sketch and log it at level 4
-#               added documentation, changed logging timestamp for power to begin of interval
-#   2016-11-02  Attribute to control timestamp backdating
-#   2016-11-04  allow number instead of rising etc. as change with min pulse length
-#   2016-11-10  finish parsing new messages
-#   2016-11-12  added attributes verboseReadings, readingStartTime
-#               add readAnswer for get info
-#   2016-12-13  better logging, ignore empty lines from Ardiuno
-#               change to new communication syntax of sketch version 1.6
-#   2016-12-24  add -b 57600 to flashCommand
-#   2016-12-25  check for old firmware and log error, better logging, disable attribute
-#   2017-01-01  improved logging
-#   2017-01-02  modification for sketch 1.7, monitor clock drift difference between ardino and Fhem
-#   2017-01-04  some more beautification in logging
-#   2017-01-06  avoid reopening when disable=0 is set during startup
-#   2017-02-06  Doku korrigiert
-#   2017-02-18  fixed a bug that caused a missing open when the device is defined while fhem is already initialized
-#   2017-05-09  fixed character encoding for documentation text
-#   2017-09-24  interpolation of lost impulses during fhem restart / arduino reset
-#   2017-10-03  bug fix
-#   2017-10-06  more optimisations regarding longCount
-#   2017-10-08  more little bug fixes (parsing debug messages)
-#   2017-10-14  modifications for new sketch version 1.9
-#   2017-11-26  minor modifications of log levels
-#   2017-12-02  fixed adding up reject count reading
-#   2017-12-27  modified logging levels
-#   2018-01-01  little fixes
-#   2018-01-02  extend reporting line with history H.*, create new reading pinHistory if received from device and verboseReadings is set to 1
-#               create long count readings always, not only if attr verboseReadings is set to 1
-#   2018-01-03  little docu fix
-#   2018-01-13  little docu addon
-#   2018-02-04  modifications for ArduCounter on ESP8266 connected via TCP
-#                   remove "change" as option (only rising and falling allowed now)
-#                   TCP connection handling, keepalive, 
-#                   many changes more ...
-#   2018-03-07  fix pinHistory when verboseReadings is not set
-#   2018-03-08  parse board name in setup / hello message
-#   2018-04-10  many smaller fixes, new interpolation based on real boot time, counter etc.
-#   2018-05-13  send keepalive delay with k command, don't reset k timer when parsing a message
-#   2018-07-17  modify define / notify so connection is opened after Event Defined 
-#   2018-12-17  modifications to support analog ferraris counters with IR at analog input pin, some smaller bug fixes, 
-#               new attribute pulsesPerKWh, analogThresholds
-#               reading names now follow the definition of the pin (end on D4 instead of 4 if the pin was defined as pinD4 and not pin4)
-#               attributes that modify a pin or its reading names also look for the pin name (like D4 instead of 4 or A7 instead of 21)
-#   2019-01-12  fixed a small bug in logging
-#   2019-01-18  better logging for disallowed pins
-#   2019-01-29  changed handling of analog pins to better support future boards like ESP32
-#   2019-02-14  fixed typo in attr definitions
-#   2019-02-15  fixed bug in configureDevice
-#   2019-02-18  fix name of pinHistory Reading (pinName)
-#   2019-02-23  get History
-#   2019-02-23  added maxHist attribute
-#   2019-02-24  added documentation and better return value when get history has no data, option to pass a pinName to get history
-#               query new running config after configuring device
-#   2019-06-17  fix log messages and expose logRetries attribute
-#   2019-07-20  add clearLevels, parese more verbose level output at 25v
-#   2019-08-10  fix parsing of levels at devVerbose >= 25
-#   2019-08-12  fix documentation of keepalive attributes, add parsing of RSSI, 
-#               add missing attributes if they don't match the running device config
-#   2019-10-13  fix a bug where calc counters are not created when readingPulsesPerKWh$pinName is specified instead of readingPulsesPerKWh$pin
-#   2019-11-16  fix typos in documentation
-#   2019-12-21  fix small bugs discovered while testing ESP32 based boards, enhanced documentation.
-#
-#   2020-01-29  Version 7.00, modifictaions for new firmware >= 4.00
-#   2020-04-17  V 7.24 - many things restructured, new attributes, new set options
-#   2020-04-29  V 7.26 - fixed a small bug in handling the deviceDisplay attribute
-#   2020-05-01  V 7.27 - fix rssi reading
-#   2020-05-03  V 7.28 - fix board attr checking when sending display config
-#   2020-05-08  V 7.29 - fix debug logging
-#   2020-05-17  V 7.30 - fix pin / pinName usage in configureDisplay
-#   2020-05-21  V 7.31 - documentation enhancements
 #
 #
 # ideas / todo:
+#   - use DoClose / SetStates -> Utils?
+#   - check integration of device none and write tests
+#
+#   - DevIo_IsOpen instead of checking fd
+#   - "static" ports that do not count but report every change or an analog value to Fhem
 #   - check reply from device after sending a command
 #   - rename existing readings if new name is specified in attr
 #   - max time for interpolation as attribute
 #   - detect level thresholds automatically for analog input, track drift
-#   - convert module to package  
 #   - timeMissed
 #
 
@@ -118,55 +43,131 @@
 # => minimal duration 20 ms, sampling at 5ms is fine
 #
 
-package main;
+package ArduCounter;
 
-use strict;                          
-use warnings;                        
-use Time::HiRes qw(gettimeofday);    
+use strict;
+use warnings;
+use GPUtils     qw(:all);
+use Time::HiRes qw(gettimeofday time);    
 use DevIo;
+use FHEM::HTTPMOD::Utils  qw(:all);
 
-my $ArduCounter_Version = '7.30 - 17.5.2020';
+use Exporter ('import');
+our @EXPORT_OK = qw();
+our %EXPORT_TAGS = (all => [@EXPORT_OK]);
+
+BEGIN {
+    GP_Import( qw(
+        fhem
+        CommandAttr
+        CommandDeleteAttr
+        addToDevAttrList
+        AttrVal
+        ReadingsVal
+        ReadingsTimestamp
+        readingsSingleUpdate
+        readingsBeginUpdate
+        readingsBulkUpdate
+        readingsEndUpdate
+        readingsDelete
+        InternalVal
+        makeReadingName
+        Log3
+        RemoveInternalTimer
+        InternalTimer
+        deviceEvents
+        EvalSpecials
+        AnalyzePerlCommand
+        CheckRegexp
+        IsDisabled
+        devspec2array
+        FmtTime
+        gettimeofday
+        FmtDateTime
+        GetTimeSpec
+        fhemTimeLocal
+        time_str2num
+        min
+        max
+        minNum
+        maxNum
+        abstime2rel
+        defInfo
+        trim
+        ltrim
+        rtrim
+        UntoggleDirect
+        UntoggleIndirect
+        IsInt
+        fhemNc
+        round
+        sortTopicNum
+        Svn_GetFile
+        WriteFile
+
+        DevIo_OpenDev
+        DevIo_SimpleWrite
+        DevIo_SimpleRead
+        DevIo_CloseDev
+        DevIo_Disconnected
+        SetExtensions
+        HttpUtils_NonblockingGet
+
+        featurelevel
+        defs
+        modules
+        attr
+        init_done
+    ));
+
+    GP_Export( qw(
+        Initialize
+    ));
+};
 
 
-my %ArduCounter_sets = (  
-    "disable"       =>  "",
-    "enable"        =>  "",
-    "raw"           =>  "",
-    "reset"         =>  "",
-    "resetWifi"     =>  "",
-    "flash"         =>  "",
-    "saveConfig"    =>  "",
-    "clearLevels"   =>  "",
-    "counter"       =>  "",
-    "clearCounters" =>  "",
-    "clearHistory"  =>  "",
-    "reconnect"     =>  ""  
+my $Module_version = '8.00 - 21.10.2021';
+
+
+my %SetHash = (  
+    'disable'       =>  '',
+    'enable'        =>  '',
+    'raw'           =>  '',
+    'reset'         =>  '',
+    'resetWifi'     =>  '',
+    'flash'         =>  '',
+    'saveConfig'    =>  '',
+    'clearLevels'   =>  '',
+    'counter'       =>  '',
+    'clearCounters' =>  '',
+    'clearHistory'  =>  '',
+    'reconnect'     =>  ''  
 );
 
 
-my %ArduCounter_gets = (  
-    "info"    =>  "",
-    "history" =>  "",
-    "levels"  =>  ""
+my %GetHash = (  
+    'info'    =>  '',
+    'history' =>  '',
+    'levels'  =>  ''
 );
 
  
 my %AnalogPinMap = (
-    "NANO" => { 
-        "A0" => 14,
-        "A1" => 15,
-        "A2" => 16,
-        "A3" => 17,             
-        "A4" => 18,
-        "A5" => 19,
-        "A6" => 20,
-        "A7" => 21 },
-    "ESP8266" => {
-        "A0" => 17 },
-    "ESP32" => {
-        "A0" => 36 },
-    "T-Display" => {
-        "A0" => 36 }
+    'NANO' => { 
+        'A0' => 14,
+        'A1' => 15,
+        'A2' => 16,
+        'A3' => 17,             
+        'A4' => 18,
+        'A5' => 19,
+        'A6' => 20,
+        'A7' => 21 },
+    'ESP8266' => {
+        'A0' => 17 },
+    'ESP32' => {
+        'A0' => 36 },
+    'T-Display' => {
+        'A0' => 36 }
 );
 my %rAnalogPinMap;
 
@@ -175,18 +176,17 @@ my %rAnalogPinMap;
 #########################################################################
 # FHEM module intitialisation
 # defines the functions to be called from FHEM
-sub ArduCounter_Initialize($)
-{
-    my ($hash) = @_;
+sub Initialize {
+    my $hash = shift;
 
-    $hash->{ReadFn}   = "ArduCounter_Read";
-    $hash->{ReadyFn}  = "ArduCounter_Ready";
-    $hash->{DefFn}    = "ArduCounter_Define";
-    $hash->{UndefFn}  = "ArduCounter_Undef";
-    $hash->{GetFn}    = "ArduCounter_Get";
-    $hash->{SetFn}    = "ArduCounter_Set";
-    $hash->{AttrFn}   = "ArduCounter_Attr";
-    $hash->{NotifyFn} = "ArduCounter_Notify";
+    $hash->{ReadFn}   = \&ArduCounter::ReadFn;
+    $hash->{ReadyFn}  = \&ArduCounter::ReadyFn;
+    $hash->{DefFn}    = \&ArduCounter::DefineFn;
+    $hash->{UndefFn}  = \&ArduCounter::UndefFn;
+    $hash->{GetFn}    = \&ArduCounter::GetFn;
+    $hash->{SetFn}    = \&ArduCounter::SetFn;
+    $hash->{AttrFn}   = \&ArduCounter::AttrFn;
+    $hash->{NotifyFn} = \&ArduCounter::NotifyFn;
     $hash->{AttrList} =
         'board:UNO,NANO,ESP8266,ESP32,T-Display ' .
         'pin[AD]?[0-9]+ ' .                             # configuration of pins -> sent to device
@@ -232,8 +232,9 @@ sub ArduCounter_Initialize($)
         'logFilter ' .
         'disable:0,1 ' .
         'do_not_notify:1,0 ' . 
-        $readingFnAttributes;
+        $main::readingFnAttributes;
 
+    # initialize rAnalogPinMap for each board and pin
     foreach my $board (keys %AnalogPinMap) {
         foreach my $pinName (keys %{$AnalogPinMap{$board}}) {
             my $pin = $AnalogPinMap{$board}{$pinName};
@@ -241,29 +242,34 @@ sub ArduCounter_Initialize($)
             #Log3 undef, 3, "ArduCounter: initialize rAalogPinMap $board - $pin - $pinName";
         }
     }
+    return;
 }
 
-
+ 
 ##########################################################################
 # Define command
-sub ArduCounter_Define($$)
-{
-    my ($hash, $def) = @_;
-    my @a = split( /[ \t\n]+/, $def );
+sub DefineFn {
+    my $hash = shift;                           # reference to the Fhem device hash 
+    my $def  = shift;                           # definition string
+    my @a    = split( /[ \t]+/, $def );         # the above string split at space or tab
 
-    return "wrong syntax: define <name> ArduCounter devicename\@speed"
+    return 'wrong syntax: define <name> ArduCounter devicename@speed or ipAdr:port'
       if ( @a < 3 );
 
     DevIo_CloseDev($hash);
     my $name = $a[0];
     my $dev  = $a[2];
     
-    if ($dev =~ m/^(.+):([0-9]+)$/) {                   # tcp conection
+    if ($dev =~ m/^[Nn]one$/) {                         # none
+        # for testing 
+    } elsif ($dev =~ m/^(.+):([0-9]+)$/) {                   # tcp conection with explicit port
         $hash->{TCP} = 1;                               
-    } elsif ($dev =~ m/^(\d+\.\d+\.\d+\.\d+)(?:\:([0-9]+))?$/) { 
+    } 
+    elsif ($dev =~ m/^(\d+\.\d+\.\d+\.\d+)(?:\:([0-9]+))?$/) { 
         $hash->{TCP} = 1;
-        $dev .= ':80' if (!$2);
-    } else {
+        $dev .= ':80' if (!$2);                         # ip adr with optional port
+    } 
+    else {                                              # serial connection
         if ($dev !~ /.+@([0-9]+)/) {
             $dev .= '@115200';                          # add new default serial speed
         } else {
@@ -272,13 +278,13 @@ sub ArduCounter_Define($$)
         }
     }
     $hash->{DeviceName}    = $dev;
-    $hash->{VersionModule} = $ArduCounter_Version;
+    $hash->{VersionModule} = $Module_version;
     $hash->{NOTIFYDEV}     = "global";                  # NotifyFn nur aufrufen wenn global events (INITIALIZED)
     $hash->{STATE}         = "disconnected";
     
     delete $hash->{Initialized};                        # device might not be initialized - wait for hello / setup before cmds
         
-    Log3 $name, 5, "$name: defined with $dev, Module version $ArduCounter_Version";
+    Log3 $name, 3, "$name: defined with $dev, Module version $Module_version";
     # do open in notify after init_done or after a new defined device (also after init_done)    
     return;
 }
@@ -286,18 +292,17 @@ sub ArduCounter_Define($$)
 
 #########################################################################
 # undefine command when device is deleted
-sub ArduCounter_Undef($$)    
-{                     
-    my ( $hash, $arg ) = @_;       
-    DevIo_CloseDev($hash);             
+sub UndefFn {                     
+    my $hash = shift;       
+    DevIo_CloseDev($hash);   
+    return;          
 }    
 
 
 #####################################################
 # remove timers, call DevIo_Disconnected 
 # to set state and add to readyFnList
-sub ArduCounter_Disconnected($)
-{
+sub SetDisconnected {
     my $hash = shift;
     my $name = $hash->{NAME};
   
@@ -305,15 +310,15 @@ sub ArduCounter_Disconnected($)
     RemoveInternalTimer ("keepAlive:$name");        # don't send keepalive messages anymore
     RemoveInternalTimer ("sendHello:$name");
     DevIo_Disconnected($hash);                      # close, add to readyFnList so _Ready is called to reopen
-    delete $hash->{WaitForAlive};
+    return;
 }
 
 
 #####################################################
 # open callback
-sub ArduCounter_OpenCB($$)
-{
-    my ($hash, $msg) = @_;
+sub OpenCallback {
+    my $hash = shift;
+    my $msg  = shift;
     my $name = $hash->{NAME};
     my $now  = gettimeofday();
     if ($msg) {
@@ -321,20 +326,20 @@ sub ArduCounter_OpenCB($$)
     }
     delete $hash->{BUSY_OPENDEV};
     if ($hash->{FD}) {  
-        Log3 $name, 5, "$name: ArduCounter_Open succeeded in callback";
+        Log3 $name, 5, "$name: DoOpen succeeded in callback";
         my $hdl = AttrVal($name, "helloSendDelay", 4);
         # send hello if device doesn't say "Started" withing $hdl seconds
         RemoveInternalTimer ("sendHello:$name");
-        InternalTimer($now+$hdl, "ArduCounter_AskForHello", "sendHello:$name", 0);    
+        InternalTimer($now+$hdl, "ArduCounter::AskForHello", "sendHello:$name", 0);    
         
         if ($hash->{TCP}) {
             # send first keepalive immediately to turn on tcp mode in device
-            ArduCounter_KeepAlive("keepAlive:$name");   
+            KeepAlive("keepAlive:$name");   
         }
-    } else {
-        #Log3 $name, 5, "$name: ArduCounter_Open failed - open callback called from DevIO without FD";
+    } 
+    else {      # no file descriptor after open
+        #Log3 $name, 5, "$name: DoOpen failed - open callback called from DevIO without FD";
     }
-
     return;
 }
 
@@ -350,26 +355,33 @@ sub ArduCounter_OpenCB($$)
 # normally an open also resets the counter board, unless its hardware is modified
 # to continue when opened.
 #
-sub ArduCounter_Open($;$)
-{
-    my ($hash, $reopen) = @_;
-    my $name = $hash->{NAME};
-    my $now  = gettimeofday();
-    $reopen  = 0 if (!$reopen);
+sub DoOpen {
+    my $hash   = shift;
+    my $reopen = shift // 0;
+    my $name   = $hash->{NAME};
+    my $now    = gettimeofday();
+    my $caller = FhemCaller();
+
+    if ($hash->{DeviceName} eq 'none') {
+        Log3 $name, 5, "$name: open called from $caller, device is defined with none" if ($caller ne 'Ready'); 
+        SetStates($hash, 'opened');
+        return;
+    } 
     
-    if ($hash->{BUSY_OPENDEV}) {  # still waiting for callback to last open 
+    if ($hash->{BUSY_OPENDEV}) {    # still waiting for callback to last open 
         if ($hash->{LASTOPEN} && $now > $hash->{LASTOPEN} + (AttrVal($name, "openTimeout", 3) * 2)
                               && $now > $hash->{LASTOPEN} + 15) {
             Log3 $name, 5, "$name: _Open - still waiting for open callback, timeout is over twice - this should never happen";
             Log3 $name, 5, "$name: _Open - stop waiting and reset the flag.";
             $hash->{BUSY_OPENDEV} = 0;
-        } else {
+        } 
+        else {                      # no timeout yet
             Log3 $name, 5, "$name: _Open - still waiting for open callback";
             return;
         }
     }    
     
-    if (!$reopen) {         # not called from _Ready
+    if (!$reopen) {                 # not called from _Ready
         DevIo_CloseDev($hash);
         delete $hash->{NEXT_OPEN};
         delete $hash->{DevIoJustClosed};
@@ -384,34 +396,76 @@ sub ArduCounter_Open($;$)
     $hash->{TIMEOUT}        = AttrVal($name, "openTimeout", 3);
     $hash->{buffer}         = "";       # clear Buffer for reception
 
-    DevIo_OpenDev($hash, $reopen, 0, \&ArduCounter_OpenCB);
+    DevIo_OpenDev($hash, $reopen, 0, \&OpenCallback);
     delete $hash->{TIMEOUT};    
     if ($hash->{FD}) {  
-        Log3 $name, 5, "$name: ArduCounter_Open succeeded immediately" if (!$reopen);
+        Log3 $name, 5, "$name: DoOpen succeeded immediately" if (!$reopen);
     } else {
-        Log3 $name, 5, "$name: ArduCounter_Open waiting for callback" if (!$reopen);
+        Log3 $name, 5, "$name: DoOpen waiting for callback" if (!$reopen);
     }
-
+    return;
 }
 
 
+
+##################################################
+# close connection 
+# $hash is physical or both (connection over TCP)
+sub DoClose {
+    my ($hash, $noState, $noDelete) = @_;
+    my $name = $hash->{NAME};
+       
+    Log3 $name, 5, "$name: Close called from " . FhemCaller() . 
+        ($noState || $noDelete ? ' with ' : '') . ($noState ? 'noState' : '') .     # set state?
+        ($noState && $noDelete ? ' and ' : '') . ($noDelete ? 'noDelete' : '');     # command delete on connection device?
+    
+    delete $hash->{LASTOPEN};                           # reset so next open will actually call OpenDev
+    if ($hash->{DeviceName} eq 'none') {
+        Log3 $name, 4, "$name: Simulate closing connection to none";
+    } 
+    else {
+        Log3 $name, 4, "$name: Close connection with DevIo_CloseDev";
+        # close even if it was not open yet but on ready list (need to remove entry from readylist)
+        DevIo_CloseDev($hash);
+    }
+    SetStates($hash, 'disconnected') if (!$noState);
+    return;
+}
+    
+
+#################################################################
+# set state Reading and STATE internal 
+# call instead of setting STATE directly and when inactive / disconnected
+sub SetStates {
+    my $hash     = shift;
+    my $state    = shift;
+    my $name     = $hash->{NAME};
+    my $newState = $state;
+
+    Log3 $name, 5, "$name: SetState called from " . FhemCaller() . " with $state sets state and STATE to $newState";
+    $hash->{STATE} = $newState;
+    return if ($newState eq ReadingsVal($name, 'state', ''));
+    readingsSingleUpdate($hash, 'state', $newState, 1);
+    return;
+}
+
+
+
 #########################################################################
-sub ArduCounter_Ready($)
-{
-    my ($hash) = @_;
-    my $name   = $hash->{NAME};
+sub ReadyFn {
+    my $hash = shift;
+    my $name = $hash->{NAME};
     
     if($hash->{STATE} eq "disconnected") {  
         RemoveInternalTimer ("alive:$name");        # no timeout if waiting for keepalive response
         RemoveInternalTimer ("keepAlive:$name");    # don't send keepalive messages anymore
-        delete $hash->{WaitForAlive};
         delete $hash->{Initialized};                # when reconnecting wait for setup / hello before further action
         if (IsDisabled($name)) {
             Log3 $name, 3, "$name: _Ready: $name is disabled - don't try to reconnect";
             DevIo_CloseDev($hash);                  # close, remove from readyfnlist so _ready is not called again         
             return;
         }
-        ArduCounter_Open($hash, 1);                 # reopen, don't call DevIoClose before reopening
+        DoOpen($hash, 1);                 # reopen, don't call DevIoClose before reopening
         return;                                     # a return value triggers direct read for win
     }
     # This is relevant for windows/USB only
@@ -427,8 +481,7 @@ sub ArduCounter_Ready($)
 #######################################################
 # called from InternalTimer 
 # if TCP connection is busy or after firmware flash
-sub ArduCounter_DelayedOpen($)
-{
+sub DelayedOpen {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
@@ -436,15 +489,15 @@ sub ArduCounter_DelayedOpen($)
     Log3 $name, 4, "$name: try to reopen connection after delay";
     RemoveInternalTimer ("delayedopen:$name");
     delete $hash->{DevIoJustClosed};    # otherwise open returns without doing anything this time and we are not on the readyFnList ...
-    ArduCounter_Open($hash, 1);         # reopen
+    DoOpen($hash, 1);         # reopen
+    return;
 }
 
 
 ########################################################
 # Notify for INITIALIZED or Modified 
 # -> Open connection to device
-sub ArduCounter_Notify($$)
-{
+sub NotifyFn {
     my ($hash, $source) = @_;
     return if($source->{NAME} ne "global");
 
@@ -454,7 +507,7 @@ sub ArduCounter_Notify($$)
     my $name = $hash->{NAME};
     # Log3 $name, 5, "$name: Notify called for source $source->{NAME} with events: @{$events}";
   
-    return if (!grep(m/^INITIALIZED|REREADCFG|(MODIFIED $name)|(DEFINED $name)$/, @{$source->{CHANGED}}));
+    return if (!grep {m/^INITIALIZED|REREADCFG|(MODIFIED $name)$|(DEFINED $name)$/}  @{$events});
     # DEFINED is not triggered if init is not done.
 
     if (IsDisabled($name)) {
@@ -464,17 +517,18 @@ sub ArduCounter_Notify($$)
 
     Log3 $name, 3, "$name: Notify called with events: @{$events}, " .
         "open device and set timer to send hello to device";
-    ArduCounter_Open($hash);    
+    DoOpen($hash);  
+    return;  
 }
 
 
 ######################################
 # wrapper for DevIo write
-sub ArduCounter_Write ($$)
-{
-    my ($hash, $line) = @_;
+sub DoWrite {
+    my $hash = shift;
+    my $line = shift;
     my $name = $hash->{NAME};
-    if ($hash->{STATE} eq "disconnected" || !$hash->{FD}) {
+    if (!IsOpen($hash)) {
         Log3 $name, 5, "$name: Write: device is disconnected, dropping line to write";
         return 0;
     } 
@@ -484,21 +538,12 @@ sub ArduCounter_Write ($$)
     }   
     #Log3 $name, 5, "$name: Write: $line";  # devio will already log the write
     #DevIo_SimpleWrite($hash, "\n", 2);
-    DevIo_SimpleWrite($hash, "$line.", 2);
+    if ($hash->{DeviceName} eq 'none') {
+        Log3 $name, 4, "$name: Simulate sending to none: $line";
+    } else {
+        DevIo_SimpleWrite($hash, "$line.", 2);
+    }
     return 1;
-}
-
-
-
-###########################################################
-# return the name of the calling function for debug output
-sub ArduCounter_Caller() 
-{
-    my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller 2;
-    return $1 if ($subroutine =~ /main::ArduCounter_(.*)/);
-    return $1 if ($subroutine =~ /main::(.*)/);
-    return 'Fhem internal timer' if ($subroutine =~ /main::HandleTimeout/);
-    return "$subroutine";
 }
 
 
@@ -507,11 +552,11 @@ sub ArduCounter_Caller()
 # $hash->{Board} is set in parseHello and potentially overwritten by Attribut board
 # called from Attr and ConfigureDevice to translate analog pin specifications to numbers
 # in all cases Board and AllowedPins have been received with hello before
-sub ArduCounter_PinNumber($$)
-{
-    my ($hash, $pinName) = @_;
-    my $name = $hash->{NAME};
-    my $board = $hash->{Board};
+sub InternalPinNumber {
+    my $hash    = shift;
+    my $pinName = shift;
+    my $name    = $hash->{NAME};
+    my $board   = $hash->{Board};
     my $pin;
 
     if (!$board) {                  # if board is not known, try to guess it
@@ -525,25 +570,28 @@ sub ArduCounter_PinNumber($$)
             }
         }
         if ($count > 1) {
-            Log3 $name, 3, "$name: PinNumber called from " . ArduCounter_Caller() . 
+            Log3 $name, 3, "$name: PinNumber called from " . FhemCaller() . 
                 " can not determine internal pin number for $pinName," .
                 " board type is not known (yet) and attribute Board is also not set";
-        } elsif (!$count) {
-            Log3 $name, 3, "$name: PinNumber called from " . ArduCounter_Caller() . 
+        } 
+        elsif (!$count) {
+            Log3 $name, 3, "$name: PinNumber called from " . FhemCaller() . 
                 " can not determine internal pin number for $pinName." .
                 " No known board seems to support it";
-        } else {
-            Log3 $name, 3, "$name: PinNumber called from " . ArduCounter_Caller() . 
+        } 
+        else {
+            Log3 $name, 3, "$name: PinNumber called from " . FhemCaller() . 
                 " does not know what kind of board is used. " .
                 " Guessing $board ...";
         }
     }
     $pin = $AnalogPinMap{$board}{$pinName} if ($board);
     if ($pin) {
-        Log3 $name, 5, "$name: PinNumber called from " . ArduCounter_Caller() . 
+        Log3 $name, 5, "$name: PinNumber called from " . FhemCaller() . 
             " returns $pin for $pinName";
-    } else {
-        Log3 $name, 5, "$name: PinNumber called from " . ArduCounter_Caller() . 
+    } 
+    else {
+        Log3 $name, 5, "$name: PinNumber called from " . FhemCaller() . 
             " returns unknown for $pinName";
     }
     return $pin                                 # might be undef
@@ -553,9 +601,9 @@ sub ArduCounter_PinNumber($$)
 ######################################################
 # return the the pin as it is used in a pin attr
 # e.g. D2 or A1 for a passed pin number
-sub ArduCounter_PinName($$)
-{
-    my ($hash, $pin) = @_;
+sub PinName {
+    my $hash = shift;
+    my $pin  = shift;
     my $name = $hash->{NAME};
   
     my $pinName = $pin;                         # start assuming that attrs are set as pinX
@@ -563,7 +611,8 @@ sub ArduCounter_PinName($$)
         if (AttrVal($name, "pinD$pin", 0)) {    # is the pin defined as pinDX?
             $pinName = "D$pin";
             #Log3 $name, 5, "$name: using attrs with pin name D$pin";
-        } elsif ($hash->{Board}) {
+        } 
+        elsif ($hash->{Board}) {
             my $aPin = $rAnalogPinMap{$hash->{Board}}{$pin};
             if ($aPin) {                        # or pinAX?
                 $pinName = "$aPin";
@@ -574,20 +623,20 @@ sub ArduCounter_PinName($$)
     return $pinName;
 }
 
+
 #####################################################
 # return the first attr in the list that is defined
-sub ArduCounter_AttrVal($$$;$$$)
-{
+sub AttrValFromList {
     my ($hash, $default, $a1, $a2, $a3, $a4) = @_;
     my $name = $hash->{NAME};
     return AttrVal($name, $a1, undef) if (defined (AttrVal($name, $a1, undef)));
-    #Log3 $name, 5, "$name: AAV (" . ArduCounter_Caller() . ") $a1 not there";
+    #Log3 $name, 5, "$name: AAV (" . FhemCaller() . ") $a1 not there";
     return AttrVal($name, $a2, undef) if (defined ($a2) && defined (AttrVal($name, $a2, undef)));
-    #Log3 $name, 5, "$name: AAV (" . ArduCounter_Caller() . ") $a2 not there";
+    #Log3 $name, 5, "$name: AAV (" . FhemCaller() . ") $a2 not there";
     return AttrVal($name, $a3, undef) if (defined ($a3) && defined (AttrVal($name, $a3, undef)));
-    #Log3 $name, 5, "$name: AAV (" . ArduCounter_Caller() . ") $a3 not there";
+    #Log3 $name, 5, "$name: AAV (" . FhemCaller() . ") $a3 not there";
     return AttrVal($name, $a4, undef) if (defined ($a4) && defined (AttrVal($name, $a4, undef)));
-    #Log3 $name, 5, "$name: AAV (" . ArduCounter_Caller() . ") $a4 not there";
+    #Log3 $name, 5, "$name: AAV (" . FhemCaller() . ") $a4 not there";
     return $default;
 }
 
@@ -596,11 +645,11 @@ sub ArduCounter_AttrVal($$$;$$$)
 # return a meaningful name (the relevant reading name) 
 # for passed pin number
 # called from functions that handle device output with pin number
-sub ArduCounter_LogPinDesc($$)
-{
-    my ($hash, $pin) = @_;
-    my $pinName = ArduCounter_PinName ($hash, $pin);
-    return ArduCounter_AttrVal($hash, "pin$pin", "readingNameCount$pinName", "readingNameCount$pin", "readingNamePower$pinName", "readingNamePower$pin");
+sub LogPinDesc {
+    my $hash = shift;
+    my $pin  = shift;
+    my $pinName = PinName ($hash, $pin);
+    return AttrValFromList($hash, "pin$pin", "readingNameCount$pinName", "readingNameCount$pin", "readingNamePower$pinName", "readingNamePower$pin");
 }
 
 
@@ -608,8 +657,7 @@ sub ArduCounter_LogPinDesc($$)
 # send 'a' command to the device to configure a pin
 # called from attr (pin attribute) and configureDevice
 # with a pinName
-sub ArduCounter_ConfigurePin($$$)
-{
+sub ConfigurePin {
     my ($hash, $pinArg, $aVal) = @_;
     my $name = $hash->{NAME};
     my $opt;
@@ -621,9 +669,9 @@ sub ArduCounter_ConfigurePin($$$)
     my ($edge, $pullup, $minText, $min, $aout, $t1, $t2) = ($1, $2, $3, $4, $5, $6, $7);
     if (!$hash->{Initialized}) {                        # no hello received yet
         Log3 $name, 5, "$name: pin validation and communication postponed until device is initialized";
-        return undef;                                   # accept value but don't send it to the device yet.
+        return;                                   # accept value but don't send it to the device yet.
     }
-    my ($pin, $pinName) = ArduCounter_ParsePin($hash, $pinArg);
+    my ($pin, $pinName) = ParsePin($hash, $pinArg);
     return "illegal pin $pinArg" if (!defined($pin));   # parsePin logs error if wrong pin spec
 
     if ($edge eq 'rising')       {$opt = "3"}           # pulse level rising or falling
@@ -633,26 +681,31 @@ sub ArduCounter_ConfigurePin($$$)
     if ($hash->{VersionFirmware} && $hash->{VersionFirmware} > "4.00") {
         if (defined($aout)) { $opt .= ",$aout" }        # analog out pin
         if (defined($t2))   { $opt .= ",$t1,$t2" }      # analog thresholds
-    } else {
+    } 
+    else {
         Log3 $name, 3, "$name: ConfigurePin sends old syntax to outdated firmware ($hash->{VersionFirmware})";    
     }                  
 
-    Log3 $name, 3, "$name: ConfigurePin creates command ${pin},${opt}a";
-    ArduCounter_Write($hash, "${pin},${opt}a");         # initialized is already checked above
-    return undef;
+    Log3 $name, 5, "$name: ConfigurePin creates command ${pin},${opt}a";
+    DoWrite($hash, "${pin},${opt}a");         # initialized is already checked above
+    return;
 }
 
 
 ######################################################
-# send 'a' command to the device to configure a pin
-sub ArduCounter_ConfigureIntervals($;$)
-{
-    my ($hash, $aVal) = @_;
+# send 'i' command to the device to configure a pin
+sub ConfigureIntervals {
+    my $hash = shift;
+    my $aVal = shift;
     my $name = $hash->{NAME};
     my $cmd;
 
     if (!defined($aVal)) {
         $aVal = AttrVal($name, "interval", "");
+        if (!$aVal) {
+            Log3 $name, 4, "$name: attr interval not set";
+            return;
+        }
     }
     if ($aVal !~ /^(\d+)[\s\,](\d+)[\s\,]?(\d+)?[\s\,]?(\d+)?([\s\,](\d+)[\s\,]+(\d+))?/) {
         Log3 $name, 3, "$name: Invalid interval specification $aVal";
@@ -665,7 +718,7 @@ sub ArduCounter_ConfigureIntervals($;$)
     }
     if (!$hash->{Initialized}) {
         Log3 $name, 5, "$name: communication postponed until device is initialized";
-        return undef;
+        return;
     }
     $sml = 0 if (!$sml);
     $cnt = 0 if (!$cnt);
@@ -674,19 +727,19 @@ sub ArduCounter_ConfigureIntervals($;$)
 
     if ($hash->{VersionFirmware} && $hash->{VersionFirmware} > "4.00") {
         $cmd = "${min},${max},${sml},${cnt},${ain},${asm}i";
-    } else {
+    } 
+    else {      # old firmware
         $cmd = "${min},${max},${sml},${cnt}i";
     }
-    Log3 $name, 3, "$name: ConfigureIntervals creates command $cmd";
-    ArduCounter_Write($hash, $cmd);
-    return undef;
+    Log3 $name, 5, "$name: ConfigureIntervals creates command $cmd";
+    DoWrite($hash, $cmd);
+    return;
 }
 
 
 ######################################################
 # send 'a' command to the device to configure a pin
-sub ArduCounter_ConfigureVerboseLevels($;$$$$$)
-{
+sub ConfigureVerboseLevels {
     my ($hash, $eHist, $eSerial, $pinDebug, $aDebug, $eTime) = @_;
     my $name = $hash->{NAME};
     my $err;
@@ -694,35 +747,40 @@ sub ArduCounter_ConfigureVerboseLevels($;$$$$$)
         if ($eHist !~ /^[01]$/) {
             $err = "illegal value for enableHistory: $eHist, only 0 and 1 allowed";
         }
-    } else {
+    } 
+    else {
         $eHist = AttrVal($name, "enableHistory", 0);
     }
     if (defined($eSerial)) {
         if ($eSerial !~ /^[012]$/) {
             $err = "illegal value enableSerialEcho: $eSerial, only 0,1 and 2 allowed";
         }
-    } else {
+    } 
+    else {
         $eSerial = AttrVal($name, "enableSerialEcho", 0);
     }
     if (defined($pinDebug)) {
         if ($pinDebug !~ /^[01]$/) {
             $err = "illegal value enablePinDebug: $pinDebug, only 0 and 1 allowed";
         }
-    } else {
+    } 
+    else {
         $pinDebug = AttrVal($name, "enablePinDebug", 0);
     }
     if (defined($aDebug)) {
         if ($aDebug !~ /^[0123]$/) {
             $err = "illegal value enable AnalogDebug: $aDebug, only 0-3 allowed";
         }
-    } else {
+    } 
+    else {
         $aDebug = AttrVal($name, "enableAnalogDebug", 0);
     }
     if (defined($eTime)) {
         if ($eTime !~ /^[01]$/) {
             $err = "illegal value enableDevTime: $eTime, only 0 and 1 allowed";
         }
-    } else {
+    } 
+    else {
         $eTime = AttrVal($name, "enableDevTime", 0);
     }
     if ($err) {
@@ -731,21 +789,20 @@ sub ArduCounter_ConfigureVerboseLevels($;$$$$$)
     }
     if (!$hash->{Initialized}) {        # no hello received yet
         Log3 $name, 5, "$name: pin validation and communication postponed until device is initialized";
-        return undef;                   # accept value but don't send it to the device yet.
+        return;                   # accept value but don't send it to the device yet.
     }
 
     my $cmd = "${eHist},${eSerial},${pinDebug},${aDebug},${eTime}v";
-    Log3 $name, 3, "$name: ConfigureVerboseLevels creates command $cmd";
-    ArduCounter_Write($hash, $cmd);
-    return undef;
+    Log3 $name, 5, "$name: ConfigureVerboseLevels creates command $cmd";
+    DoWrite($hash, $cmd);
+    return;
 }
 
 
 ######################################################
 # encode string as int sequence 
 # used in communication with device
-sub ArduCounter_IntString($)
-{
+sub IntString {
     my ($inStr) = @_;
     my $byteNum = 0;
     my $val = 0;
@@ -755,7 +812,8 @@ sub ArduCounter_IntString($)
             $val = ord($char) * 256 + $val;         # second char -> add as high byte
             $outStr .= ",$val";
             $byteNum = 0;
-        } else {
+        } 
+        else {
             $val = ord($char);                      # first char
             $byteNum++;
         }
@@ -763,7 +821,8 @@ sub ArduCounter_IntString($)
     if ($byteNum) {                                 # low order byte has been set, high byte is still zero
         $outStr .= ",$val";                         # but not added to outstr yet
 
-    } else {                                        # high byte is used as well, 
+    } 
+    else {                                        # high byte is used as well, 
         $outStr .= ",0";                            # add training zero if val is not already zero
     }
     return $outStr;
@@ -775,8 +834,7 @@ sub ArduCounter_IntString($)
 # a tft display connected to the device
 # called from configureDevice which handles hello message from device
 # and from attr deviceDisplay with $aVal
-sub ArduCounter_ConfigureDisplay($;$)
-{
+sub ConfigureDisplay {
     my ($hash, $aVal) = @_;
     my ($pinArg, $pin, $pinName, $ppu, $fDiv, $unit, $fut, $funit);
     my $name = $hash->{NAME};
@@ -788,50 +846,51 @@ sub ArduCounter_ConfigureDisplay($;$)
 
         if (!$hash->{Initialized}) {                        # no hello received yet
             Log3 $name, 5, "$name: pin validation and communication postponed until device is initialized";
-            return undef;                                   # accept value but don't send it to the device yet.
+            return;                                   # accept value but don't send it to the device yet.
         }
-        ($pin, $pinName) = ArduCounter_ParsePin($hash, $pinArg);
+        ($pin, $pinName) = ParsePin($hash, $pinArg);
         return "illegal pin $pinArg" if (!defined($pin));   # parsePin logs error if wrong pin spec
 
-        $ppu = ArduCounter_AttrVal($hash, 0, "readingPulsesPerUnit$pinName", "readingPulsesPerUnit$pin");
-        $ppu = ArduCounter_AttrVal($hash, 0, "readingPulsesPerKWh$pinName", "readingPulsesPerKWh$pin") if (!$ppu);
-        $ppu = ArduCounter_AttrVal($hash, 1, "pulsesPerUnit", "pulsesPerKWh") if (!$ppu);
-        $fut = ArduCounter_AttrVal($hash, 60, "readingFlowUnitTime$pinName", "readingFlowUnitTime$pin");
-        Log3 $name, 3, "$name: ConfigureDisplay pin $pin / $pinName, ppu $ppu, fut $fut";
+        $ppu = AttrValFromList($hash, 0, "readingPulsesPerUnit$pinName", "readingPulsesPerUnit$pin");
+        $ppu = AttrValFromList($hash, 0, "readingPulsesPerKWh$pinName", "readingPulsesPerKWh$pin") if (!$ppu);
+        $ppu = AttrValFromList($hash, 1, "pulsesPerUnit", "pulsesPerKWh") if (!$ppu);
+        $fut = AttrValFromList($hash, 60, "readingFlowUnitTime$pinName", "readingFlowUnitTime$pin");
+        Log3 $name, 5, "$name: ConfigureDisplay pin $pin / $pinName, ppu $ppu, fut $fut";
         if ($ppu =~ /(\.\d)/) {
             $fDiv = 10 ** (length($1)-1);
             $ppu = int($ppu * $fDiv);
         } else {
             $fDiv = 1;
         }
-    } else {
+    } 
+    else {
         Log3 $name, 3, "$name: Invalid device display configuration $aVal";
         return "Invalid device display configuration $aVal";        
     }
-    Log3 $name, 3, "$name: ConfigureDisplay $pin, $ppu, $fDiv, $unit, $fut, $funit";
+    Log3 $name, 5, "$name: ConfigureDisplay $pin, $ppu, $fDiv, $unit, $fut, $funit";
     if (!$hash->{Initialized}) {        # no hello received yet
         Log3 $name, 5, "$name: pin validation and communication postponed until device is initialized";
-        return undef;                   # accept value but don't send it to the device yet.
+        return;                   # accept value but don't send it to the device yet.
     }
-    my $cmd = "$pin,$ppu,$fDiv" . ArduCounter_IntString($unit) . ",$fut" . ArduCounter_IntString($funit) . "u";
-    Log3 $name, 3, "$name: ConfigureDisplay creates command $cmd";
-    ArduCounter_Write($hash, $cmd);
-    return undef;
+    my $cmd = "$pin,$ppu,$fDiv" . IntString($unit) . ",$fut" . IntString($funit) . "u";
+    Log3 $name, 5, "$name: ConfigureDisplay creates command $cmd";
+    DoWrite($hash, $cmd);
+    return;
 }
 
 
 #######################################################
 # called from InternalTimer 
 # if relevant attr is changed
-sub ArduCounter_DelayedConfigureDisplay($)
-{
+sub DelayedConfigureDisplay {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     
     Log3 $name, 5, "$name: call configureDisplay after delay";
     RemoveInternalTimer ("delayedcdisp:$name");
-    ArduCounter_ConfigureDisplay($hash);
+    ConfigureDisplay($hash);
+    return;
 }
 
 
@@ -840,27 +899,26 @@ sub ArduCounter_DelayedConfigureDisplay($)
 # Aufruf aus InternalTimer
 # send "h" to ask for "Hello" since device didn't say "Started" so far - maybe it's still counting ...
 # called with timer from _openCB, _Ready and if count is read in _Parse but no hello was received
-sub ArduCounter_AskForHello($)
-{
+sub AskForHello {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     
-    Log3 $name, 3, "$name: sending h(ello) to device to ask for version";
-    return if (!ArduCounter_Write( $hash, "h"));
+    Log3 $name, 5, "$name: ArduCounter $Module_version sending h(ello) to device to ask for firmware version";
+    return if (!DoWrite( $hash, "h"));
 
     my $now = gettimeofday();
     my $hwt = AttrVal($name, "helloWaitTime", 2);
     RemoveInternalTimer ("hwait:$name");
-    InternalTimer($now+$hwt, "ArduCounter_HelloTimeout", "hwait:$name", 0);
+    InternalTimer($now+$hwt, "ArduCounter::HelloTimeout", "hwait:$name", 0);
     $hash->{WaitForHello} = 1;
+    return;
 }
 
 
 #######################################
 # Aufruf aus InternalTimer
-sub ArduCounter_HelloTimeout($)
-{
+sub HelloTimeout {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
@@ -870,7 +928,8 @@ sub ArduCounter_HelloTimeout($)
     if ($hash->{DeviceName} !~ m/^(.+):([0-9]+)$/) {        # not TCP
         if (!$hash->{OpenRetries}) {
             $hash->{OpenRetries} = 1;
-        } else {
+        } 
+        else {
             $hash->{OpenRetries}++;
             if ($hash->{OpenRetries}++ > 4) {
                 Log3 $name, 3, "$name: device didn't reply to h(ello). Is the right sketch flashed? Is serial speed set to 38400 or 115200 for firmware >4.0?";                
@@ -881,30 +940,32 @@ sub ArduCounter_HelloTimeout($)
         if ($hash->{DeviceName} !~ /(.+)@([0-9]+)(.*)/) {   # no serial speed specified
             $hash->{DeviceName} .= '@38400';                # should not happen (added during define)
             Log3 $name, 3, "$name: device didn't reply to h(ello). No serial speed set. Is the right sketch flashed? Trying again with \@38400";
-        } else {                                   
+        } 
+        else {                                   
             if ($2 == 38400) {             
                 $hash->{DeviceName} = "${1}\@115200${3}";    # now try 115200 if 38400 before
                 Log3 $name, 3, "$name: device didn't reply to h(ello). Is the right sketch flashed? Serial speed was $2. Trying again with \@115200";
-            } else {
+            } 
+            else {
                 $hash->{DeviceName} = "${1}\@38400${3}";    # now try 38400
                 Log3 $name, 3, "$name: device didn't reply to h(ello). Is the right sketch flashed? Serial speed was $2. Trying again with \@38400";
             }
         }
         Log3 $name, 5, "$name: HelloTimeout: DeviceName in hash is set to $hash->{DeviceName}";
-        ArduCounter_Open($hash);                            # try again                             
+        DoOpen($hash);                            # try again                             
     }
+    return;
 }
 
 
 ############################################
 # Aufruf aus Open / Ready und InternalTimer
 # send "1k" to ask for "alive"
-sub ArduCounter_KeepAlive($)
-{
+sub KeepAlive {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
-    my $now = gettimeofday();
+    my $now  = gettimeofday();
     
     if (IsDisabled($name)) {
         return;
@@ -913,52 +974,51 @@ sub ArduCounter_KeepAlive($)
     my $kto = AttrVal($name, "keepAliveTimeout", 2);    # timeout waiting for response 
     
     Log3 $name, 5, "$name: sending k(eepAlive) to device" if (AttrVal($name, "logFilter", "N") =~ "N"); 
-    ArduCounter_Write( $hash, "1,${kdl}k");  
+    DoWrite( $hash, "1,${kdl}k");  
     RemoveInternalTimer ("alive:$name");
-    InternalTimer($now+$kto, "ArduCounter_AliveTimeout", "alive:$name", 0);
-    $hash->{WaitForAlive} = 1;
+    InternalTimer($now+$kto, "ArduCounter::AliveTimeout", "alive:$name", 0);
     #Log3 $name, 5, "$name: keepAlive timeout timer set  $kto";
     if ($hash->{TCP}) {        
         RemoveInternalTimer ("keepAlive:$name");
-        InternalTimer($now+$kdl, "ArduCounter_KeepAlive", "keepAlive:$name", 0);    # next keepalive
+        InternalTimer($now+$kdl, "ArduCounter::KeepAlive", "keepAlive:$name", 0);    # next keepalive
         #Log3 $name, 5, "$name: keepAlive timer for next message set in $kdl";
     }
+    return;
 }
 
 
 #######################################
 # Aufruf aus InternalTimer
-sub ArduCounter_AliveTimeout($)
-{
+sub AliveTimeout {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     #Log3 $name, 5, "$name: AliveTimeout called";
-    delete $hash->{WaitForAlive};
     $hash->{KeepAliveRetries} = 0 if (!$hash->{KeepAliveRetries});    
     if (++$hash->{KeepAliveRetries} > AttrVal($name, "keepAliveRetries", 2)) {
         Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), no retries left, setting device to disconnected";
-        ArduCounter_Disconnected($hash);        # set to Disconnected but let _Ready try to Reopen
+        SetDisconnected($hash);        # set to Disconnected but let _Ready try to Reopen
         delete $hash->{KeepAliveRetries};
-    } else {
+    } 
+    else {
         Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), count=$hash->{KeepAliveRetries}";
     }
+    return;
 }
 
 
 ##########################################################################
 # Send config commands after Board reported it is ready or still counting
 # called when parsing hello message from device
-sub ArduCounter_ConfigureDevice($)
-{
+sub ConfigureDevice {
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
     
     # todo: check if device got disconnected in the meantime!
-    my @runningPins = sort grep (/[\d]/, keys %{$hash->{runningCfg}});
+    my @runningPins = sort grep {/[\d]/} keys %{$hash->{runningCfg}};
     #Log3 $name, 5, "$name: ConfigureDevice: pins in running config: @runningPins";
-    my @attrPins = sort grep (/pin([dDaA])?[\d]/, keys %{$attr{$name}});
+    my @attrPins = sort grep {/pin([dDaA])?[\d]/} keys %{$attr{$name}};
     #Log3 $name, 5, "$name: ConfigureDevice: pins from attrs: @attrPins";
            
     #Log3 $name, 5, "$name: ConfigureDevice: check for pins without attr in list: @runningPins";
@@ -967,17 +1027,18 @@ sub ArduCounter_ConfigureDevice($)
         $cPins{$runningPins[$i]} = 1;
         #Log3 $name, 3, "$name: ConfigureDevice remember pin $runningPins[$i]";
     }
-    Log3 $name, 3, "$name: ConfigureDevice: send config";
+    Log3 $name, 5, "$name: ConfigureDevice: send config";
     while (my ($aName, $val) = each(%{$attr{$name}})) {
         if ($aName =~ /^pin([DA])?([\d+]+)/) {                  # for each pin attr
             my $type = ($1 ? $1 : '');
             my $aPinNum = $2;                                   # if not overwritten for analog pins, we have already a number
             my $pinName = $type.$aPinNum;
-            $aPinNum = ArduCounter_PinNumber($hash, $pinName) if ($type && $type eq 'A');    # if this is an analog pin specification translate it
+            $aPinNum = InternalPinNumber($hash, $pinName) if ($type && $type eq 'A');    # if this is an analog pin specification translate it
             if ($aPinNum) {
-                ArduCounter_ConfigurePin($hash, $pinName, $val);
+                ConfigurePin($hash, $pinName, $val);
                 delete $cPins{$aPinNum};                        # this pin from running config has an attr
-            } else {
+            } 
+            else {
                 Log3 $name, 3, "$name: ConfigureDevice can not send pin config for $aName, internal pin number can not be determined";
             }
         }
@@ -987,70 +1048,25 @@ sub ArduCounter_ConfigureDevice($)
         Log3 $name, 5, "$name: ConfigureDevice: pins in running config without attribute in Fhem: $pins";
         foreach my $pin (keys %cPins) {
             Log3 $name, 5, "$name: ConfigureDevice: removing pin $pin";
-            ArduCounter_Write($hash, "${pin}d");
+            DoWrite($hash, "${pin}d");
         }
-    } else {
+    } 
+    else {
         Log3 $name, 5, "$name: ConfigureDevice: no pins in running config without attribute in Fhem";
     }
 
-    ArduCounter_ConfigureIntervals($hash);
-    ArduCounter_ConfigureVerboseLevels($hash);
-    ArduCounter_ConfigureDisplay($hash) if ($hash->{Board} =~ /Display/);
+    ConfigureIntervals($hash);
+    ConfigureVerboseLevels($hash);
+    ConfigureDisplay($hash) if ($hash->{Board} =~ /Display/);
 
-    ArduCounter_Write( $hash, "s");     # get new running config 
+    DoWrite( $hash, "s");     # get new running config 
+    return;
 }
-
-
-#########################################################################
-# setzt userAttr-Attribute bei Regex-Attrs
-sub ArduCounter_ManageUserAttr($$)
-{                     
-    my ($hash, $aName) = @_;       
-    my $name    = $hash->{NAME};
-    my $modHash = $modules{$hash->{TYPE}};
-
-    # handle wild card attributes -> Add to userattr to allow modification in fhemweb
-    if (" $modHash->{AttrList} " !~ m/ ${aName}[ :;]/) {
-        # nicht direkt in der Liste -> evt. wildcard attr in AttrList
-        foreach my $la (split " ", $modHash->{AttrList}) {
-            $la =~ /^([^:;]+)(:?.*)$/;
-            my $vgl = $1;               # attribute name in list - probably a regex
-            my $opt = $2;               # attribute hint in list
-            if ($aName =~ /^$vgl$/) {   # yes - the name in the list now matches as regex
-                # $aName ist eine Ausprägung eines wildcard attrs
-                addToDevAttrList($name, "$aName" . $opt);    # create userattr with hint to allow change in fhemweb
-                #Log3 $name, 5, "$name: ManageUserAttr added attr $aName with $opt to userattr list";
-                if ($opt) {
-                    # remove old entries without hint
-                    my $ualist = $attr{$name}{userattr};
-                    $ualist = "" if(!$ualist);
-                    my %uahash;
-                    foreach my $a (split(" ", $ualist)) {
-                        if ($a !~ /^${aName}$/) {       # no match -> existing entry in userattr list is attribute without hint
-                            $uahash{$a} = 1;            # put $a as key into the hash so it is kept in userattr later
-                        } else {                        # match -> in list without attr -> remove
-                            #Log3 $name, 5, "$name: ManageUserAttr removes attr $a without hint $opt from userattr list";
-                        }
-                    }
-                    $attr{$name}{userattr} = join(" ", sort keys %uahash);
-                }
-            }
-        }
-    } else {
-        # exakt in Liste enthalten -> sicherstellen, dass keine +* etc. drin sind.
-        if ($aName =~ /\|\*\+\[/) {
-            Log3 $name, 3, "$name: Atribute $aName is not valid. It still contains wildcard symbols";
-            return "$name: Atribute $aName is not valid. It still contains wildcard symbols";
-        }
-    }
-}
-
 
 
 #########################################################################
 # Attr command 
-sub ArduCounter_Attr(@)
-{
+sub AttrFn {
     my ($cmd,$name,$aName,$aVal) = @_;
     # $cmd can be "del" or "set"
     # $name is device name
@@ -1062,9 +1078,9 @@ sub ArduCounter_Attr(@)
     if ($cmd eq "set") {
         if ($aName =~ /^pin([DA]?\d+)/) {             # pin attribute -> add a pin
             my $pinName = $1;
-            return ArduCounter_ConfigurePin($hash, $pinName, $aVal);
-        
-        } elsif ($aName eq "devVerbose") {
+            return ConfigurePin($hash, $pinName, $aVal);
+        } 
+        elsif ($aName eq "devVerbose") {
             my $text = "devVerbose has been replaced by " .
                     'enableHistory:0,1 ' .                          # history creation on device
                     'enableSerialEcho:0,1,2 ' .                     # serial echo of output via TCP from device
@@ -1075,23 +1091,23 @@ sub ArduCounter_Attr(@)
 
             Log3 $name, 3, "$name: $text";
             return $text;
-
-        } elsif ($aName eq "enableHistory") {
-            return ArduCounter_ConfigureVerboseLevels($hash, $aVal); 
-
-        } elsif ($aName eq "enableSerialEcho") {
-            return ArduCounter_ConfigureVerboseLevels($hash, undef, $aVal); 
-
-        } elsif ($aName eq "enablePinDebug") {
-            return ArduCounter_ConfigureVerboseLevels($hash, undef, undef, $aVal); 
-
-        } elsif ($aName eq "enableAnalogDebug") {
-            return ArduCounter_ConfigureVerboseLevels($hash, undef, undef, undef, $aVal); 
-
-        } elsif ($aName eq "enableDevTime") {
-            return ArduCounter_ConfigureVerboseLevels($hash, undef, undef, undef, undef, $aVal); 
-
-        } elsif ($aName eq "analogThresholds") {
+        } 
+        elsif ($aName eq "enableHistory") {
+            return ConfigureVerboseLevels($hash, $aVal); 
+        } 
+        elsif ($aName eq "enableSerialEcho") {
+            return ConfigureVerboseLevels($hash, undef, $aVal); 
+        } 
+        elsif ($aName eq "enablePinDebug") {
+            return ConfigureVerboseLevels($hash, undef, undef, $aVal); 
+        } 
+        elsif ($aName eq "enableAnalogDebug") {
+            return ConfigureVerboseLevels($hash, undef, undef, undef, $aVal); 
+        } 
+        elsif ($aName eq "enableDevTime") {
+            return ConfigureVerboseLevels($hash, undef, undef, undef, undef, $aVal); 
+        } 
+        elsif ($aName eq "analogThresholds") {
             my $text = "analogThresholds has been removed. Thresholds are now part of the pin attribute. Please update your configuration";
             Log3 $name, 3, "$name: $text";
 
@@ -1103,67 +1119,73 @@ sub ArduCounter_Attr(@)
                     return "Invalid Value $aVal";
                 }
                 if ($hash->{Initialized}) {
-                    ArduCounter_Write($hash, "${min},${max}t");
+                    DoWrite($hash, "${min},${max}t");
                 } else {
                     Log3 $name, 5, "$name: communication postponed until device is initialized";
                 }
-            } else {
+            } 
+            else {
                 Log3 $name, 3, "$name: Invalid value in attr $name $aName $aVal";
                 return "Invalid Value $aVal";
             }           
-            
-        } elsif ($aName eq "interval") { 
-            return ArduCounter_ConfigureIntervals($hash, $aVal);
-
-        } elsif ($aName eq "board") {
+        } 
+        elsif ($aName eq "interval") { 
+            return ConfigureIntervals($hash, $aVal);
+        } 
+        elsif ($aName eq "board") {
             $hash->{Board} = $aVal;
-
-        } elsif ($aName eq "factor") {                          # log notice to remove this / replace
+        } 
+        elsif ($aName eq "factor") {                          # log notice to remove this / replace
             if ($aVal =~ '^(\d+)$') {
             } else {
                 Log3 $name, 3, "$name: Invalid value in attr $name $aName $aVal";
                 return "Invalid Value $aVal";
             }           
-        } elsif ($aName eq "keepAliveDelay") {
+        } 
+        elsif ($aName eq "keepAliveDelay") {
             if ($aVal =~ '^(\d+)$') {
                 if ($aVal > 3600) {
                     Log3 $name, 3, "$name: value too big in attr $name $aName $aVal";
                     return "Value too big: $aVal";
                 }
-            } else {
+            } 
+            else {
                 Log3 $name, 3, "$name: Invalid value in attr $name $aName $aVal";
                 return "Invalid Value $aVal";
             }           
-        } elsif ($aName eq 'disable') {
+        } 
+        elsif ($aName eq 'disable') {
             if ($aVal) {
                 Log3 $name, 5, "$name: disable attribute set";                
-                ArduCounter_Disconnected($hash);    # set to disconnected and remove timers
+                SetDisconnected($hash);    # set to disconnected and remove timers
                 DevIo_CloseDev($hash);              # really close and remove from readyFnList again
                 return;
             } else {
                 Log3 $name, 3, "$name: disable attribute cleared";
-                ArduCounter_Open($hash) if ($init_done);    # only if fhem is initialized
+                DoOpen($hash) if ($init_done);    # only if fhem is initialized
             }
-        } elsif ($aName eq 'deviceDisplay') {
-            ArduCounter_ConfigureDisplay($hash, $aVal);
-
-        } elsif ($aName =~ /pulsesPer/ || $aName =~ /[Ff]lowUnitTime/) {
+        } 
+        elsif ($aName eq 'deviceDisplay') {
+            ConfigureDisplay($hash, $aVal);
+        } 
+        elsif ($aName =~ /pulsesPer/ || $aName =~ /[Ff]lowUnitTime/) {
             my $now = gettimeofday(); 
             RemoveInternalTimer ("delayedcdisp:$name");
-            InternalTimer($now, "ArduCounter_DelayedConfigureDisplay", "delayedcdisp:$name", 0);
-
-        } elsif ($aName =~ /^verboseReadings([DA]?(\d+))/) {
+            InternalTimer($now, "ArduCounter::DelayedConfigureDisplay", "delayedcdisp:$name", 0);
+        } 
+        elsif ($aName =~ /^verboseReadings([DA]?(\d+))/) {
             my $arg = $1;
             if (!$hash->{Initialized}) {        # no hello received yet
                 return;                         # accept value for now.
             }
-            my ($pin, $pinName) = ArduCounter_ParsePin($hash, $arg);
+            my ($pin, $pinName) = ParsePin($hash, $arg);
             return "illegal pin $arg" if (!defined($pin));          # parsePin logs error if wrong pin spec
 
             if ($aVal eq "0") {
-                ArduCounter_ReadingsDelete($hash, "lastMsg", $pin);
-                ArduCounter_ReadingsDelete($hash, "pinHistory", $pin);
-            } elsif ($aVal eq "-1") {
+                UserReadingsDelete($hash, "lastMsg", $pin);
+                UserReadingsDelete($hash, "pinHistory", $pin);
+            } 
+            elsif ($aVal eq "-1") {
                 readingsDelete($hash, 'pin' . $pin);
                 readingsDelete($hash, 'pin' . $pinName);
                 readingsDelete($hash, 'long' . $pin);
@@ -1178,33 +1200,33 @@ sub ArduCounter_Attr(@)
                 readingsDelete($hash, 'interpolatedLong' . $pinName);
             }
         }        
-        ArduCounter_ManageUserAttr($hash, $aName);
-        
-    } elsif ($cmd eq "del") {
+        ManageUserAttr($hash, $aName);
+    } 
+    elsif ($cmd eq "del") {
         if ($aName =~ 'pin(.*)') {
             my $arg = $1;
             if (!$hash->{Initialized}) {        # no hello received yet
                 return;                         # accept value for now.
             }
-            my ($pin, $pinName) = ArduCounter_ParsePin($hash, $arg);
+            my ($pin, $pinName) = ParsePin($hash, $arg);
             if (defined($pin)) {
-                ArduCounter_Write( $hash, "${pin}d");
+                DoWrite( $hash, "${pin}d");
             }
 
-        } elsif ($aName eq 'disable') {
+        } 
+        elsif ($aName eq 'disable') {
             Log3 $name, 3, "$name: disable attribute removed";    
-            ArduCounter_Open($hash) if ($init_done);       # if fhem is initialized
+            DoOpen($hash) if ($init_done);       # if fhem is initialized
         }
     }
-    return undef;
+    return;
 }
 
 
 
 #########################################################################
 # flash a device via serial or OTA with external commands
-sub ArduCounter_Flash($@)
-{
+sub DoFlash {
     my ($hash, @args) = @_;
     my $name = $hash->{NAME};
     my $log = "";   
@@ -1229,7 +1251,8 @@ sub ArduCounter_Flash($@)
         if (!$flashCommand ) {
             if ($hash->{TCP}) {
                 $flashCommand = 'espota.py -i[IP] -p [NETPORT] -f [BINFILE] >[LOGFILE] 2>&1';
-            } else {
+            } 
+            else {
                 $flashCommand = 'esptool.py --chip esp8266 --port [PORT] --baud 115200 write_flash 0x0 [BINFILE] >[LOGFILE] 2>&1';
             }
         }
@@ -1237,13 +1260,16 @@ sub ArduCounter_Flash($@)
         $netPort = 3232;
         if ($hash->{Board} =~ /T-Display/ ) {
             $hexFile = "ArduCounter-ESP32T.bin" if (!$hexFile);
-        } else {
+        } 
+        else {
             $hexFile = "ArduCounter-ESP32.bin" if (!$hexFile);
         }
         if (!$flashCommand ) {
             if ($hash->{TCP}) {
                 $flashCommand = 'espota.py -i[IP] -p [NETPORT] -f [BINFILE] 2>[LOGFILE]';
-            } else {
+                # https://github.com/esp8266/Arduino/blob/master/tools/espota.py
+            } 
+            else {
                 $flashCommand = 'esptool.py --chip esp32 --port [PORT] --baud 460800 --before default_reset --after hard_reset write_flash -z ' .
                                 '--flash_mode dio --flash_freq 40m --flash_size detect ' .
                                 '0x1000  FHEM/firmware/ArduCounter-ESP32-bootloader_dio_40m.bin ' .
@@ -1254,16 +1280,20 @@ sub ArduCounter_Flash($@)
                 # and then pip3 install esptool
             }
         }
-    } elsif ($hash->{Board} =~ /NANO/ ) {
+    } 
+    elsif ($hash->{Board} =~ /NANO/ ) {
         $hexFile = "ArduCounter-NANO.hex" if (!$hexFile);
         $flashCommand = 'avrdude -p atmega328P -b 57600 -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]' if (!$flashCommand);        
-    } elsif ($hash->{Board} =~ /UNO/ ) {
+    } 
+    elsif ($hash->{Board} =~ /UNO/ ) {
         $hexFile = "ArduCounter-NANO.hex" if (!$hexFile);
         $flashCommand = 'avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]' if (!$flashCommand);
-    } else {
+    } 
+    else {
         if (!$hash->{Board}) {
             return "Flashing not possible if board type is unknown and no filename given. Try setting the board attribute (ESP8266, ESP32 or NANO)."; 
-        } else {
+        } 
+        else {
             return "Flashing $hash->{Board} not supported or board attribute wrong (should be ESP8266, ESP32 or NANO)"; 
         }
     }
@@ -1284,7 +1314,7 @@ sub ArduCounter_Flash($@)
           unlink $logFile;
         }
 
-        ArduCounter_Disconnected($hash);
+        SetDisconnected($hash);
         DevIo_CloseDev($hash);
         $log .= "$name closed\n";
 
@@ -1300,9 +1330,9 @@ sub ArduCounter_Flash($@)
 
         local $/=undef;
         if (-e $logFile) {
-            open FILE, $logFile;
-            my $logText = <FILE>;
-            close FILE;
+            open my $FILE, '<', $logFile;
+            my $logText = <$FILE>;
+            close $FILE;
             $log .= "--- flash command ---------------------------------------------------------------------------------\n";
             $log .= $logText;
             $log .= "--- flash command ---------------------------------------------------------------------------------\n\n";
@@ -1313,11 +1343,12 @@ sub ArduCounter_Flash($@)
         delete $hash->{Initialized};
         my $now   = gettimeofday(); 
         my $delay = 5;          # wait 5 seconds to give device time for reboot
-        Log3 $name, 4, "$name: ArduCounter_Flash set internal timer to call open";
+        Log3 $name, 4, "$name: DoFlash set internal timer to call open";
         RemoveInternalTimer ("delayedopen:$name");
-        InternalTimer($now+$delay, "ArduCounter_DelayedOpen", "delayedopen:$name", 0);
+        InternalTimer($now+$delay, "ArduCounter::DelayedOpen", "delayedopen:$name", 0);
         $log .= "$name internal timer set to call open.\n";
-    } else {
+    } 
+    else {
          return "Flashing not possible if flash command is not set for this board and connection"; 
     }
     return $log;
@@ -1327,25 +1358,24 @@ sub ArduCounter_Flash($@)
 
 #####################################################
 # parse pin input and return pin number and pin name
-sub ArduCounter_ParsePin($$)
-{
+sub ParsePin {
     my ($hash, $arg) = @_;
     my $name = $hash->{NAME};        
     if ($arg !~ /^([DA]?)(\d+)/) {
         Log3 $name, 3, "$name: parseTime got invalid pin spec $arg";
-        return undef;
+        return;
     } 
     my $pinType = $1;
     my $pin     = $2;
-    $pin = ArduCounter_PinNumber($hash, $pinType.$pin) if ($pinType eq 'A');
-    my $pinName = ArduCounter_PinName ($hash, $pin);
+    $pin = InternalPinNumber($hash, $pinType.$pin) if ($pinType eq 'A');
+    my $pinName = PinName ($hash, $pin);
 
     # if board did send allowed pins, check here
     if ($hash->{allowedPins}) {         # list of allowed pins received with hello
         my %pins = map { $_ => 1 } split (/,/, $hash->{allowedPins});
         if ($init_done && %pins && !$pins{$pin}) {
             Log3 $name, 3, "$name: Invalid / disallowed pin in specification $arg";
-            return undef;
+            return;
         }
     }
     return ($pin, $pinName);
@@ -1355,179 +1385,176 @@ sub ArduCounter_ParsePin($$)
 #########################################################################
 # clears all counter readings for a specified pin number
 # called from set with a pin number
-sub ArduCounter_ClearPinCounters($$)
-{
+sub ClearPinCounters {
     my ($hash, $pin) = @_;
-    ArduCounter_Write($hash, "${pin}c");
-    my ($err, $msg) = ArduCounter_ReadAnswer($hash, '(cleared \d+)|(Error:)');        
+    DoWrite($hash, "${pin}c");
+    my ($err, $msg) = ReadAnswer($hash, '(cleared \d+)|(Error:)');        
 
-    ArduCounter_ReadingsDelete($hash, 'pin', $pin);             # internal device counter pinX
-    ArduCounter_ReadingsDelete($hash, 'long', $pin);            # long counter longX
-    ArduCounter_ReadingsDelete($hash, 'interpolated', $pin);    # interpolated long counter interpolatedLongX
-    ArduCounter_ReadingsDelete($hash, 'calcCounter', $pin);     # calculated counter calcCounterX
-    ArduCounter_ReadingsDelete($hash, 'calcCounter_i', $pin);   # calculated counter - ignored units calcCounterX_i
-    ArduCounter_ReadingsDelete($hash, 'power', $pin);           # power reading powerX
-    ArduCounter_ReadingsDelete($hash, 'seq', $pin);             # sequence seqX
+    UserReadingsDelete($hash, 'pin', $pin);             # internal device counter pinX
+    UserReadingsDelete($hash, 'long', $pin);            # long counter longX
+    UserReadingsDelete($hash, 'interpolated', $pin);    # interpolated long counter interpolatedLongX
+    UserReadingsDelete($hash, 'calcCounter', $pin);     # calculated counter calcCounterX
+    UserReadingsDelete($hash, 'calcCounter_i', $pin);   # calculated counter - ignored units calcCounterX_i
+    UserReadingsDelete($hash, 'power', $pin);           # power reading powerX
+    UserReadingsDelete($hash, 'seq', $pin);             # sequence seqX
         
-    ArduCounter_ReadingsDelete($hash, 'reject', $pin);          # rejected pulsesin last reportng period rejectX
-    ArduCounter_ReadingsDelete($hash, 'timeDiff', $pin);        # time difference of last reporting period timeDiffX
-    ArduCounter_ReadingsDelete($hash, 'countDiff', $pin);       # count difference of last reporting period countDiffX        
-    ArduCounter_ReadingsDelete($hash, 'lastMsg', $pin);         # last message from device
+    UserReadingsDelete($hash, 'reject', $pin);          # rejected pulsesin last reportng period rejectX
+    UserReadingsDelete($hash, 'timeDiff', $pin);        # time difference of last reporting period timeDiffX
+    UserReadingsDelete($hash, 'countDiff', $pin);       # count difference of last reporting period countDiffX        
+    UserReadingsDelete($hash, 'lastMsg', $pin);         # last message from device
 
-    ArduCounter_ReadingsDelete($hash, "runTime", $pin);
-    ArduCounter_ReadingsDelete($hash, "runTimeIgnore", $pin);
-    ArduCounter_ReadingsDelete($hash, ".switchOnTime", $pin);
-    ArduCounter_ReadingsDelete($hash, ".lastCheckIgnoreTime", $pin);
+    UserReadingsDelete($hash, "runTime", $pin);
+    UserReadingsDelete($hash, "runTimeIgnore", $pin);
+    UserReadingsDelete($hash, ".switchOnTime", $pin);
+    UserReadingsDelete($hash, ".lastCheckIgnoreTime", $pin);
+    return;
 }
 
 
 #########################################################################
 # SET command
-sub ArduCounter_Set($@)
-{
-    my ($hash, @a) = @_;
-    return "\"set ArduCounter\" needs at least one argument" if ( @a < 2 );
-    
-    # @a is an array with DeviceName, SetName, Rest of Set Line
-    my $name = shift @a;
-    my $attr = shift @a;
-    my $arg = join(" ", @a);
+sub SetFn {
 
-    if(!defined($ArduCounter_sets{$attr})) {
-        my @cList = keys %ArduCounter_sets;
-        return "Unknown argument $attr, choose one of " . join(" ", @cList);
+    my @setValArr = @_;                     # remainder is set values 
+    my $hash      = shift @setValArr;       # reference to Fhem device hash
+    my $name      = shift @setValArr;       # Fhem device name
+    my $setName   = shift @setValArr;       # name of the set option
+    my $setVal    = join(' ', @setValArr);  # set values as one string   
+
+    return "\"set $name\" needs at least an argument" if (!$setName);
+
+    if(!defined($SetHash{$setName})) {
+        my @cList = keys %SetHash;
+        return "Unknown argument $setName, choose one of " . join(" ", @cList);
     } 
-
-    if ($attr eq "disable") {
+    if ($setName eq "disable") {
         Log3 $name, 4, "$name: set disable called";
         CommandAttr(undef, "$name disable 1");
-        return;
-        
-    } elsif ($attr eq "enable") {
+        return;  
+    } 
+    elsif ($setName eq "enable") {
         Log3 $name, 4, "$name: set enable called";
         CommandAttr(undef, "$name disable 0");
         return;
-
-    } elsif ($attr eq "reconnect") {
+    } 
+    elsif ($setName eq "reconnect") {
         Log3 $name, 4, "$name: set reconnect called";
         DevIo_CloseDev($hash);   
         delete $hash->{OpenRetries};
-        ArduCounter_Open($hash);
+        DoOpen($hash);
         return;
-
-    } elsif ($attr eq "clearLevels") {
+    } 
+    elsif ($setName eq "clearLevels") {
         delete $hash->{analogLevels};
         return;
-
-    } elsif ($attr eq "clearHistory") {
+    } 
+    elsif ($setName eq "clearHistory") {
         # remove history 
         delete $hash->{History};
         delete $hash->{HistoryPin};
         delete $hash->{LastHistSeq};
         delete $hash->{HistIdx};
         return;
+    } 
+    elsif ($setName eq "clearCounters") {                # clear counters for a specific pin
+        my ($pin, $pinName) = ParsePin($hash, $setVal);
+        return "illegal pin $setVal" if (!defined($pin));          # parsePin logs error if wrong pin spec
 
-    } elsif ($attr eq "clearCounters") {                # clear counters for a specific pin
-        my ($pin, $pinName) = ArduCounter_ParsePin($hash, $arg);
-        return "illegal pin $arg" if (!defined($pin));          # parsePin logs error if wrong pin spec
-
-        Log3 $name, 4, "$name: Set $attr $arg called - removing all readings for pin $pinName, internal $pin";
-        ArduCounter_ClearPinCounters($hash, $pin);
-
-    } elsif ($attr eq "counter") {                 # set counters for a specific pin
-        if ($arg =~ /([AD]?\d+)[\s\,]+([\d\.]+)/) {
+        Log3 $name, 4, "$name: Set $setName $setVal called - removing all readings for pin $pinName, internal $pin";
+        ClearPinCounters($hash, $pin);
+    } 
+    elsif ($setName eq "counter") {                 # set counters for a specific pin
+        if ($setVal =~ /([AD]?\d+)[\s\,]+([\d\.]+)/) {
             my $val = $2;
-            my ($pin, $pinName) = ArduCounter_ParsePin($hash, $1);
-            return "illegal pin $arg" if (!defined($pin));          # parsePin logs error if wrong pin spec
-            Log3 $name, 4, "$name: Set $attr $arg called - setting calcCounter for pin $pinName";
+            my ($pin, $pinName) = ParsePin($hash, $1);
+            return "illegal pin $setVal" if (!defined($pin));          # parsePin logs error if wrong pin spec
+            Log3 $name, 4, "$name: Set $setName $setVal called - setting calcCounter for pin $pinName";
             readingsBeginUpdate($hash);
-            ArduCounter_BulkUpdate($hash, 'calcCounter', $pin, $val);
+            UserBulkUpdate($hash, 'calcCounter', $pin, $val);
             readingsEndUpdate($hash,1);    
         } else {
             return "wrong syntax, use set counters pin value";
-        }
-        
-    } elsif ($attr eq "flash") {
-        return ArduCounter_Flash($hash, @a);        
+        }    
+    } 
+    elsif ($setName eq "flash") {
+        return DoFlash($hash, @setValArr);        
     }
-    
-    if(!$hash->{FD}) {
-        Log3 $name, 4, "$name: Set $attr $arg called but device is disconnected";
+
+    if(!IsOpen($hash)) {
+        Log3 $name, 4, "$name: Set $setName $setVal called but device is disconnected";
         return "Set called but device is disconnected";
     }
     if (IsDisabled($name)) {
-        Log3 $name, 4, "$name: set $attr $arg called but device is disabled";
+        Log3 $name, 4, "$name: set $setName $setVal called but device is disabled";
         return;
     }   
-    
-    if ($attr eq "raw") {
-        Log3 $name, 4, "$name: set raw $arg called";
-        ArduCounter_Write($hash, "$arg");
-                
-    } elsif ($attr eq "saveConfig") {
+
+    if ($setName eq "raw") {
+        Log3 $name, 4, "$name: set raw $setVal called";
+        DoWrite($hash, "$setVal");            
+    } 
+    elsif ($setName eq "saveConfig") {
         Log3 $name, 4, "$name: set saveConfig called";
-        ArduCounter_Write($hash, "e");
-                
-    } elsif ($attr eq "reset") {
+        DoWrite($hash, "e");
+    } 
+    elsif ($setName eq "reset") {
         Log3 $name, 4, "$name: set reset called";
-        if (ArduCounter_Write($hash, "r")) {
+        if (DoWrite($hash, "r")) {
             delete $hash->{Initialized};
         }
         DevIo_CloseDev($hash); 
-        ArduCounter_Open($hash);
-        return "sent (r)eset command to device - waiting for its setup message";
-        
-    } elsif ($attr eq "resetWifi") {
+        DoOpen($hash);
+        return "sent (r)eset command to device - waiting for its setup message";    
+    } 
+    elsif ($setName eq "resetWifi") {
         Log3 $name, 4, "$name: set resetWifi called";
-        ArduCounter_Write($hash, "w");
+        DoWrite($hash, "w");
         return "sent (w) command to device";
         
     }
-    return undef;
+    return;
 }
 
 
-# GET command
 #########################################################################
-sub ArduCounter_Get($@)
-{
-    my ( $hash, @a ) = @_;
-    return "\"set ArduCounter\" needs at least one argument" if ( @a < 2 );    
-    my $name = shift @a;
-    my $attr = shift @a;
-    my $opt  = shift @a;
+# GET command
+sub GetFn {
+    my @getValArr = @_;                     # rest is optional values
+    my $hash      = shift @getValArr;       # reference to device hash
+    my $name      = shift @getValArr;       # device name
+    my $getName   = shift @getValArr;       # get option name
+    my $getVal    = join(' ', @getValArr);  # optional value after get name
 
-    if(!defined($ArduCounter_gets{$attr})) {
-        my @cList = keys %ArduCounter_gets;
-        return "Unknown argument $attr, choose one of " . join(" ", @cList);
+    return "\"get $name\" needs at least one argument" if (!$getName);
+
+    if(!defined($GetHash{$getName})) {
+        my @cList = keys %GetHash;
+        return "Unknown argument $getName, choose one of " . join(" ", @cList);
     } 
-
-    if ($attr eq "levels") {
+    if ($getName eq "levels") {
         my $msg = "";
         foreach my $level (sort {$a <=> $b} keys %{$hash->{analogLevels}}) {
             $msg .= "$level: $hash->{analogLevels}{$level}\n";
         }
         return "observed levels from analog input:\n$msg\n";
     }
-    
-    if(!$hash->{FD}) {
+    if(!IsOpen($hash)) {
         Log3 $name, 4, "$name: Get called but device is disconnected";
         return ("Get called but device is disconnected", undef);
     }
-
     if (IsDisabled($name)) {
         Log3 $name, 4, "$name: get called but device is disabled";
         return;
     }   
     
-    if ($attr eq "info") {
-        Log3 $name, 3, "$name: Sending info command to device";
-        ArduCounter_Write( $hash, "s");
-        my ($err, $msg) = ArduCounter_ReadAnswer($hash, 'Next report in.*seconds');        
-        return ($err ? $err : $msg);
-        
-    } elsif ($attr eq "history") {
-        Log3 $name, 3, "$name: get history";
+    if ($getName eq "info") {
+        Log3 $name, 5, "$name: Sending info command to device";
+        DoWrite( $hash, "s");
+        my ($err, $msg) = ReadAnswer($hash, 'Next report in.*seconds');        
+        return ($err ? $err : $msg);  
+    } 
+    elsif ($getName eq "history") {
+        Log3 $name, 5, "$name: get history";
         $hash->{HistIdx} = 0 if (!defined($hash->{HistIdx}));
         my $idx   = $hash->{HistIdx};           # HistIdx points to the next slot to be overwritten
         my $ret   = "";
@@ -1535,7 +1562,7 @@ sub ArduCounter_Get($@)
         my $histLine;
         while ($count < AttrVal($name, "maxHist", 1000)) {
             if (defined ($hash->{History}[$idx])) {
-                if (!$opt || !$hash->{HistoryPin} || $hash->{HistoryPin}[$idx] eq $opt) {
+                if (!$getVal || !$hash->{HistoryPin} || $hash->{HistoryPin}[$idx] eq $getVal) {
                     $ret .= $hash->{History}[$idx] . "\n";
                 }
             }
@@ -1548,7 +1575,7 @@ sub ArduCounter_Get($@)
         }
         return ($ret ? $ret : "no history data so far");
     }
-    return undef;
+    return;
 }
 
 
@@ -1557,8 +1584,7 @@ sub ArduCounter_Get($@)
 # called from parse_hello with T and B line,
 # from parse with new N line
 # and parse report with only N
-sub ArduCounter_ParseTime($$$)
-{
+sub ParseTime {
     my ($hash, $line, $now) = @_;
     my $name = $hash->{NAME};
 
@@ -1582,12 +1608,14 @@ sub ArduCounter_ParseTime($$$)
     if (defined ($hash->{'.DeTOff'}) && $hash->{'.LastDeT'}) {
         if ($deviceNowSecs >= $hash->{'.LastDeT'}) {
             $hash->{'.Drift2'} = ($now - $hash->{'.DeTOff'}) - $deviceNowSecs;
-        } else {
+        } 
+        else {
             $hash->{'.DeTOff'}  = $now - $deviceNowSecs;
             Log3 $name, 4, "$name: device did reset (now $deviceNowSecs, before $hash->{'.LastDeT'})." .
                 " New offset is $hash->{'.DeTOff'}";
         }
-    } else {
+    } 
+    else {
         $hash->{'.DeTOff'}  = $now - $deviceNowSecs;
         $hash->{'.Drift2'}  = 0;
         $hash->{'.DriftStart'}  = $now;
@@ -1601,13 +1629,15 @@ sub ArduCounter_ParseTime($$$)
        ", Drift "  . sprintf("%.3f", $hash->{'.Drift2'}) .
        "s in " . sprintf("%.3f", $drTime) . "s" .
        ($drTime > 0 ? ", " . sprintf("%.2f", $hash->{'.Drift2'} / $drTime * 100) . "%" : "");
+    return;
 }
 
 
-sub ArduCounter_ParseAvailablePins($$) {
+sub ParseAvailablePins {
     my ($hash, $line) = @_;
     my $name = $hash->{NAME};
     
+    Log3 $name, 5, "$name: Device sent available pins $line";
     # now enrich $line with $rAnalogPinMap{$hash->{Board}}{$pin}
     if ($line && $hash->{Board}) {
         my $newAllowed;
@@ -1622,6 +1652,7 @@ sub ArduCounter_ParseAvailablePins($$) {
         }
         $hash->{allowedPins} = $newAllowed;
     }
+    return;
 }
 
 
@@ -1629,11 +1660,11 @@ sub ArduCounter_ParseAvailablePins($$) {
 # Hello is sent after reconnect or restart
 # check firmware version, set device boot time hash
 # set timer to configure device
-sub ArduCounter_ParseHello($$$)
-{
+sub ParseHello {
     my ($hash, $line, $now) = @_;
     my $name = $hash->{NAME};
     
+    # current versions send Time and avaliable pins as separate lines, not here
     if ($line !~ /^ArduCounter V([\d\.]+) on ([^\ ]+) ?(.*) compiled (.*) (?:Started|Hello)(, pins ([0-9\,]+) available)? ?(T(\d+),(\d+) B(\d+),(\d+))?/) {
         Log3 $name, 4, "$name: probably wrong firmware version - cannot parse line $line";
         return;
@@ -1647,7 +1678,7 @@ sub ArduCounter_ParseHello($$$)
     
     my $boardAttr = AttrVal($name, 'board', '');
     if ($hash->{Board} && $boardAttr && ($hash->{Board} ne $boardAttr)) {
-        Log3 $name, 3, "attribute board is set to $boardAttr and is overwriting board $hash->{Board} reported by device";
+        Log3 $name, 5, "attribute board is set to $boardAttr and is overwriting board $hash->{Board} reported by device";
         $hash->{Board} = $boardAttr;
     }
 
@@ -1655,20 +1686,22 @@ sub ArduCounter_ParseHello($$$)
         $hash->{VersionFirmware} .= " - not compatible with this Module version - please flash new sketch";
         Log3 $name, 3, "$name: device reported outdated Arducounter Firmware ($hash->{VersionFirmware}) - please update!";
         delete $hash->{Initialized};
-    } else {
+    } 
+    else {
         if ($hash->{VersionFirmware} < "4.00") {
             Log3 $name, 3, "$name: device sent hello with outdated Arducounter Firmware ($hash->{VersionFirmware}) - please update!";
-        } else {
-            Log3 $name, 3, "$name: device sent hello: $line";
+        } 
+        else {
+            Log3 $name, 5, "$name: device sent hello: $line";
         }
         $hash->{Initialized} = 1;                   # device has finished its boot and reported version
         
         my $cft = AttrVal($name, "configDelay", 1); # wait for device to send cfg before reconf.
         RemoveInternalTimer ("cmpCfg:$name");
-        InternalTimer($now+$cft, "ArduCounter_ConfigureDevice", "cmpCfg:$name", 0);
+        InternalTimer($now+$cft, "ArduCounter::ConfigureDevice", "cmpCfg:$name", 0);
 
-        ArduCounter_ParseTime($hash, $dTime, $now) if ($dTime);
-        ArduCounter_ParseAvailablePins($hash, $allowedPins) if ($allowedPins);
+        ParseTime($hash, $dTime, $now) if ($dTime);
+        ParseAvailablePins($hash, $allowedPins) if ($allowedPins);
     }
     delete $hash->{runningCfg};                     # new config will be sent now
     delete $hash->{WaitForHello};
@@ -1682,6 +1715,7 @@ sub ArduCounter_ParseHello($$$)
     
     RemoveInternalTimer ("hwait:$name");            # dont wait for hello reply if already sent
     RemoveInternalTimer ("sendHello:$name");        # Hello not needed anymore if not sent yet
+    return;
 }
 
 
@@ -1691,46 +1725,58 @@ sub ArduCounter_ParseHello($$$)
 # like 'long' or 'calcCounter' and its pin Number
 # depending on verboseReadings and readingName attributes
 # called with a base name and a pin number
-sub ArduCounter_ReadingName($$$)
-{
+sub UserReadingName {
     my ($hash, $rBaseName, $pin) = @_;
     my $name    = $hash->{NAME};
-    my $pinName = ArduCounter_PinName ($hash, $pin);
-    my $verbose = ArduCounter_AttrVal($hash, 0, "verboseReadings$pinName", "verboseReadings$pin");
+    my $pinName = PinName ($hash, $pin);
+    my $verbose = AttrValFromList($hash, 0, "verboseReadings$pinName", "verboseReadings$pin");
     if ($verbose !~ /\-?[0-9]+/) {
         Log3 $name, 3, "illegal setting for verboseReadings: $verbose";
         $verbose = 0;
     }
     if ($rBaseName eq 'pin') {
         my $default = ($verbose >= 0 ? "pin$pinName" : ".pin$pinName");                     # hidden if verboseReadings < 0
-        return ArduCounter_AttrVal($hash, $default, "readingNameCount$pinName", "readingNameCount$pin");
-    } elsif ($rBaseName eq 'long') {
+        return AttrValFromList($hash, $default, "readingNameCount$pinName", "readingNameCount$pin");
+    } 
+    elsif ($rBaseName eq 'long') {
         my $default = ($verbose >= 0 ? "long$pinName" : ".long$pinName");                   # hidden if verboseReadings < 0
-        return ArduCounter_AttrVal($hash, $default, "readingNameLongCount$pinName", "readingNameLongCount$pin");
-    } elsif ($rBaseName eq 'interpolated') {
+        return AttrValFromList($hash, $default, "readingNameLongCount$pinName", "readingNameLongCount$pin");
+    } 
+    elsif ($rBaseName eq 'interpolated') {
         my $default = ($verbose >= 0 ? "interpolatedLong$pinName" : "");                    # no reading if verboseReadings < 0
-        return ArduCounter_AttrVal($hash, $default, "readingNameInterpolatedCount$pinName", "readingNameInterpolatedCount$pin");
-    } elsif ($rBaseName eq 'calcCounter') {
-        return ArduCounter_AttrVal($hash, "calcCounter$pinName", "readingNameCalcCount$pinName", "readingNameCalcCount$pin");
-    } elsif ($rBaseName eq 'calcCounter_i') {
-        return ArduCounter_AttrVal($hash, "calcCounter$pinName" . "_i", "readingNameCalcCount$pinName" . "_i", "readingNameCalcCount$pin" . "_i");
-    } elsif ($rBaseName eq 'timeDiff') {
+        return AttrValFromList($hash, $default, "readingNameInterpolatedCount$pinName", "readingNameInterpolatedCount$pin");
+    } 
+    elsif ($rBaseName eq 'calcCounter') {
+        return AttrValFromList($hash, "calcCounter$pinName", "readingNameCalcCount$pinName", "readingNameCalcCount$pin");
+    } 
+    elsif ($rBaseName eq 'calcCounter_i') {
+        return AttrValFromList($hash, "calcCounter$pinName" . "_i", "readingNameCalcCount$pinName" . "_i", "readingNameCalcCount$pin" . "_i");
+    } 
+    elsif ($rBaseName eq 'timeDiff') {
         return ($verbose >= 0 ? "timeDiff$pinName" : ".timeDiff$pinName");                  # hidden if verboseReadings < 0
-    } elsif ($rBaseName eq 'countDiff') {
+    } 
+    elsif ($rBaseName eq 'countDiff') {
         return ($verbose >= 0 ? "countDiff$pinName" : ".countDiff$pinName");                # hidden if verboseReadings < 0
-    } elsif ($rBaseName eq 'reject') {
+    } 
+    elsif ($rBaseName eq 'reject') {
         return ($verbose >= 0 ? "reject$pinName" : ".reject$pinName");                      # hidden if verboseReadings < 0
-    } elsif ($rBaseName eq 'power') {
-        return ArduCounter_AttrVal($hash, "power$pinName", "readingNamePower$pinName", "readingNamePower$pin");
-    } elsif ($rBaseName eq 'lastMsg') {
+    } 
+    elsif ($rBaseName eq 'power') {
+        return AttrValFromList($hash, "power$pinName", "readingNamePower$pinName", "readingNamePower$pin");
+    } 
+    elsif ($rBaseName eq 'lastMsg') {
         return ($verbose > 0 ? "lastMsg$pinName" : "");                                     # no reading if verboseReadings < 1
-    } elsif ($rBaseName eq 'pinHistory') {
+    } 
+    elsif ($rBaseName eq 'pinHistory') {
         return ($verbose > 0 ? "pinHistory$pinName" : "");                                  # no reading if verboseReadings < 1
-    } elsif ($rBaseName eq 'seq') {
+    } 
+    elsif ($rBaseName eq 'seq') {
         return ($verbose > 0 ? ".seq$pinName" : "");                                        # always hidden
-    }  else {
+    }  
+    else {
         return $rBaseName . $pinName;
     }
+    return;
 }
 
 
@@ -1738,13 +1784,12 @@ sub ArduCounter_ReadingName($$$)
 # return the value of the reading 
 # with a passed internal name and a pin number
 # depending on verboseReadings and readingName attributes
-sub ArduCounter_ReadingsVal($$$;$)
-{
+sub UserReadingsVal {
     my ($name, $rBaseName, $pin, $default) = @_;
     my $hash = $defs{$name};
 
     $default = 0 if (!defined($default));
-    my $rName = ArduCounter_ReadingName($hash, $rBaseName, $pin);
+    my $rName = UserReadingName($hash, $rBaseName, $pin);
     return $default if (!$rBaseName);
     return ReadingsVal($name, $rName, $default);
 }
@@ -1754,12 +1799,11 @@ sub ArduCounter_ReadingsVal($$$;$)
 # return the value of the reading 
 # depending on verboseReadings and readingName attributes
 # only called from HandleCounters with a base name and a pin number
-sub ArduCounter_ReadingsTimestamp($$$)
-{
+sub UserReadingsTimestamp {
     my ($name, $rBaseName, $pin) = @_;
     my $hash = $defs{$name};
 
-    my $rName = ArduCounter_ReadingName($hash, $rBaseName, $pin);
+    my $rName = UserReadingName($hash, $rBaseName, $pin);
     return 0 if (!$rBaseName);
     return ReadingsTimestamp($name, $rName, 0);
 }
@@ -1770,13 +1814,12 @@ sub ArduCounter_ReadingsTimestamp($$$)
 # depending on verboseReadings and readingName attributes
 # called from functions that handle device reports 
 # with a base name and a pin number, value and optional time
-sub ArduCounter_BulkUpdate($$$$;$)
-{
+sub UserBulkUpdate {
     my ($hash, $rBaseName, $pin, $value, $sTime) = @_;
     my $name  = $hash->{NAME};
-    my $rName = ArduCounter_ReadingName($hash, $rBaseName, $pin);
+    my $rName = UserReadingName($hash, $rBaseName, $pin);
     if (!$rName) {
-        #Log3 $name, 5, "BulkUpdate - suppress reading $rBaseName for pin $pin";
+        #Log3 $name, 5, "UserBulkUpdate - suppress reading $rBaseName for pin $pin";
         return;
     }
     if (defined($sTime)) {
@@ -1790,7 +1833,8 @@ sub ArduCounter_BulkUpdate($$$$;$)
         $hash->{CHANGETIME}[$chIdx++] = $fSTime;        # Intervall start
         readingsEndUpdate($hash, 1);                    # end of special block
         readingsBeginUpdate($hash);                     # start regular update block
-    } else {
+    } 
+    else {
         readingsBulkUpdate($hash, $rName, $value);
     }
     return;
@@ -1801,36 +1845,34 @@ sub ArduCounter_BulkUpdate($$$$;$)
 # delete readings
 # depending on verboseReadings and readingName attributes
 # called with a pin number
-sub ArduCounter_ReadingsDelete($$$)
-{
+sub UserReadingsDelete {
     my ($hash, $rBaseName, $pin) = @_;
     my $name = $hash->{NAME};
 
-    my $rName = ArduCounter_ReadingName($hash, $rBaseName, $pin);
+    my $rName = UserReadingName($hash, $rBaseName, $pin);
     readingsDelete($hash, $rName);
     return;
 }
 
 
 #########################################################################
-sub ArduCounter_HandleCounters($$$$$$$$$)
-{
+sub HandleCounters {
     my ($hash, $pin, $seq, $count, $time, $diff, $rDiff, $now, $ppu) = @_;
     my $name = $hash->{NAME};
     
-    my $pinName   = ArduCounter_PinName ($hash, $pin);
-    my $lName     = ArduCounter_LogPinDesc($hash, $pin);
+    my $pinName   = PinName ($hash, $pin);
+    my $lName     = LogPinDesc($hash, $pin);
     my $pLog      = "$name: pin $pinName ($lName)";             # to be used as start of log lines
 
-    my $longCount = ArduCounter_ReadingsVal($name, 'long', $pin);           # alter long count Wert
-    my $intpCount = ArduCounter_ReadingsVal($name, 'interpolated', $pin);   # alter interpolated count Wert
-    my $lastCount = ArduCounter_ReadingsVal($name, 'pin', $pin);
-    my $cCounter  = ArduCounter_ReadingsVal($name, 'calcCounter', $pin);    # calculated counter 
-    my $iSum      = ArduCounter_ReadingsVal($name, 'calcCounter_i', $pin);  # ignored sum 
-    my $lastSeq   = ArduCounter_ReadingsVal($name, 'seq', $pin);
+    my $longCount = UserReadingsVal($name, 'long', $pin);           # alter long count Wert
+    my $intpCount = UserReadingsVal($name, 'interpolated', $pin);   # alter interpolated count Wert
+    my $lastCount = UserReadingsVal($name, 'pin', $pin);
+    my $cCounter  = UserReadingsVal($name, 'calcCounter', $pin);    # calculated counter 
+    my $iSum      = UserReadingsVal($name, 'calcCounter_i', $pin);  # ignored sum 
+    my $lastSeq   = UserReadingsVal($name, 'seq', $pin);
     my $intrCount = 0;                                          # interpolated count to be added    
 
-    my $lastCountTS   = ArduCounter_ReadingsTimestamp ($name, 'pin', $pin); # last time long count reading was set as string
+    my $lastCountTS   = UserReadingsTimestamp ($name, 'pin', $pin); # last time long count reading was set as string
     my $lastCountTNum = time_str2num($lastCountTS);             # time as number
         
     my $fBootTim;
@@ -1864,8 +1906,8 @@ sub ArduCounter_HandleCounters($$$$$$$$$)
         $seqGap   = $seq - 1;                                   # $seq should be 1 after restart
         $pulseGap = $countStart;                                # we missed everything up to the count at start of the reported interval
         
-        my $lastInterval  = ArduCounter_ReadingsVal ($name, "timeDiff", $pin);          # time diff of last interval (old reading)
-        my $lastCDiff     = ArduCounter_ReadingsVal ($name, "countDiff", $pin);         # count diff of last interval (old reading)
+        my $lastInterval  = UserReadingsVal ($name, "timeDiff", $pin);          # time diff of last interval (old reading)
+        my $lastCDiff     = UserReadingsVal ($name, "countDiff", $pin);         # count diff of last interval (old reading)
         my $offlTime      = sprintf ("%.2f", $hash->{deviceBooted} - $lastCountTNum);   # estimated offline time (last report in readings until boot)
         
         if ($lastInterval && ($offlTime > 0) && ($offlTime < 12*60*60)) {               # offline > 0 and < 12h
@@ -1874,10 +1916,12 @@ sub ArduCounter_HandleCounters($$$$$$$$$)
             my $intRatio  = 1000 * ($lastRatio + $curRatio) / 2;            
             $intrCount = int(($offlTime * $intRatio)+0.5);
             Log3 $name, 3, "$pLog interpolating for $offlTime secs until boot, $intrCount estimated pulses (before $lastCDiff in $lastInterval ms, now $diff in $time ms, avg ratio $intRatio p/s)";
-        } else {
+        } 
+        else {
             Log3 $name, 4, "$pLog interpolation of missed pulses for pin $pinName ($lName) not possible - no valid historic data.";
         }              
-    } else {
+    } 
+    else {
         if ($pulseGap < 0) {                                    # pulseGap < 0 abd not booted should not happen
             Log3 $name, 3, "$pLog seems to have missed $seqGap reports in $timeGap seconds. " .
                 "Last reported sequence was $lastSeq, now $seq. " .
@@ -1900,79 +1944,82 @@ sub ArduCounter_HandleCounters($$$$$$$$$)
         $iSum     += $intrCount / $ppu;                         # sum of interpolation kWh
     }
     
-    ArduCounter_BulkUpdate($hash, 'pin', $pin, $count);
-    ArduCounter_BulkUpdate($hash, 'long', $pin, $longCount);
-    ArduCounter_BulkUpdate($hash, 'interpolated', $pin, $intpCount);
-    ArduCounter_BulkUpdate($hash, 'calcCounter', $pin, $cCounter) if ($ppu);
-    ArduCounter_BulkUpdate($hash, 'calcCounter_i', $pin, $iSum) if ($ppu);
-    ArduCounter_BulkUpdate($hash, 'seq', $pin, $seq);
+    UserBulkUpdate($hash, 'pin', $pin, $count);
+    UserBulkUpdate($hash, 'long', $pin, $longCount);
+    UserBulkUpdate($hash, 'interpolated', $pin, $intpCount);
+    UserBulkUpdate($hash, 'calcCounter', $pin, $cCounter) if ($ppu);
+    UserBulkUpdate($hash, 'calcCounter_i', $pin, $iSum) if ($ppu);
+    UserBulkUpdate($hash, 'seq', $pin, $seq);
+    return;
 }
   
 
 
 
 #########################################################################
-sub ArduCounter_HandleRunTime($$$$$)
-{
+sub HandleRunTime {
     my ($hash, $pinName, $pin, $lastPower, $power) = @_;
     my $name  = $hash->{NAME};
-    my $now   = int(gettimeofday());                                                # just work with seconds here 
+    my $now   = int(gettimeofday());                                        # just work with seconds here 
     #Log3 $name, 5, "$name: HandleRunTime: power is $power";
-    if ($power > 0) {
-        my $soTime = ReadingsVal($name, ".switchOnTime$pinName", 0);                # start time when power was >0 for the first time since it is >0
-        if (!$soTime || !$lastPower) {
-            $soTime = $now;
-            readingsBulkUpdate($hash, ".switchOnTime$pinName", $now);               # save when consumption started
-            readingsDelete($hash, "runTime$pinName");
-            Log3 $name, 5, "$name: HandleRunTime: start from zero consumption - reset runtime and update .switchOnTime";
-        }
-        if ($soTime) {
-            my $siTime = ReadingsVal($name, ".lastCheckIgnoreTime$pinName", $now);
-            my $iTime  = ReadingsVal($name, "runTimeIgnore$pinName", 0);            # time to ignore accumulated
-
-            my $ignore = 0;
-            my $ignoreSpec = ArduCounter_AttrVal($hash, "", "runTimeIgnore$pinName", "runTimeIgnore$pin");
-            my @devices = devspec2array($ignoreSpec);
-            #Log3 $name, 5, "$name: HandleRunTime: devices list is @devices";
-            foreach my $d (@devices) {
-                my $state = (ReadingsVal($d, "state", ""));
-                #Log3 $name, 5, "$name: HandleRunTime: check $d with state $state";
-                if ($state =~ /1|on|open|BI/) {
-                    $ignore = 1;
-                    Log3 $name, 5, "$name: HandleRunTime: ignoreDevice $d is $state";
-                    last;
-                }
-            }
-            my $iAddTime = 0;
-            if ($ignore) {                                                          # ignore device is on
-                $iAddTime = $now - $siTime;                                         # add to ignore time
-                Log3 $name, 5, "$name: HandleRunTime: addiere $iAddTime auf ignoreTime $iTime";
-                $iTime += $iAddTime;
-                readingsBulkUpdate($hash, "runTimeIgnore$pinName", $iTime);         # remember time to ignore
-                readingsBulkUpdate($hash, ".lastCheckIgnoreTime$pinName", $now);
-                #Log3 $name, 5, "$name: HandleRunTime: setze .lastCheckIgnoreTime auf now";
-            } else {                                                            
-                Log3 $name, 5, "$name: HandleRunTime: no ignoreDevice is on, lösche .lastCheckIgnoreTime";
-                readingsDelete($hash, ".lastCheckIgnoreTime$pinName");              # no ignore device is on -> remove start marker
-            }
-
-            my $rTime = int($now - $soTime);                                        # time to add to runtime
-            my $newRunTime = $rTime - $iTime;
-            Log3 $name, 5, "$name: HandleRunTime: runTime is now: $rTime - $iTime = $newRunTime";
-            readingsBulkUpdate($hash, "runTime$pinName", $newRunTime);
-        }
-    } else {
+    if ($power <= 0) {
         readingsDelete($hash, "runTime$pinName");
         readingsDelete($hash, "runTimeIgnore$pinName");
         readingsDelete($hash, ".switchOnTime$pinName");
         readingsDelete($hash, ".lastCheckIgnoreTime$pinName");
+        return;
     }
+    my $soTime = ReadingsVal($name, ".switchOnTime$pinName", 0);            # start time when power was >0 for the first time since it is >0
+    if (!$soTime || !$lastPower) {
+        $soTime = $now;
+        readingsBulkUpdate($hash, ".switchOnTime$pinName", $now);           # save when consumption started
+        readingsDelete($hash, "runTime$pinName");
+        Log3 $name, 5, "$name: HandleRunTime: start from zero consumption - reset runtime and update .switchOnTime";
+    }
+
+    # check if an ignore device is on so runtime is not added currently
+    my $doIgnore = 0;
+    my $ignoreSpec = AttrValFromList($hash, "", "runTimeIgnore$pinName", "runTimeIgnore$pin");
+    my @devices = devspec2array($ignoreSpec);
+    #Log3 $name, 5, "$name: HandleRunTime: devices list is @devices";
+    DEVICELOOP:
+    foreach my $d (@devices) {
+        my $state = (ReadingsVal($d, "state", ""));
+        #Log3 $name, 5, "$name: HandleRunTime: check $d with state $state";
+        if ($state =~ /1|on|open|BI/) {
+            $doIgnore = 1;
+            Log3 $name, 5, "$name: HandleRunTime: ignoreDevice $d is $state";
+            last DEVICELOOP;
+        }
+    }
+
+    my $iTime  = ReadingsVal($name, "runTimeIgnore$pinName", 0);            # time to ignore accumulated
+    if ($doIgnore) {                                                        # ignore device is on
+        my $siTime = ReadingsVal($name, ".lastCheckIgnoreTime$pinName",0);  # last time we saw ignore device on
+        if ($siTime) {
+            my $iAddTime = $now - $siTime;                                  # add to ignore time
+            Log3 $name, 5, "$name: HandleRunTime: addiere $iAddTime auf ignoreTime $iTime";
+            $iTime += $iAddTime;
+            readingsBulkUpdate($hash, "runTimeIgnore$pinName", $iTime);     # remember time to ignore
+        }
+        #Log3 $name, 5, "$name: HandleRunTime: setze .lastCheckIgnoreTime auf now";
+        readingsBulkUpdate($hash, ".lastCheckIgnoreTime$pinName", $now);    # last time we saw ignore device on
+    } 
+    else {                                                            
+        Log3 $name, 5, "$name: HandleRunTime: no ignoreDevice is on, lösche .lastCheckIgnoreTime";
+        readingsDelete($hash, ".lastCheckIgnoreTime$pinName");              # no ignore device is on -> remove marker for last time on
+    }
+
+    my $rTime = int($now - $soTime);                                        # time since water was switched on
+    my $newRunTime = $rTime - $iTime;                                       # time since switch on minus ignore time
+    Log3 $name, 5, "$name: HandleRunTime: runTime is now: $rTime - $iTime = $newRunTime";
+    readingsBulkUpdate($hash, "runTime$pinName", $newRunTime);              # set new runtime reading
+    return; 
 }
 
 
 #########################################################################
-sub ArduCounter_ParseReport($$)
-{
+sub ParseReport {
     my ($hash, $line) = @_;
     my $name  = $hash->{NAME};
     my $now   = gettimeofday();
@@ -1981,23 +2028,23 @@ sub ArduCounter_ParseReport($$)
         # new count is beeing reported
         my ($pin, $count, $diff, $rDiff, $time, $dTime, $reject, $seq, $avgLen) =
             ($1, $2, $3, $4, $5, $6, $7, $8, $9);
-        my $pinName = ArduCounter_PinName($hash, $pin);
+        my $pinName = PinName($hash, $pin);
         my $power;      
         
         # first try with pinName, then pin Number, then generic fallback for all pins
-        my $factor  = ArduCounter_AttrVal($hash, 1000, "readingFactor$pinName", "readingFactor$pin", "factor");
-        my $ppu     = ArduCounter_AttrVal($hash, 0, "readingPulsesPerKWh$pinName", "readingPulsesPerKWh$pin", "pulsesPerKWh");
-        $ppu        = ArduCounter_AttrVal($hash, $ppu, "readingPulsesPerUnit$pin", "readingPulsesPerUnit$pinName", "pulsesPerUnit");
-        my $fut     = ArduCounter_AttrVal($hash, 3600, "readingFlowUnitTime$pin", "readingFlowUnitTime$pinName", "flowUnitTime");
-        my $doRTime = ArduCounter_AttrVal($hash, 0, "runTime$pinName", "runTime$pin");
-        my $doSTime = ArduCounter_AttrVal($hash, 0, "readingStartTime$pinName", "readingStartTime$pin");
-        my $lName   = ArduCounter_LogPinDesc($hash, $pin);
+        my $factor  = AttrValFromList($hash, 1000, "readingFactor$pinName", "readingFactor$pin", "factor");
+        my $ppu     = AttrValFromList($hash, 0, "readingPulsesPerKWh$pinName", "readingPulsesPerKWh$pin", "pulsesPerKWh");
+        $ppu        = AttrValFromList($hash, $ppu, "readingPulsesPerUnit$pin", "readingPulsesPerUnit$pinName", "pulsesPerUnit");
+        my $fut     = AttrValFromList($hash, 3600, "readingFlowUnitTime$pin", "readingFlowUnitTime$pinName", "flowUnitTime");
+        my $doRTime = AttrValFromList($hash, 0, "runTime$pinName", "runTime$pin");
+        my $doSTime = AttrValFromList($hash, 0, "readingStartTime$pinName", "readingStartTime$pin");
+        my $lName   = LogPinDesc($hash, $pin);
         my $pLog    = "$name: pin $pinName ($lName)";       # start of log lines              
         my $sTime   = $now - $time/1000;                    # start of interval (~first pulse) in secs (float)
         my $fSdTim  = FmtTime($sTime);                      # only time formatted for logging
         my $fEdTim  = FmtTime($now);                        # end of Interval - only time formatted for logging
 
-        ArduCounter_ParseTime($hash, $dTime, $now) if (defined($dTime));        # parse device time (old firmware, now line starting with N)
+        ParseTime($hash, $dTime, $now) if (defined($dTime));        # parse device time (old firmware, now line starting with N)
         
         if (!$time || !$factor) {
             Log3 $name, 3, "$pLog skip line because time or factor is 0: $line";
@@ -2006,7 +2053,8 @@ sub ArduCounter_ParseReport($$)
         
         if ($ppu) {                                     
             $power = ($diff/$time) * (1000 * $fut / $ppu);  # new calculation with pulses or rounds per unit (kWh)
-        } else {                                        
+        } 
+        else {                                        
             $power = ($diff/$time) / 1000 * $fut * $factor; # old calculation with a factor that is hard to understand
         }
         my $powerFmt = sprintf ("%.3f", $power);
@@ -2017,37 +2065,37 @@ sub ArduCounter_ParseReport($$)
             (defined($avgLen) ? ", Avg ${avgLen}ms" : "") . (defined($ppu) ? ", PPU ${ppu}" : "") . 
             (defined($fut) ? ", FUT ${fut}s" : "") . ", result $powerFmt";   
         
-        my $lastPower = ArduCounter_ReadingsVal($name, 'power', $pin);   # alter Power Wert
+        my $lastPower = UserReadingsVal($name, 'power', $pin);   # alter Power Wert
         readingsBeginUpdate($hash);
-        ArduCounter_BulkUpdate($hash, 'power', $pin, $powerFmt, ($doSTime ? $sTime : undef));
+        UserBulkUpdate($hash, 'power', $pin, $powerFmt, ($doSTime ? $sTime : undef));
 
         #Log3 $name, 5, "$pLog last power $lastPower, power $power";
-        ArduCounter_HandleRunTime($hash, $pinName, $pin, $lastPower, $powerFmt) if ($doRTime);
+        HandleRunTime($hash, $pinName, $pin, $lastPower, $powerFmt) if ($doRTime);
 
         if (defined($reject) && $reject ne "") {
             my $rejCount = ReadingsVal($name, "reject$pinName", 0); # alter reject count Wert
-            ArduCounter_BulkUpdate($hash, 'reject', $pin, $reject + $rejCount);
+            UserBulkUpdate($hash, 'reject', $pin, $reject + $rejCount);
         }
-        ArduCounter_BulkUpdate($hash, 'timeDiff', $pin, $time);     # used internally for interpolation
-        ArduCounter_BulkUpdate($hash, 'countDiff', $pin, $diff);    # used internally for interpolation
-        ArduCounter_BulkUpdate($hash, 'lastMsg', $pin, $line);
+        UserBulkUpdate($hash, 'timeDiff', $pin, $time);     # used internally for interpolation
+        UserBulkUpdate($hash, 'countDiff', $pin, $diff);    # used internally for interpolation
+        UserBulkUpdate($hash, 'lastMsg', $pin, $line);
         
-        ArduCounter_HandleCounters($hash, $pin, $seq, $count, $time, $diff, $rDiff, $now, $ppu);
+        HandleCounters($hash, $pin, $seq, $count, $time, $diff, $rDiff, $now, $ppu);
         readingsEndUpdate($hash, 1);
                     
         if (!$hash->{Initialized}) {                                # device sent count but no hello after reconnect
             Log3 $name, 3, "$name: device is still counting";
             if (!$hash->{WaitForHello}) {                           # if hello not already sent, send it now
-                ArduCounter_AskForHello("direct:$name");
+                AskForHello("direct:$name");
             }
             RemoveInternalTimer ("sendHello:$name");                # don't send hello again
         }
     }
+    return;
 }
 
 
-sub ArduCounter_HandleHistory($$$$) 
-{
+sub HandleHistory {
     my ($hash, $now, $pinName, $hist) = @_;
     my $name  = $hash->{NAME};
     my @hList = split(/, /, $hist);
@@ -2078,17 +2126,18 @@ sub ArduCounter_HandleHistory($$$$)
                     $hash->{HistIdx}++;
                 }
                 $hash->{HistIdx} = 0 if ($hash->{HistIdx} > AttrVal($name, "maxHist", 1000));
-            } else {
+            } 
+            else {
                 Log3 $name, 5, "$name: HandleHistory - no match for $he";
             }
         }
     }
+    return;
 }
 
 
 #########################################################################
-sub ArduCounter_Parse($)
-{
+sub Parse {
     my ($hash) = @_;
     my $name   = $hash->{NAME};
     my $retStr = "";
@@ -2101,100 +2150,101 @@ sub ArduCounter_Parse($)
         #Log3 $name, 5, "$name: Parse line: #" . $line . "#";
         
         if ($line =~ /^ArduCounter V([\d\.]+).*(Started|Hello)/) {  # setup / hello message
-            ArduCounter_ParseHello($hash, $line, $now);       
-           
-        } elsif ($line =~ /^(?:A|a|alive|Alive) *(?:(?:R|RSSI) *([\-\d]+))? *$/) {    # alive response
+            ParseHello($hash, $line, $now);        
+        } 
+        elsif ($line =~ /^(?:A|a|alive|Alive) *(?:(?:R|RSSI) *([\-\d]+))? *$/) {    # alive response
             my $rssi = $1;
             Log3 $name, 5, "$name: device sent alive response: $line" if (AttrVal($name, "logFilter", "N") =~ "N");
             RemoveInternalTimer ("alive:$name");
-            $hash->{WaitForAlive} = 0;
             delete $hash->{KeepAliveRetries};
-            readingsSingleUpdate($hash, "RSSI", $rssi, 1) if ($rssi);
-            
-        } elsif ($line =~ /^R([\d]+)(.*)/) {                # report counters
-            ArduCounter_ParseReport($hash, $line);
+            readingsSingleUpdate($hash, "RSSI", $rssi, 1) if ($rssi);            
+        } 
+        elsif ($line =~ /^R([\d]+)(.*)/) {                # report counters
+            ParseReport($hash, $line);
             $retStr .= ($retStr ? "\n" : "") . "report for pin $1: $2";
-            
-        } elsif ($line =~ /^C([0-9\,]+)/) {                 # available pins
-            ArduCounter_ParseAvailablePins($hash, $1);
+        } 
+        elsif ($line =~ /^C([0-9\,]+)/) {                 # available pins
+            ParseAvailablePins($hash, $1);
             $retStr .= ($retStr ? "\n" : "") . "available pins: $1";
-
-        } elsif ($line =~ /^H([\d]+) (.+)/) {               # pin pulse history as separate line
+        } 
+        elsif ($line =~ /^H([\d]+) (.+)/) {               # pin pulse history as separate line
             my $pin  = $1;
             my $hist = $2;
-            my $pinName = ArduCounter_PinName($hash, $pin);  
-            ArduCounter_HandleHistory($hash, $now, $pinName, $hist);
-            if (ArduCounter_AttrVal($hash, 0, "verboseReadings$pinName", "verboseReadings$pin") eq "1") {                    
+            my $pinName = PinName($hash, $pin);  
+            HandleHistory($hash, $now, $pinName, $hist);
+            if (AttrValFromList($hash, 0, "verboseReadings$pinName", "verboseReadings$pin") eq "1") {                    
                 readingsSingleUpdate($hash, "pinHistory$pinName", $hist, 1);
             }
-
-        } elsif ($line =~ /^I(.*)/) {                       # interval config report after show/hello
+        } 
+        elsif ($line =~ /^I(.*)/) {                       # interval config report after show/hello
             $retStr .= ($retStr ? "\n" : "") . "interval config: $1";
             $hash->{runningCfg}{I} = $1;                    # save for later compare
             $hash->{runningCfg}{I} =~ s/\s+$//;             # remove spaces at end
             Log3 $name, 4, "$name: device sent interval config $hash->{runningCfg}{I}";
-
-        } elsif ($line =~ /^U(.*)/) {                       # unit display config
+        } 
+        elsif ($line =~ /^U(.*)/) {                       # unit display config
             $retStr .= ($retStr ? "\n" : "") . "display unit config: $1";
             $hash->{runningCfg}{U} = $1;                    # save for later compare
             $hash->{runningCfg}{U} =~ s/\s+$//;             # remove spaces at end
             Log3 $name, 4, "$name: device sent unit display config $hash->{runningCfg}{U}";
-
-        } elsif ($line =~ /^V(.*)/) {                       # devVerbose
+        } 
+        elsif ($line =~ /^V(.*)/) {                       # devVerbose
             $retStr .= ($retStr ? "\n" : "") . "verbose config: $1";
             $hash->{runningCfg}{V} = $1;                    # save for later compare
             $hash->{runningCfg}{V} =~ s/\s+$//;             # remove spaces at end
             Log3 $name, 4, "$name: device sent devVerbose $hash->{runningCfg}{V}";
-            
-        } elsif ($line =~ /^P(\d+) *(f|falling|r|rising|-) *(p|pullup)? *(?:m|min)? *(\d+) *(?:(?:analog)? *(?:o|out|out-pin)? *(\d+) *(?:(?:t|thresholds) *(\d+) *[\/\, ] *(\d+))?)?(?:, R\d+.*)?/) {    # pin configuration at device
+        } 
+        elsif ($line =~ /^P(\d+) *(f|falling|r|rising|-) *(p|pullup)? *(?:m|min)? *(\d+) *(?:(?:analog)? *(?:o|out|out-pin)? *(\d+) *(?:(?:t|thresholds) *(\d+) *[\/\, ] *(\d+))?)?(?:, R\d+.*)?/) {    # pin configuration at device
             my $p = ($3 ? $3 : "nop");
             $hash->{runningCfg}{$1} = $line;
             $retStr .= ($retStr ? "\n" : "") . "pin $1 config: $2 $p min length $4 " . ($5 ? "analog out $5 thresholds $6/$7" : "");
-            Log3 $name, 4, "$name: device sent config for pin $1: $line";
-            
-        } elsif ($line =~ /^N(.*)/) {                       # device time and boot time, track drift
-            ArduCounter_ParseTime($hash, $line, $now);
+            Log3 $name, 4, "$name: device sent config for pin $1: $line"; 
+        } 
+        elsif ($line =~ /^N(.*)/) {                       # device time and boot time, track drift
+            ParseTime($hash, $line, $now);
             $retStr .= ($retStr ? "\n" : "") . "device time $1";   
             Log3 $name, 4, "$name: device sent time info: $line";
-         
-        } elsif ($line =~ /conn.* busy/) {
+        } 
+        elsif ($line =~ /conn.* busy/) {
             my $now   = gettimeofday(); 
             my $delay = AttrVal($name, "nextOpenDelay", 60);  
             Log3 $name, 4, "$name: _Parse: primary tcp connection seems busy - delay next open";
-            ArduCounter_Disconnected($hash);                # set to disconnected (state), remove timers
+            SetDisconnected($hash);                # set to disconnected (state), remove timers
             DevIo_CloseDev($hash);                          # close, remove from readyfnlist so _ready is not called again
             RemoveInternalTimer ("delayedopen:$name");
-            InternalTimer($now+$delay, "ArduCounter_DelayedOpen", "delayedopen:$name", 0);
-            
+            InternalTimer($now+$delay, "ArduCounter::DelayedOpen", "delayedopen:$name", 0);
         # todo: the level reports should be recorded separately per pin
-        } elsif ($line =~ /^L\d+: *([\d]+) ?, ?([\d]+) ?, ?-> *([\d]+)/) { # analog level difference reported with details
+        } 
+        elsif ($line =~ /^L\d+: *([\d]+) ?, ?([\d]+) ?, ?-> *([\d]+)/) { # analog level difference reported with details
             if ($hash->{analogLevels}{$3}) {
                 $hash->{analogLevels}{$3}++;
             } else {
                 $hash->{analogLevels}{$3} = 1;
             }
-        } elsif ($line =~ /^L\d+: *([\d]+)/) {          # analog level difference reported
+        } 
+        elsif ($line =~ /^L\d+: *([\d]+)/) {          # analog level difference reported
             if ($hash->{analogLevels}{$1}) {
                 $hash->{analogLevels}{$1}++;
             } else {
                 $hash->{analogLevels}{$1} = 1;
-            }
-            
-        } elsif ($line =~ /^Error:/) {                  # Error message from device
+            }  
+        } 
+        elsif ($line =~ /^Error:/) {                  # Error message from device
             $retStr .= ($retStr ? "\n" : "") . $line;  
-            Log3 $name, 3, "$name: device: $line";
-            
-        } elsif ($line =~ /^M (.*)/) {                  # other Message from device
+            Log3 $name, 3, "$name: device: $line"; 
+        } 
+        elsif ($line =~ /^M (.*)/) {                  # other Message from device
             $retStr .= ($retStr ? "\n" : "") . $1;
             Log3 $name, 3, "$name: device: $1";
-            
-        } elsif ($line =~ /^D (.*)/) {                  # debug / info Message from device
+        } 
+        elsif ($line =~ /^D (.*)/) {                  # debug / info Message from device
             $retStr .= ($retStr ? "\n" : "") . $1;
-            Log3 $name, 4, "$name: device: $1";
-            
-        } elsif ($line =~ /^[\s\n]*$/) {
+            Log3 $name, 4, "$name: device: $1"; 
+        } 
+        elsif ($line =~ /^[\s\n]*$/) {
             # blank line - ignore
-        } else {
+        } 
+        else {
             Log3 $name, 3, "$name: unparseable message from device: $line";
         }
     }
@@ -2206,15 +2256,23 @@ sub ArduCounter_Parse($)
 
 #########################################################################
 # called from the global loop, when the select for hash->{FD} reports data
-sub ArduCounter_Read($)
-{
-    my ($hash) = @_;
+sub ReadFn {
+    my $hash = shift;
     my $name = $hash->{NAME};
     my ($pin, $count, $diff, $power, $time, $reject, $msg);
-    
-    # read from serial device
-    my $buf = DevIo_SimpleRead($hash);      
-    return if (!defined($buf) );
+    my $buf;
+
+    if ($hash->{DeviceName} eq 'none') {            # simulate receiving
+        if ($hash->{TestInput}) {
+            $buf = $hash->{TestInput};
+            delete $hash->{TestInput};
+        }
+    } 
+    else {
+        # read from serial device
+        $buf = DevIo_SimpleRead($hash);      
+        return if (!defined($buf) );
+    }
 
     $hash->{buffer} .= $buf;    
     my $end = chop $buf;
@@ -2222,16 +2280,15 @@ sub ArduCounter_Read($)
 
     # did we already get a full frame?
     return if ($end ne "\n");   
-    ArduCounter_Parse($hash);
+    Parse($hash);
+    return;
 }
-
 
 
 #####################################
 # Called from get / set to get a direct answer
 # called with logical device hash
-sub ArduCounter_ReadAnswer($$)
-{
+sub ReadAnswer {
     my ($hash, $expect) = @_;
     my $name   = $hash->{NAME};
     my $rin    = '';
@@ -2242,15 +2299,19 @@ sub ArduCounter_ReadAnswer($$)
     Log3 $name, 5, "$name: ReadAnswer called";  
     
     for(;;) {
-
-        if($^O =~ m/Win/ && $hash->{USBDev}) {        
-            $hash->{USBDev}->read_const_time($to*1000);   # set timeout (ms)
+        if ($hash->{DeviceName} eq 'none') {            # simulate receiving
+            $buf = $hash->{TestInput};
+            delete $hash->{TestInput};
+        } 
+        elsif($^O =~ m/Win/ && $hash->{USBDev}) {        
+            $hash->{USBDev}->read_const_time($to*1000); # set timeout (ms)
             $buf = $hash->{USBDev}->read(999);
             if(length($buf) == 0) {
                 Log3 $name, 3, "$name: Timeout in ReadAnswer";
                 return ("Timeout reading answer", undef)
             }
-        } else {
+        }
+        else {
             if(!$hash->{FD}) {
                 Log3 $name, 3, "$name: Device lost in ReadAnswer";
                 return ("Device lost when reading answer", undef);
@@ -2261,7 +2322,7 @@ sub ArduCounter_ReadAnswer($$)
             if($nfound < 0) {
                 next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
                 my $err = $!;
-                ArduCounter_Disconnected($hash);                    # set to disconnected, remove timers, let _ready try to reopen
+                SetDisconnected($hash);                    # set to disconnected, remove timers, let _ready try to reopen
                 Log3 $name, 3, "$name: ReadAnswer error: $err";
                 return("ReadAnswer error: $err", undef);
             }
@@ -2284,7 +2345,7 @@ sub ArduCounter_ReadAnswer($$)
         #Log3 $name, 5, "$name: Current buffer content: " . $hash->{buffer};
         next if ($end ne "\n"); 
         $msgBuf .= "\n" if ($msgBuf);
-        $msgBuf .= ArduCounter_Parse($hash);
+        $msgBuf .= Parse($hash);
         
         #Log3 $name, 5, "$name: ReadAnswer msgBuf: " . $msgBuf;
         if ($msgBuf =~ $expect) {
@@ -2305,7 +2366,7 @@ sub ArduCounter_ReadAnswer($$)
 =item summary_DE Modul für Strom / Wasserzähler mit Arduino, ESP8266 oder ESP32
 =begin html
 
-<a name="ArduCounter"></a>
+<a id="ArduCounter"></a>
 <h3>ArduCounter</h3>
 
 <ul>
@@ -2341,7 +2402,7 @@ sub ArduCounter_ReadAnswer($$)
     </ul>
     <br>
 
-    <a name="ArduCounterdefine"></a>
+    <a id="ArduCounter-define"></a>
     <b>Define</b>
     <ul>
         <br>
@@ -2364,7 +2425,7 @@ sub ArduCounter_ReadAnswer($$)
     </ul>
     <br>
 
-    <a name="ArduCounterconfiguration"></a>
+    <a id="ArduCounter-configuration"></a>
     <b>Configuration of ArduCounter digital counters</b><br><br>
     <ul>
         Specify the pins where impulses should be counted e.g. as <code>attr AC pinX falling pullup min 25</code> <br>
@@ -2492,7 +2553,7 @@ sub ArduCounter_ReadAnswer($$)
     </ul>
     <br>
 
-    <a name="ArduCounterset"></a>
+    <a id="ArduCounter-set"></a>
     <b>Set-Commands</b><br>
     <ul>
         <li><b>raw</b></li> 
@@ -2547,7 +2608,7 @@ sub ArduCounter_ReadAnswer($$)
             deletes all the cached pin history entries
     </ul>
     <br>
-    <a name="ArduCounterget"></a>
+    <a id="ArduCounter-get"></a>
     <b>Get-Commands</b><br>
     <ul>
         <li><b>info</b></li> 
@@ -2562,13 +2623,13 @@ sub ArduCounter_ReadAnswer($$)
             The maximum number of lines that the Arducounter module stores in a ring buffer is defined by the attribute maxHist and defaults to 1000.
     </ul>
     <br>
-    <a name="ArduCounterattr"></a>
+    <a id="ArduCounter-attr"></a>
     <b>Attributes</b><br><br>
     <ul>
         <li><a href="#do_not_notify">do_not_notify</a></li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br>
-        <li><b>pin[AD]?[0-9]+&lt;rising|falling&gt; [&lt;pullup&gt;] [min] &lt;min length&gt; [[analog] out &lt;out pin&gt; [threshold] &lt;min, max&gt;]</b></li> 
+		<li><a id="ArduCounter-attr-pin" data-pattern="pin.*">pin[AD]?[0-9]+&lt;rising|falling&gt; [&lt;pullup&gt;] [min] &lt;min length&gt; [[analog] out &lt;out pin&gt; [threshold] &lt;min, max&gt;]</a><br> 
             Define a GPIO pin of the Arduino or ESP board as input. This attribute expects for digital inputs either 
             <code>rising</code> or <code>falling</code>, followed by an optional <code>pullup</code> and the optional keyword <code>min</code> 
             and an optional number as minimal length of pulses and gaps between pulses.<br>
@@ -2576,18 +2637,18 @@ sub ArduCounter_ReadAnswer($$)
             The minimal length specified here is the minimal duration of a pulse and a pause before a pulse. If one is too small, 
             the pulse is not counted but added to a separate reject counter.<br>
             Example:<br>
-            <code>
+            <pre>
             attr MyCounter pinD4 falling pullup 25
-            </code>
+            </pre>
             For analog inputs with connected reflective light barries, you have to add <code>analog out</code> 
             and the GPIO pin number of the pin where the light source (LED or laser) is connected, the keyword <code>threshold</code> 
             followed by the lower and upper threshold separated by a komma.<br>
             Example:<br>
-            <code>
+            <pre>
             attr MyCounter pinA0 rising pullup min 3 analog out 27 threshold 120,220
-            </code>
-            
-        <li><b>interval</b> &lt;normal&gt; &lt;max&gt; [&lt;min&gt; &lt;min count&gt; [&lt;analog interval&gt; &lt;analog samples&gt;]]</li> 
+            </pre>
+        </li>
+        <li><a id="ArduCounter-attr-interval">interval &lt;normal&gt; &lt;max&gt; [&lt;min&gt; &lt;min count&gt; [&lt;analog interval&gt; &lt;analog samples&gt;]]</a><br> 
             Defines the parameters that affect the way counting and reporting works.
             This Attribute expects at least two and a maximum of six numbers as value. 
             The first is the normal interval, the second the maximal interval, the third is a minimal interval and the fourth is a minimal pulse count. 
@@ -2613,97 +2674,115 @@ sub ArduCounter_ReadAnswer($$)
             or the above conditions have changed after another normal interval.<br>
             This way the counter will report a higher number of pulses counted and a larger time difference back to fhem. <br>
             Example:<br>
-            <code>
+            <pre>
             attr myCounter interval 60 600 5 2
-            </code><br>
+            </pre><br>
             If this is seems too complicated and you prefer a simple and constant reporting interval, then you can set the normal interval and the mximum interval to the same number. 
             This changes the operation mode of the counter to just count during this normal and maximum interval and report the count. 
             In this case the reported time difference is always the reporting interval and not the measured time between the real impulses.
             <br><br>
             For analog sampling the last two numbers define the delay in milliseconds between analog measurements and the number of samples that will be taken as one mesurement.
-            
-        <li><b>pulsesPerUnit &lt;number&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-board">board</a><br> 
+            specify the type of the board used for ArduCounter like NANO, UNO, ESP32, ESP8266 or T-Display<br>
+            Example:
+            <pre>
+            attr myCounter board NANO
+            </pre>
+        </li>
+		<li><a id="ArduCounter-attr-pulsesPerUnit" data-pattern="pulsesPer.*">pulsesPerUnit &lt;number&gt;</a><br> 
             specify the number of pulses that the meter is giving out per unit that sould be displayed (e.g. per kWh energy consumed). <br>
             For many S0 counters this is 1000, for old ferraris counters this is 75 (rounds per kWh).<br>
             This attribute used to be called pulsesPerKWh and this name still works but the new name should be used preferably since the old one could be removed in future versions.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter pulsesPerUnit 75
-            </code>
-        <li><b>readingPulsesPerUnit[AD]?[0-9]+ &lt;number&gt;</b></li> 
+            </pre>
+        </li>
+		<li><a id="ArduCounter-attr-readingPulsesPerUnit" data-pattern="readingPulsesPer.*">readingPulsesPerUnit[AD]?[0-9]+ &lt;number&gt;</a><br> 
             is the same as pulsesPerUnit but specified per GPIO pin individually in case you have multiple counters with different settings at the same time<br>
             This attribute used to be called readingPulsesPerKWh[AD]?[0-9]+ and this name still works but the new name should be used preferably 
             since the old one could be removed in future versions.<br>
             <br>
             Example:<br>
-            <code>
+            <pre>
             attr myCounter readingPulsesPerUnitA7 75<br>
             attr myCounter readingPulsesPerUnitD4 1000
-            </code>
+            </pre>
 
-        <li><b>readingFlowUnitTime[AD]?[0-9]+ &lt;time&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingFlowUnitTime" data-pattern="readingFlowUnitTime.*">readingFlowUnitTime[AD]?[0-9]+ &lt;time&gt;</a><br> 
             specified the time period in seconds which is used as the basis for calculating the current flow or power for the given pin.<br>
             If the counter e.g. counts liters and you want to see the flow in liters per minute, then you have to set this attribute to 60.<br>
             If you count kWh and you want to see the current power in kW, then specify 3600 (one hour).<br>
             Since this attribute is just used for multiplying the consumption per second, you can also use it to get watts 
             instead of kW by using 3600000 instead of 3600.
 
-        <li><b>flowUnitTime &lt;time&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-flowUnitTime" data-pattern="flowUnitTime">flowUnitTime &lt;time&gt;</a><br> 
             like readingFlowUnitTimeXX but applies to all pins that have no explicit readingFlowUnitTimeXX attribute.
 
-        <li><b>readingNameCount[AD]?[0-9]+ &lt;new name&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingNameCount" data-pattern="readingNameCount">readingNameCount[AD]?[0-9]+ &lt;new name&gt;</a><br> 
             Change the name of the counter reading pinX to something more meaningful. <br>
             Example:
-            <code>
+            <pre>
             attr myCounter readingNameCountD4 CounterHaus_internal
-            </code>
-        <li><b>readingNameLongCount[AD]?[0-9]+ &lt;new name&gt;</b></li> 
+            </pre>
+        </li>
+		<li><a id="ArduCounter-attr-readingNameLongCount" data-pattern="readingNameLongCount">readingNameLongCount[AD]?[0-9]+ &lt;new name&gt;</a><br> 
             Change the name of the long counter reading longX to something more meaningful.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter readingNameLongCountD4 CounterHaus_long
-            </code>
+            </pre>
             
-        <li><b>readingNameInterpolatedCount[AD]?[0-9]+ &lt;new name&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingNameInterpolatedCount" data-pattern="readingNameInterpolatedCount">readingNameInterpolatedCount[AD]?[0-9]+ &lt;new name&gt;</a><br> 
             Change the name of the interpolated long counter reading InterpolatedlongX to something more meaningful.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter readingNameInterpolatedCountD4 CounterHaus_interpolated
-            </code>
+            </pre>
             
-        <li><b>readingNameCalcCount[AD]?[0-9]+ &lt;new name&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingNameCalcCount" data-pattern="readingNameCalcCount">readingNameCalcCount[AD]?[0-9]+ &lt;new name&gt;</a><br> 
             Change the name of the real unit counter reading CalcCounterX to something more meaningful.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter readingNameCalcCountD4 CounterHaus_kWh
-            </code>
+            </pre>
             
-        <li><b>readingNamePower[AD]?[0-9]+ &lt;new name&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingNamePower" data-pattern="readingNamePower">readingNamePower[AD]?[0-9]+ &lt;new name&gt;</a><br> 
             Change the name of the power reading powerX to something more meaningful.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter readingNamePowerD4 PowerHaus_kW
-            </code>
+            </pre>
             
-        <li><b>readingStartTime[AD]?[0-9]+ [0|1]</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingStartTime" data-pattern="readingStartTime">readingStartTime[AD]?[0-9]+ [0|1]</a><br> 
             Allow the reading time stamp to be set to the beginning of measuring intervals. 
             This is a hack where the timestamp of readings is artificially set to a past time and may have side effects 
             so avoid it unless you fully understand how Fhem works with readings and their time.
             
-        <li><b>verboseReadings[AD]?[0-9]+ [0|1]</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-verboseReadings" data-pattern="verboseReadings">verboseReadings[AD]?[0-9]+ [0|1]</a><br> 
             create the additional readings lastMsg and pinHistory for each pin<br>
             if verboseReafings is set to 1 for the specified pin.<br>
             If set to -1 then the internal counter, the long counter and interpolated long counter readings will be hidden.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter verboseReadingsD4 1
-            </code>
+            </pre>
             
-        <li><b>enableHistory [0|1]</b></li>
+        </li>
+		<li><a id="ArduCounter-attr-enableHistory" data-pattern="enableHistory">enableHistory [0|1]</a><br>
             tells the counting device to record the individual time of each change at each GPIO pin and send it to Fhem. 
             This information is cached on the Fhem side and can be viewed with the command <code>get history</code>
             The optput of <code>get history</code> will look like this:
-            <code>
+            <pre>
                 Seq  12627 2020-03-22 20:39:54 Pin D5   0.080 seconds at 0 -> pulse counted
                 Seq  12628 2020-03-22 20:39:55 Pin D5   1.697 seconds at 1 -> gap
                 Seq  12629 2020-03-22 20:39:56 Pin D5   0.080 seconds at 0 -> pulse counted
@@ -2720,31 +2799,38 @@ sub ArduCounter_ReadAnswer($$)
                 Seq  12642 2020-03-22 20:40:05 Pin D5   1.699 seconds at 1 -> gap
                 Seq  12643 2020-03-22 20:40:07 Pin D5   0.080 seconds at 0 -> pulse counted
                 Seq  12644 2020-03-22 20:40:07 Pin D5   1.698 seconds at 1 -> gap            
-            </code>
+            </pre>
 
-        <li><b>enableSerialEcho [0|1]</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-enableSerialEcho" data-pattern="enableSerialEcho">enableSerialEcho [0|1]</a><br> 
             tells the counting device to show diagnostic data over the serial line when connected via TCP
             
-        <li><b>enablePinDebug [0|1]</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-enablePinDebug" data-pattern="enablePinDebug">enablePinDebug [0|1]</a><br> 
             tells the counting device to show every level change of the defined input pins over the serial line or via TCP
-        <li><b>enableAnalogDebug [0|1]</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-enableAnalogDebug" data-pattern="enableAnalogDebug">enableAnalogDebug [0|1]</a><br> 
             tells the counting device to show every analog measurement of the defined analog input pins over the serial line or via TCP
-        <li><b>enableDevTime [0|1]</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-enableDevTime" data-pattern="enableDevTime">enableDevTime [0|1]</a><br> 
             tells the counting device to show its internal millis timer so a drift between the devices time and fhem time can be calculated and logged
 
-        <li><b>maxHist &lt;max entries&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-maxHist" data-pattern="maxHist">maxHist &lt;max entries&gt;</a><br> 
             specifies how many pin history lines hould be buffered for "get history".<br>
             This attribute defaults to 1000.
             
-        <li><b>analogThresholds</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-analogThresholds" data-pattern="analogThresholds">analogThresholds</a><br> 
             this Attribute is outdated. Please specify the analog thresholds for reflective light barrier input with the attribute "pin..."
         
-        <li><b>flashCommand &lt;new shell command&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-flashCommand" data-pattern="flashCommand">flashCommand &lt;new shell command&gt;</a><br> 
             overrides the default command to flash the firmware via Wifi (OTA) or serial line. It is recommended to not define this attribute. <br>
             Example:
-            <code>            
+            <pre>            
             attr myCounter flashCommand avrdude -p atmega328P -c arduino -b 57600 -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]
-            </code>
+            </pre>
             <code>[PORT]</code> is automatically replaced with the serial port for this device as it is specified in the <code>define</code> command.<br>
             <code>[HEXFILE]</code> or <code>[BINFILE]</code> are synonyms and are both automatically replaced with the firmware file appropriate for the device. 
             For ESP32 boards <code>[HEXFILE]</code> would be replaced by ArduCounter-8266.bin for example.<br>
@@ -2752,79 +2838,99 @@ sub ArduCounter_ReadAnswer($$)
             <code>[NETPORT]</code> is automatically replaced by the tcp port number used for OTA flashing. 
             For ESP32 this usually is 3232 and for 8266 Bords it is 8266.<br>
             
-        <li><b>keepAliveDelay &lt;delay&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-keepAliveDelay" data-pattern="keepAliveDelay">keepAliveDelay &lt;delay&gt;</a><br> 
             defines an interval in which the module sends keepalive messages to a counter device that is conected via tcp.<br>
             This attribute is ignored if the device is connected via serial port.<br>
             If the device doesn't reply within a defined timeout then the module closes and tries to reopen the connection.<br>
             The module tells the device when to expect the next keepalive message and the device will also close the tcp connection if it doesn't see a keepalive message within the delay multiplied by 3<br>
             The delay defaults to 10 seconds.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter keepAliveDelay 30
-            </code>            
+            </pre>            
             
-        <li><b>keepAliveTimeout &lt;seconds&gt;</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-keepAliveTimeout" data-pattern="keepAliveTimeout">keepAliveTimeout &lt;seconds&gt;</a><br> 
             defines the timeout when wainting for a keealive reply (see keepAliveDelay)
             The timeout defaults to 2 seconds.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter keepAliveTimeout 3
-            </code>            
-        <li><b>keepAliveRetries &lt;max number of retries&gt;</b></li> 
+            </pre>            
+        </li>
+		<li><a id="ArduCounter-attr-keepAliveRetries" data-pattern="keepAliveRetries">keepAliveRetries &lt;max number of retries&gt;</a><br> 
             defines how often sending a keepalive is retried before the connection is closed and reopened.<br>
             It defaults to 2.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter keepAliveRetries 3
-            </code>            
-        <li><b>nextOpenDelay &lt;delay&gt;</b></li> 
+            </pre>            
+        </li>
+		<li><a id="ArduCounter-attr-nextOpenDelay" data-pattern="nextOpenDelay">nextOpenDelay &lt;delay&gt;</a><br> 
             defines the time in seconds that the module waits before retrying to open a disconnected tcp connection. <br>
             This defaults to 60 seconds.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter nextOpenDelay 20
-            </code>            
-            
-        <li><b>openTimeout &lt;timeout&gt;</b></li> 
+            </pre>            
+        </li>
+		<li><a id="ArduCounter-attr-openTimeout" data-pattern="openTimeout">openTimeout &lt;timeout&gt;</a><br> 
             defines the timeout in seconds after which tcp open gives up trying to establish a connection to the counter device.
             This timeout defaults to 3 seconds.<br>
             Example:
-            <code>
+            <pre>
             attr myCounter openTimeout 5
-            </code>            
-            
-        <li><b>silentReconnect [0|1]</b></li> 
+            </pre>            
+        </li>
+		<li><a id="ArduCounter-attr-silentReconnect" data-pattern="silentReconnect">silentReconnect [0|1]</a><br> 
             if set to 1, then it will set the loglevel for "disconnected" and "reappeared" messages to 4 instead of 3<br>
             Example:
-            <code>
+            <pre>
             attr myCounter silentReconnect 1
-            </code>            
-
-        <li><b>deviceDisplay</b> &lt;pin&gt; &lt;unit&gt; &lt;flowUnit&gt;</li> 
+            </pre>            
+        </li>
+        <li><a id="ArduCounter-attr-deviceDisplay">deviceDisplay &lt;pin&gt; &lt;unit&gt; &lt;flowUnit&gt;</a><br>
             controls the unit strings that a local display on the counting device will show. <br> 
             Example:
-            <code>
+            <pre>
             attr myCounter deviceDisplay 36,l,l/m
             attr myCounter deviceDisplay 36,kWh,kW
-            </code>      
-
-        <li><b>disable [0|1]</b></li> 
+            </pre>      
+        </li>
+		<li><a id="ArduCounter-attr-disable" data-pattern="disable">disable [0|1]</a><br> 
             if set to 1 then the module is disabled and closes the connection to a counter device.<br>
-
-        <li><b>factor</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-factor">factor</a><br> 
             Define a multiplicator for calculating the power from the impulse count and the time between the first and the last impulse. <br>
             This attribute is outdated and unintuitive so you should avoid it. <br>
             Instead you should specify the attribute pulsesPerUnit or readingPulsesPerUnit[0-9]+ (where [0-9]+ stands for the pin number).
-
-        <li><b>readingFactor[AD]?[0-9]+</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-readingFactor" data-pattern="readingFactor.*">readingFactor[AD]?[0-9]+</a><br> 
             Override the factor attribute for this individual pin. <br>
             Just like the attribute factor, this is a rather cumbersome way to specify the pulses per kWh. <br>
             Instead it is advised to use the attribute pulsesPerUnit or readingPulsesPerUnit[0-9]+ (where [0-9]+ stands for the pin number).
-
-        <li><b>devVerbose</b></li> 
+        </li>
+		<li><a id="ArduCounter-attr-runTime" data-pattern="runTime">runTime[AD]?[0-9]+</a><br> 
+            if this attribute is set for a pin, then a new reading will be created which accumulates the run time for this pin while consumption is greater than 0.<br>
+            This allows e.g. to check if a water meter shows water consumption for a time longer than X without stop.
+        </li>
+		<li><a id="ArduCounter-attr-runTimeIgnore" data-pattern="runTimeIgnore">runTimeIgnore[AD]?[0-9]+</a><br> 
+            this allows to ignore consumption for the run time attribute while a certain other device is switched on.
+        </li>
+		<li><a id="ArduCounter-attr-devVerbose">devVerbose</a><br> 
             this attribute is outdated and has been replaced with the attributes 
             <code>enableHistory, enableSerialEcho, enablePinDebug, enableAnalogDebug, enableDevTime</code>
-            
+        </li>
+		<li><a id="ArduCounter-attr-configDelay">configDelay</a><br> 
+            specify the time to wait for the board to report its configuration before Fhem sends the commands to reconfigure the board 
+        </li>
+		<li><a id="ArduCounter-attr-helloSendDelay">helloSendDelay</a><br> 
+            specify the time to wait for the board to report its type before Fhem sends the commands to ask for it 
+        </li>
+		<li><a id="ArduCounter-attr-helloWaitTime">helloWaitTime</a><br> 
+            specify the time to wait for the board to report its type when Fhem has asked for it before a timeout occurs 
+        </li>
     </ul>
     <br>
     <b>Readings / Events</b><br>
