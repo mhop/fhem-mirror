@@ -1,4 +1,4 @@
-##############################################
+#############################################################################
 # $Id$
 #
 # Basiert auf der Idee Fhem Daten auf einem Kindle anzuzeigen
@@ -22,9 +22,11 @@
 #   2016-10-31  added SVG
 #   2016-11-02  RepXXText und RepXXTidy, delay first update for 1 secs after INITIALIZED
 #               Attribute disable, fixed uninitialized wearning at start with SVG
-#	2016-11-17	fixed missing REREADCFG in Notify check
-#	2016-12-21	set NOTIFYDEV in Define
+#   2016-11-17  fixed missing REREADCFG in Notify check
+#   2016-12-21  set NOTIFYDEV in Define
+#   2019-11-17  precompile regexes like in httpmod
 #
+
 
 # to include an SVG Plot
 # add a group to the template like this:
@@ -49,8 +51,10 @@
 
 #
 # ToDo:
-#	fhem blocks during SVG creation. Can we make this async?
-#	$FW_wname undef -> warning in SVG call at startup
+#   fhem blocks during SVG creation. Can we make this async?
+#   $FW_wname undef -> warning in SVG call at startup
+#
+#   change to own namespace
 #
 
 package main;
@@ -61,6 +65,8 @@ use warnings;
 use Time::HiRes qw( time );
 use POSIX qw(strftime);
 use Encode qw(decode encode);
+use FHEM::HTTPMOD::Utils  qw(:all);
+
 
 sub FReplacer_Initialize($);
 sub FReplacer_Define($$);
@@ -68,7 +74,8 @@ sub FReplacer_Undef($$);
 sub FReplacer_Update($);
 sub FReplacer_Attr(@);
 
-my $FReplacer_Version = '2.4 - 21.12.2016';
+my $FReplacer_Version = '2.5 - 17.11.2019';
+
 
 #####################################
 sub FReplacer_Initialize($)
@@ -95,6 +102,8 @@ sub FReplacer_Initialize($)
                         "ReplacementEncode " .      # Ergebnis einer Ersetzung z.B. in UTF-8 Encoden
                         "PostCommand " .            # Systembefehl, der nach der Ersetzung ausgeführt wird
                         "LUTimeFormat " .           # time format for strftime for LastUpdate
+                        "regexDecode " .    
+                        "regexCompile " .
                         "disable:0,1 " .
 
                         $readingFnAttributes;  
@@ -125,8 +134,7 @@ sub FReplacer_Define($$)
 
 
 #####################################
-sub
-FReplacer_Undef($$)
+sub FReplacer_Undef($$)
 {
     my ($hash, $arg) = @_;
     #my $name = $hash->{NAME};
@@ -159,11 +167,9 @@ sub FReplacer_Notify($$)
 }
 
 
-#
-# Attr command 
 ##############################################################
-sub
-FReplacer_Attr(@)
+# Attr command 
+sub FReplacer_Attr(@)
 {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
@@ -210,7 +216,7 @@ FReplacer_Attr(@)
                 return "Invalid Format $aVal";
             }
         } 
-        addToDevAttrList($name, $aName)
+        #addToDevAttrList($name, $aName)     # todo: use better library function to manage userattr list
     }
     
     if ($aName eq 'disable') {
@@ -223,12 +229,13 @@ FReplacer_Attr(@)
             InternalTimer(gettimeofday()+1, "FReplacer_Update", $hash, 0);
         }
     }   
-
+    my $err = ManageUserAttr($hash, $aName);
+    return $err if ($err);    
     return undef;
 }
 
-# SET command
 #########################################################################
+# SET command
 sub FReplacer_Set($@)
 {
     my ( $hash, @a ) = @_;
@@ -245,12 +252,62 @@ sub FReplacer_Set($@)
         return "Unknown argument $setName, choose one of ReplaceNow";
     }
 }
+
+
+###################################
+# precompile regex attr value
+sub FReplacer_PrecompileRegexAttr($$$)
+{
+    my ($hash, $aName, $aVal) = @_;
+    my $name = $hash->{NAME};
     
+    my $regDecode = AttrVal($name, 'regexDecode', "");
+    if ($regDecode && $regDecode !~ /^[Nn]one$/) {
+        $aVal = decode($regDecode, $aVal);
+        Log3 $name, 5, "$name: PrecompileRegexAttr is decoding regex $aName as $regDecode";
+    }
+        
+    my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
+    $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PrecompileRegexAttr for $aName $aVal created warning: @_"; };
+    eval {$hash->{CompiledRegexes}{$aName} = qr/$aVal/};
+    $SIG{__WARN__} = $oldSig;
+    if (!$@) {
+        Log3 $name, 5, "$name: PrecompileRegexAttr precompiled $aName /$aVal/ to $hash->{CompiledRegexes}{$aName}";
+    }
+}
+
+
+################################################
+# get a regex from attr and compile if not done
+sub FReplacer_GetRegex($$$$$)
+{
+    my ($name, $context, $num, $type, $default) = @_; 
+    my $hash = $defs{$name};
+    my $val;
+    my $regDecode  = AttrVal($name, 'regexDecode', "");
+    my $regCompile = AttrVal($name, 'regexCompile', 1);
+
+    if ($num && defined ($attr{$name}{$context . $num . $type})) {      # specific regex attr exists
+        return $attr{$name}{$context . $num . $type} if (!$regCompile);
+        if ($hash->{CompiledRegexes}{$context . $num . $type}) {        # compiled specific regex esists
+            $val = $hash->{CompiledRegexes}{$context . $num . $type};
+            Log3 $name, 5, "$name: GetRegex found precompiled $type for $context$num as $val";
+        } else {                                                        # not compiled (yet)
+            $val = $attr{$name}{$context . $num . $type};
+            FReplacer_PrecompileRegexAttr($hash, $context . $num . $type, $val);
+            $val = $hash->{CompiledRegexes}{$context . $num . $type};
+        }
+        
+    } else {
+        $val = $default;
+        return if (!$val)       # default is not compiled - should only be "" or similar
+    }
+    return $val;
+}    
     
     
 #####################################
-sub
-FReplacer_Update($) {
+sub FReplacer_Update($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "FReplacer_Update", $hash, 0);
@@ -280,11 +337,12 @@ FReplacer_Update($) {
         if ($key =~ /Rep([0-9]+)Regex/) {
             my $replacement = "";
             my $index = $1;
-            my $regex = $attr{$name}{"Rep${index}Regex"};
+            #my $regex = $attr{$name}{"Rep${index}Regex"};
+            my $regex = FReplacer_GetRegex($name, "Rep", $index, "Regex", "");
             my $skip  = 0;
             my $isSVG = 0;
             
-            if ($attr{$name}{"Rep${index}Reading"}) {
+            if ($regex && $attr{$name}{"Rep${index}Reading"}) {
                 if ($attr{$name}{"Rep${index}Reading"} !~ '([^\:]+):([^\:]+):?(.*)') {
                     Log3 $name, 3, "$name: wrong format in attr Rep${index}Reading";
                     next;
@@ -426,6 +484,7 @@ FReplacer_Update($) {
     }
 }
 
+
 1;
 
 =pod
@@ -434,7 +493,7 @@ FReplacer_Update($) {
 =item summary_DE ersetzt Platzhalter mit Readings oder SVG Plots in einer Datei
 =begin html
 
-<a name="FReplacer"></a>
+<a id="FReplacer"></a>
 <h3>FReplacer</h3>
 
 <ul>
@@ -443,7 +502,7 @@ FReplacer_Update($) {
     The resulting SVG file can then optionally be converted to a PNG file which can be used as an online screensaver for Kindle devices for example.
     <br><br>
 
-    <a name="FReplacerdefine"></a>
+    <a id="FReplacer-define"></a>
     <b>Define</b>
     <ul>
         <br>
@@ -456,7 +515,7 @@ FReplacer_Update($) {
     </ul>
     <br>
 
-    <a name="FReplacerconfiguration"></a>
+    <a id="FReplacer-configuration"></a>
     <b>Configuration of FReplacer Devices</b><br><br>
     <ul>
         Specify pairs of <code>attr FxxRegex</code> and <code>attr FxxReading</code> or <code>attr FxxExpr</code> to define which strings / placeholders in the InputFile should be replaced with which redings / expressions
@@ -487,7 +546,7 @@ FReplacer_Update($) {
         <br>
     </ul>
     
-    <a name="FReplacerset"></a>
+    <a id="FReplacer-set"></a>
     <b>Set-Commands</b><br>
     <ul>
         <li><b>ReplaceNow</b></li>
@@ -495,14 +554,14 @@ FReplacer_Update($) {
     </ul>
     <br>
 
-    <a name="FReplacerget"></a>
+    <a id="FReplacer-get"></a>
     <b>Get-Commands</b><br>
     <ul>
         none
     </ul>
     <br>
 
-    <a name="FReplacerReadings"></a>
+    <a id="FReplacer-Readings"></a>
     <b>Readings</b><br>
     <ul>
         <li><b>LastUpdate</b></li>
@@ -510,41 +569,54 @@ FReplacer_Update($) {
     </ul>
     <br>
 
-
-    <a name="FReplacerattr"></a>
+    <a id="FReplacer-attr"></a>
     <b>Attributes</b><br><br>
     <ul>
-        <li><b>Rep[0-9]+Regex</b></li>
+		<li><a id="FReplacer-attr-Rep[0-9]+Regex" data-pattern="Rep.*Regex">Rep[0-9]+Regex</a><br>
             defines the regex to be used for finding the right string to be replaced with the corresponding Reading / Expr result
-        <li><b>Rep[0-9]+Reading</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+Reading" data-pattern="Rep.*Reading">Rep[0-9]+Reading</a><br>
             defines a device and reading to be used as replacement value. It is specified as devicename:readingname:default_value.<br>
             The default_value is optional and defaults to 0. If the reading doesn't exist, default_value is used.
-        <li><b>Rep[0-9]+Text</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+Text" data-pattern="Rep.*Text">Rep[0-9]+Text</a><br>
             Use static text as replacement value. 
-        <li><b>Rep[0-9]+Tidy</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+Tidy" data-pattern="Rep.*Tidy">Rep[0-9]+Tidy</a><br>
             XML encode special characters in this replacement.
-        <li><b>Rep[0-9]+MaxAge</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+MaxAge" data-pattern="Rep.*MaxAge">Rep[0-9]+MaxAge</a><br>
             this can optionally be used together with RepReading to define a maximum age of the reading. It is specified as seconds:replacement. If the corresponding reading has not been updated for the specified number of seconds, then the replacement is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
             If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
-        <li><b>Rep[0-9]+MinValue</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+MinValue" data-pattern="Rep.*MinValue">Rep[0-9]+MinValue</a><br>
             this can optionally be used together with RepReading to define a minimum value of the reading. It is specified as min:replacement. If the corresponding reading is too small, then the replacement string is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
             If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
-        <li><b>Rep[0-9]+MaxValue</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+MaxValue" data-pattern="Rep.*MaxValue">Rep[0-9]+MaxValue</a><br>
             this can optionally be used together with RepReading to define a maximum value of the reading. It is specified as max:replacement. If the corresponding reading is too big, then the replacement string is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
             If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
-        <li><b>Rep[0-9]+Expr</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+Expr" data-pattern="Rep.*Expr">Rep[0-9]+Expr</a><br>
             defines an optional expression that can be used to compute the replacement value. If RepExpr is used together with RepReading then the expression is evaluated after getting the reading and the value of the reading can be used in the expression as $replacement. <br>
             If only RepExpr is specified then readings can be retrieved with the perl function ReadingsVal() inside the expression. <br>
             If neither RepExpr nor RepReading is specified then the match for the correspondig regex will be replaced with an empty string.
-        <li><b>Rep[0-9]+Format</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+Format" data-pattern="Rep.*Format">Rep[0-9]+Format</a><br>
             defines an optional format string to be used in a sprintf statement to format the replacement before it is applied.<br>
             Can be used with RepReading or RepExpr or both.
-        <li><b>Rep[0-9]+SVG</b></li>
+        </li>
+		<li><a id="FReplacer-attr-Rep[0-9]+SVG" data-pattern="Rep.*SVG">Rep[0-9]+SVG</a><br>
             defines a SVG Plot be used as replacement. It is specified as the name of a defined fhem SVG.<br>
             In order to include this in a SVG template, include e.g. a group in the template with a rect in it and then replace the rect with the SVG Plot data.
-        <li><b>LUTimeFormat</b></li>
+        </li>
+		<li><a id="FReplacer-attr-RepComment" data-pattern="Rep.*Comment">Rep[0-9]+Comment</a><br>
+            can be used to put comments in the configuration
+        </li>
+		<li><a id="FReplacer-attr-LUTimeFormat">LUTimeFormat</a><br>
             defines a time format string (see Posix strftime format) to be used when creating the reading LastUpdate.
-        <li><b>PostCommand</b></li>
+        </li>
+		<li><a id="FReplacer-attr-PostCommand">PostCommand</a><br>
             Execute an external command after writing the output file, e.g. to convert a resulting SVG file to a PNG file.
             For an eInk Kindle you need a PNG in 8 bit greyscale format. A simple example to call the convert utility from ImageMagick would be <br>
             <code> attr fr PostCommand convert /opt/fhem/www/images/status.svg 
@@ -555,10 +627,22 @@ FReplacer_Update($) {
             or even <br>
             <code> attr fr PostCommand bash -c 'inkscape /opt/fhem/www/images/status.svg -e=tmp.png -b=rgb\(255,255,255\) --export-height=1024 --export-width=758;; convert tmp.png -type GrayScale -depth 8 /opt/fhem/www/images/status.png' >/dev/null 2>&1 & </code><br>
             Inkscape might be needed because ImageMagick seems to have problems convertig SVG files with embedded icons. However a PNG file created by Inkscape is not in 8 bit greyscale so Imagemagick can be run after Inkscape to convert to 8 bit greyscale
-        <li><b>ReplacementEncode</b></li>
+        </li>
+		<li><a id="FReplacer-attr-ReplacementEncode" data-pattern="ReplacementEncode">ReplacementEncode</a><br>
             defines an encoding to apply to the replacement string, e.g. UTF-8
-        <li><b>disable</b></li>
+        </li>
+		<li><a id="FReplacer-attr-disable" data-pattern="disable">disable</a><br>
             disables the update timer
+        </li>
+		<li><a id="FReplacer-attr-regexDecode">regexDecode</a><br> 
+            defines an encoding to be used in a call to the perl function decode to convert the raw data string from regex attributes before further processing / matching<br>
+            If you have trouble matching special characters or if you need to get around a memory leak in Perl regex processing this might help
+            <br>
+        </li>
+		<li><a id="FReplacer-attr-regexCompile">regexCompile</a><br> 
+            defines that regular expressions will be precompiled when they are used for the first time and then stored internally so that subsequent uses of the same 
+            regular expression will be faster. This option is turned on by default but setting this attribute to 0 will disable it.
+        </li>
     </ul>
 </ul>
 
