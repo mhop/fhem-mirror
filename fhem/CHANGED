@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 14_SD_WS09: fixed windDirAverage bug
  - bugfix: 95_Dashboard: fix perl warnings, Forum: #127216
  - bugfix: 74_GardenaSmartDevice: fix ic24,fix regex,fix state_string variable
                    add sensor2 support, fix open + paused 

@@ -488,7 +488,7 @@ sub SD_WS09_Attr(@) {
 }
 
 ###################################
-sub SD_WS09_WindDirAverage($$$){
+sub SD_WS09_WindDirAverage {
  ###############################################################################
  #  übernommen von SabineT https://forum.fhem.de/index.php/topic,75225.msg669950.html#msg669950
  #  WindDirAverage
@@ -513,6 +513,11 @@ sub SD_WS09_WindDirAverage($$$){
  ###############################################################################
 
 	my ($hash, $ws, $wd) = @_;
+
+	return if ref($hash) ne 'HASH';
+	return if !defined $ws;
+	return if !defined $wd;
+
 	my $name = $hash->{NAME};
 	Log3 $hash, 4, "SD_WS09_WindDirAverage --- OK ----" ;
 
@@ -531,20 +536,20 @@ sub SD_WS09_WindDirAverage($$$){
 		return "";
 	}
 
-	my $avtime = AttrVal($name,'WindDirAverageTime',0);
+	my $avtime = AttrVal($name,'WindDirAverageTime',600);
 	my $decay = AttrVal($name,'WindDirAverageDecay',0);
 	my $minspeed = AttrVal($name,'WindDirAverageMinSpeed',0);
 	my $windDirection_old = $wd;
 
 	# default Werte für die optionalen Parameter, falls nicht beim Aufruf mit angegeben
-	$avtime = 600 if (!(defined $avtime) || $avtime == 0 );
+	#$avtime = 600 if (!(defined $avtime) || $avtime == 0 );
 	$decay = 1 if (!(defined $decay));
 	$decay = 1 if ($decay > 1); # darf nicht >1 sein
 	$decay = 0 if ($decay < 0); # darf nicht <0 sein
-	$minspeed = 0 if (!(defined $minspeed));
+	#$minspeed = 0 if (!(defined $minspeed));
 
 	$wd = deg2rad($wd);
-	my $ctime = time;
+	my $ctime = CORE::time;
 	my $time = FmtDateTime($ctime);
 	my @new = ($ws,$wd,$time);
 
@@ -590,38 +595,38 @@ sub SD_WS09_WindDirAverage($$$){
 	my ($anz, $sanz) = 0;
 	$num = int(@{$hash->{helper}{history}});
 	my ($sumSin, $sumCos, $sumSpeed, $age, $maxage, $weight) = 0;
-	for(my $i=0; $i<$num; $i++){
+	for(my $i=0; $i<$num; $i++) {
 		($ws, $wd, $time) = @{ $arr->[$i] };
 		$age = $ctime - time_str2num($time);
 		if (($time eq "") || ($age > $avtime)) {
 			#-- zu alte Einträge entfernen
-      Log3 $hash,4,"SD_WS09_WindDirAverage_07 $name i=".$i." Speed=".round($ws,2)." Dir=".round($wd,2)." Time=".substr($time,11)." ctime=".$ctime." akt.=".time_str2num($time);
-      shift(@{$hash->{helper}{history}});
-      $i--;
-      $num--;
-    } else {
+      		Log3 $hash,4,"SD_WS09_WindDirAverage_07 $name i=".$i." Speed=".round($ws,2)." Dir=".round($wd,2)." Time=".substr($time,11)." ctime=".$ctime." akt.=".time_str2num($time);
+      		shift(@{$hash->{helper}{history}});
+      		$i--;
+      		$num--;
+    	} else {
 			#-- Werte aufsummieren, Windrichtung gewichtet über Geschwindigkeit und decay/"alter"
-      $weight = $decay ** ($age / $avtime);
-      #-- für die Mittelwertsbildung der Geschwindigkeit wird nur ein 10tel von avtime genommen
-      if ($age < ($avtime / 10)) {
-        $sumSpeed += $ws * $weight if ($age < ($avtime / 10));
-        $sanz++;
-      }
-      $sumSin += sin($wd) * $ws * $weight;
-      $sumCos += cos($wd) * $ws * $weight;
-      $anz++;
-      Log3 $hash,4,"SD_WS09_WindDirAverage_08 $name i=".$i." Speed=".round($ws,2)." Dir=".round($wd,2)." Time=".substr($time,11)." vec=".round($sumSin,2)."/".round($sumCos,2)." age=".$age." ".round($weight,2);
-    }
-  }
-  my $average = int((rad2deg(atan2($sumSin, $sumCos)) + 360) % 360);
-  Log3 $hash,4,"SD_WS09_WindDirAverage_09 $name Mittelwert über $anz Werte ist $average, avspeed=".round($sumSpeed/$num,1) if ($num > 0);
+      		$weight = $decay ** ($age / $avtime);
+      		#-- für die Mittelwertsbildung der Geschwindigkeit wird nur ein 10tel von avtime genommen
+      		if ($age < ($avtime / 10)) {
+        		$sumSpeed += $ws * $weight ;
+        		$sanz++;
+      		}
+			$sumSin += sin($wd) * $ws * $weight;
+			$sumCos += cos($wd) * $ws * $weight;
+			$anz++;
+			Log3 $hash,4,"SD_WS09_WindDirAverage_08 $name i=".$i." Speed=".round($ws,2)." Dir=".round($wd,2)." Time=".substr($time,11)." vec=".round($sumSin,2)."/".round($sumCos,2)." age=".$age." ".round($weight,2);
+  		}
+  	}
+  	my $average = int((rad2deg(atan2($sumSin, $sumCos)) + 360) % 360);
+  	Log3 $hash,4,"SD_WS09_WindDirAverage_09 $name Mittelwert über $anz Werte ist $average, avspeed=".round($sumSpeed/$num,1) if ($num > 0);
   
 	#-- undef zurückliefern, wenn die durchschnittliche Geschwindigkeit zu gering oder gar keine Werte verfügbar
-  return undef if (($anz == 0) || ($sanz == 0));
-  return undef if (($sumSpeed / $sanz) < $minspeed);
+  	return if (($anz == 0) || ($sanz == 0));
+  	return if (($sumSpeed / $sanz) < $minspeed);
 
-	Log3 $hash,4,"SD_WS09_WindDirAverage_END $name Mittelwert=$average";
-  return $average;
+  	Log3 $hash,4,"SD_WS09_WindDirAverage_END $name Mittelwert=$average";
+  	return $average;
 }
 
 ###################################
