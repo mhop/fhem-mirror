@@ -3732,7 +3732,7 @@ sub AddToSendQueue {
             This option will likely need to be combined with sidXXParseResponse.
             
         </li>
-		<li><a id="HTTPMOD-attr-parseFunction1</b> and <b>parseFunction2" data-pattern="parseFunction.?">parseFunction1</b> and <b>parseFunction2</a><br>
+		<li><a id="HTTPMOD-attr-parseFunction" data-pattern="parseFunction.?">parseFunction1 and parseFunction2</a><br>
             These functions allow an experienced Perl / Fhem developer to plug in his own parsing functions.<br>
             Please look into the module source to see how it works and don't use them if you are not sure what you are doing.
         </li>
