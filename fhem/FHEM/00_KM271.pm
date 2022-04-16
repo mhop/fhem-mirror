@@ -636,7 +636,7 @@ KM271_Set($@)
     $val = sprintf("%02x%02x%02x%02x%02x%02x",
         $lt[0], $lt[1], $lt[2],  # Ignoring DST and Radio-Clock
         $lt[3],
-        ($lt[4]+1) + (($lt[6] ? $lt[6] : 7) << 4),
+        ($lt[4]+1) + ((($lt[6]+6) % 7)<<4), # WDay: 0/Mon..6/Sun
         $lt[5]);
   }
   push @{$hash->{SENDBUFFER}}, sprintf($cmd, $val, $val);
