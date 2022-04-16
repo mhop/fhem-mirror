@@ -9,6 +9,7 @@
 # version history
 #    1.01.01      first released version
 #    1.01.02      bugfix for single-digit NextTimer 
+#    1.01.03      corrections for german Umlaute
 #
 ########################################################################################
 #
@@ -40,7 +41,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.02";
+my $version = "1.01.03";
 
 my %SVDRP_gets = (
   #
@@ -554,8 +555,8 @@ sub SVDRP_parseMessage {
     $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
     #Log3 $name, 5, "[$name] Parse: updated $reading with $msg"
   }
-  elsif ($msg =~ /^250[-|\h]\d+[ ]\d+:\d+:[A-Za-z-]{7}/ ||
-        $msg =~ /^250[-|\h]\d+[ ]\d+:\d+:\d{4}-\d{2}-\d{2}:\d{4}:\d{4}:\d{2}:\d{2}:[A-Za-z0-9-_!?\.\h]+:\s$/){
+  elsif ($msg =~ /^250[-|\h]\d+[ ]\d+:\d+:[A-Za-z\-]{7}/ ||
+        $msg =~ /^250[-|\h]\d+[ ]\d+:\d+:\d{4}-\d{2}-\d{2}:\d{4}:\d{4}:\d{2}:\d{2}:/){
     # ListTimer formats:
     # 250 1 1:1:MTWTF--@2022-03-15:0950:1115:50:99:Verrückt nach Meer (neu):
     # 250 2 1:4:2022-02-13:1858:1915:50:99:RTL Aktuell - Das Wetter:
