@@ -6170,6 +6170,7 @@ restoreDir_mkDir($$$)
   if($isFile) { # Delete the file Component
     $dir =~ m,^(.*)/([^/]*)$,;
     $dir = $1;
+    $dir = "" if(!defined($dir)); # file in .
   }
   return if($restoreDir_dirs{$dir});
   $restoreDir_dirs{$dir} = 1;

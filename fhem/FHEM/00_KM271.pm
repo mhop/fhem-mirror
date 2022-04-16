@@ -10,7 +10,7 @@ package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw( time );
+use DevIo;
 
 my %km271_sets = (
   "hk1_nachtsoll"   => {SET => "07006565%02x656565:0702%02x", # 0.5 celsius
@@ -60,6 +60,9 @@ my %km271_sets = (
                       OPT => ":slider,0,1,99"},
 
   "logmode"         => {SET => "EE0000",
+                        OPT => ":noArg"},
+
+  "datetime"        => {SET => "013FssmmhhDDMMYY",
                         OPT => ":noArg"}
 );
 
@@ -373,7 +376,6 @@ KM271_Initialize($)
 {
   my $hash = shift;
 
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
   $hash->{ReadFn}   = "KM271_Read";
   $hash->{ReadyFn}  = "KM271_Ready";
@@ -627,6 +629,16 @@ KM271_Set($@)
     # Dirty trick: Changes of the timer are not notified by the heater, so internal notification is added after the colon
     $val = sprintf("%02x%s:%s%s", $offset, $val, $key, $val);
   }
+
+  elsif($a[0] =~ m/^datetime$/) {
+    my @lt = localtime();
+    $cmd = "0100%s:013f:%s";
+    $val = sprintf("%02x%02x%02x%02x%02x%02x",
+        $lt[0], $lt[1], $lt[2],  # Ignoring DST and Radio-Clock
+        $lt[3],
+        ($lt[4]+1) + (($lt[6] ? $lt[6] : 7) << 4),
+        $lt[5]);
+  }
   push @{$hash->{SENDBUFFER}}, sprintf($cmd, $val, $val);
 
   END_SET:
@@ -827,13 +839,15 @@ KM271_Read($)
         elsif($f eq "mb") {
           $val += ReadingsVal($name, $key."1", 0) * 256;
           $val += ReadingsVal($name, $key."2", 0) * 65536 if($farg == 3); }
-        elsif($f eq "t")  { $val = sprintf("%s | %s | %s", KM271_setprg($val, hex(substr($arg, ($off+1)*2, 2)))
-                                                         , KM271_setprg(hex(substr($arg, ($off+2)*2, 2)), hex(substr($arg, ($off+3)*2, 2)))
-                                                         , KM271_setprg(hex(substr($arg, ($off+4)*2, 2)), hex(substr($arg, ($off+5)*2, 2)))); 
-                            # Fill internal timer hash
-                            $km271Timer->{$fn}{0} = substr($arg, 0, 4);
-                            $km271Timer->{$fn}{1} = substr($arg, 4, 4);
-                            $km271Timer->{$fn}{2} = substr($arg, 8, 4); }
+        elsif($f eq "t" && $arg)  {  # $arg is empty for the datetime ACK
+          $val = sprintf("%s | %s | %s", 
+            KM271_setprg($val, hex(substr($arg, ($off+1)*2, 2))),
+            KM271_setprg(hex(substr($arg, ($off+2)*2, 2)), hex(substr($arg, ($off+3)*2, 2))),
+            KM271_setprg(hex(substr($arg, ($off+4)*2, 2)), hex(substr($arg, ($off+5)*2, 2)))); 
+          # Fill internal timer hash
+          $km271Timer->{$fn}{0} = substr($arg, 0, 4);
+          $km271Timer->{$fn}{1} = substr($arg, 4, 4);
+          $km271Timer->{$fn}{2} = substr($arg, 8, 4); }
         elsif($f eq "eh") { $val = KM271_seterror($hash->{ERR_STATE}, substr($key, -1) -1, $arg); }
       }
       $key = ucfirst($key);   # Hack to match the original and the fake reading
@@ -1034,7 +1048,7 @@ KM271_SetReading($$$$)
 =item summary_DE Anbindung für Buderus Logamatic 2105/2107 Heizungssteuerung
 =begin html
 
-<a name="KM271"></a>
+<a id="KM271"></a>
 <h3>KM271</h3>
 <ul>
   KM271 is the name of the communication device for the Buderus Logamatic 2105
@@ -1048,7 +1062,7 @@ KM271_SetReading($$$$)
   Note: this module requires the Device::SerialPort or Win32::SerialPort module.
   <br><br>
 
-  <a name="KM271define"></a>
+  <a id="KM271-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; KM271 &lt;serial-device-name&gt;</code>
@@ -1060,36 +1074,45 @@ KM271_SetReading($$$$)
   </ul>
   <br>
 
-  <a name="KM271set"></a>
+  <a id="KM271-set"></a>
   <b>Set</b>
   <ul>
     <code>set KM271 &lt;param&gt; [&lt;value&gt; [&lt;values&gt;]]</code><br><br>
     where param is one of:
     <ul>
+      <a id="KM271-set-hk1_tagsoll"></a>
       <li>hk1_tagsoll &lt;temp&gt;<br>
           sets the by day temperature for heating circuit 1<br>
           0.5 celsius resolution - temperature between 10 and 30 celsius</li>
+      <a id="KM271-set-hk2_tagsoll"></a>
       <li>hk2_tagsoll &lt;temp&gt;<br>
           sets the by day temperature for heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-hk1_nachtsoll"></a>
       <li>hk1_nachtsoll &lt;temp&gt;<br>
           sets the by night temperature for heating circuit 1<br>
           (see above)</li>
+      <a id="KM271-set-hk2_nachtsoll"></a>
       <li>hk2_nachtsoll &lt;temp&gt;<br>
           sets the by night temperature for heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-hk1_urlaubsoll"></a>
       <li>hk1_urlaubsoll &lt;temp&gt;<br>
           sets the temperature during holiday mode for heating circuit 1<br>
           (see above)</li>
+      <a id="KM271-set-hk1_urlaubsoll"></a>
       <li>hk2_urlaubsoll &lt;temp&gt;<br>
           sets the temperature during holiday mode for heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-hk1_urlaubsoll"></a>
       <li>hk1_aussenhalt_ab &lt;temp&gt;<br>
           sets the threshold for working mode Aussenhalt for heating circuit 1<br>
           1.0 celsius resolution - temperature between -20 and 10 celsius</li>
+      <a id="KM271-set-hk2_aussenhalt_ab"></a>
       <li>hk2_aussenhalt_ab &lt;temp&gt;<br>
           sets the threshold for working mode Aussenhalt for heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-hk1_betriebsart"></a>
       <li>hk1_betriebsart [automatik|nacht|tag]<br>
           sets the working mode for heating circuit 1<br>
           <ul>
@@ -1097,12 +1120,15 @@ KM271_SetReading($$$$)
             <li>nacht: manual by night working mode, no timer program is in effect</li>
             <li>tag: manual by day working mode, no timer program is in effect</li>
           </ul></li>
+      <a id="KM271-set-hk2_betriebsart"></a>
       <li>hk2_betriebsart [automatik|nacht|tag]<br>
           sets the working mode for heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-ww_soll"></a>
       <li>ww_soll &lt;temp&gt;<br>
           sets the hot water temperature<br>
           1.0 celsius resolution - temperature between 30 and 60 celsius</li>
+      <a id="KM271-set-ww_betriebsart"></a>
       <li>ww_betriebsart [automatik|nacht|tag]<br>
           sets the working mode for hot water<br>
           <ul>
@@ -1110,10 +1136,12 @@ KM271_SetReading($$$$)
             <li>nacht: no hot water at all</li>
             <li>tag: manual permanent hot water</li>
           </ul></li>
+      <a id="KM271-set-w_on-till"></a>
       <li>ww_on-till [localtime]<br>
           start hot water production till the given time is reached<br>
           localtime must have the format HH:MM[:SS]<br>
           ww_betriebsart is set according to the attribut ww_timermode. For switching-off hot water a single one-time at command is automatically generated which will set ww_betriebsart back to nacht</li>
+      <a id="KM271-set-ww_zirkulation"></a>
       <li>ww_zirkulation [count]<br>
           count pumping phases for hot water circulation per hour<br>
           count must be between 0 and 7 with special meaning for<br>
@@ -1121,6 +1149,7 @@ KM271_SetReading($$$$)
             <li>0: no circulation at all</li>
             <li>7: circulation is always on</li>
           </ul></li>
+      <a id="KM271-set-sommer_ab"></a>
       <li>sommer_ab &lt;temp&gt;<br>
           temp defines the threshold for switching between summer or winter mode of the heater<br>
           1.0 celsius resolution - temp must be between 9 and 31 with special meaning for<br>
@@ -1128,24 +1157,29 @@ KM271_SetReading($$$$)
             <li> 9: fixed summer mode (only hot water and frost protection)</li>
             <li>31: fixed winter mode</li>
           </ul></li>
+      <a id="KM271-set-frost_ab"></a>
       <li>frost_ab &lt;temp&gt;<br>
           temp defines the threshold for activation of frost protection of the heater<br>
           1.0 celsius resolution - temp must be between -20 and 10 celsius</li>
+      <a id="KM271-set-urlaub"></a>
       <li>urlaub [count]<br>
           sets the duration of the holiday mode to count days<br>
           count must be between 0 and 99 with special meaning for<br>
           <ul>
             <li> 0: holiday mode is deactivated</li>
           </ul></li>
+      <a id="KM271-set-hk1_programm"></a>
       <li>hk1_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
           sets the timer program for heating circuit 1<br>
           <ul>
             <li>eigen: the custom program defined by the user (see below) is used</li>
             <li>all others: predefined programs from Buderus for various situations (see Buderus manual for details)</li>
           </ul></li>
+      <a id="KM271-set-hk2_programm"></a>
       <li>hk2_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
           sets the timer program for heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-hk1_timer"></a>
       <li>hk1_timer [&lt;position&gt; delete|&lt;position&gt; &lt;on-day&gt; &lt;on-time&gt; &lt;off-day&gt; &lt;off-time&gt;]<br>
           sets (or deactivates) a by day working mode time interval for the custom program of heating circuit 1<br>
           <ul>
@@ -1169,15 +1203,19 @@ KM271_SetReading($$$$)
             <code>set KM271 hk1_timer 1 mo 06:30 mo 08:20</code><br>
           </ul><br>
           This will toogle the by day working mode every Monday at 6:30 and will fall back to by night working mode at 8:20 the same day.</li>
+      <a id="KM271-set-hk2_timer"></a>
       <li>hk2_timer [&lt;position&gt; delete|&lt;position&gt; &lt;on-day&gt; &lt;on-time&gt; &lt;off-day&gt; &lt;off-time&gt;]<br>
           sets (or deactivates) a by day working mode time interval for the custom program of heating circuit 2<br>
           (see above)</li>
+      <a id="KM271-set-logmode"></a>
       <li>logmode<br>set to logmode / request all readings again</li>
+      <a id="KM271-set-datetime"></a>
+      <li>datetime<br>send the current date and time to the controller</li>
     </ul>
   </ul>
   <br>
 
-  <a name="KM271get"></a>
+  <a id="KM271-get"></a>
   <b>Get</b>
   <ul>
     <code>get KM271 &lt;param&gt;</code><br><br>
@@ -1193,11 +1231,11 @@ KM271_SetReading($$$$)
   </ul>
   <br>
 
-  <a name="KM271attr"></a>
+  <a id="KM271-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <a name="all_km271_events"></a>
+    <a id="KM271-attr-all_km271_events"></a>
     <li>all_km271_events<br>
         If this attribute is set to 1, do not ignore following events:<br>
         HK1_Vorlaufisttemperatur, HK1_Mischerstellung, HK2_Vorlaufisttemperatur, HK2_Mischerstellung,
@@ -1206,18 +1244,18 @@ KM271_SetReading($$$$)
         All UNKNOWN events are ignored too, most of them were only seen
         directly after setting the device into logmode.
         </li>
-    <a name="ww_timermode"></a>
+    <a id="KM271-attr-ww_timermode"></a>
     <li>ww_timermode [automatik|tag]<br>
         Defines the working mode for the ww_on-till command (default is tag).<br>
         ww_on-till will set the ww_betriebsart of the heater according to this attribute.
         </li>
-    <a name="readingsFilter"></a>
+    <a id="KM271-attr-readingsFilter"></a>
     <li>readingsFilter<br>
         Regular expression for selection of desired readings.<br>
         Only readings which will match the regular expression will be used. All other readings are
         suppressed in the device and even in the logfile.
         </li>
-    <a name="additionalNotify"></a>
+    <a id="KM271-attr-additionalNotify"></a>
     <li>additionalNotify<br>
         Regular expression for activation of notify for readings with normally suppressed events.<br>
         Useful for *_Vorlaufisttemperatur readings if notification should be activated only for a specific reading
@@ -1226,7 +1264,7 @@ KM271_SetReading($$$$)
   </ul>
   <br>
 
-  <a name="KM271events"></a>
+  <a id="KM271-events"></a>
   <b>Generated events:</b>
   <ul>
     <li>Abgastemperatur</li>
