@@ -1,8 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - bugfix: 14_SD_WS09: fixed windDirAverage bug
- - bugfix: 95_Dashboard: fix perl warnings, Forum: #127216
- - bugfix: 74_GardenaSmartDevice: fix ic24,fix regex,fix state_string variable
+ - bugfix:  70_SVDRP: handle timers with german Umlaute
+ - bugfix:  14_SD_WS09: fixed windDirAverage bug
+ - bugfix:  95_Dashboard: fix perl warnings, Forum: #127216
+ - bugfix:  74_GardenaSmartDevice: fix ic24,fix regex,fix state_string variable
                    add sensor2 support, fix open + paused 
  - bugfix:  93_DbRep: minor fix in reduceLog 
             forum: topic,53584.msg1217329.html#msg1217329
