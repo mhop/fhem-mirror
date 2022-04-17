@@ -4658,7 +4658,7 @@ sub plot {
   
   $minVal=$value if (!defined $minVal);
   $maxVal=$value if (!defined $maxVal);
-  my $opacity=0.2;
+  my $opacity=0.5;
   if ($minPlot < 0 and $maxPlot > 0) {
     $xpos=50-int($n*10)/10;
     $topVal=($maxVal > 0 ? $maxVal : 0);
@@ -4752,7 +4752,7 @@ sub plot {
     if (!defined $unitColor) {
       $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
       $out.= $points;
-      $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
+      $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.4" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
     } else {
       $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
       $out.= $points;
@@ -4763,13 +4763,13 @@ sub plot {
 
   ##$out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
   my ($x1,$y1)=($maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10)-2.3);
-  $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.7"/>',$x1,$y1,$x1+2.4,$y1+4.3,$x1-2.4,$y1+4.3, defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
+  $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.5"/>',$x1,$y1,$x1+2.4,$y1+4.3,$x1-2.4,$y1+4.3, defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
  
  ##$out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
   ($x1,$y1)=($minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10)+2.3);
-  $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.7"/>',$x1,$y1,$x1+2.4,$y1-4.3,$x1-2.4,$y1-4.3, defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
+  $out.=sprintf('<path d="M%s %s L%s %s L%s %s Z" fill="%s" opacity="0.5"/>',$x1,$y1,$x1+2.4,$y1-4.3,$x1-2.4,$y1-4.3, defined $unitColor ? $unitColor:color($minValColor,$ln)) if (defined $minValSlot);
   
-  $out.=sprintf(('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7">'.$animate),$chart_dim,(50-int(($value*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($currColor,$ln)) if ($val ne "N/A");
+  $out.=sprintf(('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.5">'.$animate),$chart_dim,(50-int(($value*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($currColor,$ln)) if ($val ne "N/A");
   
   my $footer="";
   
