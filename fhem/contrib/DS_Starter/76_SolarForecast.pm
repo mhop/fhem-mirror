@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.58.0 "=> "10.04.2022  new setter consumerImmediatePlanning ",
   "0.57.3 "=> "10.04.2022  some fixes (\$eavg in ___csmSpecificEpieces, useAutoCorrection switch to regex) ",
   "0.57.2 "=> "03.04.2022  area factor for 25° added ",
   "0.57.1 "=> "28.02.2022  new attr flowGraphicShowConsumerPower and flowGraphicShowConsumerRemainTime (Consumer remainTime in flowGraphic)",                                                                                                                                
@@ -240,39 +241,40 @@ my %vNotesIntern = (
 # Voreinstellungen
 
 my %hset = (                                                                # Hash der Set-Funktion
-  currentForecastDev      => { fn => \&_setcurrentForecastDev     },
-  currentRadiationDev     => { fn => \&_setcurrentRadiationDev    },
-  modulePeakString        => { fn => \&_setmodulePeakString       },
-  inverterStrings         => { fn => \&_setinverterStrings        },
-  consumerAction          => { fn => \&_setconsumerAction         },
-  currentInverterDev      => { fn => \&_setinverterDevice         },
-  currentMeterDev         => { fn => \&_setmeterDevice            },
-  currentBatteryDev       => { fn => \&_setbatteryDevice          },
-  energyH4Trigger         => { fn => \&_setenergyH4Trigger        },
-  plantConfiguration      => { fn => \&_setplantConfiguration     },
-  powerTrigger            => { fn => \&_setpowerTrigger           },
-  pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_06   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_07   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_08   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_09   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_10   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_11   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_12   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_13   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_14   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_15   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_16   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_17   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_18   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_19   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_20   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_21   => { fn => \&_setpvCorrectionFactor     },
-  pvCorrectionFactor_Auto => { fn => \&_setpvCorrectionFactorAuto },
-  reset                   => { fn => \&_setreset                  },
-  moduleTiltAngle         => { fn => \&_setmoduleTiltAngle        },
-  moduleDirection         => { fn => \&_setmoduleDirection        },
-  writeHistory            => { fn => \&_setwriteHistory           },
+  consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
+  currentForecastDev        => { fn => \&_setcurrentForecastDev        },
+  currentRadiationDev       => { fn => \&_setcurrentRadiationDev       },
+  modulePeakString          => { fn => \&_setmodulePeakString          },
+  inverterStrings           => { fn => \&_setinverterStrings           },
+  consumerAction            => { fn => \&_setconsumerAction            },
+  currentInverterDev        => { fn => \&_setinverterDevice            },
+  currentMeterDev           => { fn => \&_setmeterDevice               },
+  currentBatteryDev         => { fn => \&_setbatteryDevice             },
+  energyH4Trigger           => { fn => \&_setenergyH4Trigger           },
+  plantConfiguration        => { fn => \&_setplantConfiguration        },
+  powerTrigger              => { fn => \&_setpowerTrigger              },
+  pvCorrectionFactor_05     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_06     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_07     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_08     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_09     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_10     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_11     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_12     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_13     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_14     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_15     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_16     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_17     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_18     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_19     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_20     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_21     => { fn => \&_setpvCorrectionFactor        },
+  pvCorrectionFactor_Auto   => { fn => \&_setpvCorrectionFactorAuto    },
+  reset                     => { fn => \&_setreset                     },
+  moduleTiltAngle           => { fn => \&_setmoduleTiltAngle           },
+  moduleDirection           => { fn => \&_setmoduleDirection           },
+  writeHistory              => { fn => \&_setwriteHistory              },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -737,8 +739,8 @@ sub Set {
   
   return if(IsDisabled($name));
   
-  my ($setlist,@fcdevs,@cfs);
-  my ($fcd,$ind,$med,$cf) = ("","","","");
+  my ($setlist,@fcdevs,@cfs,@condevs);
+  my ($fcd,$ind,$med,$cf,$cons) = ("","","","","noArg");
   
   my @re = qw( ConsumerMaster
                consumerPlanning
@@ -761,8 +763,16 @@ sub Set {
       push @cfs, "pvCorrectionFactor_".sprintf("%02d",$h); 
   }
   $cf = join " ", @cfs if(@cfs);
+  
+  my $type  = $hash->{TYPE};
+  
+  for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {
+      push @condevs, $c if($c);
+  }
+  $cons = join ",", @condevs if(@condevs); 
 
   $setlist = "Unknown argument $opt, choose one of ".
+             "consumerImmediatePlanning:$cons ".
              "currentForecastDev:$fcd ".
              "currentRadiationDev:$fcd ".
              "currentBatteryDev:textField-long ".
@@ -784,6 +794,7 @@ sub Set {
   my $params = {
       hash    => $hash,
       name    => $name,
+      type    => $type,
       opt     => $opt,
       arg     => $arg,
       argsref => \@args,
@@ -799,6 +810,38 @@ sub Set {
   }
 
 return "$setlist";
+}
+
+################################################################
+#                      Setter consumerImmediatePlanning
+################################################################
+sub _setconsumerImmediatePlanning {      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $opt   = $paref->{opt};
+  my $c     = $paref->{arg};
+  
+  return qq{no consumer number specified} if(!$c);
+  return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));  
+
+  my $startts                       = time;  
+  my (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
+
+  my $mintime                       = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  my $stopdiff                      = ceil        ($mintime * 60);  
+  my $stopts                        = $startts + $stopdiff;
+  
+  my (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
+  
+  $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
+  $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                                      # Unix Timestamp für geplanten Switch on       
+  $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                       # Unix Timestamp für geplanten Switch off
+
+  _getdata ($paref); 
+  
+return;
 }
 
 ################################################################
@@ -1427,8 +1470,6 @@ sub _setconsumerAction {                 ## no critic "not used"
   Log3($name, 4, qq{$name - Consumer Action received / executed: "$action $cname $tail"});
   
   centralTask ($hash);
-  # RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
-  # InternalTimer      (gettimeofday()+0.5, "FHEM::SolarForecast::centralTask", $hash, 0);
 
 return;
 }
@@ -3212,12 +3253,12 @@ sub ___switchonTimelimits {
   
   if($notbefore && int $starthour < int $notbefore) {
       $starthour = $notbefore;
-      $change     = "notbefore";
+      $change    = "notbefore";
   }
   
   if($notafter && int $starthour > int $notafter) {
       $starthour = $notafter;
-      $change     = "notafter";
+      $change    = "notafter";
   } 
   
   $starthour = sprintf("%02d", $starthour);
@@ -4521,12 +4562,13 @@ sub _showConsumerInGraphicBeam {
   my @consumers = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                          # definierte Verbraucher ermitteln
   
   for (@consumers) {
+      next if(!$_);
       my ($itemName, undef) = split(':',$_);
       $itemName =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
       $_        =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
     
-      #check if listed device is planned
-      ##################################
+      # check if listed device is planned
+      ####################################
       if (ReadingsVal($name, $itemName."_Planned", "no") eq "yes") {
           #get start and end hour
           my ($start, $end);                                                                     # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
@@ -4636,7 +4678,7 @@ sub _graphicConsumerLegend {
       my $offcom     = ConsumerVal ($hash, $c, "offcom",                  "");                      # Consumer Ausschaltkommando
       my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
       my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
-      my $iscrecomm  = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);                      # ist einschalten Vervracher empfohlen
+      my $iscrecomm  = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);                      # ist einschalten Verbraucher empfohlen
       
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
@@ -7251,6 +7293,23 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
   <a id="SolarForecast-set"></a>
   <b>Set</b> 
   <ul>
+  
+    <ul>
+      <a id="SolarForecast-set-consumerImmediatePlanning"></a>
+      <li><b>consumerImmediatePlanning &lt;Verbrauchernummer&gt; </b> <br><br>  
+      
+      Es wird das sofortige Einschalten des Verbrauchers zur aktuellen Zeit eingeplant.  
+      Eventuell im consumerXX Attribut gesetzte Schlüssel <b>notbefore</b>, <b>notafter</b> bzw. <b>mode</b> werden nicht 
+      beachtet. <br>
+      <br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; consumerImmediatePlanning 01 <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
   
     <ul>
       <a id="SolarForecast-set-currentBatteryDev"></a>
