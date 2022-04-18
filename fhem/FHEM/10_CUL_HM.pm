@@ -230,7 +230,7 @@ sub CUL_HM_updateConfig($){##########################
   }
   if (!$modules{CUL_HM}{helper}{initDone}){ #= 0;$type eq "startUp"){
     # only once after startup - clean up definitions. During operation define function will take care
-    Log 1,"CUL_HM start inital cleanup";
+    Log 5,"CUL_HM start inital cleanup";
     $mIdReverse = 1 if (scalar keys %{$culHmModel2Id});
     my @hmdev = devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=DEF!=000000");   # devices only
     
@@ -555,7 +555,7 @@ sub CUL_HM_updateConfig($){##########################
   
   delete $modules{CUL_HM}{helper}{updtCfgLst};
   if(!$modules{CUL_HM}{helper}{initDone}){
-    Log 1,"CUL_HM finished initial cleanup";
+    Log 5,"CUL_HM finished initial cleanup";
     if (defined &HMinfo_init){# force reread
       $modules{HMinfo}{helper}{initDone} = 0;
       InternalTimer(gettimeofday() + 5,"HMinfo_init", "HMinfo_init", 0);
@@ -571,7 +571,6 @@ sub CUL_HM_initializeVirtuals {
     my $vId = substr($hash->{DEF}."01",0,8);
     if ($hash->{helper}{fkt} eq "vdCtrl"){
       my $d = ReadingsNum($name,'valvePosTC','50');
-                 #Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
       CUL_HM_Set($hash,$name,"valvePos",$d);
       CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if ($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
       RemoveInternalTimer("valvePos:$vId");
@@ -579,7 +578,6 @@ sub CUL_HM_initializeVirtuals {
       InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
     }
     elsif($hash->{helper}{fkt} eq "virtThSens"){
-             #Log(1,"----- test2 ----- -> n:$name"); #Beta-User: For Debugging only
       my $d = ReadingsNum($name,'temperature','');
       CUL_HM_Set($hash,$name,"virtTemp",$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
       $d = ReadingsNum($name,"humidity","");
@@ -1778,7 +1776,7 @@ sub CUL_HM_Parse($$) {#########################################################
     if ( InternalVal($mh{ioName},'hmPair',InternalVal(InternalVal($mh{ioName},'owner_CCU',''),'hmPair',0 ))) { # initiated via hm-pair-command => User wants actively have the device created
       if (IsDisabled((devspec2array('TYPE=autocreate'))[0]) ) { 
         my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
-        Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+        Log 2,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
       } 
       else { 
         DoTrigger('global', "UNDEFINED $sname CUL_HM $mh{src}"); #Beta-User: procedure similar to ZWave
@@ -1842,7 +1840,7 @@ sub CUL_HM_Parse($$) {#########################################################
           ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef);
       }
       
-      Log3 $mh{dstN},2,"CUL_HM $mh{dstN} attack:".($mh{dstH}->{helper}{cSnd} ? $mh{dstH}->{helper}{cSnd} : "").":$tm";
+      Log3 $mh{dstN},3,"CUL_HM $mh{dstN} attack:".($mh{dstH}->{helper}{cSnd} ? $mh{dstH}->{helper}{cSnd} : "").":$tm";
       CUL_HM_eventP($mh{dstH},"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoAttack"},2);
       push @evtEt,[$mh{dstH},1,"sabotageAttack_ErrIoAttack_cnt:$evntCnt"];
@@ -1968,7 +1966,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $mh{devH}->{helper}{aesCommRq}{msgStat} = "AESCom-ok";
       } 
       else {
-        Log3 $mh{devH},4,"CUL_HM $mh{dstN} signature: bad";
+        Log3 $mh{devH},2,"CUL_HM $mh{dstN} signature: bad";
         $mh{devH}->{helper}{aesCommRq}{msgStat} = "AESCom-fail";
       }
  
@@ -2146,11 +2144,11 @@ sub CUL_HM_Parse($$) {#########################################################
           }
           CUL_HM_SndCmd($h, $m);
         }
-        Log3 $mh{devN},4,"CUL_HM $mh{devN} dupe: repeat ".scalar(@{$ack})." ack, dont process";
+        Log3 $mh{devN},5,"CUL_HM $mh{devN} dupe: repeat ".scalar(@{$ack})." ack, dont process";
       }
     }
     else{
-      Log3 $mh{devN},4,"CUL_HM $mh{devN} dupe: dont process";
+      Log3 $mh{devN},5,"CUL_HM $mh{devN} dupe: dont process";
     }
     CUL_HM_pushEvnts();
     $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devH}->{NAME}$/,@entities);
@@ -2168,7 +2166,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
   if(!defined $mh{md} or $mh{md} eq '' or $mh{md} eq "unknown"){
     $mh{devN} = '' if (!defined($mh{devN}));
-    Log3 $mh{devH},4, "CUL_HM drop msg for $mh{devN} with unknown model";
+    Log3 $mh{devH},5, "CUL_HM drop msg for $mh{devN} with unknown model";#actually level 1 - however there might be neighbors around
     $evtDly   = 0;#noansi: switch delay trigger off
     return;
   }
@@ -2845,7 +2843,7 @@ sub CUL_HM_Parse($$) {#########################################################
         if ($mI[2] ne $mh{cHash}->{helper}{dlvl} #level not met?
             && !($err&0x70)){                    #and already stopped not timedOn
           #level not met, repeat
-          Log3 $mh{cName},3,"CUL_HM $mh{cName} repeat, level $mI[2] instead of $mh{cHash}->{helper}{dlvl}";
+          Log3 $mh{cName},5,"CUL_HM $mh{cName} repeat, level $mI[2] instead of $mh{cHash}->{helper}{dlvl}";
           if ($mh{cHash}->{helper}{dlvlCmd}){# first try
             CUL_HM_PushCmdStack($mh{cHash},$mh{cHash}->{helper}{dlvlCmd});
             CUL_HM_ProcessCmdStack($mh{cHash});
@@ -3985,7 +3983,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $hmPair = InternalVal($ioN,"hmPair"      ,InternalVal($ioOwn,"hmPair"      ,0 ));
     my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",InternalVal($mhp->{devN},"hmPairSerial","")));
     
-    Log3 $ioOwn,3,"CUL_HM received config CCU:$ioOwn device: $mhp->{devN}. PairForSec: ".($hmPair?"on":"off")." PairSerial: $hmPser";
+    Log3 $ioOwn,4,"CUL_HM received config CCU:$ioOwn device: $mhp->{devN}. PairForSec: ".($hmPair?"on":"off")." PairSerial: $hmPser";
 
     if ( $hmPair ){# pairing is active
       my $regser = ReadingsVal($mhp->{devN},"D-serialNr",AttrVal($mhp->{devN},'serialNr',''));
@@ -4061,7 +4059,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       delete $devHlpr->{prt}{tryMsg}{substr($rspWait->{cmd},8)};
       if( $rspWait->{Pending} eq "RegisterRead"){
         my $chName = CUL_HM_id2Name($mhp->{src}.$rspWait->{forChn});
-        Log3 $mhp->{devH},2,"add peer by try message: $rspWait->{forPeer} to $chName";
+        Log3 $mhp->{devH},3,"add peer by try message: $rspWait->{forPeer} to $chName";
         CUL_HM_ID2PeerList ($chName,$tryPid,1); # add the newly found
         CUL_HM_ID2PeerList ($chName,substr($tryPid,0,7)."x",0);# remove the placeholder. 
       }
@@ -4140,11 +4138,11 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_rmOldRegs($chnName,$readCont);
           $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
           CUL_HM_cfgStateDelay($chnName);#schedule check when finished
-          Log3 $mhp->{devH},4,'peerlist finished. cmds pending:'.scalar(@{$mhp->{devH}->{cmdStack}});
+          Log3 $mhp->{devH},5,'peerlist finished. cmds pending:'.scalar(@{$mhp->{devH}->{cmdStack}});
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
-          Log3 $mhp->{devH},4,'waiting for Peerlist: msgNo:'.$rspWait->{mNo}.'+, rec:'.hex($mhp->{mNo});
+          Log3 $mhp->{devH},5,'waiting for Peerlist: msgNo:'.$rspWait->{mNo}.'+, rec:'.hex($mhp->{mNo});
         }
       }
       else {
@@ -7349,7 +7347,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my $pl = scalar (CUL_HM_getPeers($PInfo{$myNo}{name},"ID:".$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn}));
         if(  ( $pl &&  $set)
            ||(!$pl && !$set) ){ # already peered or removed - skip
-          Log3 $name,2,"peering skip - already done:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
+          Log3 $name,4,"peering skip - already done:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
           next;
         }
         else{
@@ -7795,7 +7793,7 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
                                                                     :'_'.sprintf("%02d",$chnNoTyp));
                                   
           CommandDefine(undef,$chnName.' CUL_HM '.$chnId);
-          Log3 $name,3,"CUL_HM_update: $name add channel ID: $chnId name: $chnName";
+          Log3 $name,5,"CUL_HM_update: $name add channel ID: $chnId name: $chnName";
         }
         if(defined $modules{CUL_HM}{defptr}{$chnId}){
           $attr{CUL_HM_id2Name($chnId)}{model} = $model ;
@@ -7814,7 +7812,7 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
     foreach(keys %chanExist){
       next if ($chanExist{$_} == 1);
       CommandDelete(undef,CUL_HM_id2Name($_));
-      Log3 $name,3,"CUL_HM_update: $name delete channel name: $_";
+      Log3 $name,5,"CUL_HM_update: $name delete channel name: $_";
     }
     my $CycTime = AttrVal($name,"actCycle", $culHmModel->{$mId}{cyc});
     CUL_HM_ActAdd($hash->{DEF},$CycTime)if ($CycTime);
@@ -8508,7 +8506,7 @@ sub CUL_HM_respPendTout($) {
     else{# manage retries
       $pHash->{rspWait}{reSent}++;
       CUL_HM_eventP($hash,"Resnd");
-      Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
+      Log3 $name,5,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
       if   ($hash->{protCondBurst} && $hash->{protCondBurst} eq "on" ){
         #timeout while conditional burst was active. try re-wakeup
         my $addr = CUL_HM_IoId($hash);
@@ -9290,7 +9288,7 @@ sub CUL_HM_DumpProtocol($$@) {
   $src=CUL_HM_id2Name($src);
   $dst=CUL_HM_id2Name($dst);
   my $msg ="$prefix L:$len N:$cnt F:$msgFlags CMD:$mTp SRC:$src DST:$dst $p$txt ($msgFlLong)";
-  Log3 $iname,1,$msg;
+  Log3 $iname,5,$msg;
   DoTrigger($iname, $msg) if($hmProtocolEvents > 2);
 }
 
@@ -10441,7 +10439,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
-  Log3 $actHash, 3,"Device ".$devName." added to ActionDetector with $cycleString time";
+  Log3 $actHash, 5,"Device ".$devName." added to ActionDetector with $cycleString time";
   return;
 }
 sub CUL_HM_ActDel($) {# delete HMid for activity supervision
@@ -10457,7 +10455,7 @@ sub CUL_HM_ActDel($) {# delete HMid for activity supervision
   my $peerIDs = $actHash->{helper}{peers};
   $peerIDs =~ s/$devId//g if($peerIDs);
   $actHash->{helper}{peers} = CUL_HM_noDupInString($peerIDs);
-  Log3 $actHash,3,"Device ".$devName." removed from ActionDetector";
+  Log3 $actHash,5,"Device ".$devName." removed from ActionDetector";
   RemoveInternalTimer("ActionDetector");
   CUL_HM_ActCheck("del");
   return;
@@ -10535,7 +10533,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
     }
     if ($oldState ne $state){
       CUL_HM_ActDepRead($devName,$state,$oldState);
-      Log3 $actHash,4,"Device: $devName changed from:$oldState to-> $state";
+      Log3 $actHash,5,"Device: $devName changed from:$oldState to-> $state";
     }
     if    ($state eq "unknown")    {$cntUnkn++;} 
     elsif ($state eq "alive")      {$cntAliv++;} 
@@ -10874,7 +10872,7 @@ sub CUL_HM_UpdtCentralState($){
     $xo++ if (InternalVal($ioN,"XmitOpen",($x eq "ok" ? 1 : 0)));# if xmitOpen is not supported use state (e.g.CUL)
 
     if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){ # update HMid of io devices
-      Log 1,"CUL_HM correct hmId for assigned IO $ioN";
+      Log 2,"CUL_HM correct hmId for assigned IO $ioN";
       CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}");
     }
   };
@@ -11641,7 +11639,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
              (ReadingsVal     ($name,"level"   ,""  )
              ,CUL_HM_getAttr  ($name,"subType" ,""  )
              );
-
+  $level =~ s/^set_//;
   if(CUL_HM_SearchCmd($name,"on")){# devices with 'on' cmd are major light switches - but not all
     if(CUL_HM_SearchCmd($name,"color")){
       return ".*:"
