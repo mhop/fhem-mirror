@@ -236,7 +236,7 @@ MQTT2_SERVER_Set($@)
     my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? "RETAIN" : ".RETAIN";
     delete($hash->{READINGS}{$rname});
     delete($hash->{retain});
-
+    return undef;
   }
 }
 
