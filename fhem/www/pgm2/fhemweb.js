@@ -373,7 +373,7 @@ FW_displayHelp(devName, sel, selType, val, group)
     if(!$(aTag).length) { // regexp attributes, like backend_.*
       wb.find("a[id^='"+mtype+"-"+selType+"-'][data-pattern]").each(
         function() {
-          if(val.match($(this).attr("data-pattern")))
+          if(!$(aTag).length && val.match($(this).attr("data-pattern")))
             aTag = this;
         });
     }
