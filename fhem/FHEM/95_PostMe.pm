@@ -33,7 +33,7 @@ package main;
 
 use strict;
 use warnings;
-use vars qw(%defs);		        # FHEM device/button definitions
+use vars qw(%defs);		     # FHEM device/button definitions
 use vars qw($FW_RET);           # Returned data (html)
 use vars qw($FW_RETTYPE);       # image/png or the like
 use vars qw($FW_wname);         # Web instance
@@ -42,7 +42,7 @@ use Time::Local;
 
 #########################
 # Global variables
-my $postmeversion  = "2.07";
+my $postmeversion  = "2.10";
 my $FW_encoding    = "UTF-8";
 
 #########################################################################################
@@ -65,7 +65,7 @@ sub PostMe_Initialize ($) {
   $hash->{InitFn}      = "PostMe_Init";  
   $hash->{AttrFn}      = "PostMe_Attr";
   $hash->{AttrList}    = "postmeTTSFun postmeTTSDev postmeMsgFun postme[0-9]+MsgRec postmeMailFun postme[0-9]+MailRec ".
-                         "postmeStd postmeIcon postmeStyle:test,jQuery,HTML,SVG postmeClick:0,1 listseparator ".$readingFnAttributes;		
+                         "postmeStd postmeIcon postmeStyle:jQuery,HTML,SVG postmeClick:0,1 listseparator ".$readingFnAttributes;		
   
   $hash->{FW_detailFn}  = "PostMe_detailFn";
     	 
@@ -674,26 +674,28 @@ sub PostMe_procSpecial($$$$$){
   }
   
   if( $attr eq "at" ){
-    my ($timeraw,$year,$mon,$day,$hour,$min,$sec,$delta,$deltah,$deltam,$repeat);
+    my ($timeraw,$dateraw,$year,$mon,$day,$hour,$min,$sec,$delta,$deltah,$deltam,$repeat);
     my ($secn,$minn,$hourn,$dayn,$monn,$yearn) = localtime(time);
     
     my $str = "{";
-    if( $val =~ /((\d\d\:\d\d)|(\d\d\:\d\d\:\d\d)|(\d\d\d\d-\d\d-\d\dT\d\d\:\d\d\:\d\d))(\-(\d\d:\d\d)(P(\d+))?)/ ){
-      $timeraw = $1;
+    if( $val =~ /((\d\d\d\d-\d\d-\d\d)T)?(\d\d:\d\d(\:\d\d)?)(\-(\d\d\:\d\d)(P(\d+)))?/ ){
+
+      $dateraw = $2;
+      $timeraw = $3;
       $delta   = $6;
       $repeat  = ($8)?$8:1;
-      $timeraw =~ /((\d\d\d\d)-(\d\d)-(\d\d)T)?(\d\d)\:(\d\d)\:?(\d\d)?/;
-      #($year,$mon,$day,$hour,$min,$sec) = ($2,$3-1,$4,$5,$6,$7);
-      $year =($2)?$2  : $yearn+1900;
-      $mon  =($3)?$3-1: $monn;
+      $dateraw =~ /(\d\d\d\d)-(\d\d)-(\d\d)/;
+      $year =($1)?$1  : $yearn+1900;
+      $mon  =($2)?$2-1: $monn;
       $mon  = ( ($mon>=0)&&($mon<=11) )? $mon:0;
-      $day  =($4)?$4  : $dayn;
+      $day  =($3)?$3  : $dayn;
       $day  = ( ($day>=1)&&($day<=31) )? $day:0;
-      $hour =($5)?$5  : $hourn;
+      $timeraw =~ /(\d\d):(\d\d)(\:(\d\d))?/;
+      $hour =($1)?$1  : $hourn;
       $hour = ( ($hour>=0)&&($hour<=23) )? $hour:0;
-      $min  =($6)?$6  : $minn;
+      $min  =($2)?$2  : $minn;
       $min  = ( ($min>=0)&&($min<=59) )? $min:0;
-      $sec  =($7)?$7  : "00";
+      $sec  =($4)?$4  : "00";
       $sec  = ( ($sec>=0)&&($sec<=59) )? $sec:0;
             
       $delta =~ /(\d\d):(\d\d)/;
@@ -701,9 +703,9 @@ sub PostMe_procSpecial($$$$$){
       
       my $deltas = min(3600*$deltah+60*$deltam,86400);
       $repeat = ( ($repeat>=0)&&($repeat<=10) )? $repeat:0;
-     
+
       my $ftime = timelocal($sec,$min,$hour,$day,$mon,$year);
-      my $ftimel= localtime($ftime);
+      my $ftimel= strftime('%Y-%m-%dT%H:%M:%S',localtime($ftime));
       #-- determine send strings
       my $mrcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
       my $mfun  = AttrVal($devname,"postmeMailFun",undef);
@@ -720,14 +722,15 @@ sub PostMe_procSpecial($$$$$){
                                                                                                                                      
       #-- define name for timer     
       my $safename = PostMe_safeItem($hash,$listname,$item,"at");
-      fhem("define ".$safename."_00 at $ftime $str");
+      fhem("defmod ".$safename."_00 at $ftimel $str");
       fhem("attr ".$safename."_00 room hidden");
      
       if( $delta ){
         for(my $i=1;$i<=$repeat;$i++){
           my $stime = $ftime-$i*$deltas;
+          my $stimel= strftime('%Y-%m-%dT%H:%M:%S',localtime($stime));
           my $sname = $safename.sprintf("_%02d",$i);
-          fhem("define ".$sname." at $stime $str");
+          fhem("defmod ".$sname." at $stimel $str");
           fhem("attr   ".$sname." room hidden");
         }
       }
@@ -735,6 +738,7 @@ sub PostMe_procSpecial($$$$$){
   }elsif( $attr eq "notify" ){
     return
       if( !$val);
+    $val =~ s/\"$//;
     my $str = "{";
     #-- determine send strings
     my $mrcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
@@ -752,7 +756,7 @@ sub PostMe_procSpecial($$$$$){
                                                                                                                                      
     #-- define name for notify     
     my $safename = PostMe_safeItem($hash,$listname,$item,"notify");
-    fhem("define ".$safename." notify $val $str");
+    fhem("defmod ".$safename." notify $val $str");
     fhem("attr ".$safename." room hidden");
   
   } 
@@ -807,7 +811,7 @@ sub PostMe_safeItem($$$$){
   
   my $safeattr = substr($attr,0,2);
   
-  return $devname."rem_".$safelist."_".$safeitem."_".$safeattr;
+  return $devname."_".$safelist."_".$safeitem."_".$safeattr;
 }
 
 #########################################################################################
@@ -1022,7 +1026,7 @@ sub PostMe_Set($@) {
     PostMe_Delete($hash,$listname);
       
   }elsif( $key eq "rename"){
-    PostMe_Rename($hash,$listname,@args[0]);
+    PostMe_Rename($hash,$listname,$args[0]);
   
   }elsif( $key eq "add"){
     PostMe_Add($hash,$listname,@args);
@@ -1081,16 +1085,17 @@ sub PostMe_Get($$$@) {
     return $res;
   }
   
-  my $listname = @args[0];
+  my $listname = $args[0];
     
   if ($key eq "version") {
     return "PostMe.version => $postmeversion";
    
    #-- list one PostMe
-  } elsif( ($key eq "list")||($key eq "special")||($key eq "JSON")||($key eq "mail")||($key eq "message")||($key eq "TTS") ){    
+  } elsif( ($key eq "list")||($key eq "special")||($key eq "JSON")||($key eq "mail")||($key eq "message")||($key eq "TTS") ){   
+    my ($mga,$rcpt,$text,$fun); 
     $pmn = PostMe_Check($hash,$listname);
     if( !$pmn ){
-      my $mga = "Error, a PostMe named $listname does not exist";
+      $mga = "Error, a PostMe named $listname does not exist";
       Log 1,"[PostMe_Get] $mga";
       return "$mga";
     }
@@ -1112,31 +1117,43 @@ sub PostMe_Get($$$@) {
     
     ##-- send by mail
     }elsif( $key eq "mail" ){
-      my $rcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
-      my $text = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
-      my $fun  = AttrVal($devname,"postmeMailFun",undef);
+      $rcpt = AttrVal($devname,sprintf("postme%02dMailRec",$pmn),undef);
+      $text = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
+      $fun  = AttrVal($devname,"postmeMailFun",undef);
+      $mga  = "postmeMailFun not defined";
       
       if( $rcpt && $text && $fun ){ 
+        local $@; # protect existing $@ 
         my $ref = \&$fun;
-        &$ref($rcpt,$listname,$text);
+        eval{&$ref($rcpt,$listname,$text)};
+        if($@){
+          $mga = "postmeMailFun failed with rc=$@";
+        }else{
+          $mga = "$listname sent by mail";
+        }
       }
-      my $mga = "$listname sent by mail";
       readingsSingleUpdate($hash,"state",$mga,1 );
       Log3 $devname,3,"[PostMe] ".$mga;
       return undef;
     
     ##-- send by instant messenger
     }elsif( $key eq "message" ){
-      my $rcpt = AttrVal($devname,sprintf("postme%02dMsgRec",$pmn),undef);
-      my $text = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
+      $rcpt = AttrVal($devname,sprintf("postme%02dMsgRec",$pmn),undef);
+      $text = PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),11);
       $text =~ s/,/,\n/g;
-      my $fun  = AttrVal($devname,"postmeMsgFun",undef);
+      $fun  = AttrVal($devname,"postmeMsgFun",undef);
+      $mga  = "postmeMsgFun not defined";
       
-      if( $rcpt && $text && $fun ){      
+      if( $rcpt && $text && $fun ){  
+        local $@; # protect existing $@    
         my $ref = \&$fun;
-        &$ref($rcpt,$listname,$text);
+        eval{&$ref($rcpt,$listname,$text)};
+        if($@){
+          $mga = "postmeMsgFun failed with rc=$@";
+        }else{
+          $mga = "$listname sent by messenger";
+        }
       }
-      my $mga = "$listname sent by messenger";
       readingsSingleUpdate($hash,"state",$mga,1 );
       Log3 $devname,3,"[PostMe] ".$mga;
       return undef;
@@ -1144,14 +1161,20 @@ sub PostMe_Get($$$@) {
     ##-- speak as TTS
     }elsif( $key eq "TTS" ){
       my $dev  = AttrVal($devname,"postmeTTSDev",undef);
-      my $text = $listname.": ".PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
-      my $fun  = AttrVal($devname,"postmeTTSFun",undef);
+      $text = $listname.": ".PostMe_LineOut($hash,$listname,ReadingsVal($devname, sprintf("postme%02dCont",$pmn),undef),10);
+      $fun  = AttrVal($devname,"postmeTTSFun",undef);
+      $mga  = "postmeTTSFun not defined";
       
       if( $text && $fun ){
+        local $@; # protect existing $@
         my $ref = \&$fun;
-        &$ref($dev,$text);
+        eval{&$ref($dev,$text)};
+        if($@){
+          $mga = "postmeTTSFun failed with rc=$@";
+        }else{
+          $mga = "$listname spoken by TTS";
+        }
       }
-      my $mga = "$listname spoken by TTS";
       readingsSingleUpdate($hash,"state",$mga,1 );
       Log3 $devname,3,"[PostMe] ".$mga;
       return undef;
@@ -1295,7 +1318,7 @@ sub PostMe_widget($) {
   my $click = AttrVal($devname,"postmeClick","0");
   my $css   = '<link href="www/pgm2/'.AttrVal($FW_wname, "stylesheetPrefix", "").'style.css" rel="stylesheet"/>';  
   
-  ##################################################-- type=pins => list with pins
+  ##################################################-- type=pins => list with pins, separate boxes for lists
   if( $type eq "pins"){
     #-- current number of Postmes
     my $cnop = ReadingsVal($devname,"postmeCnt",0);
@@ -1393,7 +1416,7 @@ sub PostMe_widget($) {
     return undef;
   }
   
-  ##################################################-- type=pin => single pin
+  ##################################################-- type=pin => single pin, only one list
   if( $type eq "pin"){
   #-- jQuery rendering
     if( $style eq "jQuery"){
@@ -1667,7 +1690,7 @@ sub PostMe_widget($) {
 <a name="PostMe"></a>
 <h3>PostMe</h3>
 <ul>
-<a href="https://wiki.fhem.de/wiki/Modul_PostMe">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#PostMe">PostMe</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_PostMe">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="commandref.html#PostMe">PostMe</a> 
 </ul>
 =end html_DE
 =cut
