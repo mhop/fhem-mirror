@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 14 / 2020-10-01
+# Release 16 / 2022-04-24
 
 
 package main;
@@ -528,7 +528,7 @@ sub withings_Define($$) {
 
     $hash->{helper}{username} = $username;
     $hash->{helper}{password} = $password;
-    $hash->{helper}{appliver} = '4080100';
+    $hash->{helper}{appliver} = '5010005';
     #$hash->{helper}{csrf_token} = 'e0a2595a83b85236709e366a8eed30b568df3dde';
   } else {
     return "Usage: define <name> withings ACCOUNT <login> <password>"  if(@a < 3 || @a > 5);
@@ -784,6 +784,7 @@ sub withings_getSessionKey($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  return undef if(IsDisabled($hash));
   return if( $hash->{SUBTYPE} ne "ACCOUNT" );
 
   return if( $hash->{SessionKey} && $hash->{SessionTimestamp} && gettimeofday() - $hash->{SessionTimestamp} < (60*60*24*7-3600) );
@@ -850,11 +851,11 @@ sub withings_getSessionKey($) {
     # }
 
   my $datahash = {
-      url => "https://account.withings.com/connectionwou/account_login?r=https://healthmate.withings.com/",
+    url => "https://scalews.withings.net/cgi-bin/auth",
+    method => "POST",
     timeout => 10,
     noshutdown => 1,
-    ignoreredirects => 1,
-      data => { email=> withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => 'f', use_2fa => '' },
+    data => { action => 'login', email => withings_decrypt($hash->{helper}{username}), hash => md5_hex(withings_decrypt($hash->{helper}{password})), duration => '604800', os => 'ios', osversion => '15.4', appname => 'wiscaleNG', apppfm => 'ios', appliver => '5010005' },
   };
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
@@ -865,12 +866,21 @@ sub withings_getSessionKey($) {
     $hash->{STATE} = "Login error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
     return undef;
   }
+
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: json evaluation error on getSessionKey: ".$@;
+    return undef;
+  }
   else
   {
-    if ($datahash->{httpheader} =~ /session_key=(.*?);/)
+
+    if(defined($json->{body}{sessionid}))
     {
-      $hash->{SessionKey} = $1;
+      $hash->{SessionKey} = $json->{body}{sessionid};
       $hash->{SessionTimestamp} = (gettimeofday())[0] if( $hash->{SessionKey} );
+      $hash->{Token} = $json->{body}{auth_token} if(defined($json->{body}{auth_token}));
       $hash->{STATE} = "Connected" if( $hash->{SessionKey} );
       $hash->{STATE} = "Session error" if( !$hash->{SessionKey} );
       Log3 $name, 4, "$name: sessionkey ".$hash->{SessionKey};
@@ -879,7 +889,7 @@ sub withings_getSessionKey($) {
     {
       $hash->{STATE} = "Cookie error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
       Log3 $name, 1, "$name: COOKIE ERROR ";
-      $hash->{helper}{appliver} = '4080100';
+      $hash->{helper}{appliver} = '5010005';
       #$hash->{helper}{csrf_token} = '9855c478';
       return undef;
     }
@@ -936,6 +946,7 @@ sub withings_connect($) {
 
   $hash->{'.https'} = "https";
   $hash->{'.https'} = "http" if( AttrVal($name, "nossl", 0) );
+  return undef if(IsDisabled($hash));
 
   withings_getSessionKey( $hash );
 
@@ -1699,8 +1710,8 @@ sub withings_poll($;$) {
   my $name = $hash->{NAME};
 
   RemoveInternalTimer($hash, "withings_poll");
-
   return undef if(IsDisabled($name));
+  return undef if(IsDisabled($hash->{IODev}));
 
 
   #my $resolve = inet_aton("scalews.withings.com");
