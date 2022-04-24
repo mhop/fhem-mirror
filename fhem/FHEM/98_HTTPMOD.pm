@@ -21,7 +21,6 @@
 #   First version: 25.12.2013
 #
 #   Todo:       
-#               set..IExpr etc. von AttrVal auf GetFAttr umstellen, damit auch generische Attribute ohne Num funktionieren
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
@@ -30,7 +29,7 @@
 #               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
 #               featureAttrs aus hash verarbeiten
 #
-#               Implement IMap und IExpr for get
+#               Implement IMap und IExpr for get (input values to be passed for get requests)
 #
 #               replacement scope attribute?
 #               make extracting the sid after a get / update an attribute / option?
@@ -141,12 +140,13 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.10 - 6.7.2021';
+my $Module_Version = '4.1.12 - 19.4.2022';
 
 my $AttrList = join (' ', 
-      '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
-      '(reading|get|set)[0-9]*(-[0-9]+)?Expr:textField-long',
-      '(reading|get|set)[0-9]*(-[0-9]+)?Map', 
+      'reading[0-9]+(-[0-9]+)?Name', 
+      '(get|set)[0-9]+(-[0-9]+)?Name', 
+      '(reading|get|set)[0-9]*(-[0-9]+)?Expr:textField-long',       # old
+      '(reading|get|set)[0-9]*(-[0-9]+)?Map',                       # old
       '(reading|get|set)[0-9]*(-[0-9]+)?OExpr:textField-long',
       '(reading|get|set)[0-9]*(-[0-9]+)?OMap:textField-long',
       '(get|set)[0-9]*(-[0-9]+)?IExpr:textField-long',
@@ -190,16 +190,16 @@ my $AttrList = join (' ',
       'parseFunction1',
       'parseFunction2',
       'set[0-9]+Local',               # don't create a request and just set a reading
-      '[gs]et[0-9]*URL',
-      '[gs]et[0-9]*Data.*:textField-long',
-      '[gs]et[0-9]*NoData.*',         # make sure it is an HTTP GET without data - even if a more generic data is defined
-      '[gs]et[0-9]*Header.*:textField-long',
-      '[gs]et[0-9]*CheckAllReadings:0,1',
-      '[gs]et[0-9]*ExtractAllJSON:0,1,2',
+      '(get|set)[0-9]*URL',
+      '(get|set)[0-9]*Data.*:textField-long',
+      '(get|set)[0-9]*NoData.*',      # make sure it is an HTTP GET without data - even if a more generic data is defined
+      '(get|set)[0-9]*Header.*:textField-long',
+      '(get|set)[0-9]*CheckAllReadings:0,1',
+      '(get|set)[0-9]*ExtractAllJSON:0,1,2',
       
-      '[gs]et[0-9]*URLExpr:textField-long',          # old
-      '[gs]et[0-9]*DatExpr:textField-long',          # old
-      '[gs]et[0-9]*HdrExpr:textField-long',          # old
+      '(get|set)[0-9]*URLExpr:textField-long',          # old
+      '(get|set)[0-9]*DatExpr:textField-long',          # old
+      '(get|set)[0-9]*HdrExpr:textField-long',          # old
 
       'get[0-9]*Poll:0,1', 
       'get[0-9]*PollDelay',
@@ -208,10 +208,10 @@ my $AttrList = join (' ',
       'set[0-9]+Max',
       'set[0-9]+Hint',                # Direkte Fhem-spezifische Syntax für's GUI, z.B. '6,10,14' bzw. slider etc.
       'set[0-9]*NoArg:0,1',           # don't expect a value - for set on / off and similar. (default for get)
-      '[gs]et[0-9]*TextArg:0,1',      # just pass on a raw text value without validation / further conversion
+      '(get|set)[0-9]*TextArg:0,1',   # just pass on a raw text value without validation / further conversion
       'set[0-9]*ParseResponse:0,1',   # parse response to set as if it was a get
       'set[0-9]*Method:GET,POST,PUT', # select HTTP method for the set
-      '[gs]et[0-9]*FollowGet',        # do a get after the set/get to update readings / create chains
+      '(get|set)[0-9]*FollowGet',     # do a get after the set/get to update readings / create chains
       'maxGetChain',                  # max length of chains
       
       'reAuthRegex',
@@ -219,10 +219,10 @@ my $AttrList = join (' ',
       'reAuthJSON',
       'reAuthXPath',
       'reAuthXPath-Strict',
-      '[gs]et[0-9]*ReAuthRegex',
-      '[gs]et[0-9]*ReAuthJSON',
-      '[gs]et[0-9]*ReAuthXPath',
-      '[gs]et[0-9]*ReAuthXPath-Strict',
+      '(get|set)[0-9]*ReAuthRegex',
+      '(get|set)[0-9]*ReAuthJSON',
+      '(get|set)[0-9]*ReAuthXPath',
+      '(get|set)[0-9]*ReAuthXPath-Strict',
       
       'idRegex',
       'idJSON',
@@ -248,10 +248,11 @@ my $AttrList = join (' ',
       'replacement[0-9]+Regex',
       'replacement[0-9]+Mode:reading,internal,text,expression,key',   # defaults to text
       'replacement[0-9]+Value:textField-long',                        # device:reading, device:internal, text, replacement expression
-      '[gs]et[0-9]*Replacement[0-9]+Value:textField-long',            # can overwrite a global replacement value - todo: auch für auth?
+      '(get|set)[0-9]*Replacement[0-9]+Value:textField-long',         # can overwrite a global replacement value - todo: auch für auth?
       
       'do_not_notify:1,0', 
       'disable:0,1',
+      'disabledForIntervals',
       'enableControlSet:0,1',
       'enableCookies:0,1',
       'useSetExtensions:1,0 '.
@@ -372,20 +373,21 @@ sub NotifyFn {
 }
 
 
-#########################################################################
+#################################################################################
 sub LogOldAttr {                     
     my $hash = shift;               # reference to the HTTPMOD Fhem device hash 
     my $old  = shift;               # old attr name
     my $new  = shift;               # new attr name
     my $name = $hash->{NAME};       # name of the Fhem device
-    Log3 $name, 3, "$name: the attribute $old should no longer be used." . ($new ? " Please use $new instead" : "");
-    Log3 $name, 3, "$name: For most old attributes you can specify enableControlSet and then set device upgradeAttributes to automatically modify the configuration";
+    Log3 $name, 1, "$name: the attribute $old should no longer be used." . ($new ? " Please use $new instead" : "");
+    Log3 $name, 1, "$name: For most old attributes you can specify enableControlSet and then set device upgradeAttributes to automatically modify the configuration";
     return;
 }
 
 
-###################################
+#########################################################################
 # precompile regex attr value
+# called from GetRegex if regex is not yet compiled and stored in a hash
 sub PrecompileRegexAttr {
     my $hash   = shift;             # reference to the HTTPMOD Fhem device hash 
     my $aName  = shift;             # name of the object that contains the regex (e.g. attr name)          
@@ -450,7 +452,7 @@ sub AttrFn {
             my $regexErr = CheckRegexp($aVal, "attr $aName");       # check if Regex is valid
             return "$name: $aName Regex: $regexErr" if ($regexErr);
             
-            if ($aName =~ /([gs]et[0-9]*)?[Rr]eplacement[0-9]*Regex$/) {
+            if ($aName =~ /((get|set)[0-9]*)?[Rr]eplacement[0-9]*Regex$/) {
                 $hash->{'.ReplacementEnabled'} = 1;
             }
             if ($aName =~ /(.+)IDRegex$/) {         # conversions for legacy things
@@ -500,7 +502,7 @@ sub AttrFn {
                 return "$name: illegal mode in attr $name $aName $aVal";
             }    
         } 
-        elsif ($aName =~ /([gs]et[0-9]*)?[Rr]eplacement([0-9]*)Value/) {
+        elsif ($aName =~ /((get|set)[0-9]*)?[Rr]eplacement([0-9]*)Value/) {
             Log3 $name, 5, "$name: validating attr $name $aName $aVal";
             if (AttrVal($name, "replacement${2}Mode", "text") eq "expression") {
                 return "Invalid Expression $aVal" if (!EvalExpr($hash, 
@@ -618,8 +620,8 @@ sub AttrFn {
                 delete $hash->{'.MaxAgeEnabled'};
             }
         } 
-        elsif ($aName =~                 /([gs]et[0-9]*)?[Rr]eplacement[0-9]*Regex/) {
-            if (!(grep {!/$aName/} grep {/([gs]et[0-9]*)?[Rr]eplacement[0-9]*Regex/} keys %{$attr{$name}})) {
+        elsif ($aName =~                 /((get|set)[0-9]*)?[Rr]eplacement[0-9]*Regex/) {
+            if (!(grep {!/$aName/} grep {/((get|set)[0-9]*)?[Rr]eplacement[0-9]*Regex/} keys %{$attr{$name}})) {
                 delete $hash->{'.ReplacementEnabled'};
             }
         } 
@@ -638,7 +640,7 @@ sub AttrFn {
             #delete $hash->{TimeAlignFmt};    
         }
     }
-    if ($aName =~ /^[gs]et/ || $aName eq "enableControlSet") {
+    if ($aName =~ /^(get|set)/ || $aName eq "enableControlSet") {
         $hash->{".updateHintList"} = 1;
     }
     if ($aName =~ /^(get|reading)/) {
@@ -888,7 +890,7 @@ sub DoReplacement {
             }
         } 
         elsif ($mode eq 'expression') {
-            $value = 'package main; ' . ($value // '');
+            $value = 'package main; ' . ($value // '');         # contains the expression
             local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: Replacement $rNum with expression $value and regex $regex created warning: @_"; };
             # if expression calls other fhem functions, creates readings or other, then the warning handler will create misleading messages!
             $match = eval { $string =~ s/$regex/$value/gee };
@@ -976,7 +978,7 @@ sub DoAuth {
     foreach my $step (sort {$b cmp $a} keys %steps) {   # reverse sort because requests are prepended
         my $request = PrepareRequest($hash, "sid", $step);
         if ($request->{'url'}) {
-            $request->{'ignoreRedirects'} = AttrVal($name, "sid${step}IgnoreRedirects", 0);
+            $request->{'ignoreRedirects'} = GetFAttr($name, 'sid', $step, 'IgnoreRedirects', 0);
             $request->{'priority'} = 1;                 # prepend at front of queue
             AddToSendQueue($hash, $request);
             # todo: http method for sid steps?
@@ -1015,26 +1017,26 @@ sub UpdateHintList {
                  
         if ($context eq 'set') {
             my $map = '';
-            $map = AttrVal($name, "${context}${num}Map", "") if ($context ne "get"); # old Map for set is now IMap (Input)
-            $map = AttrVal($name, "${context}${num}IMap", $map);                     # new syntax ovverides old one
+            $map = AttrVal($name, "${context}${num}Map", '');                   # old Map for set is now IMap (Input)
+            $map = GetFAttr($name, $context, $num, 'IMap', $map);               # new syntax overrides old one
             if ($map) {                                                         
                 my $hint = MapToHint($map);                                     # create hint from map
                 $opt  = $oName . ":$hint";                                      # opt is Name:Hint (from Map)
-            } elsif (AttrVal($name, "${context}${num}NoArg", undef)) {          # NoArg explicitely specified for a set?
+            } elsif (GetFAttr($name, $context, $num, 'NoArg')) {                # NoArg explicitely specified for a set?
                 $opt = $oName . ':noArg';                            
             } else {
                 $opt = $oName;                                                  # nur den Namen für opt verwenden.
             }
         } 
         elsif ($context eq 'get') {
-            if (AttrVal($name, "${context}${num}TextArg", undef)) {             # TextArg explicitely specified for a get?
+            if (GetFAttr($name, $context, $num, 'TextArg')) {                   # TextArg explicitely specified for a get?
                 $opt = $oName;                                                  # nur den Namen für opt verwenden.
             } else {
                 $opt = $oName . ':noArg';                                       # sonst noArg bei get
             }           
         }
-        if (AttrVal($name, "${context}${num}Hint", undef)) {                    # gibt es einen expliziten Hint?
-            $opt = $oName . ":" . AttrVal($name, "${context}${num}Hint", undef);
+        if (GetFAttr($name, $context, $num, 'Hint')) {                          # gibt es einen expliziten Hint?
+            $opt = $oName . ":" . GetFAttr($name, $context, $num, 'Hint');
         }
         $hash->{".${context}List"} .= $opt . ' ';                               # save new hint list
     }
@@ -1204,7 +1206,6 @@ sub SetFn {
     if(!defined ($setNum)) {                                # gültiger set Aufruf? ($setNum oben schon gesetzt?)
         UpdateHintList($hash) if ($hash->{".updateHintList"});
         if (AttrVal($name, "useSetExtensions", 1)) {
-            #Log3 $name, 5, "$name: set is passing to setExtensions";
             return SetExtensions($hash, $hash->{".setList"}, $name, $setName, @setValArr);
         } else {
             return "Unknown argument $setName, choose one of " . $hash->{".setList"};
@@ -1217,7 +1218,7 @@ sub SetFn {
         return;
     }
      
-    if (!AttrVal($name, "set${setNum}NoArg", undef)) {      # soll überhaupt ein Wert übergeben werden?
+    if (!GetFAttr($name, 'set', $setNum, 'NoArg')) {        # soll überhaupt ein Wert übergeben werden?
         if (!defined($setVal)) {                            # Ist ein Wert übergeben?
             Log3 $name, 3, "$name: set without value given for $setName";
             return "no value given to set $setName";
@@ -1226,27 +1227,27 @@ sub SetFn {
 
         # Eingabevalidierung von Sets mit Definition per Attributen
         # 1. Schritt, falls definiert, per Umkehrung der Map umwandeln (z.B. Text in numerische Codes)
-        my $map = AttrVal($name, "set${setNum}Map", "");                # old Map for set is now IMap (Input)
-        $map    = AttrVal($name, "set${setNum}IMap", $map);             # new syntax ovverides old one
+        my $map = AttrVal($name, "set${setNum}Map", '');                # old Map for set is now IMap (Input)
+        $map    = GetFAttr($name, 'set', $setNum, 'IMap', $map);        # new syntax ovverides old one
         $rawVal = MapConvert ($hash, {map => $map, val => $rawVal, reverse => 1, undefIfNoMatch => 1});
         return "set value $setVal did not match defined map" if (!defined($rawVal));
 
         # make sure $rawVal is numeric unless textArg is specified
-        if (!$map && !AttrVal($name, "set${setNum}TextArg", undef) && $rawVal !~ /^-?\d+\.?\d*$/) {
+        if (!$map && !GetFAttr($name, 'set', $setNum, 'TextArg') && $rawVal !~ /^-?\d+\.?\d*$/) {
             Log3 $name, 3, "$name: set - value $rawVal is not numeric";
             return "set value $rawVal is not numeric";
         }
 
-        if (!AttrVal($name, "set${setNum}TextArg", undef) 
+        if (!GetFAttr($name, 'set', $setNum, 'TextArg') 
                 && !CheckRange($hash, {val => $rawVal, 
-                                        min => AttrVal($name, "set${setNum}Min", undef), 
-                                        max => AttrVal($name, "set${setNum}Max", undef)} ) ) {
+                                        min => GetFAttr($name, 'set', $setNum. 'Min'), 
+                                        max => GetFAttr($name, 'set', $setNum, 'Max')} ) ) {
             return "set value $rawVal is not within defined range";
         }
 
         # Konvertiere input mit IExpr falls definiert
         my $exp = AttrVal($name, "set${setNum}Expr", "");           # old syntax for input in set
-        $exp    = AttrVal($name, "set${setNum}IExpr", $exp);        # new syntax overrides old one
+        $exp    = GetFAttr($name, 'set', $setNum, 'IExpr', $exp);   # new syntax overrides old one
         #Log3 $name, 5, "$name: set calls EvalExpr with exp $exp";
         $rawVal = EvalExpr($hash, {expr => $exp, val => $rawVal, '@setValArr' => \@setValArr, action => "set${setNum}IExpr"});
         Log3 $name, 4, "$name: set will now set $setName -> $rawVal";
@@ -1255,12 +1256,12 @@ sub SetFn {
         $rawVal = 0;
         Log3 $name, 4, "$name: set will now set $setName";
     }
-    if (!AttrVal($name, "set${setNum}Local", undef)) {              # soll überhaupt ein Request erzeugt werden?
+    if (!GetFAttr($name, 'set', $setNum, 'Local')) {                # soll überhaupt ein Request erzeugt werden?
         my $request = PrepareRequest($hash, "set", $setNum);
         if ($request->{'url'}) {
             DoAuth $hash if (AttrVal($name, "reAuthAlways", 0));
             $request->{'value'}  = $rawVal;
-            $request->{'method'} = AttrVal($name, "set${setNum}Method", '');
+            $request->{'method'} = GetFAttr($name, 'set', $setNum, 'Method', '');
             AddToSendQueue($hash, $request );
         } else {
             Log3 $name, 3, "$name: no URL for set $setNum";
@@ -1331,7 +1332,7 @@ sub ChainGet {
     my $type = shift;
     my $num  = shift;
     my $name = $hash->{NAME};
-    my $get  = AttrVal($name, "${type}${num}FollowGet", '');
+    my $get  = GetFAttr($name, $type, $num, 'FollowGet');
     if (!$get) {
         delete $hash->{GetChainLength};
         return;
@@ -1407,12 +1408,12 @@ sub GetUpdate {
 sub EvalFunctionCall {
     my ($hash, $buffer, $fName, $type) = @_;
     my $name = $hash->{NAME};
-    if (AttrVal($name, $fName, undef)) {
-        Log3 $name, 5, "$name: Read is calling $fName for HTTP Response to $type";
-        my $func = AttrVal($name, 'parseFunction1', undef);
+    my $callName = AttrVal($name, $fName, undef);
+    if ($callName) {
+        Log3 $name, 5, "$name: Read is calling $fName as $callName for HTTP Response to $type";
         no strict "refs";               ## no critic - function name needs to be string becase it comes from an attribute
-        eval { &{$func}($hash, $buffer) };
-        Log3 $name, 3, "$name: error calling $func: $@" if($@);
+        eval { &{$callName}($hash, $buffer) };
+        Log3 $name, 3, "$name: error calling $callName: $@" if($@);
         use strict "refs";
     }
     return;
@@ -1421,6 +1422,8 @@ sub EvalFunctionCall {
 
 ################################################
 # get a regex from attr and compile if not done
+# called from DoReplacement, ExtractReading, ExtractSid,
+#   CheckAuth and ReadCallback
 sub GetRegex {
     my ($name, $context, $num, $type, $default) = @_; 
     my $hash = $defs{$name};
@@ -1432,7 +1435,7 @@ sub GetRegex {
     # first look for attribute with the full num in it
     if ($num && defined ($attr{$name}{$context . $num . $type})) {      # specific regex attr exists
         return $attr{$name}{$context . $num . $type} if (!$regCompile); # regex string from attr if no compilation wanted
-        if ($hash->{CompiledRegexes}{$context . $num . $type}) {        # compiled specific regex esists
+        if ($hash->{CompiledRegexes}{$context . $num . $type}) {        # compiled specific regex exists
             $val = $hash->{CompiledRegexes}{$context . $num . $type};
             #Log3 $name, 5, "$name: GetRegex found precompiled $type for $context$num as $val";
         } else {                                                        # not compiled (yet)
@@ -1469,16 +1472,15 @@ sub FormatReading {
     my $expr = "";
     my $map  = "";
 
-    if ($context eq "reading") {        
-        $expr = AttrVal($name, 'readingsExpr'  . $num, "") if ($context ne "set");   # very old syntax, not for set!
-    }
-    $decode  = GetFAttr($name, $context, $num, "Decode");
-    $encode  = GetFAttr($name, $context, $num, "Encode");
-    $map     = GetFAttr($name, $context, $num, "Map") if ($context ne "set");           # not for set!
-    $map     = GetFAttr($name, $context, $num, "OMap", $map);                           # new syntax
-    $format  = GetFAttr($name, $context, $num, "Format");
-    $expr    = GetFAttr($name, $context, $num, "Expr", $expr) if ($context ne "set");   # not for set!
-    $expr    = GetFAttr($name, $context, $num, "OExpr", $expr);                         # new syntax
+    $decode  = GetFAttr($name, $context, $num, 'Decode');
+    $encode  = GetFAttr($name, $context, $num, 'Encode');
+    $map     = GetFAttr($name, $context, $num, 'Map') if ($context ne 'set');           # not for set!
+    $map     = GetFAttr($name, $context, $num, 'OMap', $map);                           # new syntax
+    $format  = GetFAttr($name, $context, $num, 'Format');
+
+    $expr    = AttrVal($name, 'readingsExpr'  . $num, '') if ($context eq 'reading');   # very old syntax, not for set
+    $expr    = GetFAttr($name, $context, $num, 'Expr', $expr) if ($context ne 'set');   # not for set!
+    $expr    = GetFAttr($name, $context, $num, 'OExpr', $expr);                         # new syntax
     
     # encode as utf8 by default if no encode is specified and body was decoded or no charset was seen in the header 
     if (!$encode && (!$hash->{'.bodyCharset'} || $hash->{'.bodyCharset'} eq 'internal' )) {   # body was decoded and encode not sepcified
@@ -2158,7 +2160,7 @@ sub CheckRedirects {
     my $code    = $header0[1];
     Log3 $name, 4, "$name: checking for redirects, code=$code, ignore=$request->{ignoreredirects}";
 
-    if ($code !~ m{ \A 301 | 302 | 303 \z }xms) {
+    if ($code !~ m{ \A 301 | 302 | 303 | 308 \z }xms) {
         Log3 $name, 4, "$name: no redirects to handle";
         return;
     }
@@ -2280,8 +2282,13 @@ sub DumpBuffer {
     $hash->{BufCounter} = 0 if (!$hash->{BufCounter});
     $hash->{BufCounter} ++;
     my $path = AttrVal($name, "dumpBuffers", '.');
-    Log3 $name, 3, "$name: dump buffer to $path/buffer$hash->{BufCounter}.txt";
+    Log3 $name, 4, "$name: dump buffer to $path/buffer$hash->{BufCounter}.txt";
     open($fh, '>', "$path/buffer$hash->{BufCounter}.txt");      ## no critic 
+    if ($!) {
+        Log3 $name, 3, "$name: error opening: $!";
+        return;
+    }
+    Log3 $name, 5, "$name: Filehandle is $fh";
     if ($header) {
         print $fh $header;
         print $fh "\r\n\r\n";
@@ -2324,9 +2331,9 @@ sub ReadCallback {
     }
     if ($err) {
         my $lvlRegex = GetRegex($name, '', '', 'errLogLevelRegex', '');
-        my $errLvl   = AttrVal($name, 'errLogLevel', 3);
+        my $errLvl   = AttrVal($name, 'errLogLevel', 3);            # default error log level is 3, can be cahnged by attr
         Log3 $name, 5, "$name: Read callback Error LogLvl set to $errLvl, regex " . ($lvlRegex // '');
-        $errLvl      = 3 if ($lvlRegex && $err !~ $lvlRegex);
+        $errLvl      = 3 if ($lvlRegex && $err !~ $lvlRegex);       # reset log level to 3 if regex given and it doesnt match
         Log3 $name, $errLvl, "$name: Read callback: Error: $err";
     }
     
@@ -2678,7 +2685,7 @@ sub AddToSendQueue {
 =item summary_DE fragt Readings von Geräten mit HTTP-Interface ab
 =begin html
 
-<a name="HTTPMOD"></a>
+<a id="HTTPMOD"></a>
 <h3>HTTPMOD</h3>
 
 <ul>
@@ -2699,7 +2706,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODdefine"></a>
+    <a id="HTTPMOD-define"></a>
     <b>Define</b>
     <ul>
         <br>
@@ -2715,7 +2722,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODconfiguration"></a>
+    <a id="HTTPMOD-configuration"></a>
     <b>Simple configuration of HTTP Devices</b><br><br>
     <ul>
         In a simple configuration you don't need to define get or set commands. One common HTTP request is automatically sent in the 
@@ -2780,7 +2787,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODformat"></a>
+    <a id="HTTPMOD-format"></a>
     <b>formating and manipulating values / readings</b><br><br>
     <ul>
         Values that are parsed from an HTTP response can be further treated or formatted with the following attributes:<br>
@@ -2842,7 +2849,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODsetconfiguration"></a>
+    <a id="HTTPMOD-setconfiguration"></a>
     <b>Configuration to define a <code>set</code> command and send data to a device</b><br><br>
     <ul>
         When a set option is defined by attributes, the module will use the value given to the set command 
@@ -2887,7 +2894,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODgetconfiguration"></a>
+    <a id="HTTPMOD-getconfiguration"></a>
     <b>Configuration to define a <code>get</code> command</b><br><br>
     <ul>        
         
@@ -2926,7 +2933,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODsessionconfiguration"></a>
+    <a id="HTTPMOD-sessionconfiguration"></a>
     <b>Handling sessions and logging in</b><br><br>
     <ul>
         In simple cases logging in works with basic authentication. In the case HTTPMOD accepts a username and password as part of the URL
@@ -2951,7 +2958,9 @@ sub AddToSendQueue {
         <li>(get|set|sid)[0-9]*IdXPath</li>
         <li>(get|set|sid)[0-9]*IdXPath-Strict</li>
         </ul><br>
-        Each step can have a URL, Headers and Post Data. To extract the actual session Id, you can use regular expressions, JSON or XPath just like for the parsing of readings but with the attributes (get|set|sid)[0-9]*IdRegex, (get|set|sid)[0-9]*IdJSON, (get|set|sid)[0-9]*IdXPath or (get|set|sid)[0-9]*IdXPath-Strict.<br>
+        Each step can have a URL, Headers and Post Data. To extract the actual session Id, you can use regular expressions, 
+        JSON or XPath just like for the parsing of readings but with the attributes 
+        (get|set|sid)[0-9]*IdRegex, (get|set|sid)[0-9]*IdJSON, (get|set|sid)[0-9]*IdXPath or (get|set|sid)[0-9]*IdXPath-Strict.<br>
         An extracted session Id will be stored in the internal <code>$hash->{sid}</code>.<br>
         HTTPMOD will create a sorted list of steps (the numbers between sid and URL / Data / Header) 
         and the loop through these steps and send the corresponding requests to the device. 
@@ -2969,10 +2978,10 @@ sub AddToSendQueue {
         <li>reAuthJSON</li>
         <li>reAuthXPath</li>
         <li>reAuthXPath-Strict</li>
-        <li>[gs]et[0-9]*ReAuthRegex</li>
-        <li>[gs]et[0-9]*ReAuthJSON</li>
-        <li>[gs]et[0-9]*ReAuthXPath</li>
-        <li>[gs]et[0-9]*ReAuthXPath-Strict</li>
+        <li>(get|set)[0-9]*ReAuthRegex</li>
+        <li>(get|set)[0-9]*ReAuthJSON</li>
+        <li>(get|set)[0-9]*ReAuthXPath</li>
+        <li>(get|set)[0-9]*ReAuthXPath-Strict</li>
         </ul>
         <br>
         reAuthJSON or reAuthXPath typically only extract one piece of data from a response. 
@@ -3005,7 +3014,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODjsonconfiguration"></a>
+    <a id="HTTPMOD-jsonconfiguration"></a>
     <b>Parsing JSON</b><br><br>
     <ul>
         If a webservice delivers data in JSON format, HTTPMOD can directly parse JSON which might be easier in this case than definig regular expressions.<br>
@@ -3096,7 +3105,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODxpathconfiguration"></a>
+    <a id="HTTPMOD-xpathconfiguration"></a>
     <b>Parsing http / XML using xpath</b><br><br>
     <ul>
         
@@ -3139,7 +3148,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODnamedGroupsconfiguration"></a>
+    <a id="HTTPMOD-namedGroupsconfiguration"></a>
     <b>Parsing with named regex groups</b><br><br>
     <ul>
         If you are an expert with regular expressions you can also use named capture groups in regexes for parsing and HTTPMOD will use the group names as reading names. This feature is only meant for experts who know exactly what they are doing and it is not necessary for normal users.
@@ -3147,7 +3156,7 @@ sub AddToSendQueue {
     </ul>
     <br>
     
-    <a name="HTTPMODreplacements"></a>
+    <a id="HTTPMOD-replacements"></a>
     <b>Further replacements of URL, header or post data</b><br><br>
     <ul>
         sometimes it is helpful to dynamically change parts of a URL, HTTP header or post data depending on existing readings, internals or perl expressions at runtime. <br>
@@ -3162,7 +3171,7 @@ sub AddToSendQueue {
           "replacement[0-9]*Regex "<br>
           "replacement[0-9]*Mode "<br>
           "replacement[0-9]*Value "<br>
-          "[gs]et[0-9]*Replacement[0-9]*Value "
+          "(get|set)[0-9]*Replacement[0-9]*Value "
         </ul></code>        
         <br>
         A replacement always replaces a match of a regular expression. 
@@ -3221,7 +3230,7 @@ sub AddToSendQueue {
     </ul>
     <br>
 
-    <a name="HTTPMODaging"></a>
+    <a id="HTTPMOD-aging"></a>
     <b>replacing reading values when they have not been updated / the device did not respond</b><br><br>
     <ul>
         If a device does not respond then the values stored in readings will keep the same and only their timestamp shows that they are outdated. 
@@ -3249,7 +3258,7 @@ sub AddToSendQueue {
     </ul>
     <br>
     
-    <a name="HTTPMODset"></a>
+    <a id="HTTPMOD-set"></a>
     <b>Set-Commands</b><br>
     <ul>
         As defined by the attributes set.*Name<br>
@@ -3257,61 +3266,58 @@ sub AddToSendQueue {
         Since setExtensions include AttrTemplate, HTTPMOD also supports these templates.<br>
         If you set the attribute enableControlSet to 1, the following additional built in set commands are available:<br>
         <ul>
-            <li><b>interval</b></li>
+            <li><b>interval</b><br>
                 set new interval time in seconds and restart the timer<br>
-            <li><b>reread</b></li>
+            </li>
+            <li><b>reread</b><br>
                 request the defined URL and try to parse it just like the automatic update would do it every Interval seconds 
-                without modifying the running timer. <br>
-            <li><b>stop</b></li>
-                stop interval timer.<br>
-            <li><b>start</b></li>
-                restart interval timer to call GetUpdate after interval seconds<br>
-            <li><b>clearCookies</b></li>
-                delete all saved cookies<br>
-            <li><b>upgradeAttributes</b></li>
+                without modifying the running timer.
+            </li>
+            <li><b>stop</b><br>
+                stop interval timer.
+            </li>
+            <li><b>start</b><br>
+                restart interval timer to call GetUpdate after interval seconds
+            </li>
+            <li><b>clearCookies</b><br>
+                delete all saved cookies
+            </li>
+            <li><b>upgradeAttributes</b><br>
                 convert the attributes for this device from the old syntax to the new one.<br>
                 atributes with the description "this attribute should not be used anymore" or similar will be translated to the new syntax, e.g. readingsName1 to reading01Name.
-            <li><b>storeKeyValue</b></li>
+            </li>
+            <li><b>storeKeyValue</b><br>
                 stores a key value pair in an obfuscated form in the file system. Such values can then be used in replacements where
                 the mode is "key" e.g. to avoid storing passwords in the configuration in clear text<br>
+            </li>
         </ul>
         <br>
     </ul>
     <br>
-    <a name="HTTPMODget"></a>
+    <a id="HTTPMOD-get"></a>
     <b>Get-Commands</b><br>
     <ul>
         as defined by the attributes get.*Name
     </ul>
     
-    
-    
     <br>
-    <a name="HTTPMODattr"></a>
+    <a id="HTTPMOD-attr"></a>
     <b>Attributes</b><br><br>
     <ul>
         <li><a href="#do_not_notify">do_not_notify</a></li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br>
         
-        <li><b>reading[0-9]+Name</b></li>
+        <li><a id="HTTPMOD-attr-readingName" data-pattern="reading.*Name">reading[0-9]+(-[0-9]+)?Name</a><br>
             specifies the name of a reading to extract with the corresponding readingRegex, readingJSON, readingXPath or readingXPath-Strict<br>
             Example:
-            <code>
+            <pre>
             attr myWebDevice reading01Name temperature
             attr myWebDevice reading02Name humidity
-            </code>
+            </pre>
             Please note that the old syntax <b>readingsName.*</b> does not work with all features of HTTPMOD and should be avoided. It might go away in a future version of HTTPMOD.
-            
-        <li><b>(get|set)[0-9]+Name</b></li>
-            Name of a get or set command to be defined. If the HTTP response that is received after the command is parsed with an individual parse option then this name is also used as a reading name. Please note that no individual parsing needs to be defined for a get or set. If no regex, XPath or JSON is specified for the command, then HTTPMOD will try to parse the response using all the defined readingRegex, readingXPath or readingJSON attributes.
-            Example:
-            <code>
-            attr myWebDevice get01Name temperature
-            attr myWebDevice set01Name tempSoll
-            </code>
-            
-        <li><b>(get|set|reading)[0-9]+Regex</b></li>
+        </li>
+        <li><a id="HTTPMOD-attr-readingRegex" data-pattern="(get|set|reading|readings|[0-9]+)Regex">(get|set|reading)[0-9]+Regex</a><br>
             If this attribute is specified, the Regex defined here is used to extract the value from the HTTP Response 
             and assign it to a Reading with the name defined in the (get|set|reading)[0-9]+Name attribute.<br>
             If this attribute is not specified for an individual Reading or get or set but without the numbers in the middle, e.g. as getRegex or readingRegex, then it applies to all the other readings / get / set commands where no specific Regex is defined.<br>
@@ -3319,86 +3325,105 @@ sub AddToSendQueue {
             Multiple capture groups will create multiple readings (see explanation above)<br>
             Using this attribute for a set command (setXXRegex) only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
             Please note that the old syntax <b>readingsRegex.*</b> does not work with all features of HTTPMOD and should be avoided. It might go away in a future version of HTTPMOD.
-            If for get or set commands neither a generic Regex attribute without numbers nor a specific (get|set)[0-9]+Regex attribute is specified and also no XPath or JSON parsing specification is given for the get or set command, then HTTPMOD tries to use the parsing definitions for general readings defined in reading[0-9]+Name, reading[0-9]+Regex or XPath or JSON attributes and assigns the Readings that match here.
+            If for get or set commands neither a generic Regex attribute without numbers nor a specific (get|set)[0-9]+Regex attribute is specified and also no XPath or JSON parsing specification is given for the get or set command, 
+            then HTTPMOD tries to use the parsing definitions for general readings defined in reading[0-9]+Name, reading[0-9]+Regex or XPath or JSON attributes and assigns the Readings that match here.<br>
             Example:
-            <code>
+            <pre>
             attr myWebDevice get01Regex temperature:.([0-9]+)
             attr myWebDevice reading102Regex 34.4001.value":[ \t]+"([\d\.]+)"
-            </code>
-            
-        <li><b>(get|set|reading)[0-9]+RegOpt</b></li>
+            </pre>
+        </li>
+		<li><a id="HTTPMOD-attr-readingRegOpt" data-pattern=".*RegOpt">(get|set|reading)[0-9]+RegOpt</a><br>
             Lets the user specify regular expression modifiers. For example if the same regular expression should be matched as often as possible in the HTTP response, 
             then you can specify RegOpt g which will case the matching to be done as /regex/g<br>
             The results will be trated the same way as multiple capture groups so the reading name will be extended with -number. 
             For other possible regular expression modifiers see http://perldoc.perl.org/perlre.html#Modifiers
             Example:
-            <code>
+            <pre>
             attr myWebDevice reading0088Regex temperature:.([0-9]+)
             attr myWebDevice reading0088RegOpt g
-            </code>
-            
-        <li><b>(get|set|reading)[0-9]+XPath</b></li>
-            defines an xpath to one or more values when parsing HTML data (see examples above)<br>
-            Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>          
-        <li><b>get|set|reading[0-9]+XPath-Strict</b></li>
+            </pre>    
+        </li>
+
+        <li><a id="HTTPMOD-attr-getsetName" data-pattern="(get|set).*[0-9].*Name">(get|set)[0-9]+Name</a><br>
+            Name of a get or set command to be defined. If the HTTP response that is received after the command is parsed with an individual parse option 
+            then this name is also used as a reading name. Please note that no individual parsing needs to be defined for a get or set. 
+            If no regex, XPath or JSON is specified for the command, then HTTPMOD will try to parse the response using all the defined readingRegex, readingXPath or readingJSON attributes.<br>
+            Example:
+            <pre>
+            attr myWebDevice get01Name temperature
+            attr myWebDevice set01Name tempSoll
+            </pre>
+        </li>
+		<li><a id="HTTPMOD-attr-readingXPath-Strict" data-pattern="(get|set|reading|[0-9]+|\+)XPath-Strict">(get|set|reading)[0-9]+XPath-Strict</a><br>
             defines an xpath to one or more values when parsing XML data (see examples above)<br>
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
-        <li><b>(get|set|reading)[0-9]+AutoNumLen</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingXPath" data-pattern="(get|set|reading|[0-9]+|\+)XPath$">(get|set|reading)[0-9]+XPath</a><br>
+            defines an xpath to one or more values when parsing HTML data (see examples above)<br>
+            Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>          
+        </li>
+        
+		<li><a id="HTTPMOD-attr-readingAutoNumLen" data-pattern=".*AutoNumLen">(get|set|reading)[0-9]+AutoNumLen</a><br>
             In cases where a regular expression or an XPath results in multiple results and these results are stored in a common reading name with extension -number, then 
             you can modify the format of this number to have a fixed length with leading zeros. AutoNumLen 3 for example will lead to reading names ending with -001 -002 and so on.
-        <li><b>(reading|get|set)[0-9]*AlwaysNum</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingAlwaysNum" data-pattern=".*AlwaysNum">(reading|get|set)[0-9]*AlwaysNum</a><br>
             if set to 1 this attributes forces reading names to end with a -1, -01 (depending on the above described AutoNumLen) even if just one value is parsed.
-        <li><b>get|set|reading[0-9]+JSON</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingJSON" data-pattern=".*JSON">get|set|reading[0-9]+JSON</a><br>
             defines a path to the JSON object wanted by concatenating the object names. See the above example.<br>
             If you don't know the paths, then start by using extractAllJSON and the use the names of the readings as values for the JSON attribute.<br>
             Please don't forget to also specify a name for a reading, get or set. 
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
-        <li><b>get|set[0-9]+ExtractAllJSON or extractAllJSON</b></li>
+        </li>
+        
+		<li><a id="HTTPMOD-attr-extractAllJSONFilter" data-pattern="extractAllJSONFilter">extractAllJSONFilter</a><br>    
+            is an optional regular expression that filters the readings to be created with extractAllJSON.
+        </li>
+		<li><a id="HTTPMOD-attr-getExtractAllJSON" data-pattern=".*[eE]xtractAllJSON">(get|set)[0-9]+ExtractAllJSON or extractAllJSON</a><br>
             if set to 1 it will create a reading for every JSON object. The reading names will be deducted from the JSON strings hierarchically concatenated by "_".<br>
             if set to 2 it will create attributes for naming and parsing the JSON objects to make it easier to rename or remove some of them.
-        <li><b>extractAllJSONFilter</b></li>    
-            is an optional regular expression that filters the readings to be created with extractAllJSON.
-        <li><b>(get|set|reading)[0-9]*RecombineExpr</b></li> 
+        </li>
+        
+		<li><a id="HTTPMOD-attr-readingRecombineExpr" data-pattern=".*RecombineExpr">(get|set|reading)[0-9]*RecombineExpr</a><br> 
             defines an expression that is used in an eval to compute one reading value out of the list of matches. <br>
             This is supposed to be used for regexes or xpath specifications that produce multiple results if only one result that combines them is wanted. The list of matches will be in the variable @matchlist.<br>
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
-        <li><b>get[0-9]*CheckAllReadings</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getCheckAllReadings" data-pattern=".*CheckAllReadings">get[0-9]*CheckAllReadings</a><br>
             this attribute modifies the behavior of HTTPMOD when the HTTP Response of a get command is parsed. <br>
             If this attribute is set to 1, then additionally to the matching of get specific regexe (get[0-9]*Regex), XPath or JSON
             also all the reading names and parse definitions defined in Reading[0-9]+Name and Reading[0-9]+Regex, XPath or JSON attributes are checked and if they match, the coresponding Readings are assigned as well.<br>
             This is automatically done if a get or set command is defined without its own parse attributes.
         <br>
           
-        <li><b>(get|reading)[0-9]*OExpr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingOExpr" data-pattern="(get|reading).*OExpr">(get|reading)[0-9]*OExpr</a><br>
             defines an optional expression that is used in an eval to compute / format a readings value after parsing an HTTP response<br>
             The raw value from the parsing will be in the variable $val.<br>
             If specified as readingOExpr then the attribute value is a default for all other readings that don't specify an explicit reading[0-9]*Expr.<br>
             Please note that the old syntax <b>readingsExpr.*</b> does not work with all features of HTTPMOD and should be avoided. It might go away in a future version of HTTPMOD.
-        <li><b>(get|reading)[0-9]*Expr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingExpr" data-pattern="(get|reading|readings|[0-9]+|\?)Expr">(get|reading)[0-9]*Expr</a><br>
             This is the old syntax for (get|reading)[0-9]*OExpr. It should be replaced by (get|reading)[0-9]*OExpr. The set command upgradeAttributes which becomes visible when the attribute enableControlSet is set to 1, can do this renaming automatically.
-        <li><b>(get|reading)[0-9]*OMap</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingOMap" data-pattern="(get|reading).*OMap">(get|reading)[0-9]*OMap</a><br>
             Map that defines a mapping from raw value parsed to visible values like "0:mittig, 1:oberhalb, 2:unterhalb". <br>
             If specified as readingOMap then the attribute value is a default for all other readings that don't specify 
             an explicit reading[0-9]*Map.<br>
             The individual options in a map are separated by a komma and an optional space. Spaces are allowed to appear in a visible value however kommas are not possible.
-        <li><b>(get|reading)[0-9]*Map</b></li>
-            This is the old syntax for (get|reading)[0-9]*OMap. It should be replaced by (get|reading)[0-9]*OMap. The set command upgradeAttributes which becomes visible when the attribute enableControlSet is set to 1, can do this renaming automatically.
-        <li><b>(get|set|reading)[0-9]*Format</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingMap" data-pattern="(get|reading|[0-9]+|\?)Map">(get|reading)[0-9]*Map</a><br>
+            This is the old syntax for (get|reading)[0-9]*OMap. It should be replaced by (get|reading)[0-9]*OMap. 
+            The set command upgradeAttributes which becomes visible when the attribute enableControlSet is set to 1, can do this renaming automatically.
+        </li>
+		<li><a id="HTTPMOD-attr-readingFormat" data-pattern=".*Format">(get|set|reading)[0-9]*Format</a><br>
             Defines a format string that will be used in sprintf to format a reading value.<br>
             If specified without the numbers in the middle e.g. as readingFormat then the attribute value is a default for all other readings that don't specify an explicit reading[0-9]*Format.
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
-        <li><b>(get|set|reading)[0-9]*Decode</b></li> 
-            defines an encoding to be used in a call to the perl function decode to convert the raw data string read from the device to a reading. 
-            This can be used if the device delivers strings in an encoding like cp850 instead of utf8.<br>
-            If your reading values contain Umlauts and they are shown as strange looking icons then you probably need to use this feature.
-            Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
-        <li><b>(get|set|reading)[0-9]*Encode</b></li> 
-            defines an encoding to be used in a call to the perl function encode to convert the data string read from the device to a reading. 
-            This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.<br>
-            When the attribute bodyDecode is not set to 'none' then this encoding attribute defaults to utf8.
-            If your reading values contain Umlauts and they are shown as strange looking icons then you probably need to modidify this attribute.
-            Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
-        <li><b>bodyDecode</b></li> 
+        </li>
+		<li><a id="HTTPMOD-attr-bodyDecode" data-pattern="bodyDecode">bodyDecode</a><br> 
             defines an encoding to be used in a call to the perl function decode to convert the raw http response body data string 
             read from the device before further processing / matching<br>
             If you have trouble matching special characters or if your reading values contain Umlauts 
@@ -3406,50 +3431,74 @@ sub AddToSendQueue {
             If this attribute is set to 'auto' then HTTPMOD automatically looks for a charset header and decodes the body acordingly. 
             If no charset header is found, the body will remain undecoded.
             <br>
-        <li><b>regexDecode</b></li> 
+        </li>
+		<li><a id="HTTPMOD-attr-regexDecode" data-pattern="regexDecode">regexDecode</a><br> 
             defines an encoding to be used in a call to the perl function decode to convert the raw data string from regex attributes before further processing / matching<br>
             If you have trouble matching special characters or if you need to get around a memory leak in Perl regex processing this might help
             <br>
-        <li><b>regexCompile</b></li> 
+        </li>
+		<li><a id="HTTPMOD-attr-regexCompile" data-pattern="regexCompile">regexCompile</a><br> 
             defines that regular expressions will be precompiled when they are used for the first time and then stored internally so that subsequent uses of the same 
             regular expression will be faster. This option is turned on by default but setting this attribute to 0 will disable it.
-            <br>
-        <br>
-            
-        <li><b>(get|set)[0-9]*URL</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingDecode" data-pattern=".?(get|set|reading).*[0-9]*.*Decode">(get|set|reading)[0-9]*Decode</a><br> 
+            defines an encoding to be used in a call to the perl function decode to convert the raw data string read from the device to a reading. 
+            This can be used if the device delivers strings in an encoding like cp850 instead of utf8.<br>
+            If your reading values contain Umlauts and they are shown as strange looking icons then you probably need to use this feature.
+            Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
+        </li>
+		<li><a id="HTTPMOD-attr-readingEncode" data-pattern=".?(get|set|reading).*[0-9]*.*Encode">(get|set|reading)[0-9]*Encode</a><br> 
+            defines an encoding to be used in a call to the perl function encode to convert the data string read from the device to a reading. 
+            This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.<br>
+            When the attribute bodyDecode is not set to 'none' then this encoding attribute defaults to utf8.
+            If your reading values contain Umlauts and they are shown as strange looking icons then you probably need to modidify this attribute.
+            Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
+        </li>            
+		<li><a id="HTTPMOD-attr-getURL" data-pattern=".*URL">(get|set)[0-9]*URL</a><br>
             URL to be requested for the get or set command. 
             If this option is missing, the URL specified during define will be used.
-        <li><b>(get|set)[0-9]*Data</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getData" data-pattern=".*Data">(get|set)[0-9]*Data</a><br>
             optional data to be sent to the device as POST data when the get oer set command is executed. 
             if this attribute is specified, an HTTP POST method will be sent instead of an HTTP GET
-        <li><b>set[0-9]*Method</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setMethod" data-pattern=".*Method">set[0-9]*Method</a><br>
              HTTP Method (GET, POST or PUT) which shall be used for the set.
-        <li><b>(get|set)[0-9]*NoData</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getNoData" data-pattern=".*NoData">(get|set)[0-9]*NoData</a><br>
             can be used to override a more generic attribute that specifies POST data for all get commands. 
             With NoData no data is sent and therefor the request will be an HTTP GET.
-        <li><b>(get|set)[0-9]*Header.*</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getHeader.*" data-pattern=".?(get|set).*[0-9]*.*Header.*">(get|set)[0-9]*Header.*</a><br>
             optional HTTP Headers to be sent to the device when the get or set command is executed
-        <li><b>requestHeader.*</b></li> 
+        </li>
+		<li><a id="HTTPMOD-attr-requestHeader" data-pattern="requestHeader.*">requestHeader.*</a><br> 
             Define an optional additional HTTP Header to set in the HTTP request <br>
-        <li><b>requestData</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-requestData" data-pattern="requestData">requestData</a><br>
             optional POST Data to be sent in the request. If not defined, it will be a GET request as defined in HttpUtils used by this module<br>
-        <br>
-
-        <li><b>get[0-9]+Poll</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getPoll" data-pattern="get.*Poll">get[0-9]+Poll</a><br>
             if set to 1 the get is executed automatically during the normal update cycle (after the interval provided in the define command has elapsed)
-        <li><b>get[0-9]+PollDelay</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getPollDelay" data-pattern="get.*PollDelay">get[0-9]+PollDelay</a><br>
             if the value should not be read in each iteration (after the interval given to the define command), then a
             minimum delay can be specified with this attribute. This has only an effect if the above Poll attribute has
             also been set. Every time the update function is called, it checks if since this get has been read the last time, the defined delay has elapsed. If not, then it is skipped this time.<br>
             PollDelay can be specified as seconds or as x[0-9]+ which means a multiple of the interval in the define command.
         <br>
-        <li><b>(get|set)[0-9]*FollowGet</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getFollowGet" data-pattern=".*FollowGet">(get|set)[0-9]*FollowGet</a><br>
             allows to chain a get command after another set or get command. <br>
             If for example you want to set a new required temerature with a set 'TargetTemp' command and this set command changes the temperature with a series 
             of HTTP requests in your heating system, then you can automaticaly do a get 'TargetTemp' to read out the new value from your heating.<br>
             The value of this attribute must match a defined get command name.
         
-        <li><b>(get|set)[0-9]*TextArg</b></li>
+        </li>
+        <li><a id="HTTPMOD-attr-maxGetChain" >maxGetChain</a><br>
+            limits the chain of get command that can be defied with FollowGet<br>        
+        </li>
+		<li><a id="HTTPMOD-attr-getTextArg" data-pattern=".*TextArg">(get|set)[0-9]*TextArg</a><br>
             For a get command this defines that the command accepts a text value after the option name. 
             By default a get command doesn't accept optional values after the command name. 
             If TextArg is specified and a value is passed after the get name then this value can then be used in a request URL, header or data 
@@ -3457,40 +3506,52 @@ sub AddToSendQueue {
             If used for a set command then it defines that the value to be set doesn't require any validation / conversion. 
             The raw value is passed on as text to the device. By default a set command expects a numerical value or a text value that is converted to a numeric value using a map.
 
-        <li><b>set[0-9]+Min</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setMin" data-pattern="set.*Min">set[0-9]+Min</a><br>
             Minimum value for input validation. 
-        <li><b>set[0-9]+Max</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setMax" data-pattern="set.*Max">set[0-9]+Max</a><br>
             Maximum value for input validation. 
-        <li><b>set[0-9]+IExpr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setIExpr" data-pattern="set.*IExpr">set[0-9]+IExpr</a><br>
             Perl Expression to compute the raw value to be sent to the device from the input value passed to the set.
-        <li><b>set[0-9]+Expr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setExpr" data-pattern="set.*\[?\+?]Expr">set[0-9]+Expr</a><br>
             This is the old syntax for (get|reading)[0-9]*IExpr. It should be replaced by (get|reading)[0-9]*IExpr. The set command upgradeAttributes which becomes visible when the attribute enableControlSet is set to 1, can do this renaming automatically.
             
-        <li><b>set[0-9]+IMap</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setIMap" data-pattern="set.*IMap">set[0-9]+IMap</a><br>
             Map that defines a mapping from raw to visible values like "0:mittig, 1:oberhalb, 2:unterhalb". This attribute atomatically creates a hint for FhemWEB so the user can choose one of the visible values and HTTPMOD sends the raw value to the device.
-        <li><b>set[0-9]+Map</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setMap" data-pattern="^set.*Map">set[0-9]+Map</a><br>
             This is the old syntax for (get|reading)[0-9]*IMap. It should be replaced by (get|reading)[0-9]*IMap. The set command upgradeAttributes which becomes visible when the attribute enableControlSet is set to 1, can do this renaming automatically.
-        <li><b>set[0-9]+Hint</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setHint" data-pattern="set.*Hint">set[0-9]+Hint</a><br>
             Explicit hint for fhemWEB that will be returned when set ? is seen.
-        <li><b>set[0-9]*NoArg</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setNoArg" data-pattern="set.*NoArg">set[0-9]*NoArg</a><br>
             Defines that this set option doesn't require arguments. It allows sets like "on" or "off" without further values.
-        <li><b>set[0-9]*ParseResponse</b></li>
-            defines that the HTTP response to the set will be parsed as if it was the response to a get command.
-        <li><b>set[0-9]*Local</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-setParseResponse" data-pattern=".*ParseResponse">(set|sid)[0-9]*ParseResponse</a><br>
+            defines that the HTTP response to the set or auth step will be parsed as if it was the response to a get command.
+        </li>
+		<li><a id="HTTPMOD-attr-setLocal" data-pattern="set.*Local">set[0-9]*Local</a><br>
             defines that no HTTP request will be sent. Instead the value is directly set as a reading value.
         <br>
-
-        <li><b>(get|set)[0-9]*HdrExpr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getHdrExpr" data-pattern=".*HdrExpr">(get|set)[0-9]*HdrExpr</a><br>
             Defines a Perl expression to specify the HTTP Headers for this request. This overwrites any other header specification 
             and should be used carefully only if needed. The original headers are availabe as $old and separated by newlines. 
             Typically this feature is not needed and it might go away in future versions of HTTPMOD. 
             Please use the "replacement" attributes if you want to pass additional variable data to a web service. 
-        <li><b>(get|set)[0-9]*DatExpr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getDatExpr" data-pattern=".*DatExpr">(get|set)[0-9]*DatExpr</a><br>
             Defines a Perl expression to specify the HTTP Post data for this request. This overwrites any other post data specification 
             and should be used carefully only if needed. The original Data is availabe as $old. 
             Typically this feature is not needed and it might go away in future versions of HTTPMOD. 
             Please use the "replacement" attributes if you want to pass additional variable data to a web service. 
-        <li><b>(get|set)[0-9]*URLExpr</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getURLExpr" data-pattern=".*URLExpr">(get|set)[0-9]*URLExpr</a><br>
             Defines a Perl expression to specify the URL for this request. This overwrites any other URL specification 
             and should be used carefully only if needed. The original URL is availabe as $old. 
             Typically this feature is not needed and it might go away in future versions of HTTPMOD. 
@@ -3498,61 +3559,76 @@ sub AddToSendQueue {
         <br>
 
         
-        <li><b>set[0-9]*ReAuthRegex</b></li>
-            Regex that will detect when a session has expired during a set operation and a new login needs to be performed.
-            It works like the global reAuthRegex but is used for set operations.
-    
-        <li><b>reAuthRegex</b></li>
-            regular Expression to match an error page indicating that a session has expired and a new authentication for read access needs to be done. 
+        </li>
+		<li><a id="HTTPMOD-attr-reAuthRegex" data-pattern="[Rr]eAuth">(get|set)[0-9]*ReAuth.*, reAuthRegex, reAuthJSON, reAuthXPath or reAuthXPath-Strict</a><br>
+            regular Expression, JSON or XPath specification to match an error page indicating that a session has expired and a new authentication for read access needs to be done. 
             This attribute only makes sense if you need a forms based authentication for reading data and if you specify a multi step login procedure based on the sid.. attributes.<br>
-            This attribute is used for all requests. For set operations you can however specify individual reAuthRegexes with the set[0-9]*ReAuthRegex attributes.
-        <li><b>reAuthAlways</b></li>
+            This attribute is used for all requests or for matching get / set requests if sepcified as (get|set)[0-9]ReAuth(Regex|JSON|XPath|XPath-Strict).
+        </li>
+		<li><a id="HTTPMOD-attr-reAuthAlways" data-pattern="reAuthAlways">reAuthAlways</a><br>
             if set to 1 will force authentication requests defined in the sid-attributes to be sent before each getupdate, get or set.
-        <br><br>
-        <li><b>sid[0-9]*URL</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-sidURL" data-pattern="sid.*URL">sid[0-9]*URL</a><br>
             different URLs or one common URL to be used for each step of an optional login procedure. 
-        <li><b>sid[0-9]*IdRegex</b></li>
-            different Regexes per login procedure step or one common Regex for all steps to extract the session ID from the HTTP response
-        <li><b>sid[0-9]*Data.*</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getIdRegex" data-pattern="(get|set|sid).*[Ii][Dd](Regex|JSON|XPath)">(get|set|sid)[0-9]*IdRegex or IdJSON or IdXPath or IdXPath-Strict</a><br>
+            different Regexes, JSON or XPath specifications for get, set or login procedure step to extract the session ID from the HTTP response
+        </li>
+		<li><a id="HTTPMOD-attr-idRegex" data-pattern="^id(Regex|JSON|XPath)">idRegex, idJSON, idXPath or idXPath-Strict</a><br>
+            common Regexes, JSON or XPath specifications to extract the session ID from the HTTP response
+        </li>
+		<li><a id="HTTPMOD-attr-sidData.*" data-pattern="sid.*Data.*">sid[0-9]*Data.*</a><br>
             data part for each step to be sent as POST data to the corresponding URL
-        <li><b>sid[0-9]*Header.*</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-sidHeader.*" data-pattern="sid.*Header.*">sid[0-9]*Header.*</a><br>
             HTTP Headers to be sent to the URL for the corresponding step
-        <li><b>sid[0-9]*IgnoreRedirects</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-sidIgnoreRedirects" data-pattern="sid.*IgnoreRedirects">sid[0-9]*IgnoreRedirects</a><br>
             tell HttpUtils to not follow redirects for this authentication request
-        <li><b>clearSIdBeforeAuth</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-clearSIdBeforeAuth" data-pattern="clearSIdBeforeAuth">clearSIdBeforeAuth</a><br>
             will set the session id to "" before doing the authentication steps
-        <li><b>authRetries</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-authRetries" data-pattern="authRetries">authRetries</a><br>
             number of retries for authentication procedure - defaults to 1
         <br>
 
-        <li><b>replacement[0-9]*Regex</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-replacementRegex" data-pattern="replacement.*Regex">replacement[0-9]*Regex</a><br>
             Defines a replacement to be applied to an HTTP request header, data or URL before it is sent. This allows any part of the request to be modified based on a reading, an internal or an expression.
             The regex defines which part of a header, data or URL should be replaced. The replacement is defined with the following attributes:
-        <li><b>replacement[0-9]*Mode</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-replacementMode" data-pattern="replacement.*Mode">replacement[0-9]*Mode</a><br>
             Defines how the replacement should be done and what replacementValue means. Valid options are text, reading, internal and expression.
-        <li><b>replacement[0-9]*Value</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-replacementValue" data-pattern="replacement.*Value">replacement[0-9]*Value</a><br>
             Defines the replacement. If the corresponding replacementMode is <code>text</code>, then value is a static text that is used as the replacement.<br>
             If replacementMode is <code>reading</code> then Value can be the name of a reading of this device or it can be a reading of a different device referred to by devicename:reading.<br>
             If replacementMode is <code>internal</code> the Value can be the name of an internal of this device or it can be an internal of a different device referred to by devicename:internal.<br>
             If replacementMode is <code>expression</code> the the Value is treated as a Perl expression that computes the replacement value. The expression can use $1, $2 and so on to refer to capture groups of the corresponding regex that is matched against the original URL, header or post data.<br>
             If replacementMode is <code>key</code> then the module will use a value from a key / value pair that is stored in an obfuscated form in the file system with the set storeKeyValue command. This might be useful for storing passwords.
 
-        <li><b>[gs]et[0-9]*Replacement[0-9]*Value</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-getReplacementValue" data-pattern=".?(get|set).*Replacement.*Value">(get|set)[0-9]*Replacement[0-9]*Value</a><br>
             This attribute can be used to override the replacement value for a specific get or set.
         <br>
 
-        <li><b>get|reading[0-9]*MaxAge</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingMaxAge" data-pattern=".*MaxAge">get|reading[0-9]*MaxAge</a><br>
             Defines how long a reading is valid before it is automatically overwritten with a replacement when the read function is called the next time.
-        <li><b>get|reading[0-9]*MaxAgeReplacement</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingMaxAgeReplacement" data-pattern=".*MaxAgeReplacement">get|reading[0-9]*MaxAgeReplacement</a><br>
             specifies the replacement for MaxAge - either as a static text, the name of a reading / internal or as a perl expression.<br>
             If MaxAgeReplacementMode is <code>reading</code> then the value of MaxAgeReplacement can be the name of a reading of this device or it can be a reading of a different device referred to by devicename:reading.<br>
             If MaxAgeReplacementMode is <code>internal</code> the value of MaxAgeReplacement can be the name of an internal of this device or it can be an internal of a different device referred to by devicename:internal.
             
-        <li><b>get|reading[0-9]*MaxAgeReplacementMode</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingMaxAgeReplacementMode" data-pattern=".*MaxAgeReplacementMode">get|reading[0-9]*MaxAgeReplacementMode</a><br>
             specifies how the replacement is interpreted: can be text, reading, internal, expression and delete.
         <br>
 
-        <li><b>get|reading[0-9]*DeleteIfUnmatched</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-readingDeleteIfUnmatched" data-pattern=".*DeleteIfUnmatched">get|reading[0-9]*DeleteIfUnmatched</a><br>
             If set to 1 this attribute causes certain readings to be deleted when the parsing of the website does not match the specified reading. 
             Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). 
             Specified readings will only be deleted if the same operation does not parse this reading again. 
@@ -3562,96 +3638,127 @@ sub AddToSendQueue {
             Please note that this mechanism will not work in all cases after a restart. Especially when a get definition does not contain its own parsing definition 
             but ExtractAllJSON or relies on HTTPMOD to use all defined reading.* attributes to parse the responsee to a get command, 
             old readings might not be deleted after a restart of fhem.
-        <li><b>get|reading[0-9]*DeleteOnError</b></li>
-            If set to 1 this attribute causes certain readings to be deleted when the website can not be reached and the HTTP request returns an error. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation returns an error. <br>
+        </li>
+		<li><a id="HTTPMOD-attr-readingDeleteOnError" data-pattern=".*DeleteOnError">get|reading[0-9]*DeleteOnError</a><br>
+            If set to 1 this attribute causes certain readings to be deleted when the website can not be reached and the HTTP request returns an error. 
+            Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). 
+            Specified readings will only be deleted if the same operation returns an error. <br>
             The same restrictions as for DeleteIfUnmatched apply regarding a fhem restart.
-        <br>        
-
-        <li><b>httpVersion</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-httpVersion">httpVersion</a><br>
             defines the HTTP-Version to be sent to the server. This defaults to 1.0.
-        <li><b>sslVersion</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-sslVersion">sslVersion</a><br>
             defines the SSL Version for the negotiation with the server. The attribute is evaluated by HttpUtils. If it is not specified, HttpUtils assumes SSLv23:!SSLv3:!SSLv2
-        <li><b>sslArgs</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-sslArgs">sslArgs</a><br>
             defines a list that is converted to a key / value hash and gets passed to HttpUtils. To avoid certificate validation for broken servers you can for example specify 
             <code>attr myDevice sslArgs SSL_verify_mode,SSL_VERIFY_NONE</code>
-        <li><b>noShutdown</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-noShutdown">noShutdown</a><br>
             pass the noshutdown flag to HTTPUtils for webservers that need it (some embedded webservers only deliver empty pages otherwise)
             
-        <li><b>disable</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-disable">disable</a><br>
             stop communication with the Web_Server with HTTP requests while this attribute is set to 1
-        <li><b>enableControlSet</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-enableControlSet">enableControlSet</a><br>
             enables the built in set commands like interval, stop, start, reread, upgradeAttributes, storeKeyValue.
             <br>
             starting with featurelevel > 5.9 HTTPMOD uses this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
             
-        <li><b>enableCookies</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-enableCookies">enableCookies</a><br>
             enables the built cookie handling if set to 1. With cookie handling each HTTPMOD device will remember cookies that the server sets and send them back to the server in the following requests. 
             This simplifies session magamenet in cases where the server uses a session ID in a cookie. In such cases enabling Cookies should be sufficient and no sidRegex and no manual definition of a Cookie Header should be necessary.
             <br>
             starting with featurelevel > 5.9 HTTPMOD uses this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
 
-        <li><b>showMatched</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-showMatched">showMatched</a><br>
             if set to 1 then HTTPMOD will create a reading with the name MATCHED_READINGS 
             that contains the names of all readings that could be matched in the last request.
-        <li><b>showError</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-showError">showError</a><br>
             if set to 1 then HTTPMOD will create a reading and event with the Name LAST_ERROR 
             that contains the error message of the last error returned from HttpUtils. 
-        <li><b>removeBuf</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-removeBuf">removeBuf</a><br>
             This attribute has been removed. If set to 1 then HTTPMOD used to removes the internal named buf when a HTTP-response had been
             received. $hash->{buf} is used internally be Fhem httpUtils and used to be visible. This behavior of httpUtils has changed so removeBuf has become obsolete.
-        <li><b>showBody</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-showBody">showBody</a><br>
             if set to 1 then the body of http responses will be visible as internal httpbody.
             
-        <li><b>timeout</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-timeout">timeout</a><br>
             time in seconds to wait for an answer. Default value is 2
-        <li><b>queueDelay</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-queueDelay">queueDelay</a><br>
             HTTP Requests will be sent from a queue in order to avoid blocking when several Requests have to be sent in sequence. This attribute defines the delay between calls to the function that handles the send queue. It defaults to one second.
-        <li><b>queueMax</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-queueMax">queueMax</a><br>
             Defines the maximum size of the send queue. If it is reached then further HTTP Requests will be dropped and not be added to the queue
-        <li><b>minSendDelay</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-minSendDelay">minSendDelay</a><br>
             Defines the minimum time between two HTTP Requests.
         <br>
-        <li><b>alignTime</b></li>
-            Aligns each periodic read request for the defined interval to this base time. This is typcally something like 00:00 (see the Fhem at command)
+        </li>
+		<li><a id="HTTPMOD-attr-alignTime">alignTime</a><br>
+            Aligns each periodic read request for the defined interval to this base time. This is typically something like 00:00 (see the Fhem at command)
         <br>
 
-        <li><b>enableXPath</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-enableXPath">enableXPath</a><br>
             This attribute should no longer be used. Please specify an HTTP XPath in the dedicated attributes shown above.
-        <li><b>enableXPath-Strict</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-enableXPath-Strict">enableXPath-Strict</a><br>
             This attribute should no longer be used. Please specify an XML XPath in the dedicated attributes shown above.
             
-        <li><b>enforceGoodReadingNames</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-enforceGoodReadingNames">enforceGoodReadingNames</a><br>
             makes sure that reading names are valid and especially that extractAllJSON creates valid reading names.
             <br>
             starting with featurelevel > 5.9 HTTPMOD uses this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
             
-        <li><b>handleRedirects</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-handleRedirects">handleRedirects</a><br>
             enables redirect handling inside HTTPMOD. This makes complex session establishment where the HTTP responses contain a series of redirects much easier. If enableCookies is set as well, cookies will be tracked during the redirects.
             <br>
             starting with featurelevel > 5.9 HTTPMOD uses this feature by default. So you don't need to set it to 1, but you can disable it by setting it to 0.
             
-        <li><b>useSetExtensions</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-useSetExtensions">useSetExtensions</a><br>
             enables or disables the integration of setExtensions in HTTPMOD. By default this is enabled, but setting this attribute to 0 will disable setExtensions in HTTPMOD.
             
-        <li><b>dontRequeueAfterAuth</b></li>
-            prevents the original HTTP request to be added to the send queue again after the authentication steps. This might be necessary if the authentication steps will automatically get redirects to the URL originally requested. This option will likely need to be combined with sidXXParseResponse.
+        </li>
+		<li><a id="HTTPMOD-attr-dontRequeueAfterAuth">dontRequeueAfterAuth</a><br>
+            prevents the original HTTP request to be added to the send queue again after the authentication steps. 
+            This might be necessary if the authentication steps will automatically get redirects to the URL originally requested. 
+            This option will likely need to be combined with sidXXParseResponse.
             
-        <li><b>parseFunction1</b> and <b>parseFunction2</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-parseFunction" data-pattern="parseFunction.?">parseFunction1 and parseFunction2</a><br>
             These functions allow an experienced Perl / Fhem developer to plug in his own parsing functions.<br>
             Please look into the module source to see how it works and don't use them if you are not sure what you are doing.
-        <li><b>preProcessRegex</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-preProcessRegex">preProcessRegex</a><br>
             can be used to fix a broken HTTP response before parsing. The regex should be a replacement regex like s/match/replacement/g and will be applied to the buffer.
             
-        <li><b>errorLogLevel</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-errLogLevel">errorLogLevel</a><br>
             allows to modify the loglevel used to log errors from HttpUtils. by default level 3 is used.
-        <li><b>errorLogLevelRegex</b></li>
-            restricts the effect of errorLogLevel to such error messages that match this regex.
-
-        <li><b>Remarks regarding the automatically created userattr entries</b></li>
+        </li>
+		<li><a id="HTTPMOD-attr-errLogLevelRegex">errorLogLevelRegex</a><br>
+            restricts the effect of errorLogLevel to error messages that match this regex.
+        </li>
+                
+		<li><a id="HTTPMOD-attr-UserAttrRemarks">Remarks regarding the automatically created userattr entries</a><br>
             Fhemweb allows attributes to be edited by clicking on them. However this did not work for attributes that match to a wildcard attribute in earlier versions. 
             To circumvent this restriction HTTPMOD automatically added an entry for each instance of a defined wildcard attribute to the device userattr list. 
             E.g. if you define a reading[0-9]Name attribute as reading01Name, HTTPMOD added reading01Name to the device userattr list. 
             These entries only had the purpose of making editing in Fhemweb easier. In newer versions this has become obsolete.
+        </li>
     </ul>
     <br>
     <b>Author's notes</b><br><br>
