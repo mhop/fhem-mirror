@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 11/2021
-my $thzversion = "0.198";
+# by immi 02/2022
+my $thzversion = "0.200";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -379,7 +379,7 @@ my %parsinghash = (
 ########################################################################################
 
 my %sets439technician =(
-#  "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"0clean",  unit =>""},
+  "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"0clean",  unit =>""},
 #  "zPassiveCoolingtrigger"	=> {cmd2=>"0A0597", argMin =>   "0",	argMax =>  "50",	type =>"1clean",  unit =>""},
   "zPumpHC"			=> {cmd2=>"0A0052", argMin =>   "0",	argMax =>  "1",	type =>"0clean",  unit =>""},  
   "zPumpDHW"			=> {cmd2=>"0A0056", argMin =>   "0",	argMax =>  "1",	type =>"0clean",  unit =>""}
@@ -389,22 +389,22 @@ my %sets439technician =(
 
 my %sets439539common = (
   "pOpMode"			=> {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-  "p01RoomTempDayHC1"		=> {cmd2=>"0B0005", argMin =>  "12",	argMax =>   "30",	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "12",	argMax =>   "30",	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1"	=> {cmd2=>"0B013D", argMin =>  "12",	argMax =>   "30",	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "12",	argMax =>   "30",	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1SummerMode"=> {cmd2=>"0B056B", argMin =>  "12",	argMax =>   "30",	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1SummerMode"=> {cmd2=>"0B056A", argMin =>  "12",	argMax =>   "30",	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1"		=> {cmd2=>"0B0005", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1"	=> {cmd2=>"0B013D", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1SummerMode"=> {cmd2=>"0B056B", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1SummerMode"=> {cmd2=>"0B056A", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
   "p13GradientHC1"		=> {cmd2=>"0B010E", argMin => "0.1",	argMax =>    "5",	type =>"6gradient", unit =>""}, # 0..5 rappresentato/100
   "p14LowEndHC1"		=> {cmd2=>"0B059E", argMin =>   "0",	argMax =>   "10",	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
   "p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin =>   "0",	argMax =>  "100",	type =>"0clean", unit =>" %"},
   "p19FlowProportionHC1"	=> {cmd2=>"0B059D", argMin =>   "0",	argMax =>  "100",	type =>"1clean", unit =>" %"}, #in % 0..100%
-  "p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin =>  "12",	argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "12",	argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC2"	=> {cmd2=>"0C013D", argMin =>  "12",	argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "12",	argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC2SummerMode"=> {cmd2=>"0C056B", argMin =>  "12",	argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC2SummerMode"=> {cmd2=>"0C056A", argMin =>  "12",	argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC2"	=> {cmd2=>"0C013D", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC2SummerMode"=> {cmd2=>"0C056B", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC2SummerMode"=> {cmd2=>"0C056A", argMin =>  "12",	argMax =>   "32",	type =>"5temp",  unit =>" °C"},
   "p16GradientHC2"		=> {cmd2=>"0C010E", argMin => "0.1",	argMax =>    "5",	type =>"6gradient", unit =>""}, # /100
   "p17LowEndHC2"		=> {cmd2=>"0C059E", argMin =>   "0",	argMax =>   "10", type =>"5temp",  unit =>" K"},
   "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0",	argMax =>  "100",	type =>"0clean", unit =>" %"}, 
@@ -466,11 +466,11 @@ my %sets439539common = (
   "pClockMinutes"		=> {cmd2=>"0A0126", argMin =>   "0",	argMax =>   "59",	type =>"0clean", unit =>""},
   "pHolidayBeginDay"		=> {cmd2=>"0A011B", argMin =>   "1",	argMax =>   "31",	type =>"0clean", unit =>""},
   "pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>   "1",	argMax =>   "12",	type =>"0clean", unit =>""},
-  "pHolidayBeginYear"		=> {cmd2=>"0A011D", argMin =>  "12",	argMax =>   "20",	type =>"0clean", unit =>""},
+  "pHolidayBeginYear"		=> {cmd2=>"0A011D", argMin =>  "12",	argMax =>   "30",	type =>"0clean", unit =>""},
   "pHolidayBeginTime"		=> {cmd2=>"0A05D3", argMin =>  "00:00",	argMax =>"23:59",	type =>"9holy",  unit =>""},
   "pHolidayEndDay"		=> {cmd2=>"0A011E", argMin =>   "1",	argMax =>   "31",	type =>"0clean", unit =>""},
   "pHolidayEndMonth"		=> {cmd2=>"0A011F", argMin =>   "1",	argMax =>   "12",	type =>"0clean", unit =>""},
-  "pHolidayEndYear"		=> {cmd2=>"0A0120", argMin =>  "12",	argMax =>   "20",	type =>"0clean", unit =>""},
+  "pHolidayEndYear"		=> {cmd2=>"0A0120", argMin =>  "12",	argMax =>   "30",	type =>"0clean", unit =>""},
   "pHolidayEndTime"		=> {cmd2=>"0A05D4", argMin =>  "00:00",	argMax =>"23:59",	type =>"9holy",  unit =>""}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
   #"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00",	argMax =>"23:59",	type =>"8party", unit =>""}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   "programHC1_Mo_0"		=> {cmd2=>"0B1410", argMin =>  "00:00",	argMax =>"24:00",	type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
