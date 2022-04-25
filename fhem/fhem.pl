@@ -723,6 +723,7 @@ while (1) {
                               (!defined($timeout) || $timeout > $readytimeout));
   $timeout = 5 if $winService->{AsAService} && $timeout > 5;
   $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $timeout) if(!$nfound);
+  my $err = int($!);
 
   $winService->{serviceCheck}->() if($winService->{serviceCheck});
   if($gotSig) {
@@ -733,7 +734,6 @@ while (1) {
   }
 
   if($nfound < 0) {
-    my $err = int($!);
     next if($err==0 || $err==4); # 4==EINTR
 
     Log 1, "ERROR: Select error $nfound ($err), error count= $errcount";
