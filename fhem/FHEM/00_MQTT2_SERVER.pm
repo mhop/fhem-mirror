@@ -233,7 +233,7 @@ MQTT2_SERVER_Set($@)
     MQTT2_SERVER_doPublish($hash->{CL}, $hash, $tp, $val, $retain);
 
   } elsif($a[0] eq "clearRetain") {
-    my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? "RETAIN" : ".RETAIN";
+    my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? ".RETAIN" : "RETAIN";
     delete($hash->{READINGS}{$rname});
     delete($hash->{retain});
     return undef;
