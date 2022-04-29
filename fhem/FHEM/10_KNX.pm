@@ -78,6 +78,7 @@
 #              changed unit encoding to UTF8 eg: dpt9.030 from: &mu;g/m&sup3; to: µg/m³
 # MH 20220403  allow 'nosuffix' as only option in define 
 #              minor corrections to cmdref
+# MH 20220429  minor additions to cmdref & some cleanup
 
 
 package FHEM::KNX; ## no critic 'package'
@@ -87,16 +88,15 @@ use warnings;
 use Encode qw(encode decode);
 use Time::HiRes qw(gettimeofday);
 use Scalar::Util qw(looks_like_number);
-#use SetExtensions; # not yet!
 use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 
 ### perlcritic parameters
 # these ones are NOT used! (constants,Policy::Modules::RequireFilenameMatchesPackage,Modules::RequireVersionVar,NamingConventions::Capitalization)
+# these ones are NOT used! (ControlStructures::ProhibitCascadingIfElse)
 ### the following percritic items will be ignored global ###
 ## no critic (ValuesAndExpressions::RequireNumberSeparators,ValuesAndExpressions::ProhibitMagicNumbers)
 ## no critic (RegularExpressions::RequireDotMatchAnything,RegularExpressions::RequireLineBoundaryMatching)
 ## no critic (ControlStructures::ProhibitPostfixControls)
-### no critic (ControlStructures::ProhibitCascadingIfElse)
 ## no critic (Documentation::RequirePodSections)
 
 ### import FHEM functions / global vars
@@ -161,7 +161,6 @@ my $PAT_DTSEP = qr/(?:_)/ix; # date/time separator
 my $PAT_DATE = qr/(3[01]|[0-2]?[0-9])\.(1[0-2]|0?[0-9])\.((?:19|20)[0-9][0-9])/ix;
 #pattern for time
 my $PAT_TIME = qr/(2[0-4]|[01]{0,1}[0-9]):([0-5]{0,1}[0-9]):([0-5]{0,1}[0-9])/ix;
-#my $PAT_TIME = qr/(2[0-4]|[0?1][0-9]):([0?1-5][0-9]):([0?1-5][0-9])/ix;
 my $PAT_DPT16_CLR = qr/>CLR</ix;
 
 #CODE is the identifier for the en- and decode algos. See encode and decode functions
@@ -394,7 +393,6 @@ sub KNX_Define {
 		foreach my $tuls (@tulList) {
 			if ($tuls eq $iodevCandidate) {
 				if ((IsDisabled($iodevCandidate) == 1) || IsDummy($iodevCandidate)) { # IO - device is disabled or dummy
-#					delete $attr{$name}{IODev};
 					Log3 ($name, 3, "KNX_define ($name): IODev $iodevCandidate not used - because IODev is disabled or dummy");
 					next;
 				}
@@ -652,7 +650,7 @@ sub KNX_Get {
 
 	IOWrite($hash, $TULid, 'r' . $groupc);
 
-	FW_directNotify("FILTER=" . $FW_detail, '#FHEMWEB:' . $FW_wname, 'FW_errmsg(" current value for ' . $name . ' - ' . $group . ' requested",5000)', qq{});
+	FW_directNotify("FILTER=" . $FW_detail, '#FHEMWEB:' . $FW_wname, 'FW_errmsg(" current value for ' . $name . ' - ' . $group . ' requested",5000)', qq{}) if (defined($FW_wname));
 
 	return;
 }
@@ -1481,7 +1479,6 @@ sub KNX_decodeByDpt {
 
 	if (ref($dpttypes{$code}->{DEC}) eq 'CODE') {
 		$state = $dpttypes{$code}->{DEC}->($value, $model, $hash);
-#		$state = $dpttypes{$code}->{DEC}->($value, $model);
 		my $unit = $dpttypes{$model}{UNIT};
 		$state = $state . q{ } . $unit if (defined ($unit) && ($unit ne q{})); #append unit, if supplied
 
@@ -1676,9 +1673,7 @@ sub enc_dpt232 { #RGB-Code
 ### decode sub functions ###
 sub dec_dpt1 { #Binary value
 	my $numval = hex (shift);
-#	my $value = shift;
 	my $model = shift;
-#	my $numval = hex ($value);
 	$numval = ($numval & 0x01);
 	my $state = $dpttypes{"$model"}{MIN}; # default
 	$state = $dpttypes{"$model"}{MAX} if ($numval == 1);
@@ -1894,7 +1889,6 @@ sub main::KNX_scan {
 ### issue all get cmd's - each one delayed by InternalTimer
 sub doKNX_scan {
 	my ($devgad, $arr) = split(/,/x,shift,2);
-#	Log3 undef,1, "doKNX_scan: get $devgad";
 	main::fhem("get $devgad");
 	return if (length($arr) <= 1);
 	return InternalTimer(gettimeofday() + 0.2,\&doKNX_scan,$arr); # does not support array-> use string...
@@ -2228,11 +2222,14 @@ The result of the "get" cmd  will be stored in the respective readings - same as
 <br/>Useful after a fhem-start to syncronize the readings with the status of the KNX-device.
 <br/>The "get" cmds are scheduled asynchronous, with a delay of 200ms between each get. (avoid overloading KNX-bus) 
 Returns number of "get's" issued.<br/>
-<code>KNX_scan                      - scan all possible devices</code><br/>
+<code>KNX_scan()                    - scan all possible devices</code><br/>
 <code>KNX_scan('dev-A')             - scan device-A only</code><br/>
 <code>KNX_scan('dev-A,dev-B,dev-C') - scan device-A, device-B, device-C</code><br/>
 <code>KNX_scan('room=Kueche')       - scan all KNX-devices in room Kueche</code><br/>
 <code>{KNX_scan('device')}          - syntax when used from FHEM-cmdline</code><br/>
+<br/>When using KNX_scan() or any 'set|get <device> ...' in a global:INITIALIZED notify, pls. ensure to have some delay in processing the cmd's by using <b>fhem sleep</b>.
+<br/>Example: <code>defmod initialized_nf notify global:INITIALIZED sleep 2 quiet;; set KNX_date now;; set KNX_time now;; {KNX_scan()};;</code>
+<br>This avoids sending requests while the KNX-Gateway has not finished its initial handshake-procedure with FHEM (the KNX-IO-device).  
 </li>
 </ul>
 
