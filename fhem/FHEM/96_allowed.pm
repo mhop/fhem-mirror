@@ -482,13 +482,15 @@ EOF
 
     <a name="allowedIfAuthenticatedByMe"></a>
     <li>allowedIfAuthenticatedByMe<br>
-        if set (to 1), then the allowed parameters will only be checked, if the
-        authentication was executed by this allowed instance.
+        By default (value is 1), the rules only apply, if the connection was
+        authenticated (via username/password) by this allowed instance. Set the
+        value to 0 to apply the rules anyway, e.g. if this instance has no
+        username or password set.
         </li><br>
 
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
-        request a username/password authentication for FHEMWEB access.
+        Request a username/password authentication for FHEMWEB access.
         It can be a base64 encoded string of user:password, an SHA256 hash
         (which should be set via the corresponding set command) or a perl
         expression if enclosed in {}, where $user and $password are set, and
@@ -634,9 +636,11 @@ EOF
 
     <a name="allowedIfAuthenticatedByMe"></a>
     <li>allowedIfAuthenticatedByMe<br>
-        falls gesetzt (auf 1), dann werden die allowed Attribute nur dann
-        angewendet, falls auch die Authentifikation durch diese allowed Instanz
-        durchgef&uuml;hrt wurde.
+        Per Voreinstellung (Wert ist 1) werden die Regel nur dann angewendet,
+        falls die Authentifikation (per Benutzername / Passwort) durch diese
+        allowed Instanz erfolgte.  Falls der Wert 0 ist, werden die Regel in
+        jedem Fall angewendet. Das ist z.Bsp. dann notwendig, falls kein
+        Benutzername/Passwort gesetzt ist.
         </li><br>
 
     <a name="basicAuth"></a>
