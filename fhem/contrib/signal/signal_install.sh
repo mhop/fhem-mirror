@@ -506,7 +506,7 @@ start_service() {
 			cd $SIGNALPATH/signal/bin
 			echo "Starting signal-cli daemon for Docker"
 			sudo -u $SIGNALUSER ./signal-cli --config $SIGNALVAR daemon --system >/var/log/signal.log 2>/var/log/signal.err &
-			WAITCHECK="grep dbus /var/log/signal.err"
+			WAITCHECK="grep -i dbus /var/log/signal.err"
 		fi
 		echo -n "Waiting for signal-cli to become ready."
 		WAIT=""
