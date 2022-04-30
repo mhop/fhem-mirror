@@ -1,32 +1,47 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.5"
+SCRIPTVERSION="3.8"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.9.2"
+SIGNALVERSION="0.9.2"	#Default for systems that don't hava Java17
+ALTVERSION="0.10.5"		#Default for systems with Java17
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
 SYSTEMD=/etc/systemd/system
 LOG=/tmp/signal_install.log
 TMPFILE=/tmp/signal$$.tmp
-VIEWER=eog
 DBVER=0.19
 OPERATION=$1
-JAVA_VERSION=11.0
+JAVACMD=java
 
-if [ $OPERATION = "experimental" ]; then
-  SIGNALVERSION="0.10.2"
+#Check if Java 17 installation is available for this system
+J17=`apt-cache search --names-only 'openjdk-17-jdk-headless'`
+if ! [ "$JAVA_HOME" = "" ]; then
+	JAVACMD=$JAVA_HOME/bin/java
+fi
+JVER=`$JAVA_HOME/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+if [ "$J17" != "" ] || [ "$JVER" = "17.0" ]; then
+  SIGNALVERSION=$ALTVERSION
+  VEXT="-Linux"
+  JAVA_VERSION=17.0
+  NATIVE_JAVA17=yes
+else 
+  JAVA_VERSION=11.0
+  NATIVE_JAVA17=no
+  VEXT=
+fi
+
+if [ "$OPERATION" = "experimental" ]; then
+  SIGNALVERSION=$ALTVERSION
+  VEXT="-Linux"
   JAVA_VERSION=17.0
   OPERATION=
 fi
-
-#Make sure picture viewer exists
-VIEWER=`which $VIEWER`
 
 #Get OS data
 if [ -e /etc/os-release ]; then
@@ -82,7 +97,7 @@ install_by_file() {
 	PACKAGE=$2
 	echo -n "Checking for $FILE..."
 	if ! [ -e "$FILE" ]; then
-		echo -n "installing ($PACKAGE)"
+		echo -n "installing ($PACKAGE)..."
 		apt-get -q -y install $PACKAGE >>$LOG
 		if ! [ -e "$FILE" ]; then
 			echo "Failed to install $FILE"
@@ -157,16 +172,13 @@ fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
 IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
-KNOWN=("amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "armhf-glibc2.31-0.10.2" "armhf-glibc2.28-0.10.2" "amd64-glibc2.27-0.10.2" "amd64-glibc2.31-0.10.2")
+KNOWN=("amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "amd64-glibc2.28-0.10.5" "amd64-glibc2.31-0.10.5" "armhf-glibc2.28-0.10.5" "armhf-glibc2.31-0.10.5")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
     echo "$IDENTSTR is an unsupported combination - signal-cli binary libraries might not work"
-	if [ $ARCH = "amd64" && $GLIBC < "2.31" ]; then
-		GLIBC=2.28
-		echo "Fallback to GLIBC $GLIBC";
-	elif [ $ARCH = "armhf" && $GLIBC < "2.31" ]; then
-	    GLIBC=2.27
+	if [ "$GLIBC" != "2.31" ]; then
+	    GLIBC=2.28
 		echo "Fallback to GLIBC $GLIBC";
 	else
 	   GETLIBS=0
@@ -195,6 +207,7 @@ echo "Signal version:               $SIGNALVERSION"
 echo "System library path:          $LIBPATH"
 echo "System architecture:          $ARCH"
 echo "System GLIBC version:         $GLIBC"
+echo "Using Java version:           $JAVA_VERSION"
 fi
 
 check_and_update() {
@@ -266,9 +279,22 @@ else
 fi
 
 echo -n "Checking system Java version ... "
-JVER=`java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
 echo $JVER
-if ! [ "$JAVA_VERSION" = "$JVER" ]; then
+if [ "$JVER" != "17.0" ] && [ $NATIVE_JAVA17 = "yes" ]; then
+	echo -n "Installing openjdk-17-jre-headless..."
+	apt-get -q -y install openjdk-17-jre-headless >>$LOG
+	JVER=`java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+	if [ "$JVER" = "17.0" ]; then
+		echo "done"
+	else 
+		echo "failed"
+		exit
+	fi
+fi
+
+if ! [ "$JVER" = "17.0" ]; then 
+  if ! [ "$JAVA_VERSION" = "$JVER" ]; then
 	if [ -e /opt/java ]; then
 		echo -n "Checking for Java in /opt/java ... "
 		JVER=`/opt/java/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
@@ -294,6 +320,7 @@ if ! [ "$JAVA_VERSION" = "$JVER" ]; then
 		echo "done"
 	fi
 	export JAVA_HOME=/opt/java
+  fi
 fi
 }
 
@@ -314,7 +341,7 @@ if [ -x "$SIGNALPATH/signal/bin/signal-cli" ]; then
 	if [ "$CHECKVER" = "signal-cli $SIGNALVERSION" ]; then
 		echo "signal-cli matches target version...ok"
 	else 
-		echo -n "Update to current version (y/N)? "
+		echo -n "Update to current version $SIGNALVERSION (y/N)? "
 		read REPLY
 		if [ "$REPLY" = "y" ]; then
 			NEEDINSTALL=1
@@ -330,7 +357,7 @@ if [ $NEEDINSTALL = 1 ]; then
 	stop_service
 	cd /tmp
 	echo -n "Downloading signal-cli $SIGNALVERSION..."
-	wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION.tar.gz
+	wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION$VEXT.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
 	if ! [ -e signal-cli-$SIGNALVERSION.tar.gz ]; then
 		echo "failed"
 		exit
@@ -353,8 +380,11 @@ if [ $NEEDINSTALL = 1 ]; then
 			echo "Updating native libs for $IDENTSTR"
 			if [ $JAVA_VERSION = "11.0" ]; then
 				zip -u $SIGNALPATH/signal/lib/zkgroup-java-*.jar libzkgroup.so
+				zip -u $SIGNALPATH/signal/lib/signal-client-java-*.jar libsignal_jni.so
+			else
+				zip -u $SIGNALPATH/signal/lib/libsignal-client-*.jar libsignal_jni.so
 			fi
-			zip -u $SIGNALPATH/signal/lib/signal-client-java-*.jar libsignal_jni.so
+
 			#Use updated libs in jar instead of /usr/lib
 			#mv libsignal_jni.so libzkgroup.so $LIBPATH
 			#rm -f $LIBDIR/libzkgroup.so $LIBDIR/libsignal_jni.so

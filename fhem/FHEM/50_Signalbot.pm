@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.7";
+my $Signalbot_VERSION="3.8";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -26,9 +26,13 @@ use HttpUtils;
 
 eval "use Protocol::DBus;1";
 eval "use Protocol::DBus::Client;1" or my $DBus_missing = "yes";
+sub LogUnicode($$$);
 
 require FHEM::Text::Unicode;
 use FHEM::Text::Unicode qw(:ALL);
+use vars qw(%FW_webArgs); # all arguments specified in the GET
+use vars qw($FW_detail);  # currently selected device for detail view
+use vars qw($FW_RET);
 
 #maybe really get introspective here instead of handwritten list
  my %signatures = (
@@ -43,35 +47,46 @@ use FHEM::Text::Unicode qw(:ALL);
 	"sendMessage" 			=> "sasas",
 	"getContactName" 		=> "s",
 	"setContactName" 		=> "ss",
-	"getGroupIds" 			=> "aay",
+	"getGroupIds" 			=> "",
 	"getGroupName" 			=> "ay",
 	"getGroupMembers" 		=> "ay",
 	"listNumbers" 			=> "",
 	"getContactNumber" 		=> "s",
 	"isContactBlocked" 		=> "s",
 	"isGroupBlocked" 		=> "ay",
-	"version" 				=> "",
 	"isMember"				=> "ay",
+	"createGroup"			=> "sass",
 	"getSelfNumber"			=> "", #V0.9.1
 	"deleteContact"			=> "s", #V0.10.0
 	"deleteRecipient"		=> "s", #V0.10.0
 	"setPin"				=> "s", #V0.10.0
 	"removePin"				=> "", #V0.10.0
+	"getGroup"				=> "ay", #V0.10.0
 	"sendEndSessionMessage" => "as",		#unused
 	"sendRemoteDeleteMessage" => "xas",		#unused
 	"sendGroupRemoteDeletemessage" => "xay",#unused
 	"sendMessageReaction" => "sbsxas",		#unused
 	"sendGroupMessageReaction" => "sbsxay",	#unused
 );
+	
+ my %groupsignatures = (
+	#methods in the "Groups" object from V0.10
+	"deleteGroup"			=> "",
+	"addMembers"			=> "as",
+	"removeMembers"			=> "as",
+	"quitGroup"				=> "",
+	"addAdmins"				=> "as",
+	"removeAdmins"			=> "as",
+);
 
 #dbus interfaces that only exist in registration mode
 my %regsig = (
 	"listAccounts"			=> "",
 	"link"					=> "s",
-	"registerWithCaptcha"	=> "sbs",	#not implemented yet
-	"verifyWithPin"			=> "sss",	#not implemented yet
-	"register"				=> "sb",	#not implemented yet
-	"verify"				=> "ss",	#not implemented yet
+	"registerWithCaptcha"	=> "sbs",
+	"verifyWithPin"			=> "sss", #not used
+	"register"				=> "sb",
+	"verify"				=> "ss",
 	"version" 				=> "",
 );
 
@@ -93,6 +108,7 @@ sub Signalbot_Initialize($) {
   $hash->{ReceiptReceived} = "Signalbot_ReceiptReceived";
   $hash->{version}		= "Signalbot_Version_cb";
   $hash->{updateGroup}  = "Signalbot_UpdateGroup_cb";
+  $hash->{createGroup}  = "Signalbot_UpdateGroup_cb";
   $hash->{joinGroup}	= "Signalbot_UpdateGroup_cb";
   $hash->{listNumbers}	= "Signalbot_ListNumbers_cb";
   $hash->{AttrList}  = 	"IODev do_not_notify:1,0 ignore:1,0 showtime:1,0 ".
@@ -110,7 +126,28 @@ sub Signalbot_Initialize($) {
 												"formatting:none,html,markdown,both ".
 												"registerMethod:SMS,Voice ".
 												"$readingFnAttributes";
+	$data{FWEXT}{"/Signalbot_sendMsg"}{CONTENTFUNC} = "Signalbot_sendMsg";
 }
+
+sub Signalbot_sendMsg($@) {
+	my ($arg) = @_;
+	my ($cmd, $cmddev) = FW_digestCgi($arg);
+	my $mod=$FW_webArgs{detail};
+	my $snd=$FW_webArgs{send};
+	my $hash = $defs{$mod};
+	my @args=split(" ",$snd);
+	@args=parse_line(' ',0,join(" ",@args));
+	my $ret=Signalbot_prepareSend($hash,"send",@args);
+	readingsSingleUpdate($hash, 'lastError', $ret,1) if defined $ret;
+	#$FW_XHR=1;
+	#This does not work als {CL} is not set here
+	#my $name = $hash->{NAME};
+	#my $web=$hash->{CL}{SNAME};
+	#my $peer=$hash->{CL}{PEER};
+	#DoTrigger($web,"JS#$peer:location.href=".'"'."?detail=$name".'"');
+	return 0;
+}
+
 ################################### 
 sub Signalbot_Set($@) {					#
 
@@ -127,22 +164,22 @@ sub Signalbot_Set($@) {					#
 	my @accounts;
 	@accounts =@{$hash->{helper}{accountlist}} if defined $hash->{helper}{accountlist};
 	my $sets=	"send:textField ".
-				"reply:textField ".
-				"contact:textField ".
+				"updateProfile:textField ".
+				"reply:textField ";
+	$sets.=	"addContact:textField ".
 				"createGroup:textField ".
 				"invite:textField ".
 				"block:textField ".
 				"unblock:textField ".
 				"updateGroup:textField ".
 				"quitGroup:textField ".
-				"joinGroup:textField ".
-				"updateProfile:textField ";
-	$sets.=		"deleteContact:textField " if $version >=1000;
+				"joinGroup:textField " if $version <1000;
+	$sets.=		"group:widgetList,13,select,addMembers,removeMembers,addAdmins,removeAdmins,invite,create,delete,block,unblock,update,".
+				"quit,join,1,textField contact:widgetList,5,select,add,delete,block,unblock,1,textField " if $version >=1000;
 	my $sets_reg=	"link:noArg ".
-					"register:textField ".
-					"captcha:textField ".
-					"verify:textField ";
-					
+					"register:textField ";
+	$sets_reg	.=	"captcha:textField " if defined ($hash->{helper}{register});
+	$sets_reg	.=	"verify:textField " if defined ($hash->{helper}{verification});
 	
 	$sets.=$sets_reg if defined $multi && $multi==1;
 	$sets=$sets_reg if $account eq "none";
@@ -158,6 +195,8 @@ sub Signalbot_Set($@) {					#
 		my $ret = Signalbot_setup($hash);
 		$hash->{STATE} = $ret if defined $ret;
 		$hash->{helper}{qr}=undef;
+		$hash->{helper}{register}=undef;
+		$hash->{helper}{verification}=undef;
 		Signalbot_createRegfiles($hash);
 		return undef;
 	}
@@ -166,6 +205,15 @@ sub Signalbot_Set($@) {					#
 	if ( $cmd ne "send") {
 		@args=parse_line(' ',0,join(" ",@args));
 	}
+
+	#restructure multi widget command (that have a comma after the first argument)
+	if ( $cmd eq "group" or $cmd eq "contact") {
+		my @cm=split(",",$args[0]);
+		$cmd=$cmd.$cm[0];
+		$args[0]=$cm[1];
+		print "$cmd ".join(":",@args)."\n";
+	}
+	
 	if ( $cmd eq "signalAccount" ) {
 		#When registered, first switch back to default account
 		my $number = shift @args;
@@ -184,7 +232,6 @@ sub Signalbot_Set($@) {					#
 		return "Error changing account, using previous account $account";
 	} elsif ($cmd eq "link") {
 		my $qrcode=Signalbot_CallS($hash,"link","FHEM");
-		
 		if (defined $qrcode) {
 			my $qr_url = "https://chart.googleapis.com/chart?cht=qr&chs=200x200"."&chl=";
 			$qr_url .= uri_escape($qrcode);
@@ -193,7 +240,7 @@ sub Signalbot_Set($@) {					#
 			$hash->{helper}{verification}=undef;
 			return undef;
 		}
-		return "Error creating device link";
+		return "Error creating device link:".$hash->{helper}{lasterr};
 	} elsif ( $cmd eq "register") {
 		my $account= shift @args;
 		return "Number needs to start with '+' followed by digits" if !defined Signalbot_checkNumber($account);
@@ -239,7 +286,7 @@ sub Signalbot_Set($@) {					#
 			return "You first need to complete registration before you can enter the verification code";
 		}
 		my $ret=Signalbot_CallS($hash,"verify",$account,$code);
-		return if !defined $ret;
+		return $hash->{helper}{lasterr} if !defined $ret;
 		if ($ret == 0) {
 			#On successfuly verification switch to that account
 			$ret=Signalbot_setAccount($hash,$account);
@@ -249,7 +296,7 @@ sub Signalbot_Set($@) {					#
 			return undef;
 		}
 		return $ret;
-	} elsif ( $cmd eq "contact") {
+	} elsif ( $cmd eq "addContact" || $cmd eq "contactadd") {
 		if (@args<2 ) {
 			return "Usage: set ".$hash->{NAME}." contact <number> <nickname>";
 		} else {
@@ -259,19 +306,35 @@ sub Signalbot_Set($@) {					#
 			return $ret if defined $ret;
 		}
 		return undef;
-	} elsif ( $cmd eq "deleteContact") {
+	} elsif ( $cmd eq "deleteContact" || $cmd eq "contactdelete") {
 		return "Usage: set ".$hash->{NAME}." deleteContact <number|name>" if (@args<1);
 		return "signal-cli 0.10.0+ required" if $version<1000;
 		my $nickname = join (" ",@args);
 		my $number=Signalbot_translateContact($hash,$nickname);
 		return "Unknown contact" if !defined $number;
 		delete $hash->{helper}{contacts}{$number} if defined $hash->{helper}{contacts}{$number};
-		#Signalbot_CallS($hash,"deleteContact",$number);
-		my $ret=Signalbot_CallS($hash,"deleteRecipient",$number);
-		return; #$ret;
-	} elsif ( $cmd eq "createGroup") {
-		if (@args<1 || @args>2 ) {
-			return "Usage: set ".$hash->{NAME}." createGroup <group name> &[path to thumbnail]";
+		Signalbot_CallA($hash,"deleteRecipient",$number);
+		return;
+	} elsif ( $cmd eq "deleteGroup" || $cmd eq "groupdelete") {
+		return "Usage: set ".$hash->{NAME}." deleteGroup <groupname>" if (@args<1);
+		return "signal-cli 0.10.0+ required" if $version<1000;
+		my $ret=Signalbot_CallSG($hash,"deleteGroup",shift @args);
+		return $hash->{helper}{lasterr} if !defined $ret;
+		delete $hash->{helper}{groups}; #Delete the whole hash to clean up removed groups
+		print "deleted" if !defined $hash->{helper}{groups};
+		Signalbot_refreshGroups($hash); #and read the back
+		return;		
+	} elsif ( $cmd eq "addGroupMembers" || $cmd eq "groupaddMembers") {
+		return Signalbot_memberShip($hash,"addMembers",@args);
+	} elsif ( $cmd eq "removeGroupMembers" || $cmd eq "groupremoveMembers") {
+		return Signalbot_memberShip($hash,"removeMembers",@args);
+	} elsif ( $cmd eq "addGroupAdmins" || $cmd eq "groupaddAdmins") {
+		return Signalbot_memberShip($hash,"addAdmins",@args);
+	} elsif ( $cmd eq "removeGroupAdmins" || $cmd eq "groupremoveAdmins") {
+		return Signalbot_memberShip($hash,"removeAdmins",@args);
+	} elsif ( $cmd eq "createGroup" || $cmd eq "groupcreate") {
+		if (@args<1) {
+			return "Usage: set ".$hash->{NAME}." createGroup <group name> &[path to thumbnail] [member1,member2...]";
 		} else {
 			my $ret=Signalbot_updateGroup($hash,@args);
 			return $ret if defined $ret;
@@ -285,30 +348,30 @@ sub Signalbot_Set($@) {					#
 			return $ret if defined $ret;
 		}
 		return undef;
-	} elsif ( $cmd eq "quitGroup") {
+	} elsif ( $cmd eq "quitGroup" || $cmd eq "groupquit") {
 		if (@args!=1) {
 			return "Usage: set ".$hash->{NAME}." ".$cmd." <group name>";
 		}
-		my $ret;
 		my @group=Signalbot_getGroup($hash,$args[0]);
 		return join(" ",@group) unless @group>1;
-		Signalbot_Call($hash,"quitGroup",\@group);
-		return undef;
-	} elsif ( $cmd eq "joinGroup") {
+		Signalbot_CallA($hash,"quitGroup",\@group);
+		return;
+	} elsif ( $cmd eq "joinGroup" || $cmd eq "groupjoin") {
 		if (@args!=1) {
 			return "Usage: set ".$hash->{NAME}." ".$cmd." <group link>";
 		}
-		return Signalbot_Call($hash,"joinGroup",$args[0]);
-	} elsif ( $cmd eq "block" || $cmd eq "unblock") {
+		Signalbot_CallA($hash,"joinGroup",$args[0]);
+		return;
+	} elsif ( $cmd eq "block" || $cmd eq "unblock" || $cmd eq "contactblock" || $cmd eq "contactunblock" || $cmd eq "groupblock" || $cmd eq "groupunblock") {
 		if (@args!=1) {
 			return "Usage: set ".$hash->{NAME}." ".$cmd." <group name>|<contact>";
 		} else {
 			my $name=shift @args;
-			my $ret=Signalbot_setBlocked($hash,$name,($cmd eq "block"?1:0));
+			my $ret=Signalbot_setBlocked($hash,$name,(($cmd=~ /unblock/)?0:1));
 			return $ret if defined $ret;
 		}
 		return undef;
-	} elsif ( $cmd eq "updateGroup") {
+	} elsif ( $cmd eq "updateGroup" || $cmd eq "groupupdate") {
 		if (@args<1 || @args>3 ) {
 			return "Usage: set ".$hash->{NAME}." updateGroup <group name> #[new name] &[path to thumbnail]";
 		} else {
@@ -316,7 +379,7 @@ sub Signalbot_Set($@) {					#
 			return $ret if defined $ret;
 		}
 		return undef;
-	} elsif ( $cmd eq "invite") {
+	} elsif ( $cmd eq "invite" || $cmd eq "groupinvite") {
 		if (@args < 2 ) {
 			return "Usage: set ".$hash->{NAME}." invite <group name> <contact1> [<contact2] ...]";
 		} else {
@@ -327,130 +390,154 @@ sub Signalbot_Set($@) {					#
 		return undef;
 	} elsif ( $cmd eq "send" || $cmd eq "reply") {
 		return "Usage: set ".$hash->{NAME}." send [@<Recipient1> ... @<RecipientN>] [#<GroupId1> ... #<GroupIdN>] [&<Attachment1> ... &<AttachmentN>] [<Text>]" if ( @args==0); 
-
-		my @recipients = ();
-		my @groups = ();
-		my @attachments = ();
-		my $message = "";
-		#To allow spaces in strings, join string and split it with parse_line that will honor spaces embedded by double quotes
-		my $fullstring=join(" ",@args);
-		my $bExclude=AttrVal($hash->{NAME},"babbleExclude",undef);
-		if ($bExclude && $fullstring =~ /$bExclude(.*)/s) {  #/s required so newlines are included in match
-			#Extra utf Encoding marker)
-			$fullstring=encode_utf8($1);
-			Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Extra UTF8 encoding of:$fullstring:\n";
-		}
-		eval { $fullstring=decode_utf8($fullstring); };
-		#	Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Error from decode" if $@;
-			
-		Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Before parse:" .$fullstring. ":";
-		my $tmpmessage = $fullstring =~ s/\\n/\x0a/rg;
-		my @args=parse_line(' ',0,$tmpmessage);
 		
-		while(my $curr_arg = shift @args){
-			if($curr_arg =~ /^\@([^#].*)$/){	#Compatbility with SiSi - also allow @# as groupname
-				push(@recipients,$1);
-			}elsif($curr_arg =~ /^\@#(.*)$/){ 	#Compatbility with SiSi - also allow @# as groupname
-				push(@groups,$1);
-			}elsif($curr_arg =~ /^#(.*)$/){
-				push(@groups,$1);
-			}elsif($curr_arg =~ /^\&(.*)$/){
-				push(@attachments,$1);
-			}else{
-				unshift(@args,$curr_arg);
-				last;
-			}
-
-		}
-		my $defaultPeer=AttrVal($hash->{NAME},"defaultPeer",undef);
-		if ($cmd eq "reply") {
-			my $lastSender=ReadingsVal($hash->{NAME},"msgGroupName","");
-			if ($lastSender ne "") {
-				$lastSender="#".$lastSender;
-			} else {
-				$lastSender=ReadingsVal($hash->{NAME},"msgSender","");
-			}
-			$defaultPeer=$lastSender if $lastSender ne "";
-			Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Reply mode to $defaultPeer";
-		}
-		return "Not enough arguments. Specify a Recipient, a GroupId or set the defaultPeer attribute" if( (@recipients==0) && (@groups==0) && (!defined $defaultPeer) );
-
-		#Check for embedded fhem/perl commands
-		my $err;
-		($err, @recipients) = Signalbot_replaceCommands($hash,@recipients);
-		if ($err) { return $err; }
-		($err, @groups) = Signalbot_replaceCommands($hash,@groups);
-		if ($err) { return $err; }
-		($err, @attachments) = Signalbot_replaceCommands($hash,@attachments);
-		if ($err) { return $err; }
-		
-		if ((defined $defaultPeer) && (@recipients==0) && (@groups==0)) {
-
-			my @peers = split(/,/,$defaultPeer);
-			while(my $curr_arg = shift @peers){
-				if($curr_arg =~ /^#/){
-					push(@groups,$curr_arg);
-				} else {
-					push(@recipients,$curr_arg);
-				}
-			}
-		}
-		return "Specify either a message text or an attachment" if((@attachments==0) && (@args==0));
-
-		$message = join(" ", @args);
-		if (@attachments>0) {
-			#create copy in /tmp to mitigate incomplete files and relative paths in fhem
-			my @newatt;
-			foreach my $file (@attachments) {
-				if ( -e $file ) {
-					if ($file=~/^\/tmp\/signalbot.*/ ne 1) {
-						$file =~ /^.*?\.([^.]*)?$/;
-						my $type = $1;
-						my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
-						copy($file,$tmpfilename);
-						push @newatt, $tmpfilename;
-					} else {
-						push @newatt, $file;
-					}
-				} else {
-					my $png=Signalbot_getPNG($hash,$file);
-					return "File not found: $file" if !defined $png;
-					return $png if ($png =~ /^Error:.*/);
-					push @newatt, $png;
-				}
-			}
-			@attachments=@newatt;
-		}
-		#Convert html or markdown to unicode
-		my $format=AttrVal($hash->{NAME},"formatting","none");
-		my $convmsg=formatTextUnicode($format,$message);
-		$message=$convmsg if defined $convmsg;
-		
-		#Send message to individuals (bulk)
-		if (@recipients > 0) {
-			Signalbot_sendMessage($hash,join(",",@recipients),join(",",@attachments),$message);
-		}
-		if (@groups > 0) {
-		#Send message to groups (one at time)
-			while(my $currgroup = shift @groups){
-				Signalbot_sendGroupMessage($hash,$currgroup,join(",",@attachments),$message);
-			}
-		}
-		#Remember temp files
-		my @atts = ();
-		my $attstore = $hash->{helper}{attachments};
-		if (defined $attstore) {
-			@atts = @$attstore;
-		}
-		push @atts,@attachments;
-		$hash->{helper}{attachments}=[@atts];
+		return Signalbot_prepareSend($hash,$cmd,@args);
 	} 
-	return undef;
+	return "Unknown command $cmd";
+}
+
+sub Signalbot_memberShip($@) {
+	my ($hash,$func,@args) = @_;
+	return "Usage: set ".$hash->{NAME}." $func <groupname> <contact1> [contact2] ..." if (@args<2);
+	my $version = $hash->{helper}{version};
+	return "signal-cli 0.10.0+ required" if $version<1000;
+	my $group=shift @args;
+	my @contacts;
+	foreach my $contact (@args) {
+		my $c=Signalbot_translateContact($hash,$contact);
+		return "Unknown contact $contact" if !defined $c;
+		push @contacts,$c;
+	}
+	Signalbot_CallAG($hash,$func,$group,\@contacts);
+	return;
+}
+		
+sub Signalbot_prepareSend($@) {
+	my ($hash,$cmd,@args)= @_;
+
+	my @recipients = ();
+	my @groups = ();
+	my @attachments = ();
+	my $message = "";
+	#To allow spaces in strings, join string and split it with parse_line that will honor spaces embedded by double quotes
+	my $fullstring=join(" ",@args);
+	my $bExclude=AttrVal($hash->{NAME},"babbleExclude",undef);
+	if ($bExclude && $fullstring =~ /$bExclude(.*)/s) {  #/s required so newlines are included in match
+		#Extra utf Encoding marker)
+		#$fullstring=encode_utf8($1);
+		#Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Extra UTF8 encoding of:$fullstring:\n";
+	}
+	#$fullstring=encode_utf8($fullstring) if($unicodeEncoding); 
+	eval { $fullstring=decode_utf8($fullstring) if !($unicodeEncoding)};
+	#	Log3 $hash->{NAME}, 3 , $hash->{NAME}.": Error from decode" if $@;
+		
+	LogUnicode $hash->{NAME}, 3 , $hash->{NAME}.": Before parse:" .$fullstring. ":";
+	my $tmpmessage = $fullstring =~ s/\\n/\x0a/rg;
+	@args=parse_line(' ',0,$tmpmessage);
+	
+	while(my $curr_arg = shift @args){
+		if($curr_arg =~ /^\@([^#].*)$/){	#Compatbility with SiSi - also allow @# as groupname
+			push(@recipients,$1);
+		}elsif($curr_arg =~ /^\@#(.*)$/){ 	#Compatbility with SiSi - also allow @# as groupname
+			push(@groups,$1);
+		}elsif($curr_arg =~ /^#(.*)$/){
+			push(@groups,$1);
+		}elsif($curr_arg =~ /^\&(.*)$/){
+			push(@attachments,$1);
+		}else{
+			unshift(@args,$curr_arg);
+			last;
+		}
+
+	}
+	my $defaultPeer=AttrVal($hash->{NAME},"defaultPeer",undef);
+	if ($cmd eq "reply") {
+		my $lastSender=ReadingsVal($hash->{NAME},"msgGroupName","");
+		if ($lastSender ne "") {
+			$lastSender="#".$lastSender;
+		} else {
+			$lastSender=ReadingsVal($hash->{NAME},"msgSender","");
+		}
+		$defaultPeer=$lastSender if $lastSender ne "";
+		Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Reply mode to $defaultPeer";
+	}
+	return "Not enough arguments. Specify a Recipient, a GroupId or set the defaultPeer attribute" if( (@recipients==0) && (@groups==0) && (!defined $defaultPeer) );
+
+	#Check for embedded fhem/perl commands
+	my $err;
+	($err, @recipients) = Signalbot_replaceCommands($hash,@recipients);
+	if ($err) { return $err; }
+	($err, @groups) = Signalbot_replaceCommands($hash,@groups);
+	if ($err) { return $err; }
+	($err, @attachments) = Signalbot_replaceCommands($hash,@attachments);
+	if ($err) { return $err; }
+	
+	if ((defined $defaultPeer) && (@recipients==0) && (@groups==0)) {
+
+		my @peers = split(/,/,$defaultPeer);
+		while(my $curr_arg = shift @peers){
+			if($curr_arg =~ /^#/){
+				push(@groups,$curr_arg);
+			} else {
+				push(@recipients,$curr_arg);
+			}
+		}
+	}
+	return "Specify either a message text or an attachment" if((@attachments==0) && (@args==0));
+
+	$message = join(" ", @args);
+	if (@attachments>0) {
+		#create copy in /tmp to mitigate incomplete files and relative paths in fhem
+		my @newatt;
+		foreach my $file (@attachments) {
+			if ( -e $file ) {
+				if ($file=~/^\/tmp\/signalbot.*/ ne 1) {
+					$file =~ /^.*?\.([^.]*)?$/;
+					my $type = $1;
+					my $tmpfilename="/tmp/signalbot".gettimeofday().".".$type;
+					copy($file,$tmpfilename);
+					push @newatt, $tmpfilename;
+				} else {
+					push @newatt, $file;
+				}
+			} else {
+				my $png=Signalbot_getPNG($hash,$file);
+				return "File not found: $file" if !defined $png;
+				return $png if ($png =~ /^Error:.*/);
+				push @newatt, $png;
+			}
+		}
+		@attachments=@newatt;
+	}
+	#Convert html or markdown to unicode
+	my $format=AttrVal($hash->{NAME},"formatting","none");
+	my $convmsg=formatTextUnicode($format,$message);
+	$message=$convmsg if defined $convmsg;
+	my $ret;
+	#Send message to individuals (bulk)
+	if (@recipients > 0) {
+		$ret=Signalbot_sendMessage($hash,join(",",@recipients),join(",",@attachments),$message);
+	}
+	if (@groups > 0) {
+	#Send message to groups (one at time)
+		while(my $currgroup = shift @groups){
+			$ret=Signalbot_sendGroupMessage($hash,$currgroup,join(",",@attachments),$message);
+		}
+	}
+	#Remember temp files
+	my @atts = ();
+	my $attstore = $hash->{helper}{attachments};
+	if (defined $attstore) {
+		@atts = @$attstore;
+	}
+	push @atts,@attachments;
+	$hash->{helper}{attachments}=[@atts];
+	return $ret;
 }
 ################################### 
 sub Signalbot_Get($@) {
 	my ($hash, $name, @args) = @_;
-	
+	my $version = $hash->{helper}{version};	
 	my $numberOfArgs  = int(@args);
 	return "Signalbot_Get: No cmd specified for get" if ( $numberOfArgs < 1 );
 
@@ -461,10 +548,10 @@ sub Signalbot_Get($@) {
 		my $gets="favorites:noArg accounts:noArg helpUnicode:noArg ";
 		$gets.="contacts:all,nonblocked ".
 			"groups:all,active,nonblocked " if $account ne "none";
+		$gets .="groupProperties:textField " if $version >= 1000;
 		return "Signalbot_Get: Unknown argument $cmd, choose one of ".$gets;
 	}
 	
-	my $version = $hash->{helper}{version};
 	my $arg = shift @args;
 	
 	if ($cmd eq "introspective") {
@@ -507,7 +594,7 @@ sub Signalbot_Get($@) {
 		return $ret;
 	} elsif ($cmd eq "contacts" && defined $arg) {
 		my $num=Signalbot_CallS($hash,"listNumbers");
-		return "Error in listNumbers" if !defined $num;
+		return $hash->{helper}{lasterr} if !defined $num;
 		my @numlist=@$num;
 		my $ret="List of known contacts:\n\n";
 		my $format="%-16s|%-30s|%-6s\n";
@@ -515,8 +602,12 @@ sub Signalbot_Get($@) {
 		$ret.="\n";
 		foreach my $number (@numlist) {
 			my $blocked=Signalbot_CallS($hash,"isContactBlocked",$number);
+			return $hash->{helper}{lasterr} if !defined $blocked;
 			my $name=$hash->{helper}{contacts}{$number};
-			$name="UNKNOWN" unless defined $name;
+			if (!defined $name) {
+				$name=Signalbot_getContactName($hash,$number);
+			}
+			$name="UNKNOWN" if ($name =~/^\+/);
 			if (! ($number =~ /^\+/) ) { $number="Unknown"; }
 			if ($arg eq "all" || $blocked==0) {
 				$ret.=sprintf($format,$number,$name,$blocked==1?"yes":"no");
@@ -537,7 +628,7 @@ sub Signalbot_Get($@) {
 			my $group=$hash->{helper}{groups}{$groupid}{name};
 			my @groupID=split(" ",$groupid);
 			my $mem=Signalbot_CallS($hash,"getGroupMembers",\@groupID);
-			return "Error reading group memebers" if !defined $mem;
+			return $hash->{helper}{lasterr} if !defined $mem;
 			my @members=();;
 			foreach (@$mem) {
 				push @members,Signalbot_getContactName($hash,$_);
@@ -553,14 +644,46 @@ sub Signalbot_Get($@) {
 			}
 		}
 		return $ret;
+	} elsif ($cmd eq "groupProperties") {
+		return if $version<1000;
+		my $ret=Signalbot_getGroupProperties($hash,$arg);
+		return "Error:".$hash->{helper}{lasterr} if !defined $ret;
+		my %props=%$ret;
+		
+		$ret="Group $arg\n==============================\n";
+		$ret.="Description:".$props{Description}."\n";
+		$ret.="IsMember:".(($props{IsMember}==1)?"yes":"no")."\n";
+		$ret.="SendMessage:".$props{PermissionSendMessage}."\n";
+		$ret.="EditDetails:".$props{PermissionEditDetails}."\n";
+		$ret.="IsBlocked:".(($props{IsBlocked}==1)?"yes":"no")."\n";
+		$ret.="IsAdmin:".(($props{IsAdmin}==1)?"yes":"no")."\n";
+		
+		my $members=$props{Members};
+		$ret .="\nMembers:".join(",",Signalbot_contactsToList($hash,@$members));
+		$members=$props{RequestingMembers};
+		$ret .="\nRequesting members:".join(",",Signalbot_contactsToList($hash,@$members));
+		$members=$props{Admins};
+		$ret .="\nAdmins:".join(",",Signalbot_contactsToList($hash,@$members));
+		$members=$props{PendingMembers};
+		$ret .="\nPending members:".join(",",Signalbot_contactsToList($hash,@$members));
+		return $ret;
 	}
 	return undef;
+}
+
+sub Signalbot_contactsToList($@) {
+	my ($hash,@con) = @_;
+	my @list;
+	foreach (@con) {
+		push @list,Signalbot_getContactName($hash,$_);
+	}
+	return @list;
 }
 
 sub Signalbot_command($@){
 	my ($hash, $sender, $message) = @_;
 	
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Check Command $sender $message";
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Check Command $sender $message";
 	my $timeout=AttrVal($hash->{NAME},"authTimeout",300);
 	return $message if $timeout==0;
 	my $cmd=AttrVal($hash->{NAME},"cmdKeyword",undef);
@@ -568,7 +691,7 @@ sub Signalbot_command($@){
 	my @arr=();
 	if ($message =~ /^$cmd(.*)/) {
 		$cmd=$1;
-		Log3 $hash->{NAME}, 5, $hash->{NAME}.": Command received:$cmd";
+		LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Command received:$cmd";
 		my $device=AttrVal($hash->{NAME},"authDev",undef);
 		if (!defined $device) {
 			readingsSingleUpdate($hash, 'lastError', "Missing GoogleAuth device in authDev to execute remote command",1);
@@ -581,7 +704,7 @@ sub Signalbot_command($@){
 			my $restcmd=join(" ",@cc);
 			my $ret = gAuth($device,$token);
 			if ($ret == 1) {
-				Log3 $hash->{NAME}, 5, $hash->{NAME}.": Token valid for sender $sender for $timeout seconds";
+				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Token valid for sender $sender for $timeout seconds";
 				$hash->{helper}{auth}{$sender}=1;
 				#Remove potential old timer so countdown start from scratch
 				RemoveInternalTimer("$hash->{NAME} $sender");
@@ -589,10 +712,10 @@ sub Signalbot_command($@){
 				Signalbot_sendMessage($hash,$sender,"","You have control for ".$timeout."s");
 				$cmd=$restcmd;
 			} else {
-				Log3 $hash->{NAME}, 3, $hash->{NAME}.": Invalid token sent by $sender";
+				LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": Invalid token sent by $sender";
 				$hash->{helper}{auth}{$sender}=0;
 				Signalbot_sendMessage($hash,$sender,"","Invalid token");
-				Log3 $hash->{NAME}, 2, $hash->{NAME}.": Invalid token sent by $sender:$message";
+				LogUnicode $hash->{NAME}, 2, $hash->{NAME}.": Invalid token sent by $sender:$message";
 				return $cmd;
 			}
 		}
@@ -608,11 +731,12 @@ sub Signalbot_command($@){
 		if (defined $fav && defined $cc[0] && $cc[0] eq $fav) {
 			shift @cc;
 			my $fav=AttrVal($hash->{NAME},"favorites","");
+			eval { $fav=decode_utf8($fav) if !($unicodeEncoding)};
 			$fav =~ s/[\n\r]//g;
 			$fav =~ s/;;/##/g;
 			my @favorites=split(";",$fav);
 			if (@cc>0) {
-				Log3 $hash->{NAME}, 4, $hash->{NAME}.": $sender executes favorite command $cc[0]";
+				LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": $sender executes favorite command $cc[0]";
 				if ($cc[0] =~/\d+$/) {
 					#Favorite by index
 					my $fid=$cc[0]-1;
@@ -622,7 +746,7 @@ sub Signalbot_command($@){
 						$cmd=$3 if defined $3;
 						#"-" defined favorite commands that do not require authentification
 						$auth=1 if (defined $2 && $2 eq "-");
-						Log3 $hash->{NAME}, 4, $hash->{NAME}.": $sender requests favorite command:$cmd";
+						LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": $sender requests favorite command:$cmd";
 					} else {
 						$cmd="";
 						$error="favorite #$cc[0] not defined";
@@ -659,7 +783,7 @@ sub Signalbot_command($@){
 				}
 				$ret="No favorites defined" if @favorites==0;
 				if ($auth || $authList eq "-") {
-					Signalbot_sendMessage($hash,$sender,"",decode_utf8($ret));
+					Signalbot_sendMessage($hash,$sender,"",$ret);
 					return $cmd;
 				}
 				$cmd="";
@@ -668,7 +792,7 @@ sub Signalbot_command($@){
 		# Always return the same message if not authorized
 		if (!$auth) {
 			readingsSingleUpdate($hash, 'lastError', "Unauthorized command request by $sender:$message",1);
-			Log3 $hash->{NAME}, 2, $hash->{NAME}.": Unauthorized command request by $sender:$message";
+			LogUnicode $hash->{NAME}, 2, $hash->{NAME}.": Unauthorized command request by $sender:$message";
 			Signalbot_sendMessage($hash,$sender,"","You are not authorized to execute commands");
 			return $cmd;
 		}
@@ -679,15 +803,15 @@ sub Signalbot_command($@){
 		}
 		return $cmd if $cmd eq "";
 
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": $sender executes command $cmd";
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": $sender executes command $cmd";
 		$cmd =~ s/##/;/g;
 		my %dummy; 
 		my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $cmd ) );
 		if ( $err ) {
-			Log3 $hash->{NAME}, 4, $hash->{NAME}.": parse cmd failed on ReplaceSetmagic with :$err: on  :$cmd:";
+			LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": parse cmd failed on ReplaceSetmagic with :$err: on  :$cmd:";
 		} else {
 		$cmd = join(" ", @a);
-			Log3 $hash->{NAME}, 4, $hash->{NAME}.": parse cmd returned :$cmd:";
+			LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": parse cmd returned :$cmd:";
 		}
 		if ($cmd =~ /^print (.*)/) {
 			$error=$1; #ReplaceSetMagic has already modified the string, treat it as error to send
@@ -699,7 +823,7 @@ sub Signalbot_command($@){
 			$error = AnalyzeCommandChain($hash, $cmd);
 		}
 		if (defined $error) {
-			Signalbot_sendMessage($hash,$sender,"",decode_utf8($error));
+			Signalbot_sendMessage($hash,$sender,"",$error);
 		} else {
 			Signalbot_sendMessage($hash,$sender,"","Done");
 		}
@@ -719,7 +843,7 @@ sub Signalbot_authTimeout($@) {
 #Wrapper around the new MessageReceived callback - currently ignored since V0.10.0 sends both callbacks
 sub Signalbot_MessageReceivedV2 ($@) {
 	my ($hash,$timestamp,$source,$groupID,$message,$extras) = @_;
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Message CallbackV2 - ignored";	
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Message CallbackV2 - ignored";	
 	return;
 	my @attachments;
 	if (defined $extras->{attachments}) {
@@ -734,7 +858,7 @@ sub Signalbot_MessageReceivedV2 ($@) {
 sub Signalbot_MessageReceived ($@) {
 	my ($hash,$timestamp,$source,$groupID,$message,$attachments) = @_;
 
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Message Callback";
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Message Callback";
 
 	my $atr="";
 	my @att=@$attachments;
@@ -761,14 +885,15 @@ sub Signalbot_MessageReceived ($@) {
 	my $sender=Signalbot_getContactName($hash,$source);
 	
 	if (!defined $sender) {
-		Log3 $hash->{NAME}, 3, $hash->{NAME}.":Issue with resolving contact $source\n";
+		LogUnicode $hash->{NAME}, 3, $hash->{NAME}.":Issue with resolving contact $source\n";
 		$sender=$source;
 	}
 	
 	my $join=AttrVal($hash->{NAME},"autoJoin","no");
 	if ($join eq "yes") {
 		if ($message =~ /^https:\/\/signal.group\//) {
-			return Signalbot_Call($hash,"joinGroup",$message);
+			Signalbot_CallA($hash,"joinGroup",$message);
+			return;
 		}
 	}
 	
@@ -794,7 +919,7 @@ sub Signalbot_MessageReceived ($@) {
 			$babble=0; #Skip Babble execution in command mode
 			$message=Signalbot_command($hash,$source,$message);
 		}
-		$message=encode_utf8($message);
+		#$message=encode_utf8($message);
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "msgAttachment", trim($atr));
 		readingsBulkUpdate($hash, "msgTimestamp", strftime("%d-%m-%Y %H:%M:%S", localtime($timestamp/1000)));
@@ -812,7 +937,7 @@ sub Signalbot_MessageReceived ($@) {
 		my $bExclude=AttrVal($hash->{NAME},"babbleExclude",undef);
 		
 		if ($bExclude && $message =~ /$bExclude/) {
-			Log3 $hash->{NAME}, 5, $hash->{NAME}.": Message matches BabbleExclude, skipping BabbleCall";
+			LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Message matches BabbleExclude, skipping BabbleCall";
 			return;
 		}
 		
@@ -825,24 +950,24 @@ sub Signalbot_MessageReceived ($@) {
 		#Activate Babble integration, only if sender or sender group is in babblePeer 
 		if (defined $bDevice && defined $bPeer && defined $replyPeer && $babble==1) {
 			if ($bPeer =~ /^.*$senderRegex.*$/ || $bPeer =~ /^.*$sourceRegex.*$/ || ($groupIdRegex ne "" && $bPeer =~ /^.*$groupIdRegex.*$/)) {
-				Log3 $hash->{NAME}, 4, $hash->{NAME}.": Calling Babble for $message ($replyPeer)";
+				LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": Calling Babble for $message ($replyPeer)";
 				if ($defs{$bDevice} && $defs{$bDevice}->{TYPE} eq "Babble") {
 					my $rep=Babble_DoIt($bDevice,$message,$replyPeer);
 				} else {
-					Log3 $hash->{NAME}, 2, $hash->{NAME}.": Wrong Babble Device $bDevice";
+					LogUnicode $hash->{NAME}, 2, $hash->{NAME}.": Wrong Babble Device $bDevice";
 				}
 			}
 		}
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": Message from $sender : ".decode_utf8($message)." processed";
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": Message from $sender : ".$message." processed";
 	} else {
-		Log3 $hash->{NAME}, 2, $hash->{NAME}.": Ignored message due to allowedPeer by $source:$message";
+		LogUnicode $hash->{NAME}, 2, $hash->{NAME}.": Ignored message due to allowedPeer by $source:$message";
 		readingsSingleUpdate($hash, 'lastError', "Ignored message due to allowedPeer by $source:$message",1);
 	}
 }
 
 sub Signalbot_ReceiptReceived {
 	my ($hash, $timestamp, $source) = @_;
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Signalbot_receive_callback $timestamp $source ";
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Signalbot_receive_callback $timestamp $source ";
 	my $sender=Signalbot_getContactName($hash,$source);
 	#Delete temporary files from last message(s)
 	my $attstore = $hash->{helper}{attachments};
@@ -857,7 +982,7 @@ sub Signalbot_ReceiptReceived {
 	}
 
 	if (!defined $sender) {
-		Log3 $hash->{NAME}, 3, $hash->{NAME}.":Issue with resolving contact $source\n";
+		LogUnicode $hash->{NAME}, 3, $hash->{NAME}.":Issue with resolving contact $source\n";
 		$sender=$source;
 	}
 	readingsBeginUpdate($hash);
@@ -868,7 +993,7 @@ sub Signalbot_ReceiptReceived {
 
 sub Signalbot_SyncMessageReceived {
 	my ($hash,$timestamp, $source, $string1, $array1, $string2, $array2) = @_;
-	Log3 $hash->{NAME}, 5, $hash->{NAME}."Signalbot: Signalbot_sync_callback $timestamp $source";
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}."Signalbot: Signalbot_sync_callback $timestamp $source";
 	my $tmp="";
 	my @arr1=@$array1;
 	foreach (@arr1) {
@@ -970,8 +1095,9 @@ sub Signalbot_setup2($@) {
 	
 	my @ver=split('\.',$version);
 	#to be on the safe side allow 2 digits for version number, so 0.8.0 results to 800, 1.10.11 would result in 11011
-	$hash->{helper}{version}=$ver[0]*10000+$ver[1]*100+$ver[2];
 	$hash->{VERSION}="Signalbot:".$Signalbot_VERSION." signal-cli:".$version." Protocol::DBus:".$Protocol::DBus::VERSION;
+	$version=$ver[0]*10000+$ver[1]*100+$ver[2];
+	$hash->{helper}{version}=$version;
 	$hash->{model}=Signalbot_OSRel();
 	#listAccounts only available in registration instance
 	my $num=Signalbot_getAccounts($hash);
@@ -980,7 +1106,7 @@ sub Signalbot_setup2($@) {
 		$hash->{helper}{signalpath}='/org/asamk/Signal';
 		$account=Signalbot_CallS($hash,"getSelfNumber") if ($version>901); #Available from signal-cli 0.9.1
 		#Workaround since signal-cli 0.9.0 did not include by getSelfNumber() method - delete the reading, so its not confusing
-		if (!defined $account) { readingsDelete($hash,"account"); }
+		if (!defined $account) { readingsDelete($hash,"account"); $account="none"; }
 		$hash->{helper}{accounts}=0;
 		$hash->{helper}{multi}=0;
 	} else {
@@ -1017,7 +1143,7 @@ sub Signalbot_setup2($@) {
 
 	#-u Mode or already registered
 	if ($num<0 || $account ne "none") {
-		Signalbot_Call($hash,"listNumbers");
+		Signalbot_CallA($hash,"listNumbers");
 		#Might make sense to call refreshGroups here, however, that is a sync call and might potentially take longer, so maybe no good idea in startup
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, 'account', $account) if defined $account;
@@ -1034,7 +1160,7 @@ sub Signalbot_setup2($@) {
 	}
 }
 
-#Async Callback after updating Groups (change/invite/join)
+#Async Callback after updating Groups (change/invite/join/create)
 sub Signalbot_UpdateGroup_cb($@) {
 	my ($hash) = @_;
 	Signalbot_refreshGroups($hash);
@@ -1049,140 +1175,166 @@ sub Signalbot_ListNumbers_cb($@) {
 	}
 }
 
-# Dbus syncronous (request->reply) Call
-sub Signalbot_CallS($@) {
+#async
+sub	Signalbot_CallA($@) { 
 	my ($hash,$function,@args) = @_;
-	my $dbus=$hash->{helper}{dbuss};
-	if (!defined $dbus) {
-		readingsSingleUpdate($hash, 'lastError', "Error: Dbus not initialized",1);
-		return undef;
-	}
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Sync Dbus Call: $function Args:".((@args==0)?"empty":join(",",@args));
-	my $sig="";
-	my $body="";
+	my $prototype=$signatures{$function};
 	my $path=$hash->{helper}{signalpath};
-	my $got_response = 0;
-	if (@args>0) {
-		$sig=$signatures{$function};
-		$body=\@args;
-	}
-	#Call base service (registration mode)
-	if (exists $regsig{$function}) {
-		$sig=$regsig{$function};
-		$path='/org/asamk/Signal';
-	}
-	#print $path."\nf:".$function."\nb:".Dumper($body)."\ns:".$sig."\n";
-	$dbus->send_call(
-		path => $path,
-		interface => 'org.asamk.Signal',
-		signature => $sig,
-		body => $body,
-		destination => 'org.asamk.Signal',
-		member => $function,
-	) ->then( sub {
-		$got_response = 1;
-		} 
-	) -> catch ( sub () {
-		#Ignore this error in Log for listAccounts since it is expected and confuses users
-		if ($function ne "listAccounts") {
-			Log3 $hash->{NAME}, 4, $hash->{NAME}.": Sync Error for: $function";
-		}
-		my $msg = shift;
-		if (!defined $msg) {
-			readingsSingleUpdate($hash, 'lastError', "Fatal Error in $function: empty message",1);
-			return;
-		}
-		my $sig = $msg->get_header('SIGNATURE');
-		if (!defined $sig) {
-			readingsSingleUpdate($hash, 'lastError', "Error in $function: message without signature",1);
-			return;
-		}
-		$got_response = -1;
-		}
-	);
-
-	my $counter=5;
-	while ($counter>0) {
-		my $msg=$dbus->get_message();
-		my $sig = $msg->get_header('SIGNATURE');
-		if (!defined $sig) {
-			#Empty signature is probably a reply from a function without return data, return 0 to differ to error case
-			return 0;
-		}
-		my $b=$msg->get_body()->[0];
-		if ($got_response==-1) {
-			#Error Case
-			readingsSingleUpdate($hash, 'lastError', "Error in $function:".$b,1);
-			return undef;
-		}
-		if ($got_response==1) {
-			return $b
-		}
-		$counter--;
-	}
+	Signalbot_CallDbus($hash,0,$path,$function,$prototype,'org.asamk.Signal',@args);
+}
+#sync
+sub	Signalbot_CallS($@) { 
+	my ($hash,$function,@args) = @_;
+	my $prototype=$signatures{$function};
+	my $path=$hash->{helper}{signalpath};
+	return Signalbot_CallDbus($hash,1,$path,$function,$prototype,'org.asamk.Signal',@args);
+}
+#async, group
+sub	Signalbot_CallAG($@) { 
+	my ($hash,$function,$group,@args) = @_;
+	my $prototype=$groupsignatures{$function};
+	my $path=Signalbot_getGroupPath($hash,$group);
+	return if !defined $path;
+	Signalbot_CallDbus($hash,0,$path,$function,$prototype,'org.asamk.Signal',@args);
+}
+#sync, group
+sub	Signalbot_CallSG($@) { 
+	my ($hash,$function,$group,@args) = @_;
+	my $prototype=$groupsignatures{$function};
+	my $path=Signalbot_getGroupPath($hash,$group);
+	return if !defined $path;
+	return Signalbot_CallDbus($hash,1,$path,$function,$prototype,'org.asamk.Signal',@args);
 }
 
-# Generic Dbus Call method
-#e.g.:
-# $hash, "sendMessage", ("Message",\@att,\@rec)
-sub Signalbot_Call($@) {
-	my ($hash,$function,@args) = @_;
+#all group properties
+sub	Signalbot_getGroupProperties($@) { 
+	my ($hash,$group) = @_;
+	my $prototype="s";
+	my $path=Signalbot_getGroupPath($hash,$group);
+	return if !defined $path;
+	return Signalbot_CallDbus($hash,1,$path,'GetAll',$prototype,'org.freedesktop.DBus.Properties','org.asamk.Signal.Group');
+}
+
+
+sub Signalbot_CallDbus($@) {
+	my ($hash,$sync,$path,$function,$prototype,$interface,@args) = @_;
+	my $got_response=0;
 	my $dbus=$hash->{helper}{dbus};
 	if (!defined $dbus) {
-		readingsSingleUpdate($hash, 'lastError', "Error: Dbus not initialized",1);
+		$hash->{helper}{lasterr}="Error: Dbus not initialized";
+		readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
 		return undef;
 	}
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": ASync Dbus Call: $function Args:".((@args==0)?"empty":join(",",@args));
-	my $sig="";
+
 	my $body="";
-	my $path=$hash->{helper}{signalpath};
 	if (@args>0) {
-		$sig=$signatures{$function};
 		$body=\@args;
 	}
 	#Call base service (registration mode)
-	if (exists $regsig{$function}) {
-		$sig=$regsig{$function};
+	if (!defined $prototype) {
+		$prototype=$regsig{$function};
 		$path='/org/asamk/Signal';
 	}
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Dbus Call sync:$sync $function($prototype) $path Args:".((@args==0)?"empty":join(",",@args));
 	$dbus->send_call(
 		path => $path,
-		interface => 'org.asamk.Signal',
-		signature => $sig,
+		interface => $interface,
+		signature => $prototype,
 		body => $body,
 		destination => 'org.asamk.Signal',
 		member => $function,
 	) ->then ( sub () {
-		my $msg = shift;
-		my $sig = $msg->get_header('SIGNATURE');
-		if (!defined $sig) {
-			#Empty signature is probably a reply from a function without return data, nothing to do
-			return undef;
-		}
-		my $b=$msg->get_body();
-		my 	@body=@$b;
-		Log3 $hash->{NAME}, 5, $hash->{NAME}.": ASync Calling: $function Args:".join(",",@body);
-		CallFn($hash->{NAME},$function,$hash,@body);
+			$got_response = 1;
+			return if $sync; # Synchronous mode, handling of return data in main loop
+
+			#Only for asynchronous case:
+			my $msg = shift;
+			my $sig = $msg->get_header('SIGNATURE');
+			if (!defined $sig) {
+				#Empty signature is probably a reply from a function without return data, nothing to do
+				return undef;
+			}
+			my $b=$msg->get_body();
+			my 	@body=@$b;
+			if (!defined $hash->{$function}) {
+				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Invalid callback: $function Args:".join(",",@body);
+				return;
+			}
+			LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": DBus callback: $function Args:".join(",",@body);
+			CallFn($hash->{NAME},$function,$hash,@body);
 		}
 	) -> catch ( sub () {
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": ASync Error for: $function";
-		my $msg = shift;
-		if (!defined $msg) {
-			readingsSingleUpdate($hash, 'lastError', "Fatal Error in $function: empty message",1);
+			$got_response = -1;
+			if ($function ne "listAccounts") { #listacccounts produces an error in some versions of signal-cli
+				Log3 $hash->{NAME}, 4, $hash->{NAME}.": Dbus Error for: $function (details in reading lasterr)";
+			}
+			my $msg = shift;
+			if (!defined $msg) {
+				$hash->{helper}{lasterr}="Fatal Error in $function: empty message";
+				readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
+				return;
+			}
+			my $sig = $msg->get_header('SIGNATURE');
+			if (!defined $sig) {
+				$hash->{helper}{lasterr}="Error in $function: message without signature";
+				readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
+				return;
+			}
+			#Handle Error here and mark Serial for mainloop to ignore
+			my $b=$msg->get_body()->[0];
+			$hash->{helper}{lasterr}="Error in $function:".$b;
+			readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
 			return;
-		}
-		my $sig = $msg->get_header('SIGNATURE');
-		if (!defined $sig) {
-			readingsSingleUpdate($hash, 'lastError', "Error in $function: message without signature",1);
-			return;
-		}
-		#Handle Error here and mark Serial for mainloop to ignore
-		my $b=$msg->get_body()->[0];
-		readingsSingleUpdate($hash, 'lastError', "Error in $function:".$b,1);
-		return;
 		}
 	);
+	return undef if !$sync; #Async mode returns immediately and uses callback functions
+
+	#Evaluate reply in sync mode
+	my $counter=5;
+	while ($counter>0) {
+		$dbus->blocking(1);
+		my $msg=$dbus->get_message();
+		#print Dumper($msg);
+		if (defined $msg) {
+			my $sig = $msg->get_header('SIGNATURE');
+			if (!defined $sig) {
+				#Empty signature is probably a reply from a function without return data, return 0 to differ to error case
+				return 0;
+			}
+			my $b=$msg->get_body()->[0];
+			if ($got_response==-1) {
+				#Error Case
+				$hash->{helper}{lasterr}="Error in $function:".$b;
+				readingsSingleUpdate($hash, 'lastError', $hash->{helper}{lasterr},1);
+				return undef;
+			}
+			if ($got_response==1) {
+				return $b
+			}
+		}
+		$counter--; #usleep(10000); 
+	}
+	Log3 $hash->{NAME}, 3, $hash->{NAME}.": Dbus Timeout for $function";
 	return undef;
+}
+
+sub Signalbot_getGroupPath($@) {
+	my ($hash,$group) = @_;
+	my @arr=Signalbot_getGroup($hash,$group);
+	if (@arr<2) {
+		$hash->{helper}{lasterr}=join(" ",@arr);
+		return undef;
+	}
+	return join(" ",@arr) unless @arr>1; #Error message
+	#Get the DBus PATH to the group
+	my $path=Signalbot_CallS($hash,"getGroup",\@arr);
+	return "Cannot access group $group" if !defined $path;
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Group Dbus Path=".$path;
+	if (! ($path =~ /^\//)) {
+		$hash->{helper}{lasterr}=$path;
+		return undef;
+	}
+	return $path
 }
 
 sub Signalbot_Read($@){
@@ -1206,7 +1358,7 @@ sub Signalbot_Read($@){
 				my @body=@$b;
 				if ($callback eq "MessageReceived" || $callback eq "ReceiptReceived" || $callback eq "SyncMessageReceived" || $callback eq "MessageReceivedV2") {
 					my $func="Signalbot_$callback";
-					Log3 $hash->{NAME}, 5, $hash->{NAME}.": Sync Callback: $callback Args:".join(",",@body);
+					LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Sync Callback: $callback Args:".join(",",@body);
 					CallFn($hash->{NAME},$callback,$hash,@body);
 				} elsif ($callback eq "NameAcquired") {
 					Log3 $hash->{NAME}, 5, $hash->{NAME}.": My Dbus Name is $body[0]";
@@ -1247,17 +1399,21 @@ sub Signalbot_updateGroup($@) {
 	}
 	my $rename;
 	my $avatar;
+	my @members;
 	while (my $next = shift @args) {
 		if ($next =~ /^#(.*)/) {
 			$rename=$1;
-		}
-		if ($next =~ /^\&(.*)/) {
+		} elsif ($next =~ /^\&(.*)/) {
 			$avatar=$1;
+		} else {
+			my $contact=Signalbot_translateContact($hash,$next);
+			return "Unknown contact $next" if !defined $contact;
+			push @members,$contact;
 		}
 	}
 	if (defined $avatar) {
 		return "Can't find file $avatar" unless ( -e $avatar);
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": updateGroup Avatar $avatar";
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": updateGroup Avatar $avatar";
 		my $size = -s $avatar;
 		return "Please reduce the size of your group picture to <2MB" if ($size>2000000);
 	}
@@ -1267,19 +1423,17 @@ sub Signalbot_updateGroup($@) {
 		if (@groupID==1) {
 			return "Group $groupname does not exist";
 		} else {
-			Log3 $hash->{NAME}, 4, $hash->{NAME}.": renameGroup $groupname to $rename";
-			$groupname=$rename;
+			LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": renameGroup $groupname to $rename";
+			Signalbot_CallA($hash,"updateGroup",\@groupID,$rename,\@members,$avatar);
+			return;
 		}
-	}
-	#Create case (no rename and no avatar): Group cannot exist
-	if (!defined $rename && !defined $avatar) {
+	} else {
+		$avatar="" if (!defined $avatar);
 		return "Group $groupname already exists" if @groupID>1;
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": createGroup $groupname";
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": createGroup $groupname:".join(" ",@members);
+		Signalbot_CallA($hash,"createGroup",$groupname,\@members,$avatar);
+		return;
 	}
-	if (@groupID==1) { @groupID=();	}
-	if (!defined $avatar) { $avatar=""; }
-	my @members=(); #only set for invite
-	Signalbot_Call($hash,"updateGroup",\@groupID,$groupname,\@members,$avatar);
 }
 
 sub Signalbot_updateProfile($@) {
@@ -1295,12 +1449,12 @@ sub Signalbot_updateProfile($@) {
 	}
 	if (defined $avatar) {
 		return "Can't find file $avatar" unless ( -e $avatar);
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": updateProfile Avatar $avatar";
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": updateProfile Avatar $avatar";
 		my $size = -s $avatar;
 		return "Please reduce the size of your group picture to <2MB" if ($size>2000000);
 	} else { $avatar=""; }
 	#new name, about, emoji, avatar, removeAvatar
-	Signalbot_Call($hash,"updateProfile",$newname,"","",$avatar,0);
+	Signalbot_CallA($hash,"updateProfile",$newname,"","",$avatar,0);
 }
 
 sub Signalbot_invite($@) {
@@ -1317,8 +1471,8 @@ sub Signalbot_invite($@) {
 	my @group=Signalbot_getGroup($hash,$groupname);
 	return join(" ",@group) unless @group>1;
 	
-	Log3 $hash->{NAME}, 4, $hash->{NAME}.": Invited ".join(",",@members)." to $groupname";
-	Signalbot_Call($hash,"updateGroup",\@group,"",\@members,"");
+	LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": Invited ".join(",",@members)." to $groupname";
+	Signalbot_CallA($hash,"updateGroup",\@group,"",\@members,"");
 	return;
 }
 
@@ -1327,13 +1481,13 @@ sub Signalbot_setBlocked($@) {
 	if ($name =~ /^#(.*)/) {
 		my @group=Signalbot_getGroup($hash,$1);
 		return join(" ",@group) unless @group>1;
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": ".($blocked==0?"Un":"")."blocked $name";
-		Signalbot_Call($hash,"setGroupBlocked",\@group,$blocked);
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": ".($blocked==0?"Un":"")."blocked $name";
+		Signalbot_CallA($hash,"setGroupBlocked",\@group,$blocked);
 	} else {
 		my $number=Signalbot_translateContact($hash,$name);
 		return "Unknown Contact" unless defined $number;
-		Log3 $hash->{NAME}, 4, $hash->{NAME}.": ".($blocked==0?"Un":"")."blocked $name ($number)";
-		my $ret=Signalbot_Call($hash,"setContactBlocked",$number,$blocked);
+		LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": ".($blocked==0?"Un":"")."blocked $name ($number)";
+		Signalbot_CallA($hash,"setContactBlocked",$number,$blocked);
 	}
 	return undef;
 }
@@ -1349,7 +1503,7 @@ sub Signalbot_setContactName($@) {
 	}
 	$hash->{helper}{contacts}{$number}=$name;
 
-	Signalbot_Call($hash,"setContactName",$number,$name);
+	Signalbot_CallA($hash,"setContactName",$number,$name);
 	return undef;
 }
 
@@ -1412,12 +1566,15 @@ sub Signalbot_refreshGroups($@) {
 	foreach (@groups) {
 		my @group=@$_;
 		my $groupname = Signalbot_CallS($hash,"getGroupName",\@group);
+		return $hash->{helper}{lasterr} if !defined $groupname;
 		my $groupid = join(" ",@group);
 		$hash->{helper}{groups}{$groupid}{name}=$groupname;	
-		Log3 $hash->{NAME}, 5, "found group ".$groupname; 
+		LogUnicode $hash->{NAME}, 5, "found group ".$groupname; 
 		my $active = Signalbot_CallS($hash,"isMember",\@group);
+		$active="?" if !defined $active;
 		$hash->{helper}{groups}{$groupid}{active}=$active;
 		my $blocked = Signalbot_CallS($hash,"isGroupBlocked",\@group);
+		$blocked="?" if !defined $blocked;
 		$hash->{helper}{groups}{$groupid}{blocked}=$blocked;
 		if ($blocked==1) {
 			$groupname="(".$groupname.")";
@@ -1432,7 +1589,7 @@ sub Signalbot_refreshGroups($@) {
 
 sub Signalbot_sendMessage($@) {
 	my ( $hash,$rec,$att,$mes ) = @_;
-	Log3 $hash->{NAME}, 4, $hash->{NAME}.": sendMessage called for $rec:$att:".$mes; 
+	LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": sendMessage called for $rec:$att:".$mes; 
 
 	my @recorg= split(/,/,$rec);
 	my @attach=split(/,/,$att);
@@ -1443,17 +1600,17 @@ sub Signalbot_sendMessage($@) {
 		push @recipient, $trans;
 	}
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "sentMsg", encode_utf8($mes));
+	readingsBulkUpdate($hash, "sentMsg", $mes);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
 	readingsEndUpdate($hash, 0);
-	Signalbot_Call($hash,"sendMessage",$mes,\@attach,\@recipient); 
+	Signalbot_CallA($hash,"sendMessage",$mes,\@attach,\@recipient); 
 }
 
 #get the identifies (list of hex codes) for a group based on the name
 #Check error with int(@)=1
 sub Signalbot_getGroup($@) {
 	my ($hash,$rec) = @_;
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": getGroup $rec";
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": getGroup $rec";
 	if ( $rec =~ /^#(.*)/) {
 		$rec=$1;
 	}
@@ -1472,7 +1629,7 @@ sub Signalbot_getGroup($@) {
 
 sub Signalbot_sendGroupMessage($@) {
 	my ( $hash,$rec,$att,$mes ) = @_;
-	Log3 $hash->{NAME}, 4, $hash->{NAME}.": sendGroupMessage called for $rec:$att:$mes"; 
+	LogUnicode $hash->{NAME}, 4, $hash->{NAME}.": sendGroupMessage called for $rec:$att:$mes"; 
 
 	$rec=~s/#//g;
 	my @recipient= split(/,/,$rec);
@@ -1482,11 +1639,11 @@ sub Signalbot_sendGroupMessage($@) {
 	return join(" ",@arr) unless @arr>1;
 
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "sentMsg", encode_utf8($mes));
+	readingsBulkUpdate($hash, "sentMsg", $mes);
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
 	readingsEndUpdate($hash, 0);
 
-	Signalbot_Call($hash,"sendGroupMessage",$mes,\@attach,\@arr); 
+	Signalbot_CallA($hash,"sendGroupMessage",$mes,\@attach,\@arr); 
 }
 
 ################################### 
@@ -1495,7 +1652,7 @@ sub Signalbot_Attr(@) {					#
 	my $hash = $defs{$name};
 	my $msg = undef;
 	return if !defined $val; #nothing to do when deleting an attribute
-	Log3 $hash->{NAME}, 5, $hash->{NAME}.": Attr $attr=$val"; 
+	LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Attr $attr=$val"; 
 	if($attr eq "allowedPeer") {
 	#Take over as is
 	return undef;
@@ -1559,10 +1716,10 @@ sub Signalbot_setPath($$) {
 	if (defined $val) {
 		readingsSingleUpdate($hash, 'account', ($account=~s/^\_/\+/r),0);
 		$hash->{helper}{signalpath}='/org/asamk/Signal/'.($val=~s/^\+/\_/r);
-		Log3 $hash->{NAME}, 5, $hash->{NAME}." Using number $val";
+		LogUnicode $hash->{NAME}, 5, $hash->{NAME}." Using number $val";
 	} else {
 		$hash->{helper}{signalpath}='/org/asamk/Signal';
-		Log3 $hash->{NAME}, 5, $hash->{NAME}." Setting number to default";
+		LogUnicode $hash->{NAME}, 5, $hash->{NAME}." Setting number to default";
 		readingsSingleUpdate($hash, 'account', "none" ,0 );
 	}
 	my $ret = Signalbot_setup($hash);
@@ -1594,6 +1751,7 @@ sub Signalbot_getAccounts($) {
 	}
 	$hash->{helper}{accountlist}=\@accounts;
 	$hash->{helper}{accounts}=@accounts;
+	Log3 $hash->{NAME}, 5, $hash->{NAME}." Found @accounts";
 	return @accounts;
 }
 
@@ -1662,7 +1820,7 @@ sub Signalbot_createRegfiles($) {
 		$msg .= ' -replace \'^(.*)/$\',\'$1\') ) )"'."\n";
 	}
 	if(!open($fh, ">", $tmpfilename,)) {
-		Log3 $hash->{NAME}, 3, $hash->{NAME}.": Can't write $tmpfilename";
+		LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": Can't write $tmpfilename";
 	} else {
 		print $fh $msg;
 		close($fh);
@@ -1677,7 +1835,7 @@ sub Signalbot_createRegfiles($) {
 	$msg .= "StartupNotify=false\n";
 	$msg .= "MimeType=x-scheme-handler/signalcaptcha\n";
 	if(!open($fh, ">", $tmpfilename,)) {
-		Log3 $hash->{NAME}, 3, $hash->{NAME}.": Can't write $tmpfilename";
+		LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": Can't write $tmpfilename";
 	} else {
 		print $fh $msg;
 		close($fh);
@@ -1818,7 +1976,7 @@ sub Signalbot_Detail {
 			$ret .= "You seem to access FHEM from a Linux Desktop. Please consider to download <a href=fhem/signal/signalcaptcha.desktop download>this mine scheme<\/a> and install under ~/.local/share/applications/signalcaptcha.desktop<br>";
 			$ret .= "To activate it execute <b>xdg-mime default signalcaptcha.desktop x-scheme-handler/signalcaptcha</b> from your shell. This helps to mostly automate the registration process, however seems only to work with Firefox (not with Chromium)<br><br>";
 		}
-		$ret .= "Visit <a href=https://signalcaptchas.org/registration/generate.html>Signal Messenger Captcha Page<\/a> and complete the potential Captcha (often you will see an empty page which means you already passed just by visiting the page).<br><br>";
+		$ret .= "Visit <a href=https://signalcaptchas.org/registration/generate.html>Signal Messenger Captcha Page<\/a> or <a href=https://signalcaptchas.org/challenge/generate.html>Alternative Captcha Page<\/a> and complete the potential Captcha (often you will see an empty page which means you already passed just by visiting the page).<br><br>";
 		if ($FW_userAgent =~ /\(Windows/) {
 		$ret .= "If you applied the Windows registry hack, confirm opening Windows PowerShell and the rest will run automatically.<br><br>"
 		}
@@ -1857,6 +2015,16 @@ sub Signalbot_Detail {
 		$ret .= "</table><br>After successfully scanning and accepting the QR code on your phone, wait ~1min to let signal-cli sync and then execute <b>set reinit</b><br>";
 		$ret .= "If you already have other accounts active, you might additionally have to do a <b>set signalAccount<br></b>"
 	}
+
+#  $ret .= "<div class='makeTable wide'>";
+  $ret.="<form id='Signalbot' method='$FW_formmethod' autocomplete='off' ".
+              "action='$FW_ME/Signalbot_sendMsg'>";
+  $ret .= "<table class=\"block wide\">";
+  $ret .= "<td>";
+  $ret .= FW_submit("submit", "send message ")."<input type=\"text\" name=\"send\" size=\"80\">";
+  $ret .= "<input type=\"hidden\" name=\"detail\" value=\"$hash->{NAME}\">";
+  $ret .= "</table></form>";
+	
 	return if ($ret eq ""); #Avoid strange empty line if nothing is printed
 	return $ret;
 }
@@ -1902,32 +2070,32 @@ sub Signalbot_replaceCommands(@) {
 			my ($err, @newargs) = ReplaceSetMagic(\%dummy, 0, ( $string ) );
 			my $msg="";
 			if ( $err ) {
-				Log3 $hash->{NAME}, 3, $hash->{NAME}.": parse cmd failed on ReplaceSetmagic with :$err: on  :$string:";
+				LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": parse cmd failed on ReplaceSetmagic with :$err: on  :$string:";
 			} else {
 				$msg = join(" ", @newargs);
-				Log3 $hash->{NAME}, 5, $hash->{NAME}.": parse cmd returned :$msg:";
+				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": parse cmd returned :$msg:";
 			}
 			$msg = AnalyzeCommandChain( $hash, $msg );
 			#If a normal FHEM command (no return value) is executed, $msg is undef - just the to empty string then
 			if (!defined $msg) { 
 				$msg=""; 
-				Log3 $hash->{NAME}, 5, $hash->{NAME}.": commands executed without return value";
+				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": commands executed without return value";
 			}
 			#Only way to distinguish a real error with the return stream
 			if ($msg =~ /^Unknown command/) { 
-				Log3 $hash->{NAME}, 3, $hash->{NAME}.": Error message: ".$msg;
+				LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": Error message: ".$msg;
 				return ($msg, @processed); 
 			}
 			
 			my ( $isMediaStream, $type ) = Signalbot_IdentifyStream( $hash, $msg );
 			if ($isMediaStream<0) {
-				Log3 $hash->{NAME}, 5, $hash->{NAME}.": Media stream found $isMediaStream $type";
+				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Media stream found $isMediaStream $type";
 				my $ret=Signalbot_copyToFile($msg,$type);
 				return ("Can't write to temporary file",@processed) if !defined $ret;
 				#If we created a file return the filename instead
 				push @processed, $ret;
 			} else {
-				Log3 $hash->{NAME}, 5, $hash->{NAME}.": normal text found:$msg";
+				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": normal text found:$msg";
 				#No mediastream - return what it was
 				push @processed, $msg;
 			}
@@ -1965,7 +2133,9 @@ sub Signalbot_getPNG(@) {
 		Log3 $hash->{NAME}, 4 , $hash->{NAME}.": Attachment matches device $sname of type $shash->{TYPE}";
 		my $svg;
 		if ($shash->{TYPE} eq "SVG") {
+			my $FW_RET_save=$FW_RET;
 			$svg=plotAsPng($sname,@special);
+			$FW_RET=$FW_RET_save;
 		}
 		if ($shash->{TYPE} eq "DOIF") {
 			$svg=Signalbot_DOIFAsPng($shash,@special);
@@ -2066,6 +2236,7 @@ Signalbot_DOIFAsPng($@)
 	eval {
 		require Image::LibRSVG;
 		$rsvg = new Image::LibRSVG();
+		$svgdata=~s/&#x(....)/chr(hex($1))/ge; #replace all html unicode with real characters since libsvg does not like'em
 		if ($sizex != -1 && $sizey !=-1) {
 		$ret=$rsvg->loadFromStringAtZoomWithMax($svgdata, $zoom, $zoom, $sizex, $sizey  );
 		} else {
@@ -2076,6 +2247,7 @@ Signalbot_DOIFAsPng($@)
 	if (defined $pngImg && $pngImg ne "") {
 		return $pngImg if $pngImg;
 	}
+	print $@;
 	return "Error: Converting SVG to PNG for $cmd";
 }
 
@@ -2095,6 +2267,12 @@ sub Signalbot_OSRel() {
 	}
 	close ($fh);
 	return "Unknown";
+}
+
+sub LogUnicode($$$) {
+	my ($name,$level,$text) = @_;
+	$text=encode_utf8($text) if !($unicodeEncoding);
+	Log3 $name, $level, $text;
 }
 
 ######################################
@@ -2163,6 +2341,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		<li>Register and link multiple devices and switch between them</li>
 		<br>
 		</ul>
+</ul>
 	<a id="Signalbot-define"></a><br>
 	<b>Define</b>
 	<ul>
@@ -2179,8 +2358,8 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 			<a id="Signalbot-set-send"></a>
 			Send a message to a Signal recipient using @Name or @+49xxx as well as groups with #Group or #@Group along with an attachment with &<path to file> and a message.
 		</li>
-		<br>
-		<a id="Signalbot-setignore"></a>
+			<ul>
+			<a id="Signalbot-set-ignore"></a>
 			<li>Use round brackets to let FHEM execute the content (e.g <code>&({plotAsPng('SVG_Temperatures')}</code></li>
 			<li>If a recipient, group or attachment contains white spaces, the whole expression (including @ # or &) needs to be put in double quotes. Escape quotes within with \"</li>
 			<li>If the round brackets contain curly brackets to execute Perl commands, two semi-colons (;;) need to be used to seperate multiple commands and at the end. The return value will be used e.g. as recipient</li>
@@ -2194,16 +2373,16 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 			<br>
 			Example:<br>
 			<code>set Signalbot send "@({my $var=\"Joerg\";; return $var;;})" #FHEM "&( {plotAsPng('SVG_Temperatures')} )" Here come the current temperature plot</code><br>
-			</ul>
 			<br>
+			</ul>
 		<li><b>set reply ....</b><br>
 			<a id="Signalbot-set-reply"></a>
 			Send message to previous sender. For detailed syntax, see "set send"<br>
 			If no recipient is given, sends the message back to the sender of the last received message. If the message came from a group (reading "msgGroupName" is set), the reply will go to the group, else the individual sender (reading "msgSender") is used.<br>
 			<b>Note:</b> You should only use this from a NOTIFY or DOIF that was triggered by an incoming message otherwise you risk using the wrong recipient.<br>
 		</li>
-		<li><b>set contact &ltnumber&gt &ltname&gt</b><br>
-		<a id="Signalbot-set-contact"></a>
+		<li><b>set setContact &ltnumber&gt &ltname&gt</b><br>
+		<a id="Signalbot-set-setContact"></a>
 		Define a nickname for a phone number to be used with the send command and in readings<br>
 		</li>
 		<li><b>set block #&ltgroupname&gt|&ltcontact&gt</b><br>
@@ -2233,7 +2412,7 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		Join a group via an invitation group like (starting with https://signal.group/....). This link can be sent from the group properties with the "group link" function.<br>
 		Easiest way is to share via Signal and set the "autoJoin" attribute which be recognized by Signalbot to automatically join.<br>
 		</li>
-		<li><b>set quitGroup &ltgroup link&gt</b><br>
+		<li><b>set quitGroup &ltgroupname&gt</b><br>
 		<a id="Signalbot-set-quitGroup"></a>
 		Quit from a joined group. This only sets the membership to inactive, but does not delete the group (see "get groups")"<br>
 		</li>
@@ -2269,6 +2448,29 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		<a id="Signalbot-set-reinit"></a>
 		Re-Initialize the module. For testing purposes when module stops receiving, has other issues or has been updated. Should not be necessary.<br>
 		</li>
+		<li><b>set group &ltgroup command&gt &ltgroupname&gt &ltargument&gt</b><br>
+		<a id="Signalbot-set-group"></a>
+		Combined command for group related functions:
+		<ul>
+			<li>addMembers,removeMembers,addAdmins,removeAdmins &ltgroupname&gt &ltcontact(s)&gt : Modify the member or admin list for the group</li>
+			<li>invite &ltgroupname&gt &ltcontact(s)&gt : Same as addMembers</li>
+			<li>create &ltgroupname&gt [&ltcontact(s)&gt]: create a new group and optionally define members</li>
+			<li>block/unblock &ltgroupname&gt : block/unblock receiving messages from a specific group</li>
+			<li>quit &ltgroupname&gt : Leave a group</li>
+			<li>join &ltgroup link&gt : Join a group with a group link.</li>
+			<li>delete &ltgroupname&gt : Delete a group from local repository (you should first leave it)</li>
+			<li>update &ltgroupname&gt &ltnew groupname&gt [&&ltavatar picture&gt] : Set a new name and/or picture for the group</li>
+		</ul>
+		</li>
+		<li><b>set contact &ltcontact command&gt &ltcontact&gt &ltargument&gt</b><br>
+		<a id="Signalbot-set-contact"></a>
+		Combined command for contact related functions:
+		<ul>
+			<li>add &ltcontact&gt &ltnickname&gt : Define a local name for a contact</li>
+			<li>delete &ltcontact&gt : Remove contact from local repository</li>
+			<li>block/unblock &ltcontact&gt : block/unblock receiving messages from contact</li>
+		</ul>
+		</li>
 		<br>
 	</ul>
 	
@@ -2297,6 +2499,10 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 			<a id="Signalbot-get-helpUnicode"></a>
 			Opens a cheat sheet for all supported replacements to format text or add emoticons using html-like tags or markdown.<br>
 			<b>Note:</b> This functionality needs to be enabled using the "formatting" attribute.<br>
+		</li>
+		<li><b>get groupPropertiese &ltgroup&gt</b><br>
+			<a id="Signalbot-get-groupPropertiese"></a>
+			Shows all known properties of the given group, like members, admins and permissions.
 		</li>
 		<br>
 	</ul>
