@@ -147,10 +147,10 @@ HttpUtils_dumpDnsCache()
   my @ret;
   my $max = 0;
   map { my $l=length($_); $max=$l if($l>$max) } keys %HU_dnsCache;
-  for my $hn (sort keys %HU_dnsCache) {
-    push @ret, sprintf("%*s   TS: %s   TTL: %5s   ADDR: %s", -$max, $hn, 
-      FmtDateTime($HU_dnsCache{$hn}{TS}), $HU_dnsCache{$hn}{TTL},
-      join(".", unpack("C*", $HU_dnsCache{$hn}{addr})));
+  for my $key (sort keys %HU_dnsCache) {
+    push @ret, sprintf("%*s   TS: %s   TTL: %5s   ADDR: %s", -$max, $key, 
+      FmtDateTime($HU_dnsCache{$key}{TS}), $HU_dnsCache{$key}{TTL},
+      join(".", unpack("C*", $HU_dnsCache{$key}{addr})));
   }
   return join("\n", @ret);
 }
@@ -189,6 +189,14 @@ HttpUtils_dnsParse($$$)
   return "No A record found";
 }
 
+
+sub
+HttpUtils_wantInet6($)
+{
+  my ($hash) = @_;
+  return $haveInet6 && (!defined($hash->{try6}) || $hash->{try6} == 1);
+}
+
 # { HttpUtils_gethostbyname({timeout=>4}, "fhem.de", 1,
 #   sub(){my($h,$e,$a)=@_;; Log 1, $e ? "ERR:$e": ("IP:".ip2str($a)) }) }
 sub
@@ -205,7 +213,7 @@ HttpUtils_gethostbyname($$$$)
   my $dnsServer = AttrVal("global", "dnsServer", undef);
 
   if(!$dnsServer) { # use the blocking libc to get the IP
-    if($haveInet6) {
+    if(HttpUtils_wantInet6($hash)) {
       $host = $1 if($host =~ m/^\[([a-f0-9:]+)\]+$/); # remove [] from IPV6
       my $iaddr = Socket6::inet_pton(AF_INET6, $host);  # Try it as IPV6
       return $fn->($hash, undef, $iaddr) if($iaddr);
@@ -243,10 +251,10 @@ HttpUtils_gethostbyname($$$$)
     return;
   }
 
-  return $fn->($hash, undef, $HU_dnsCache{$host}{addr}) # check the cache
-        if($HU_dnsCache{$host} &&
-           $HU_dnsCache{$host}{TS}+$HU_dnsCache{$host}{TTL} > gettimeofday());
-
+  my $dnsKey = "$host/".($try6 ? "IPv6" : "IPv4");
+  return $fn->($hash, undef, $HU_dnsCache{$dnsKey}{addr}) # check the cache
+        if($HU_dnsCache{$dnsKey} &&
+           $HU_dnsCache{$dnsKey}{TS}+$HU_dnsCache{$dnsKey}{TTL}>gettimeofday());
   my $dh = AttrVal("global", "dnsHostsFile", "undef");
   if($dh) {
     my $fh;
@@ -293,9 +301,10 @@ HttpUtils_gethostbyname($$$$)
       if($err && $dh->{try6});
     return $dh->{callback}->($dh->{origHash}, "DNS: $err", undef) if($err);
     Log 4, "DNS result for $dh->{host}: ".ip2str($addr).", ttl:$ttl";
-    $HU_dnsCache{$dh->{host}}{TS} = gettimeofday();
-    $HU_dnsCache{$dh->{host}}{TTL} = $ttl;
-    $HU_dnsCache{$dh->{host}}{addr} = $addr;
+    my $dnsKey = $dh->{host}."/".($dh->{try6} ? "IPv6" : "IPv4");
+    $HU_dnsCache{$dnsKey}{TS} = gettimeofday();
+    $HU_dnsCache{$dnsKey}{TTL} = $ttl;
+    $HU_dnsCache{$dnsKey}{addr} = $addr;
     return $dh->{callback}->($dh->{origHash}, undef, $addr);
   }
   $dh{directReadFn} = \&directReadFn;
@@ -398,7 +407,8 @@ HttpUtils_Connect($)
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
   if($hash->{callback}) { # Nonblocking staff
-    HttpUtils_gethostbyname($hash, $host, $haveInet6, sub($$$) {
+    HttpUtils_gethostbyname($hash, $host, HttpUtils_wantInet6($hash),
+    sub($$$) {
       my ($hash, $err, $iaddr) = @_;
       $hash = $hash->{origHash} if($hash->{origHash});
       if($err) {
@@ -473,7 +483,7 @@ HttpUtils_Connect($)
     return;
 
   } else {
-    $hash->{conn} = $haveInet6 ?
+    $hash->{conn} = HttpUtils_wantInet6($hash) ?
       IO::Socket::INET6->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout}):
       IO::Socket::INET ->new(PeerAddr=>"$host:$port",Timeout=>$hash->{timeout});
 
@@ -999,12 +1009,27 @@ HttpUtils_ParseAnswer($)
 
 # Parameters in the hash:
 #  mandatory:
-#    url, callback
-#  optional(default):
-#    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
-#    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
-#    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
-#    compress(1), incrementalTimeout(0), forceEncoding(undef)
+#    url,
+#    callback
+#  optional(default-value):
+#    compress(1)
+#    data("")             # sending data via POST
+#    forceEncoding(undef) # Encode received data with this charset
+#    header("" or {})
+#    hideurl(0)           # hide the url in the logs
+#    httpversion("1.0")
+#    ignoreredirects(0)
+#    incrementalTimeout(0)
+#    keepalive(0)         # leave connection open for repeated queries
+#    loglevel(4)
+#    method($data ? "POST" : "GET")
+#    noshutdown(1)        # 0: do not close write channel (see below: shutdown)
+#    pwd()                # basic auth password
+#    shutdown(0)          # close write channel after sending data / HTTP only
+#    sslargs({})
+#    timeout(4)
+#    try6()               # 0: prohibit IPV6, even if useInet6 is set
+#    user()               # basic auth uset
 # Example:
 #   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
