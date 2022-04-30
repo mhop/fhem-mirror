@@ -156,6 +156,12 @@ HttpUtils_dumpDnsCache()
 }
 
 sub
+HttpUtils_clearDnsCache()
+{
+  %HU_dnsCache = ();
+}
+
+sub
 HttpUtils_dnsParse($$$)
 {
   my ($a,$ql,$try6) = @_;    # $ql: query length
