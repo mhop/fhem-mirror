@@ -8185,8 +8185,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <ul>
          <b>Beispiel: </b> <br>
          attr &lt;name&gt; createTomorrowPVFcReadings 09,11 <br>
-         
-         # erstellt Readings für die Stunde 09 (08:00-09:00) und 11 (10:00 bis 11:00) des kommenden Tages
+         # erstellt Readings für die Stunde 09 (08:00-09:00) und 11 (10:00-11:00) des kommenden Tages
        </ul>         
          
        </li>
