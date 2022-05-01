@@ -112,10 +112,15 @@ sub Define($$){
             oilfox_metering_liters              => 0,
             oilfox_metering_currentOilHeight    => 0,
             oilfox_metering_battery             => 0,
+            oilfox_currentMeteringAt            => '',
+            oilfox_nextMeteringAt               => '',
+            oilfox_daysReach                    => 0,
+            oilfox_quantityUnit                 => '',
             email 				                => '',
             password 				            => '',
             interval    			            => 300,
-            expires 					        => time(),
+            access_token_expires 				=> time(),
+            validationError                     => '',
         },
     );
     
@@ -294,7 +299,7 @@ sub APIAuth($) {
                 }';
 
     HttpUtils_NonblockingGet({
-        url        	=> API . "v3/login",
+        url        	=> API . "customer-api/v1/login",
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "POST",
@@ -336,7 +341,7 @@ sub APIAuthResponse($) {
             readingsBulkUpdate($hash,'token',$hash->{OilFox}->{token} );
             
             my $expire_date = strftime("%Y-%m-%d %H:%M:%S", localtime($hash->{OilFox}->{expires}));
-            readingsBulkUpdate($hash,'expires',$expire_date );
+            readingsBulkUpdate($hash,'access_token_expires',$expire_date );
             readingsEndUpdate($hash, 1);
             
             CONNECTED($hash,'authenticated');
@@ -383,7 +388,8 @@ sub DoUpdate($) {
         Log3 $name, 2, "LOGIN TOKEN MISSING OR EXPIRED";
         CONNECTED($hash,'disconnected');
 
-    } elsif ($hash->{OilFox}->{CONNECTED} eq 'connected') {
+    }
+    elsif ($hash->{OilFox}->{CONNECTED} eq 'connected') {
         Log3 $name, 4, "Update with device: " . $hash->{OilFox}->{oilfox_hwid} . " Interval:". $hash->{OilFox}->{interval};
         get($hash);
         InternalTimer( time() + $hash->{OilFox}->{interval}, "FHEM::OilFox::DoUpdate", $hash);
@@ -399,7 +405,7 @@ sub get($) {
     my $header = "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer " . $token;
 
     HttpUtils_NonblockingGet({
-        url        	=> API . "v4/summary",
+        url        	=> API .  "customer-api/v1/device",
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "GET",
@@ -439,31 +445,33 @@ sub getResponse($) {
             }	
                     
             my $oilfox = $hash->{OilFox}->{oilfox};
-            Log3 $name, 5, $result->{'devices'}->[$oilfox]->{'name'};
+            Log3 $name, 5, $result->{'items'}->[$oilfox]->{'hwid'};
             
-            my $myoilfox = $result->{'devices'}->[$oilfox];
-            $hash->{OilFox}->{oilfox_name} = $myoilfox->{'name'};
+            my $myoilfox = $result->{'items'}->[$oilfox];
             $hash->{OilFox}->{oilfox_hwid} = $myoilfox->{'hwid'};
-            $hash->{OilFox}->{oilfox_tankVolume} = $myoilfox->{'tankVolume'};
-            $hash->{OilFox}->{oilfox_metering_value} = $myoilfox->{'lastMetering'}->{'value'};
-            $hash->{OilFox}->{oilfox_metering_fillingPercentage} = $myoilfox->{'lastMetering'}->{'fillingPercentage'};
-            $hash->{OilFox}->{oilfox_metering_liters} = $myoilfox->{'lastMetering'}->{'liters'};
-            $hash->{OilFox}->{oilfox_metering_currentOilHeight} = $myoilfox->{'lastMetering'}->{'currentOilHeight'};
-            $hash->{OilFox}->{oilfox_metering_battery} = $myoilfox->{'lastMetering'}->{'battery'};
+            $hash->{OilFox}->{oilfox_currentMeteringAt} = $myoilfox->{'currentMeteringAt'};
+            $hash->{OilFox}->{oilfox_nextMeteringAt} = $myoilfox->{'nextMeteringAt'};
+            $hash->{OilFox}->{oilfox_daysReach} = $myoilfox->{'daysReach'};
+            $hash->{OilFox}->{oilfox_metering_fillingPercentage} = $myoilfox->{'fillLevelPercent'};
+            $hash->{OilFox}->{oilfox_metering_liters} = $myoilfox->{'fillLevelQuantity'};
+            $hash->{OilFox}->{oilfox_metering_battery} = $myoilfox->{'batteryLevel'};
+            $hash->{OilFox}->{oilfox_quantityUnit} = $myoilfox->{'quantityUnit'};
+            $hash->{OilFox}->{validationError} = $myoilfox->{'validationError'};
        
             CONNECTED($hash,'connected');
 
         }
         
         readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "oilfox_name", $hash->{OilFox}->{oilfox_name});    
-        readingsBulkUpdate($hash, "oilfox_hwid", $hash->{OilFox}->{oilfox_hwid});    
-        readingsBulkUpdate($hash, "oilfox_tankVolume", $hash->{OilFox}->{oilfox_tankVolume});   
-        readingsBulkUpdate($hash, "oilfox_metering_value", $hash->{OilFox}->{oilfox_metering_value});   
-        readingsBulkUpdate($hash, "oilfox_metering_fillingPercentage", $hash->{OilFox}->{oilfox_metering_fillingPercentage});   
+        readingsBulkUpdate($hash, "oilfox_hwid", $hash->{OilFox}->{oilfox_hwid});
+        readingsBulkUpdate($hash, "oilfox_currentMeteringAt", $hash->{OilFox}->{oilfox_currentMeteringAt});
+        readingsBulkUpdate($hash, "oilfox_nextMeteringAt", $hash->{OilFox}->{oilfox_nextMeteringAt});
+        readingsBulkUpdate($hash, "oilfox_daysReach", $hash->{OilFox}->{oilfox_daysReach});
+        readingsBulkUpdate($hash, "oilfox_metering_fillingPercentage", $hash->{OilFox}->{oilfox_metering_fillingPercentage});
         readingsBulkUpdate($hash, "oilfox_metering_liters", $hash->{OilFox}->{oilfox_metering_liters});
-        readingsBulkUpdate($hash, "oilfox_metering_currentOilHeight", $hash->{OilFox}->{oilfox_metering_currentOilHeight});   
         readingsBulkUpdate($hash, "oilfox_metering_battery", $hash->{OilFox}->{oilfox_metering_battery});
+        readingsBulkUpdate($hash, "oilfox_quantityUnit", $hash->{OilFox}->{oilfox_quantityUnit});
+        readingsBulkUpdate($hash, "validationError", $hash->{OilFox}->{validationError});
         readingsEndUpdate($hash, 1);
          
     }	
@@ -525,16 +533,37 @@ sub getResponse($) {
 	<a name="OilFoxReadings"></a>
 	<b>Readings</b>
 	<ul>
-		<li>expires - date when session of OilFox Cloud expires</li>
-		<li>battery - Battery power in percent</li>
-		<li>ooilfox_hwid - Id of the OilFox</li>
+		<li>access_token_expires - date when session of OilFox Cloud expires</li>
+		<li>oilfox_hwid - Id of the OilFox</li>
         <li>oilfox_name - Name of the OilFox</li>
+        <li>oilfox_daysReach - Estimated days until the storage runs empty</li>
         <li>oilfox_tankVolume - Tank Volume in liters</li>
-		<li>oilfox_metering_battery - Battery in percent</li>
+		<li>oilfox_metering_battery - enum of the battery level</li>
+            <ul>
+            <li>FULL - Full battery level</li>
+            <li>GOOD - Good battery level</li>
+            <li>MEDIUM - Medium battery level</li>
+            <li>WARNING - Low battery level</li>
+            <li>CRITICAL - Critical battery level</li>
+            </ul>
 		<li>oilfox_metering_value - Tank Value</li>
 		<li>oilfox_metering_fillingPercentage - Tank filling Percentage</li>
 		<li>oilfox_metering_liters - Tank filling liters</li>
         <li>oilfox_metering_currentOilHeight - Tank current Oil Height</li>
+        <li>oilfox_currentMeteringAt - Timestamp of measurement</li>
+        <li>oilfox_nextMeteringAt - Timestamp of next measurement</li>
+        <li>validationError - enum with errors regarding the measurement</li>
+            <ul>
+            <li>NO_METERING - No measurement yet</li>
+            <li>EMPTY_METERING - Incorrect Measurement</li>
+            <li>NO_EXTRACTED_VALUE - No fill level detected</li>
+            <li>SENSOR_CONFIG - Faulty measurement</li>
+            <li>MISSING_STORAGE_CONFIG - Storage configuration missing</li>
+            <li>INVALID_STORAGE_CONFIG - Incorrect storage configuration</li>
+            <li>DISTANCE_TOO_SHORT - Measured distance too small</li>
+            <li>ABOVE_STORAGE_MAX - Storage full</li>
+            <li>BELOW_STORAGE_MIN - Calculated filling level implausible</li>
+            </ul>
 	</ul>
 </ul>
 
