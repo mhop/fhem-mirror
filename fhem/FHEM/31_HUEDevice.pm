@@ -801,8 +801,9 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq 'v2effect' ) {
     my $hash = $defs{$name};
     my $iohash = $hash->{IODev};
-    my $id = HUEBridge_V2IdOfV1Id( $iohash, 'light', "/lights/$hash->{ID}" );
+    return "IODev missing" if( !$iohash );
 
+    my $id = HUEBridge_V2IdOfV1Id( $iohash, 'light', "/lights/$hash->{ID}" );
     HUEBridge_Set( $iohash, $iohash->{NAME}, $cmd, $id, $value );
 
     $obj->{'on'}  = JSON::true;
@@ -830,7 +831,14 @@ HUEDevice_Set($@)
   $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 1);
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
-    if( $cmd eq 'lights' ) {
+    if( $cmd eq "statusRequest" ) {
+      delete $hash->{lights}; # force .associatedWith refresh
+
+      RemoveInternalTimer($hash);
+      HUEDevice_GetUpdate($hash);
+      return undef;
+
+    } elsif( $cmd eq 'lights' ) {
       return "usage: lights <lights>" if( @args != 1 );
 
       my $obj = { 'lights' => HUEBridge_string2array($args[0]), };
@@ -922,16 +930,23 @@ HUEDevice_Set($@)
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     my $iohash = $hash->{IODev};
+    return "IODev missing" if( !$iohash );
 
     my $id = $hash->{ID};
     $id = $1 if( $id =~ m/^S(\d.*)/ );
 
     $hash->{".triggerUsed"} = 1;
 
+    $cmd = 'configsensor' if( $cmd eq 'config' );
+
     if( $cmd eq "statusRequest" ) {
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate($hash);
       return undef;
+
+    } elsif( $cmd eq 'setsensor' || $cmd eq 'configsensor' ) {
+      return "usage: $cmd <json>" if( !@args );
+      return HUEBridge_Set( $iohash, $iohash->{NAME}, $cmd, $id, @args );
 
     } elsif( $cmd eq 'json' ) {
       return "usage: json [setsensor|configsensor] <json>" if( !@args );
@@ -940,8 +955,6 @@ HUEDevice_Set($@)
         $type = shift @args;
        }
       return HUEBridge_Set( $iohash, $iohash->{NAME}, $type, $id, @args );
-
-      return undef;
 
     } elsif( @match = grep { $cmd eq $_ } keys %{($hash->{helper}{setList}{cmds}?$hash->{helper}{setList}{cmds}:{})} ) {
       return HUEBridge_Set( $iohash, $iohash->{NAME}, 'setsensor', $id, $hash->{helper}{setList}{cmds}{$match[0]} );
@@ -956,7 +969,7 @@ HUEDevice_Set($@)
           if( $json =~ m/^perl:\{(.*)\}$/ ) {
             $json = eval $json;
             if($@) {
-              Log3 $name, 3, "$name: configList: ". join(' ', @aa). ": ". $@;
+              Log3 $name, 3, "$name: setList: ". join(' ', @aa). ": ". $@;
               return "error: ". join(' ', @aa). ": ". $@;
             }
           } else {
@@ -1020,6 +1033,8 @@ HUEDevice_Set($@)
     return SetExtensions($hash, $list, $name, @aa);
   }
 
+  $cmd = 'configlight' if( $cmd eq 'config' );
+
   if( $cmd eq 'rename' ) {
     my $new_name =  join( ' ', @aa[1..@aa-1]);
     my $obj = { 'name' => $new_name, };
@@ -1034,6 +1049,13 @@ HUEDevice_Set($@)
 
     return $result->{error}{description} if( $result->{error} );
     return undef;
+
+  } elsif( $cmd eq 'setlight' || $cmd eq 'configlight' ) {
+    return "usage: $cmd <json>" if( !@args );
+    my $iohash = $hash->{IODev};
+    return "IODev missing" if( !$iohash );
+    return HUEBridge_Set( $iohash, $iohash->{NAME}, $cmd, $hash->{ID}, @args );
+
   }
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
@@ -1175,6 +1197,7 @@ HUEDevice_Set($@)
     $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
 
     $list .= " rename";
+    #$list .= " setlight configlight config" if( !$hash->{helper}->{devtype} );
 
     if( $hash->{helper}->{devtype} eq 'G' ) {
       $list .= " savescene deletescene";
@@ -1830,8 +1853,8 @@ HUEDevice_Parse($$)
     }
 
     my $lastupdated;
+    my $now = time;
     my $ts;
-    my $offset = 0;
     if( my $state = $result->{state} ) {
       $lastupdated = $state->{lastupdated};
 
@@ -1840,13 +1863,15 @@ HUEDevice_Parse($$)
 
       $ts = time_str2num($lastupdated);
 
+      my $offset = 0;
       if( my $iohash = $hash->{IODev} ) {
         if( my $offset_bridge = $iohash->{helper}{offsetUTC} ) {
           $offset = $offset_bridge;
           Log3 $name, 5, "$name: using offsetUTC $offset from bridge";
+
         } else {
           # bridge has no offsetUTC configured, use the system offsetUTC for now
-          my @t = localtime(time);
+          my @t = localtime($now);
           $offset = timegm(@t) - timelocal(@t);
           Log3 $name, 5, "$name: using offsetUTC $offset from system";
         }
@@ -1967,12 +1992,19 @@ HUEDevice_Parse($$)
          if( defined($readings{$key}) ) {
            if( $lastupdated ) {
              my $rut = ReadingsTimestamp($name,$key,undef);
-             if( !$hash->{helper}{forceUpdate}                                # not from queryAfterEvent
+             if( !$hash->{helper}{forceUpdate}                                 # not from queryAfterEvent
+                 #&& defined($result->{source}) && $result->{source} ne 'event' # not v2 event and not deconz event
                  && !defined($result->{v2_service}) && !defined($result->{t}) # not v2 event and not deconz event
-                 && $ts && defined($rut) && $ts <= time_str2num($rut) ) {     # lastupdated older than or equal to reading
+                 && $ts && defined($rut) && $ts <= time_str2num($rut) ) {      # lastupdated older than or equal to reading
                Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, current reading timestamp is $rut";
                next;
              }
+             #if( !$hash->{helper}{forceUpdate}                                 # not from queryAfterEvent
+             #    && defined($result->{source}) && $result->{source} ne 'event' # not v2 event and not deconz event
+             #    && $ts && $ts-60 > $now ) {                                   # lastupdated older than or equal to reading
+             #  Log3 $name, 4, "$name: ignoring reading $key with timestamp $lastupdated, older than 60sec";
+             #  next;
+             #}
 
              $hash->{'.updateTimestamp'} = $lastupdated;
              $hash->{CHANGETIME}[$i] = $lastupdated;
@@ -2382,6 +2414,11 @@ __END__
       Renames the device in the bridge and changes the fhem alias.</li>
       <li>json [setsensor|configsensor] {&lt;json&gt;}<br>
       send <code>{&lt;json&gt;}</code> to the state or config endpoints for this device.</li>
+      <li>setsensor|configsensor|config {&lt;json&gt;}<br>
+      send <code>{&lt;json&gt;}</code> to the state or config endpoints for this device.</li>
+      <li>setlight|configlight|config {&lt;json&gt;}<br>
+        send <code>{&lt;json&gt;}</code> to the state or config endpoints for this device.
+        see: <a href="#HUEBridge-set-configlight">HUEBridge:configlight</a></li>
       <li>habridgeupdate [ : &lt; on | off &gt; ] [ : &lt; bri | pct &gt; &lt; value &gt; ] <br>
       This command is only for usage of HA-Bridges that are emulating an Hue Hub. <br>
       It updates your HA-Bridge internal light state of the devices without changing the devices itself.
