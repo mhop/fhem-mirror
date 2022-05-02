@@ -472,6 +472,8 @@ FHEM/95_FLOORPLAN.pm         ulimaass             Frontends/FLOORPLAN
 FHEM/95_holiday.pm           rudolfkoenig         Sonstiges
 FHEM/95_PostMe.pm            pahenning            Unterstützende Dienste
 FHEM/95_remotecontrol.pm     ulimaass             Frontends
+FHEM/95_Shares.pm            pahenning            Sonstiges
+FHEM/95/ShareMaster.pm       pahenning            Sonstiges
 FHEM/95_YAAHM.pm             pahenning            Unterstützende Dienste
 FHEM/96_allowed.pm           rudolfkoenig         Automatisierung
 FHEM/96_SIP.pm               Wzut,plin            Sonstiges
