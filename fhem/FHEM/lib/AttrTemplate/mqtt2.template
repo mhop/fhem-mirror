@@ -3503,6 +3503,8 @@ set DEVICE attrTemplate shellyPlus_1 \CALLSPEECHRECOGN=0
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'online','false') eq 'false'?'10px-kreis-rot': ReadingsVal($name,'new_fw','false') eq 'true' ? '10px-kreis-gelb' : '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'apower',0); my $total = round(ReadingsNum($name,'aenergy_total',0)/1000,1); my $temp = ReadingsVal($name,'temperature','-100'); my $ip = ReadingsVal($name,'ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh / Temp: $temp °C</div>)}
 attr DEVICE  readingList $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/events/rpc:.* { return if $EVENT =~ m{switch:[1-3]}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/status/switch.0:.* { json2nameValue($EVENT, '', $JSONMAP) }\
+  $\DEVICETOPIC/status/mqtt:.* { json2nameValue($EVENT, '', $JSONMAP) }\
   fhem2shelly/rpc:.* {}
 attr DEVICE setList  toggle:noArg $\DEVICETOPIC/rpc {"id":1,"src":"fhem2shelly","method":"Switch.Toggle","params": {"id":0}}\
   off:noArg $\DEVICETOPIC/rpc {"id":1,"src":"fhem2shelly","method":"Switch.Set","params": {"id":0,"on":false}}\
@@ -3517,7 +3519,8 @@ copy DEVICE DEVICE_CH#
 deleteattr DEVICE_CH# stateFormat
 deleteattr DEVICE_CH# devStateIcon
 attr DEVICE_CH# jsonMap params_switch_#_state:state params_switch_#_aenergy_total:aenergy_total params_switch_#_apower:apower params_switch_#_temperature_tC:temperature params_switch_#_temperature_tF:0
-attr DEVICE_CH# readingList $\DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:#}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE_CH# readingList $\DEVICETOPIC/events/rpc:.* { return if $EVENT !~ m{switch:#}; $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/status/switch.#:.* { json2nameValue($EVENT, '', $JSONMAP) }
 attr DEVICE_CH# setList toggle:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Toggle","params": {"id":#}}\
   off:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":#,"on":false}}\
   on:noArg $\DEVICETOPIC/rpc {"id":0,"src":"fhem2shelly","method":"Switch.Set","params": {"id":#,"on":true}}\
@@ -3528,12 +3531,12 @@ rename DEVICE_CH3 DEVICE_CH4
 rename DEVICE_CH2 DEVICE_CH3
 rename DEVICE_CH1 DEVICE_CH2
 loop:#:2:3:4
-defmod DEVICE_CH# MQTT2_\DEVICE DEVICE_CH#
+defmod DEVICE_CH# MQTT2_\DEVICE
 attr DEVICE_CH# devicetopic DEV_TPC
 loop:END
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20220115
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20220505
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model shellypro4pm
 
 
