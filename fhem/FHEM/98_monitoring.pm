@@ -1,6 +1,6 @@
-# Id ##########################################################################
+##########################################################################
 # $Id$
-
+#
 # copyright ###################################################################
 #
 # 98_monitoring.pm
@@ -22,48 +22,88 @@
 # FHEM.  If not, see <http://www.gnu.org/licenses/>.
 
 # packages ####################################################################
-package main;
+package FHEM::Automation::monitoring; ##no critic qw(Package)
   use strict;
   use warnings;
+  use Carp qw(carp);
+  use Scalar::Util qw(looks_like_number);
+  use Time::HiRes qw(gettimeofday);
+  
+  use GPUtils qw(GP_Import);
+
+sub ::monitoring_Initialize { goto &Initialize }
+
+
+BEGIN {
+
+  GP_Import( qw(
+    readingsSingleUpdate
+    readingsBeginUpdate
+    readingsBulkUpdate
+    readingsEndUpdate
+    Log3 fhem
+    defs attr
+    DAYSECONDS HOURSECONDS MINUTESECONDS
+    init_done
+    InternalTimer
+    RemoveInternalTimer
+    readingFnAttributes
+    IsDisabled
+    AttrVal
+    InternalVal
+    ReadingsVal
+    ReadingsNum
+    devspec2array
+    AnalyzeCommandChain
+    AnalyzeCommand
+    EvalSpecials
+    AnalyzePerlCommand
+    perlSyntaxCheck
+    FmtDateTime time_str2num
+    notifyRegexpChanged
+    deviceEvents
+  ) )
+};
 
 # initialize ##################################################################
-sub monitoring_Initialize {
-  my $hash = shift // return;
-  my $TYPE = "monitoring";
+sub Initialize {
+    my $hash = shift // return;
 
-  $hash->{DefFn}    = $TYPE."_Define";
-  $hash->{UndefFn}  = $TYPE."_Undefine";
-  $hash->{SetFn}    = $TYPE."_Set";
-  $hash->{GetFn}    = $TYPE."_Get";
-  $hash->{AttrFn}   = $TYPE."_Attr";
-  $hash->{NotifyFn} = $TYPE."_Notify";
+    $hash->{DefFn}       = \&Define;
+    $hash->{UndefFn}     = \&Undefine;
+    $hash->{DeleteFn}    = \&Delete;
+    #$hash->{RenameFn}    = \&Rename;
+    $hash->{SetFn}       = \&Set;
+    $hash->{GetFn}       = \&Get;
+    $hash->{AttrFn}      = \&Attr;
+    $hash->{NotifyFn}    = \&Notify;
 
-  $hash->{AttrList} =
-    "addStateEvent:1,0 ".
-    "blacklist:textField-long ".
-    "disable:1,0 ".
-    "disabledForIntervals ".
-    "errorFuncAdd:textField-long ".
-    "errorFuncAdded:textField-long ".
-    "errorFuncRemove:textField-long ".
-    "errorWait ".
-    "errorReturn:textField-long ".
-    "getDefault:all,error,warning ".
-    "setActiveFunc:textField-long ".
-    "setInactiveFunc:textField-long ".
-    "warningFuncAdd:textField-long ".
-    "warningFuncAdded:textField-long ".
-    "warningFuncRemove:textField-long ".
-    "warningWait ".
-    "warningReturn:textField-long ".
-    "whitelist:textField-long ".
-    $readingFnAttributes
-  ;
+
+    $hash->{AttrList} =
+        "addStateEvent:1,0 ".
+        "blacklist:textField-long ".
+        "disable:1,0 ".
+        "disabledForIntervals ".
+        "errorFuncAdd:textField-long ".
+        "errorFuncAdded:textField-long ".
+        "errorFuncRemove:textField-long ".
+        "errorWait ".
+        "errorReturn:textField-long ".
+        "getDefault:all,error,warning ".
+        "setActiveFunc:textField-long ".
+        "setInactiveFunc:textField-long ".
+        "warningFuncAdd:textField-long ".
+        "warningFuncAdded:textField-long ".
+        "warningFuncRemove:textField-long ".
+        "warningWait ".
+        "warningReturn:textField-long ".
+        "whitelist:textField-long ".
+        $readingFnAttributes;
   return;
 }
 
 # regular Fn ##################################################################
-sub monitoring_Define {
+sub Define {
   my $hash = shift // return;
   my $def  = shift // return;
   my ($SELF, $TYPE, @re) = split m{\s+}xms, $def, 5;
@@ -72,21 +112,21 @@ sub monitoring_Define {
     if( !@re || @re > 2);
 
   monitoring_NOTIFYDEV($hash) if !$init_done;
-  monitoring_setActive($hash) if $init_done;
+  setActive($hash) if $init_done;
 
   return;
 }
 
-sub monitoring_Undefine {
+sub Undefine {
   my $hash = shift // return;
 
-  monitoring_setInactive($hash);
+  setInactive($hash);
   monitoring_RemoveInternalTimer($hash);
 
   return;
 }
 
-sub monitoring_Set {
+sub Set {
   my ($hash, @arr) = @_;
   my $TYPE = $hash->{TYPE};
 
@@ -112,10 +152,10 @@ sub monitoring_Set {
     if !exists $monitoring_sets{$argument};
 
   if ( $argument eq 'active' ) {
-    return monitoring_setActive($hash);
+    return setActive($hash);
   }
   if ( $argument eq 'inactive' ) {
-    monitoring_setInactive($hash);
+    setInactive($hash);
     readingsSingleUpdate($hash, 'state', $argument, 0);
 
     Log3($SELF, 3, "$SELF ($TYPE) set $SELF inactive");
@@ -163,7 +203,7 @@ sub monitoring_Set {
   return;
 }
 
-sub monitoring_Get {
+sub Get {
   my ($hash, @arr) = @_;
   my $TYPE = $hash->{TYPE};
   my $SELF = shift @arr;
@@ -196,12 +236,12 @@ sub monitoring_Get {
   elsif($argument eq 'error' || $argument eq 'warning') {
     push @ret, monitoring_return($hash, $argument);
   }
-
-  return join("\n\n", @ret)."\n" if @ret;
+  @ret = grep { defined } @ret; #prevent uninitialized warnings
+  return join ("\n\n", @ret)."\n" if @ret;
   return;
 }
 
-sub monitoring_Attr {
+sub Attr {
   my ($cmd, $SELF, $attribute, $value) = @_;
   my $hash = $defs{$SELF} // return;
 
@@ -228,15 +268,15 @@ sub monitoring_Attr {
     for my $list ( qw(warning error) ){
         for my $name ( split m{,}x, ReadingsVal($SELF, $list, '') ) {
           monitoring_modify("$SELF|$list|remove|$name")
-            if !grep {m/$name/} @whitelist;
+            if !grep {m{$name}x} @whitelist;
       }
     }
   }
   elsif($attribute eq 'disable'){
     if($cmd eq 'set' and $value == 1){
-      return monitoring_setActive($hash);
+      return setActive($hash);
     }
-    monitoring_setInactive($hash);
+    setInactive($hash);
     readingsSingleUpdate($hash, 'state', 'disabled', 0);
     Log3($SELF, 3, "$hash->{TYPE} ($SELF) attr $SELF disabled");
   }
@@ -244,7 +284,7 @@ sub monitoring_Attr {
   return;
 }
 
-sub monitoring_Notify {
+sub Notify {
   my $hash     = shift // return;
   my $dev_hash = shift // return;
   my $SELF = $hash->{NAME};
@@ -262,8 +302,8 @@ sub monitoring_Notify {
 
   return if !$events;
 
-  if($name eq 'global' && 'INITIALIZED|REREADCFG' =~ m/\Q@{$events}\E/){
-    monitoring_setActive($hash);
+  if($name eq 'global' && 'INITIALIZED|REREADCFG' =~ m{\Q@{$events}\E}x){
+    setActive($hash);
 
     return;
   }
@@ -283,32 +323,43 @@ sub monitoring_Notify {
   push @blacklist, devspec2array($_)
     for (split m{[\s]+}x, AttrVal($SELF, 'blacklist', ''));
 
-  return if @blacklist && grep {/$name/} @blacklist;
+  return if @blacklist && grep { m{$name}x } @blacklist;
 
   my @whitelist;
 
   push @whitelist, devspec2array($_)
     for (split m{[\s]+}x, AttrVal($SELF, 'whitelist', ''));
 
-  return if @whitelist && !grep {/$name/} @whitelist;
+  return if @whitelist && !grep { m{$name}x } @whitelist;
 
   for my $event (@{$events}){
     next if !$event;
 
     my $addMatch = "$name:$event" =~ m{\A$addRegex\z}xms;
     my $removeMatch = $removeRegex ? "$name:$event" =~ m{\A$removeRegex\z}xms : 0;
-    #Log3($hash, 3, "monitoring_notify called with add $addMatch and remove $removeMatch");
+    #Log3($hash, 3, "notify called with add $addMatch and remove $removeMatch");
 
     #next unless(defined($event) && ($addMatch || $removeMatch));
     next if !$addMatch && !$removeMatch;
-    #Log3($hash, 3, "monitoring_notify unless 1 replacement passed w. $addMatch and remove $removeMatch");
+    #Log3($hash, 3, "notify unless 1 replacement passed w. $addMatch and remove $removeMatch");
 
     Log3($SELF, 4 , "$TYPE ($SELF) triggered by \"$name $event\"");
 
     for my $list ( qw (error warning) ){
       my $listFuncAdd = AttrVal($SELF, $list.'FuncAdd', 'preset');
       my $listFuncRemove = AttrVal($SELF, $list.'FuncRemove', 'preset');
-      my $listWait = eval(AttrVal($SELF, $list.'Wait', 0));
+      #my $listWait = eval(AttrVal($SELF, $list.'Wait', 0));
+
+      my $cmd = AttrVal($SELF, $list.'Wait', 0);
+      my %specials = (
+         '$name'   => $name,      #Name des Event auslösenden Gerätes
+         '$SELF'   => $SELF,      #Eigenname des monitoring
+      );
+
+      $cmd  = EvalSpecials($cmd, %specials);
+
+      # CMD ausführen
+      my $listWait = AnalyzePerlCommand( $hash, $cmd );
       $listWait = 0 if !looks_like_number($listWait);
 
       if ( $listFuncAdd eq 'preset' && $listFuncRemove eq 'preset' ) {
@@ -378,9 +429,17 @@ sub monitoring_Notify {
         $listFuncRemove = 1 if $listFuncRemove eq 'preset' && $removeMatch;
       }
 
-      $listFuncAdd = eval($listFuncAdd) if $listFuncAdd =~ /^\{.*\}$/s;
-      $listFuncRemove = eval($listFuncRemove)
-        if($listFuncRemove =~ /^\{.*\}$/s);
+      #$listFuncAdd = eval($listFuncAdd) if $listFuncAdd =~ /^\{.*\}$/s;
+      if ( $listFuncAdd =~ m{\A\{.*\}\z}xs ) {
+          $listFuncAdd = EvalSpecials($listFuncAdd, %specials);
+
+          # CMD ausführen
+          $listFuncAdd = AnalyzePerlCommand( $hash, $listFuncAdd) 
+      };
+      if($listFuncRemove =~ m{\A\{.*\}\z}xs ) {
+          $listFuncRemove = EvalSpecials($listFuncRemove, %specials);
+          $listFuncRemove = AnalyzePerlCommand($hash, $listFuncRemove)
+      }
 
       monitoring_modify("$SELF|$list|remove|$name")
         if $listFuncRemove && $listFuncRemove eq '1';
@@ -402,7 +461,11 @@ sub monitoring_modify {
   return if IsDisabled($SELF);
 
   my $at;
-  $at = eval($wait + gettimeofday()) if $wait && $wait ne 'quiet';
+  #$at = eval($wait + gettimeofday()) if $wait && $wait ne 'quiet';
+  if ( $wait && $wait ne 'quiet' ) {
+      $at = looks_like_number($wait) ? $wait : AnalyzeCommandChain($hash, $wait);
+      $at +=gettimeofday();
+  }
   my $TYPE = $hash->{TYPE};
   my (@change, %readings);
   %readings = map{ $_ => 1 } split m{,}xms, ReadingsVal($SELF, $list, '');
@@ -421,14 +484,14 @@ sub monitoring_modify {
   if ( $operation eq 'add' ) {
     return if 
       $readings{$value} ||
-      ReadingsVal($SELF, 'error', '') =~ m/(?:^|,)$value(?:,|$)/
+      ReadingsVal($SELF, 'error', '') =~ m{(?:^|,)$value(?:,|$)}x
     ;
 
     if ( $at ){
       return if $hash->{READINGS}{$reading};
 
       readingsSingleUpdate($hash, $reading, FmtDateTime($at), 0);
-      InternalTimer($at, 'monitoring_modify', $arg);
+      InternalTimer($at, \&monitoring_modify, $arg);
 
       return;
     }
@@ -455,7 +518,13 @@ sub monitoring_modify {
   if ($operation eq 'add') {
     my $name = $value;
     my $listFuncAdded = AttrVal($SELF, $list.'FuncAdded', '');
-    $listFuncAdded = $listFuncAdded =~ /^\{.*\}$/s ? eval($listFuncAdded) : fhem($listFuncAdded);
+    my %specials = (
+         '$name'   => $name,      #Name des Event auslösenden Gerätes
+         '$SELF'   => $SELF,      #Eigenname des monitoring
+      );
+      $listFuncAdded = EvalSpecials($listFuncAdded, %specials);
+      $listFuncAdded = AnalyzeCommandChain($hash, $listFuncAdded);
+    #$listFuncAdded = $listFuncAdded =~ /^\{.*\}$/s ? eval($listFuncAdded) : fhem($listFuncAdded);
   }
 
   readingsBeginUpdate($hash);
@@ -506,10 +575,15 @@ sub monitoring_return {
   $ret = '"$list: $value"' if !$ret && $value;
 
   return if !$ret;
-  return eval($ret);
+  #return ; 
+  
+  if ( !eval{ $ret = eval($ret) ; 1 } ) { ##no critic qw(StringyEval)
+    return Log3($hash->{NAME}, 1, "Evaluation error: $@");
+  }
+  return $ret;
 }
 
-sub monitoring_setActive {
+sub setActive {
   my $hash = shift // return;
   my $SELF = $hash->{NAME} // return;
   my $TYPE = $hash->{TYPE};
@@ -542,7 +616,7 @@ sub monitoring_setActive {
   return;
 }
 
-sub monitoring_setInactive {
+sub setInactive {
   my $hash = shift // return;
   my $SELF = $hash->{NAME} // return;
   my $TYPE = $hash->{TYPE};
@@ -827,7 +901,8 @@ __END__
           </li>
         </ul>
         With this attribute the output created with "get &lt;name&gt; error"
-        can be formatted.
+        can be formatted.<br>
+        Note: As evaluation is done in package context, using functions from main may require redirection in lexical main context (e.g. use double colons "::myFunction($SELF)").
       </li>
       <a id="monitoring-attr-getDefault"></a><li>
         <code>getDefault (all|error|warning)</code><br>
@@ -1332,7 +1407,8 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
           </li>
         </ul>
         Mit diesem Attribut kann die Ausgabe die mit "get &lt;name&gt; error"
-        erzeugt wird angepasst werden.
+        erzeugt wird angepasst werden.<br>
+        Hinweis: Da der Code im package-Kontext evaluiert wird, muss ggf. bei Funktionen aus dem main Kontext explizit ein Verweis auf diesen Kontext ergänzt werden(z.B. mit vorangestelltem doppeltem Doppelpunt "::myFunction($SELF)").
       </li>
       <a id="monitoring-attr-getDefault"></a><li>
         <code>getDefault (all|error|warning)</code><br>
