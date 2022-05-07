@@ -2162,6 +2162,22 @@ CommandDefine($$)
       addStructChange("define", $name, $def) if(!$opt{silent});
       DoTrigger("global", "DEFINED $name", 1);
     }
+
+    if($init_done && $modules{$m}{Match}) { # reset multiple IOdev, #127565
+      foreach my $an (keys %defs) {
+        my $ah = $defs{$an};
+        my $cl = $ah->{Clients};
+        $cl = $modules{$ah->{TYPE}}{Clients} if(!$cl);
+        next if(!$cl || !$ah->{'.clientArray'});
+        foreach my $cmRe ( split(/:/, $cl) ) {
+          if($m =~ $cmRe) {
+            delete($ah->{'.clientArray'});
+            last;
+          }
+        }
+      }
+    }
+
   }
   return ($ret && $opt{ignoreErr} ?
         "Cannot define $name, remove -ignoreErr for details" : $ret);
