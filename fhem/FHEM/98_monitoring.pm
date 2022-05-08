@@ -140,7 +140,7 @@ sub Set {
     clear         => 'clear:all,error,warning',
     errorAdd      => 'errorAdd:textField',
     errorRemove   => 'errorRemove:'.
-                       join q{,}, ReadingsVal($SELF, 'error', ''),
+                       join( q{,}, ReadingsVal($SELF, 'error', '')),
     inactive      => 'inactive:noArg',
     warningAdd    => 'warningAdd:textField',
     warningRemove => 'warningRemove:'.
