@@ -35,6 +35,7 @@
 #    1.01.14  fixed problem with DevIo "No route" sending fhem to 100% CPU
 #    1.01.15  add debug options
 #    1.01.16  add cyclicConnect to mitigate lost TCP connection issue
+#    1.01.17  add TW9400
 #
 ################################################################################
 #
@@ -68,7 +69,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.16";
+my $version = "1.01.17";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -106,6 +107,7 @@ my %ESCVP21net_Miscsets = (
 # TW5650 sets
 my %ESCVP21net_TW5650sets = (
   "ASPECT"  => ":get,Auto,Auto20,Normal,Full,Zoom",
+  "AUTOHOME"     => ":get,off,on",
   "AUTOKEYSTONE" => ":get,on,off",
   "BTAUDIO" => ":get,on,off,toggle",
   "CMODE"   => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
@@ -168,8 +170,10 @@ my %ESCVP21net_TW6100result = (
   "SOURCE:F0"  => "ChangeCyclic"
 );
 
+# TW7400 sets
 my %ESCVP21net_TW7400sets = (
   "4KENHANCE" => ":get,off,FullHD",
+  "AUTOHOME"     => ":get,off,on",
   "ASPECT"    => ":get,Normal,Auto,Full,Zoom",
   "CMODE"     => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,DigitalCinema",
   "HREVERSE"  => ":get,Flip,Normal",
@@ -204,20 +208,23 @@ my %ESCVP21net_TW7400result = (
   "SOURCE:F0"  => "ChangeCyclic"
 );
 
-
-# scotty sets - sort of godmode, gives you enhanced set possibilities
-my %ESCVP21net_Scottysets = (
+# TW9400 sets
+my %ESCVP21net_TW9400sets = (
   "4KENHANCE" => ":get,off,FullHD",
-  "ASPECT"    => ":get,Auto,Auto20,Normal,Full,Zoom,Wide",
-  "AUTOKEYSTONE" => ":get,on,off",
+  "ASPECT"    => ":get,Auto,Normal,Full,Zoom",
   "AUDIO"     => ":get,Audio1,Audio2,USB",
+  "AUTOHOME"  => ":get,off,on",
+  "AUTOKEYSTONE" => ":get,on,off",
   "AVOUT"     => ":get,projection,constantly",
   "BTAUDIO"   => ":get,on,off,toggle",
-  "CMODE"     => ":get,sRGB,Normal,Meeting,Presentation,Theatre,Game/LivingRoom,Natural,Dynamic/Sports,09,Custom,Living,BlackBoard,WhiteBoard,14,Photo,Cinema,3D_Cinema,3D_Dynamic",
+  "CMODE"     => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigialCinema",
+  "DYNRANGE"  => ":get,Auto,SDR,HDR10,HLG",
   "FREEZE"    => ":get,on,off,toggle",
   "HREVERSE"  => ":get,Flip,Normal",
   "ILLUM"     => ":get,on,off,toggle",
-  "LUMINANCE" => ":get,high,low,toggle",
+  "IMGPRESET" => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
+  "LUMINANCE" => ":get,normal,eco,medium",
+  "MCFI"      => ":get,off,low,normal,high",
   "MSEL"      => ":get,black,blus,user",
   "OVSCAN"    => ":get,off,4%,8%,auto",
   "PRODUCT"   => ":get,ModelName_on,ModelName_off",
@@ -229,6 +236,50 @@ my %ESCVP21net_Scottysets = (
   "VOLset"    => ":slider,-1,1,20",
   "VREVERSE"  => ":get,Flip,Normal",
   "WLPWR"     => ":get,WLAN_on,WLAN_off"
+);
+
+my %ESCVP21net_TW9400result = (
+  "CMODE:06"     => "Dynamic",
+  "CMODE:07"     => "Natural",
+  "CMODE:0C"     => "BrightCinema",
+  "CMODE:15"     => "Cinema",
+  "CMODE:17"     => "3D_Cinema",
+  "CMODE:18"     => "3D_Dynamic",
+  "CMODE:20"     => "BW_Cinema",
+  "CMODE:22"     => "DigitalCinema",
+  "LUMINANCE:00" => "normal",
+  "LUMINANCE:01" => "eco",
+  "LUMINANCE:02" => "medium"
+);
+
+# scotty sets - sort of godmode, gives you enhanced set possibilities
+my %ESCVP21net_Scottysets = (
+  "4KENHANCE"    => ":get,off,FullHD",
+  "ASPECT"       => ":get,Auto,Auto20,Normal,Full,Zoom,Wide",
+  "AUTOHOME"     => ":get,off,on",
+  "AUTOKEYSTONE" => ":get,on,off",
+  "AUDIO"        => ":get,Audio1,Audio2,USB",
+  "AVOUT"        => ":get,projection,constantly",
+  "BTAUDIO"      => ":get,on,off,toggle",
+  "CMODE"        => ":get,sRGB,Normal,Meeting,Presentation,Theatre,Game/LivingRoom,Natural,Dynamic/Sports,09,Custom,Living,BlackBoard,WhiteBoard,14,Photo,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigitalCinema",
+  "DYNRANGE"     => ":get,Auto,SDR,HDR10,HLG",
+  "FREEZE"       => ":get,on,off,toggle",
+  "HREVERSE"     => ":get,Flip,Normal",
+  "ILLUM"        => ":get,on,off,toggle",
+  "IMGPRESET"    => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
+  "LUMINANCE"    => ":get,high,low,toggle",
+  "MCFI"         => ":get,off,low,normal,high",
+  "MSEL"         => ":get,black,blus,user",
+  "OVSCAN"       => ":get,off,4%,8%,auto",
+  "PRODUCT"      => ":get,ModelName_on,ModelName_off",
+  "PWSTATUS"     => ":get",
+  "SIGNAL"       => ":get,none,2D,3D",
+  "SNO"          => ":get",
+  "SOURCE"       => ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
+  "VOL"          => ":get",
+  "VOLset"       => ":slider,-1,1,20",
+  "VREVERSE"     => ":get,Flip,Normal",
+  "WLPWR"        => ":get,WLAN_on,WLAN_off"
 );
 
 my %ESCVP21net_Scottyresult = (
@@ -250,6 +301,8 @@ my %ESCVP21net_Scottyresult = (
   "CMODE:15"     => "Cinema",
   "CMODE:17"     => "3D_Cinema",
   "CMODE:18"     => "3D_Dynamic",
+  "CMODE:20"     => "BW_Cinema",  
+  "CMODE:22"     => "DigitalCinema",  
   "LUMINANCE:00" => "normal",
   "LUMINANCE:01" => "eco",
   "LUMINANCE:02" => "medium"
@@ -269,6 +322,8 @@ my %ESCVP21net_data = (
   "AUDIO:USB"             => "03",
   "AUTOKEYSTONE:on"       => "ON",
   "AUTOKEYSTONE:off"      => "OFF",
+  "AUTOHOME:off"          => "00",
+  "AUTOHOME:on"           => "01",
   "AVOUT:projection"      => "00",
   "AVOUT:constantly"      => "01",
   "BTAUDIO:on"            => "01",
@@ -293,13 +348,22 @@ my %ESCVP21net_data = (
   "CMODE:Cinema"          => "15",
   "CMODE:3D_Cinema"       => "17",
   "CMODE:3D_Dynamic"      => "18",
-  "CMODE:DigitalCinema"   => "22",  
+  "CMODE:DigitalCinema"   => "22",
+  "DYNRANGE:Auto"         => "00",
+  "DYNRANGE:SDR"          => "01",
+  "DYNRANGE:HDR10"        => "20",
+  "DYNRANGE:HLG"          => "30",              
   "FREEZE:on"             => "ON",
   "FREEZE:off"            => "OFF",
   "HREVERSE:Flip"         => "ON",
   "HREVERSE:Normal"       => "OFF",
   "ILLUM:on"              => "01",
   "ILLUM:off"             => "00",
+  "IMGPRESET:Setting1"    => "01",
+  "IMGPRESET:Setting2"    => "02",
+  "IMGPRESET:Setting3"    => "03",
+  "IMGPRESET:Setting4"    => "04",
+  "IMGPRESET:Setting5"    => "05",
   "LUMINANCE:high"        => "00",
   "LUMINANCE:low"         => "01",
   "LUMINANCE:normal"      => "00",
@@ -363,16 +427,27 @@ my %ESCVP21net_defaultresults = (
   "AUDIO:03"         => "USB",
   "AVOUT:00"         => "projection",
   "AVOUT:01"         => "constantly",
+  "AUTOHOME:00"      => "off",
+  "AUTOHOME:01"      => "on",  
   "AUTOKEYSTONE:ON"  => "on",
   "AUTOKEYSTONE:OFF" => "off",
   "BTAUDIO:01"       => "on",
   "BTAUDIO:00"       => "off",
+  "DYNRANGE:00"      => "Auto",
+  "DYNRANGE:01"      => "SDR",
+  "DYNRANGE:20"      => "HDR10",
+  "DYNRANGE:30"      => "HLG",  
   "FREEZE:ON"        => "on",
   "FREEZE:OFF"       => "off",
   "HREVERSE:ON"      => "Flip",
   "HREVERSE:OFF"     => "Normal",
   "ILLUM:01"         => "on", 
   "ILLUM:00"         => "off",
+  "IMGPRESET:01"     => "Setting1",
+  "IMGPRESET:02"     => "Setting2",
+  "IMGPRESET:03"     => "Setting3",
+  "IMGPRESET:04"     => "Setting4",
+  "IMGPRESET:05"     => "Setting5",  
   "MCFI:00"          => "off",
   "MCFI:01"          => "low",
   "MCFI:02"          => "normal",
@@ -1690,6 +1765,11 @@ sub ESCVP21net_setTypeCmds ($){
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW7400result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW7400 sets and result";
   }
+  elsif ($hash->{model} eq "TW9400"){
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW9400sets, %VP21addattrs);
+    %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW9400result);
+    main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW9400 sets and result";
+  }  
   elsif ($hash->{model} eq "Scotty"){
     %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Scottysets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_Scottyresult);
@@ -1839,7 +1919,8 @@ sub ESCVP21net_openDevice{
 <h3>ESCVP21net</h3>
 
 <ul>
-  <i>ESCVP21net</i> implements Epson VP21 control via (W)LAN, uses VP.net.
+  <br><i>ESCVP21net</i> implements Epson VP21 control via (W)LAN, uses VP.net.
+  <br>Attention: To be able to switch the projector power on via (W)LAN, you have to enable wireless/LAN standby mode (or whatever it is called in your projector menu), so that the projector does NOT deactivate the (W)LAN in standby mode!
   <br><br>
   <a id="ESCVP21net-define"></a>
   <b>Define</b>
