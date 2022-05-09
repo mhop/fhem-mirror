@@ -2170,7 +2170,7 @@ CommandDefine($$)
         $cl = $modules{$ah->{TYPE}}{Clients} if(!$cl);
         next if(!$cl || !$ah->{'.clientArray'});
         foreach my $cmRe ( split(/:/, $cl) ) {
-          if($m =~ $cmRe) {
+          if($m =~ m/^$cmRe$/) {
             delete($ah->{'.clientArray'});
             last;
           }
