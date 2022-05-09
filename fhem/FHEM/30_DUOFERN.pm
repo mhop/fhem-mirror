@@ -37,40 +37,44 @@ my %devices = (
     "A5"    => {"name" => "Sonnensensor"                      },
     "A7"    => {"name" => "Funksender UP"                     },
     "A8"    => {"name" => "HomeTimer"                         },
+    "A9"    => {"name" => "Sonnen-/Windsensor"                },
     "AA"    => {"name" => "Markisenwaechter"                  },
     "AB"    => {"name" => "Rauchmelder"                       },
     "AC"    => {"name" => "Fenster-Tuer-Kontakt"              },
     "AD"    => {"name" => "Wandtaster 6fach Bat"              },
+    "AF"    => {"name" => "Sonnensensor"                      },
     "E0"    => {"name" => "Handzentrale"                      },
     "E1"    => {"name" => "Heizkoerperantrieb"                },
 );
 
 my %sensorMsg = (
-    "0701"    => {"name" => "up",          "chan" => 6, "state" => "Btn01"},
-    "0702"    => {"name" => "stop",        "chan" => 6, "state" => "Btn02"},
-    "0703"    => {"name" => "down",        "chan" => 6, "state" => "Btn03"},
-    "0718"    => {"name" => "stepUp",      "chan" => 6, "state" => "Btn18"},
-    "0719"    => {"name" => "stepDown",    "chan" => 6, "state" => "Btn19"},
-    "071A"    => {"name" => "pressed",     "chan" => 6, "state" => "Btn1A"},  
-    "0713"    => {"name" => "dawn",        "chan" => 5, "state" => "dawn"},
-    "0709"    => {"name" => "dusk",        "chan" => 5, "state" => "dusk"},
-    "0708"    => {"name" => "startSun",    "chan" => 5, "state" => "on"},
-    "070A"    => {"name" => "endSun",      "chan" => 5, "state" => "off"},
-    "070D"    => {"name" => "startWind",   "chan" => 5, "state" => "on"},
-    "070E"    => {"name" => "endWind",     "chan" => 5, "state" => "off"},
-    "0711"    => {"name" => "startRain",   "chan" => 5, "state" => "on"},
-    "0712"    => {"name" => "endRain",     "chan" => 5, "state" => "off"},   
-    "071C"    => {"name" => "startTemp",   "chan" => 5, "state" => "on"},
-    "071D"    => {"name" => "endTemp",     "chan" => 5, "state" => "off"},
-    "071E"    => {"name" => "startSmoke",  "chan" => 5, "state" => "on"},
-    "071F"    => {"name" => "endSmoke",    "chan" => 5, "state" => "off"},      
-    "0720"    => {"name" => "startMotion", "chan" => 5, "state" => "on"},
-    "0721"    => {"name" => "endMotion",   "chan" => 5, "state" => "off"},
-    "0723"    => {"name" => "opened",      "chan" => 5, "state" => "opened"},
-    "0724"    => {"name" => "closed",      "chan" => 5, "state" => "closed"},
-    "0E01"    => {"name" => "off",         "chan" => 6, "state" => "Btn01"},
-    "0E02"    => {"name" => "off",         "chan" => 6, "state" => "Btn02"},
-    "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
+    "0701"    => {"name" => "up",             "chan" => 6, "state" => "Btn01"},
+    "0702"    => {"name" => "stop",           "chan" => 6, "state" => "Btn02"},
+    "0703"    => {"name" => "down",           "chan" => 6, "state" => "Btn03"},
+    "0718"    => {"name" => "stepUp",         "chan" => 6, "state" => "Btn18"},
+    "0719"    => {"name" => "stepDown",       "chan" => 6, "state" => "Btn19"},
+    "071A"    => {"name" => "pressed",        "chan" => 6, "state" => "Btn1A"},  
+    "0713"    => {"name" => "dawn",           "chan" => 5, "state" => "dawn"},
+    "0709"    => {"name" => "dusk",           "chan" => 5, "state" => "dusk"},
+    "0708"    => {"name" => "startSun",       "chan" => 5, "state" => "on"},
+    "070A"    => {"name" => "endSun",         "chan" => 5, "state" => "off"},
+    "070D"    => {"name" => "startWind",      "chan" => 5, "state" => "on"},
+    "070E"    => {"name" => "endWind",        "chan" => 5, "state" => "off"},
+    "0711"    => {"name" => "startRain",      "chan" => 5, "state" => "on"},
+    "0712"    => {"name" => "endRain",        "chan" => 5, "state" => "off"},   
+    "071C"    => {"name" => "startTemp",      "chan" => 5, "state" => "on"},
+    "071D"    => {"name" => "endTemp",        "chan" => 5, "state" => "off"},
+    "071E"    => {"name" => "startSmoke",     "chan" => 5, "state" => "on"},
+    "071F"    => {"name" => "endSmoke",       "chan" => 5, "state" => "off"},      
+    "0720"    => {"name" => "startMotion",    "chan" => 5, "state" => "on"},
+    "0721"    => {"name" => "endMotion",      "chan" => 5, "state" => "off"},
+    "0723"    => {"name" => "opened",         "chan" => 5, "state" => "opened"},
+    "0724"    => {"name" => "closed",         "chan" => 5, "state" => "closed"},
+    "0725"    => {"name" => "startVibration", "chan" => 5 },
+    "0726"    => {"name" => "endVibration",   "chan" => 5 },
+    "0E01"    => {"name" => "off",            "chan" => 6, "state" => "Btn01"},
+    "0E02"    => {"name" => "off",            "chan" => 6, "state" => "Btn02"},
+    "0E03"    => {"name" => "on",             "chan" => 6, "state" => "Btn03"},        
 );
 
 
@@ -1345,7 +1349,7 @@ DUOFERN_Parse($$)
           if($code =~ m/^(AC)..../ &&  substr($msg, 14, 2) eq "FE") {
             readingsSingleUpdate($hash, "state", "tilted", 1);
             $state = "tilted";
-          } elsif($code =~ m/^(65|A5|AA|AB|AC)..../) {
+          } elsif($code =~ m/^(65|A5|AA|AB|AC|AF)..../ && defined($sensorMsg{$id}{state})) {
             readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
           }
           
