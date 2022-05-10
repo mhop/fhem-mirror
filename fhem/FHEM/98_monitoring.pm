@@ -71,8 +71,6 @@ sub Initialize {
 
     $hash->{DefFn}       = \&Define;
     $hash->{UndefFn}     = \&Undefine;
-    $hash->{DeleteFn}    = \&Delete;
-    #$hash->{RenameFn}    = \&Rename;
     $hash->{SetFn}       = \&Set;
     $hash->{GetFn}       = \&Get;
     $hash->{AttrFn}      = \&Attr;
