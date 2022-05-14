@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.60.0 "=> "14.05.2022  new key 'swoncond' in consumer attributes ",
   "0.59.0 "=> "01.05.2022  new attr createTomorrowPVFcReadings ",
   "0.58.0 "=> "20.04.2022  new setter consumerImmediatePlanning, functions isConsumerOn isConsumerOff ",
   "0.57.3 "=> "10.04.2022  some fixes (\$eavg in ___csmSpecificEpieces, useAutoCorrection switch to regex) ",
@@ -3355,11 +3356,11 @@ sub __switchConsumer {
   
   my $type  = $hash->{TYPE};
   
-  my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);             # geplante Unix Startzeit
-  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);             # geplante Unix Stopzeit  
-  my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
-  my $cname   = ConsumerVal ($hash, $c, "name",             "");             # Consumer Device Name
-  my $calias  = ConsumerVal ($hash, $c, "alias",            "");             # Consumer Device Alias
+  my $startts   = ConsumerVal ($hash, $c, "planswitchon",  undef);             # geplante Unix Startzeit
+  my $stopts    = ConsumerVal ($hash, $c, "planswitchoff", undef);             # geplante Unix Stopzeit  
+  my $pstate    = ConsumerVal ($hash, $c, "planstate",        "");
+  my $cname     = ConsumerVal ($hash, $c, "name",             "");             # Consumer Device Name
+  my $calias    = ConsumerVal ($hash, $c, "alias",            "");             # Consumer Device Alias
   
   ## Ist Verbraucher empfohlen ?
   ################################
@@ -3372,10 +3373,12 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                             # Set Command für "on"
-  my $auto   = ConsumerVal ($hash, $c, "auto",    1);
+  my $oncom    = ConsumerVal       ($hash, $c, "oncom",  "");                                     # Set Command für "on"
+  my $auto     = ConsumerVal       ($hash, $c, "auto",    1);
+  my $swoncond = isAddSwitchOnCond ($hash, $c);                                                   # zusätzliche Switch on Bedingung
  
-  if($auto && $oncom && $pstate =~ /planned|priority/xs && $startts && $t >= $startts) {          # Verbraucher Start ist geplant && Startzeit überschritten
+  if($swoncond && $auto && 
+     $oncom    && $pstate =~ /planned|priority/xs && $startts && $t >= $startts) {                # Verbraucher Start ist geplant && Startzeit überschritten
       my $surplus = CurrentVal  ($hash, "surplus",          0);                                   # aktueller Überschuß
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
       my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
@@ -4121,7 +4124,7 @@ sub collectAllRegConsumers {
           next; 
       }
       
-      push @{$data{$type}{$name}{current}{consumerdevs}}, $consumer;                                    # alle Consumerdevices in CurrentHash eintragen
+      push @{$data{$type}{$name}{current}{consumerdevs}}, $consumer;                              # alle Consumerdevices in CurrentHash eintragen
       
       my $alias = AttrVal ($consumer, "alias", $consumer);
       
@@ -4141,6 +4144,11 @@ sub collectAllRegConsumers {
       if(exists $hc->{swstate}) {
           ($rswstate,$onreg,$offreg) = split ":", $hc->{swstate};
       }
+      
+      my ($dswoncond,$rswoncond,$swoncondregex);
+      if(exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
+          ($dswoncond,$rswoncond,$swoncondregex) = split ":", $hc->{swoncond};
+      }     
       
       my $rauto     = $hc->{auto}     // q{};
       my $ctype     = $hc->{type}     // $defctype;
@@ -4171,6 +4179,9 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{rswstate}       = $rswstate        // 'state';           # Schaltstatus Reading
       $data{$type}{$name}{consumers}{$c}{onreg}          = $onreg           // 'on';              # Regex für 'ein'
       $data{$type}{$name}{consumers}{$c}{offreg}         = $offreg          // 'off';             # Regex für 'aus'
+      $data{$type}{$name}{consumers}{$c}{dswoncond}      = $dswoncond       // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{rswoncond}      = $rswoncond       // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{swoncondregex}  = $swoncondregex   // q{};               # Regex einer zusätzliche Einschaltbedingung
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -7134,6 +7145,34 @@ sub isConsumerOff {
 return;
 }
 
+################################################################
+#  Funktion liefert "1" wenn die zusätzliche Einschaltbedingung
+#  aus dem Schlüssel "swoncond" im Consumer Attribut wahr ist
+################################################################
+sub isAddSwitchOnCond {
+  my $hash = shift;
+  my $c    = shift;  
+  
+  my $dswoncond = ConsumerVal ($hash, $c, "dswoncond", "");                     # Device zur Lieferung einer zusätzlichen Einschaltbedingung
+  
+  if($dswoncond && !$defs{$dswoncond}) {
+      my $name = $hash->{NAME};
+      my $err  = qq{ERROR - the device "$dswoncond" doesn't exist! Check the key "swoncond" in attribute "consumer${c}"};
+      Log3 ($name, 1, "$name - $err");
+      return; 
+  }  
+  
+  my $rswoncond     = ConsumerVal ($hash, $c, "rswoncond",     "");             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
+  my $swoncondregex = ConsumerVal ($hash, $c, "swoncondregex", "");             # Regex einer zusätzliche Einschaltbedingung
+  my $condstate     = ReadingsVal ($dswoncond, $rswoncond,     "");
+  
+  if ($condstate =~ m/^$swoncondregex$/x) {                                                     
+      return 1;
+  }
+
+return;
+}
+
 ###############################################################################
 #    Wert des pvhist-Hash zurückliefern
 #    Usage:
@@ -7339,35 +7378,38 @@ sub CurrentVal {
 return $def;
 }
 
-#######################################################################
+############################################################################################
 # Wert des consumer-Hash zurückliefern
 # Usage:
 # ConsumerVal ($hash, $co, $key, $def)
 #
 # $co:  Consumer Nummer (01,02,03,...)
-# $key: name      - Name des Verbrauchers (Device)
-#       alias     - Alias des Verbrauchers (Device)
-#       type      - Typ des Verbrauchers
-#       power     - nominale Leistungsaufnahme des Verbrauchers in W
-#       mode      - Planungsmode des Verbrauchers
-#       icon      - Icon für den Verbraucher
-#       mintime   - min. Einschalt- bzw. Zykluszeit
-#       oncom     - Setter Einschaltkommando 
-#       offcom    - Setter Ausschaltkommando
-#       retotal   - Reading der Leistungsmessung
-#       uetotal   - Unit der Leistungsmessung
-#       rpcurr    - Readingname des aktuellen Verbrauchs
+# $key: name           - Name des Verbrauchers (Device)
+#       alias          - Alias des Verbrauchers (Device)
+#       type           - Typ des Verbrauchers
+#       power          - nominale Leistungsaufnahme des Verbrauchers in W
+#       mode           - Planungsmode des Verbrauchers
+#       icon           - Icon für den Verbraucher
+#       mintime        - min. Einschalt- bzw. Zykluszeit
+#       oncom          - Setter Einschaltkommando 
+#       offcom         - Setter Ausschaltkommando
+#       retotal        - Reading der Leistungsmessung
+#       uetotal        - Unit der Leistungsmessung
+#       rpcurr         - Readingname des aktuellen Verbrauchs
 #       powerthreshold - Schwellenwert (Wh pro Stunde) ab der ein 
 #                        Verbraucher als aktiv gewertet wird  
-#       upcurr    - Unit des aktuellen Verbrauchs
-#       avgenergy - initialer / gemessener Durchschnittsverbrauch
-#                   eines Tages
-#       epieces   - prognostizierte Energiescheiben (Hash)
+#       upcurr         - Unit des aktuellen Verbrauchs
+#       avgenergy      - initialer / gemessener Durchschnittsverbrauch
+#                        eines Tages
+#       epieces        - prognostizierte Energiescheiben (Hash)
 #       isConsumptionRecommended - ist Verbrauch empfohlen ?
+#       dswoncond      - Device zur Lieferung einer zusätzliche Einschaltbedingung
+#       rswoncond      - Reading zur Lieferung einer zusätzliche Einschaltbedingung
+#       swoncondregex  - Regex einer zusätzliche Einschaltbedingung
 #
 # $def: Defaultwert
 #
-######################################################################
+############################################################################################
 sub ConsumerVal {
   my $hash = shift;
   my $co   = shift;
@@ -8127,7 +8169,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>       
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] </b><br><br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] </b><br><br>
         
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
@@ -8159,10 +8201,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>notbefore</b>  </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                         </td></tr>
             <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                        </td></tr>
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
-            <tr><td>                   </td><td>Readingwert = 1: Schalten freigegeben (default),  0: Schalten blockiert                                                          </td></tr>
+            <tr><td>                   </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                         </td></tr>
             <tr><td> <b>pcurr</b>      </td><td>Reading welches den aktuellen Energieverbrauch (z.B. Schaltdose mit Energiemessung) liefert und Einheit (W/kW) (optional)        </td></tr>
-            <tr><td> <b>etotal</b>     </td><td>Reading / Einheit (Wh/kWh), welches die Summe der verbrauchten Energie liefert (optional)                                        </td></tr>
-            <tr><td> <b>               </td><td>&lt;Schwellenwert&gt (Wh) = optionaler Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.               </td></tr>
+            <tr><td> <b>etotal</b>     </td><td>Reading:Einheit (Wh/kWh), welches die Summe der verbrauchten Energie liefert (optional)                                          </td></tr>
+            <tr><td> <b>               </td><td>:&lt;Schwellenwert&gt (Wh) - optionaler Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.              </td></tr>
+            <tr><td> <b>swoncond</b>   </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional).                                          </td></tr>
+            <tr><td>                   </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                         </td></tr>
+            <tr><td>                   </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                       </td></tr>
+            <tr><td>                   </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                </td></tr>
          </table>
          </ul>
        <br>
