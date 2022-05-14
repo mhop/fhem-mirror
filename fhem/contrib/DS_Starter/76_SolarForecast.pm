@@ -8176,7 +8176,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br>
         Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den 
         entsprechenden Drucktasten umgeschaltet werden. Das angegebene Reading wird ggf. im Consumer Device angelegt falls
-        es nicht vorhanden ist.        
+        es nicht vorhanden ist. <br>
+        Mit dem optionalen Schlüssel "swoncond" kann eine zusätzliche externe Bedingung definiert werden um den Einschaltvorgang des 
+        Consumers freizugeben. Ist die Bedingung (Regex) nicht erfüllt, erfolgt kein Einschalten des Verbrauchers auch die 
+        sonstigen Voraussetzungen wie Auto-Planung, mode, vorhandene PV-Leistung usw. gegeben sind.  
         <br><br>
          <ul>   
          <table>  
