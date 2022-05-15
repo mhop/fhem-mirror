@@ -120,6 +120,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.61.0 "=> "15.05.2022  limit PV forecast to inverter capacity ",
+  "0.60.1 "=> "15.05.2022  consumerHash -> new key avgruntime, don't modify mintime by avgruntime by default anymore ".
+                           "debug switch conditions ",
   "0.60.0 "=> "14.05.2022  new key 'swoncond' in consumer attributes ",
   "0.59.0 "=> "01.05.2022  new attr createTomorrowPVFcReadings ",
   "0.58.0 "=> "20.04.2022  new setter consumerImmediatePlanning, functions isConsumerOn isConsumerOff ",
@@ -2499,11 +2502,13 @@ sub _transferInverterValues {
   my ($a,$h) = parseParams ($indev);
   $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
-  
+             
   my $type = $hash->{TYPE};
   
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
-  my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total
+  my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
+                                                      
+  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if($h->{capacity});         # optionale Angabe max. WR-Leistung
   
   return if(!$pvread || !$edread);
   
@@ -2865,22 +2870,25 @@ sub _manageConsumerData {
       my $runhours   = 0;
       my $dnum       = 0;
       
-      for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {                                             # gemessenen Verbrauch ermitteln
-          my $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
-          next if(!$csme);
+      for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {                                             # Betriebszeit und gemessenen Verbrauch ermitteln
+          my $csme  = HistoryVal ($hash, $n, 99, "csme${c}", 0);
           my $hours = HistoryVal ($hash, $n, 99, "hourscsme${c}", 0);
+          next if(!$hours);
           
           $consumerco += $csme;
           $runhours   += $hours;
           $dnum++;      
       }
-
-      if ($dnum) {         
-          $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);                               # Durchschnittsverbrauch eines Tages aus History  
-          my $mintime                                   = ConsumerVal ($hash, $c, "mintime", $defmintime);
-          my $avgruntime                                = (ceil($runhours/$dnum)) * 60;                           # Durchschnittslaufzeit in Minuten 
-          $mintime                                      = $avgruntime < $mintime ? $mintime : $avgruntime;
-          $data{$type}{$name}{consumers}{$c}{mintime}   = $mintime;
+      
+      if ($dnum) {  
+          if($consumerco) {      
+              $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);                          # Durchschnittsverbrauch eines Tages aus History  
+          }
+          else {
+              delete $data{$type}{$name}{consumers}{$c}{avgenergy};
+          }
+          
+          $data{$type}{$name}{consumers}{$c}{avgruntime} = (ceil($runhours/$dnum)) * 60;                          # Durchschnittslaufzeit in Minuten 
       }
       
       $paref->{consumer} = $c;
@@ -3361,6 +3369,7 @@ sub __switchConsumer {
   my $pstate    = ConsumerVal ($hash, $c, "planstate",        "");
   my $cname     = ConsumerVal ($hash, $c, "name",             "");             # Consumer Device Name
   my $calias    = ConsumerVal ($hash, $c, "alias",            "");             # Consumer Device Alias
+  my $debug     = AttrVal     ($name, "debug",                 0);
   
   ## Ist Verbraucher empfohlen ?
   ################################
@@ -3373,9 +3382,19 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom    = ConsumerVal       ($hash, $c, "oncom",  "");                                     # Set Command für "on"
-  my $auto     = ConsumerVal       ($hash, $c, "auto",    1);
-  my $swoncond = isAddSwitchOnCond ($hash, $c);                                                   # zusätzliche Switch on Bedingung
+  my $oncom                 = ConsumerVal       ($hash, $c, "oncom",  "");                        # Set Command für "on"
+  my $auto                  = ConsumerVal       ($hash, $c, "auto",    1);
+  my ($swoncond,$info,$err) = isAddSwitchOnCond ($hash, $c);                                      # zusätzliche Switch on Bedingung
+
+  Log3 ($name, 1, "$name - $err") if($err);
+  
+  if($debug) {                                                                                    # nur für Debugging
+      Log (1, qq{DEBUG> $name - Parameters for switch on decision consumer "$c": }.
+              qq{swoncond: $swoncond, auto mode: $auto, on-command: $oncom, }.
+              qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef").", ".
+              qq{timestamp: $t}              
+           );
+  }
  
   if($swoncond && $auto && 
      $oncom    && $pstate =~ /planned|priority/xs && $startts && $t >= $startts) {                # Verbraucher Start ist geplant && Startzeit überschritten
@@ -3418,6 +3437,15 @@ sub __switchConsumer {
   ## Verbraucher ausschalten
   ############################
   my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                             # Set Command für "off"
+  
+  if($debug) {                                                                                    # nur für Debugging
+      Log (1, qq{DEBUG> $name - Parameters for switch off decision consumer "$c": }.
+              qq{auto mode: $auto, off-command: $offcom, }.
+              qq{planning state: $pstate, stop timestamp: }.($stopts ? $stopts : "undef").", ".
+              qq{timestamp: $t}              
+           );
+  }
+  
   if($auto && $offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {              # Verbraucher nicht switched off && Stopzeit überschritten
       CommandSet(undef,"$cname $offcom");
       
@@ -6134,7 +6162,14 @@ sub calcPVforecast {
   $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # insgesamt installierte Peakleistung in W
   
   $pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden
-  $pvsum  = $peaksum if($pvsum > $peaksum);
+  $pvsum  = $peaksum if($pvsum > $peaksum);                                                          # Vorhersage nicht größer als die Summe aller PV-Strings Peak
+      
+  my $invcapacity = CurrentVal ($hash, "invertercapacity", 0);                                       # Max. Leistung des Invertrs
+  
+  if ($invcapacity && $pvsum > $invcapacity) {
+      $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
+      Log3 ($name, 4, "$name - PV forecast limited to $pvsum Watt due to inverter capacity");
+  }
       
   my $logao         = qq{};
   $paref->{pvsum}   = $pvsum;
@@ -7148,18 +7183,23 @@ return;
 ################################################################
 #  Funktion liefert "1" wenn die zusätzliche Einschaltbedingung
 #  aus dem Schlüssel "swoncond" im Consumer Attribut wahr ist
+#
+#
+#
+#
 ################################################################
 sub isAddSwitchOnCond {
   my $hash = shift;
-  my $c    = shift;  
+  my $c    = shift;
+
+  my $info = q{};
+  my $err  = q{};
   
   my $dswoncond = ConsumerVal ($hash, $c, "dswoncond", "");                     # Device zur Lieferung einer zusätzlichen Einschaltbedingung
   
   if($dswoncond && !$defs{$dswoncond}) {
-      my $name = $hash->{NAME};
-      my $err  = qq{ERROR - the device "$dswoncond" doesn't exist! Check the key "swoncond" in attribute "consumer${c}"};
-      Log3 ($name, 1, "$name - $err");
-      return; 
+      $err = qq{ERROR - the device "$dswoncond" doesn't exist! Check the key "swoncond" in attribute "consumer${c}"};
+      return (0, $info, $err); 
   }  
   
   my $rswoncond     = ConsumerVal ($hash, $c, "rswoncond",     "");             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
@@ -7167,10 +7207,12 @@ sub isAddSwitchOnCond {
   my $condstate     = ReadingsVal ($dswoncond, $rswoncond,     "");
   
   if ($condstate =~ m/^$swoncondregex$/x) {                                                     
-      return 1;
+      return (1, $info, $err);
   }
+  
+  $info = qq{The device "$dswoncond", reading "$rswoncond" doen't match the Regex "$swoncondregex"};  
 
-return;
+return (0, $info, $err);
 }
 
 ###############################################################################
@@ -7359,6 +7401,7 @@ return $def;
 #       powerbatout         - Batterie Entladeleistung
 #       temp                - aktuelle Außentemperatur
 #       tomorrowconsumption - Verbrauch des kommenden Tages
+#       invertercapacity    - Bemessungsleistung der Wechselrichters (max. W)
 # $def: Defaultwert
 #
 #############################################################################
@@ -7401,6 +7444,7 @@ return $def;
 #       upcurr         - Unit des aktuellen Verbrauchs
 #       avgenergy      - initialer / gemessener Durchschnittsverbrauch
 #                        eines Tages
+#       avgruntime     - durchschnittliche Einschalt- bzw. Zykluszeit (Minuten)
 #       epieces        - prognostizierte Energiescheiben (Hash)
 #       isConsumptionRecommended - ist Verbrauch empfohlen ?
 #       dswoncond      - Device zur Lieferung einer zusätzliche Einschaltbedingung
@@ -7590,12 +7634,13 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-set-currentInverterDev"></a>
-      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;  </b> <br><br>  
+      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt; [capacity=&lt;max. WR-Leistung&gt;] </b> <br><br>  
       
       Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest. 
       Es kann auch ein Dummy Device mit entsprechenden Readings sein. 
       Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt dieses Device mit den 
-      entsprechenden Readings an. Die Bedeutung des jeweiligen "Readingname" ist:
+      entsprechenden Readings an. <br>
+      Die Angabe von <b>capacity</b> ist optional, wird aber zur Optimierung der Vorhersagegenauigkeit dringend empfohlen.
       <br>
       
       <ul>   
@@ -7604,16 +7649,17 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
           <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                       </td></tr>
           <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugten Energie liefert (ein stetig aufsteigender Zähler) </td></tr>
           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                     </td></tr>
+          <tr><td> <b>capacity</b> </td><td>Bemessungsleistung des Wechselrichters gemäß Datenblatt (max. möglicher Output in Watt) </td></tr>
         </table>
       </ul> 
       <br>
       
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh <br>
+        set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh capacity=5000 <br>
         <br>
         # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die tägliche Erzeugung im 
-          Reading "etotal" (kWh)
+          Reading "etotal" (kWh). Die max. Leistung des Wechselrichters beträgt 5000 Watt.
       </ul>
       </li>
     </ul>
@@ -8177,9 +8223,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den 
         entsprechenden Drucktasten umgeschaltet werden. Das angegebene Reading wird ggf. im Consumer Device angelegt falls
         es nicht vorhanden ist. <br>
-        Mit dem optionalen Schlüssel "swoncond" kann eine zusätzliche externe Bedingung definiert werden um den Einschaltvorgang des 
-        Consumers freizugeben. Ist die Bedingung (Regex) nicht erfüllt, erfolgt kein Einschalten des Verbrauchers auch die 
-        sonstigen Voraussetzungen wie Auto-Planung, mode, vorhandene PV-Leistung usw. gegeben sind.  
+        Mit dem optionalen Schlüssel <b>swoncond</b> kann eine <b>zusätzliche externe Bedingung</b> definiert werden um den Einschaltvorgang des 
+        Consumers freizugeben. Ist die Bedingung (Regex) nicht erfüllt, erfolgt kein Einschalten des Verbrauchers auch wenn die 
+        sonstigen Voraussetzungen wie Zeitplanung, mode, vorhandene PV-Leistung usw. gegeben sind.  
         <br><br>
          <ul>   
          <table>  
@@ -8206,7 +8252,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
             <tr><td>                   </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                         </td></tr>
             <tr><td> <b>pcurr</b>      </td><td>Reading welches den aktuellen Energieverbrauch (z.B. Schaltdose mit Energiemessung) liefert und Einheit (W/kW) (optional)        </td></tr>
-            <tr><td> <b>etotal</b>     </td><td>Reading:Einheit (Wh/kWh), welches die Summe der verbrauchten Energie liefert (optional)                                          </td></tr>
+            <tr><td> <b>etotal</b>     </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                      </td></tr>
             <tr><td> <b>               </td><td>:&lt;Schwellenwert&gt (Wh) - optionaler Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.              </td></tr>
             <tr><td> <b>swoncond</b>   </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional).                                          </td></tr>
             <tr><td>                   </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                         </td></tr>
