@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.62.0 "=> "16.05.2022  new key 'swoffcond' in consumer attributes ",
   "0.61.0 "=> "15.05.2022  limit PV forecast to inverter capacity ",
   "0.60.1 "=> "15.05.2022  consumerHash -> new key avgruntime, don't modify mintime by avgruntime by default anymore ".
                            "debug switch conditions ",
@@ -3371,6 +3372,8 @@ sub __switchConsumer {
   my $calias    = ConsumerVal ($hash, $c, "alias",            "");             # Consumer Device Alias
   my $debug     = AttrVal     ($name, "debug",                 0);
   
+  my ($swoncond,$swoffcond,$info,$err);
+  
   ## Ist Verbraucher empfohlen ?
   ################################
   if ($startts && $t >= $startts && $stopts && $t <= $stopts) {
@@ -3382,9 +3385,9 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom                 = ConsumerVal       ($hash, $c, "oncom",  "");                        # Set Command für "on"
-  my $auto                  = ConsumerVal       ($hash, $c, "auto",    1);
-  my ($swoncond,$info,$err) = isAddSwitchOnCond ($hash, $c);                                      # zusätzliche Switch on Bedingung
+  my $oncom              = ConsumerVal       ($hash, $c, "oncom",  "");                           # Set Command für "on"
+  my $auto               = ConsumerVal       ($hash, $c, "auto",    1);
+  ($swoncond,$info,$err) = isAddSwitchOnCond ($hash, $c);                                         # zusätzliche Switch on Bedingung
 
   Log3 ($name, 1, "$name - $err") if($err);
   
@@ -3436,17 +3439,20 @@ sub __switchConsumer {
   
   ## Verbraucher ausschalten
   ############################
-  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                             # Set Command für "off"
+  my $offcom              = ConsumerVal        ($hash, $c, "offcom", "");                         # Set Command für "off"
+  ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                       # zusätzliche Switch on Bedingung
+
+  Log3 ($name, 1, "$name - $err") if($err);
   
   if($debug) {                                                                                    # nur für Debugging
       Log (1, qq{DEBUG> $name - Parameters for switch off decision consumer "$c": }.
-              qq{auto mode: $auto, off-command: $offcom, }.
+              qq{swoffcond: $swoffcond, auto mode: $auto, off-command: $offcom, }.
               qq{planning state: $pstate, stop timestamp: }.($stopts ? $stopts : "undef").", ".
               qq{timestamp: $t}              
            );
   }
   
-  if($auto && $offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {              # Verbraucher nicht switched off && Stopzeit überschritten
+  if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && $pstate !~ /switched\soff/xs)) {                         
       CommandSet(undef,"$cname $offcom");
       
       $paref->{ps}     = "switched off:";
@@ -4176,7 +4182,12 @@ sub collectAllRegConsumers {
       my ($dswoncond,$rswoncond,$swoncondregex);
       if(exists $hc->{swoncond}) {                                                                # zusätzliche Einschaltbedingung
           ($dswoncond,$rswoncond,$swoncondregex) = split ":", $hc->{swoncond};
-      }     
+      } 
+
+      my ($dswoffcond,$rswoffcond,$swoffcondregex);
+      if(exists $hc->{swoffcond}) {                                                               # vorrangige Ausschaltbedingung
+          ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $hc->{swoffcond};
+      }       
       
       my $rauto     = $hc->{auto}     // q{};
       my $ctype     = $hc->{type}     // $defctype;
@@ -4210,6 +4221,9 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{dswoncond}      = $dswoncond       // q{};               # Device zur Lieferung einer zusätzliche Einschaltbedingung
       $data{$type}{$name}{consumers}{$c}{rswoncond}      = $rswoncond       // q{};               # Reading zur Lieferung einer zusätzliche Einschaltbedingung
       $data{$type}{$name}{consumers}{$c}{swoncondregex}  = $swoncondregex   // q{};               # Regex einer zusätzliche Einschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{dswoffcond}     = $dswoffcond      // q{};               # Device zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{rswoffcond}     = $rswoffcond      // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
+      $data{$type}{$name}{consumers}{$c}{swoffcondregex} = $swoffcondregex  // q{};               # Regex einer vorrangigen Ausschaltbedingung
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -7184,8 +7198,8 @@ return;
 #  Funktion liefert "1" wenn die zusätzliche Einschaltbedingung
 #  aus dem Schlüssel "swoncond" im Consumer Attribut wahr ist
 #
-#
-#
+#  $info - den Info-Status
+#  $err  - einen Error-Status
 #
 ################################################################
 sub isAddSwitchOnCond {
@@ -7211,6 +7225,41 @@ sub isAddSwitchOnCond {
   }
   
   $info = qq{The device "$dswoncond", reading "$rswoncond" doen't match the Regex "$swoncondregex"};  
+
+return (0, $info, $err);
+}
+
+################################################################
+#  Funktion liefert "1" wenn die vorrangige Ausschaltbedingung
+#  aus dem Schlüssel "swoffcond" im Consumer Attribut wahr ist
+#
+#  $info - den Info-Status
+#  $err  - einen Error-Status
+#
+################################################################
+sub isAddSwitchOffCond {
+  my $hash = shift;
+  my $c    = shift;
+
+  my $info = q{};
+  my $err  = q{};
+  
+  my $dswoffcond = ConsumerVal ($hash, $c, "dswoffcond", "");                     # Device zur Lieferung einer vorrangigen Ausschaltbedingung
+  
+  if($dswoffcond && !$defs{$dswoffcond}) {
+      $err = qq{ERROR - the device "$dswoffcond" doesn't exist! Check the key "swoffcond" in attribute "consumer${c}"};
+      return (0, $info, $err); 
+  }  
+  
+  my $rswoffcond     = ConsumerVal ($hash, $c, "rswoffcond",     "");             # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
+  my $swoffcondregex = ConsumerVal ($hash, $c, "swoffcondregex", "");             # Regex einer vorrangigen Ausschaltbedingung
+  my $condstate      = ReadingsVal ($dswoffcond, $rswoffcond,    "");
+  
+  if ($condstate =~ m/^$swoffcondregex$/x) {                                                     
+      return (1, $info, $err);
+  }
+  
+  $info = qq{The device "$dswoffcond", reading "$rswoffcond" doen't match the Regex "$swoffcondregex"};  
 
 return (0, $info, $err);
 }
@@ -7450,6 +7499,9 @@ return $def;
 #       dswoncond      - Device zur Lieferung einer zusätzliche Einschaltbedingung
 #       rswoncond      - Reading zur Lieferung einer zusätzliche Einschaltbedingung
 #       swoncondregex  - Regex einer zusätzliche Einschaltbedingung
+#       dswoffcond     - Device zur Lieferung einer vorrangige Ausschaltbedingung
+#       rswoffcond     - Reading zur Lieferung einer vorrangige Ausschaltbedingung
+#       swoffcondregex - Regex einer einer vorrangige Ausschaltbedingung
 #
 # $def: Defaultwert
 #
@@ -8215,17 +8267,27 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>       
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] </b><br><br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] <br>
+                         [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] <br>
+                         [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
+                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt]</b><br><br>
         
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
         sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br>
         Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den 
         entsprechenden Drucktasten umgeschaltet werden. Das angegebene Reading wird ggf. im Consumer Device angelegt falls
-        es nicht vorhanden ist. <br>
+        es nicht vorhanden ist. <br><br>
+        
         Mit dem optionalen Schlüssel <b>swoncond</b> kann eine <b>zusätzliche externe Bedingung</b> definiert werden um den Einschaltvorgang des 
         Consumers freizugeben. Ist die Bedingung (Regex) nicht erfüllt, erfolgt kein Einschalten des Verbrauchers auch wenn die 
-        sonstigen Voraussetzungen wie Zeitplanung, mode, vorhandene PV-Leistung usw. gegeben sind.  
+        sonstigen Voraussetzungen wie Zeitplanung, on-Schlüssel, auto-Mode und aktuelle PV-Leistung gegeben sind. Es erfolgt somit eine 
+        <b>UND-Verknüpfung</b> des Schlüssels swoncond mit den weiteren Einschaltbedingungen. <br><br>
+
+        Der optionale Schlüssel <b>swoffcond</b> definiert eine <b>vorrangige Ausschaltbedingung</b> (Regex). Sobald diese 
+        Bedingung erfüllt ist, wird der Consumer ausgeschaltet auch wenn die geplante Endezeit (consumerXX_planned_stop) 
+        noch nicht erreicht ist (<b>ODER-Verknüpfung</b>). Weitere Bedingungen wie off-Schlüssel und auto-Mode müssen
+        zum automatischen Ausschalten erfüllt sein.        
         <br><br>
          <ul>   
          <table>  
@@ -8258,6 +8320,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                   </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                         </td></tr>
             <tr><td>                   </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                       </td></tr>
             <tr><td>                   </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                </td></tr>
+            <tr><td> <b>swoffcond</b>  </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional).                                                                </td></tr>
+            <tr><td>                   </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                          </td></tr>
+            <tr><td>                   </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                        </td></tr>
+            <tr><td>                   </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                </td></tr>
          </table>
          </ul>
        <br>
