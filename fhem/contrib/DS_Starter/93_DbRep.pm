@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 25492 2022-01-17 22:28:33Z DS_Starter $
+# $Id: 93_DbRep.pm 25939 2022-04-09 19:03:34Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -44,8 +44,8 @@ use warnings;
 use POSIX qw(strftime SIGALRM);
 use Time::HiRes qw(gettimeofday tv_interval ualarm);
 use Scalar::Util qw(looks_like_number);
-eval "use DBI;1" or my $DbRepMMDBI = "DBI";
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+eval "use DBI;1"               or my $DbRepMMDBI = "DBI";
+eval "use FHEM::Meta;1"        or my $modMetaAbsent = 1;
 use DBI::Const::GetInfoType;
 use Blocking;
 use Color;                           # colorpicker Widget
@@ -57,8 +57,13 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
+  "8.48.4"  => "16.05.2022  fix perl warning of set ... insert, Forum: topic,53584.msg1221588.html#msg1221588 ",
+  "8.48.3"  => "09.04.2022  minor code fix in DbRep_reduceLog ",
+  "8.48.2"  => "22.02.2022  more code refacturing ",
+  "8.48.1"  => "31.01.2022  minor fixes e.g. in file size determination, dump routines ",
   "8.48.0"  => "29.01.2022  new sqlCmdHistory params ___restore_sqlhistory___ , ___save_sqlhistory___ ".
-                            "change _DbRep_mysqlOptimizeTables ",
+                            "change _DbRep_mysqlOptimizeTables, revise insert command ",
   "8.47.0"  => "17.01.2022  new design of sqlCmdHistory, minor fixes ",
   "8.46.13" => "12.01.2022  more code refacturing, minor fixes ",
   "8.46.12" => "10.01.2022  more code refacturing, minor fixes, change usage of placeholder §device§, §reading§ in sqlCmd ",
@@ -342,17 +347,39 @@ my %DbRep_vHintsExt_de = (
 );
 
 # Hash der Main-Grundfunktionen
+# pk      = PID-Key
+# timeset = einfügen Zeitgrenzen (ts,rsf,rsn) in den Übergabehash
+# dobp    = executeBeforeProc auswerten
+###################################################################
 my %dbrep_hmainf = (                                                                                                           
-    sumValue           => { fn => "DbRep_sumval",        fndone => "DbRep_sumvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
-    countEntries       => { fn => "DbRep_count",         fndone => "DbRep_countDone",         fnabort => "DbRep_ParseAborted", timeset => 1                     },   
-    averageValue       => { fn => "DbRep_averval",       fndone => "DbRep_avervalDone",       fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" }, 
-    fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted", timeset => 1                     },
-    maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },     
-    minValue           => { fn => "DbRep_minval",        fndone => "DbRep_minvalDone",        fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
-    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },  
-    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted", timeset => 1, table => "history" },
-    tableCurrentPurge  => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted", timeset => 0, table => "current" },    
-    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted", timeset => 1, table => "current" }, 
+    sumValue           => { fn => "DbRep_sumval",        fndone => "DbRep_sumvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    countEntries       => { fn => "DbRep_count",         fndone => "DbRep_countDone",         fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },   
+    sqlCmd             => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
+    sqlCmdHistory      => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
+    sqlSpecial         => { fn => "DbRep_sqlCmd",        fndone => "DbRep_sqlCmdDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
+    averageValue       => { fn => "DbRep_averval",       fndone => "DbRep_avervalDone",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" }, 
+    fetchrows          => { fn => "DbRep_fetchrows",     fndone => "DbRep_fetchrowsDone",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1                     },
+    maxValue           => { fn => "DbRep_maxval",        fndone => "DbRep_maxvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },     
+    minValue           => { fn => "DbRep_minval",        fndone => "DbRep_minvalDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    exportToFile       => { fn => "DbRep_expfile",       fndone => "DbRep_expfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 0, table => "history" },  
+    importFromFile     => { fn => "DbRep_impfile",       fndone => "DbRep_impfile_Done",      fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 0, table => "history" },
+    tableCurrentFillup => { fn => "DbRep_currentfillup", fndone => "DbRep_currentfillupDone", fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 0, table => "current" },
+    diffValue          => { fn => "DbRep_diffval",       fndone => "DbRep_diffvalDone",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    delEntries         => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    syncStandby        => { fn => "DbRep_syncStandby",   fndone => "DbRep_syncStandbyDone",   fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    delSeqDoublets     => { fn => "DbRep_delseqdoubl",   fndone => "DbRep_deldoubl_Done",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    delDoublets        => { fn => "DbRep_deldoublets",   fndone => "DbRep_deldoubl_Done",     fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history" },
+    reduceLog          => { fn => "DbRep_reduceLog",     fndone => "DbRep_reduceLogDone",     fnabort => "DbRep_reduceLogAborted", pk => "RUNNING_REDUCELOG", timeset => 1, dobp => 1, table => "history" },
+    tableCurrentPurge  => { fn => "DbRep_del",           fndone => "DbRep_del_Done",          fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "current" },    
+    dbvars             => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
+    dbstatus           => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
+    tableinfo          => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
+    procinfo           => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
+    svrinfo            => { fn => "DbRep_dbmeta",        fndone => "DbRep_dbmeta_Done",       fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 0                     },
+    insert             => { fn => "DbRep_insert",        fndone => "DbRep_insertDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "history" },
+    deviceRename       => { fn => "DbRep_changeDevRead", fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "history", renmode => "devren"    },
+    readingRename      => { fn => "DbRep_changeDevRead", fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 0, dobp => 1, table => "history", renmode => "readren"   },
+    changeValue        => { fn => "DbRep_changeVal",     fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history", renmode => "changeval" },         
 ); 
 
 
@@ -511,15 +538,15 @@ return;
 sub DbRep_Set {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
-  my $name           = $a[0];
-  my $opt            = $a[1];
-  my $prop           = $a[2];
-  my $prop1          = $a[3];
-  my $dbh            = $hash->{DBH};
-  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
-  my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbmodel        = $dbloghash->{MODEL};
-  my $dbname         = $hash->{DATABASE};
+  my $name        = $a[0];
+  my $opt         = $a[1];
+  my $prop        = $a[2];
+  my $prop1       = $a[3];
+  my $dbh         = $hash->{DBH};
+  my $dblogdevice = $hash->{HELPER}{DBLOGDEVICE};
+  my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbmodel     = $dbloghash->{MODEL};
+  my $dbname      = $hash->{DATABASE};
   
   my $sd ="";
   
@@ -619,13 +646,16 @@ sub DbRep_Set {
            Log3 ($name, 3, "DbRep $name - ################################################################");
            Log3 ($name, 3, "DbRep $name - ###             New database serverSide dump                 ###");
            Log3 ($name, 3, "DbRep $name - ################################################################");
-       } else {
+       } 
+       else {
            Log3 ($name, 3, "DbRep $name - ################################################################");
            Log3 ($name, 3, "DbRep $name - ###             New database clientSide dump                 ###");
            Log3 ($name, 3, "DbRep $name - ################################################################");
        }
+       
        DbRep_beforeproc($hash, "dump");
-       DbRep_Main($hash,$opt,$prop);
+       DbRep_Main($hash, $opt, $prop);
+       
        return;
   }
   
@@ -637,7 +667,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        
        DbRep_beforeproc($hash, "dump");
-       DbRep_Main($hash,$opt,$prop);
+       DbRep_Main($hash, $opt, $prop);
        
        return;
   }
@@ -657,7 +687,7 @@ sub DbRep_Set {
        CommandSet(undef,"$dbl reopen $prop");
        
        DbRep_beforeproc ($hash, "repair");
-       DbRep_Main       ($hash,$opt);
+       DbRep_Main       ($hash, $opt);
        
        return;
   }
@@ -693,14 +723,21 @@ sub DbRep_Set {
   }
   
   if ($opt =~ m/delSeqDoublets|delDoublets/ && $hash->{ROLE} ne "Agent") {
+     if ($opt eq "delSeqDoublets") {
+         $prop //= "adviceRemain";
+     }     
+     elsif ($opt eq "delDoublets") {
+         $prop //= "adviceDelete";
+     }
+      
       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";  
       
       if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       } 
+           
+      DbRep_Main ($hash, $opt, $prop);
       
-      DbRep_beforeproc ($hash, "delDoublets");     
-      DbRep_Main       ($hash,$opt,$prop); 
       return;      
   }
   
@@ -714,11 +751,13 @@ sub DbRep_Set {
           shift(@b);
           $hash->{LASTCMD}           = join(" ",@b);
           $hash->{HELPER}{REDUCELOG} = \@a;
+          
           Log3 ($name, 3, "DbRep $name - ################################################################");
           Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
           Log3 ($name, 3, "DbRep $name - ################################################################");
-          DbRep_beforeproc ($hash, "reduceLog");    
-          DbRep_Main       ($hash,$opt);
+  
+          DbRep_Main ($hash,$opt);
+          
           return;
       }
   }
@@ -763,8 +802,10 @@ sub DbRep_Set {
   }
   
   if ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
-      DbRep_Main($hash,$opt);
+      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";  
+      
+      DbRep_Main($hash, $opt);
+      
       return;
   }  
   
@@ -774,21 +815,39 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        
-       # Befehl vor Procedure ausführen
        DbRep_beforeproc ($hash, "index");
-       DbRep_Main       ($hash,$opt,$prop);
+       DbRep_Main       ($hash, $opt, $prop);
+       
        return;
   }
   
   if ($opt eq "adminCredentials" && $hash->{ROLE} ne "Agent") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);        
-      my $success = DbRep_setcredentials($hash,"adminCredentials",$prop,$prop1);
+      my $success = DbRep_setcredentials($hash, "adminCredentials", $prop, $prop1);
       
       if($success) {
           return "Username and password for database root access saved successfully";
-      } else {
+      } 
+      else {
           return "Error while saving username / password - see logfile for details";
       }     
+  }
+  
+  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop ? "$opt $prop " : "$opt";
+      my $table        = $prop // "history";
+      
+      DbRep_Main ($hash, $opt, $table);
+      
+      return;      
+  } 
+  elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
+      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+      my $table        = $prop // "history";
+      
+      DbRep_Main ($hash, $opt, $table);    
+      
+      return;
   }
   
   #######################################################################################################
@@ -801,22 +860,8 @@ sub DbRep_Set {
       return;
   }
   #######################################################################################################
-  
-  if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop " : "$opt";
-      my $table        = $prop // "history";
-      
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash,$opt,$table);  
-  } 
-  elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      my $table        = $prop // "history";
-      
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash,$opt,$table);    
-  } 
-  elsif ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
+   
+  if ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
@@ -832,8 +877,7 @@ sub DbRep_Set {
           }
       }
       
-      DbRep_beforeproc ($hash, $hash->{LASTCMD}); 
-      DbRep_Main       ($hash,$opt,$prop);    
+      DbRep_Main ($hash,$opt,$prop);    
   } 
   elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {      
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
@@ -846,9 +890,8 @@ sub DbRep_Set {
       shift @a;
       shift @a;
       $hash->{HELPER}{DELENTRIES} = \@a if(@a);
-            
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash,$opt);
+      
+      DbRep_Main ($hash,$opt);
   } 
   elsif ($opt eq "deviceRename") {
       shift @a;
@@ -862,8 +905,7 @@ sub DbRep_Set {
       $hash->{HELPER}{OLDDEV}  = $olddev;
       $hash->{HELPER}{NEWDEV}  = $newdev;
       
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash, $opt, $prop);
+      DbRep_Main ($hash, $opt, $prop);
   } 
   elsif ($opt eq "readingRename") {
       shift @a;
@@ -877,8 +919,7 @@ sub DbRep_Set {
       $hash->{HELPER}{OLDREAD} = $oldread;
       $hash->{HELPER}{NEWREAD} = $newread;
 
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash, $opt, $prop);    
+      DbRep_Main ($hash, $opt, $prop);    
   } 
   elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") {
       shift @a;
@@ -888,28 +929,28 @@ sub DbRep_Set {
       if (!$prop) {
           return qq{Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. "Unit" is optional. Spaces are not allowed !};      
       }
-
-      my $i_device  = AttrVal($hash->{NAME}, "device",  "");
-      my $i_reading = AttrVal($hash->{NAME}, "reading", "");
-
-      if (!$i_device || !$i_reading) {
-          return qq{One or both of attributes "device", "reading" are not set. It's mandatory to set both to complete dataset for manual insert !};
-      }
       
-      # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
-      if($i_device =~ m/%/ || $i_reading =~ m/%/ ) {
-          return qq{One or both of attributes "device", "reading" containing SQL wildcard "%". Wildcards are not allowed in manual function insert !} 
-      }
-      
-      my ($i_date, $i_time, $i_value, $i_unit) = split ",", $prop;
-      $i_unit //= "";
+      my ($i_date, $i_time, $i_value, $i_unit, $i_device, $i_reading) = split ",", $prop;
+      $i_unit    //= "";
+      $i_device  //= AttrVal($name, "device",  "");                                            # Device aus Attr lesen wenn nicht im insert angegeben
+      $i_reading //= AttrVal($name, "reading", "");                                            # Reading aus Attr lesen wenn nicht im insert angegeben
 
       if (!$i_date || !$i_time || !defined $i_value) {
           return qq{At least data for "Date", "Time" and "Value" is needed to insert. "Unit" is optional. Inputformat is "YYYY-MM-DD,HH:MM:SS,<Value>,<Unit>"};
       }
 
-      unless ($i_date =~ /(\d{4})-(\d{2})-(\d{2})/) {return "Input for date is not valid. Use format YYYY-MM-DD !";}
-      unless ($i_time =~ /(\d{2}):(\d{2}):(\d{2})/) {return "Input for time is not valid. Use format HH:MM:SS !";}
+      if ($i_date !~ /^(\d{4})-(\d{2})-(\d{2})$/x || $i_time !~ /^(\d{2}):(\d{2}):(\d{2})$/x) {
+          return "Input for date is not valid. Use format YYYY-MM-DD,HH:MM:SS";
+      }
+
+      if (!$i_device || !$i_reading) {
+          return qq{One or both of "device", "reading" are not set. It's mandatory to set both in the insert command or with the device / reading attributes};
+      }
+      
+      # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
+      if($i_device =~ m/%/ || $i_reading =~ m/%/ ) {
+          return qq{One or both of "device", "reading" containing SQL wildcard "%". Wildcards are not allowed in manual function insert !} 
+      }
       
       my $i_timestamp = $i_date." ".$i_time;
       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
@@ -923,15 +964,7 @@ sub DbRep_Set {
       
       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
       
-      if ($dbmodel ne 'SQLITE') {                                                                               # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog) beschneiden wenn nicht SQLite
-          $i_device  = substr($i_device,  0, $hash->{HELPER}{DBREPCOL}{DEVICE});
-          $i_reading = substr($i_reading, 0, $hash->{HELPER}{DBREPCOL}{READING});
-          $i_value   = substr($i_value,   0, $hash->{HELPER}{DBREPCOL}{VALUE});
-          $i_unit    = substr($i_unit,    0, $hash->{HELPER}{DBREPCOL}{UNIT});
-      }
-      
-      DbRep_beforeproc ($hash, $hash->{LASTCMD});
-      DbRep_Main       ($hash, $opt, "$i_timestamp,$i_device,$i_reading,$i_value,$i_unit");  
+      DbRep_Main ($hash, $opt, "$i_timestamp,$i_device,$i_reading,$i_value,$i_unit");  
   } 
   elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       $prop        // push @a, AttrVal($name, "expimpfile", "");
@@ -949,7 +982,6 @@ sub DbRep_Set {
       }
       
       $prop            = $e ? $f." ".$e : $f;
-      
       $hash->{LASTCMD} = $opt.' '.$prop;
       
       DbRep_Main ($hash, $opt, $prop);
@@ -1032,8 +1064,8 @@ sub DbRep_Set {
           my @cmd = @a;
           shift @cmd; shift @cmd;
           
-          $sqlcmd  = join(" ", @cmd);
-          $sqlcmd  = DbRep_trim ($sqlcmd);
+          $sqlcmd = join(" ", @cmd);
+          $sqlcmd = DbRep_trim ($sqlcmd);
           
           if ($sqlcmd =~ /^ckey:/ix) {
               my $key = (split ":", $sqlcmd)[1]; 
@@ -1090,8 +1122,7 @@ sub DbRep_Set {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
       
-      DbRep_beforeproc ($hash, "sqlCmd");
-      DbRep_Main       ($hash, $opt, $sqlcmd);   
+      DbRep_Main ($hash, $opt, $sqlcmd);   
   }
   elsif ($opt =~ /changeValue/) {
       shift @a;
@@ -1124,17 +1155,18 @@ sub DbRep_Set {
       $hash->{HELPER}{OLDVAL}  = $oldval;
       $hash->{HELPER}{NEWVAL}  = $newval;
 
-      DbRep_beforeproc ($hash, "changeval");
-      DbRep_Main       ($hash, $opt, $prop);   
+      DbRep_Main ($hash, $opt, $prop);   
   }  
   elsif ($opt =~ m/syncStandby/ && $hash->{ROLE} ne "Agent") {   
-      unless($prop) {return "A DbLog-device (standby) is needed to sync. Use \"set $name syncStandby <DbLog-standby name>\" ";}
+      unless($prop) {
+          return qq{A DbLog-device (standby) is needed to sync. Use "set $name syncStandby <DbLog-standby name>"};
+      }
+      
       if(!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
           return "The device \"$prop\" doesn't exist or is not a DbLog-device. ";
       }
       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt"; 
-      
-      DbRep_beforeproc ($hash, "syncStandby");     
+         
       DbRep_Main       ($hash, $opt, $prop);    
   }
   else {
@@ -1726,7 +1758,7 @@ sub DbRep_Notify {
  my $events = deviceEvents($dev_hash,0);  
  return if(!$events);
 
- foreach my $event (@{$events}) {
+ for my $event (@{$events}) {
      $event  = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
@@ -1735,8 +1767,7 @@ sub DbRep_Notify {
          DbRep_modAssociatedWith ($own_hash,"set",$awdev);
      }
      
-     if ($own_hash->{ROLE} eq "Agent") {
-         # wenn Rolle "Agent" Verbeitung von RENAMED Events
+     if ($own_hash->{ROLE} eq "Agent") {                               # wenn Rolle "Agent" Verbeitung von RENAMED Events
          next if ($event !~ /RENAMED/);
          
          my $strucChanged;                                             # altes in neues device in der DEF des angeschlossenen DbLog-device ändern (neues device loggen)
@@ -1746,8 +1777,9 @@ sub DbRep_Notify {
          if ( $dblog_hash->{DEF} =~ m/( |\(|\|)$evl[1]( |\)|\||:)/ ) {
              $dblog_hash->{DEF}    =~ s/$evl[1]/$evl[2]/;
              $dblog_hash->{REGEXP} =~ s/$evl[1]/$evl[2]/;
-             # Definitionsänderung wurde vorgenommen
-             $strucChanged = 1;
+             
+             $strucChanged = 1;                                        # Definitionsänderung wurde vorgenommen
+             
              Log3 ($myName, 3, "DbRep Agent $myName - $dblog_name substituted in DEF, old: \"$evl[1]\", new: \"$evl[2]\" "); 
          }  
          
@@ -1756,20 +1788,21 @@ sub DbRep_Notify {
          $own_hash->{HELPER}{OLDDEV}  = $evl[1];
          $own_hash->{HELPER}{NEWDEV}  = $evl[2];
          $own_hash->{HELPER}{RENMODE} = "devren";
-         DbRep_Main($own_hash,"deviceRename");
+         DbRep_Main($own_hash, "deviceRename");
          
-         # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
-         foreach(devspec2array("TYPE=DbRep")) {
-             my $repname = $_;
-             next if($_ eq $myName);
-             my $repattrdevice = $attr{$_}{device};
+         for my $repname (devspec2array("TYPE=DbRep")) {                      # die Attribute "device" in allen DbRep-Devices mit der Datenbank = DB des Agenten von alten Device in neues Device ändern
+             next if($repname eq $myName);
+             
+             my $repattrdevice = $attr{$repname}{device};
              next if(!$repattrdevice);
-             my $repdb         = $defs{$_}{DATABASE};
+             my $repdb         = $defs{$repname}{DATABASE};
+             
              if ($repattrdevice eq $evl[1] && $repdb eq $own_hash->{DATABASE}) { 
-                 $attr{$_}{device} = $evl[2];
-                 # Definitionsänderung wurde vorgenommen
-                 $strucChanged = 1;
-                 Log3 ($myName, 3, "DbRep Agent $myName - $_ attr device changed, old: \"$evl[1]\", new: \"$evl[2]\" "); 
+                 $attr{$repname}{device} = $evl[2];
+                 
+                 $strucChanged = 1;                                  # Definitionsänderung wurde vorgenommen
+                 
+                 Log3 ($myName, 3, "DbRep Agent $myName - $repname attr device changed, old: \"$evl[1]\", new: \"$evl[2]\" "); 
              }
          }
      # if ($strucChanged) {CommandSave("","")};
@@ -1928,20 +1961,27 @@ sub DbRep_getInitData {
   $paref->{dbh} = $dbh;
   my $mints     = _DbRep_getInitData_mints ($paref);
   
-  # Encoding der Datenbank ermitteln
-  ####################################
-  my $enc = qq{undefined};
-  my @se;
+  # Encoding der Datenbank und Verbindung ermitteln
+  ##################################################
+  my $enc  = qq{};
+  my $encc = qq{};
+  my (@se,@sec);
   
   if($dbmodel =~ /MYSQL/) {
-      eval { @se = $dbh->selectrow_array("SHOW VARIABLES LIKE 'character_set_database';") };
-      $enc = @se ? uc($se[1]) : $enc;
+      eval { @se = $dbh->selectrow_array("SELECT default_character_set_name FROM information_schema.SCHEMATA WHERE schema_name = '$database'") };
+      $enc = $se[0] // $enc;
+      eval { @sec = $dbh->selectrow_array("SHOW VARIABLES LIKE 'character_set_connection'") };
+      $encc = $sec[1] // $encc;
   } 
   elsif($dbmodel =~ /SQLITE/) {
-      eval { $enc = $dbh->selectrow_array("PRAGMA encoding;") };
+      eval { @se = $dbh->selectrow_array("PRAGMA encoding;") };
+      $enc = $se[0] // $enc;
   } 
   elsif($dbmodel =~ /POSTGRESQL/) {
-      eval { $enc = $dbh->selectrow_array("select character_set_name from information_schema.character_sets;") };
+      eval { @se = $dbh->selectrow_array("SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = '$database'") };
+      $enc = $se[0] // $enc;
+      eval { @sec = $dbh->selectrow_array("SHOW CLIENT_ENCODING") };
+      $encc = $sec[0] // $encc;
   } 
   
   Log3 ($name, 4, "DbRep $name - Encoding of database determined: $enc");
@@ -1993,6 +2033,7 @@ sub DbRep_getInitData {
   my $rt = tv_interval($st);                                  # SQL-Laufzeit ermitteln
   
   $enc      = encode_base64($enc,      "");
+  $encc     = encode_base64($encc,     "");
   $mints    = encode_base64($mints,    "");
   $idxstate = encode_base64($idxstate, "");
   $grants   = encode_base64($grants,   "");
@@ -2005,7 +2046,7 @@ sub DbRep_getInitData {
   $prop = DbRep_trim ($prop) if($prop);
   $err  = q{};
  
-return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc";
+return "$name|$err|$mints|$rt|$opt|$prop|$fret|$idxstate|$grants|$enc|$encc";
 }
 
 ####################################################################################################
@@ -2097,8 +2138,9 @@ sub DbRep_getInitDataDone {
   my $prop      = $a[5];
   my $fret      = $a[6] ? \&{$a[6]} : '';
   my $idxstate  = decode_base64($a[7]);
-  my $grants    = $a[8] ? decode_base64($a[8]) : '';
-  my $enc       = decode_base64($a[9]);
+  my $grants    = $a[8]  ? decode_base64($a[8])  : '';
+  my $enc       = $a[9]  ? decode_base64($a[9])  : '';
+  my $encc      = $a[10] ? decode_base64($a[10]) : '';
   
   my $hash      = $defs{$name};
   
@@ -2132,6 +2174,7 @@ sub DbRep_getInitDataDone {
       }
       else {
           ReadingsBulkUpdateValue ($hash, "dbEncoding",                    $enc);
+          ReadingsBulkUpdateValue ($hash, "connectionEncoding",           $encc) if($encc); 
           ReadingsBulkUpdateValue ($hash, "indexState",               $idxstate);
           ReadingsBulkUpdateValue ($hash, "timestamp_oldest_dataset",    $mints);
           ReadingsBulkUpdateValue ($hash, "userRights",                 $grants) if($grants);        
@@ -2144,7 +2187,7 @@ sub DbRep_getInitDataDone {
       
       $hash->{HELPER}{MINTS}  = $mints;
       $hash->{HELPER}{GRANTS} = $grants if($grants);
-      $hash->{UTF8}           = $enc =~ /UTF-?8/x ? 1 : 0;
+      $hash->{UTF8}           = $enc =~ /utf-?8/xi ? 1 : 0;
   }
 
 return if(!$fret);
@@ -2215,8 +2258,7 @@ sub DbRep_dbConnect {
   eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
                                                                     RaiseError          => 1, 
                                                                     AutoCommit          => 1,
-                                                                    AutoInactiveDestroy => 1, 
-                                                                    mysql_enable_utf8   => $utf8
+                                                                    AutoInactiveDestroy => 1
                                                                   }
                             ); 1;
        } 
@@ -2224,6 +2266,17 @@ sub DbRep_dbConnect {
                Log3 ($name, 2, "DbRep $name - ERROR: $@");
                $ret = "$name|$err";
              };
+  
+  if($utf8) {
+      if($dbmodel eq "MYSQL") {
+          $dbh->{mysql_enable_utf8} = 1;
+          $dbh->do('set names "UTF8"');
+      }
+      
+      if($dbmodel eq "SQLITE") {
+        $dbh->do('PRAGMA encoding="UTF-8"');
+      }
+  }    
 
 return ($ret, $dbh, $dbmodel);
 }
@@ -2234,7 +2287,7 @@ return ($ret, $dbh, $dbmodel);
 sub DbRep_Main {
  my $hash      = shift;
  my $opt       = shift;
- my $prop      = shift;
+ my $prop      = shift // q{};
  my $name      = $hash->{NAME}; 
  my $to        = AttrVal($name, "timeout", "86400");
  my $reading   = AttrVal($name, "reading",     "%");
@@ -2399,384 +2452,91 @@ sub DbRep_Main {
  }
  
  # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
+ ############################################################################
  if(!$hash->{HELPER}{MINTS} or !$hash->{HELPER}{DBREPCOL}{COLSET}) {
-     my $dbname = $hash->{DATABASE};
+     my $dbname                 = $hash->{DATABASE};
      $hash->{HELPER}{IDRETRIES} = 3 if($hash->{HELPER}{IDRETRIES} < 0);
+     
      Log3 ($name, 3, "DbRep $name - get initial structure information of database \"$dbname\", remaining attempts: ".$hash->{HELPER}{IDRETRIES});
+     
      $prop //= '';
      DbRep_firstconnect("$name|$opt|$prop|DbRep_Main") if($hash->{HELPER}{IDRETRIES} > 0);
      $hash->{HELPER}{IDRETRIES}--;
+     
  return;
  }
  
- ReadingsSingleUpdateValue ($hash, "state", "running", 1);
  
- no warnings 'uninitialized'; 
+ ##  Funktionsaufrufe 
+ ######################
  
- # Ausgaben und Zeitmanipulationen
+ ReadingsSingleUpdateValue ($hash, "state", "running", 1); 
+ 
  Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
  Log3 ($name, 4, "DbRep $name - Command: $opt $prop"); 
  
- # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
  
- my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);
-
- my $ts = "no_aggregation";                                                                  # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
- if($IsTimeSet || $IsAggrSet) {
-     ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
- } 
- else {
-     Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
-     Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set")   if($opt !~ /tableCurrentPurge/); 
- }
-
- Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries|^sql/x); 
- 
- #####  Funktionsaufrufe #####
- #############################
  if($dbrep_hmainf{$opt} && defined &{$dbrep_hmainf{$opt}{fn}}) {
      $params = {
          hash    => $hash,
          name    => $name,
+         opt     => $opt,
+         prop    => $prop,
          table   => $dbrep_hmainf{$opt}{table} // $prop,
          device  => $device,
-         reading => $reading,
-         opt     => $opt,
-         prop    => $prop
+         reading => $reading
      };
      
-     if($dbrep_hmainf{$opt}{timeset}) {
+     if($dbrep_hmainf{$opt}{timeset}) {                                                              # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
+         my ($IsTimeSet, $IsAggrSet, $aggregation) = DbRep_checktimeaggr($hash);
+         my $ts                                    = "no_aggregation";                               # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
+         
+         if($IsTimeSet || $IsAggrSet) {
+             ($epoch_seconds_begin, $epoch_seconds_end, $runtime_string_first, $runtime_string_next, $ts) = DbRep_createTimeArray($hash, $aggregation, $opt);
+         } 
+         else {
+             Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
+             Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set")   if($opt !~ /tableCurrentPurge/); 
+         }
+
+         Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries|^sql/x); 
+         
          $params->{ts}  = $ts;
          $params->{rsf} = $runtime_string_first;
          $params->{rsn} = $runtime_string_next;
      }
-      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall ($dbrep_hmainf{$opt}{fn}, 
-                                                  $params, 
-                                                  $dbrep_hmainf{$opt}{fndone}, 
-                                                  $to, 
-                                                  $dbrep_hmainf{$opt}{fnabort}, 
-                                                  $hash
-                                                 );      
- }
-  
-# if ($opt eq "sumValue") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "history",
-#         device  => $device,
-#         reading => $reading,
-#         prop    => $prop,
-#         ts      => $ts,
-#     };
      
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sumval", $params, "DbRep_sumvalDone", $to, "DbRep_ParseAborted", $hash);
-# } 
-# elsif ($opt eq "countEntries") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
- #        table   => $prop,
-#         device  => $device,
-#         reading => $reading,
-#         ts      => $ts,
-#     };
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_count", $params, "DbRep_countDone", $to, "DbRep_ParseAborted", $hash);  
-# } 
-# if ($opt eq "averageValue") { 
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "history",
-#         device  => $device,
-#         reading => $reading,
-#         prop    => $prop,
-#         ts      => $ts,
-#     };
-#     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_averval", $params, "DbRep_avervalDone", $to, "DbRep_ParseAborted", $hash); 
-# } 
-# if ($opt eq "fetchrows") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => $prop,
-#         device  => $device,
-#         reading => $reading,
-#         rsf     => $runtime_string_first,
-#         rsn     => $runtime_string_next
-#     };
-#            
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_fetchrows", $params, "DbRep_fetchrowsDone", $to, "DbRep_ParseAborted", $hash);
-# } 
-# elsif ($opt eq "exportToFile") {
-#     DbRep_beforeproc ($hash, "export");
-#     
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         device  => $device,
-#         reading => $reading,
-#         rsf     => $runtime_string_first,
-#         file    => $prop,
-#         ts      => $ts,
-#     };
-     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_expfile", $params, "DbRep_expfile_Done", $to, "DbRep_ParseAborted", $hash); 
-# } 
-# elsif ($opt eq "importFromFile") {     
-#     DbRep_beforeproc ($hash, "import");
-     
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "history",
-#         rsf     => $runtime_string_first,
-#         prop    => $prop,
-#     };    
-     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_impfile", $params, "DbRep_impfile_Done", $to, "DbRep_ParseAborted", $hash);
-# } 
-# elsif ($opt eq "maxValue") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "history",
-#         device  => $device,
-#         reading => $reading,
-#         prop    => $prop,
-#         ts      => $ts,
-#     };
-     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_maxval", $params, "DbRep_maxvalDone", $to, "DbRep_ParseAborted", $hash);      
-# } 
-# elsif ($opt eq "minValue") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "history",
-#         device  => $device,
-#         reading => $reading,
-#         prop    => $prop,
-#         ts      => $ts,
-#     };
-#     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_minval", $params, "DbRep_minvalDone", $to, "DbRep_ParseAborted", $hash);        
-# }
-# elsif ($opt eq "tableCurrentPurge") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "current",
-#         device  => $device,
-#         reading => $reading
-#     };
-     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
-# } 
-# elsif ($opt eq "tableCurrentFillup") {
-#     $params = {
-#         hash    => $hash,
-#         name    => $name,
-#         table   => "current",
-#         device  => $device,
-#         reading => $reading,
-#         rsf     => $runtime_string_first,
-#         rsn     => $runtime_string_next
-#     };
-     
-#     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_currentfillup", $params, "DbRep_currentfillupDone", $to, "DbRep_ParseAborted", $hash);
-# }
- if ($opt eq "delDoublets") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop // "adviceDelete",
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_deldoublets", $params, "DbRep_deldoubl_Done", $to, "DbRep_ParseAborted", $hash);  
- } 
- elsif ($opt eq "delSeqDoublets") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop // "adviceRemain",
-         ts      => $ts,
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_delseqdoubl", $params, "DbRep_deldoubl_Done", $to, "DbRep_ParseAborted", $hash);   
- } 
- elsif ($opt eq "delEntries") {
-     delete $hash->{HELPER}{DELENTRIES};
-     DbRep_beforeproc ($hash, "delEntries");
-     
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next
-     };
-     
-     if($IsTimeSet || $IsAggrSet) {                                                                         # Forum:#113202
-         DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return; 
+     if(exists $dbrep_hmainf{$opt}{renmode}) {
+         $params->{renmode} = $dbrep_hmainf{$opt}{renmode};
      }
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_del", $params, "DbRep_del_Done", $to, "DbRep_ParseAborted", $hash);
- } 
- elsif ($opt eq "diffValue") {  
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         device  => $device,
-         reading => $reading,
-         prop    => $prop,
-         ts      => $ts
-     };
+     if ($opt eq "delEntries" || $opt =~ /reduceLog/xi) {                                                                              # Forum:#113202
+         DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return; 
+         
+         if ($opt =~ /reduceLog/xi) {
+            ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
+         }         
+     }
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_diffval", $params, "DbRep_diffvalDone", $to, "DbRep_ParseAborted", $hash);         
- } 
- elsif ($opt eq "insert") { 
-      $params = {
-         hash  => $hash,
-         name  => $name,
-         table => "history",
-         prop  => $prop
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_insert", $params, "DbRep_insertDone", $to, "DbRep_ParseAborted", $hash);           
- } 
- elsif ($opt eq "deviceRename") { 
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         renmode => "devren",
-         device  => $device,
-         reading => $reading
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevOrRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
- } 
- elsif ($opt eq "readingRename") { 
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         renmode => "readren",
-         device  => $device,
-         reading => $reading
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeDevOrRead", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);         
- }
- elsif ($opt eq "changeValue") {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         table   => "history",
-         renmode => "changeval",
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next,
-         ts      => $ts
-     };
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_changeVal", $params, "DbRep_changeDone", $to, "DbRep_ParseAborted", $hash);    
- }
- elsif ($opt =~ /dbvars|dbstatus|tableinfo|procinfo|svrinfo/) {
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         opt     => $opt
-     }; 
-     
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_dbmeta", $params, "DbRep_dbmeta_Done", $to, "DbRep_ParseAborted", $hash);    
- } 
- elsif ($opt eq "sqlCmd") {                                       # Execute a generic sql command   
-    $params = {
-        hash    => $hash,
-        name    => $name,
-        opt     => $opt,
-        prop    => $prop,
-        device  => $device,
-        reading => $reading,
-        rsf     => $runtime_string_first,
-        rsn     => $runtime_string_next
-    };    
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
- }
- elsif ($opt eq "sqlCmdHistory") {
-    $params = {
-        hash    => $hash,
-        name    => $name,
-        opt     => $opt,
-        prop    => $prop,
-        device  => $device,
-        reading => $reading,
-        rsf     => $runtime_string_first,
-        rsn     => $runtime_string_next
-    };    
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
- }
- elsif ($opt eq "sqlSpecial") {                                       # Execute a special sql command   
-    $params = {
-        hash    => $hash,
-        name    => $name,
-        opt     => $opt,
-        prop    => $prop,
-        device  => $device,
-        reading => $reading,
-        rsf     => $runtime_string_first,
-        rsn     => $runtime_string_next
-    };    
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_sqlCmd", $params, "DbRep_sqlCmdDone", $to, "DbRep_ParseAborted", $hash);     
- } 
- elsif ($opt =~ /syncStandby/ ) {
-    DbRep_beforeproc($hash, "syncStandby");                           # Befehl vor Procedure ausführen
-    
-    $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_syncStandby", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts§$prop", "DbRep_syncStandbyDone", $to, "DbRep_ParseAborted", $hash);     
- }
- 
- if ($opt =~ /reduceLog/) {
-     DbRep_checkValidTimeSequence ($hash, $runtime_string_first, $runtime_string_next) or return;
-     
-     $params = {
-         hash    => $hash,
-         name    => $name,
-         device  => $device,
-         reading => $reading,
-         rsf     => $runtime_string_first,
-         rsn     => $runtime_string_next
-     };
+     if ($dbrep_hmainf{$opt}{dobp}) {                                         # Prozedur vor Command ausführen
+         DbRep_beforeproc ($hash, $opt);
+     }
       
-     $hash->{HELPER}{RUNNING_REDUCELOG}           = BlockingCall("DbRep_reduceLog", $params, "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
-     $hash->{HELPER}{RUNNING_REDUCELOG}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_REDUCELOG});   
-     
-     ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
-     
-     return;
- }
+     $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}} = BlockingCall ($dbrep_hmainf{$opt}{fn}, 
+                                                              $params, 
+                                                              $dbrep_hmainf{$opt}{fndone}, 
+                                                              $to, 
+                                                              $dbrep_hmainf{$opt}{fnabort}, 
+                                                              $hash
+                                                             );                                                             
 
- if($hash->{HELPER}{RUNNING_PID}) {                                                           
-     $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if(exists $hash->{HELPER}{RUNNING_PID});             # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
-     Log3 ($name, 5, qq{DbRep $name - start BlockingCall with PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+     delete $hash->{HELPER}{DELENTRIES};
+     
+     if(exists $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) {                                                           
+         $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{loglevel} = 5;                                             # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
+         Log3 ($name, 5, qq{DbRep $name - BlockingCall with PID "$hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{pid}" started});
+     }
  }
 
 return;
@@ -3785,7 +3545,7 @@ sub DbRep_avervalDone {
   
   my $reading_runtime_string;
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -3987,7 +3747,7 @@ sub DbRep_countDone {
   
   my $reading_runtime_string;
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4231,7 +3991,7 @@ sub DbRep_maxvalDone {
   
   my ($reading_runtime_string);
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4466,7 +4226,7 @@ sub DbRep_minvalDone {
   
   my $hash      = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4798,7 +4558,7 @@ sub DbRep_diffvalDone {
   
   my $reading_runtime_string;
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -4992,7 +4752,7 @@ sub DbRep_sumvalDone {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5112,7 +4872,7 @@ sub DbRep_del_Done {
      
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5167,21 +4927,29 @@ sub DbRep_insert {
   
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  
-  my $bst = [gettimeofday];                                               # Background-Startzeit
+  my $bst = [gettimeofday];                                                        # Background-Startzeit
  
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return $err if ($err);
  
-  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+  # check ob PK verwendet wird, @usepkx ? Anzahl der Felder im PK : 0 wenn kein PK, 
+  # $pkx ? Namen der Felder : none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
   
   my ($i_timestamp,$i_device,$i_reading,$i_value,$i_unit) = split ",", $prop;
   my $i_type                                              = "manual";
   my $i_event                                             = "manual";
+  
+  if ($dbmodel ne 'SQLITE') {                                                      # V8.48.4 - Daten auf maximale Länge (entsprechend der Feldlänge in DbLog) beschneiden wenn nicht SQLite
+      $i_device  = substr($i_device,  0, $hash->{HELPER}{DBREPCOL}{DEVICE});
+      $i_reading = substr($i_reading, 0, $hash->{HELPER}{DBREPCOL}{READING});
+      $i_value   = substr($i_value,   0, $hash->{HELPER}{DBREPCOL}{VALUE});
+      $i_unit    = substr($i_unit,    0, $hash->{HELPER}{DBREPCOL}{UNIT});
+  }
  
   Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
  
-  my $st = [gettimeofday];                                               # SQL-Startzeit
+  my $st = [gettimeofday];                                                         # SQL-Startzeit
 
   my ($sth,$sql,$irow);
   
@@ -5247,7 +5015,7 @@ sub DbRep_insertDone {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5382,7 +5150,7 @@ sub DbRep_currentfillupDone {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                          # Befehl nach Procedure ausführen
   
@@ -5420,7 +5188,7 @@ return;
 ####################################################################################################
 #                    nichtblockierendes DB deviceRename / readingRename
 ####################################################################################################
-sub DbRep_changeDevOrRead {
+sub DbRep_changeDevRead {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
@@ -5698,7 +5466,7 @@ sub DbRep_changeDone {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -5803,7 +5571,7 @@ sub DbRep_fetchrows {
  
   s/\|/_E#S#C_/g for @row_array;                                                     # escape Pipe "|"
  
-  if ($utf8) {
+  if ($utf8 && $dbmodel ne "SQLITE") {
       $rowlist = Encode::encode_utf8(join('|', @row_array));
   } 
   else {
@@ -5838,7 +5606,7 @@ sub DbRep_fetchrowsDone {
   
   my $hash       = $defs{$name};
     
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -6357,7 +6125,7 @@ sub DbRep_deldoubl_Done {
   my $rowlist    = $a[2] ? decode_base64($a[2]) : '';
   my $bt         = $a[3];
   my $nrows      = $a[4];
-  my $opt        = $a[5];
+  my $prop       = $a[5];
   
   my $reading    = AttrVal($name, "reading",  '');
   my $limit      = AttrVal($name, "limit",  1000);
@@ -6368,7 +6136,7 @@ sub DbRep_deldoubl_Done {
   my $l = 1;
   my $reading_runtime_string;
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -6386,7 +6154,7 @@ sub DbRep_deldoubl_Done {
   
   readingsBeginUpdate($hash);
   
-  if ($opt !~ /delete/ && $rowlist) {
+  if ($prop !~ /delete/ && $rowlist) {
       my @row_array = split("\\|", $rowlist);
       s/_E#S#C_/\|/g for @row_array;                                    # escaped Pipe return to "|"
       
@@ -6418,8 +6186,8 @@ sub DbRep_deldoubl_Done {
   my $sfx = AttrVal("global", "language", "EN");
   $sfx    = $sfx eq "EN" ? "" : "_$sfx";
 
-  my $rnam = $opt =~ /adviceRemain/ ? "number_rows_to_remain" : 
-             $opt =~ /adviceDelete/ ? "number_rows_to_delete" :
+  my $rnam = $prop =~ /adviceRemain/ ? "number_rows_to_remain" : 
+             $prop =~ /adviceDelete/ ? "number_rows_to_delete" :
              "number_rows_deleted"; 
              
   ReadingsBulkUpdateValue     ($hash, "$rnam", "$nrows");
@@ -6583,7 +6351,7 @@ sub DbRep_expfile_Done {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -6792,7 +6560,7 @@ sub DbRep_impfile_Done {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -7070,11 +6838,11 @@ sub DbRep_sqlCmdDone {
   
   my $hash       = $defs{$name};
     
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my ($erread, $state) = DbRep_afterproc ($hash, "sqlCmd");                     # Befehl nach Procedure ausführen
+  my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
   
   if ($err) {
     ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
@@ -7366,7 +7134,7 @@ sub DbRep_dbmeta_Done {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
@@ -7626,7 +7394,7 @@ sub DbRep_IndexDone {
   
   my $hash       = $defs{$name};
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_INDEX}{pid}"});
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_INDEX}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_INDEX});
   
@@ -7891,7 +7659,7 @@ sub _DbRep_mysqlOpdAndFreeSpace  {
   $query  = qq{SELECT round ((COUNT(*) * 300 * 1024)/1048576 + 150, 2) "overhead in MB" };
   $query .= qq{FROM information_schema.TABLES where table_schema = '$dbname'; };
   
-  my ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);                               # Overhead ermitteln
+  ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query);                               # Overhead ermitteln
   return $err if ($err);
   
   my $ovh = $sth->fetchrow_array();
@@ -7947,22 +7715,18 @@ sub DbRep_mysql_DumpClientSide {
  my $paref                      = shift;
  my $hash                       = $paref->{hash};
  my $name                       = $paref->{name};
-  
- my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn                     = $dbloghash->{dbconn};
- my $dbuser                     = $dbloghash->{dbuser};
- my $dblogname                  = $dbloghash->{NAME};
- my $dbpassword                 = $attr{"sec$dblogname"}{secret};
  
  my $dbname                     = $hash->{DATABASE};
  my $dump_path                  = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
  $dump_path                     = $dump_path."/" unless($dump_path =~ m/\/$/);
+ 
  my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
- my $memory_limit               = AttrVal($name, "dumpMemlimit", 100000);
- my $my_comment                 = AttrVal($name, "dumpComment", "");
- my $dumpspeed                  = AttrVal($name, "dumpSpeed", 10000);
- my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
- my $ead                        = AttrVal($name, "executeAfterProc", undef);
+ my $memory_limit               = AttrVal($name, "dumpMemlimit",        100000);
+ my $my_comment                 = AttrVal($name, "dumpComment",             "");
+ my $dumpspeed                  = AttrVal($name, "dumpSpeed",            10000);
+ my $ebd                        = AttrVal($name, "executeBeforeProc",    undef);
+ my $ead                        = AttrVal($name, "executeAfterProc",     undef);
+ 
  my $mysql_commentstring        = "-- ";
  my $character_set              = "utf8";
  my $repver                     = $hash->{HELPER}{VERSION};
@@ -7975,13 +7739,12 @@ sub DbRep_mysql_DumpClientSide {
  my (@ar,@tablerecords,@tablenames,@tables,@ergebnis);
  my (%db_tables);
  
- # Background-Startzeit
- my $bst = [gettimeofday];
+ my $bst = [gettimeofday];                                                        # Background-Startzeit
  
  Log3 ($name, 3, "DbRep $name - Starting dump of database '$dbname'");
 
  #####################  Beginn Dump  ######################## 
- ##############################################################
+ ############################################################
      
  undef(%db_tables);
 
@@ -7997,8 +7760,10 @@ sub DbRep_mysql_DumpClientSide {
     
  my $fieldlist = "";
     
- my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+ my ($err, $dbh, $dbmodel) = DbRep_dbConnect($name, 0);
  return $err if ($err);
+ 
+ $dbh->{mysql_enable_utf8} = 0;                                                    # Dump Performance !!! Forum: https://forum.fhem.de/index.php/topic,53584.msg1204535.html#msg1204535
  
  my $st = [gettimeofday];                                                          # SQL-Startzeit
  
@@ -8008,25 +7773,23 @@ sub DbRep_mysql_DumpClientSide {
  my @mysql_version = $sth->fetchrow;
  my @v             = split(/\./,$mysql_version[0]);
 
- if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                   # mysql Version >= 4.1
-     $sth = $dbh->prepare("SET NAMES '".$character_set."'");
-     $sth->execute;
+ if($v[0] >= 5 || ($v[0] >= 4 && $v[1] >= 1) ) {                                                       # mysql Version >= 4.1
+     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SET NAMES '".$character_set."'");         # get standard encoding of MySQl-Server
      
-     $sth = $dbh->prepare("SHOW VARIABLES LIKE 'character_set_connection'");       # get standard encoding of MySQl-Server
-     $sth->execute;
-     @ar = $sth->fetchrow; 
+     ($err, $sth)   = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
+     @ar            = $sth->fetchrow; 
      $character_set = $ar[1];
  } 
- else {
-     # mysql Version < 4.1 -> no SET NAMES available
-     # get standard encoding of MySQl-Server
-     $sth = $dbh->prepare("SHOW VARIABLES LIKE 'character_set'");
-     $sth->execute;
-     @ar = $sth->fetchrow; 
-     if (defined($ar[1])) { $character_set=$ar[1]; }
+ else {                                                                                                # mysql Version < 4.1 -> no SET NAMES available
+     ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, "SHOW VARIABLES LIKE 'character_set'");    # get standard encoding of MySQl-Server   
+     @ar          = $sth->fetchrow; 
+     
+     if (defined($ar[1])) { 
+         $character_set = $ar[1]; 
+     }
  }
  
- Log3 ($name, 3, "DbRep $name - Characterset of collection and backup file set to $character_set. ");
+ Log3 ($name, 3, "DbRep $name - Characterset of collection set to $character_set. ");
     
  undef(@tables);                     
  undef(@tablerecords);
@@ -8063,17 +7826,16 @@ sub DbRep_mysql_DumpClientSide {
      # decide if we need to skip the data while dumping (VIEWs and MEMORY)
      # check for old MySQL3-Syntax Type=xxx 
      
-     if (defined $value->{Type}) {                                         # port old index type to index engine, so we can use the index Engine in the rest of the script
+     if (defined $value->{Type}) {                                                         # port old index type to index engine, so we can use the index Engine in the rest of the script
          $value->{Engine} = $value->{Type}; 
-         $engine = uc($value->{Type});
+         $engine          = uc($value->{Type});
          
          if ($engine eq "MEMORY") {
              $value->{skip_data} = 1;
          }
      }
 
-     # check for > MySQL3 Engine = xxx 
-     if (defined $value->{Engine}) {
+     if (defined $value->{Engine}) {                                                       # check for > MySQL3 Engine = xxx 
          $engine = uc($value->{Engine});
          
          if ($engine eq "MEMORY") {
@@ -8081,8 +7843,7 @@ sub DbRep_mysql_DumpClientSide {
          }
      }
 
-     # check for Views - if it is a view the comment starts with "VIEW" 
-     if (defined $value->{Comment} && uc(substr($value->{Comment},0,4)) eq 'VIEW') {
+     if (defined $value->{Comment} && uc(substr($value->{Comment},0,4)) eq 'VIEW') {       # check for Views - if it is a view the comment starts with "VIEW" 
          $value->{skip_data}   = 1;
          $value->{Engine}      = 'VIEW'; 
          $value->{Update_time} = '';
@@ -8092,17 +7853,16 @@ sub DbRep_mysql_DumpClientSide {
          $db_tables{$value->{Name}} = $value;
      }
          
-     # cast indexes to int, cause they are used for builing the statusline
-     $value->{Rows}         += 0;
+     $value->{Rows}         += 0;                                                         # cast indexes to int, cause they are used for builing the statusline
      $value->{Data_length}  += 0;
      $value->{Index_length} += 0;
  }
+ 
  $sth->finish;
 
  @tablenames = sort(keys(%db_tables));
  
- # add VIEW at the end as they need all tables to be created before
- @tablenames = (@tablenames,sort(keys(%db_tables_views)));
+ @tablenames = (@tablenames,sort(keys(%db_tables_views)));                                # add VIEW at the end as they need all tables to be created before
  %db_tables  = (%db_tables,%db_tables_views);
  $tablename  = '';
  
@@ -8114,7 +7874,7 @@ sub DbRep_mysql_DumpClientSide {
      return "$name|$err";
  }
 
- if($optimize_tables_beforedump) {                                             # Tabellen optimieren vor dem Dump
+ if($optimize_tables_beforedump) {                                                        # Tabellen optimieren vor dem Dump
      $hash->{HELPER}{DBTABLES} = \%db_tables;
      
      my $opars = {
@@ -8128,18 +7888,18 @@ sub DbRep_mysql_DumpClientSide {
      return $err if($err);
  }
     
- $st_e .= "-- TABLE-INFO\n";                                                   # Tabelleneigenschaften für SQL-File ermitteln
+ $st_e .= "-- TABLE-INFO\n";                                                             # Tabelleneigenschaften für SQL-File ermitteln
     
  for $tablename (@tablenames) {
      my $dump_table = 1;
      
      if ($dbpraefix ne "") {
-         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {         # exclude table from backup because it doesn't fit to praefix
+         if (substr($tablename,0,length($dbpraefix)) ne $dbpraefix) {                    # exclude table from backup because it doesn't fit to praefix
              $dump_table = 0;
          }
      }
                         
-     if ($dump_table == 1) {                                                  # how many rows
+     if ($dump_table == 1) {                                                             # how many rows
          $sql_create = "SELECT count(*) FROM `$tablename`";
 
          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql_create);
@@ -8149,7 +7909,7 @@ sub DbRep_mysql_DumpClientSide {
          $sth->finish;  
          
          $r += $db_tables{$tablename}{Rows};
-         push(@tables,$db_tables{$tablename}{Name});                         # add tablename to backuped tables
+         push(@tables,$db_tables{$tablename}{Name});                                     # add tablename to backuped tables
          $t++;
          
          if (!defined $db_tables{$tablename}{Update_time}) {
@@ -8157,6 +7917,7 @@ sub DbRep_mysql_DumpClientSide {
          }
             
          $st_e .= $mysql_commentstring."TABLE: $db_tables{$tablename}{Name} | Rows: $db_tables{$tablename}{Rows} | Length: ".($db_tables{$tablename}{Data_length}+$db_tables{$tablename}{Index_length})." | Engine: $db_tables{$tablename}{Engine}\n";
+         
          if($db_tables{$tablename}{Name} eq "current") {
              $drc = $db_tables{$tablename}{Rows};
          }
@@ -8166,6 +7927,7 @@ sub DbRep_mysql_DumpClientSide {
          }
      }
  }
+ 
  $st_e .= "-- EOF TABLE-INFO";
     
  Log3 ($name, 3, "DbRep $name - Found ".(@tables)." tables with $r records.");
@@ -8181,7 +7943,7 @@ sub DbRep_mysql_DumpClientSide {
  $sql_text = $status_start.$status_end;
  
  # neues SQL-Ausgabefile anlegen
- ($sql_text,$first_insert,$sql_file,$backupfile,$err) = DbRep_NewDumpFilename($sql_text, $dump_path, $dbname, $time_stamp, $character_set);
+ ($err, $sql_text, $first_insert, $sql_file, $backupfile) = DbRep_NewDumpFilename($sql_text, $dump_path, $dbname, $time_stamp, $character_set);
  if ($err) {
      Log3 ($name, 2, "DbRep $name - $err");
      $err = encode_base64($err,"");
@@ -8231,7 +7993,7 @@ sub DbRep_mysql_DumpClientSide {
              $sql_text .= "\n$mysql_commentstring\n$mysql_commentstring"."Dumping data for table `$tablename`\n$mysql_commentstring\n";
              $sql_text .= "/*!40000 ALTER TABLE `$tablename` DISABLE KEYS */;";
 
-             DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);
+             DbRep_WriteToDumpFile($sql_text, $sql_file);
              $sql_text = "";
 
              $fieldlist  = "(";
@@ -8243,6 +8005,7 @@ sub DbRep_mysql_DumpClientSide {
              while (@ar = $sth->fetchrow) {
                  $fieldlist .= "`".$ar[0]."`,";
              }
+             
              $sth->finish;
              
              Log3 ($name, 5, "DbRep $name - Fieldlist found: $fieldlist");
@@ -8278,8 +8041,8 @@ sub DbRep_mysql_DumpClientSide {
                      $sql_text .= $a;
                         
                      if($memory_limit > 0 && length($sql_text) > $memory_limit) {
-                         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);
-                         # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '".DbRep_byteOutput($filesize)."'");
+                         ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);
+                         # Log3 ($name, 5, "DbRep $name - Memory limit '$memory_limit' exceeded. Wrote to '$sql_file'. Filesize: '"._DbRep_byteOutput($filesize)."'");
                          $sql_text = "";
                      }
                  }
@@ -8288,22 +8051,22 @@ sub DbRep_mysql_DumpClientSide {
              $sql_text .= "\n/*!40000 ALTER TABLE `$tablename` ENABLE KEYS */;\n";
          }
 
-         ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);        # write sql commands to file
+         ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);                        # write sql commands to file
          $sql_text = "";
 
          if ($db_tables{$tablename}{skip_data} == 0) {
-             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: ".DbRep_byteOutput($filesize).")") if($filesize);
+             Log3 ($name, 3, "DbRep $name - $rct records inserted (size of backupfile: "._DbRep_byteOutput($filesize).")") if($filesize);
              $totalrecords += $rct;
          } 
          else {
-             Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: ".DbRep_byteOutput($filesize).")");
+             Log3 ($name, 3, "DbRep $name - Dumping structure of $tablename (Type ".$db_tables{$tablename}{Engine}." ) (size of backupfile: "._DbRep_byteOutput($filesize).")");
          }     
      }
  }
    
  # end
- DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file, $character_set);
- ($filesize,$err) = DbRep_WriteToDumpFile($mysql_commentstring."EOB\n", $sql_file, $character_set);
+ DbRep_WriteToDumpFile("\nSET FOREIGN_KEY_CHECKS=1;\n", $sql_file);
+ ($err, $filesize) = DbRep_WriteToDumpFile($mysql_commentstring."EOB\n", $sql_file);
  
  # Datenbankverbindung schliessen
  $sth->finish();
@@ -8313,16 +8076,7 @@ sub DbRep_mysql_DumpClientSide {
  
  my $compress = AttrVal($name, "dumpCompress", 0);                                                # Dumpfile komprimieren wenn dumpCompress=1
  if($compress) {
-     ($err,$backupfile) = DbRep_dumpCompress($hash,$backupfile);                                  # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
-         
-     my $fref = stat("$dump_path$backupfile");  
-     
-     if ($fref =~ /ARRAY/) {
-         $filesize = (@{stat("$dump_path$backupfile")})[7];
-     } 
-     else {
-         $filesize = (stat("$dump_path$backupfile"))[7];
-     }
+     ($err, $backupfile, $filesize) = DbRep_dumpCompress($hash, $backupfile);
  }
  
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$backupfile);                         # Dumpfile per FTP senden und versionieren
@@ -8330,23 +8084,19 @@ sub DbRep_mysql_DumpClientSide {
            $ftpmsg ? encode_base64($ftpmsg,"") : 
            0;
            
- my $ffd = join ", ", @ftpfd;
- $ffd    = $ffd ? encode_base64($ffd,"") : 0;
+ my $ffd   = join ", ", @ftpfd;
+ $ffd      = $ffd ? encode_base64($ffd,"") : 0;
  
- my @fd  = DbRep_deldumpfiles($hash,$backupfile);                                        # alte Dumpfiles löschen
- my $bfd = join ", ", @fd;
- $bfd    = $bfd ? encode_base64($bfd,"") : 0;
+ my @fd    = DbRep_deldumpfiles($hash,$backupfile);                                        # alte Dumpfiles löschen
+ my $bfd   = join ", ", @fd;
+ $bfd      = $bfd ? encode_base64($bfd,"") : 0;
 
- my $brt = tv_interval($bst);                                                            # Background-Laufzeit ermitteln
- $rt     = $rt.",".$brt;
+ my $brt   = tv_interval($bst);                                                            # Background-Laufzeit ermitteln
+ $rt       = $rt.",".$brt;
  
- my $fsize = '';
- if($filesize) {
-    $fsize = DbRep_byteOutput($filesize);
-    $fsize = encode_base64($fsize,"");
- }
- 
- $err = q{};
+ my $fsize = _DbRep_byteOutput($filesize);
+ $fsize    = encode_base64    ($fsize,"");
+ $err      = q{};
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
@@ -8366,6 +8116,10 @@ sub DbRep_mysql_DumpServerSide {
  my $optimize_tables_beforedump = AttrVal($name, "optimizeTablesBeforeDump", 0);
  my $dump_path_rem              = AttrVal($name, "dumpDirRemote", $dbrep_dump_remotepath_def);
  $dump_path_rem                 = $dump_path_rem."/" unless($dump_path_rem =~ m/\/$/);
+ 
+ my $dump_path_loc              = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
+ $dump_path_loc                 = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
+ 
  my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  
@@ -8440,7 +8194,7 @@ sub DbRep_mysql_DumpServerSide {
  
  Log3 ($name, 5, "DbRep $name - Use Outfile: $dump_path_rem$bfile");
 
- my $st = [gettimeofday];                                                                     # SQL-Startzeit
+ my $st  = [gettimeofday];                                                                     # SQL-Startzeit
 
  my $sql = "SELECT * FROM $table INTO OUTFILE '$dump_path_rem$bfile' FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\n'; ";
 
@@ -8450,50 +8204,38 @@ sub DbRep_mysql_DumpServerSide {
  $sth->finish;
  $dbh->disconnect;
   
- my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
+ my $rt       = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
- my $compress = AttrVal($name,"dumpCompress",0);                                    # Dumpfile komprimieren wenn dumpCompress=1
- if($compress) {                                                                    # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
-     ($err,$bfile) = DbRep_dumpCompress($hash,$bfile);
- }
+ my $fsBytes  = _DbRep_fsizeInBytes ($dump_path_loc.$bfile);                            # Größe Dumpfile ermitteln
+ my $fsize    = _DbRep_byteOutput   ($fsBytes);
  
- my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dbrep_dump_path_def);           # Größe Dumpfile ermitteln ("dumpDirRemote" muß auf "dumpDirLocal" gemountet sein) 
- $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
+ Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
  
- my $filesize;
- my $fref = stat($dump_path_loc.$bfile); 
- if($fref) {
-     if($fref =~ /ARRAY/) {
-         $filesize = (@{stat($dump_path_loc.$bfile)})[7];
-     } 
-     else {
-         $filesize = (stat($dump_path_loc.$bfile))[7];
-     }
+ my $compress = AttrVal($name, "dumpCompress", 0);                                      # Dumpfile komprimieren wenn dumpCompress=1
+ 
+ if($compress) {                                                                        # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
+     ($err, $bfile, $fsBytes) = DbRep_dumpCompress ($hash, $bfile);
+     $fsize                   = _DbRep_byteOutput  ($fsBytes);
  }
  
  Log3 ($name, 3, "DbRep $name - Number of exported datasets: $drh");
- Log3 ($name, 3, "DbRep $name - Size of backupfile: ".DbRep_byteOutput($filesize)) if($filesize);
  
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile);                             # Dumpfile per FTP senden und versionieren
  my $ftp = $ftperr ? encode_base64($ftperr,"") : 
            $ftpmsg ? encode_base64($ftpmsg,"") : 
            0;
            
- my $ffd = join(", ", @ftpfd);
- $ffd    = $ffd?encode_base64($ffd,""):0;
+ my $ffd   = join(", ", @ftpfd);
+ $ffd      = $ffd ? encode_base64($ffd,"") : 0;
  
- my @fd  = DbRep_deldumpfiles($hash,$bfile);                                            # alte Dumpfiles löschen
- my $bfd = join(", ", @fd );
- $bfd    = $bfd?encode_base64($bfd,""):0;
+ my @fd    = DbRep_deldumpfiles($hash,$bfile);                                            # alte Dumpfiles löschen
+ my $bfd   = join(", ", @fd );
+ $bfd      = $bfd ? encode_base64($bfd,"") : 0;
  
- my $brt = tv_interval($bst);                                                           # Background-Laufzeit ermitteln
+ my $brt   = tv_interval($bst);                                                           # Background-Laufzeit ermitteln
  
- my $fsize = '';
- if($filesize) {
-     $fsize = DbRep_byteOutput($filesize);
-     $fsize = encode_base64   ($fsize,"");
- }
-
+ $fsize    = encode_base64    ($fsize,"");
+ 
  $rt  = $rt.",".$brt;
  $err = q{};
  
@@ -8517,7 +8259,7 @@ sub DbRep_sqlite_Dump {
  my $ebd                        = AttrVal($name, "executeBeforeProc", undef);
  my $ead                        = AttrVal($name, "executeAfterProc", undef);
  
- my ($db_MB,$r,$query,$sth);
+ my ($db_MB,$r,$query,$sth,$fsBytes);
  
  my $bst = [gettimeofday];                                                                   # Background-Startzeit
  
@@ -8525,7 +8267,8 @@ sub DbRep_sqlite_Dump {
  return $err if ($err);
   
  if($optimize_tables_beforedump) {                                                           # Vacuum vor Dump  # Anfangsgröße ermitteln
-     $db_MB = (split(' ',qx(du -m $dbname)))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+     $fsBytes  = _DbRep_fsizeInBytes ($dbname);
+     $db_MB    = _DbRep_byteOutput   ($fsBytes);
      
      Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB");
      
@@ -8536,7 +8279,9 @@ sub DbRep_sqlite_Dump {
      ($err, $sth, $r) = DbRep_prepareExecuteQuery ($name, $dbh, $query);
      return $err if ($err);
      
-     $db_MB = (split(' ',qx(du -m $dbname)))[0] if ($^O =~ m/linux/i || $^O =~ m/unix/i);     # Endgröße ermitteln
+     $fsBytes  = _DbRep_fsizeInBytes ($dbname);
+     $db_MB    = _DbRep_byteOutput   ($fsBytes);
+     
      Log3 ($name, 3, "DbRep $name - Size of database $dbname after optimize (MB): $db_MB");
  } 
  
@@ -8569,38 +8314,36 @@ sub DbRep_sqlite_Dump {
   
  $dbh->disconnect;
   
- my $rt = tv_interval($st);                                                            # SQL-Laufzeit ermitteln
+ my $rt    = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
  
- my $compress = AttrVal($name,"dumpCompress",0);                                       # Dumpfile komprimieren
- if($compress) {                                                                       # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
-     ($err,$bfile) = DbRep_dumpCompress($hash,$bfile);
- }
-
- my @a;                                                                                # Größe Dumpfile ermitteln
- @a = split(' ',qx(du $dump_path$bfile)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
- 
- my $filesize = ($a[0]) ? ($a[0]*1024) : "n.a.";
- my $fsize    = DbRep_byteOutput($filesize);
+ $fsBytes  = _DbRep_fsizeInBytes ($dump_path.$bfile);                                  # Größe Dumpfile ermitteln
+ my $fsize = _DbRep_byteOutput   ($fsBytes);
  
  Log3 ($name, 3, "DbRep $name - Size of backupfile: ".$fsize);
  
+ my $compress = AttrVal($name, "dumpCompress", 0);                                     # Dumpfile komprimieren
+ if($compress) {                                                                       # $err nicht auswerten -> wenn compress fehlerhaft wird unkomprimiertes dumpfile verwendet
+     ($err, $bfile, $fsBytes) = DbRep_dumpCompress ($hash, $bfile);
+     $fsize                   = _DbRep_byteOutput  ($fsBytes);
+ }
+  
  my ($ftperr,$ftpmsg,@ftpfd) = DbRep_sendftp($hash,$bfile);                            # Dumpfile per FTP senden und versionieren
  my $ftp = $ftperr ? encode_base64($ftperr,"") : 
            $ftpmsg ? encode_base64($ftpmsg,"") : 
            0;
            
- my $ffd = join ", ", @ftpfd;
- $ffd    = $ffd ? encode_base64($ffd,"") : 0;
+ my $ffd   = join ", ", @ftpfd;
+ $ffd      = $ffd ? encode_base64($ffd,"") : 0;
  
- my @fd  = DbRep_deldumpfiles($hash,$bfile);                                           # alte Dumpfiles löschen
- my $bfd = join ", ", @fd;
- $bfd    = $bfd ? encode_base64($bfd,"") : 0;
+ my @fd    = DbRep_deldumpfiles($hash,$bfile);                                           # alte Dumpfiles löschen
+ my $bfd   = join ", ", @fd;
+ $bfd      = $bfd ? encode_base64($bfd,"") : 0;
  
- my $brt = tv_interval($bst);                                                          # Background-Laufzeit ermitteln
+ my $brt   = tv_interval($bst);                                                          # Background-Laufzeit ermitteln
  
- $fsize  = encode_base64($fsize,"");
- $rt     = $rt.",".$brt;
- $err    = q{};
+ $fsize    = encode_base64($fsize,"");
+ $rt       = $rt.",".$brt;
+ $err      = q{};
  
  Log3 ($name, 3, "DbRep $name - Finished backup of database $dbname - total time used (hh:mm:ss): ".DbRep_sec2hms($brt));
  
@@ -8911,6 +8654,8 @@ sub DbRep_mysql_RestoreClientSide {
  
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return $err if ($err);
+  
+  $dbh->{mysql_enable_utf8} = 0;                                              # identisch zu DbRep_mysql_DumpClientSide setzen !
  
  my @row_ary;
  my $sql         = "show variables like 'max_allowed_packet'";                # maximal mögliche Packetgröße ermitteln (in Bits) -> Umrechnen in max. Zeichen
@@ -9068,6 +8813,7 @@ sub DbRep_mysql_RestoreClientSide {
  my $rt  = tv_interval($st);                                  # SQL-Laufzeit ermitteln
  my $brt = tv_interval($bst);                                 # Background-Laufzeit ermitteln
  $rt     = $rt.",".$brt;
+ $err    = q{};
  
  Log3 ($name, 3, "DbRep $name - Restore of '$dbname' finished - inserted history: $nh, inserted curent: $nc, time used: ".sprintf("%.0f",$brt)." seconds.");
  
@@ -9116,116 +8862,108 @@ return;
 #      Übertragung Datensätze in weitere DB
 ####################################################################################################
 sub DbRep_syncStandby {
- my $string     = shift;
- my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts,$stbyname) = split("\\§", $string);
- my $hash       = $defs{$name};
- my $table      = "history";
- my $utf8       = $hash->{UTF8} // 0;
- my ($dbh,$dbhstby,$err,$sql,$irows,$irowdone);
+  my $paref                = shift;
+  my $hash                 = $paref->{hash};
+  my $name                 = $paref->{name};
+  my $stbyname             = $paref->{prop};
+  my $table                = $paref->{table};
+  my $device               = $paref->{device};
+  my $reading              = $paref->{reading};
+  my $runtime_string_first = $paref->{rsf};
+  my $runtime_string_next  = $paref->{rsn};
+  my $ts                   = $paref->{ts};
+  
+  my $utf8                 = $hash->{UTF8} // 0;
  
- # Quell-DB
- my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
- my $dbconn     = $dbloghash->{dbconn};
- my $dbuser     = $dbloghash->{dbuser};
- my $dblogname  = $dbloghash->{NAME};
- my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my ($dbhstby,$sql);
  
- # Standby-DB
- my $stbyhash   = $defs{$stbyname};
- my $stbyconn   = $stbyhash->{dbconn};
- my $stbyuser   = $stbyhash->{dbuser};
- my $stbypasswd = $attr{"sec$stbyname"}{secret};
- my $stbyutf8   = defined($stbyhash->{UTF8})?$stbyhash->{UTF8}:0;
+  # Standby-DB
+  my $stbyhash   = $defs{$stbyname};
+  my $stbyconn   = $stbyhash->{dbconn};
+  my $stbyuser   = $stbyhash->{dbuser};
+  my $stbypasswd = $attr{"sec$stbyname"}{secret};
+  my $stbyutf8   = defined($stbyhash->{UTF8}) ? $stbyhash->{UTF8} : 0;
  
- my $bst = [gettimeofday];                                                  # Background-Startzeit
+  my $bst = [gettimeofday];                                                  # Background-Startzeit
  
- # Verbindung zur Quell-DB
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err";
- }
+  # Verbindung zur Quell-DB
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
+  return $err if ($err);
  
- # Verbindung zur Standby-DB
- eval {$dbhstby = DBI->connect("dbi:$stbyconn", $stbyuser, $stbypasswd, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $stbyutf8 });};
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err";
- }
+  # Verbindung zur Standby-DB
+  eval {$dbhstby = DBI->connect("dbi:$stbyconn", $stbyuser, $stbypasswd, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $stbyutf8 });};
+  if ($@) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - $@");
+      return "$name|$err";
+  }
  
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
- Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                           # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
+  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
 
- my $st = [gettimeofday];                                                  # SQL-Startzeit
+  my $st = [gettimeofday];                                                           # SQL-Startzeit
  
- my ($sth,$old,$new);
- eval { $dbh->begin_work() if($dbh->{AutoCommit}); };                      # Transaktion wenn gewünscht und autocommit ein
- if ($@) {
-     Log3($name, 2, "DbRep $name -> Error start transaction - $@");
- }
+  my ($sth,$old,$new);
+  
+  $err = DbRep_beginDatabaseTransaction ($name, $dbhstby);
+  return $err if ($err);
      
- my @ts = split("\\|", $ts);                                               # Timestampstring to Array
- Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
+  my @ts = split("\\|", $ts);                                                        # Timestampstring to Array
+  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts");
      
- $irows      = 0;                                                            # DB-Abfrage zeilenweise für jeden Array-Eintrag
- $irowdone   = 0;
- my $selspec = "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT";
- my $addon   = '';
+  my $irows    = 0;                                                                  # DB-Abfrage zeilenweise für jeden Array-Eintrag
+  my $selspec  = "TIMESTAMP,DEVICE,TYPE,EVENT,READING,VALUE,UNIT";
+  my $addon    = '';
  
- for my $row (@ts) {
-     my @a                     = split("#", $row);
-     my $runtime_string        = $a[0];
-     my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];
+  for my $row (@ts) {
+      my @a                     = split("#", $row);
+      my $runtime_string        = $a[0];
+      my $runtime_string_first  = $a[1];
+      my $runtime_string_next   = $a[2];
          
-     if ($IsTimeSet || $IsAggrSet) {
-         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon); 
-     } 
-     else {
-         $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,$addon);
-     }
+      if ($IsTimeSet || $IsAggrSet) {
+          $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon); 
+      } 
+      else {
+          $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, undef, undef, $addon);
+      }
      
-     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+      
+      ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+      return $err if ($err);
          
-     eval{ $sth = $dbh->prepare($sql);
-           $sth->execute();
-         };          
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - $@");
-         $dbh->disconnect;
-         return "$name|''|''|$err";
-     }
-         
-     no warnings 'uninitialized'; 
+      no warnings 'uninitialized'; 
      
-     #                          DATE _ESC_ TIME      _ESC_  DEVICE   _ESC_  TYPE    _ESC_   EVENT    _ESC_  READING  _ESC_   VALUE   _ESC_   UNIT
-     my @row_array = map { ($_->[0] =~ s/ /_ESC_/r)."_ESC_".$_->[1]."_ESC_".$_->[2]."_ESC_".$_->[3]."_ESC_".$_->[4]."_ESC_".$_->[5]."_ESC_".$_->[6] } @{$sth->fetchall_arrayref()}; 
-     use warnings;
-         
-     (undef,$irowdone,$err) = DbRep_WriteToDB($name,$dbhstby,$stbyhash,"0",@row_array) if(@row_array);
-     if ($err) {
-         Log3 ($name, 2, "DbRep $name - $err");
-         $err = encode_base64($err,"");
-         $dbh->disconnect;
-         $dbhstby->disconnect();
-         return "$name|''|''|$err";
-     }
+      #                          DATE _ESC_ TIME      _ESC_  DEVICE   _ESC_  TYPE    _ESC_   EVENT    _ESC_  READING  _ESC_   VALUE   _ESC_   UNIT
+      my @row_array = map { ($_->[0] =~ s/ /_ESC_/r)."_ESC_".$_->[1]."_ESC_".$_->[2]."_ESC_".$_->[3]."_ESC_".$_->[4]."_ESC_".$_->[5]."_ESC_".$_->[6] } @{$sth->fetchall_arrayref()}; 
+      use warnings;
+      
+      my $irowdone = 0;
+      ($err, $irowdone) = DbRep_WriteToDB($name, $dbhstby, $stbyhash, 0, @row_array) if(@row_array);
+      if ($err) {
+          Log3 ($name, 2, "DbRep $name - $err");
+          $err = encode_base64($err,"");
+          $dbh->disconnect;
+          $dbhstby->disconnect();
+          return "$name|$err";
+      }
      
-     $irows += $irowdone;
- }
+      $irows += $irowdone;
+  }
+  
+  $err = DbRep_commitOnly ($name, $dbhstby);
+  return $err if ($err);
  
- $dbh->disconnect();
- $dbhstby->disconnect();
+  $dbh->disconnect();
+  $dbhstby->disconnect();
 
- my $rt  = tv_interval($st);                                       # SQL-Laufzeit ermitteln
- my $brt = tv_interval($bst);                                      # Background-Laufzeit ermitteln
- $rt     = $rt.",".$brt;
+  my $rt  = tv_interval($st);                                       # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                      # Background-Laufzeit ermitteln
+  $rt     = $rt.",".$brt;
+  $err    = 0;
  
-return "$name|$irows|$rt|0";
+return "$name|$err|$irows|$rt";
 }
 
 ####################################################################################################
@@ -9234,26 +8972,27 @@ return "$name|$irows|$rt|0";
 sub DbRep_syncStandbyDone {
   my $string     = shift;
   my @a          = split("\\|",$string);
-  my $hash       = $defs{$a[0]};
-  my $name       = $hash->{NAME};
-  my $irows      = $a[1];
-  my $bt         = $a[2];
-  my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[3]?decode_base64($a[3]):undef;
+  my $name       = $a[0];
+  my $err        = $a[1] ? decode_base64($a[1]) : '';
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});
+  my $irows      = $a[2];
+  my $bt         = $a[3];
+  
+  my $hash       = $defs{$name};
+  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   
   delete($hash->{HELPER}{RUNNING_PID});
   
   my ($erread, $state) = DbRep_afterproc ($hash, "syncStandby");                         # Befehl nach Procedure ausführen
-  
+    
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
       return;
   } 
-
-  no warnings 'uninitialized'; 
+  
+  my ($rt,$brt)  = split ",", $bt;
   
   readingsBeginUpdate         ($hash);
   ReadingsBulkUpdateValue     ($hash, "number_lines_inserted_Standby", $irows); 
@@ -9273,6 +9012,7 @@ sub DbRep_reduceLog {
     my $paref      = shift;    
     my $hash       = $paref->{hash};
     my $name       = $paref->{name};
+    my $table      = $paref->{table};
     my $d          = $paref->{device};
     my $r          = $paref->{reading};
     my $nts        = $paref->{rsf};
@@ -9338,7 +9078,7 @@ sub DbRep_reduceLog {
     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
     
     my $sql;
-    my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history where ";
+    my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
     
     my $valfilter = AttrVal($name, "valueFilter", undef);                               # Wertefilter
@@ -9354,7 +9094,7 @@ sub DbRep_reduceLog {
     };
     
     if($includes) {                                                                      # Option EX/INCLUDE wurde angegeben
-        $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
+        $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table WHERE "
                .($includes =~ /^(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
                ."TIMESTAMP <= '$ots'"
                .($nts ? " AND TIMESTAMP >= '$nts' " : " ")
@@ -9388,10 +9128,10 @@ sub DbRep_reduceLog {
         
     my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
     
-    eval { $sth_del  = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-           $sth_upd  = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-           $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-           $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    eval { $sth_del  = $dbh->prepare_cached("DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+           $sth_upd  = $dbh->prepare_cached("UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+           $sth_delD = $dbh->prepare_cached("DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+           $sth_updD = $dbh->prepare_cached("UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
            $sth_get  = $dbh->prepare($sql);
          };
     if ($@) {
@@ -9457,7 +9197,7 @@ sub DbRep_reduceLog {
                             for my $delRow (@dayRows) {
                                 if($day != 00 || $delRow->[0] !~ /$lastHour/) {
                                     
-                                    Log3 ($name, 5, "DbRep $name - DELETE FROM history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+                                    Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
                                     
                                     $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
                                     $i++;
@@ -9543,7 +9283,7 @@ sub DbRep_reduceLog {
                                         $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
                                         $sum     = 0;
                                         
-                                        Log3 ($name, 4, "DbRep $name - UPDATE history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                                        Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
                                         
                                         $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
                                         
@@ -9625,8 +9365,8 @@ sub DbRep_reduceLog {
                         $deletedCount += $c;
                         $updateCount  += keys(%averageHash);
                         
-                        my ($id,$iu) = 0;
-                        my ($kd,$ku) = 1;
+                        my ($id,$iu) = (0,0);
+                        my ($kd,$ku) = (1,1);
                         my $thd      = ($c <= 2000)  ? 100  : 
                                        ($c <= 30000) ? 1000 : 
                                        10000;
@@ -9641,7 +9381,7 @@ sub DbRep_reduceLog {
                             $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
                             
                             for (@{$averageHash{$reading}->{tedr}}) {
-                                Log3 ($name, 5, "DbRep $name - DELETE FROM history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
+                                Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
                                 
                                 $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
                                 
@@ -9654,7 +9394,7 @@ sub DbRep_reduceLog {
                                 }
                             }
                             
-                            Log3 ($name, 4, "DbRep $name - UPDATE history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+                            Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
                             
                             $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
                         
@@ -9862,7 +9602,7 @@ sub DbRep_ParseAborted {
   my $name   = $hash->{NAME};
   my $dbh    = $hash->{DBH}; 
   
-  Log3 ($name, 5, qq{DbRep $name - BlockingCall finished PID "$hash->{HELPER}{RUNNING_PID}{pid}"});  
+  Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});  
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -11217,14 +10957,17 @@ return ($txt);
 #                    Befehl vor Procedure ausführen
 ###################################################################################
 sub DbRep_beforeproc {
-  my ($hash, $txt) = @_;
-  my $name         = $hash->{NAME};
+  my $hash = shift;
+  my $txt  = shift // q{process};
   
-  # Befehl vor Procedure ausführen
-  my $ebd = AttrVal($name, "executeBeforeProc", undef);
+  my $name = $hash->{NAME};
+  
+  my $ebd = AttrVal($name, 'executeBeforeProc', '');
+  
   if($ebd) {
       Log3 ($name, 3, "DbRep $name - execute command before $txt: '$ebd' ");
-      my $err = AnalyzeCommandChain(undef, $ebd);     
+      my $err = AnalyzeCommandChain(undef, $ebd);
+      
       if ($err) {
           Log3 ($name, 2, "DbRep $name - command message before $txt: \"$err\" ");
           my $erread = "Warning - message from command before $txt appeared";
@@ -11241,13 +10984,15 @@ return;
 ###################################################################################
 sub DbRep_afterproc {
   my $hash  = shift;
-  my $cmd   = shift;
+  my $cmd   = shift // q{process};
   my $bfile = shift // q{};
   my $name  = $hash->{NAME};
   
   my $erread;
   
-  my $ead = AttrVal($name, "executeAfterProc", "");
+  $cmd = (split " ", $cmd)[0];
+  
+  my $ead = AttrVal($name, 'executeAfterProc', '');
   
   if($ead) {
       Log3 ($name, 4, "DbRep $name - execute command after $cmd: '$ead' ");
@@ -11256,7 +11001,7 @@ sub DbRep_afterproc {
       
       if ($err) {
           Log3 ($name, 2, qq{DbRep $name - command message after $cmd: "$err"});
-          ReadingsSingleUpdateValue ($hash, "after".$cmd."_message", $err, 1);
+          ReadingsSingleUpdateValue ($hash, "after_".$cmd."_message", $err, 1);
           $erread = qq{WARNING - $cmd finished, but message after command appeared};
       }
   }
@@ -11400,87 +11145,59 @@ return;
 #                          erstellen neues SQL-File für Dumproutine
 ####################################################################################################
 sub DbRep_NewDumpFilename {
-    my ($sql_text,$dump_path,$dbname,$time_stamp,$character_set) = @_;
-    my $part       = "";
-    my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
-    my $backupfile = $dbname."_".$time_stamp.$part.".sql";
+  my ($sql_text,$dump_path,$dbname,$time_stamp,$character_set) = @_;
+  my $part       = "";
+  my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
+  my $backupfile = $dbname."_".$time_stamp.$part.".sql";
     
-    $sql_text .= "/*!40101 SET NAMES '".$character_set."' */;\n";
-    $sql_text .= "SET FOREIGN_KEY_CHECKS=0;\n";
+  $sql_text .= "/*!40101 SET NAMES '".$character_set."' */;\n";
+  $sql_text .= "SET FOREIGN_KEY_CHECKS=0;\n";
     
-    my ($filesize,$err) = DbRep_WriteToDumpFile($sql_text, $sql_file, $character_set);
+  my ($err, $filesize) = DbRep_WriteToDumpFile($sql_text, $sql_file);
+  return $err if($err);
     
-    if($err) {
-        return (undef,undef,undef,undef,$err);
-    }
+  chmod(0777, $sql_file);
     
-    chmod(0777,$sql_file);
-    $sql_text        = "";
-    my $first_insert = 0;
+  $sql_text        = "";
+  my $first_insert = 0;
     
-return ($sql_text,$first_insert,$sql_file,$backupfile,undef);
+return ($err, $sql_text, $first_insert, $sql_file, $backupfile);
 }
 
 ####################################################################################################
 #                          Schreiben DB-Dumps in SQL-File
 ####################################################################################################
 sub DbRep_WriteToDumpFile {
-    my $inh           = shift;
-    my $sql_file      = shift;
-    my $character_set = shift // q{};
+  my $inh      = shift;
+  my $sql_file = shift;
     
-    my $filesize;
+  my $filesize;
     
-    my $err = 0;
+  my $err = '';
     
-    if(length($inh) > 0) {
-        my $fh;
-        unless (open $fh,">>$sql_file") {
-            $err = "Can't open file '$sql_file' for write access";
-            return (undef,$err);
-        }
+  if(length($inh) > 0) {
+      my $fh;
+      unless (open $fh,">>$sql_file") {
+          $err = "Can't open file '$sql_file' for write access";
+          return ($err);
+      }
 
-        if ($character_set =~ /utf8/i) {
-            binmode($fh, "encoding(UTF-8)");
-        }
-        else {
-            binmode($fh);
-        }
+      binmode($fh);
         
-        print $fh $inh;
-        close $fh;
+      print $fh $inh;
+      close $fh;
         
-        my $fref = stat($sql_file);    
+      my $fref = stat($sql_file);    
         
-        if ($fref =~ /ARRAY/) {
-            $filesize = (@{stat($sql_file)})[7];
-        } 
-        else {
-            $filesize = (stat($sql_file))[7];
-        }
-    }
-
-return ($filesize,undef);
-}
-
-####################################################################################################
-#             Filesize (Byte) umwandeln in KB bzw. MB
-####################################################################################################
-sub DbRep_byteOutput {
-    my $bytes = shift;
+      if ($fref =~ /ARRAY/) {
+          $filesize = (@{stat($sql_file)})[7];
+      } 
+      else {
+          $filesize = (stat($sql_file))[7];
+      }
+  }
     
-    return if(!defined($bytes));
-    return $bytes if(!looks_like_number($bytes));
-    
-    my $suffix = "Bytes";
-    
-    if ($bytes >= 1024) { $suffix = "KB"; $bytes = sprintf("%.2f",($bytes/1024));};
-    if ($bytes >= 1024) { $suffix = "MB"; $bytes = sprintf("%.2f",($bytes/1024));};
-    
-    my $ret = sprintf "%.2f",$bytes;
-    $ret   .=' '.$suffix;
-
-return $ret;
+return ($err, $filesize);
 }
 
 ######################################################################################
@@ -11890,29 +11607,43 @@ return @fd;
 }
 
 ####################################################################################################
-#                                  Dumpfile  komprimieren  
+#                                  Dumpfile  komprimieren
+#         Rückgabe        $GzipError: zip-Fehler
+#                         <Ergebnisfile> 
+#                         $fsBytes:   Filegröße in Bytes
 ####################################################################################################
 sub DbRep_dumpCompress {
-  my ($hash,$bfile) = @_; 
+  my $hash          = shift;
+  my $bfile         = shift; 
   my $name          = $hash->{NAME};
   my $dump_path_loc = AttrVal($name, "dumpDirLocal", $dbrep_dump_path_def);
   $dump_path_loc    =~ s/(\/$|\\$)//;
   my $input         = $dump_path_loc."/".$bfile;
   my $output        = $dump_path_loc."/".$bfile.".gzip";
+  
+  my $fsBytes = '';
 
   Log3($name, 3, "DbRep $name - compress file $input");
   
   my $stat = gzip $input => $output ,BinModeIn => 1;
   if($GzipError) {
       Log3($name, 2, "DbRep $name - gzip of $input failed: $GzipError");
-      return ($GzipError,$input);
+      $fsBytes = _DbRep_fsizeInBytes ($input);
+      return ($GzipError, $input, $fsBytes);
   }
   
   Log3($name, 3, "DbRep $name - file compressed to output file: $output");
+  
+  $fsBytes  = _DbRep_fsizeInBytes ($output);
+  my $fsize = _DbRep_byteOutput   ($fsBytes);
+  
+  Log3 ($name, 3, "DbRep $name - Size of compressed file: ".$fsize);
+  
   unlink("$input");
+  
   Log3($name, 3, "DbRep $name - input file deleted: $input");
 
-return (undef,$bfile.".gzip");
+return ('', $bfile.".gzip", $fsBytes);
 }
 
 ####################################################################################################
@@ -11938,15 +11669,64 @@ sub DbRep_dumpUnCompress {
   
   Log3($name, 3, "DbRep $name - file uncompressed to output file: $output");
   
-  # Größe dekomprimiertes File ermitteln
-  my @a;
-  @a = split(' ',qx(du $output)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
- 
-  my $filesize = ($a[0])?($a[0]*1024):undef;
-  my $fsize    = DbRep_byteOutput($filesize);
+  my $fsBytes = _DbRep_fsizeInBytes ($output);
+  my $fsize   = _DbRep_byteOutput   ($fsBytes);
+  
   Log3 ($name, 3, "DbRep $name - Size of uncompressed file: ".$fsize);
 
 return (undef,$outfile);
+}
+
+####################################################################################################
+#                      Größe File in Bytes ermitteln
+####################################################################################################
+sub _DbRep_fsizeInBytes {
+  my $file = shift // return;
+  
+  my $fs;
+  my $fref = stat($file); 
+
+  return '' if(!$fref);  
+     
+  if ($fref =~ /ARRAY/) {
+      $fs = (@{stat($file)})[7];
+  } 
+  else {
+      $fs = (stat($file))[7];
+  }
+  
+  $fs //= '';
+
+return ($fs);
+}
+
+####################################################################################################
+#             Filesize (Byte) umwandeln in KB bzw. MB
+####################################################################################################
+sub _DbRep_byteOutput {
+  my $bytes = shift;
+    
+  return ''     if(!defined($bytes));
+  return $bytes if(!looks_like_number($bytes));
+    
+  my $suffix = q{};
+  
+  if ($bytes >= 1048576) { 
+      $suffix = "MB"; 
+      $bytes  = $bytes/1048576;
+  }    
+  elsif ($bytes >= 1024) { 
+      $suffix = "KB"; 
+      $bytes  = $bytes/1024;
+  }
+  else {
+      $suffix = "Bytes";
+  }
+    
+  my $ret = sprintf "%.2f", $bytes;
+  $ret   .=' '.$suffix;
+
+return $ret;
 }
 
 ####################################################################################################
@@ -12482,144 +12262,161 @@ sub DbRep_WriteToDB {
   my ($name,$dbh,$dbloghash,$histupd,@row_array) = @_;
   my $hash      = $defs{$name};
   my $dblogname = $dbloghash->{NAME};
-  my $DbLogType = AttrVal($dblogname, "DbLogType", "History");
-  my $supk      = AttrVal($dblogname, "noSupportPK", 0);
+  my $DbLogType = AttrVal($dblogname, "DbLogType",  "History");
+  my $supk      = AttrVal($dblogname, "noSupportPK",        0);
   my $wrt       = 0;
   my $irowdone  = 0;
-  my $totrows   = 0;
-  my ($sth_ih,$sth_uh,$sth_ic,$sth_uc,$err);
+  
+  my ($sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$sql);
          
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc);
   if (!$supk) {
       ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
-  } else {
+  } 
+  else {
       Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog \"$dblogname\"";
   }
       
-  if (lc($DbLogType) =~ m(history)) {
-      # insert history mit/ohne primary key
-      eval {
-          if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
-              $sth_ih = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-          } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
-              $sth_ih = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-          } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-              $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING");
-          } else {
-              $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-          }
-      };
-      if ($@) {
-          $err = $@;
-          Log3 ($name, 2, "DbRep $name - $@");
-          return ($wrt,$irowdone,$err);
+  if ($DbLogType =~ /history/xi) {                                               # insert history mit/ohne primary key
+      if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
+          $sql = "INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      } 
+      elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
+          $sql = "INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      } 
+      elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+          $sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
+      } 
+      else {
+          $sql = "INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
       }
+      
+      Log3 ($name, 4, "DbRep $name - prepare insert history SQL: \n$sql"); 
+      
+      eval { 
+          $sth_ih = $dbh->prepare_cached($sql);
+      } 
+      or do { $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              return ($err,$irowdone,$wrt);
+            };
+      
       # update history mit/ohne primary key
       if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
-          $sth_uh = $dbh->prepare("REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"); 
-      } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {  
-          $sth_uh = $dbh->prepare("INSERT OR REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
-      } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-          $sth_uh = $dbh->prepare("INSERT INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
-                                   DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
-                                   VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-      } else {
-          $sth_uh = $dbh->prepare("UPDATE history SET TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (TIMESTAMP=?) AND (DEVICE=?) AND (READING=?)");
+          $sql = "REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"; 
+      } 
+      elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {  
+          $sql = "INSERT OR REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)";
+      } 
+      elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+          $sql = "INSERT INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
+                  DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
+                  VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT";
+      } 
+      else {
+          $sql = "UPDATE history SET TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (TIMESTAMP=?) AND (DEVICE=?) AND (READING=?)";
       }
+      
+      Log3 ($name, 4, "DbRep $name - prepare update history SQL: \n$sql"); 
+      $sth_uh = $dbh->prepare($sql);
   }
       
-  if (lc($DbLogType) =~ m(current) ) {
-      # insert current mit/ohne primary key
+  if ($DbLogType =~ /current/xi ) {                                     # insert current mit/ohne primary key
       if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
-          eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };      
-      } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
-          eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-      } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-          eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-      } else {
-          # old behavior
-          eval { $sth_ic = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
+          $sql = "INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";      
+      } 
+      elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
+          $sql = "INSERT OR IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      } 
+      elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+          $sql = "INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
+      } 
+      else {                                                                                 # old behavior
+          $sql = "INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
       }
-      if ($@) {
-          $err = $@;
-          Log3 ($name, 2, "DbRep $name - $@");
-          return ($wrt,$irowdone,$err);
-      }
+      
+      Log3 ($name, 4, "DbRep $name - prepare insert current SQL: \n$sql"); 
+      
+      eval { 
+          $sth_ic = $dbh->prepare_cached($sql);
+      }      
+      or do { $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              return ($err,$irowdone,$wrt);
+            };
+      
       # update current mit/ohne primary key
       if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
-          $sth_uc = $dbh->prepare("REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); 
-      } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {  
-          $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-      } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-          $sth_uc = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
-                                   DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
-                                   VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-      } else {
-          $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
+          $sql = "REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"; 
+      } 
+      elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {  
+          $sql = "INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)";
+      } 
+      elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+          $sql = "INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
+                  DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
+                  VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT";
+      } 
+      else {
+          $sql = "UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)";
       }
-  }
       
-  eval { $dbh->begin_work() if($dbh->{AutoCommit}); };
-  if ($@) {
-      Log3($name, 2, "DbRep $name -> Error start transaction for history - $@");
+      Log3 ($name, 4, "DbRep $name - prepare update current SQL: \n$sql"); 
+      $sth_uc = $dbh->prepare($sql);
   }
       
   Log3 $hash->{NAME}, 5, "DbRep $name - data prepared to db write:"; 
       
-  # SQL-Startzeit
-  my $wst = [gettimeofday]; 
+  my $wst = [gettimeofday];                                                                                      # SQL-Startzeit
       
   my ($ihs,$uhs) = (0,0);
-  foreach my $row (@row_array) {
+  
+  for my $row (@row_array) {
       my ($date,$time,$device,$type,$event,$reading,$value,$unit) = ($row =~ /^(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)$/);
       Log3 $hash->{NAME}, 5, "DbRep $name - $row";     
       my $timestamp = $date." ".$time;
           
-      eval {
-          # update oder insert history
-          if (lc($DbLogType) =~ m(history) ) {
+      eval {                                                                                                     # update oder insert history
+          if ($DbLogType =~ /history/xi ) {
               my $rv_uh = 0;
               if($histupd) {
                   $rv_uh = $sth_uh->execute($type,$event,$value,$unit,$timestamp,$device,$reading); 
               }
+              
               if ($rv_uh == 0) {
-                  $ihs      += $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);          # V8.30.7
+                  $ihs += $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);               # V8.30.7
                   # $ihs++;                                                                                      # V8.30.7
-              } else {
-                  $uhs      += $rv_uh;                                                                           # V8.30.7
+              } 
+              else {
+                  $uhs += $rv_uh;                                                                                # V8.30.7
               }
           }
+          
           # update oder insert current
-          if (lc($DbLogType) =~ m(current) ) {
+          if ($DbLogType =~ /current/xi ) {
               my $rv_uc = $sth_uc->execute($timestamp,$type,$event,$value,$unit,$device,$reading);
+              
               if ($rv_uc == 0) {
                   $sth_ic->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
               }
           }
-      };
- 
-      if ($@) {
-          $err = $@;
-          Log3 ($name, 2, "DbRep $name - $@");
-          $dbh->rollback;
-          return ($wrt,0,$err);
-      } else {
-          $totrows++;                                                                                            # V8.30.7
+          1;
       }
-  }    
-      
-  eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      or do { $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              $dbh->rollback;
+              return ($err,$irowdone,$wrt);
+            };
+  }
   
-  Log3 ($name, 3, "DbRep $name - total lines transfered to standby database: $totrows");                         # V8.30.7
-  Log3 ($name, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs") if($uhs); 
+  Log3 ($name, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs")    if($uhs); 
   Log3 ($name, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs") if($ihs);
-  $irowdone = $ihs + $uhs; 
-      
-  # SQL-Laufzeit ermitteln
-  $wrt = tv_interval($wst);
   
-return ($wrt,$irowdone,$err);
+  $irowdone = $ihs + $uhs;
+  $wrt      = tv_interval($wst);                                                                                 # SQL-Laufzeit ermitteln
+  
+return ($err,$irowdone,$wrt);
 }
 
 ################################################################
@@ -12659,6 +12456,8 @@ sub DbRep_checkValidTimeSequence {
   my $runtime_string_next  = shift;
   
   my $valid = 1;
+  
+  return $valid if(!$runtime_string_first || !$runtime_string_next);
   
   my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
   my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
@@ -12790,12 +12589,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 25492 2022-01-17 22:28:33Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 25939 2022-04-09 19:03:34Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 25492 2022-01-17 22:28:33Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 25939 2022-04-09 19:03:34Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -14119,27 +13918,27 @@ return;
                                </li> <br>
      
     <a name="insert"></a>     
-    <li><b> insert </b>       -  data are inserted into table "history" manually. Input values for Date, Time and Value are 
-                                 mandatory. The database fields for Type and Event will be filled in with "manual" automatically. 
-                                 The values of <a href="#device">device</a>, <a href="#reading">reading</a> use the 
-                                 attribute settings .  <br><br>
-                                 
-                                 <ul>
-                                 <b>input format: </b>   Date,Time,Value,[Unit]    <br>
-                                 # Unit is optional, attributes <a href="#device">device</a>, <a href="#reading">reading</a> must be set ! <br>
-                                 # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br>
-                                 <br>
-                                 </ul>
-                                 
-                                 <b>example:</b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>
-                                 # Spaces are NOT allowed in fieldvalues ! <br>
-                                 <br>
+    <li><b> insert &lt;Date&gt;,&lt;Time&gt;,&lt;Value&gt;,[&lt;Unit&gt;],[&lt;Device&gt;],[&lt;Reading&gt;] </b>     
+                                 -  Manual insertion of a data record into the table "history". Input values for date, time and value are obligatory. 
+                                 The values for the DB fields TYPE and EVENT are filled with "manual". <br>
+                                 If <b>Device</b>, <b>Reading</b> are not set, these values are taken from the corresponding
+                                 attributes <a href="#device">device</a>, <a href="#reading">reading</a>.  
+                                 <br><br>
                                  
                                  <b>Note: </b><br>
-                                 Please consider to insert AT LEAST two datasets into the intended time / aggregatiom period (day, week, month, etc.) because of
-                                 it's needed by function diffValue. Otherwise no difference can be calculated and diffValue will be print out "0" for the respective period !
+                                 Unused fields within the insert command must be enclosed within the string in "," 
+                                 within the string.
                                  <br>
                                  <br>
+                                 
+                                 <ul>
+                                 <b>Examples: </b> <br>
+                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW                         <br>
+                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space                 <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,SMA_Wechselrichter,etotal  <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,,etotal                    <br>
+                                 </ul>
+                                 <br>  
                      
                                  The relevant attributes to control this function are: <br><br>
                                  
@@ -16418,29 +16217,29 @@ return;
                                  gekennzeichnet:<br><br>
                                  <ul>
                                  <b>2017-11-25_00-00-05__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_00-02-26__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_00-04-33__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_01-06-10__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_00-02-26__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_00-04-33__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_01-06-10__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_01-08-21__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_01-08-59__eg.az.fridge_Pwr__power 60.32 </b>     <br>
                                  <b>2017-11-25_01-11-21__eg.az.fridge_Pwr__power 56.26 </b>     <br>
                                  <b>2017-11-25_01-27-54__eg.az.fridge_Pwr__power 6.19  </b>     <br>
                                  <b>2017-11-25_01-28-51__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_01-31-00__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_01-33-59__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_01-31-00__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_01-33-59__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_02-39-29__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_02-41-18__eg.az.fridge_Pwr__power 105.28</b>     <br>
                                  <b>2017-11-25_02-41-26__eg.az.fridge_Pwr__power 61.52 </b>     <br>
                                  <b>2017-11-25_03-00-06__eg.az.fridge_Pwr__power 47.46 </b>     <br>
                                  <b>2017-11-25_03-00-33__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_03-02-07__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_23-37-42__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_03-02-07__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_23-37-42__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_23-40-10__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_23-42-24__eg.az.fridge_Pwr__power 1     </b>     <br>
-                                 2017-11-25_23-42-24__eg.az.fridge_Pwr__power 1             <br>
+                                 2017-11-25_23-42-24__eg.az.fridge_Pwr__power 1                 <br>
                                  <b>2017-11-25_23-45-27__eg.az.fridge_Pwr__power 1     </b>     <br>
                                  <b>2017-11-25_23-47-07__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_23-55-27__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_23-55-27__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_23-48-15__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_23-50-21__eg.az.fridge_Pwr__power 59.1  </b>     <br>
                                  <b>2017-11-25_23-55-14__eg.az.fridge_Pwr__power 52.31 </b>     <br>
@@ -16923,26 +16722,26 @@ return;
                                    
                                </li> <br>                                
     <a name="insert"></a>   
-    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
-                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für 
-                                 <a href="#device">Device</a>, <a href="#reading">Reading</a> aus den gesetzten Attributen 
-                                 genommen.  <br><br>
-                                 
-                                 <ul>
-                                 <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
-                                 # Unit ist optional, Attribute <a href="#device">device</a>, <a href="#reading">reading</a> müssen gesetzt sein  <br>
-                                 # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
-                                 
-                                 <b>Beispiel: </b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>
-                                 # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
-                                 <br>
-                                 </ul>
+    <li><b> insert &lt;Datum&gt;,&lt;Zeit&gt;,&lt;Value&gt;,[&lt;Unit&gt;],[&lt;Device&gt;],[&lt;Reading&gt;] </b>       
+                                 -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
+                                 Die Werte für die DB-Felder TYPE bzw. EVENT werden mit "manual" gefüllt. <br>
+                                 Werden <b>Device</b>, <b>Reading</b> nicht gesetzt, werden diese Werte aus den entsprechenden
+                                 Attributen <a href="#device">device</a> bzw. <a href="#reading">reading</a> genommen.  
+                                 <br><br>
                                  
                                  <b>Hinweis: </b><br>
-                                 Bei der Eingabe ist darauf zu achten dass im beabsichtigten Aggregationszeitraum (Tag, Woche, Monat, etc.) MINDESTENS zwei 
-                                 Datensätze für die Funktion diffValue zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue 
-                                 gibt in diesem Fall "0" in der betroffenen Periode aus !
+                                 Nicht belegte Felder innerhalb des insert Kommandos müssen innerhalb des Strings in "," 
+                                 eingeschlossen werden.
                                  <br>
+                                 <br>
+                                 
+                                 <ul>
+                                 <b>Beispiel: </b> <br>
+                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW                         <br>
+                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space                 <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,SMA_Wechselrichter,etotal  <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,,etotal                    <br>
+                                 </ul>
                                  <br>
                                  
                                  Die für diese Funktion relevanten Attribute sind: <br><br>
