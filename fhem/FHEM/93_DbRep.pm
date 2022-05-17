@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
+  "8.48.4"  => "16.05.2022  fix perl warning of set ... insert, Forum: topic,53584.msg1221588.html#msg1221588 ",
   "8.48.3"  => "09.04.2022  minor code fix in DbRep_reduceLog ",
   "8.48.2"  => "22.02.2022  more code refacturing ",
   "8.48.1"  => "31.01.2022  minor fixes e.g. in file size determination, dump routines ",
@@ -927,21 +929,11 @@ sub DbRep_Set {
       if (!$prop) {
           return qq{Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. "Unit" is optional. Spaces are not allowed !};      
       }
-
-      my $i_device  = AttrVal($hash->{NAME}, "device",  "");
-      my $i_reading = AttrVal($hash->{NAME}, "reading", "");
-
-      if (!$i_device || !$i_reading) {
-          return qq{One or both of attributes "device", "reading" are not set. It's mandatory to set both to complete dataset for manual insert !};
-      }
       
-      # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
-      if($i_device =~ m/%/ || $i_reading =~ m/%/ ) {
-          return qq{One or both of attributes "device", "reading" containing SQL wildcard "%". Wildcards are not allowed in manual function insert !} 
-      }
-      
-      my ($i_date, $i_time, $i_value, $i_unit) = split ",", $prop;
-      $i_unit //= "";
+      my ($i_date, $i_time, $i_value, $i_unit, $i_device, $i_reading) = split ",", $prop;
+      $i_unit    //= "";
+      $i_device  //= AttrVal($name, "device",  "");                                            # Device aus Attr lesen wenn nicht im insert angegeben
+      $i_reading //= AttrVal($name, "reading", "");                                            # Reading aus Attr lesen wenn nicht im insert angegeben
 
       if (!$i_date || !$i_time || !defined $i_value) {
           return qq{At least data for "Date", "Time" and "Value" is needed to insert. "Unit" is optional. Inputformat is "YYYY-MM-DD,HH:MM:SS,<Value>,<Unit>"};
@@ -949,6 +941,15 @@ sub DbRep_Set {
 
       if ($i_date !~ /^(\d{4})-(\d{2})-(\d{2})$/x || $i_time !~ /^(\d{2}):(\d{2}):(\d{2})$/x) {
           return "Input for date is not valid. Use format YYYY-MM-DD,HH:MM:SS";
+      }
+
+      if (!$i_device || !$i_reading) {
+          return qq{One or both of "device", "reading" are not set. It's mandatory to set both in the insert command or with the device / reading attributes};
+      }
+      
+      # Attribute device & reading dürfen kein SQL-Wildcard % enthalten
+      if($i_device =~ m/%/ || $i_reading =~ m/%/ ) {
+          return qq{One or both of "device", "reading" containing SQL wildcard "%". Wildcards are not allowed in manual function insert !} 
       }
       
       my $i_timestamp = $i_date." ".$i_time;
@@ -962,13 +963,6 @@ sub DbRep_Set {
       }
       
       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      
-      if ($dbmodel ne 'SQLITE') {                                                                               # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog) beschneiden wenn nicht SQLite
-          $i_device  = substr($i_device,  0, $hash->{HELPER}{DBREPCOL}{DEVICE});
-          $i_reading = substr($i_reading, 0, $hash->{HELPER}{DBREPCOL}{READING});
-          $i_value   = substr($i_value,   0, $hash->{HELPER}{DBREPCOL}{VALUE});
-          $i_unit    = substr($i_unit,    0, $hash->{HELPER}{DBREPCOL}{UNIT});
-      }
       
       DbRep_Main ($hash, $opt, "$i_timestamp,$i_device,$i_reading,$i_value,$i_unit");  
   } 
@@ -4933,21 +4927,29 @@ sub DbRep_insert {
   
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  
-  my $bst = [gettimeofday];                                               # Background-Startzeit
+  my $bst = [gettimeofday];                                                        # Background-Startzeit
  
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return $err if ($err);
  
-  # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
+  # check ob PK verwendet wird, @usepkx ? Anzahl der Felder im PK : 0 wenn kein PK, 
+  # $pkx ? Namen der Felder : none wenn kein PK 
   my ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
   
   my ($i_timestamp,$i_device,$i_reading,$i_value,$i_unit) = split ",", $prop;
   my $i_type                                              = "manual";
   my $i_event                                             = "manual";
+  
+  if ($dbmodel ne 'SQLITE') {                                                      # V8.48.4 - Daten auf maximale Länge (entsprechend der Feldlänge in DbLog) beschneiden wenn nicht SQLite
+      $i_device  = substr($i_device,  0, $hash->{HELPER}{DBREPCOL}{DEVICE});
+      $i_reading = substr($i_reading, 0, $hash->{HELPER}{DBREPCOL}{READING});
+      $i_value   = substr($i_value,   0, $hash->{HELPER}{DBREPCOL}{VALUE});
+      $i_unit    = substr($i_unit,    0, $hash->{HELPER}{DBREPCOL}{UNIT});
+  }
  
   Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
  
-  my $st = [gettimeofday];                                               # SQL-Startzeit
+  my $st = [gettimeofday];                                                         # SQL-Startzeit
 
   my ($sth,$sql,$irow);
   
@@ -13916,25 +13918,27 @@ return;
                                </li> <br>
      
     <a name="insert"></a>     
-    <li><b> insert &lt;Datum,Zeit,Value,[Unit]&gt; </b>      
-                                 -  Manual insertion of a record into the "history" table. Mandatory are input values for Date, Time and Value. 
-                                 The values for the DB fields TYPE and EVENT are filled with "manual", and the values for 
-                                 DEVICE, READING are taken from the set attributes 
-                                 <a href="#device">device</a> bzw. <a href="#reading">reading</a>.
+    <li><b> insert &lt;Date&gt;,&lt;Time&gt;,&lt;Value&gt;,[&lt;Unit&gt;],[&lt;Device&gt;],[&lt;Reading&gt;] </b>     
+                                 -  Manual insertion of a data record into the table "history". Input values for date, time and value are obligatory. 
+                                 The values for the DB fields TYPE and EVENT are filled with "manual". <br>
+                                 If <b>Device</b>, <b>Reading</b> are not set, these values are taken from the corresponding
+                                 attributes <a href="#device">device</a>, <a href="#reading">reading</a>.  
                                  <br><br>
                                  
-                                 <ul>
-                                 <b>Example: </b> <br>
-                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW          <br>
-                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space  <br>
-                                 </ul>
+                                 <b>Note: </b><br>
+                                 Unused fields within the insert command must be enclosed within the string in "," 
+                                 within the string.
+                                 <br>
                                  <br>
                                  
-                                 <b>Note: </b><br>
-                                 Please consider to insert AT LEAST two datasets into the intended time / aggregatiom period (day, week, month, etc.) because of
-                                 it's needed by function diffValue. Otherwise no difference can be calculated and diffValue will be print out "0" for the respective period !
-                                 <br>
-                                 <br>
+                                 <ul>
+                                 <b>Examples: </b> <br>
+                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW                         <br>
+                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space                 <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,SMA_Wechselrichter,etotal  <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,,etotal                    <br>
+                                 </ul>
+                                 <br>  
                      
                                  The relevant attributes to control this function are: <br><br>
                                  
@@ -16213,29 +16217,29 @@ return;
                                  gekennzeichnet:<br><br>
                                  <ul>
                                  <b>2017-11-25_00-00-05__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_00-02-26__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_00-04-33__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_01-06-10__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_00-02-26__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_00-04-33__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_01-06-10__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_01-08-21__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_01-08-59__eg.az.fridge_Pwr__power 60.32 </b>     <br>
                                  <b>2017-11-25_01-11-21__eg.az.fridge_Pwr__power 56.26 </b>     <br>
                                  <b>2017-11-25_01-27-54__eg.az.fridge_Pwr__power 6.19  </b>     <br>
                                  <b>2017-11-25_01-28-51__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_01-31-00__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_01-33-59__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_01-31-00__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_01-33-59__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_02-39-29__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_02-41-18__eg.az.fridge_Pwr__power 105.28</b>     <br>
                                  <b>2017-11-25_02-41-26__eg.az.fridge_Pwr__power 61.52 </b>     <br>
                                  <b>2017-11-25_03-00-06__eg.az.fridge_Pwr__power 47.46 </b>     <br>
                                  <b>2017-11-25_03-00-33__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_03-02-07__eg.az.fridge_Pwr__power 0             <br>
-                                 2017-11-25_23-37-42__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_03-02-07__eg.az.fridge_Pwr__power 0                 <br>
+                                 2017-11-25_23-37-42__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_23-40-10__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_23-42-24__eg.az.fridge_Pwr__power 1     </b>     <br>
-                                 2017-11-25_23-42-24__eg.az.fridge_Pwr__power 1             <br>
+                                 2017-11-25_23-42-24__eg.az.fridge_Pwr__power 1                 <br>
                                  <b>2017-11-25_23-45-27__eg.az.fridge_Pwr__power 1     </b>     <br>
                                  <b>2017-11-25_23-47-07__eg.az.fridge_Pwr__power 0     </b>     <br>
-                                 2017-11-25_23-55-27__eg.az.fridge_Pwr__power 0             <br>
+                                 2017-11-25_23-55-27__eg.az.fridge_Pwr__power 0                 <br>
                                  <b>2017-11-25_23-48-15__eg.az.fridge_Pwr__power 0     </b>     <br>
                                  <b>2017-11-25_23-50-21__eg.az.fridge_Pwr__power 59.1  </b>     <br>
                                  <b>2017-11-25_23-55-14__eg.az.fridge_Pwr__power 52.31 </b>     <br>
@@ -16718,25 +16722,26 @@ return;
                                    
                                </li> <br>                                
     <a name="insert"></a>   
-    <li><b> insert &lt;Datum,Zeit,Value,[Unit]&gt; </b>       
+    <li><b> insert &lt;Datum&gt;,&lt;Zeit&gt;,&lt;Value&gt;,[&lt;Unit&gt;],[&lt;Device&gt;],[&lt;Reading&gt;] </b>       
                                  -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
-                                 Die Werte für die DB-Felder TYPE bzw. EVENT werden mit "manual" gefüllt, sowie die Werte für 
-                                 DEVICE, READING aus den gesetzten Attributen <a href="#device">device</a> bzw. <a href="#reading">reading</a>
-                                 genommen.  
+                                 Die Werte für die DB-Felder TYPE bzw. EVENT werden mit "manual" gefüllt. <br>
+                                 Werden <b>Device</b>, <b>Reading</b> nicht gesetzt, werden diese Werte aus den entsprechenden
+                                 Attributen <a href="#device">device</a> bzw. <a href="#reading">reading</a> genommen.  
                                  <br><br>
+                                 
+                                 <b>Hinweis: </b><br>
+                                 Nicht belegte Felder innerhalb des insert Kommandos müssen innerhalb des Strings in "," 
+                                 eingeschlossen werden.
+                                 <br>
+                                 <br>
                                  
                                  <ul>
                                  <b>Beispiel: </b> <br>
-                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW          <br>
-                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space  <br>
+                                 set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW                         <br>
+                                 set &lt;name&gt; insert 2021-02-02,10:50:00,value with space                 <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,SMA_Wechselrichter,etotal  <br>
+                                 set &lt;name&gt; insert 2022-05-16,10:55:00,1800,,,etotal                    <br>
                                  </ul>
-                                 <br>
-                                 
-                                 <b>Hinweis: </b><br>
-                                 Bei der Eingabe ist darauf zu achten dass im beabsichtigten Aggregationszeitraum (Tag, Woche, Monat, etc.) MINDESTENS zwei 
-                                 Datensätze für die Funktion diffValue zur Verfügung stehen. Ansonsten kann keine Differenz berechnet werden und diffValue 
-                                 gibt in diesem Fall "0" in der betroffenen Periode aus !
-                                 <br>
                                  <br>
                                  
                                  Die für diese Funktion relevanten Attribute sind: <br><br>
