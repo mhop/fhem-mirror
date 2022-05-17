@@ -7255,7 +7255,7 @@ sub isAddSwitchOffCond {
   my $swoffcondregex = ConsumerVal ($hash, $c, "swoffcondregex", "");             # Regex einer vorrangigen Ausschaltbedingung
   my $condstate      = ReadingsVal ($dswoffcond, $rswoffcond,    "");
   
-  if ($condstate =~ m/^$swoffcondregex$/x) {                                                     
+  if ($condstate && $condstate =~ m/^$swoffcondregex$/x) {                                                     
       return (1, $info, $err);
   }
   
