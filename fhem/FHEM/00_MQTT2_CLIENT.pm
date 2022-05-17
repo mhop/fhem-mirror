@@ -746,8 +746,7 @@ MQTT2_CLIENT_feedTheList($$$)
         delete($fl->{$fwid});
         next;
       }
-      FW_AsyncOutput($cl, "", 
-                  defined($cid) ? "RCVD: $tp $val<br>" : "SENT: $tp $val<br>");
+      FW_AsyncOutput($cl, "", toJSON([defined($cid)?"RCVD":"SENT", $tp,$val]));
     }
     delete($server->{".feedList"}) if(!keys %{$fl});
   }
