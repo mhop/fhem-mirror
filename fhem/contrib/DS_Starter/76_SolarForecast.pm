@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.63.0 "=> "18.05.2022  new attr flowGraphicConsumerDistance ",
   "0.62.0 "=> "16.05.2022  new key 'swoffcond' in consumer attributes ",
   "0.61.0 "=> "15.05.2022  limit PV forecast to inverter capacity ",
   "0.60.1 "=> "15.05.2022  consumerHash -> new key avgruntime, don't modify mintime by avgruntime by default anymore ".
@@ -614,6 +615,7 @@ sub Initialize {
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
+                                "flowGraphicConsumerDistance:slider,80,10,500 ".
                                 "flowGraphicShowConsumer:1,0 ".
                                 "flowGraphicShowConsumerDummy:1,0 ".      
                                 "flowGraphicShowConsumerPower:0,1 ". 
@@ -4362,6 +4364,7 @@ sub entryGraphic {
       flowgconX      => AttrVal ($name,    'flowGraphicShowConsumerDummy',      1),            # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
       flowgconsPower => AttrVal ($name,    'flowGraphicShowConsumerPower'     , 1),            # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => AttrVal ($name,    'flowGraphicShowConsumerRemainTime', 1),            # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen                                                                                                                                                         
+      flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance',      80),            # Abstand Verbrauchericons zueinander
       css            => AttrVal ($name,    'Css',                         $cssdef),            # Css Styles
   };
   
@@ -5546,16 +5549,17 @@ sub _flowGraphic {
   my $flowgcons     = $paref->{flowgcons};
   my $flowgconX     = $paref->{flowgconX};
   my $flowgconPower = $paref->{flowgconsPower};
-  my $flowgconTime  = $paref->{flowgconsTime};                                          
+  my $flowgconTime  = $paref->{flowgconsTime};
+  my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
   
   my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
-  my $cpv        = ReadingsNum($name, 'Current_PV', 0);
+  my $cpv        = ReadingsNum($name, 'Current_PV',              0);
   my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
-  my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn', 0);
+  my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn',      0);
   my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
-  my $cc         = ReadingsNum($name, 'Current_Consumption', 0);
+  my $cc         = ReadingsNum($name, 'Current_Consumption',     0);
   my $cc_dummy   = $cc;
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
@@ -5660,12 +5664,11 @@ END0
 
   ## get consumer list and display it in Graphics
   ################################################
-  my $pos_left          = 0;
-  my $consumercount     = 0;
-  my $consumer_start    = 0;
-  my $consumer_distance = 80;
+  my $pos_left       = 0;
+  my $consumercount  = 0;
+  my $consumer_start = 0;
+  my $currentPower   = 0;
   my @consumers;
-  my $currentPower      = 0;
   
   if ($flowgcons) {
       my $type       = $hash->{TYPE};
@@ -5673,10 +5676,10 @@ END0
       $consumercount = scalar @consumers; 
 
       if ($consumercount % 2) {
-          $consumer_start = 350 - ($consumer_distance  * (($consumercount -1) / 2)); 
+          $consumer_start = 350 - ($consDist  * (($consumercount -1) / 2)); 
       } 
       else {
-          $consumer_start = 350 - ((($consumer_distance ) / 2) * ($consumercount-1));
+          $consumer_start = 350 - ((($consDist ) / 2) * ($consumercount-1));
       }
       
       $consumer_start = 0 if $consumer_start < 0;
@@ -5692,7 +5695,7 @@ END0
           $ret .= "<title>$calias</title>".FW_makeImage($cicon, '');
           $ret .= '</g> ';
         
-          $pos_left += $consumer_distance;
+          $pos_left += $consDist;
       }
   }
 
@@ -5734,10 +5737,13 @@ END3
       my $consumer_style = 'flowg inactive_out';
       $consumer_style    = 'flowg active_out' if($cc_dummy > 1);
           
-      my $consumer_color = "";
-      $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($cc_dummy > 0.5);
+      my $chain_color = "";                                                                       # Farbe der Laufkette Donsumer-Dummy
+      if($cc_dummy > 0.5) {
+          $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+          #$chain_color  = 'style="stroke: #DF0101;"';
+      }
       
-      $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $consumer_color d="M780,620 L930,620" />};  
+      $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $chain_color d="M780,620 L930,620" />};  
    }
   
   ## get consumer list and display it in Graphics
@@ -5756,11 +5762,10 @@ END3
       
       for my $c1 (@consumers) {     
           my $power          = ConsumerVal ($hash, $c1, "power",   0);
-          my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                             # Reading für akt. Verbrauch angegeben ?
-          #my $swstate        = ConsumerVal ($hash, $c1, "state", "undef");                         # Schaltzustand des Consumerdevices
+          my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                              # Reading für akt. Verbrauch angegeben ?
           $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
           
-          if (!$rpcurr && isConsumerOn($hash, $c1)) {                                                      # Workaround wenn Verbraucher ohne Leistungsmessung
+          if (!$rpcurr && isConsumerOn($hash, $c1)) {                                               # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = $power;
           }
           
@@ -5770,13 +5775,16 @@ END3
           my $consumer_style = 'flowg inactive_out';
           $consumer_style    = 'flowg active_out' if($p > $defpopercent);
          
-          my $consumer_color = "";
-          $consumer_color    = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"' if($p > 0.5);
+          my $chain_color = "";                                                                     # Farbe der Laufkette des Consumers
+          if($p > 0.5) {
+              $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
+              #$chain_color  = 'style="stroke: #DF0101;"';
+          }
          
-          $ret              .= qq{<path id="home-consumer_$c1" class="$consumer_style" $consumer_color d="M$pos_left_start,700 L$pos_left,850" />};
+          $ret            .= qq{<path id="home-consumer_$c1" class="$consumer_style" $chain_color d="M$pos_left_start,700 L$pos_left,850" />};
          
-          $pos_left         += ($consumer_distance * 2);
-          $pos_left_start   += $distance;
+          $pos_left       += ($consDist * 2);
+          $pos_left_start += $distance;
       } 
   }
   
@@ -5801,11 +5809,9 @@ END3
       $pos_left = ($consumer_start * 2) - 50;
       
       for my $c2 (@consumers) {      
-          $currentPower     = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
-          
-          my $consumerTime  = ConsumerVal ($hash, $c2, "remainTime", "");                             # Restlaufzeit                                    
-          #my $swstate       = ConsumerVal ($hash, $c2, "state", "undef");                             # Schaltzustand des Consumerdevices
-          my $rpcurr        = ConsumerVal ($hash, $c2, "rpcurr",     "");                             # Readingname f. current Power
+          $currentPower    = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
+          my $consumerTime = ConsumerVal ($hash, $c2, "remainTime", "");                              # Restlaufzeit
+          my $rpcurr       = ConsumerVal ($hash, $c2, "rpcurr",     "");                              # Readingname f. current Power
           
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = isConsumerOn($hash, $c2) ? 'on' : 'off';
@@ -5813,7 +5819,7 @@ END3
           
           $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1090" style="text-anchor: start;">$currentPower</text>}      if ($flowgconPower);    # Current_Consumption Consumer
           $ret       .= qq{<text class="flowg text" id="consumer-txt_time_$c2"     x="$pos_left" y="1150" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Consumer Restlaufzeit                                                                                                                                                                                                    
-          $pos_left  += ($consumer_distance * 2);
+          $pos_left  += ($consDist * 2);
       }
   }
 
@@ -8395,6 +8401,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Animiert die Energieflußgrafik sofern angezeigt. 
          Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
          (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-flowGraphicConsumerDistance"></a>
+       <li><b>flowGraphicConsumerDistance </b><br>
+         Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik sofern angezeigt. 
+         Siehe auch Attribut <a href="#SolarForecast-attr-flowGraphicShowConsumer">flowGraphicShowConsumer</a>. <br>
+         (default: 80)
        </li>
        <br>
        
