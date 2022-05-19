@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.63.1 "=> "19.05.2022  code review __switchConsumer ",
   "0.63.0 "=> "18.05.2022  new attr flowGraphicConsumerDistance ",
   "0.62.0 "=> "16.05.2022  new key 'swoffcond' in consumer attributes ",
   "0.61.0 "=> "15.05.2022  limit PV forecast to inverter capacity ",
@@ -2807,7 +2808,6 @@ sub _manageConsumerData {
       #######################################################
       my $nompower = ConsumerVal ($hash, $c, "power",       0);                                # nominale Leistung lt. Typenschild
       my $rpcurr   = ConsumerVal ($hash, $c, "rpcurr",     "");                                # Reading für akt. Verbrauch angegeben ?
-      #my $swstate  = ConsumerVal ($hash, $c, "state", "undef");                                # Schaltzustand des Consumerdevices
       
       if (!$rpcurr && isConsumerOn($hash, $c)) {                                              # Workaround wenn Verbraucher ohne Leistungsmessung
           $pcurr = $nompower;
@@ -2902,11 +2902,16 @@ sub _manageConsumerData {
       
       ## consumer Hash ergänzen, Reading generieren 
       ###############################################
-      my $rswstate                              = ConsumerVal             ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
-      my $costate                               = ReadingsVal             ($consumer, $rswstate,       "");       # Schaltstatus
-      my ($pstate,$starttime,$stoptime)         = __planningStateAndTimes ($paref);
+      # my $rswstate                              = ConsumerVal             ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
+      # my $costate                               = ReadingsVal             ($consumer, $rswstate,       "");       # Schaltstatus
+      my $costate                               = isConsumerOn  ($hash, $c) ? "on"  : 
+                                                  isConsumerOff ($hash, $c) ? "off" :
+                                                  "unknown";
+
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
+      my ($pstate,$starttime,$stoptime)         = __planningStateAndTimes ($paref);
+           
       push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' ";     # Consumer Infos 
       push @$daref, "consumer${c}_planned_start<>"."$starttime" if($starttime);                                   # Consumer Start geplant
       push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stoptime);                                    # Consumer Stop geplant            
@@ -3246,9 +3251,9 @@ sub ___setPlanningState {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $c       = $paref->{consumer};
-  my $ps      = $paref->{ps};                                                                        # Planstatus
-  my $startts = $paref->{startts};                                                                   # Unix Timestamp für geplanten Switch on 
-  my $stopts  = $paref->{stopts};                                                                    # Unix Timestamp für geplanten Switch off
+  my $ps      = $paref->{ps};                                                # Planstatus
+  my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on 
+  my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
   
   my $type    = $hash->{TYPE};
   my $name    = $hash->{NAME};
@@ -3362,34 +3367,62 @@ sub __switchConsumer {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                   # aktueller Unixtimestamp
+  my $t     = $paref->{t};                                                     # aktueller Unixtimestamp
   my $state = $paref->{state};
   
   my $type  = $hash->{TYPE};
   
   my $startts   = ConsumerVal ($hash, $c, "planswitchon",  undef);             # geplante Unix Startzeit
   my $stopts    = ConsumerVal ($hash, $c, "planswitchoff", undef);             # geplante Unix Stopzeit  
-  my $pstate    = ConsumerVal ($hash, $c, "planstate",        "");
-  my $cname     = ConsumerVal ($hash, $c, "name",             "");             # Consumer Device Name
-  my $calias    = ConsumerVal ($hash, $c, "alias",            "");             # Consumer Device Alias
-  my $debug     = AttrVal     ($name, "debug",                 0);
   
-  my ($swoncond,$swoffcond,$info,$err);
-  
-  ## Ist Verbraucher empfohlen ?
-  ################################
-  if ($startts && $t >= $startts && $stopts && $t <= $stopts) {
+  if ($startts && $t >= $startts && $stopts && $t <= $stopts) {                # Ist Verbrauch empfohlen ?
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;
   } 
   else {
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
   } 
   
-  ## Verbraucher einschalten
-  ############################
-  my $oncom              = ConsumerVal       ($hash, $c, "oncom",  "");                           # Set Command für "on"
-  my $auto               = ConsumerVal       ($hash, $c, "auto",    1);
-  ($swoncond,$info,$err) = isAddSwitchOnCond ($hash, $c);                                         # zusätzliche Switch on Bedingung
+  $state = ___switchConsumerOn ($paref);                                       # Verbraucher Einschaltbedingung prüfen + auslösen 
+  
+  $state = ___switchConsumerOff ($paref);                                      # Verbraucher Ausschaltbedingung prüfen + auslösen
+  
+  ## Restlaufzeit Verbraucher ermitteln
+  ######################################
+  my ($planstate,$startstr,$stoptstr) = __planningStateAndTimes ($paref);
+  my $isConsRecommended               = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);
+  
+  $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
+  
+  if ($isConsRecommended && $planstate eq "started" && isConsumerOn($hash, $c)) {
+      my $remainTime                                 = $stopts - $t ;
+      $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
+  } 
+  
+  $paref->{state} = $state;
+  
+return;
+}
+
+################################################################
+#  Verbraucher einschalten
+################################################################
+sub ___switchConsumerOn {
+  my $paref = shift; 
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
+  my $state = $paref->{state};
+  
+  my $debug   = AttrVal     ($name, "debug",                 0);
+  my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
+  my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                                  # geplante Unix Startzeit
+  my $oncom   = ConsumerVal ($hash, $c, "oncom",            "");                                  # Set Command für "on"
+  my $auto    = ConsumerVal ($hash, $c, "auto",              1);
+  my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
+  my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
+  
+  my ($swoncond,$info,$err) = isAddSwitchOnCond ($hash, $c);                                      # zusätzliche Switch on Bedingung
 
   Log3 ($name, 1, "$name - $err") if($err);
   
@@ -3406,11 +3439,12 @@ sub __switchConsumer {
       my $surplus = CurrentVal  ($hash, "surplus",          0);                                   # aktueller Überschuß
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
       my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
+      
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
       
       Log3 ($name, 4, "$name - Consumer switch enabled by battery: $enable");  
       
-      if ($mode eq "can" && !$enable) {
+      if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
 
         ___setPlanningState ($paref);
@@ -3438,11 +3472,30 @@ sub __switchConsumer {
           Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
+
+return $state;
+}
+
+################################################################
+#  Verbraucher ausschalten
+################################################################
+sub ___switchConsumerOff {
+  my $paref = shift; 
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
+  my $state = $paref->{state};
   
-  ## Verbraucher ausschalten
-  ############################
-  my $offcom              = ConsumerVal        ($hash, $c, "offcom", "");                         # Set Command für "off"
-  ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                       # zusätzliche Switch on Bedingung
+  my $debug   = AttrVal     ($name, "debug",                 0);
+  my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
+  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
+  my $auto    = ConsumerVal ($hash, $c, "auto",              1);
+  my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
+  my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
+  
+  my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
+  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch on Bedingung
 
   Log3 ($name, 1, "$name - $err") if($err);
   
@@ -3470,24 +3523,9 @@ sub __switchConsumer {
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
       
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
-  } 
+  }
   
-  ## Restlaufzeit Verbraucher ermitteln
-  ######################################
-  my ($planstate,$startstr,$stoptstr) = __planningStateAndTimes ($paref);
-  my $isConsRecommended               = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);
-  # my $costate                         = ConsumerVal ($hash, $c, "state", "off");
-  
-  $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
-  
-  if ($isConsRecommended && $planstate eq "started" && isConsumerOn($hash, $c)) {
-      my $remainTime                                 = $stopts - $t ;
-      $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
-  } 
-  
-  $paref->{state} = $state;
-  
-return;
+return $state;
 }
 
 ################################################################
@@ -4885,7 +4923,6 @@ sub _graphicConsumerLegend {
       $cmdautoon  = q{} if(!$autord); 
       $cmdautooff = q{} if(!$autord); 
 
-      #my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
       my $swicon  = q{};                                                                              # Schalter ein/aus Icon
       my $auicon  = q{};                                                                              # Schalter Automatic Icon
       my $isricon = q{};                                                                              # Zustand IsRecommended Icon
@@ -5840,7 +5877,6 @@ sub substConsumerIcon {
   my $name = $hash->{NAME};
 
   my $cicon   = ConsumerVal ($hash, $c, "icon",        "");                  # Icon des Consumerdevices angegeben ?
-  #my $swstate = ConsumerVal ($hash, $c, "state",  "undef");                  # Schaltzustand des Consumerdevices
    
   if (!$cicon) {
       $cicon = 'light_light_dim_100'; 
@@ -7173,10 +7209,12 @@ sub isConsumerOn {
   my $hash = shift;
   my $c    = shift;  
   
-  my $val      = ConsumerVal ($hash, $c, "onreg",     "on"); 
-  my $swstate  = ConsumerVal ($hash, $c, "state",  "undef");
+  my $cname    = ConsumerVal ($hash, $c, "name",              "");       # Devicename Customer 
+  my $reg      = ConsumerVal ($hash, $c, "onreg",           "on"); 
+  my $rswstate = ConsumerVal ($hash, $c, "rswstate",     "state");       # Reading mit Schaltstatus
+  my $swstate  = ReadingsVal ($cname, $rswstate,         "undef");
   
-  if ($swstate =~ m/^$val$/x) {                                                     
+  if ($swstate =~ m/^$reg$/x) {                                                     
       return 1;
   }
 
@@ -7190,10 +7228,12 @@ sub isConsumerOff {
   my $hash = shift;
   my $c    = shift;  
   
-  my $val      = ConsumerVal ($hash, $c, "offreg",     "off"); 
-  my $swstate  = ConsumerVal ($hash, $c, "state",    "undef");
+  my $cname    = ConsumerVal ($hash, $c, "name",          "");           # Devicename Customer 
+  my $reg      = ConsumerVal ($hash, $c, "offreg",     "off");
+  my $rswstate = ConsumerVal ($hash, $c, "rswstate", "state");           # Reading mit Schaltstatus  
+  my $swstate  = ReadingsVal ($cname, $rswstate,     "undef");
   
-  if ($swstate =~ m/^$val$/x) {                                                     
+  if ($swstate =~ m/^$reg$/x) {                                                     
       return 1;
   }
 
@@ -8299,7 +8339,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <table>  
          <colgroup> <col width=10%> <col width=90%> </colgroup>
             <tr><td> <b>type</b>       </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                               </td></tr>
-            <tr><td>                   </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmschine                                                                          </td></tr>
+            <tr><td>                   </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülamschine                                                                          </td></tr>
             <tr><td>                   </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                        </td></tr>
             <tr><td>                   </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                        </td></tr>
             <tr><td>                   </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                              </td></tr>
@@ -8309,7 +8349,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                   </td><td><b>can</b>  - der Verbaucher kann angeschaltet werden wenn genügend Energie bereitsteht (default)                                </td></tr>
             <tr><td>                   </td><td><b>must</b> - der Verbaucher muß einmal am Tag angeschaltet werden auch wenn nicht genügend Energie vorhanden ist                </td></tr>
             <tr><td> <b>icon</b>       </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                         </td></tr>
-            <tr><td> <b>mintime</b>    </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten (default: Typ bezogen)  </td></tr>
+            <tr><td> <b>mintime</b>    </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)    </td></tr>
             <tr><td> <b>on</b>         </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>swstate</b>    </td><td>Reading welches den Schaltzustand des Consumers anzeigt (optional). Im default wird 'state' verwendet.                           </td></tr>
