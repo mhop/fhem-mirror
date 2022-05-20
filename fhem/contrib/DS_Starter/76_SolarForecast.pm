@@ -849,7 +849,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   $paref->{startts}  = $startts;                                                # Unix Timestamp für geplanten Switch on
   $paref->{stopts}   = $stopts;                                                 # Unix Timestamp für geplanten Switch off
 
-  ___setPlanningState ($paref);
+  ___setConsumerPlanningState ($paref);
   
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
   my $calias    = ConsumerVal ($hash, $c, "alias",     "");
@@ -2900,8 +2900,8 @@ sub _manageConsumerData {
       __planSwitchTimes  ($paref);                                                                                # Consumer Switch Zeiten planen
       __switchConsumer   ($paref);                                                                                # Consumer schalten
       
-      ## Consumer Schaltstatus und Schaltzeit ermitteln 
-      ###################################################
+      ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln 
+      ################################################################
       # my $rswstate                              = ConsumerVal             ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
       # my $costate                               = ReadingsVal             ($consumer, $rswstate,       "");       # Schaltstatus
       my $costate                               = isConsumerOn  ($hash, $c) ? "on"  : 
@@ -3196,7 +3196,7 @@ sub __planSwitchTimes {
               $paref->{startts} = $startts;
               $paref->{stopts}  = $startts + $stopdiff;
 
-              ___setPlanningState ($paref);
+              ___setConsumerPlanningState ($paref);
 
               delete $paref->{ps};
               delete $paref->{startts};
@@ -3207,7 +3207,7 @@ sub __planSwitchTimes {
           else {
               $paref->{ps} = "no planning: the max expected surplus is less $epiece1";
 
-              ___setPlanningState ($paref);
+              ___setConsumerPlanningState ($paref);
               
               delete $paref->{ps};
           }
@@ -3245,9 +3245,9 @@ return;
 }
 
 ################################################################
-#     Planungsdaten setzen  
+#     Planungsdaten bzw. aktuelle Schaltzustände setzen  
 ################################################################
-sub ___setPlanningState {     
+sub ___setConsumerPlanningState {     
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $c       = $paref->{consumer};
@@ -3269,6 +3269,17 @@ sub ___setPlanningState {
       (undef,undef,undef,$stoptime)                     = timestampToTimestring ($stopts);
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts; 
   }
+  
+  #my $pstate = simplifyCstate ($ps);
+  #my $swtime = "";
+  #if ($pstate eq "started") {
+  #    ($swtime, $startts) = lastConsumerSwitchtime ($hash, $c);
+  #    Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, startts: $startts");
+  #}
+  #elsif ($pstate eq "finished") {
+  #    ($swtime, $stopts)  = lastConsumerSwitchtime ($hash, $c);
+  #   Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, stopts:$stopts ");
+  #}
   
   $ps .= " "              if ($starttime || $stoptime);
   $ps .= $starttime       if ($starttime);
@@ -3311,7 +3322,7 @@ sub ___planMust {
   $paref->{startts} = $startts;                                                                       # Unix Timestamp für geplanten Switch on       
   $paref->{stopts}  = $stopts;                                                                        # Unix Timestamp für geplanten Switch off
 
-  ___setPlanningState ($paref);
+  ___setConsumerPlanningState ($paref);
 
   delete $paref->{ps};
   delete $paref->{startts};
@@ -3447,7 +3458,7 @@ sub ___switchConsumerOn {
       if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
 
-        ___setPlanningState ($paref);
+        ___setConsumerPlanningState ($paref);
 
         delete $paref->{ps};
       }
@@ -3459,7 +3470,7 @@ sub ___switchConsumerOn {
           $paref->{startts} = $t;
           $paref->{stopts}  = $t + $stopdiff;
 
-          ___setPlanningState ($paref);
+          ___setConsumerPlanningState ($paref);
 
           delete $paref->{ps};
           delete $paref->{startts};
@@ -3513,7 +3524,7 @@ sub ___switchConsumerOff {
       $paref->{ps}     = "switched off:";
       $paref->{stopts} = $t;
 
-      ___setPlanningState ($paref);
+      ___setConsumerPlanningState ($paref);
 
       delete $paref->{ps};
       delete $paref->{stopts};      
@@ -3559,28 +3570,11 @@ sub __getPlanningStateAndTimes {
   my $hash  = $paref->{hash};
   my $c     = $paref->{consumer};
   
-  my $pstate  = ConsumerVal ($hash, $c, "planstate", "");
-  
-  $pstate     = $pstate =~ /planned/xs        ? "planned"  : 
-                $pstate =~ /switching\son/xs  ? "starting" :
-                $pstate =~ /switched\son/xs   ? "started"  :
-                $pstate =~ /switching\soff/xs ? "stopping" :
-                $pstate =~ /switched\soff/xs  ? "finished" :
-                $pstate =~ /priority/xs       ? $pstate    :
-                "unknown";
+  my $pstate  = ConsumerVal    ($hash, $c, "planstate", "");      
+  $pstate     = simplifyCstate ($pstate);
   
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
-  
-  #my $swtime = "";
-  #if ($pstate eq "started") {
-  #    ($swtime, $startts) = lastConsumerSwitchtime ($hash, $c);
-  #    Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, startts: $startts");
-  #}
-  #elsif ($pstate eq "finished") {
-  #    ($swtime, $stopts)  = lastConsumerSwitchtime ($hash, $c);
-  #    Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, stopts:$stopts ");
-  #}
   
   my $starttime = '';
   my $stoptime  = '';
@@ -7356,6 +7350,24 @@ sub isAddSwitchOffCond {
   $info = qq{The device "$dswoffcond", reading "$rswoffcond" doen't match the Regex "$swoffcondregex"};  
 
 return (0, $info, $err);
+}
+
+################################################################
+#  transformiert den ausführlichen Consumerstatus in eine
+#  einfache Form
+################################################################
+sub simplifyCstate {
+  my $ps = shift;  
+  
+  $ps = $ps =~ /planned/xs        ? "planned"  : 
+        $ps =~ /switching\son/xs  ? "starting" :
+        $ps =~ /switched\son/xs   ? "started"  :
+        $ps =~ /switching\soff/xs ? "stopping" :
+        $ps =~ /switched\soff/xs  ? "finished" :
+        $ps =~ /priority/xs       ? $ps        :
+        "unknown";
+                
+return $ps;
 }
 
 ###############################################################################
