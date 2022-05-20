@@ -2187,7 +2187,7 @@ sub getActiveDeviceForIntentAndType {
     my $hash   = shift // return;
     my $room   = shift;
     my $intent = shift;
-    my $type   = shift; #Beta-User: any necessary parameters...?
+    my $type   = shift;
     my $subType = shift // $type;
 
     my $device;
@@ -2201,10 +2201,10 @@ sub getActiveDeviceForIntentAndType {
 
         for (@{$devices}) {
             my $mapping = getMapping($subhash, $_, 'GetOnOff', undef, 1);
-            if (defined $mapping ) {
+            if ( defined $mapping ) {
                 # Gerät ein- oder ausgeschaltet?
                 my $value = _getOnOffState($subhash, $_, $mapping);
-                if ($value) {
+                if ( $value ) {
                     $match = $_;
                     last;
                 }
@@ -2215,7 +2215,7 @@ sub getActiveDeviceForIntentAndType {
 
     # Gerät finden, erst im aktuellen Raum, sonst in den restlichen
     $device = $activeDevice->($hash, $matchesInRoom);
-    $device //= $activeDevice->($hash, $matchesOutsideRoom); # if !defined $device;
+    $device //= $activeDevice->($hash, $matchesOutsideRoom);
 
     Log3($hash->{NAME}, 5, "Device selected: $device");
 
@@ -2227,27 +2227,27 @@ sub getActiveDeviceForIntentAndType {
 sub getDeviceByMediaChannel {
     my $hash    = shift // return;
     my $room    = shift;
-    my $channel = shift; #Beta-User: any necessary parameters...?
+    my $channel = shift // return;
 
-    my $device;
-
+    my $devices;
     return if !defined $hash->{helper}{devicemap};
-    my $devices = $hash->{helper}{devicemap}{Channels}{$room}->{$channel};
-    $device = ${$devices}[0];
-    if ($device) {
+    $devices = $hash->{helper}{devicemap}{Channels}{$room}->{$channel} if defined $room;
+    my $device = ${$devices}[0] // undef;
+    if ( $device ) {
         Log3($hash->{NAME}, 5, "Device selected (by hash, with room and channel): $device");
         return $device ;
     }
     for (sort keys %{$hash->{helper}{devicemap}{Channels}}) {
         $devices = $hash->{helper}{devicemap}{Channels}{$_}{$channel};
         $device = ${$devices}[0];
-    
+
         #return $device if $device;
         if ($device) {
             Log3($hash->{NAME}, 5, "Device selected (by hash, using only channel): $device");
             return $device ;
         }
     }
+    $room //= '';
     Log3($hash->{NAME}, 1, "No device for >>$channel<< found, especially not in room >>$room<< (also not outside)!");
     return;
 }
@@ -2757,18 +2757,16 @@ sub parseJSONPayload {
     my $hash = shift;
     my $json = shift // return;
     my $data;
-    #my $cp = $hash->{encoding} // q{UTF-8};
 
     # JSON Decode und Fehlerüberprüfung
     my $decoded;
-    #if ( !eval { $decoded  = decode_json(encode($cp,$json)) ; 1 } ) {
     if ( !eval { $decoded  = JSON->new->decode($json) ; 1 } ) {
         return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
     }
 
     # Standard-Keys auslesen
     ($data->{intent} = $decoded->{intent}{intentName}) =~ s{\A.*.:}{}x if exists $decoded->{intent}{intentName};
-    $data->{confidence} = $decoded->{intent}{confidenceScore} // 0.75;#        if exists $decoded->{intent}{confidenceScore};
+    $data->{confidence} = $decoded->{intent}{confidenceScore} // 0.75;
     for my $key (qw(sessionId siteId input rawInput customData lang)) {
         $data->{$key} = $decoded->{$key} if exists $decoded->{$key};
     }
@@ -2780,7 +2778,7 @@ sub parseJSONPayload {
             my $slotName = $slot->{slotName};
             my $slotValue;
 
-            $slotValue = $slot->{value}{value} if exists $slot->{value}{value} && $slot->{value}{value} ne '';#Beta-User: dismiss effectively empty fields
+            $slotValue = $slot->{value}{value} if exists $slot->{value}{value} && $slot->{value}{value} ne ''; #Beta-User: dismiss effectively empty fields
             $slotValue = $slot->{value} if exists $slot->{entity} && $slot->{entity} eq 'rhasspy/duration';
 
             $data->{$slotName} = $slotValue;
@@ -2791,7 +2789,7 @@ sub parseJSONPayload {
         my $value = $data->{$_};
         #custom converter equivalent
         if ( $_ eq 'Value' ) {
-            my $match = $value =~ s{\A\s*(\d+)\s+[.,]\s+(\d+)\s*\z}{$1.$2}xm;
+            my $match = $value =~ s{\A\s*(\d+)\s*[.,]\s*(\d+)\s*\z}{$1.$2}xm;
             $data->{$_} = $value if $match;
         }
         Log3($hash->{NAME}, 5, "Parsed value: $value for key: $_") if defined $value;
@@ -2838,8 +2836,7 @@ sub Parse {
           Log3($hash->{NAME},5,"RHASSPY: [$hash->{NAME}] Parse: internal error:  onmessage returned an unexpected value: ".$fret);
         }
     }
-    unshift(@ret, '[NEXT]') if !(@ret) || $forceNext;
-    #Log3($iodev, 4, "Parse collected these devices: ". join q{ },@ret);
+    unshift(@ret, '[NEXT]') if !@ret || $forceNext;
     return @ret;
 }
 
@@ -3299,7 +3296,6 @@ sub handleTtsMsgDialog {
     } elsif ( defined $hash->{helper}->{SpeechDialog} 
         && defined $hash->{helper}->{SpeechDialog}->{config}->{$recipient} ) {
         SpeechDialog_respond($hash,$recipient,$message,0);
-        #sayFinished($hash, $data->{id}, $hash->{siteId}); #Beta-User: may be moved to response logic later with timeout...?
     }
 
     return $recipient;
@@ -3564,7 +3560,6 @@ sub analyzeMQTTmessage {
     }
     
     if ($topic =~ m{\Ahermes/nlu/intentNotRecognized}x && defined $siteId) {
-        #return if !$hash->{siteId} || $siteId ne $hash->{siteId};
         return testmode_parse($hash, 'intentNotRecognized', $data) if defined $hash->{testline} && defined $hash->{siteId} && $siteId eq $hash->{siteId};
         return handleIntentNotRecognized($hash, $data);
     }
@@ -3622,7 +3617,6 @@ sub respond {
     if ( defined $hash->{testline} ) {
         $response = $response->{text} if ref $response eq 'HASH';
         push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Response: $response";
-        #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Response: $response";
         $hash->{testline}++;
         return testmode_next($hash);
     }
@@ -3674,7 +3668,6 @@ sub respond {
     } elsif (defined $hash->{helper}->{SpeechDialog} 
         && defined $hash->{helper}->{SpeechDialog}->{config}->{$identity} ) {
         Log3($hash, 5, "respond deviated to SpeechDialog_respond for $identity.");
-        #$hash->{helper}->{SpeechDialog}->{$identity}->{data} = $data if $topic eq 'continueSession';
         return SpeechDialog_respond($hash,$identity,$response,$topic eq 'continueSession', $contByDelay);
     }
 
@@ -3727,9 +3720,6 @@ sub sendTextCommand {
          #canBeEnqueued => 'true'
     };
     my $message = _toCleanJSON($data);
-
-    # Send fake command, so it's forwarded to NLU
-    # my $topic2 = "hermes/intent/FHEM:TextCommand";
     my $topic = q{hermes/nlu/query};
 
     return IOWrite($hash, 'publish', qq{$topic $message});
@@ -3899,7 +3889,6 @@ sub updateSlots {
         $deviceData->{qq(${language}.${fhemId}.Group-$_)}  = $grps  if (@{$grps}  || $noEmpty) 
                                                                         && ( $_ eq 'SetOnOff' || $_ eq 'SetNumeric' );
     }
-
 
     my @allKeywords = uniq(@groups, @rooms, @devices);
 
@@ -4213,7 +4202,7 @@ sub handleCustomIntent {
         $response = $error; # if $error && $error !~ m{Please.define.*first}x;
     }
 
-    $response = getResponse($hash, 'DefaultConfirmation') if !defined $response;
+    $response //= getResponse($hash, 'DefaultConfirmation');
 
     # Antwort senden
     return respond( $hash, $data, $response );
@@ -4233,7 +4222,7 @@ sub handleIntentSetMute {
         readingsSingleUpdate($hash, "mute_$siteId", $data->{Value} eq 'on' ? 1 : 0, 1);
         $response = getResponse($hash, 'DefaultConfirmation');
     }
-    $response = $response  // getResponse($hash, 'DefaultError');
+    $response //= getResponse($hash, 'DefaultError');
     return respond( $hash, $data, $response );
 }
 
@@ -4367,12 +4356,10 @@ sub handleIntentSetOnOffGroup {
     Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
     return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !keys %{$devices}; 
 
-    my $delaysum = 0;
-    
     my $value = $data->{Value};
 
     my $updatedList;
-
+    my $delaysum = 0;
     my $init_delay = 0;
     my $needs_sorting = (@{$hash->{".asyncQueue"}});
 
@@ -4491,13 +4478,11 @@ sub handleIntentSetTimedOnOffGroup {
     #calculate duration for on/off-timer
     my (undef , undef, $secsfromnow) = _getSecondsfromData($data);
 
-    my $delaysum = 0;
-
     my $value = $data->{Value};
 
     my $updatedList;
-
     my $init_delay = 0;
+    my $delaysum = 0;
     my $needs_sorting = (@{$hash->{".asyncQueue"}});
 
     for my $device (@devlist) {
@@ -4583,7 +4568,8 @@ sub isValidData {
         # Nur Type = Lautstärke und Value angegeben -> Valid (z.B. Lautstärke auf 10)
         #||!exists $data->{Device} && defined $data->{Type} && exists $data->{Value} && $data->{Type} =~ 
         #m{\A$hash->{helper}{lng}->{Change}->{regex}->{volume}\z}xim;
-        || !exists $data->{Device} && defined $data->{Type} && exists $data->{Value} && $data->{Type} eq 'volume';
+        #|| !exists $data->{Device} && defined $data->{Type} && exists $data->{Value} && $data->{Type} eq 'volume';
+        || !exists $data->{Device} && defined $data->{Type} && exists $data->{Value}; # && $data->{Type} =~ m{\A(?:volume|temperature)\z}x;
 
     return 0;
 }
@@ -4615,13 +4601,11 @@ sub handleIntentSetNumericGroup {
     Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !keys %{$devices}; 
 
-    my $delaysum = 0;
-
     my $value = $data->{Value};
 
     my $updatedList;
-
     my $init_delay = 0;
+    my $delaysum = 0;
     my $needs_sorting = (@{$hash->{'.asyncQueue'}});
 
     for my $device (@devlist) {
@@ -4696,21 +4680,6 @@ sub handleIntentSetNumeric {
 
     #more than one device
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
-=pod
-    if ( ref $device eq 'ARRAY' ) {
-        
-        #until now: only extended test code
-        my $first = $device->[0];
-        $response = $device->[1];
-        my $all = $device->[2];
-        my $choice = $device->[3];
-        $data->{customData} = $all;
-        my $toActivate = $choice eq 'RequestChoiceDevice' ? [qw(ChoiceDevice Choice CancelAction)] : [qw(ChoiceRoom Choice CancelAction)];
-        $device = $first;
-        Log3($hash->{NAME}, 5, "More than one device possible, response is $response, first is $first, all are $all, type is $choice");
-        return setDialogTimeout($hash, $data, _getDialogueTimeout($hash), $response, $toActivate);
-    }
-=cut
 
     my $mapping = getMapping($hash, $device, 'SetNumeric', { type => $type, subType => $subType });
 
@@ -4766,12 +4735,9 @@ sub handleIntentSetNumeric {
             $newVal = $value;
         } elsif ( ( $ispct || $forcePercent ) && $checkMinMax ) { 
             # Direkter Stellwert als Prozent ("Stelle Lampe auf 50 Prozent", oder "Stelle Lampe auf 50" bei forcePercent)
-            #elsif (defined $value && ( defined $unit && $unit eq 'Prozent' || $forcePercent ) && !defined $change && defined $minVal && defined $maxVal) {
 
             # Wert von Prozent in Raw-Wert umrechnen
             $newVal = $value;
-            #$newVal =   0 if ($newVal <   0);
-            #$newVal = 100 if ($newVal > 100);
             $newVal = _round(($newVal * (($maxVal - $minVal) / 100)) + $minVal);
         }
     } else { # defined $change
@@ -4783,10 +4749,7 @@ sub handleIntentSetNumeric {
             $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
         }
         # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
-        #elsif (($unit eq 'Prozent' || $forcePercent) && defined($change)  && defined $minVal && defined $maxVal) {
         elsif ( ( $ispct || $forcePercent ) && $checkMinMax ) {
-            #$maxVal = 100 if !looks_like_number($maxVal); #Beta-User: Workaround, should be fixed in mapping (tbd)
-            #my $diffRaw = round((($diff * (($maxVal - $minVal) / 100)) + $minVal), 0);
             my $diffRaw = _round($diff * ($maxVal - $minVal) / 100);
             $newVal = ($up) ? $oldVal + $diffRaw : $oldVal - $diffRaw;
             $newVal = max( $minVal, min( $maxVal, $newVal ) );
@@ -4862,20 +4825,6 @@ sub handleIntentGetNumeric {
 
     #more than one device
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
-=pod
-    if ( ref $device eq 'ARRAY' ) {
-        #until now: only extended test code
-        my $first = $device->[0];
-        my $response = $device->[1];
-        my $all = $device->[2];
-        my $choice = $device->[3];
-        $data->{customData} = $all;
-        my $toActivate = $choice eq 'RequestChoiceDevice' ? [qw(ChoiceDevice Choice CancelAction)] : [qw(ChoiceRoom  Choice CancelAction)];
-        $device = $first;
-        Log3($hash->{NAME}, 5, "More than one device possible, response is $response, first is $first, all are $all, type is $choice");
-        return setDialogTimeout($hash, $data, _getDialogueTimeout($hash), $response, $toActivate);
-    }
-=cut
 
     my $mapping = getMapping($hash, $device, 'GetNumeric', { type => $type, subType => $subType })
         // return respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
@@ -5744,7 +5693,6 @@ sub handleIntentConfirmAction {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    #delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5773,7 +5721,6 @@ sub handleIntentChoice {
     if (ref $dispatchFns->{$intent} eq 'CODE') {
         $device = $dispatchFns->{$intent}->($hash, $data_old);
     }
-    #delete $hash->{helper}{'.delayed'}{$identity};
 
     return $device;
 }
@@ -5783,7 +5730,7 @@ sub handleIntentChoiceRoom {
     my $hash = shift // return;
     my $data = shift // return;
 
-    Log3($hash->{NAME}, 5, 'handleIntentChoiceRoom called');
+    Log3($hash->{NAME}, 2, 'handleIntentChoiceRoom called, better use generic "Choice" intent now!');
 
     return handleIntentChoice($hash, $data);
 }
@@ -5792,7 +5739,7 @@ sub handleIntentChoiceDevice {
     my $hash = shift // return;
     my $data = shift // return;
 
-    Log3($hash->{NAME}, 5, 'handleIntentChoiceDevice called');
+    Log3($hash->{NAME}, 2, 'handleIntentChoiceDevice called, better use generic "Choice" intent now!');
 
     return handleIntentChoice($hash, $data);
 }
