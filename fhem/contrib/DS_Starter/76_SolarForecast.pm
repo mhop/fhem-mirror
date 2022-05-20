@@ -2900,8 +2900,8 @@ sub _manageConsumerData {
       __planSwitchTimes  ($paref);                                                                                # Consumer Switch Zeiten planen
       __switchConsumer   ($paref);                                                                                # Consumer schalten
       
-      ## consumer Hash ergänzen, Reading generieren 
-      ###############################################
+      ## Consumer Schaltstatus und Schaltzeit ermitteln 
+      ###################################################
       # my $rswstate                              = ConsumerVal             ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
       # my $costate                               = ReadingsVal             ($consumer, $rswstate,       "");       # Schaltstatus
       my $costate                               = isConsumerOn  ($hash, $c) ? "on"  : 
@@ -2910,7 +2910,7 @@ sub _manageConsumerData {
 
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
-      my ($pstate,$starttime,$stoptime)         = __planningStateAndTimes ($paref);
+      my ($pstate,$starttime,$stoptime)         = __getPlanningStateAndTimes ($paref);
            
       push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' ";     # Consumer Infos 
       push @$daref, "consumer${c}_planned_start<>"."$starttime" if($starttime);                                   # Consumer Start geplant
@@ -3388,7 +3388,7 @@ sub __switchConsumer {
   
   ## Restlaufzeit Verbraucher ermitteln
   ######################################
-  my ($planstate,$startstr,$stoptstr) = __planningStateAndTimes ($paref);
+  my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
   my $isConsRecommended               = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);
   
   $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
@@ -3552,23 +3552,35 @@ return $ena;
 }
 
 ###################################################################
-#    Consumer Planungsstatus mit Schaltzeiten liefern
+#    Consumer Planstatus und Planzeit ermitteln
 ###################################################################
-sub __planningStateAndTimes {
+sub __getPlanningStateAndTimes {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $c     = $paref->{consumer};
   
   my $pstate  = ConsumerVal ($hash, $c, "planstate", "");
   
-  $pstate     = $pstate =~ /planned/xs       ? "planned"  : 
-                $pstate =~ /switched\son/xs  ? "started"  :
-                $pstate =~ /switched\soff/xs ? "finished" :
-                $pstate =~ /priority/xs      ? $pstate    :
+  $pstate     = $pstate =~ /planned/xs        ? "planned"  : 
+                $pstate =~ /switching\son/xs  ? "starting" :
+                $pstate =~ /switched\son/xs   ? "started"  :
+                $pstate =~ /switching\soff/xs ? "stopping" :
+                $pstate =~ /switched\soff/xs  ? "finished" :
+                $pstate =~ /priority/xs       ? $pstate    :
                 "unknown";
   
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
+  
+  #my $swtime = "";
+  #if ($pstate eq "started") {
+  #    ($swtime, $startts) = lastConsumerSwitchtime ($hash, $c);
+  #    Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, startts: $startts");
+  #}
+  #elsif ($pstate eq "finished") {
+  #    ($swtime, $stopts)  = lastConsumerSwitchtime ($hash, $c);
+  #    Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, stopts:$stopts ");
+  #}
   
   my $starttime = '';
   my $stoptime  = '';
@@ -4929,7 +4941,7 @@ sub _graphicConsumerLegend {
             
       $paref->{consumer} = $c;
       
-      my ($planstate,$starttime,$stoptime) = __planningStateAndTimes ($paref);      
+      my ($planstate,$starttime,$stoptime) = __getPlanningStateAndTimes ($paref);      
       my $pstate = $caicon eq "times" ? $hqtxt{pstate}{$lang} : $htitles{pstate}{$lang};
       
       $pstate    =~ s/<pstate>/$planstate/xs;
@@ -7217,9 +7229,9 @@ sub isConsumerOn {
       return;
   }
   
-  my $reg      = ConsumerVal ($hash, $c, "onreg",           "on"); 
-  my $rswstate = ConsumerVal ($hash, $c, "rswstate",     "state");       # Reading mit Schaltstatus
-  my $swstate  = ReadingsVal ($cname, $rswstate,         "undef");
+  my $reg      = ConsumerVal ($hash, $c, "onreg",    "on"); 
+  my $rswstate = ConsumerVal ($hash, $c, "rswstate", "state");           # Reading mit Schaltstatus
+  my $swstate  = ReadingsVal ($cname, $rswstate,     "undef");
   
   if ($swstate =~ m/^$reg$/x) {                                                     
       return 1;
@@ -7252,6 +7264,28 @@ sub isConsumerOff {
   }
 
 return;
+}
+
+################################################################
+#  liefert die Zeit des letzten Schaltvorganges
+################################################################
+sub lastConsumerSwitchtime {
+  my $hash = shift;
+  my $c    = shift;
+  my $name = $hash->{NAME};  
+  
+  my $cname = ConsumerVal ($hash, $c, "name", "");                             # Devicename Customer
+
+  if(!$defs{$cname}) {
+      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the last switching time can't be identified});
+      return;
+  }
+  
+  my $rswstate = ConsumerVal           ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
+  my $swtime   = ReadingsTimestamp     ($cname, $rswstate,          "");       # Zeitstempel im Format 2016-02-16 19:34:24   
+  my $swtimets = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
+
+return ($swtime, $swtimets);
 }
 
 ################################################################
