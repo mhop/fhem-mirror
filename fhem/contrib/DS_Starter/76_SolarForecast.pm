@@ -7207,9 +7207,16 @@ return;
 ################################################################
 sub isConsumerOn {
   my $hash = shift;
-  my $c    = shift;  
+  my $c    = shift;
+  my $name = $hash->{NAME};  
   
-  my $cname    = ConsumerVal ($hash, $c, "name",              "");       # Devicename Customer 
+  my $cname = ConsumerVal ($hash, $c, "name", "");                       # Devicename Customer
+
+  if(!$defs{$cname}) {
+      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "on" state can't be identified});
+      return;
+  }
+  
   my $reg      = ConsumerVal ($hash, $c, "onreg",           "on"); 
   my $rswstate = ConsumerVal ($hash, $c, "rswstate",     "state");       # Reading mit Schaltstatus
   my $swstate  = ReadingsVal ($cname, $rswstate,         "undef");
@@ -7227,8 +7234,15 @@ return;
 sub isConsumerOff {
   my $hash = shift;
   my $c    = shift;  
+  my $name = $hash->{NAME};
   
-  my $cname    = ConsumerVal ($hash, $c, "name",          "");           # Devicename Customer 
+  my $cname = ConsumerVal ($hash, $c, "name", "");                       # Devicename Customer
+
+  if(!$defs{$cname}) {
+      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "off" state can't be identified});
+      return;
+  }
+  
   my $reg      = ConsumerVal ($hash, $c, "offreg",     "off");
   my $rswstate = ConsumerVal ($hash, $c, "rswstate", "state");           # Reading mit Schaltstatus  
   my $swstate  = ReadingsVal ($cname, $rswstate,     "undef");
