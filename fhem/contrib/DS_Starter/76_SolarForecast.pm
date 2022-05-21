@@ -128,7 +128,7 @@ my %vNotesIntern = (
                            "debug switch conditions ",
   "0.60.0 "=> "14.05.2022  new key 'swoncond' in consumer attributes ",
   "0.59.0 "=> "01.05.2022  new attr createTomorrowPVFcReadings ",
-  "0.58.0 "=> "20.04.2022  new setter consumerImmediatePlanning, functions isConsumerOn isConsumerOff ",
+  "0.58.0 "=> "20.04.2022  new setter consumerImmediatePlanning, functions isConsumerPhysOn isConsumerPhysOff ",
   "0.57.3 "=> "10.04.2022  some fixes (\$eavg in ___csmSpecificEpieces, useAutoCorrection switch to regex) ",
   "0.57.2 "=> "03.04.2022  area factor for 25° added ",
   "0.57.1 "=> "28.02.2022  new attr flowGraphicShowConsumerPower and flowGraphicShowConsumerRemainTime (Consumer remainTime in flowGraphic)",                                                                                                                                
@@ -2809,7 +2809,7 @@ sub _manageConsumerData {
       my $nompower = ConsumerVal ($hash, $c, "power",   0);                                    # nominale Leistung lt. Typenschild
       my $rpcurr   = ConsumerVal ($hash, $c, "rpcurr", "");                                    # Reading für akt. Verbrauch angegeben ?
       
-      if (!$rpcurr && isConsumerOn($hash, $c)) {                                               # Workaround wenn Verbraucher ohne Leistungsmessung
+      if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
           $pcurr = $nompower;
       }
       
@@ -2899,8 +2899,8 @@ sub _manageConsumerData {
       ################################################################
       # my $rswstate                              = ConsumerVal             ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
       # my $costate                               = ReadingsVal             ($consumer, $rswstate,       "");       # Schaltstatus
-      my $costate                               = isConsumerOn  ($hash, $c) ? "on"  : 
-                                                  isConsumerOff ($hash, $c) ? "off" :
+      my $costate                               = isConsumerPhysOn  ($hash, $c) ? "on"  : 
+                                                  isConsumerPhysOff ($hash, $c) ? "off" :
                                                   "unknown";
 
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
@@ -3399,7 +3399,7 @@ sub __switchConsumer {
   
   $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
   
-  if ($isConsRecommended && $planstate eq "started" && isConsumerOn($hash, $c)) {
+  if ($isConsRecommended && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
       my $remainTime                                 = $stopts - $t ;
       $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
   } 
@@ -4978,7 +4978,7 @@ sub _graphicConsumerLegend {
           $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
       }
       
-      if (isConsumerOff($hash, $c)) {                                                           # Schaltzustand des Consumerdevices off
+      if (isConsumerPhysOff($hash, $c)) {                                                       # Schaltzustand des Consumerdevices off
           if($cmdon) {
               $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
               $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
@@ -4989,7 +4989,7 @@ sub _graphicConsumerLegend {
           }
       } 
       
-      if (isConsumerOn($hash, $c)) {                                                            # Schaltzustand des Consumerdevices on
+      if (isConsumerPhysOn($hash, $c)) {                                                        # Schaltzustand des Consumerdevices on
           if($cmdoff) {
               $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
               $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
@@ -5803,7 +5803,7 @@ END3
           my $rpcurr         = ConsumerVal ($hash, $c1, "rpcurr", "");                              # Reading für akt. Verbrauch angegeben ?
           $currentPower      = ReadingsNum ($name, "consumer${c1}_currentPower", 0);
           
-          if (!$rpcurr && isConsumerOn($hash, $c1)) {                                               # Workaround wenn Verbraucher ohne Leistungsmessung
+          if (!$rpcurr && isConsumerPhysOn($hash, $c1)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
               $currentPower = $power;
           }
           
@@ -5852,7 +5852,7 @@ END3
           my $rpcurr       = ConsumerVal ($hash, $c2, "rpcurr",     "");                              # Readingname f. current Power
           
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
-              $currentPower = isConsumerOn($hash, $c2) ? 'on' : 'off';
+              $currentPower = isConsumerPhysOn($hash, $c2) ? 'on' : 'off';
           }
           
           $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1090" style="text-anchor: start;">$currentPower</text>}      if ($flowgconPower);    # Current_Consumption Consumer
@@ -5887,7 +5887,7 @@ sub substConsumerIcon {
   ($cicon,$color) = split '@', $cicon;  
   
   if (!$color) {
-      $color = isConsumerOn($hash, $c) ? 'darkorange' : '';
+      $color = isConsumerPhysOn($hash, $c) ? 'darkorange' : '';
   }
   
   $cicon .= '@'.$color if($color);
@@ -7204,9 +7204,10 @@ return;
 }
 
 ################################################################
-#  Funktion liefert 1 wenn Consumer Status ist "eingeschaltet"
+#  Funktion liefert 1 wenn Consumer physisch "eingeschaltet"
+#  ist, d.h. der Wert onreg des Readings rswstate wahr ist 
 ################################################################
-sub isConsumerOn {
+sub isConsumerPhysOn {
   my $hash = shift;
   my $c    = shift;
   my $name = $hash->{NAME};  
@@ -7230,9 +7231,10 @@ return;
 }
 
 ################################################################
-#  Funktion liefert 1 wenn Consumer Status ist "ausgeschaltet"
+#  Funktion liefert 1 wenn Consumer physisch "ausngeschaltet"
+#  ist, d.h. der Wert offreg des Readings rswstate wahr ist 
 ################################################################
-sub isConsumerOff {
+sub isConsumerPhysOff {
   my $hash = shift;
   my $c    = shift;  
   my $name = $hash->{NAME};
