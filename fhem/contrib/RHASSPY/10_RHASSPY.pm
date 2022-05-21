@@ -4699,7 +4699,7 @@ sub handleIntentSetNumeric {
            return respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
         }
     }
-
+    
     # Mapping and device found -> execute command
     my $cmd     = $mapping->{cmd} // return defined $data->{'.inBulk'} ? undef : respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
     my $part    = $mapping->{part};
@@ -4729,6 +4729,8 @@ sub handleIntentSetNumeric {
         my @tokens = split m{\s+}x, $oldVal;
         $oldVal = $tokens[$part] if @tokens >= $part;
     }
+    
+    $oldVal = $oldVal =~ m{(-?\d+(\.\d+)?)}x ? $1 : $oldVal;
 
     # Neuen Wert bestimmen
     my $newVal;
