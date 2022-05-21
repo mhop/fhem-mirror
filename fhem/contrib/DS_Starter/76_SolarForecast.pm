@@ -2759,12 +2759,12 @@ sub _manageConsumerData {
       ## Verbrauch auslesen + speichern
       ##################################
       my $pthreshold = 0;
-      my $enread     = ConsumerVal ($hash, $c, "retotal", ""); 
+      my $etotread   = ConsumerVal ($hash, $c, "retotal", ""); 
       my $u          = ConsumerVal ($hash, $c, "uetotal", ""); 
       
-      if($enread) {
+      if($etotread) {
           my $eu      = $u =~ /^kWh$/xi ? 1000 : 1;
-          my $etot    = ReadingsNum ($consumer, $enread, 0) * $eu;                                 # Summe Energieverbrauch des Verbrauchers
+          my $etot    = ReadingsNum ($consumer, $etotread, 0) * $eu;                               # Summe Energieverbrauch des Verbrauchers
           my $ehist   = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
           $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 0);                              # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird               
           
@@ -2781,7 +2781,7 @@ sub _manageConsumerData {
               push @$daref, "consumer${c}_currentPower<>". $pcurr." W";
           }
           #else {
-          #    deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$enread);
+          #    deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$etotread);
           #}
           
           if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $pthreshold) {
@@ -2794,22 +2794,22 @@ sub _manageConsumerData {
               delete $paref->{histname};   
           }   
 
-          $paref->{consumerco} = $etot;                                                        # Totalverbrauch des Verbrauchers
+          $paref->{consumerco} = $etot;                                                           # Totalverbrauch des Verbrauchers
           $paref->{histname}   = "csmt${c}";
           setPVhistory ($paref);
           delete $paref->{histname};
       }
       
-      deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$enread && !$paread);
+      deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$etotread && !$paread);
       
       ## Verbraucher - Laufzeit und Zyklen pro Tag ermitteln
       ## Laufzeit (in Minuten) wird pro Stunde erfasst
       ## bei Tageswechsel Rücksetzen in _specialActivities
       #######################################################
-      my $nompower = ConsumerVal ($hash, $c, "power",       0);                                # nominale Leistung lt. Typenschild
-      my $rpcurr   = ConsumerVal ($hash, $c, "rpcurr",     "");                                # Reading für akt. Verbrauch angegeben ?
+      my $nompower = ConsumerVal ($hash, $c, "power",   0);                                    # nominale Leistung lt. Typenschild
+      my $rpcurr   = ConsumerVal ($hash, $c, "rpcurr", "");                                    # Reading für akt. Verbrauch angegeben ?
       
-      if (!$rpcurr && isConsumerOn($hash, $c)) {                                              # Workaround wenn Verbraucher ohne Leistungsmessung
+      if (!$rpcurr && isConsumerOn($hash, $c)) {                                               # Workaround wenn Verbraucher ohne Leistungsmessung
           $pcurr = $nompower;
       }
       
@@ -2818,13 +2818,8 @@ sub _manageConsumerData {
       
       $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
       
-      #################################################
-      # onoff funktioniert nur zuverlässig wenn powerthreshold hier nochmal abgefragt wird ?!?
-      # $pthreshold = ConsumerVal ($hash, $c, "powerthreshold", 1); 
-      #################################################
-      
       my $starthour;
-      if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher soll aktiv sein
+      if($pcurr > $pthreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist aktiv
             if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
@@ -8399,7 +8394,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <table>  
          <colgroup> <col width=10%> <col width=90%> </colgroup>
             <tr><td> <b>type</b>       </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                               </td></tr>
-            <tr><td>                   </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülamschine                                                                          </td></tr>
+            <tr><td>                   </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülamschine                                                                         </td></tr>
             <tr><td>                   </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                        </td></tr>
             <tr><td>                   </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                        </td></tr>
             <tr><td>                   </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                              </td></tr>
@@ -8419,7 +8414,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                        </td></tr>
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
             <tr><td>                   </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                         </td></tr>
-            <tr><td> <b>pcurr</b>      </td><td>Reading welches den aktuellen Energieverbrauch (z.B. Schaltdose mit Energiemessung) liefert und Einheit (W/kW) (optional)        </td></tr>
+            <tr><td> <b>pcurr</b>      </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                 </td></tr>
             <tr><td> <b>etotal</b>     </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                      </td></tr>
             <tr><td> <b>               </td><td>:&lt;Schwellenwert&gt (Wh) - optionaler Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.              </td></tr>
             <tr><td> <b>swoncond</b>   </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional).                                          </td></tr>
