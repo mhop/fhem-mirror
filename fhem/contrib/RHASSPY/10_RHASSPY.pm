@@ -3030,6 +3030,7 @@ sub testmode_next {
 
     if ( $hash->{testline} < @{$hash->{helper}->{test}->{content}} ) {
         my @ca_strings = split m{,}x, ReadingsVal($hash->{NAME},'intents','');
+        $line = _replaceDecimalPoint($hash,$line);
         my $sendData =  { 
             input        => $line,
             sessionId    => "$hash->{siteId}_$hash->{testline}_testmode",
@@ -3240,6 +3241,7 @@ sub msgDialog_progress {
     #Log3($hash, 5, 'msgDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
+    $msgtext = _replaceDecimalPoint($hash,$msgtext);
 
     my $sendData =  { 
         input        => $msgtext,
@@ -3389,7 +3391,7 @@ sub SpeechDialog_progress {
     Log3($hash, 5, 'SpeechDialog_progress called without DATA') if !defined $data;
 
     return if !defined $data;
-
+    $msgtext = _replaceDecimalPoint($hash,$msgtext);
     my $sendData =  { 
         input        => $msgtext,
         sessionId    => $data->{sessionId},
@@ -3720,6 +3722,8 @@ sub sendTextCommand {
     my $hash = shift // return;
     my $text = shift // return;
     
+    $text = _replaceDecimalPoint($hash,$text);
+
     my $data = {
          input => $text,
          sessionId => "$hash->{fhemId}.textCommand" #,
@@ -5991,6 +5995,20 @@ sub _array2andString {
     my $text = join q{, }, @all;
     $text .=  " $and $fin";
     return $text;
+}
+
+sub _replaceDecimalPoint {
+    my $hash = shift // return;
+    my $line = shift // return;
+    my $point = 'point';
+    if ( $hash->{helper}{lng}->{commaconversion} ) {
+        $point = $hash->{helper}{lng}{words}->{comma} // 'komma';   
+        $line =~ s{(\d+)[,](\d+)}{$1 $point $2};  
+    } else {
+        $point = $hash->{helper}{lng}{words}->{point} // $point;
+        $line =~ s{(\d+)[.](\d+)}{$1 $point $2};  
+    }
+    return $line;
 }
 
 1;
