@@ -4607,8 +4607,6 @@ sub handleIntentSetNumericGroup {
     Log3($hash, 5, 'sorted devices list is: ' . join q{ }, @devlist);
     return respond( $hash, $data, getResponse( $hash, 'NoDeviceFound' ) ) if !keys %{$devices}; 
 
-    my $value = $data->{Value};
-
     my $updatedList;
     my $init_delay = 0;
     my $delaysum = 0;
@@ -4773,10 +4771,12 @@ sub handleIntentSetNumeric {
     # limit to min/max  (if set)
     $newVal = max( $minVal, $newVal ) if defined $minVal;
     $newVal = min( $maxVal, $newVal ) if defined $maxVal;
-    $data->{Value} //= $newVal;
-    $data->{Type}  //= $type;
-    delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
-
+    
+    if ( !defined $data->{'.inBulk'} ) {
+        $data->{Value} //= $newVal;
+        $data->{Type}  //= $type;
+        delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
+    }
     #check if confirmation is required
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
 
