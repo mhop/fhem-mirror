@@ -2789,8 +2789,14 @@ sub parseJSONPayload {
         my $value = $data->{$_};
         #custom converter equivalent
         if ( $_ eq 'Value' ) {
-            my $match = $value =~ s{\A\s*(\d+)\s*[.,]\s*(\d+)\s*\z}{$1.$2}xm;
-            $data->{$_} = $value if $match;
+            #my $match = $value =~ s{\A\s*(\d+)\s*[.,]\s*(\d+)\s*\z}{$1.$2}xm;
+            my $match = $value =~ m{\A(?<pre>[-])?[\s+]*(?<dig1>\d+)\s*([.]\s*(?<dig2>\d+)?)\z}x;
+            if ( $match ) {
+               $value = $+{dig1};
+               $value .= ".$+{dig2}" if $+{dig2};
+               $value = "$+{pre}$value" if $+{pre};
+               $data->{$_} = $value ;
+            }
         }
         Log3($hash->{NAME}, 5, "Parsed value: $value for key: $_") if defined $value;
     }
@@ -4663,6 +4669,8 @@ sub handleIntentSetNumeric {
     $subType =  'desired-temp' if defined $subType && $subType eq 'temperature';
 
     my $value  = $data->{Value};
+    my $factor = $data->{Factor} // 1;
+    $factor = 1 if !looks_like_number($factor);
     my $room   = getRoomName($hash, $data);
 
     # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
@@ -4746,7 +4754,7 @@ sub handleIntentSetNumeric {
         if ( $change eq 'cmdStop' || $useMap ) {
             $newVal = $oldVal // 50;
         } elsif ( ( !defined $unit || !$ispct ) && !$forcePercent ) {
-            $newVal = ($up) ? $oldVal + $diff : $oldVal - $diff;
+            $newVal = ($up) ? $oldVal + $diff*$factor : $oldVal - $diff*$factor;
         }
         # Stellwert um Prozent x ändern ("Mache Lampe um 20 Prozent heller" oder "Mache Lampe um 20 heller" bei forcePercent oder "Mache Lampe heller" bei forcePercent)
         elsif ( ( $ispct || $forcePercent ) && $checkMinMax ) {
@@ -6620,7 +6628,8 @@ yellow=rgb FFFF00</code></p>
   <li>SetTimedOnOffGroup</li> (for keywords see SetOnOffGroup)
   <li>GetOnOff</li>(for keywords see SetOnOff)
   <li>SetNumeric</li>
-  Dependend on the specific surrounding informations, a combination of {Device}, {Value} (nummeric value), {Change} and/or {Type} are sufficient, {Room} is optional. Additional optional field is {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored). {Change} can be with one of ({Type})
+  Dependend on the specific surrounding informations, a combination of {Device}, {Value} (nummeric value), {Change} and/or {Type} are sufficient, {Room} is optional. Additional optional field is {Unit} (value <i>percent</i> will be interprated as request to calculate, others will be ignored). 
+  Alternatively to {Unit:percent} you may combine {Value} with {Factor} (nummeric value) to increase or reduce the stepwidth of the desired change (both values will be multiplied). {Change} can be with one of ({Type})
   <ul>
     <li>lightUp, lightDown (brightness)</li>
     <li>volUp, volDown (volume)</li>
