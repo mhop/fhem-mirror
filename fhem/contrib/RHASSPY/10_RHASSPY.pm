@@ -3030,6 +3030,7 @@ sub testmode_next {
 
     if ( $hash->{testline} < @{$hash->{helper}->{test}->{content}} ) {
         my @ca_strings = split m{,}x, ReadingsVal($hash->{NAME},'intents','');
+        $line = (split m{[#]}x,$line)[0]; #ignore comments
         $line = _replaceDecimalPoint($hash,$line);
         my $sendData =  { 
             input        => $line,
@@ -3069,7 +3070,9 @@ sub testmode_end {
             my $line = $rawresult->{$resu};
             if ( defined $line->[1] ) {
                 my $single = $line->[0];
-                push @{$aresult}, qq(   [RHASSPY] Input:      $single);
+                my @tokens = split m{[#]}x, $single, 2; 
+                push @{$aresult}, qq(   [RHASSPY] Input:      $tokens[0]);
+                push @{$aresult}, qq(                Id:      $tokens[1]) if defined $tokens[1];
                 for ( 1..@{$line}-1) {
                     $single = $line->[$_];
                     push @{$aresult}, qq(             $single);
