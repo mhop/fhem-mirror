@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 02/2022
-my $thzversion = "0.200";
+# by immi 05/2022
+my $thzversion = "0.201";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -986,6 +986,7 @@ sub THZ_Refresh_all_gets($) {
 #        my %par = (hash => $hash, command => $cmdhash, NAME => $hash->{NAME} ); #does not group in apptime
         InternalTimer((gettimeofday() + $timedelay), "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
         $timedelay += 2;                      #0.6 seconds were ok but considering winter 2017/2018 I prefer to increase
+	$timedelay += 2 if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/);  # I added 2 more seconds for joerg 05/2022
   }  
 }
 
@@ -1541,14 +1542,16 @@ sub THZ_ReadAnswer($) {
     my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.8"));
     $rtimeout +=1 if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/);
     $rtimeout = minNum($rtimeout,1.8) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.8s if nonblocking disabled
-    my $count = 0; my $countmax = 20;
+    my $count = 0; my $countmax = 40;
     while ((!defined($buf)) and ($count <= $countmax)) {
         if ($^O =~ /Win/){
             select(undef, undef, undef, 0.005);  ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
+            select(undef, undef, undef, 0.02) if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/);   # possible fix for joerg may2022, add 20ms wait time to the above -----    
             $buf =    DevIo_DoSimpleRead($hash);
             $buf =  undef if (length($buf)==0);
         }
         else {
+            select(undef, undef, undef, 0.02) if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/);   # possible fix for joerg may2022, add 20ms wait time to the above -----    
             $buf = DevIo_SimpleReadWithTimeout($hash, (minNum($count,1)*$rtimeout/$countmax + 0.001)); ##pay attention with DevIo_SimpleRead: it closes the connection if no answe given; DevIo_SimpleReadWithTimeout does not close
         }
         $count ++;
