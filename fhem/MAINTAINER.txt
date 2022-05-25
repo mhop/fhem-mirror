@@ -28,6 +28,7 @@ FHEM/00_HMLAN.pm             martinp876           HomeMatic
 FHEM/00_HMUARTLGW.pm         mgernoth             HomeMatic
 FHEM/00_HXB.pm               neubert              Sonstige Systeme
 FHEM/00_KM271.pm             physikus             Sonstiges
+FHEM/00_KNXIO                erwin                KNX/EIB (Forum #127792) https://forum.fhem.de/index.php/topic,127792.0.html
 FHEM/00_KNXTUL               jewuma               KNX/EIB
 FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
 FHEM/00_MAXLAN.pm            Wzut		  MAX
