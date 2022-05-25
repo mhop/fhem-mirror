@@ -835,7 +835,7 @@ FB_CALLMONITOR_reverseSearch($$)
                     else
                     {
                         #Debug($result);
-                        if($result =~ m,<span class="st-treff-name">(.+?)</span>,)
+                        if($result =~ m,\@type":.+?"name":"(.+?)",)
                         {
                             $invert_match = $1;
                             $invert_match = FB_CALLMONITOR_html2txt($invert_match);

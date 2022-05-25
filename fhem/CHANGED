@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  72_FB_CALLMONITOR: adapt regexp for dasoertliche.de reverse
+                               search 
  - new:     00_KNXIO: new IO-module for KNX/EIB
  - new:     70_Klafs: Klafs Sauna control
  - change:  93_DbRep: allow optionally set device/reading insert command,
