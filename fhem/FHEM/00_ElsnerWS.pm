@@ -198,7 +198,6 @@ sub ElsnerWS_Read($) {
   $hash->{PARTIAL} = '' if(length($hash->{PARTIAL}) > 203);
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   #Log3 $name, 5, "ElsnerWS $name received DATA: " . uc(unpack('H*', $buf));
-  Log3 $name, 5, "ElsnerWS $name received DATA: $data";
 
   while($data =~ m/^(57)(2B|2D)(.{36})(.{8})(03)(.*)/ ||
         $data =~ m/^(57)(2B|2D)(.{66})(.{8})(03)(.*)/ ||
@@ -206,7 +205,7 @@ sub ElsnerWS_Read($) {
     my ($packetType, $ldata, $checksum, $etx, $rest) = ($1, $2 . $3, pack('H*', $4), hex($5), $6);
     # data telegram incomplete
     last if(!defined $etx);
-    Log3 $name, 5, "ElsnerWS $name received $packetType, $ldata, $checksum, $etx";
+    #Log3 $name, 5, "ElsnerWS $name received $packetType, $ldata, $checksum, $etx";
     last if($etx != 3);
     my $tlen = length($ldata);
     $data = $ldata;
@@ -216,6 +215,9 @@ sub ElsnerWS_Read($) {
       $data = $rest;
       next;
     }
+
+    Log3 $name, 5, "ElsnerWS $name received DATA: $data LEN: $tlen";
+
     $data =~ m/^(..)(........)(....)(....)(....)(..)(......)(........)(..)(.*)/;
     my ($temperatureSign, $temperature, $sunSouth, $sunWest, $sunEast, $twilightFlag, $brightness, $windSpeed, $isRaining, $zdata) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
     $sunSouth = pack('H*', $sunSouth) * 1000;
