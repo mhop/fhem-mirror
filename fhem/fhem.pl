@@ -3848,6 +3848,7 @@ DoTrigger($$@)
   # the inner loop.
   if($max && !defined($hash->{INTRIGGER})) {
     $hash->{INTRIGGER}=1;
+    $hash->{eventCount}++;
     if($attr{global}{verbose} >= 5) {
       Log 5, "Starting notify loop for $dev, " . scalar(@{$hash->{CHANGED}}) . 
         " event(s), first is " . escapeLogLine($hash->{CHANGED}->[0]);
