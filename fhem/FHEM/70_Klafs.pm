@@ -21,9 +21,6 @@
 #     Forum: https://forum.fhem.de/index.php?topic=127701
 #
 ##############################################################################
-# ToDo
-# get SaunaID
-##############################################################################
 package main;
 
 use strict;
@@ -175,9 +172,9 @@ sub Klafs_CONNECTED {
       $hash->{Klafs}->{CONNECTED} = $set;
 
       if ( $notUseBulk ) {
-        readingsSingleUpdate($hash,'state',$set,1) if $set eq ReadingsVal($hash->{NAME},'state','');
+        readingsSingleUpdate($hash,'state',$set,1) if $set ne ReadingsVal($hash->{NAME},'state','');
       } else {
-        readingsBulkUpdate($hash,'state',$set) if $set eq ReadingsVal($hash->{NAME},'state','');
+        readingsBulkUpdate($hash,'state',$set) if $set ne ReadingsVal($hash->{NAME},'state','');
       }
       return;
     }
