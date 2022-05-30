@@ -490,7 +490,7 @@ sub msgDialog_reset {
 sub msgDialog_updateAllowed {
   Log3('global',5, 'msgDialog - entering msgDialog_updateAllowed');
 
-  my $allowed = join q{,}, sort devspec2array($msgDialog_devspec);
+  my $allowed = join q{,}, devspec2array($msgDialog_devspec);
 
   $modules{msgDialog}{AttrList} =~
     s{allowed:multiple-strict,\S*}{allowed:multiple-strict,everyone,$allowed};
