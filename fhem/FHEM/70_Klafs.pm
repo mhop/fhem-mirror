@@ -368,7 +368,6 @@ sub klafs_getStatusResponse {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   my $header = $param->{httpheader};
-  my $power = ReadingsVal( $name, "power", "off" );
   
   Log3 ($name, 5, "Status header: $header");
   Log3 ($name, 5, "Status Data: $data");
@@ -389,6 +388,11 @@ sub klafs_getStatusResponse {
      for my $key (qw( saunaSelected sanariumSelected irSelected isConnected isPoweredOn isReadyForUse showBathingHour)) {
       $entries->{$key} = $entries->{$key} ?  q{true} : q{false} ;
      }
+     my $power = $entries->{isPoweredOn} eq q{true}  ? 'on' 
+               : $entries->{isPoweredOn} eq q{false} ? 'off'
+               : 0;
+     $entries->{power} = $power;
+
      $entries->{statusMessage} //= '';
      $entries->{currentTemperature} = '0' if $entries->{currentTemperature} eq '141';
      $entries->{RemainTime} = sprintf("%2.2d:%2.2d" , $entries->{bathingHours}, $entries->{bathingMinutes});
