@@ -334,7 +334,7 @@ sub Define {
 
     my @unknown;
     for (keys %{$h}) {
-        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|experimental|Babble|autoTraining)\z}xm;
+        push @unknown, $_ if $_ !~ m{\A(?:baseUrl|defaultRoom|language|devspec|fhemId|prefix|siteId|encoding|useGenericAttrs|sessionTimeout|handleHotword|noChangeover|experimental|Babble|autoTraining)\z}xm;
     }
     my $err = join q{, }, @unknown;
     return "unknown key(s) in DEF: $err" if @unknown && $init_done;
@@ -355,7 +355,7 @@ sub Define {
     $hash->{useGenericAttrs} = $h->{useGenericAttrs} // 1;
     $hash->{autoTraining} = $h->{autoTraining} // 60;
 
-    for my $key (qw( experimental handleHotword sessionTimeout Babble )) {
+    for my $key (qw( experimental handleHotword sessionTimeout noChangeover Babble )) {
         delete $hash->{$key};
         $hash->{$key} = $h->{$key} if defined $h->{$key};
     }
@@ -2048,18 +2048,19 @@ sub getDeviceByName {
         return \@maybees;
     }
     $room = $room ? "especially not in room >>$room<< (also not outside)!" : 'room not provided!';
-    Log3($hash->{NAME}, 1, "No device for >>$name<< found, $room");
+    Log3($hash->{NAME}, $hash->{noChangeover} ? 1 : 5, "No device for >>$name<< found, $room");
     return;
 }
 
 
 # returns lists of "might be relevant" devices via room, intent and (optional) Type info
 sub getDevicesByIntentAndType {
-    my $hash   = shift // return;
-    my $room   = shift;
-    my $intent = shift;
-    my $type   = shift; #Beta-User: any necessary parameters...?
+    my $hash    = shift // return;
+    my $room    = shift;
+    my $intent  = shift;
+    my $type    = shift; #Beta-User: any necessary parameters...?
     my $subType = shift // $type;
+    my $onlyOn  = shift;
 
     my @matchesInRoom; my @matchesOutsideRoom;
 
@@ -2070,14 +2071,13 @@ sub getDevicesByIntentAndType {
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # get lists of devices that may fit to requirements
-        if ( !defined $type ) {
+        if ( !defined $type || defined $type && $mappingType && $type =~ m{\A$mappingType\z}ix) {
+            if ($onlyOn ) {
+                my $mapon = getMapping($hash, $devs, 'GetOnOff', undef, 1) // next;
+                next if !_getOnOffState($hash, $devs, $mapon);
+            }
             $rooms =~ m{\b$room\b}ix
             ? push @matchesInRoom, $devs 
-            : push @matchesOutsideRoom, $devs;
-        }
-        elsif ( defined $type && $mappingType && $type =~ m{\A$mappingType\z}ix ) {
-            $rooms =~ m{\b$room\b}ix
-            ? push @matchesInRoom, $devs
             : push @matchesOutsideRoom, $devs;
         }
     }
@@ -2086,17 +2086,18 @@ sub getDevicesByIntentAndType {
 
 # Identify single device via room, intent and (optional) Type info
 sub getDeviceByIntentAndType {
-    my $hash   = shift // return;
-    my $room   = shift;
-    my $intent = shift;
-    my $type   = shift; #Beta-User: any necessary parameters...?
+    my $hash    = shift // return;
+    my $room    = shift;
+    my $intent  = shift;
+    my $type    = shift; #Beta-User: any necessary parameters...?
     my $subType = shift // $type;
+    my $onlyOn  = shift;
 
     #rem. Beta-User: atm function is only called by GetNumeric!
     my $device;
 
     # Devices sammeln
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
+    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType, $onlyOn);
     Log3($hash->{NAME}, 5, "matches in room: @{$matchesInRoom}, matches outside: @{$matchesOutsideRoom}");
     my ($response, $last_item, $first_items);
 
@@ -2174,50 +2175,8 @@ sub getDeviceByIntentAndType {
             }
         }
     }
-    #$device = (@{$matchesInRoom}) ? shift @{$matchesInRoom} : shift @{$matchesOutsideRoom};
 
     Log3($hash->{NAME}, 5, "Device selected: ". defined $response ? 'more than one' : $device ? $device : "none");
-
-    return $device;
-}
-
-
-# Eingeschaltetes Gerät mit bestimmten Intent und optional Type suchen
-sub getActiveDeviceForIntentAndType {
-    my $hash   = shift // return;
-    my $room   = shift;
-    my $intent = shift;
-    my $type   = shift;
-    my $subType = shift // $type;
-
-    my $device;
-    my ($matchesInRoom, $matchesOutsideRoom) = getDevicesByIntentAndType($hash, $room, $intent, $type, $subType);
-
-    # Anonyme Funktion zum finden des aktiven Geräts
-    my $activeDevice = sub ($$) {
-        my $subhash = shift;
-        my $devices = shift // return;
-        my $match;
-
-        for (@{$devices}) {
-            my $mapping = getMapping($subhash, $_, 'GetOnOff', undef, 1);
-            if ( defined $mapping ) {
-                # Gerät ein- oder ausgeschaltet?
-                my $value = _getOnOffState($subhash, $_, $mapping);
-                if ( $value ) {
-                    $match = $_;
-                    last;
-                }
-            }
-        }
-        return $match;
-    };
-
-    # Gerät finden, erst im aktuellen Raum, sonst in den restlichen
-    $device = $activeDevice->($hash, $matchesInRoom);
-    $device //= $activeDevice->($hash, $matchesOutsideRoom);
-
-    Log3($hash->{NAME}, 5, "Device selected: $device");
 
     return $device;
 }
@@ -2251,6 +2210,7 @@ sub getDeviceByMediaChannel {
     Log3($hash->{NAME}, 1, "No device for >>$channel<< found, especially not in room >>$room<< (also not outside)!");
     return;
 }
+
 
 sub getDevicesByGroup {
     my $hash    = shift // return;
@@ -2288,14 +2248,41 @@ sub getDevicesByGroup {
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
 
+    if ( !$isVirt && !$getVirt && ( !$hash->{noChangeover} || $hash->{noChangeover} ne '1' ) ) {
+        my $intent = $data->{intent} // return;
+        $intent =~ s{Group\z}{}x;
+
+        my $single = getDeviceByName( $hash, $room, $data->{Group}, $data->{Room}, $intent, $intent );
+        return if !$single || ref $single eq 'ARRAY';
+        Log3($hash->{NAME}, 3, "Device selected using Group key instead Device key: $single");
+        $devices->{$single} = { delay => 0, prio => 0 };
+    }
+
     return keys %{$devices} if $getVirt;
     return $devices;
+}
+
+
+sub getGroupReplacesDevice {
+    my $hash    = shift // return;
+    my $data    = shift // return;
+
+    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if $hash->{noChangeover};
+    $data->{Group} = $data->{Device};
+    my $isvirt = getIsVirtualGroup($hash,$data, undef, 1);
+    if ( $isvirt ) {
+        Log3($hash->{NAME}, 3, "Group $data->{Device} selected using Device key instead Group key. Finally addressed: $isvirt");
+        return $isvirt;
+    }
+
+    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
 }
 
 sub getIsVirtualGroup {
     my $hash    = shift // return;
     my $data    = shift // return;
     my $getVirt = shift;
+    my $frmChOv = shift;
 
     return if defined $data->{'.virtualGroup'};
 
@@ -2312,6 +2299,7 @@ sub getIsVirtualGroup {
     for ( keys %{$data} ) {
         $restdata->{$_} = $data->{$_} if $_ !~ m{\A(?:Room|Group|Device|intent)}x;
     }
+    @devs = () if $frmChOv;
 
     my $intent = $data->{intent} // return;
     $intent =~ s{Group\z}{}x;
@@ -2325,7 +2313,7 @@ sub getIsVirtualGroup {
 
     for my $room ( @rooms ) {
         for my $dev ( @devs ) {
-        my $single = getDeviceByName($hash, $room eq 'noneInData' ? getRoomName($hash, $data) : $data->{$room}, $data->{$dev}, $room eq 'noneInData' ? undef : $data->{$room}, $intent);
+            my $single = getDeviceByName($hash, $room eq 'noneInData' ? getRoomName($hash, $data) : $data->{$room}, $data->{$dev}, $room eq 'noneInData' ? undef : $data->{$room}, $intent);
             next if ref $single eq 'ARRAY';
             if ( defined $single && $single ne '0' ) {
                 $maynotbe_in_room->{$dev} = $room if !defined $cleared_in_room->{$dev};
@@ -2341,6 +2329,7 @@ sub getIsVirtualGroup {
             my $checkdata = $restdata;
             $checkdata->{Group}  = $data->{$grp};
             $checkdata->{Room}   = $data->{$room} if $room ne 'noneInData' ;
+            $checkdata->{intent} = $grpIntent;
             @devlist = ( @devlist, getDevicesByGroup($hash, $checkdata, 1) );
             $needsConfirmation //= getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
         }
@@ -2348,8 +2337,9 @@ sub getIsVirtualGroup {
 
     return if !@devlist;
     @devlist = uniq(@devlist);
+    Log3( $hash, 5, "[$hash->{NAME}] getIsVirtualGroup identified @devlist" );
 
-    if (!$needsConfirmation) {
+    if ( !$needsConfirmation && !$frmChOv ) {
         my $checkdata = $restdata;
         $checkdata->{Group}  = 'virtualGroup';
         $needsConfirmation = getNeedsConfirmation($hash, $checkdata, $grpIntent, undef, 1);
@@ -4307,7 +4297,9 @@ sub handleIntentSetOnOff {
     return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
-    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff' );
+    return getGroupReplacesDevice($hash, $data) if !defined $device;
+
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -4421,7 +4413,8 @@ sub handleIntentSetTimedOnOff {
     return $redirects if $redirects;
 
     my $room = getRoomName($hash, $data);
-    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+    my $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetOnOff', 'SetOnOff');
+    return getGroupReplacesDevice($hash, $data) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     my $mapping = getMapping($hash, $device, 'SetOnOff') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
@@ -4681,9 +4674,10 @@ sub handleIntentSetNumeric {
     # Gerät über Name suchen, oder falls über Lautstärke ohne Device getriggert wurde das ActiveMediaDevice suchen
     if ( !defined $device && exists $data->{Device} ) {
         $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, $subType, 'SetNumeric' );
+        return getGroupReplacesDevice($hash, $data) if !defined $device;
     } elsif ( defined $type && $type eq 'volume' ) {
         $device = 
-            getActiveDeviceForIntentAndType($hash, $room, 'SetNumeric', $type) 
+            getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $type, 1) 
             // return respond( $hash, $data, getResponse( $hash, 'NoActiveMediaDevice') );
     } elsif ( !defined $data->{'.DevName'} ) {
         $device = getDeviceByIntentAndType($hash, $room, 'SetNumeric', $type, $subType);
@@ -5033,13 +5027,14 @@ sub handleIntentMediaControls {
 
     # Search for matching device
     if (exists $data->{Device}) {
-        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' ) // return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') );
+        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' );
+        return getGroupReplacesDevice($hash, $data) if !defined $device;
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
-        return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
     } else {
-        $device = getActiveDeviceForIntentAndType($hash, $room, 'MediaControls', undef) 
+        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls', undef, 1) 
         // return respond( $hash, $data, getResponse($hash, 'NoActiveMediaDevice') );
     }
+    return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
 
     my $mapping = getMapping($hash, $device, 'MediaControls') // return respond( $hash, $data, getResponse($hash, 'NoMappingFound') );
 
@@ -5218,7 +5213,7 @@ sub handleIntentSetColor {
 
     # Search for matching device and command
     $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'SetColor', 'SetColor' ) if !defined $device;
-    return respond( $hash, $data, getResponse($hash, 'NoDeviceFound') ) if !defined $device;
+    return getGroupReplacesDevice($hash, $data) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
 
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -6011,6 +6006,7 @@ sub _replaceDecimalPoint {
         $point = $hash->{helper}{lng}{words}->{point} // $point;
         $line =~ s{(\d+)[.](\d+)}{$1 $point $2};  
     }
+    $line =~ s{(\s*\d+)[:](\d+)\s+(\w+)}{$1 $3 $2 }g; #Beta-User: Zeitangaben
     return $line;
 }
 
@@ -6091,6 +6087,8 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
       <li><code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
     </ul>
   </li>
+  <a id="RHASSPY-noChangeover"></a>
+  <li><b>noChangeover</b>: By default, RHASSPY will first try to execute the intent as handed over by Rhasspy. In case there's no strict match, RHASSPY then will do a check, if the single device intent could be executed as group intent (vice versa; to do this, the {Group} key value will be used as {Device} key). Setting this key to '1' will completely prevent this check, '2' will stop changeover from single device intent to respective group intent, but allow to switch from group to single device.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
   <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
