@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<SystemTree id="{800B2218-CCAF-4E74-AD70-8A774B99F578}">
+  <STM adr="0" name="Steuermodul 0">
+    <MOD adr="9" name="EMD230" display="EG 230 1">
+      <IN>
+        <CHA adr="0" name="BWM Wand Arbeiten zum Garten hin" visu="0"/>
+        <CHA adr="1" name="BWM Durchgang Terrasse" visu="0"/>
+      </IN>
+    </MOD>
+    <MOD adr="64" name="AMD230_10" display="KG">
+      <OUT>
+        <CHA adr="0" name="Keller Flur - Deckenlampe" visu="0"/>
+        <CHA adr="1" name="Keller Werkstatt - Deckenlampe" visu="0"/>
+      </OUT>
+    </MOD>
+    <MOD adr="77" name="JRM" display="UV-EG">
+      <OUT>
+        <CHA adr="0" name="K�che links" visu="0"/>
+        <CHA adr="1" name="K�che rechts" visu="0"/>
+        <CHA adr="2" name="Wohnen links" visu="0"/>
+        <CHA adr="3" name="Wohnen mitte" visu="0"/>
+        <CHA adr="4" name="Zeitmessung f�r Sonnenautomatik Sued" visu="0"/>
+        <CHA adr="5" name="Zeitmessung f�r Sonnenautomatik Ost" visu="0"/>
+        <CHA adr="6" name="Zeitmessung Dimmer nach Leinwand" visu="0"/>
+        <CHA adr="7" name="Zeitmessung Leinwand" visu="0"/>
+      </OUT>
+    </MOD>
+    <MOD adr="0" name="EMD_RUE" display="KG">
+      <IN>
+        <CHA adr="0" name="grosser Keller - neben Aussent�re - oben - Wandlampe Aussentreppe" visu="0"/>
+        <CHA adr="1" name="grosser Keller - neben beiden T�ren - unten1 - Deckenlicht bei W�rmepumpe" visu="0"/>
+      </IN>
+      <OUT>
+        <CHA adr="0" name="LED - grosser Keller - neben Aussent�re - oben - Wandlampe Aussentreppe" visu="0"/>
+        <CHA adr="1" name="LED Kontrolle Bachlauf Manuell" visu="0"/>
+      </OUT>
+    </MOD>
+    <MOD adr="160" name="DIM_AB" display="DG">
+      <OUT>
+        <CHA adr="0" name="Bad - Deckenleuchte" visu="0"/>
+        <CHA adr="1" name="Schlafen - Deckenleuchte" visu="0"/>
+      </OUT>
+    </MOD>
+    <MOD adr="34" name="MCC_2" display="MCC1a">
+      <IN>
+        <CHA adr="0" name="Taste links oben (1) - Bachlauf" visu="0"/>
+      </IN>
+      <OUT>
+        <CHA adr="0" name="Taste links oben (1) - Bachlauf LED" visu="0"/>
+      </OUT>
+    </MOD>
+    <MOD adr="120" name="MFM_FUNK2" display="Funkinterface E/A (Easyclick)">
+      <IN>
+        <CHA adr="3" name="Funkeingang - 03" visu="0"/>
+        <CHA adr="4" name="Funkeingang - 04" visu="0"/>
+      </IN>
+      <OUT>
+        <CHA adr="0" name="Funkausgang - 00" visu="0"/>
+        <CHA adr="1" name="Funkausgang - 01" visu="0"/>
+      </OUT>
+    </MOD>
+  </STM>
+</SystemTree>

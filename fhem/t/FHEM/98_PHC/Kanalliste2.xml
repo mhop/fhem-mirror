@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<SystemTree id="">
+<STM adr="0" name="Steuermodul 0" ver="V3">
+<MOD adr="0" display="Eingangsmodul 24V 00" iadr="0" name="EMD24">
+<IN>
+<CHA adr="0" name="Kellertreppe Flur EG" visu="0"/>
+<CHA adr="1" name="Wälzpumpe Warmwasser" visu="0"/>
+</IN>
+<OUT>
+<CHA adr="0" name="LED Ausgang - 00" visu="0"/>
+<CHA adr="1" name="LED Ausgang - 01" visu="0"/>
+</OUT>
+</MOD>
+<MOD adr="1" display="Eingangsmodul 24V -01" iadr="1" name="EMD24">
+<IN>
+<CHA adr="6" name="WZ-3 links" visu="0"/>
+<CHA adr="7" name="WZ-3 rechts" visu="0"/>
+<CHA adr="8" name="WZ-4 links" visu="0"/>
+</IN>
+<OUT>
+<CHA adr="0" name="LED Ausgang - 00" visu="0"/>
+<CHA adr="1" name="LED Ausgang - 01" visu="0"/>
+<CHA adr="2" name="LED Ausgang - 02" visu="0"/>
+</OUT>
+</MOD>
+</STM>
+</SystemTree>
