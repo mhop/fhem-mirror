@@ -1,5 +1,6 @@
 ##############################################
 # test master slave end to end
+# also map, min max, ...
 ##############################################
 
 package main;
@@ -249,7 +250,51 @@ sub testStep36 {
 sub testStep32 {     
     #LogStep "";
     #is(FhemTestUtils_gotEvent(qr/D1:TempWasserAus:\s20/xms), 1, "Write value to local slave");
-    return 0.1;
+    CheckAndReset();
+    return;
 }
+
+
+sub testStep40 {     # check input map default
+    fhem ('attr Master verbose 4');
+    fhem ('attr Master dev-h-write 6');     # back to standard
+    fhem ('attr Slave verbose 3');
+    fhem ('setreading Slave Test1 1');
+    fhem 'deleteattr Master obj-h100-expr';
+    fhem 'attr Master obj-h100-map 1:low, 2:medium, 3:high';
+
+    fhem 'set Master o4 none';
+    fhem 'get Master Test1';
+
+    return 0.2;
+}
+
+sub testStep41 {     # check write data
+    LogStep "check log for map with default";
+    is(FhemTestUtils_gotLog('0506000d0005d98e'), 1, "set o1 5 (default) message in log");
+    CheckAndReset();
+    return;
+}
+
+sub testStep45 {     # check ouput map with default
+    fhem ('attr Master verbose 5');
+    fhem ('attr Slave verbose 4');
+
+    fhem ('setreading Slave Test1 1');          # Slave expr will answer with 4
+    fhem 'deleteattr Master obj-h100-expr';
+    fhem 'attr Master obj-h100-map 1:low, 2:medium, 3:high';
+    fhem 'attr Master obj-h100-mapDefault invalid';
+    fhem 'get Master Test1';
+    return 0.2;
+}
+
+sub testStep46 {     # check data
+    LogStep "check log for output map with default";
+    is(FhemTestUtils_gotEvent(qr/Master:Test1:\sinvalid/xms), 1, "get map default result");
+    CheckAndReset();
+    return;
+}
+
+
 
 1;
