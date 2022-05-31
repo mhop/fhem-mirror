@@ -12,7 +12,7 @@ $modVersion =~ /^([0-9]+)\./;
 my $major = $1;
 
 if ($major && $major >= 4) {
-    plan tests => 9;
+    plan tests => 11;
 } else {
     plan skip_all => "This test only works for HTTPMOD version 4 or later, installed is $modVersion";
 }
@@ -34,12 +34,19 @@ fhem('attr H2 readingEncode utf8');
 fhem('set H2 reread');
 is(FhemTestUtils_gotEvent("H2:TestReading1: \xc3\x84\x6e"), 1, "TestReading with body decode");
 
+
+CheckAndReset();
+fhem('attr H2 bodyDecode UTF8');
+fhem('attr H2 readingEncode utf8');
+fhem('set H2 reread');
+is(FhemTestUtils_gotEvent("H2:TestReading1: \xef\xbf\xbd"), 1, "TestReading with body decode UTF8");
+
 CheckAndReset();
 fhem('attr H2 dumpBuffers .');
 fhem('attr H2 verbose 5');
 fhem('set H2 reread');
-
 # todo: check
+# problem: where can we write buffers (with permission) during testing?
 
 CheckAndReset();
 fhem 'set H3 reread';
