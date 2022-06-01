@@ -22,6 +22,7 @@ watchdog_Initialize($)
     activateOnStart:1,0
     addStateEvent:1,0
     autoRestart:1,0
+    completeOnDisabled:1,0
     disable:1,0
     disabledForIntervals
     execOnReactivate
@@ -57,6 +58,20 @@ watchdog_reset($)
   my ($watchdog) = @_;
   $watchdog->{STATE} = "defined";
   setReadingsVal($watchdog, "Reset", "reset", TimeNow());
+}
+
+sub
+watchdog_isDisabled($)
+{
+  my ($name) = @_;
+
+  my $state = $defs{$name}{STATE};
+
+  if(IsDisabled($name) || $defs{$name}{STATE} eq "inactive") {
+    return 0 if(AttrVal($name, "completeOnDisabled", 0) && $state =~ m/Next:/);
+    return 1;
+  }
+  return 0;
 }
 
 #####################################
@@ -123,7 +138,7 @@ watchdog_Notify($$)
   my ($watchdog, $dev) = @_;
 
   my $ln = $watchdog->{NAME};
-  return "" if(IsDisabled($ln) || $watchdog->{STATE} eq "inactive");
+  return "" if(watchdog_isDisabled($ln));
   my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
   my $re2act = AttrVal($ln, "regexp2WillReactivate", 0);
 
@@ -187,7 +202,7 @@ watchdog_Trigger($)
   my ($watchdog) = @_;
   my $name = $watchdog->{NAME};
 
-  if(IsDisabled($name) || $watchdog->{STATE} eq "inactive") {
+  if(watchdog_isDisabled($name)) {
     watchdog_reset($watchdog);
     return "";
   }
@@ -299,12 +314,12 @@ watchdog_Set($@)
 =item summary_DE f&uuml;hrt Befehl aus, falls innerhalb des Timeouts kein Event empfangen wurde
 =begin html
 
-<a name="watchdog"></a>
+<a id="watchdog"></a>
 <h3>watchdog</h3>
 <ul>
   <br>
 
-  <a name="watchdogdefine"></a>
+  <a id="watchdog-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; watchdog &lt;regexp1&gt; &lt;timespec&gt; &lt;regexp2&gt; &lt;command&gt;</code><br>
@@ -367,7 +382,7 @@ watchdog_Set($@)
     <br>
   </ul>
 
-  <a name="watchdogset"></a>
+  <a id="watchdog-set"></a>
   <b>Set </b>
   <ul>
     <li>inactive<br>
@@ -382,13 +397,13 @@ watchdog_Set($@)
     </ul>
     <br>
 
-  <a name="watchdogget"></a>
+  <a id="watchdog-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="watchdogattr"></a>
+  <a id="watchdog-attr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="watchdogactivateOnStart">activateOnStart</a><br>
+    <li><a id="watchdog-attr-activateOnStart">activateOnStart</a><br>
       if set, the watchdog will be activated after a FHEM start if appropriate,
       determined by the Timestamp of the Activated and the Triggered readings.
       Note: since between shutdown and startup events may be missed, this
@@ -399,12 +414,12 @@ watchdog_Set($@)
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
-    <li><a name="watchdogregexp1WontReactivate">regexp1WontReactivate</a><br>
+    <li><a id="watchdog-attr-regexp1WontReactivate">regexp1WontReactivate</a><br>
       When a watchdog is active, a second event matching regexp1 will
       normally reset the timeout. Set this attribute to prevents this.
       </li><br>
 
-    <li><a name="watchdogregexp2WillReactivate">regexp2WillReactivate</a><br>
+    <li><a id="watchdog-attr-regexp2WillReactivate">regexp2WillReactivate</a><br>
       Normally after an event matching regexp2 ist received, the watchdog is
       waiting for an event matching regexp1 to start the countdown. If this
       attribute set to 1 (the default 0), then after receivig an event
@@ -412,15 +427,19 @@ watchdog_Set($@)
       regexp2 are identical, or regexp2 is ., then this behavior is default.
       </li><br>
 
-    <li><a href="#execOnReactivate">execOnReactivate</a>
+    <li><a id="watchdog-attr-execOnReactivate">execOnReactivate</a><br>
       If set, its value will be executed as a FHEM command when the watchdog is
       reactivated (after triggering) by receiving an event matching regexp1.
       </li><br>
 
-    <li><a href="#autoRestart">autoRestart</a>
+    <li><a id="watchdog-attr-autoRestart">autoRestart</a><br>
       When the watchdog has triggered it will be automatically re-set to state
-      defined again (waiting for regexp1) if this attribute is set to 1.
-    </li>
+      defined again (waiting for regexp1) if this attribute is set to 1.</li><br>
+
+    <li><a id="watchdog-attr-completeOnDisabled">completeOnDisabled</a><br>
+      If set (to 1), the watchdog will complete normally, even if at completion
+      time disabled is active (see disabledForIntervals).  </li><br>
+
   </ul>
   <br>
 </ul>
@@ -429,12 +448,12 @@ watchdog_Set($@)
 
 =begin html_DE
 
-<a name="watchdog"></a>
+<a id="watchdog"></a>
 <h3>watchdog</h3>
 <ul>
   <br>
 
-  <a name="watchdogdefine"></a>
+  <a id="watchdog-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; watchdog &lt;regexp1&gt; &lt;timespec&gt;
@@ -511,7 +530,7 @@ watchdog_Set($@)
     <br>
   </ul>
 
-  <a name="watchdogset"></a>
+  <a id="watchdog-set"></a>
   <b>Set </b>
   <ul>
     <li>inactive<br>
@@ -530,13 +549,13 @@ watchdog_Set($@)
     <br>
 
 
-  <a name="watchdogget"></a>
+  <a id="watchdog-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="watchdogattr"></a>
+  <a id="watchdog-attr"></a>
   <b>Attribute</b>
   <ul>
-    <li><a name="watchdogactivateOnStart">activateOnStart</a><br>
+    <li><a id="watchdog-attr-activateOnStart">activateOnStart</a><br>
       Falls gesetzt, wird der Watchdog nach FHEM-Neustart aktiviert, je nach
       Zeitstempel der Activated und Triggered Readings. Da zwischen Shutdown
       und Neustart Events verlorengehen k&ouml;nnen, ist die Voreinstellung 0
@@ -549,12 +568,12 @@ watchdog_Set($@)
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <br>
 
-    <li><a name="watchdogregexp1WontReactivate">regexp1WontReactivate</a><br>
+    <li><a id="watchdog-attr-regexp1WontReactivate">regexp1WontReactivate</a><br>
       Wenn ein Watchdog aktiv ist, wird ein zweites Ereignis das auf regexp1
       passt normalerweise den Timer zur&uuml;cksetzen. Dieses Attribut wird
       das verhindern.</li><br>
 
-    <li><a name="watchdogregexp2WillReactivate">regexp2WillReactivate</a><br>
+    <li><a id="watchdog-attr-regexp2WillReactivate">regexp2WillReactivate</a><br>
       In der Voreinstellung wartet der Watchdog nach Empfang eines Events, der
       auf regexp2 matcht, wieder auf einem Event, was auf regexp1 matcht, um
       den R&uuml;ckw&auml;rtsz&auml;hler zu starten. Wenn dieses Attribut
@@ -563,15 +582,20 @@ watchdog_Set($@)
       gestartet. Falls regexp1 und regexp2 gleich sind, oder regexp2 ist .,
       dann ist dieses Verhalten die Voreinstellung.</li></br>
 
-    <li><a href="#execOnReactivate">execOnReactivate</a>
+    <li><a id="watchdog-attr-execOnReactivate">execOnReactivate</a><br>
       Falls gesetzt, wird der Wert des Attributes als FHEM Befehl
       ausgef&uuml;hrt, wenn ein regexp1 Ereignis den Watchdog
       aktiviert nachdem er ausgel&ouml;st wurde.</li></br>
 
-    <li><a href="#autoRestart">autoRestart</a>
+    <li><a id="watchdog-attr-autoRestart">autoRestart</a><br>
       Wenn dieses Attribut gesetzt ist, wird der Watchdog nach dem er
       getriggert wurde, automatisch wieder in den Zustand defined
-      gesetzt (Wartet also wieder auf Aktivierung durch regexp1)</li>
+      gesetzt (Wartet also wieder auf Aktivierung durch regexp1)</li><br>
+
+    <li><a id="watchdog-attr-completeOnDisabled">completeOnDisabled</a><br>
+      falls gesetzt (auf 1), wird ein aktiviertes (STATE Next:...) watchdog
+      auch dann ausgef&uuml;hrt, wenn zur Ausf&uuml;hrungszeit disabled aktiv
+      ist (siehe disabledForIntervals).</li><br>
   </ul>
 
   <br>

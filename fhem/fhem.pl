@@ -230,7 +230,7 @@ sub cfgDB_FileWrite;
 # IODev   - attached to io device
 # CHANGED - Currently changed attributes of this device. Used by NotifyFn
 # VOLATILE- Set if the definition should be saved to the "statefile"
-# NOTIFYDEV - if set, the notifyFn will only be called for this device
+# NOTIFYDEV - if set, the NotifyFn will only be called for this device
 
 use vars qw($addTimerStacktrace);# set to 1 by fhemdebug
 use vars qw($auth_refresh);
