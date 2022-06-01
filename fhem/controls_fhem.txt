@@ -1,4 +1,4 @@
-REV 26100
+REV 26106
 DIR unused
 UPD 2022-05-31_07:45:03 380242 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -748,8 +748,8 @@ UPD 2022-05-26_07:45:07 4731062 docs/commandref.html
 UPD 2022-05-26_07:45:10 2851603 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-05-31_07:45:11 275450 docs/commandref_modular.html
-UPD 2022-05-31_07:45:12 286579 docs/commandref_modular_DE.html
+UPD 2022-06-01_07:45:11 275450 docs/commandref_modular.html
+UPD 2022-06-01_07:45:12 286579 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -779,7 +779,7 @@ UPD 2021-12-18_07:45:03 42808 lib/FHEM/Devices/Nuki/Bridge.pm
 UPD 2021-12-18_07:45:03 16385 lib/FHEM/Devices/Nuki/Device.pm
 UPD 2021-07-11_07:45:03 29319 lib/FHEM/Devices/Tesla/Powerwall.pm
 UPD 2021-06-25_07:45:03 39496 lib/FHEM/HTTPMOD/Utils.pm
-UPD 2021-03-14_07:45:04 12201 lib/FHEM/Modbus/TestUtils.pm
+UPD 2022-06-01_07:45:03 11892 lib/FHEM/Modbus/TestUtils.pm
 UPD 2022-01-25_07:45:02 9836 lib/FHEM/SynoModules/API.pm
 UPD 2020-11-03_07:45:03 14279 lib/FHEM/SynoModules/ErrCodes.pm
 UPD 2022-01-25_07:45:02 74254 lib/FHEM/SynoModules/SMUtils.pm
