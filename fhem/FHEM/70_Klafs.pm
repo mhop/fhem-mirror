@@ -32,7 +32,7 @@ use JSON            qw(decode_json encode_json);
 #use Encode          qw(encode_utf8 decode_utf8);
 use Time::Piece;
 use Time::Local;
-#use Data::Dumper;
+use Data::Dumper;
 use HttpUtils;
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
@@ -667,10 +667,11 @@ sub Klafs_Set {
     }
     my $next = scalar localtime $now;
     my @Zeit = split(/ /,$next);
-    my @Uhrzeit = split(/:/,$Zeit[3]);
+    my @Uhrzeit = split(/:/,$Zeit[4]);
     my $std = $Uhrzeit[0];
     my $min = $Uhrzeit[1];
-    
+
+
     if($std < 10){
       if(substr($std,0,1) eq "0"){
         $std = substr($std,1,1);
