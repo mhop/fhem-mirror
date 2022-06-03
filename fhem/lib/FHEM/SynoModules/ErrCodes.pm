@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       ErrCodes.pm
 #
-#       (c) 2020 by Heiko Maaz
+#       (c) 2020 - 2022  by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides Synology API Error Codes.
@@ -32,7 +32,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.4');
+use version; our $VERSION = version->declare('1.3.5');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
@@ -105,6 +105,7 @@ my %errauthsscal = (                                                   # Authent
   402  => "Permission denied",
   403  => "2-step verification code required",
   404  => "Failed to authenticate 2-step verification code",
+  407  => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
 );
 
 my %errsscal = (                                                       # Standard Error Codes der Calendar API 
