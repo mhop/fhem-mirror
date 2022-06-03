@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2021 by Heiko Maaz
+#       (c) 2015-2022 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -185,6 +185,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.4" => "03.06.2022  avoid warning 'No data for Cache with key: {LASTSNAP}' if no snap exists ",
   "9.10.3" => "23.11.2022  made SYNO.SurveillanceStation.AudioStream, SYNO.SurveillanceStation.VideoStream optional for SVS compatibility to 9.0.0 ",
   "9.10.2" => "03.11.2021  set SVS compatibility to 8.2.10 ",
   "9.10.1" => "18.07.2021  set SVS compatibility to 8.2.9 ",
@@ -7189,6 +7190,8 @@ sub __saveLastSnapToCache {
   my $paref = shift;
   my $name  = $paref->{name};
   my $data  = $paref->{data};                                                                 # decodierte JSON Daten
+  
+  return if (!exists $data->{data}{data}[0]{imageData});                                      # kein Snap vorhanden
   
   my $cache = cache($name, "c_init");                                                         # Cache initialisieren  
   
