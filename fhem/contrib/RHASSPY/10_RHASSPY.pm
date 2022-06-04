@@ -1396,7 +1396,7 @@ sub _analyze_genDevType_setter {
 
     my $allValMappings = {
         MediaControls => {
-            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' },
+            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist'},
         GetState => {
             update => 'reread|update|reload' },
         SetScene => {
@@ -5043,6 +5043,8 @@ sub handleIntentMediaControls {
     #check if confirmation is required
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls', $device );
     my $cmd = $mapping->{$command};
+
+    $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
     # Execute Cmd
     analyzeAndRunCmd($hash, $device, $cmd);
     # Define voice response
