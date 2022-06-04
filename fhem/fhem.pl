@@ -1633,6 +1633,7 @@ WriteStatefile()
     if($defs{$d}{VOLATILE}) {
       my $def = $defs{$d}{DEF};
       $def =~ s/;/;;/g; # follow-on-for-timer at
+      $def =~ s/\n/\\\n/g;
       print $SFH "define $d $defs{$d}{TYPE} $def\n";
     }
 
