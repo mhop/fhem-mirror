@@ -2914,17 +2914,17 @@ sub _manageConsumerData {
       
       $paref->{consumer} = $c;
       
-      __calcEnergyPieces ($paref);                                                                                # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
-      __planSwitchTimes  ($paref);                                                                                # Consumer Switch Zeiten planen
-      __switchConsumer   ($paref);                                                                                # Consumer schalten
+      __calcEnergyPieces  ($paref);                                                                               # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
+      __planSwitchTimes   ($paref);                                                                               # Consumer Switch Zeiten planen
+      __setTimeframeState ($paref);                                                                               # Timeframe Status ermitteln
+      __setConsRcmdState  ($paref);                                                                               # Consumption Recommended Status setzen
+      __switchConsumer    ($paref);                                                                               # Consumer schalten
       
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln 
       ################################################################
-      # my $rswstate                              = ConsumerVal             ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
-      # my $costate                               = ReadingsVal             ($consumer, $rswstate,       "");       # Schaltstatus
-      my $costate                               = isConsumerPhysOn  ($hash, $c) ? "on"  : 
-                                                  isConsumerPhysOff ($hash, $c) ? "off" :
-                                                  "unknown";
+      my $costate = isConsumerPhysOn  ($hash, $c) ? "on"  : 
+                    isConsumerPhysOff ($hash, $c) ? "off" :
+                    "unknown";
 
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
@@ -3389,21 +3389,17 @@ return $starttime;
 }
 
 ################################################################
-#   Planungsdaten Consumer prüfen und ggf. starten/stoppen
+#   Timeframe Status ermitteln
 ################################################################
-sub __switchConsumer {
+sub __setTimeframeState {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                            # aktueller Unixtimestamp
-  my $state = $paref->{state};
-  my $daref = $paref->{daref};
   
   my $type  = $hash->{TYPE};
-  
-  ## Timeframe Status ermitteln
-  ###############################
+
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                      # geplante Unix Startzeit
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                      # geplante Unix Stopzeit  
   
@@ -3412,10 +3408,23 @@ sub __switchConsumer {
   } 
   else {
       $data{$type}{$name}{consumers}{$c}{isIntimeframe} = 0;
-  } 
+  }
   
-  ## Consumption Recommended Status setzen
-  ##########################################
+return;
+}
+
+################################################################
+#   Consumption Recommended Status setzen
+################################################################
+sub __setConsRcmdState {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};                                                     # aktueller Unixtimestamp
+  my $daref = $paref->{daref};
+  
+  my $type  = $hash->{TYPE};
+
   my $surplus = CurrentVal  ($hash, "surplus",   0);                                  # aktueller Energieüberschuß
   my $power   = ConsumerVal ($hash, $c, "power", 0);                                  # Consumer nominale Leistungsaufnahme (W)
   my $ccr     = AttrVal     ($name, 'createConsumptionRecReadings', '');              # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
@@ -3431,14 +3440,31 @@ sub __switchConsumer {
       push @$daref, "consumer${c}_ConsumptionRecommended<>". ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0); 
   }
   
-  $state = ___switchConsumerOn ($paref);                                              # Verbraucher Einschaltbedingung prüfen + auslösen 
+return;
+}
+
+################################################################
+#   Planungsdaten Consumer prüfen und ggf. starten/stoppen
+################################################################
+sub __switchConsumer {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
+  my $state = $paref->{state};
   
-  $state = ___switchConsumerOff ($paref);                                             # Verbraucher Ausschaltbedingung prüfen + auslösen
+  my $type  = $hash->{TYPE};
+  
+  $state = ___switchConsumerOn ($paref);                                                     # Verbraucher Einschaltbedingung prüfen + auslösen 
+  
+  $state = ___switchConsumerOff ($paref);                                                    # Verbraucher Ausschaltbedingung prüfen + auslösen
   
   ## Restlaufzeit Verbraucher ermitteln
   ######################################
   my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
   my $isIntimeframe                   = ConsumerVal ($hash, $c, "isIntimeframe", 0);
+  my $stopts                          = ConsumerVal ($hash, $c, "planswitchoff", undef);     # geplante Unix Stopzeit  
   
   $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
   
