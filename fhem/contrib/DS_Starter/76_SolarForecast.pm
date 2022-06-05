@@ -120,6 +120,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.64.0 "=> "04.06.2022  consumer type charger added, new attr createConsumptionRecReadings ",
+  "0.63.2 "=> "21.05.2022  changed isConsumptionRecommended to isIntimeframe, renewed isConsumptionRecommended ",
   "0.63.1 "=> "19.05.2022  code review __switchConsumer ",
   "0.63.0 "=> "18.05.2022  new attr flowGraphicConsumerDistance ",
   "0.62.0 "=> "16.05.2022  new key 'swoffcond' in consumer attributes ",
@@ -298,7 +300,8 @@ my %hget = (                                                                # Ha
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
-  consumer => { fn => \&_attrconsumer },
+  consumer                      => { fn => \&_attrconsumer          },
+  createConsumptionRecReadings  => { fn => \&_attrcreateConsRecRdgs },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -528,7 +531,7 @@ my $rain_base    = 0;                                                           
 
 my $maxconsumer  = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
 my $epiecHCounts = 10;                                                            # Anzahl Werte für verbraucherspezifische Energiestück Ermittlung
-my @ctypes       = qw(dishwasher dryer washingmachine heater other);              # erlaubte Consumer Typen
+my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
 my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
 my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
@@ -556,8 +559,9 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
                    ;
 
 my %hef = (                                                                                   # Energiedaktoren für Verbrauchertypen
-  "heater"         => { tot => 1.00, f => 0.30, m => 0.40, l => 0.30, mt => 240         },    # tot = Faktor nominaler Gesamtenergieverbrauch 
+  "heater"         => { tot => 1.00, f => 0.33, m => 0.34, l => 0.33, mt => 240         },    # tot = Faktor nominaler Gesamtenergieverbrauch 
   "other"          => { tot => 1.00, f => 0.25, m => 0.50, l => 0.25, mt => $defmintime },    # !!! Faktoren f,m,l MÜSSEN zusammen 1 ergeben !!!
+  "charger"        => { tot => 1.00, f => 0.33, m => 0.34, l => 0.33, mt => 120         },
   "dishwasher"     => { tot => 0.13, f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # f   = Faktor Energieverbrauch in erster Stunde
   "dryer"          => { tot => 1.00, f => 0.40, m => 0.40, l => 0.20, mt => 75          },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
   "washingmachine" => { tot => 0.18, f => 0.30, m => 0.40, l => 0.30, mt => 120         },    # l   = Faktor Energieverbrauch in letzter Stunde
@@ -580,11 +584,14 @@ sub Initialize {
   my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
   my $hod = join ",", map { sprintf "%02d", $_} (01..24);        
   
-  my $consumer;
+  my ($consumer,@allc);
   for my $c (1..$maxconsumer) {
-      $c = sprintf "%02d", $c;
+      $c         = sprintf "%02d", $c;
       $consumer .= "consumer${c}:textField-long ";
+      push @allc, $c;
   }
+  
+  my $allcs = join ",", @allc; 
   
   $hash->{DefFn}              = \&Define;
   $hash->{UndefFn}            = \&Undef;
@@ -611,6 +618,7 @@ sub Initialize {
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
                                 "createTomorrowPVFcReadings:multiple-strict,$hod ".
+                                "createConsumptionRecReadings:multiple-strict,$allcs ".
                                 "Css:textField-long ".
                                 "debug:1,0 ".
                                 "disable:1,0 ".
@@ -1736,23 +1744,38 @@ sub _attrconsumer {                      ## no critic "not used"
   else {      
       my $day  = strftime "%d", localtime(time);                                           # aktueller Tag  (range 01 to 31)
       my $type = $hash->{TYPE};
-      my ($co) = $aName =~ /consumer([0-9]+)/xs;
+      my ($c)  = $aName =~ /consumer([0-9]+)/xs;
   
-      deleteReadingspec ($hash, "consumer${co}.*");
+      deleteReadingspec ($hash, "consumer${c}.*");
       
       for my $i (1..24) {                                                                  # Consumer aus History löschen
-          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csmt${co}"};
-          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csme${co}"};
+          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csmt${c}"};
+          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csme${c}"};
       }
       
-      delete $data{$type}{$name}{pvhist}{$day}{99}{"csmt${co}"};
-      delete $data{$type}{$name}{pvhist}{$day}{99}{"csme${co}"};
-      delete $data{$type}{$name}{consumers}{$co};                                          # Consumer Hash Verbraucher löschen
+      delete $data{$type}{$name}{pvhist}{$day}{99}{"csmt${c}"};
+      delete $data{$type}{$name}{pvhist}{$day}{99}{"csme${c}"};
+      delete $data{$type}{$name}{consumers}{$c};                                           # Consumer Hash Verbraucher löschen
   }  
 
   writeDataToFile ($hash, "consumers", $csmcache.$name);                                   # Cache File Consumer schreiben
   
   InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createNotifyDev", $hash, 0);
+
+return;
+}
+
+################################################################
+#               Attr createConsumptionRecReadings
+################################################################
+sub _attrcreateConsRecRdgs {             ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aName = $paref->{aName};
+  
+  if ($aName eq 'createConsumptionRecReadings') {
+      deleteReadingspec ($hash, "consumer.*_ConsumptionRecommended");
+  }
 
 return;
 }
@@ -3373,33 +3396,53 @@ sub __switchConsumer {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                     # aktueller Unixtimestamp
+  my $t     = $paref->{t};                                                            # aktueller Unixtimestamp
   my $state = $paref->{state};
+  my $daref = $paref->{daref};
   
   my $type  = $hash->{TYPE};
   
-  my $startts   = ConsumerVal ($hash, $c, "planswitchon",  undef);             # geplante Unix Startzeit
-  my $stopts    = ConsumerVal ($hash, $c, "planswitchoff", undef);             # geplante Unix Stopzeit  
+  ## Timeframe Status ermitteln
+  ###############################
+  my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                      # geplante Unix Startzeit
+  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                      # geplante Unix Stopzeit  
   
-  if ($startts && $t >= $startts && $stopts && $t <= $stopts) {                # Ist Verbrauch empfohlen ?
-      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;
+  if ($startts && $t >= $startts && $stopts && $t <= $stopts) {                       # ist Zeit innerhalb der Planzeit ein/aus ?
+      $data{$type}{$name}{consumers}{$c}{isIntimeframe} = 1;
   } 
   else {
-      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
+      $data{$type}{$name}{consumers}{$c}{isIntimeframe} = 0;
   } 
   
-  $state = ___switchConsumerOn ($paref);                                       # Verbraucher Einschaltbedingung prüfen + auslösen 
+  ## Consumption Recommended Status setzen
+  ##########################################
+  my $surplus = CurrentVal  ($hash, "surplus",   0);                                  # aktueller Energieüberschuß
+  my $power   = ConsumerVal ($hash, $c, "power", 0);                                  # Consumer nominale Leistungsaufnahme (W)
+  my $ccr     = AttrVal     ($name, 'createConsumptionRecReadings', '');              # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   
-  $state = ___switchConsumerOff ($paref);                                      # Verbraucher Ausschaltbedingung prüfen + auslösen
+  if ($surplus >= $power) {
+      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;               # Einschalten des Consumers günstig
+  }
+  else {
+      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
+  }
+  
+  if ($ccr =~ /$c/xs) {
+      push @$daref, "consumer${c}_ConsumptionRecommended<>". ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0); 
+  }
+  
+  $state = ___switchConsumerOn ($paref);                                              # Verbraucher Einschaltbedingung prüfen + auslösen 
+  
+  $state = ___switchConsumerOff ($paref);                                             # Verbraucher Ausschaltbedingung prüfen + auslösen
   
   ## Restlaufzeit Verbraucher ermitteln
   ######################################
   my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
-  my $isConsRecommended               = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);
+  my $isIntimeframe                   = ConsumerVal ($hash, $c, "isIntimeframe", 0);
   
   $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
   
-  if ($isConsRecommended && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
+  if ($isIntimeframe && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
       my $remainTime                                 = $stopts - $t ;
       $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
   } 
@@ -4904,7 +4947,7 @@ sub _graphicConsumerLegend {
       my $offcom     = ConsumerVal ($hash, $c, "offcom",                  "");                      # Consumer Ausschaltkommando
       my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
       my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
-      my $iscrecomm  = ConsumerVal ($hash, $c, "isConsumptionRecommended", 0);                      # ist einschalten Verbraucher empfohlen
+      my $iscrecomm  = ConsumerVal ($hash, $c, "isIntimeframe",            0);                      # ist Zeit innerhalb der Planzeit ein/aus
       
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
@@ -7197,7 +7240,7 @@ sub deleteConsumerPlanning {
   delete $data{$type}{$name}{consumers}{$c}{planswitchon};
   delete $data{$type}{$name}{consumers}{$c}{planswitchoff};
   
-  $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
+  # $data{$type}{$name}{consumers}{$c}{isIntimeframe} = 0;
   
   deleteReadingspec ($hash, "consumer${c}.*" );
 
@@ -7607,7 +7650,7 @@ return $def;
 #       dswoffcond      - Device zur Lieferung einer vorrangige Ausschaltbedingung
 #       rswoffcond      - Reading zur Lieferung einer vorrangige Ausschaltbedingung
 #       swoffcondregex  - Regex einer einer vorrangige Ausschaltbedingung
-#       isConsumptionRecommended - ist Verbrauch empfohlen ?
+#       isIntimeframe   - ist Zeit innerhalb der Planzeit ein/aus
 #
 # $def: Defaultwert
 #
@@ -8247,7 +8290,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <ul>
       <a id="SolarForecast-get-valCurrent"></a>
       <li><b>valCurrent </b> <br><br>
-      Listet die aktuell ermittelten Werte auf.
+      Listet aktuelle Betriebsdaten, Kennzahlen und Status auf.
       </li>      
     </ul>
     <br>
@@ -8379,8 +8422,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
                          [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt]</b><br><br>
         
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
-        ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
-        sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br>
+        ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
+        Die meisten Schlüssel sind optional, sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit 
+        default-Werten besetzt. <br>
         Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den 
         entsprechenden Drucktasten umgeschaltet werden. Das angegebene Reading wird ggf. im Consumer Device angelegt falls
         es nicht vorhanden ist. <br><br>
@@ -8403,6 +8447,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                   </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                        </td></tr>
             <tr><td>                   </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                        </td></tr>
             <tr><td>                   </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                              </td></tr>
+            <tr><td>                   </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, etc.)                                                   </td></tr>
             <tr><td>                   </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                            </td></tr>          
             <tr><td> <b>power</b>      </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                              </td></tr>            
             <tr><td> <b>mode</b>       </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                         </td></tr>
@@ -8444,6 +8489,17 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>  
        <br>
        
+       <a id="SolarForecast-attr-createConsumptionRecReadings"></a>
+       <li><b>createConsumptionRecReadings </b><br>
+         Für die ausgewählten Consumer (Nummer) werden Readings der Form <b>consumerXX_ConsumptionRecommended</b> erstellt. <br>
+         Diese Readings signalisieren ob das Einschalten dieses Consumers abhängig von seinen Verbrauchsdaten und der aktuellen
+         PV-Erzeugung bzw. des aktuellen Energieüberschusses empfohlen ist. Der Wert des erstellten Readings korreliert 
+         mit den berechneten Planungsdaten das Consumers, kann aber von dem Planungszeitraum abweichen. <br>
+       <br>       
+         
+       </li>
+       <br>  
+       
        <a id="SolarForecast-attr-createTomorrowPVFcReadings"></a>
        <li><b>createTomorrowPVFcReadings &lt;01,02,..,24&gt; </b><br>
          Wenn gesetzt, werden Readings der Form <b>Tomorrow_Hour&lt;hour&gt;_PVforecast</b> erstellt. <br>
@@ -8458,7 +8514,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </ul>         
          
        </li>
-       <br>  
+       <br> 
        
        <a id="SolarForecast-attr-Css"></a>
        <li><b>Css </b><br>
