@@ -388,6 +388,10 @@ my %htitles = (                                                                 
                 DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>}                     },
   akorron  => { EN => qq{Enable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on},
                 DE => qq{Einschalten Autokorrektur mit:\nset <NAME> pvCorrectionFactor_Auto on}                    },
+  splus    => { EN => qq{PV surplus exists},
+                DE => qq{PV-&#220;berschu&#223; ist vorhanden}                                                     },
+  nosplus  => { EN => qq{no PV surplus present},
+                DE => qq{kein PV-&#220;berschu&#223; vorhanden}                                                    },
 );
 
 my %weather_ids = (
@@ -3463,12 +3467,11 @@ sub __switchConsumer {
   ## Restlaufzeit Verbraucher ermitteln
   ######################################
   my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
-  my $isIntimeframe                   = ConsumerVal ($hash, $c, "isIntimeframe", 0);
   my $stopts                          = ConsumerVal ($hash, $c, "planswitchoff", undef);     # geplante Unix Stopzeit  
   
   $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
   
-  if ($isIntimeframe && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
+  if (isInTimeframe($hash, $c) && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
       my $remainTime                                 = $stopts - $t ;
       $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
   } 
@@ -3501,7 +3504,7 @@ sub ___switchConsumerOn {
 
   Log3 ($name, 1, "$name - $err") if($err);
   
-  if($debug) {                                                                                    # nur für Debugging
+  if ($debug) {                                                                                   # nur für Debugging
       Log (1, qq{DEBUG> $name - Parameters for switch on decision consumer "$c": }.
               qq{swoncond: $swoncond, auto mode: $auto, on-command: $oncom, }.
               qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef").", ".
@@ -3509,12 +3512,10 @@ sub ___switchConsumerOn {
            );
   }
  
-  if($swoncond && $auto && 
-     $oncom    && $pstate =~ /planned|priority/xs && $startts && $t >= $startts) {                # Verbraucher Start ist geplant && Startzeit überschritten
-      my $surplus = CurrentVal  ($hash, "surplus",          0);                                   # aktueller Überschuß
+  if ($swoncond && $auto && $oncom && 
+      simplifyCstate($pstate) =~ /planned|priority/xs && 
+      isInTimeframe ($hash, $c)) {                                                                # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
-      my $power   = ConsumerVal ($hash, $c, "power",        0);                                   # Consumer nominale Leistungsaufnahme (W)
-      
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
       
       Log3 ($name, 4, "$name - Consumer switch enabled by battery: $enable");  
@@ -3526,7 +3527,7 @@ sub ___switchConsumerOn {
 
         delete $paref->{ps};
       }
-      elsif ($mode eq "must" || $surplus >= $power) {                                              # "Muss"-Planung oder Überschuß > Leistungsaufnahme
+      elsif ($mode eq "must" || isConsRcmd($hash, $c)) {                                          # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
           my $stopdiff      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
           
@@ -3582,7 +3583,7 @@ sub ___switchConsumerOff {
            );
   }
   
-  if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && $pstate !~ /switched\soff/xs)) {                         
+  if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && simplifyCstate($pstate) !~ /finished/xs)) {                         
       CommandSet(undef,"$cname $offcom");
       
       $paref->{ps}     = "switched off:";
@@ -4973,7 +4974,6 @@ sub _graphicConsumerLegend {
       my $offcom     = ConsumerVal ($hash, $c, "offcom",                  "");                      # Consumer Ausschaltkommando
       my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
       my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
-      my $iscrecomm  = ConsumerVal ($hash, $c, "isIntimeframe",            0);                      # ist Zeit innerhalb der Planzeit ein/aus
       
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
@@ -5001,34 +5001,35 @@ sub _graphicConsumerLegend {
       $paref->{consumer} = $c;
       
       my ($planstate,$starttime,$stoptime) = __getPlanningStateAndTimes ($paref);      
-      my $pstate = $caicon eq "times" ? $hqtxt{pstate}{$lang} : $htitles{pstate}{$lang};
+      my $pstate                           = $caicon eq "times"    ? $hqtxt{pstate}{$lang}  : $htitles{pstate}{$lang};
+      my $surplusinfo                      = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
       
-      $pstate    =~ s/<pstate>/$planstate/xs;
-      $pstate    =~ s/<start>/$starttime/xs;
-      $pstate    =~ s/<stop>/$stoptime/xs; 
-      $pstate    =~ s/\s+/&nbsp;/gxs         if($caicon eq "times");      
+      $pstate =~ s/<pstate>/$planstate/xs;
+      $pstate =~ s/<start>/$starttime/xs;
+      $pstate =~ s/<stop>/$stoptime/xs; 
+      $pstate =~ s/\s+/&nbsp;/gxs         if($caicon eq "times");      
 
       if($caicon ne "none") {
-          if($iscrecomm) {
+          if(isInTimeframe($hash, $c)) {                                                             # innerhalb Planungszeitraum ?
               if($caicon eq "times") {
-                  $isricon = $pstate;
+                  $isricon = $pstate.'<br>'.$surplusinfo;
               }
               else {
-                  $isricon = "<a title='$htitles{conrec}{$lang}\n\n$pstate' onClick=$implan>".FW_makeImage($caicon, '')." </a>";
+                  $isricon = "<a title='$htitles{conrec}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage($caicon, '')." </a>";
                   if($planstate =~ /priority/xs) {
                       my (undef,$color) = split('@', $caicon);
                       $color            = $color ? '@'.$color : '';  
-                      $isricon          = "<a title='$htitles{conrec}{$lang}\n\n$pstate' onClick=$implan>".FW_makeImage('it_ups_charging'.$color, '')." </a>";
+                      $isricon          = "<a title='$htitles{conrec}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage('it_ups_charging'.$color, '')." </a>";
                   }
               }
           }
           else {
               if($caicon eq "times") {
-                  $isricon = $pstate;
+                  $isricon =  $pstate.'<br>'.$surplusinfo;
               }
               else {
                   ($caicon) = split('@', $caicon);
-                  $isricon  = "<a title='$htitles{connorec}{$lang}\n\n$pstate' onClick=$implan>".FW_makeImage($caicon.'@grey', '')." </a>";
+                  $isricon  = "<a title='$htitles{connorec}{$lang}\n\n$surplusinfo\n$pstate' onClick=$implan>".FW_makeImage($caicon.'@grey', '')." </a>";
               }
           }
       }      
@@ -7328,28 +7329,6 @@ return;
 }
 
 ################################################################
-#  liefert die Zeit des letzten Schaltvorganges
-################################################################
-sub lastConsumerSwitchtime {
-  my $hash = shift;
-  my $c    = shift;
-  my $name = $hash->{NAME};  
-  
-  my $cname = ConsumerVal ($hash, $c, "name", "");                             # Devicename Customer
-
-  if(!$defs{$cname}) {
-      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the last switching time can't be identified});
-      return;
-  }
-  
-  my $rswstate = ConsumerVal           ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
-  my $swtime   = ReadingsTimestamp     ($cname, $rswstate,          "");       # Zeitstempel im Format 2016-02-16 19:34:24   
-  my $swtimets = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
-
-return ($swtime, $swtimets);
-}
-
-################################################################
 #  Funktion liefert "1" wenn die zusätzliche Einschaltbedingung
 #  aus dem Schlüssel "swoncond" im Consumer Attribut wahr ist
 #
@@ -7420,18 +7399,60 @@ return (0, $info, $err);
 }
 
 ################################################################
+#  liefert den Status des Timeframe von Consumer $c
+################################################################
+sub isInTimeframe {
+  my $hash = shift;
+  my $c    = shift;
+
+return ConsumerVal ($hash, $c, 'isIntimeframe', 0);
+}
+
+################################################################
+#  liefert den Status "Consumption Recommended" von Consumer $c
+################################################################
+sub isConsRcmd {
+  my $hash = shift;
+  my $c    = shift;
+
+return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
+}
+
+################################################################
+#  liefert die Zeit des letzten Schaltvorganges
+################################################################
+sub lastConsumerSwitchtime {
+  my $hash = shift;
+  my $c    = shift;
+  my $name = $hash->{NAME};  
+  
+  my $cname = ConsumerVal ($hash, $c, "name", "");                             # Devicename Customer
+
+  if(!$defs{$cname}) {
+      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the last switching time can't be identified});
+      return;
+  }
+  
+  my $rswstate = ConsumerVal           ($hash, $c, "rswstate", "state");       # Reading mit Schaltstatus
+  my $swtime   = ReadingsTimestamp     ($cname, $rswstate,          "");       # Zeitstempel im Format 2016-02-16 19:34:24   
+  my $swtimets = timestringToTimestamp ($swtime) if($swtime);                  # Unix Timestamp Format erzeugen
+
+return ($swtime, $swtimets);
+}
+
+################################################################
 #  transformiert den ausführlichen Consumerstatus in eine
 #  einfache Form
 ################################################################
 sub simplifyCstate {
   my $ps = shift;  
   
-  $ps = $ps =~ /planned/xs        ? "planned"  : 
-        $ps =~ /switching\son/xs  ? "starting" :
-        $ps =~ /switched\son/xs   ? "started"  :
-        $ps =~ /switching\soff/xs ? "stopping" :
-        $ps =~ /switched\soff/xs  ? "finished" :
-        $ps =~ /priority/xs       ? $ps        :
+  $ps = $ps =~ /planned/xs        ? 'planned'  : 
+        $ps =~ /switching\son/xs  ? 'starting' :
+        $ps =~ /switched\son/xs   ? 'started"' :
+        $ps =~ /switching\soff/xs ? 'stopping' :
+        $ps =~ /switched\soff/xs  ? 'finished' :
+        $ps =~ /priority/xs       ? 'priority' :
         "unknown";
                 
 return $ps;
