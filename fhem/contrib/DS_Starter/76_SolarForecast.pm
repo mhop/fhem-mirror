@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.64.1 "=> "06.06.2022  fixing simplifyCstate ",
   "0.64.0 "=> "04.06.2022  consumer type charger added, new attr createConsumptionRecReadings ",
   "0.63.2 "=> "21.05.2022  changed isConsumptionRecommended to isIntimeframe, renewed isConsumptionRecommended ",
   "0.63.1 "=> "19.05.2022  code review __switchConsumer ",
@@ -3464,8 +3465,25 @@ sub __switchConsumer {
   
   $state = ___switchConsumerOff ($paref);                                                    # Verbraucher Ausschaltbedingung prüfen + auslösen
   
-  ## Restlaufzeit Verbraucher ermitteln
-  ######################################
+  __remainConsumerTime ($paref);                                                             # Restlaufzeit Verbraucher ermitteln
+  
+  $paref->{state} = $state;
+  
+return;
+}
+
+################################################################
+#   Restlaufzeit Verbraucher ermitteln
+################################################################
+sub __remainConsumerTime {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
+  
+  my $type  = $hash->{TYPE};
+  
   my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
   my $stopts                          = ConsumerVal ($hash, $c, "planswitchoff", undef);     # geplante Unix Stopzeit  
   
@@ -3474,9 +3492,7 @@ sub __switchConsumer {
   if (isInTimeframe($hash, $c) && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
       my $remainTime                                 = $stopts - $t ;
       $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
-  } 
-  
-  $paref->{state} = $state;
+  }
   
 return;
 }
@@ -7449,7 +7465,7 @@ sub simplifyCstate {
   
   $ps = $ps =~ /planned/xs        ? 'planned'  : 
         $ps =~ /switching\son/xs  ? 'starting' :
-        $ps =~ /switched\son/xs   ? 'started"' :
+        $ps =~ /switched\son/xs   ? 'started' :
         $ps =~ /switching\soff/xs ? 'stopping' :
         $ps =~ /switched\soff/xs  ? 'finished' :
         $ps =~ /priority/xs       ? 'priority' :
