@@ -93,7 +93,8 @@
 
 # - BO code used for "lamellen" of blinds - considered stop fro remotes
 # - Correct match for long commands according to #msg1224029
-# 
+
+# - fix manual command also for timed blinds
 #
 ###############################################################################
 #
@@ -971,7 +972,8 @@ sub SOMFY_InternalSet($@) {
 			}
 
 		} elsif($cmd =~m/manual/) { 
-			$newState = $arg1;
+#      $updateState = $arg1;
+      $newState = $arg1;
 
 		}			
 
@@ -980,7 +982,8 @@ sub SOMFY_InternalSet($@) {
 			if ( defined( $updateState )) {
 				$updateState = minNum( 100, $updateState );
 			}
-			$newState = minNum( 100, $posRounded );
+# not sure why posrounded was used here			$newState = minNum( 100, $posRounded );
+			$newState = minNum( 100, $newState );
 		}
 	}
 
