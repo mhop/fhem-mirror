@@ -22,13 +22,6 @@
 # You should have received a copy of the GNU General Public License
 # along with FHEM.  If not, see <http://www.gnu.org/licenses/>.
 
-=pod
-defmod acFHEMapp archetype LichtAussenTerrasse
-attr acFHEMapp userattr actual_appOptions
-attr acFHEMapp actual_appOptions {genericDeviceType2appOption($name)}
-attr acFHEMapp attributes appOptions
-attr acFHEMapp splitRooms 1
-=cut
 
 package archetype; ##no critic qw(Package)
 use strict;
@@ -93,6 +86,7 @@ sub Initialize {
     . "actualTYPE "
     . "attributes "
     . "autocreate:1,0 "
+    . "autoclean_init:1,0 "
     . "deleteAttributes:0,1 "
     . "disable:0,1 "
     . "initialize:textField-long "
@@ -106,7 +100,7 @@ sub Initialize {
   addToAttrList('attributesExclude','archetype');
 
   my %hash = (
-    Fn  => 'CommandClean',
+    Fn  => \&CommandClean,
     Hlp => 'archetype [clean or check], set attributes according to settings in archetypes'
   );
   $cmds{archetype} = \%hash;
@@ -139,7 +133,6 @@ sub Define {
 
   $hash->{DEF} = "defined_by=$SELF" if !$DEF;
   setNotifyDev($hash,'global');
-  #$hash->{NOTIFYDEV} = 'global';
   if ( !IsDisabled($SELF) ) {
     readingsSingleUpdate($hash, 'state', 'active', 0);
     evalStateFormat($hash);
@@ -172,7 +165,7 @@ sub Undef {
   return;
 }
 
-sub Set { #($@)
+sub Set {
   my $hash = shift // return;
   my $SELF = shift // return;
   my $argument = shift // return '"set <archetype>" needs at least one argument';
@@ -212,7 +205,7 @@ sub Set { #($@)
   if($argument eq 'addToAttrList'){
     return addToAttrList($value);
   }
-  if($argument eq "derive" && $value eq "attributes"){
+  if($argument eq 'derive' && $value eq 'attributes'){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument $value");
 
     derive_attributes($SELF);
@@ -221,7 +214,7 @@ sub Set { #($@)
     return;
   }
 
-  if($argument eq "define" && $value eq "inheritors"){
+  if($argument eq 'define' && $value eq 'inheritors'){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument $value");
 
     define_inheritors($SELF);
@@ -230,14 +223,14 @@ sub Set { #($@)
     return;
   }
 
-  if($argument eq "inheritance"){
+  if($argument eq 'inheritance'){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument inheritors");
 
     _inheritance($SELF);
     return;
   }
 
-  if($argument eq "initialize" && $value eq "inheritors"){
+  if($argument eq 'initialize' && $value eq 'inheritors'){
     Log3($SELF, 3, "$TYPE ($SELF) - starting $argument $value");
 
     define_inheritors($SELF, $argument);
@@ -245,7 +238,7 @@ sub Set { #($@)
     return Log3($SELF, 3, "$TYPE ($SELF) - $argument $value done");
   }
 
-  if($argument eq "raw" && $value){
+  if($argument eq 'raw' && $value){
     (my $command, $value) = split m{[\s]+}x, $value, 2;
 
     if ( !$value ) {
@@ -464,7 +457,7 @@ sub Attr {
 
   return if IsDisabled($SELF);
 
-  my @attributes = AttrVal($SELF, "attributes", "");
+  my @attributes = AttrVal($SELF, 'attributes', '');
 
   if(
     $cmd eq 'del'
@@ -500,7 +493,7 @@ sub Attr {
   }
   
   if($attribute eq 'attributes' && $cmd eq 'set'){
-    if($value =~ /actual_/ && $value !~ /userattr/){
+    if($value =~ m{actual_}x && $value !~ m{userattr}x){
       $value = "userattr $value";
       $_[3] = $value;
       $attr{$SELF}{$attribute} = $value;
@@ -529,7 +522,7 @@ sub Notify {
   Log3($SELF, 5, "$TYPE ($SELF) - call archetype_Notify");
 
   return if IsDisabled($SELF);
-  return if !AttrVal($SELF, 'autocreate', 1);
+  return if !AttrVal($SELF, 'autocreate', 1) && !AttrVal($SELF, 'autoclean_init', 0);
 
   my @events = @{deviceEvents($dev_hash, 1)};
 
@@ -540,6 +533,12 @@ sub Notify {
 
     Log3($SELF, 4, "$TYPE ($SELF) - triggered by event: \"$event\"");
 
+    if( $dev_hash->{NAME} eq 'global' && $event =~ m{INITIALIZED|REREADCFG}m && AttrVal($SELF, 'autoclean_init', 0)) {
+      Log3($SELF, 3, "$TYPE ($SELF) - starting inheritance (initial autoclean )");
+      _inheritance($SELF);
+      return;
+    }
+
     my ($argument, $name, $attr, $value) = split m{[\s]+}x, $event, 4;
 
     return if !$name;
@@ -549,9 +548,11 @@ sub Notify {
 
       _inheritance($SELF, $name);
     }
+
+
     elsif(
       $argument eq 'DEFINED'
-      && grep { m/\b$name\b/ } archetype_devspec($SELF, "relations")
+      && grep { m/\b$name\b/ } archetype_devspec($SELF, 'relations')
     ){
       Log3($SELF, 3, "$TYPE ($SELF) - starting define inheritors");
 
@@ -562,11 +563,11 @@ sub Notify {
     elsif(
       $hash->{DEF} eq "derive attributes"
       && $argument eq "ATTR"
-      && grep { m/\b$name\b/ } archetype_devspec($SELF, "specials")
+      && grep { m/\b$name\b/ } archetype_devspec($SELF, 'specials')
     ){
       for my $attribute ( split m{ }, AttrVal($SELF, 'attributes', '') ) {
         my @specials = archetype_evalSpecials(
-          undef, AttrVal($SELF, "actual_$attribute", ""), "all"
+          undef, AttrVal($SELF, "actual_$attribute", ''), 'all'
         );
 
         if ( grep { m/\b$attr\b/ } @specials ){
@@ -931,6 +932,7 @@ sub archetype_evalSpecials {
   my $pattern = shift // return;
   my $get     = shift;
 
+  Log3(undef, 5, "at eval specials called, name $name, pattern $pattern");
   my $value;
 
   if ( $get ) {
@@ -962,6 +964,8 @@ sub archetype_evalSpecials {
     #$value .= $part unless($optional && $part =~ m/%\S+%/);
     $value .= $part if !$optional || $part !~ m/%\S+%/;
   }
+
+  Log3(undef, 5, "at eval specials for name $name returns $value");
 
   return $value;
 }
@@ -1007,7 +1011,7 @@ sub CommandClean {
 
   if ( $arguments eq 'check' ){
     for my $SELF (@archetypes){
-      my $ret = archetype_Get($defs{$SELF}, $SELF, "pending", "attributes");
+      my $ret = Get($defs{$SELF}, $SELF, 'pending', 'attributes');
 
       next if $ret =~ m{no attributes pending|Unknown argument pending|is disabled};
 
@@ -1019,7 +1023,7 @@ sub CommandClean {
     }
 
     for my $SELF (@archetypes){
-      my $ret = archetype_Get($defs{$SELF}, $SELF, "pending", "inheritors");
+      my $ret = Get($defs{$SELF}, $SELF, 'pending', 'inheritors');
 
       push @pendingInheritors, $ret if $ret !~ m{no inheritors pending|Unknown argument pending|is disabled};
     }
@@ -1339,6 +1343,12 @@ statistic: 04.2.2022: # installations: 13, # defines: 113
         If set to 0, the archetype does not automatically inherit attributes to new devices,
         and inheritors are not created automatically for new relations.<br>
         The default value is 1.
+      </li>
+      <br>
+      <a id="archetype-attr-autoclean_init"></a><li>
+        <code>autoclean_init 1</code><br>
+        If set to 1, the archetype will automatically execute an inherit action after FHEM has startet.<br>
+        The default value is 0.
       </li>
       <br>
       <a id="archetype-attr-defined_by"></a><li>
@@ -1712,6 +1722,13 @@ attr SVG_link_archetype attributes group</pre>
         Der Standardwert ist 1.
       </li>
       <br>
+      <a id="archetype-attr-autoclean_init"></a><li>
+        <code>autoclean_init 1</code><br>
+        Legt fest, ob das archetype beim FHEM-Start unmittelbar eine inherit-Aktion ausführen soll.<br>
+        Der Standardwert ist 0.
+      </li>
+      <br>
+
       <a id="archetype-attr-defined_by"></a><li>
         <code>defined_by &lt;...&gt;</code><br>
         Hilfsattribut um zu erkennen, durch welchen <a href="#archetype">archetype</a> ein 
