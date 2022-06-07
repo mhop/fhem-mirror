@@ -3527,7 +3527,7 @@ sub ___switchConsumerOn {
 
           delete $paref->{ps};
           
-          $state = qq{switching Consumer "$calias" to "on"};
+          $state = qq{switching Consumer "$calias" to "$oncom"};
           
           writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
           
@@ -3578,7 +3578,7 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};      
       
-      $state = qq{switching Consumer "$calias" to "off"};
+      $state = qq{switching Consumer "$calias" to "$offcom"};
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
       
