@@ -120,7 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.64.1 "=> "06.06.2022  fixing simplifyCstate ",
+  "0.64.1 "=> "07.06.2022  fixing simplifyCstate, sub ___setConsumerSwitchingState to improve safe consumer switching ",
   "0.64.0 "=> "04.06.2022  consumer type charger added, new attr createConsumptionRecReadings ",
   "0.63.2 "=> "21.05.2022  changed isConsumptionRecommended to isIntimeframe, renewed isConsumptionRecommended ",
   "0.63.1 "=> "19.05.2022  code review __switchConsumer ",
@@ -2919,11 +2919,12 @@ sub _manageConsumerData {
       
       $paref->{consumer} = $c;
       
-      __calcEnergyPieces  ($paref);                                                                               # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
-      __planSwitchTimes   ($paref);                                                                               # Consumer Switch Zeiten planen
-      __setTimeframeState ($paref);                                                                               # Timeframe Status ermitteln
-      __setConsRcmdState  ($paref);                                                                               # Consumption Recommended Status setzen
-      __switchConsumer    ($paref);                                                                               # Consumer schalten
+      __calcEnergyPieces   ($paref);                                                                              # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
+      __planSwitchTimes    ($paref);                                                                              # Consumer Switch Zeiten planen
+      __setTimeframeState  ($paref);                                                                              # Timeframe Status ermitteln
+      __setConsRcmdState   ($paref);                                                                              # Consumption Recommended Status setzen
+      __switchConsumer     ($paref);                                                                              # Consumer schalten
+      __remainConsumerTime ($paref);                                                                              # Restlaufzeit Verbraucher ermitteln
       
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln 
       ################################################################
@@ -3268,7 +3269,7 @@ return;
 }
 
 ################################################################
-#     Planungsdaten bzw. aktuelle Schaltzustände setzen  
+#     Planungsdaten bzw. aktuelle Planungszustände setzen  
 ################################################################
 sub ___setConsumerPlanningState {     
   my $paref   = shift;
@@ -3456,43 +3457,16 @@ sub __switchConsumer {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
+  my $t     = $paref->{t};                                                           # aktueller Unixtimestamp
   my $state = $paref->{state};
   
   my $type  = $hash->{TYPE};
   
-  $state = ___switchConsumerOn ($paref);                                                     # Verbraucher Einschaltbedingung prüfen + auslösen 
-  
-  $state = ___switchConsumerOff ($paref);                                                    # Verbraucher Ausschaltbedingung prüfen + auslösen
-  
-  __remainConsumerTime ($paref);                                                             # Restlaufzeit Verbraucher ermitteln
+  $state    = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen 
+  $state    = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
+  $state    = ___setConsumerSwitchingState ($paref);                                 # Consumer aktuelle Schaltzustände ermitteln & setzen 
   
   $paref->{state} = $state;
-  
-return;
-}
-
-################################################################
-#   Restlaufzeit Verbraucher ermitteln
-################################################################
-sub __remainConsumerTime {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
-  
-  my $type  = $hash->{TYPE};
-  
-  my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
-  my $stopts                          = ConsumerVal ($hash, $c, "planswitchoff", undef);     # geplante Unix Stopzeit  
-  
-  $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
-  
-  if (isInTimeframe($hash, $c) && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
-      my $remainTime                                 = $stopts - $t ;
-      $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
-  }
   
 return;
 }
@@ -3529,7 +3503,7 @@ sub ___switchConsumerOn {
   }
  
   if ($swoncond && $auto && $oncom && 
-      simplifyCstate($pstate) =~ /planned|priority/xs && 
+      simplifyCstate($pstate) =~ /planned|priority|starting/xs && 
       isInTimeframe ($hash, $c)) {                                                                # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
@@ -3545,19 +3519,15 @@ sub ___switchConsumerOn {
       }
       elsif ($mode eq "must" || isConsRcmd($hash, $c)) {                                          # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
-          my $stopdiff      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
+          my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
           
-          $paref->{ps}      = "switched on:";
-          $paref->{startts} = $t;
-          $paref->{stopts}  = $t + $stopdiff;
+          $paref->{ps} = "switching on:";
 
           ___setConsumerPlanningState ($paref);
 
           delete $paref->{ps};
-          delete $paref->{startts};
-          delete $paref->{stopts};
           
-          $state = qq{Consumer "$calias" switched on};
+          $state = qq{switching Consumer "$calias" to "on"};
           
           writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
           
@@ -3602,6 +3572,63 @@ sub ___switchConsumerOff {
   if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && simplifyCstate($pstate) !~ /finished/xs)) {                         
       CommandSet(undef,"$cname $offcom");
       
+      $paref->{ps}     = "switching off:";
+
+      ___setConsumerPlanningState ($paref);
+
+      delete $paref->{ps};      
+      
+      $state = qq{switching Consumer "$calias" to "off"};
+      
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
+      
+      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+  }
+  
+return $state;
+}
+
+################################################################
+#     Consumer aktuelle Schaltzustände ermitteln & setzen  
+#     Consumer "on" setzen wenn physisch ein und alter Status 
+#     "starting"
+#     Consumer "off" setzen wenn physisch aus und alter Status 
+#     "stopping"
+################################################################
+sub ___setConsumerSwitchingState {     
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t};
+  my $state = $paref->{state};
+  
+  my $type  = $hash->{TYPE};
+  my $name  = $hash->{NAME};
+  
+  my $pstate = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
+  my $calias = ConsumerVal    ($hash, $c, "alias", "");                                      # Consumer Device Alias
+  my $auto   = ConsumerVal    ($hash, $c, "auto",   1);
+  
+  if ($pstate eq 'starting' && isConsumerPhysOn ($hash, $c)) {
+      my $stopdiff      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
+      
+      $paref->{ps}      = "switched on:";
+      $paref->{startts} = $t;
+      $paref->{stopts}  = $t + $stopdiff;
+
+      ___setConsumerPlanningState ($paref);
+
+      delete $paref->{ps};
+      delete $paref->{startts};
+      delete $paref->{stopts};
+      
+      $state = qq{Consumer "$calias" switched on};
+      
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+      
+      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+  }
+  elsif ($pstate eq 'stopping' && isConsumerPhysOff ($hash, $c)) {
       $paref->{ps}     = "switched off:";
       $paref->{stopts} = $t;
 
@@ -3612,12 +3639,37 @@ sub ___switchConsumerOff {
       
       $state = qq{Consumer "$calias" switched off};
       
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
       
-      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      Log3 ($name, 2, "$name - $state (Automatic = $auto)");      
   }
   
 return $state;
+}
+
+################################################################
+#   Restlaufzeit Verbraucher ermitteln
+################################################################
+sub __remainConsumerTime {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
+  
+  my $type  = $hash->{TYPE};
+  
+  my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
+  my $stopts                          = ConsumerVal ($hash, $c, "planswitchoff", undef);     # geplante Unix Stopzeit  
+  
+  $data{$type}{$name}{consumers}{$c}{remainTime} = 0;
+  
+  if (isInTimeframe($hash, $c) && $planstate eq "started" && isConsumerPhysOn($hash, $c)) {
+      my $remainTime                                 = $stopts - $t ;
+      $data{$type}{$name}{consumers}{$c}{remainTime} = sprintf "%.0f", ($remainTime / 60) if($remainTime > 0);
+  }
+  
+return;
 }
 
 ################################################################
@@ -8520,9 +8572,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>mintime</b>    </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)    </td></tr>
             <tr><td> <b>on</b>         </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>swstate</b>    </td><td>Reading welches den Schaltzustand des Consumers anzeigt (optional). Im default wird 'state' verwendet.                           </td></tr>
-            <tr><td>                   </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein'                                                                       </td></tr>
-            <tr><td>                   </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus'                                                                      </td></tr>
+            <tr><td> <b>swstate</b>    </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                      </td></tr>
+            <tr><td>                   </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                       </td></tr>
+            <tr><td>                   </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                     </td></tr>
             <tr><td> <b>notbefore</b>  </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                         </td></tr>
             <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                        </td></tr>
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
