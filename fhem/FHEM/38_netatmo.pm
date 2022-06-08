@@ -11,7 +11,7 @@
 #
 #
 ##############################################################################
-# Release 25 / 2022-03-2
+# Release 26 / 2022-06-08
 
 package main;
 
@@ -2275,7 +2275,7 @@ netatmo_setNotifications($$$)
   if( !defined($iohash->{csrf_token}) )
   {
     my($err0,$data0) = HttpUtils_BlockingGet({
-      url => "https://auth.netatmo.com/en-us/access/login",
+      url => "https://auth.netatmo.com/access/csrf",
       timeout => 10,
       noshutdown => 1,
     });
@@ -2285,7 +2285,7 @@ netatmo_setNotifications($$$)
       return undef;
     }
     #Log3 $name, 1, "$name: CSRF\n".$data0;
-    $data0 =~ /csrf-token" content="(.*)"/;
+    $data0 =~ /{"token":"(.*)"}/;
     my $tmptoken = $1;
     $iohash->{csrf_token} = $tmptoken;
     if(!defined($iohash->{csrf_token})) {
