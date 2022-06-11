@@ -37,7 +37,7 @@ use JSON ();
 use Encode;
 use HttpUtils;
 use utf8;
-use List::Util 1.45 qw(max min uniq);
+use List::Util 1.45 qw(max min uniq shuffle);
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
@@ -269,6 +269,7 @@ BEGIN {
     setVolume
     AnalyzeCommandChain
     AnalyzeCommand
+    CommandSet
     CommandDefMod
     CommandDelete
     EvalSpecials
@@ -1321,8 +1322,15 @@ sub _analyze_genDevType {
             SetOnOff => { SetOnOff => {cmdOff => 'off', type => 'SetOnOff', cmdOn => 'on'} },
             GetNumeric => { 'volume' => {currentVal => 'volume', type => 'volume' } }
             };
+        if ( $allset !~ m{\b(on)([\b:\s]|\Z)}xmsi ) {
+            delete $currentMapping->{GetOnOff};
+            delete $currentMapping->{SetOnOff};
+        }
 
         $currentMapping = _analyze_genDevType_setter( $hash, $device, $allset, $currentMapping );
+        if ( InternalVal($device, 'TYPE', 'unknown') eq 'MPD' ) {
+            $currentMapping->{MediaControls}->{MediaControls}->{cmdPlaySelected} = 'playSelection'; $currentMapping->{MediaControls}->{MediaControls}->{cmdAddSelected} = 'addSelection';
+        }
         $hash->{helper}{devicemap}{devices}{$device}{intents} = $currentMapping;
     }
 
@@ -1396,7 +1404,7 @@ sub _analyze_genDevType_setter {
 
     my $allValMappings = {
         MediaControls => {
-            cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist'},
+        cmdPlay => 'play', cmdPause => 'pause' ,cmdStop => 'stop', cmdBack => 'previous', cmdFwd => 'next', chanUp => 'channelUp', chanDown => 'channelDown' , cmdPlaylist => 'playlist' },
         GetState => {
             update => 'reread|update|reload' },
         SetScene => {
@@ -2018,7 +2026,9 @@ sub getDeviceByName {
                 if ( $type ) {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}
-                        && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$type};
+                        && ( defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$type} || 
+                            defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$intent}
+                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}->{$intent}->{$type}); #Beta-User: e.g. MediaControls/MediaControls/cmdPlaylist
                 } else {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent};
@@ -2068,6 +2078,10 @@ sub getDevicesByIntentAndType {
     for my $devs (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $mapping = getMapping($hash, $devs, $intent, { type => $type, subType => $subType }, 1) // next;
         my $mappingType = $mapping->{type};
+        if ( $intent eq 'MediaControls' && defined $mapping->{$subType} ) {
+            $mappingType = $subType;
+            $type = $subType;
+        }
         my $rooms = $hash->{helper}{devicemap}{devices}{$devs}->{rooms};
 
         # get lists of devices that may fit to requirements
@@ -2248,7 +2262,7 @@ sub getDevicesByGroup {
         $devices->{$label} = { delay => $delay, prio => $prio };
     }
 
-    if ( !$isVirt && !$getVirt && ( !$hash->{noChangeover} || $hash->{noChangeover} ne '1' ) ) {
+    if ( !$isVirt && !keys %{$devices} && !$getVirt && ( !$hash->{noChangeover} || $hash->{noChangeover} ne '1' ) ) {
         my $intent = $data->{intent} // return;
         $intent =~ s{Group\z}{}x;
 
@@ -2530,7 +2544,7 @@ sub getMapping {
 
     my $matchedMapping;
 
-    $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType} if  defined $subType && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
+    $matchedMapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType} if defined $subType && defined $hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}{$subType};
     return $matchedMapping if $matchedMapping;
 
     for (sort keys %{$hash->{helper}{devicemap}{devices}{$device}{intents}{$intent}}) {
@@ -2658,20 +2672,18 @@ sub analyzeAndRunCmd {
         Log3($hash->{NAME}, 5, "$cmd is a FHEM command");
         if ( defined $hash->{testline} ) {
             push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Command(s): $cmd";
-            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Command(s): $cmd";
             return;
         }
         $error = AnalyzeCommandChain($hash, $cmd);
         $returnVal = (split m{\s+}x, $cmd)[1];
     }
     # Soll Command auf anderes Device umgelenkt werden?
-    elsif ($cmd =~ m{:}x) {
+    elsif ($cmd =~ m{:}x && $cmd !~ m{\bmpdCMD\b}x) {
     $cmd   =~ s{:}{ }x;
         $cmd   = qq($cmd $val) if defined $val;
         Log3($hash->{NAME}, 5, "$cmd redirects to another device");
         if ( defined $hash->{testline} ) {
             push @{$hash->{helper}->{test}->{result}->{$hash->{testline}}}, "Redirected command: $cmd";
-            #$hash->{helper}->{test}->{result}->[$hash->{testline}] .= " => Redirected command: $cmd";
             return;
         }
         $error = AnalyzeCommand($hash, "set $cmd");
@@ -5027,11 +5039,11 @@ sub handleIntentMediaControls {
 
     # Search for matching device
     if (exists $data->{Device}) {
-        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaControls', 'MediaControls' );
+        $device = getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, $command, 'MediaControls' );
         return getGroupReplacesDevice($hash, $data) if !defined $device;
         return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
     } else {
-        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls', undef, 1) 
+        $device = getDeviceByIntentAndType($hash, $room, 'MediaControls' , 'MediaControls', $command) #, 1)
         // return respond( $hash, $data, getResponse($hash, 'NoActiveMediaDevice') );
     }
     return respondNeedsChoice($hash, $data, $device) if ref $device eq 'ARRAY';
@@ -5042,9 +5054,53 @@ sub handleIntentMediaControls {
 
     #check if confirmation is required
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls', $device );
-    my $cmd = $mapping->{$command};
 
+    my $cmd = $mapping->{$command};
     $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
+
+    if ( $command eq 'cmdPlaySelected'|| $command eq 'cmdAddSelected' ) { #hand over method! playSelection or addSelection
+        return respond( $hash, $data, getResponse($hash, 'NoMappingFound') ) if InternalVal($device, 'TYPE', 'unknown') ne 'MPD';
+        my $newfilter; my $several;
+        for my $arg ( qw( ArtistId AlbumId Album Artist Albumartist Title Genre Name ) ) {
+            next if !defined $data->{$arg};
+            my $arg1 = lc $arg;
+            $arg1 = "musicbrainz_$arg1" if $arg eq 'ArtistId' || $arg eq 'AlbumId';
+            $newfilter .= ' AND ' if $several;
+            $several++;
+            $newfilter .= qq(($arg1 =~ '$data->{$arg}'));
+        }
+
+        return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !$newfilter;
+
+        $newfilter = "($newfilter)" if $several > 1;
+        $newfilter = qq("$newfilter"); 
+        $cmd = "$newfilter";
+        if ( defined $data->{RandomNr} && looks_like_number($data->{RandomNr}) ) {
+            my $err = CommandSet(undef, "$device mpdCMD count $newfilter\n");
+            #Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
+            $err =~ m{songs:.(\d+)}xms;
+            my $counts = $1 // return respond( $hash, $data, 'MDP device does not answer' );
+            return respond( $hash, $data, 'No songs could be identified' ) if !$counts;
+            my $min = min($counts, $data->{RandomNr})-1;
+            my @rands = shuffle(0..$counts-1);
+            my $first = shift @rands;
+            while  ( @rands > $min ) {
+                pop @rands;
+            }
+            if (!defined $hash->{testline} ) {
+                my $fnHash = resetRegIntTimer( $device, time, \&delayedMpdCommands, $hash, 0);
+                $fnHash->{enqueue} = join q{:},@rands;
+                $fnHash->{command} = 'findadd';
+                $fnHash->{filter}  = $cmd;
+            }
+            my $ends = $first+1;
+            $cmd .= " window $first:$ends" ;
+        }
+        $cmd = "findadd $cmd\n";
+        $cmd = "stop\nclear\n$cmd\nplay\n" if $command eq 'cmdPlaySelected';
+        $cmd = "mpdCMD $cmd";
+    }
+
     # Execute Cmd
     analyzeAndRunCmd($hash, $device, $cmd);
     # Define voice response
@@ -6012,6 +6068,27 @@ sub _replaceDecimalPoint {
     return $line;
 }
 
+
+sub delayedMpdCommands {
+    my $fnHash = shift // return;
+
+    my $device = $fnHash->{MODIFIER};
+    my $cmd    = $fnHash->{command};
+    my $filter = $fnHash->{filter};
+    my @rands  = split m{:}x, $fnHash->{enqueue};
+    my $todo = "$device mpdCMD $cmd $filter window";
+
+    while ( @rands ) {
+        my $single = shift @rands;
+        my $sand1 = $single+1;
+        my $err = CommandSet(undef, "$todo $single:$sand1\n");
+        Log3( $fnHash->{HASH}, 3, "[RHASSPY] $todo $single:$sand1, error is $err" );
+        last if $err && $err =~ m{$device.*Ein.Verbindungsversuch.ist.fehlgeschlagen|mpd_Msg.ACK.ERROR.}xms;
+    }
+
+    return;
+}
+
 1;
 
 __END__
@@ -6095,7 +6172,7 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
   <li><b>sessionTimeout</b> <a href="#RHASSPY-experimental"><b>experimental!</b></a> timout limit in seconds. By default, RHASSPY will close a sessions immediately once a command could be executed. Setting a timeout will keep session open until timeout expires. NOTE: Setting this key may result in confusing behaviour. Atm not recommended for regular useage, <b>testing only!</b> May require some non-default settings on the Rhasspy side to prevent endless self triggering.</li>
-  <li><b>autoTraining</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
+  <li><b>autoTraining</b>: deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
 <p>RHASSPY needs a <a href="#MQTT2_CLIENT">MQTT2_CLIENT</a> device connected to the same MQTT-Server as the voice assistant (Rhasspy) service.</p>
 <p><b>Examples for defining an MQTT2_CLIENT device and the Rhasspy device in FHEM:</b>
@@ -6455,7 +6532,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </ul>
   </li>
   <p><b>Remarks on rhasspySpeechDialog and Babble:</b><br><a id="RHASSPY-experimental"></a>
-    Interaction with Babble and AMAD.*-Devices is not approved to be propperly working yet. Further tests
+    Interaction with Babble and AMAD.*-Devices is not approved to be properly working yet. Further tests
     may be needed and functionality may be subject to changes!
   </p>
   <li>
@@ -6668,7 +6745,9 @@ yellow=rgb FFFF00</code></p>
   <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
   By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
-  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i> or <i>cmdBack</i>
+  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available).<br>
+  <a href="#RHASSPY-experimental"><b>experimental!</b></a> If you put an <a href="#MPD">MPD</a> device under RHASSPY control, you may also have the option to use <i>cmdPlaySelected</i> and <i>cmdAddSelected</i> to replace or extend your current playlist using several additional fields:
+  {ArtistId}, {AlbumId}, {Album}, {Artist}, {Albumartist}, {Title}, {Genre}, and {Name}. The first two will be treated as <i>musicbrainz_artistid</i> or <i>musicbrainz_albumid</i> respecively and (lower case) transfered to filter arguments as described in <a href="https://mpd.readthedocs.io/en/latest/protocol.html#filters">MPD documentation</a>. Additionally you may use {RandomNr} to shuffle the result and limit the songs added to the given number.
   <li>MediaChannels</li> (as configured by the user)
   <li>SetColor</li> 
   {Device} and one Color option are mandatory, {Room} is optional. Color options are {Hue} (0-360), {Colortemp} (0-100), {Saturation} (as understood by your device) or {Rgb} (hex value from 000000 to FFFFFF)
