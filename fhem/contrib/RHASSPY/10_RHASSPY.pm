@@ -5076,8 +5076,8 @@ sub handleIntentMediaControls {
         $newfilter = qq("$newfilter"); 
         $cmd = "$newfilter";
         if ( defined $data->{RandomNr} && looks_like_number($data->{RandomNr}) ) {
-            my $err = CommandSet(undef, "$device mpdCMD count $newfilter\n");
-            #Log3( $hash, 3, "[$hash->{NAME}] count request is $err" );
+            my $err = CommandSet(undef, "$device mpdCMD count $newfilter");
+            #Log3( $hash, 3, "[$hash->{NAME}] count request answer is $err" );
             $err =~ m{songs:.(\d+)}xms;
             my $counts = $1 // return respond( $hash, $data, 'MDP device does not answer' );
             return respond( $hash, $data, 'No songs could be identified' ) if !$counts;
@@ -5097,7 +5097,8 @@ sub handleIntentMediaControls {
             $cmd .= " window $first:$ends" ;
         }
         $cmd = "findadd $cmd\n";
-        $cmd = "stop\nclear\n$cmd\nplay\n" if $command eq 'cmdPlaySelected';
+        $cmd = "stop\nclear\n$cmd\n" if $command eq 'cmdPlaySelected';
+        $cmd .= "play\n";
         $cmd = "mpdCMD $cmd";
     }
 
