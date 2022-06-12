@@ -1545,8 +1545,9 @@
     <Product config="graber/vcz1.xml" id="5a31" name="VCZ1 Virtual Cord Remote Control" type="5643"/>
     <Product config="graber/csz1.xml" id="5a31" name="CSZ1 Cellular Shade" type="4353"/>
   </Manufacturer>
-  <Manufacturer id="026F" name="Sprue Safety Products"></Manufacturer>
+  <Manufacturer id="026F" name="Sprue Safety Products">
     <Product id="0003" name="NM-CO-10x-INT Carbon Monoxide Detector" type="0001" forumNr="128019"/>
+  </Manufacturer>
   <Manufacturer id="0124" name="Square Connect"></Manufacturer>
   <Manufacturer id="021B" name="ST&amp;T Electric Corporation"></Manufacturer>
   <Manufacturer id="0358" name="Star Automation"></Manufacturer>
