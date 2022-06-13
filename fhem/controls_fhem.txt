@@ -1,4 +1,4 @@
-REV 26142
+REV 26146
 DIR unused
 UPD 2022-06-09_07:45:03 380437 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -720,7 +720,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2022-03-22_07:45:02 33430 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2022-04-04_07:45:03 152103 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2022-06-13_07:45:02 152206 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2020-11-09_07:45:03 33380 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -748,8 +748,8 @@ UPD 2022-06-08_07:45:07 4731593 docs/commandref.html
 UPD 2022-06-08_07:45:09 2852023 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-06-12_07:45:10 275592 docs/commandref_modular.html
-UPD 2022-06-12_07:45:11 286721 docs/commandref_modular_DE.html
+UPD 2022-06-13_07:45:10 275592 docs/commandref_modular.html
+UPD 2022-06-13_07:45:11 286721 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
