@@ -316,6 +316,7 @@ sub statistics_PeriodChange($)
    
   # Determine the next day change time
    my @th=localtime();
+   my $now = gettimeofday();
    my $dayChangeDelay = 0;
    my $dayChangeTime = timelocal(0,0,0,$th[3],$th[4],$th[5]+1900);
    if (AttrVal($name, "dayChangeTime", "00:00") =~ /(\d+):(\d+)/ && $1<24 && $1 >=0 && $2<60 && $2>=0) {
@@ -323,16 +324,18 @@ sub statistics_PeriodChange($)
       if ($dayChangeDelay == 0) { $dayChangeTime += 24*3600; } # Otherwise it would always lay in the past
       $dayChangeTime += $dayChangeDelay - $periodChangePreset;
    }
-
+   my $dstcorr = HOURSECONDS * ((localtime($now - DAYSECONDS))[8] - $th[8]);
+   $dayChangeTime += $dstcorr;
+   
    RemoveInternalTimer($hash);
  # Run period change procedure each full hour ("periodChangePreset" second before).
-   my $periodEndTime = 3600 * ( int((gettimeofday()+$periodChangePreset)/3600) + 1 ) - $periodChangePreset ;
- # Run procedure also for given dayChangeTime  
+   my $periodEndTime = 3600 * ( int(($now+$periodChangePreset)/3600) + 1 ) - $periodChangePreset ;
+ # Run procedure also for given dayChangeTime 
    $val = "";
-   if ( gettimeofday()<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
+   if ( $now<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
       $periodEndTime = $dayChangeTime;
       $val = " (Day Change)";
-   } 
+   }
    $val = strftime ("%Y-%m-%d %H:%M:%S", localtime($periodEndTime)) . $val;
    InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 1);
 
@@ -360,17 +363,18 @@ sub statistics_PeriodChange($)
      # get time values for 50 seconds before a new day
       ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime ($curPeriodChangeTime - $dayChangeDelay + $periodChangePreset - 59);
      # get time values for next day
-      ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $periodChangePreset);
+      ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime ($now + $periodChangePreset);
       $periodSwitch = -2;
       if ($yearNow != $yearLast) { $periodSwitch = -4; }
       elsif ($monthNow != $monthLast) { $periodSwitch = -3; }
       # Positiv Value if periode changes at full hour
       $periodSwitch = abs($periodSwitch)     if $dayChangeDelay % 3600 == 0;
    } else {
-      ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime (gettimeofday());
-      ($dummy, $dummy, $hourNow, $dummy, $dummy, $dummy) = localtime (gettimeofday() + $periodChangePreset);
-      if ($hourNow != $hourLast) { 
-         $periodSwitch = 1; 
+      ($dummy, $dummy, $hourLast, $dummy, $dummy) = localtime($now);
+      ($dummy, $dummy, $hourNow , $dummy, $dummy) = localtime($now + $periodChangePreset);
+      if (   $hourNow != $hourLast
+          || $hourNow == $hourLast && $th[8] != (localtime($now - $dstcorr + $periodChangePreset))[8]) {
+         $periodSwitch = 1;
          statistics_Log $hash,4,"Calculating hour change";
       } else {
          statistics_Log $hash,4,"Calculating statistics at startup";
