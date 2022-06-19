@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 06/2022
-my $thzversion = "0.203";
+my $thzversion = "0.204";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -379,7 +379,8 @@ my %parsinghash = (
 ########################################################################################
 
 my %sets439technician =(
-  "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"0clean",  unit =>""},
+#   "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"0clean",  unit =>""},
+   "zResetLast10errors"		=> {cmd2=>"D1",     argMin =>   "0",	argMax =>  "0",	type =>"D1last",  unit =>""},
 #  "zPassiveCoolingtrigger"	=> {cmd2=>"0A0597", argMin =>   "0",	argMax =>  "50",	type =>"1clean",  unit =>""},
   "zPumpHC"			=> {cmd2=>"0A0052", argMin =>   "0",	argMax =>  "1",	type =>"0clean",  unit =>""},  
   "zPumpDHW"			=> {cmd2=>"0A0056", argMin =>   "0",	argMax =>  "1",	type =>"0clean",  unit =>""}
@@ -2070,7 +2071,9 @@ sub function_heatSetTemp($$) {
         $Simul_heatSetTemp_simplified = sprintf("%.1f", maxNum(5,($tmp + $a1)));
         push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
     }
-    my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C';
+    my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1;
+    $titlestring .= "%" if (AttrVal($devname, "firmware" , "4.39")  =~ /^2/ ); 
+    $titlestring .= " insideTemp=" . $insideTemp .'°C';
     return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode);
 }
 
