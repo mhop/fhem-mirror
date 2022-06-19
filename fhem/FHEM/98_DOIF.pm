@@ -4848,7 +4848,7 @@ sub card
   }
   
   
-  my $chart_dim = $hring eq "1" ? $bwidth-36: $bwidth-90 ;
+  my $chart_dim = $hring eq "" ? $bwidth-90: $bwidth-36 ;
   
   $chart_dim -= defined $collect2 ? ($hring eq "1" ? 13 : 15):0;
   
@@ -4934,8 +4934,8 @@ sub card
 
 
   $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />' if (defined $header or $hring);
-  if (defined $header or $hring) {
-    $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',$hring eq "1" ? 34:14,$header_style,$header_txt) if (defined $header); 
+  if (defined $header or $hring ne "") {
+    $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',($hring eq "1" and defined $ic) ? 34:14,$header_style,$header_txt) if (defined $header); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
       my $svg_icon=::FW_makeImage($ic);
       if(!($svg_icon =~ s/\sheight="[^"]*"/ height="18"/)) {
@@ -5075,7 +5075,7 @@ sub card
   $out.= '</g>';
   $out.= '</svg>';
 
-  if (!$hring) {
+  if ($hring eq "") {
     $out.=sprintf('<g transform="translate(%s,6)">',$bwidth-49);
     if (!defined $collect2) {
       if (ref($col) eq "ARRAY" and scalar (@{$col}) >= 2 ) {
