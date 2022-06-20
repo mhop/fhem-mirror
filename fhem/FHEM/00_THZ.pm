@@ -2072,7 +2072,7 @@ sub function_heatSetTemp($$) {
         push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
     }
     my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1;
-    $titlestring .= "%" if (AttrVal($devname, "firmware" , "4.39")  =~ /^2/ ); 
+    $titlestring .= "%" if (AttrVal($devname, "firmware" , "4.39")  !~ /^2/ ); 
     $titlestring .= " insideTemp=" . $insideTemp .'°C';
     return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode);
 }
