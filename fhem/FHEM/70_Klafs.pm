@@ -32,7 +32,7 @@ use JSON            qw(decode_json encode_json);
 #use Encode          qw(encode_utf8 decode_utf8);
 use Time::Piece;
 use Time::Local;
-use Data::Dumper;
+#use Data::Dumper;
 use HttpUtils;
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
@@ -666,11 +666,19 @@ sub Klafs_Set {
      $now += $FIFTEEN_MINS - $diff;
     }
     my $next = scalar localtime $now;
+    # doppelte Leerzeichen bei einstelligen Datumsangaben entfernen
+    $next =~ tr/ //s;
     my @Zeit = split(/ /,$next);
-    my @Uhrzeit = split(/:/,$Zeit[4]);
+    my @Uhrzeit = split(/:/,$Zeit[3]);
     my $std = $Uhrzeit[0];
     my $min = $Uhrzeit[1];
-
+    # print "Decoded Zeit:\n".Dumper(@Zeit);
+    #Decoded Zeit:
+    #$VAR1 = 'Mon';
+    #$VAR2 = 'Jun';
+    #$VAR3 = '20';
+    #$VAR4 = '15:15:00';
+    #$VAR5 = '2022';
 
     if($std < 10){
       if(substr($std,0,1) eq "0"){

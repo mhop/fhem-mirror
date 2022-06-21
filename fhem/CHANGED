@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  79_Klafs: minor bugfix for date format 
  - bugfix:  38_netatmo: fixed csrf error on home notification settings
  - bugfix:  10_SOMFY: Correct match for long commands according to #msg1224029
  - bugfix:  70_Klafs: Start time error fixed
