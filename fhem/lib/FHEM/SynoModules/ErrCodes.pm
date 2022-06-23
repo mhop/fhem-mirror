@@ -32,7 +32,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.5');
+use version; our $VERSION = version->declare('1.3.6');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
@@ -51,18 +51,18 @@ my %errauthsscam = (                                                    # Authen
   100  => "Unknown error",
   101  => "The account parameter is not specified",
   102  => "API does not exist",
-  400  => "Invalid user or password",
+  400  => "invalid user or password",
   401  => "Guest or disabled account",
   402  => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started, make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
-  403  => "One time password not specified",
-  404  => "One time password authenticate failed",
+  403  => "2-factor authentication code required",
+  404  => "Failed to authenticate 2-factor authentication code",
   405  => "method not allowd - maybe the password is too long",
-  406  => "OTP code enforced",
-  407  => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
-  408  => "Password Expired Can not Change",
-  409  => "Password Expired",
-  410  => "Password must change (when first time use or after reset password by admin)",
-  411  => "Account Locked (when account max try exceed)",
+  406  => "enforce to authenticate with 2-factor authentication code",
+  407  => "blocked IP source - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  408  => "expired password cannot change",
+  409  => "Password expired",
+  410  => "Password must be changed (when first time use or after reset password by admin)",
+  411  => "Account locked (when account max try exceed)",
 );
 
 my %errsscam = (                                                       # Standard Error Codes der Surveillance Station API                 
@@ -100,12 +100,18 @@ my %errsscam = (                                                       # Standar
 
 ## SSCal ##
 my %errauthsscal = (                                                   # Authentification Error Codes der Calendar API
-  400  => "No such account or the password is incorrect",
-  401  => "Account disabled",
+  400  => "invalid user or password",
+  401  => "Guest or disabled account",
   402  => "Permission denied",
-  403  => "2-step verification code required",
-  404  => "Failed to authenticate 2-step verification code",
-  407  => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  403  => "2-factor authentication code required",
+  404  => "Failed to authenticate 2-factor authentication code",
+  405  => "method not allowd - maybe the password is too long",
+  406  => "enforce to authenticate with 2-factor authentication code",
+  407  => "blocked IP source - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  408  => "expired password cannot change",
+  409  => "Password expired",
+  410  => "Password must be changed (when first time use or after reset password by admin)",
+  411  => "Account locked (when account max try exceed)",
 );
 
 my %errsscal = (                                                       # Standard Error Codes der Calendar API 
@@ -176,11 +182,18 @@ my %errsschat = (                                                       # Standa
 
 ## SSFile ##
 my %errauthssfile = (                                                   # Authentification Error Codes der File Station API
-  400  => "No such account or incorrect password",
-  401  => "Account disabled",
+  400  => "invalid user or password",
+  401  => "Guest or disabled account",
   402  => "Permission denied",
-  403  => "2-step verification code required",
-  404  => "Failed to authenticate 2-step verification code",
+  403  => "2-factor authentication code required",
+  404  => "Failed to authenticate 2-factor authentication code",
+  405  => "method not allowd - maybe the password is too long",
+  406  => "enforce to authenticate with 2-factor authentication code",
+  407  => "blocked IP source - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
+  408  => "expired password cannot change",
+  409  => "Password expired",
+  410  => "Password must be changed (when first time use or after reset password by admin)",
+  411  => "Account locked (when account max try exceed)",
 );
 
 my %errssfile = (                                                       # Standard Error Codes der File Station API
