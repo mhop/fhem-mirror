@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.64.2 "=> "23.06.2022  fix switch off by switch off condition in ___switchConsumerOff ",
   "0.64.1 "=> "07.06.2022  fixing simplifyCstate, sub ___setConsumerSwitchingState to improve safe consumer switching ",
   "0.64.0 "=> "04.06.2022  consumer type charger added, new attr createConsumptionRecReadings ",
   "0.63.2 "=> "21.05.2022  changed isConsumptionRecommended to isIntimeframe, renewed isConsumptionRecommended ",
@@ -3569,7 +3570,7 @@ sub ___switchConsumerOff {
            );
   }
   
-  if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && simplifyCstate($pstate) !~ /finished/xs)) {                         
+  if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && simplifyCstate($pstate) =~ /started|starting|stopping/xs)) {                         
       CommandSet(undef,"$cname $offcom");
       
       $paref->{ps}     = "switching off:";
@@ -3578,7 +3579,8 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};      
       
-      $state = qq{switching Consumer "$calias" to "$offcom"};
+      my $caution = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
+      $state      = qq{switching Consumer "$calias" to "$offcom", caution: $caution};
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                      # Cache File Consumer schreiben
       
@@ -7461,7 +7463,7 @@ sub isAddSwitchOffCond {
       return (1, $info, $err);
   }
   
-  $info = qq{The device "$dswoffcond", reading "$rswoffcond" doen't match the Regex "$swoffcondregex"};  
+  $info = qq{The device "$dswoffcond", reading "$rswoffcond" doesn't match the Regex "$swoffcondregex"};  
 
 return (0, $info, $err);
 }
