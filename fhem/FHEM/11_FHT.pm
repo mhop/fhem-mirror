@@ -210,6 +210,16 @@ FHT_Set($@)
     splice(@a,$i,1,("report1","255","report2","255"))
         if($a[$i] eq "refreshvalues");
 
+    if($a[$i] eq "adjusthour") {
+      my @t = localtime;
+      splice(@a,$i,1,("hour",$t[2]));
+    }
+
+    if($a[$i] eq "adjustminute") {
+      my @t = localtime;
+      splice(@a,$i,1,("minute",$t[1]));
+    }
+
     if($a[$i] eq "time") {
       my @t = localtime;
       splice(@a,$i,1,("hour",$t[2],"minute",$t[1]));
@@ -241,7 +251,7 @@ FHT_Set($@)
       my $tmpList="on,off,".join(",",@list);
       $cmdList =~ s/-temp/-temp:$tmpList/g;     # FHEMWEB sugar
       $cmdList =~ s/(-from.|-to.)/$1:time/g;
-      $cmdList .= " date:noArg time:noArg";
+      $cmdList .= " date:noArg time:noArg adjusthour:noArg adjustminute:noArg";
       return "Unknown argument $cmd, choose one of $cmdList";
     }
 
@@ -778,7 +788,7 @@ FHT_State($$$$)
       holiday1 holiday2      # see mode holiday_short or holiday<br>
       manu-temp              # No clue what it does.<br>
       year month day hour minute<br>
-      time date<br>
+      time date adjusthour adjustminute<br>
       lowtemp-offset         # Alarm-Temp.-Differenz<br>
       windowopen-temp<br>
       mon-from1 mon-to1 mon-from2 mon-to2<br>
@@ -851,6 +861,8 @@ FHT_State($$$$)
       <li>time sets hour and minute to local time</li><br>
 
       <li>date sets year, month and date to local time</li><br>
+
+      <li>adjusthour and adjustminute set hour or minute to local time, respectively</li><br>
 
       <li>refreshvalues is an alias for report1 255 report2 255</li><br>
 
@@ -1126,7 +1138,7 @@ FHT_State($$$$)
       holiday1 holiday2      # siehe mode holiday_short oder holiday<br>
       manu-temp              # Keine Ahnung was das bewirkt<br>
       year month day hour minute<br>
-      time date<br>
+      time date adjusthour adjustminute<br>
       lowtemp-offset         # Alarm-Temp.-Differenz<br>
       windowopen-temp<br>
       mon-from1 mon-to1 mon-from2 mon-to2<br>
@@ -1202,6 +1214,8 @@ FHT_State($$$$)
       <li>time setzt Stunde und Minute auf lokale Zeit</li><br>
 
       <li>date setzt Jahr, Monat und Tag auf lokale Zeit</li><br>
+
+      <li>adjusthour und adjustminute setzen Stunde bzw. Minute auf lokale Zeit</li><br>
 
       <li>refreshvalues ist ein Alias f&uuml;r report1 255 report2 255</li><br>
 
