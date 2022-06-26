@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 06/2022
-my $thzversion = "0.204";
+my $thzversion = "0.205";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -246,11 +246,32 @@ my %parsinghash = (
 	      [" heatTemp: ",		28, 4, "hex2int", 10],  
 	      [" seasonMode: ",		38, 2, "somwinmode", 1],
 	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" hcOpMode: ",		48, 2, "opmodehc", 1], 	      
-          [" roomSetTemp: ",		62, 4, "hex2int", 10],	[" x60: ", 		60, 4, "hex2int", 10],
+	      [" roomSetTemp: ",	62, 4, "hex2int", 10],	[" x60: ", 		60, 4, "hex2int", 10],
 	      [" x64: ", 		64, 4, "raw", 1],	[" insideTempRC: ", 	68, 4, "hex2int", 10],
 	      [" x72: ", 		72, 4, "raw", 1],	[" x76: ", 		76, 4, "raw", 1],
 	      [" onHysteresisNo: ",	32, 2, "hex", 1],	[" offHysteresisNo: ",	34, 2, "hex", 1],
 	      [" hcBoosterStage: ",	36, 2, "hex", 1]
+         ],
+  # contribution from joerg  hellijo  Antwort #1085  Juni 2022
+   "F4hc1214j" => [["outsideTemp: ",	4, 4, "hex2int", 10],	[" x08: ",		8, 4, "raw", 1],
+ 	      [" returnTemp: ",		12, 4, "hex2int", 10],	[" integralHeat: ",	16, 4, "hex2int", 1],
+	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10],
+	      [" heatTemp: ",		28, 4, "hex2int", 10], 
+	      [" seasonMode: ",		38, 2, "somwinmode", 1],
+	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" hcOpMode: ",		48, 2, "opmodehc", 1],
+	      [" roomSetTemp: ",	62, 4, "hex2int", 10],	[" x50: ", 		50, 4, "hex2int", 10],
+	      [" x66: ", 		66, 4, "raw", 1],	[" insideTempRC: ", 	74, 4, "hex2int", 10],
+	      [" x70: ", 		70, 4, "raw", 1],	[" x76: ", 		78, 4, "raw", 1],
+	      [" onHysteresisNo: ",	32, 2, "hex", 1],	[" offHysteresisNo: ",	34, 2, "hex", 1],
+	      [" hcStage: ",		36, 2, "hex", 1],# 0=Aus; 1=Solar; 2=V1
+	      [" boosterStage2: ", 	40, 1, "bit3", 1],
+	      [" x58: ", 		58, 4, "raw", 1],	[" x54: ", 		54, 4, "raw", 1],
+	      [" blockTimeAfterCompStart: ", 82, 4, "hex2int", 1], [" insideTemp: ", 	86, 4, "hex2int", 10],
+	      [" solarPump: ",		40, 1, 	"bit2", 1],	[" boosterStage1: ",	40, 1, 	"bit1", 1],
+	      [" compressor: ",		40, 1, 	"bit0", 1],	[" heatPipeValve: ",	41, 1, 	"bit3", 1],
+	      [" diverterValve: ",	41, 1, 	"bit2", 1],	[" dhwPump: ",		41, 1, 	"bit1", 1],
+	      [" heatingCircuitPump: ",	41, 1, 	"bit0", 1],     [" mixerOpen: ",	43, 1, 	"bit1", 1],
+	      [" mixerClosed: ",	43, 1, 	"bit0", 1]
          ],
   "F5hc2"  => [["outsideTemp: ",	4, 4, "hex2int", 10],	[" returnTemp: ",	 8, 4, "hex2int", 10],
 	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],	[" heatSetTemp: ",	16, 4, "hex2int", 10],
@@ -845,6 +866,18 @@ my %getsonly214 = (
   "sGlobal"	     	=> {cmd2=>"FB", type =>"FBglob214",unit =>""}  
  ); 
 
+ my %getsonly214j = (  # contribution from joerg  hellijo  Antwort #1085  Juni 2022
+  "pFan"		=> {cmd2=>"01", type =>"01pxx214", unit =>""},
+  "pExpert"		=> {cmd2=>"02", type =>"02pxx206", unit =>""},
+  "sControl"  		=> {cmd2=>"F2", type =>"F2type",   unit =>""},
+  "sHC1"		=> {cmd2=>"F4", type =>"F4hc1214j", unit =>""},
+  #"sLVR"  		=> {cmd2=>"E8", type =>"E8tyype",  unit =>""},
+  #"sF0"  		=> {cmd2=>"F0", type =>"F0type",   unit =>""},
+  #"sF1"  		=> {cmd2=>"F1", type =>"F1type",   unit =>""},
+  #"sEF"  		=> {cmd2=>"EF", type =>"EFtype",   unit =>""},
+  "sGlobal"	     	=> {cmd2=>"FB", type =>"FBglob214",unit =>""}  
+ ); 
+
 
 my %sets=       (%sets439539common, %sets439only);
 my %gets=       (%getsonly439, %sets);
@@ -906,7 +939,7 @@ sub THZ_Initialize($) {
 		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
 		    ."interval_sDisplay:0,60,120,180,300 "
-		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
+		    ."firmware:4.39,2.06,2.14,2.14j,5.39,4.39technician "
 		    ."interval_sDewPointHC1:0,60,120,180,300 "
 		    ."simpleReadTimeout:0.25,0.5,0.75,1,2,4,6 " #standard has been 0.75 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.75 sec.
 		    ."nonblocking:0,1 "
@@ -1962,6 +1995,10 @@ sub THZ_Attr(@) {
         elsif ($attrVal eq "2.14") {
             %sets = (%sets206, %setsonly214);
             %gets = (%getsonly2xx, %getsonly214, %sets206);
+        }
+	elsif ($attrVal eq "2.14j") {
+            %sets = (%sets206, %setsonly214);
+            %gets = (%getsonly2xx, %getsonly214j, %sets206);
         }
         elsif ($attrVal eq "5.39") {
             %sets=(%sets439539common, %sets539only);
