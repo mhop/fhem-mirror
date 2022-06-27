@@ -706,11 +706,15 @@ sub Snapcast_isPmInstalled($$)
 }
 1;
 
+__END__
+
 =pod
-=item summary    control and monitor Snapcast Server
+=item summary    control and monitor Snapcast Servers and Clients
+=item summary_DE steuert und überwacht Snapcast Servers und Clients
+
 =begin html
 
-<a name="Snapcast"></a>
+<a id="Snapcast"></a>
 <h3>Snapcast</h3>
 <ul>
     <i>Snapcast</i> is a module to control a Snapcast Server. Snapcast is a little project to achieve multiroom audio and is a leightweight alternative to such solutions using Pulseaudio.
@@ -720,8 +724,8 @@ sub Snapcast_isPmInstalled($$)
     other FHEM capabilities around it, e.g. Notifies, etc. The server module includes all readings of all snapcast clients, and it allows to control all functions of all snapcast clients. 
     Each virtual client module just gets the reading for the specific client. The client modules is encouraged and also makes it possible to do per-client Attribute settings, e.g. volume step size and volume constraints. 
     <br><br>
-    <a name="Snapcastdefine"></a>
-    <b>Define</b>
+    <a di="Snapcast-define"></a>
+    <h4>Define</h4>
     <ul>
         <code>define <name> Snapcast [&lt;ip&gt; &lt;port&gt;]</code>
         <br><br>
@@ -737,8 +741,8 @@ sub Snapcast_isPmInstalled($$)
          which is normally made out of the MAC address. Once the server module is initialized it will have all the client IDs in the readings, so you want to use those for the definition of the client modules
     </ul>
     <br>
-    <a name="Snapcastset"></a>
-    <b>Set</b><br>
+    <a id="Snapcast-set"></a>
+    <h4>Set</h4>
     <ul>
         For a Server module: <code>set &lt;name&gt; &lt;function&gt; &lt;client&gt; &lt;value&gt;</code>
         <br><br>
@@ -746,48 +750,48 @@ sub Snapcast_isPmInstalled($$)
         <br><br>
         Options:
         <ul>
-              <li><i>update</i><br>
+              <a id="Snapcast-set-update"></a><li><i>update</i><br>
                   Perform a full update of the Snapcast Status including streams and servers. Only needed if something is not working. Server module only</li>
-              <li><i>volume</i><br>
+              <a id="Snapcast-set-volume"></a><li><i>volume</i><br>
                   Set the volume of a client. For this and all the following 4 options, give client as second parameter (only for the server module), either as name, IP , or MAC and the desired value as third parameter. 
                   Client can be given as "all", in that case all clients are changed at once (only for server module)<br>
-                  Volume can be given in 3 ways: Range betwee 0 and 100 to set volume directly. Increment or Decrement given between -100 and +100. Keywords <em>up</em> and <em>down</em> to increase or decrease with a predifined step size. 
+                  Volume can be given in 3 ways: Range between 0 and 100 to set volume directly. Increment or Decrement given between -100 and +100. Keywords <em>up</em> and <em>down</em> to increase or decrease with a predifined step size. 
                   The step size can be defined in the attribute <em>volumeStepSize</em><br>
                   The step size can be defined smaller for the lower volume range, so that finetuning is possible in this area.
                   See the description of the attributes <em>volumeStepSizeSmall</em> and <em>volumeStepThreshold</em>
                   Setting a volume bigger than 0 also unmutes the client, if muted.</li>
-              <li><i>mute</i><br>
+              <a id="Snapcast-set-mute"></a><li><i>mute</i><br>
                   Mute or unmute by giving "true" or "false" as value. If no argument given,  toggle between muted and unmuted.</li>
-              <li><i>latency</i><br>
+              <a id="Snapcast-set-latency"></a><li><i>latency</i><br>
                   Change the Latency Setting of the client</li>
-              <li><i>name</i><br>
+              <a id="Snapcast-set-name"></a><li><i>name</i><br>
                   Change the Name of the client</li>
-              <li><i>stream</i><br>
+              <a id="Snapcast-set-stream"></a><li><i>stream</i><br>
                   Change the stream that the client is listening to. Snapcast uses one or more streams which can be unterstood as virtual audio channels. Each client/room can subscribe to one of them. 
                   By using next as value, you can cycle through the avaialble streams</li>
         </ul>
 </ul>
  <br><br>
-  <a name="Snapcastattr"></a>
-  <b>Attributes</b>
+  <a id="Snapcast-attr"></a>
+  <h4>Attributes</h4>
   <ul>
     All attributes can be set to the master module and the client modules. Using them for client modules enable the setting of different attribute values per client. 
-    <li>streamnext<br>
+    <a id="Snapcast-attr-streamnext"></a><li>streamnext<br>
     Can be set to <i>all</i> or <i>playing</i>. If set to <i>all</i>, the <i>next</i> function cycles through all streams, if set to <i>playing</i>, the next function cycles only through streams in the playing state.
     </li>
-    <li>volumeStepSize<br>
+    <a id="Snapcast-attr-volumeStepSize"></a><li>volumeStepSize<br>
       Default: 5. Set this to define, how far the volume is changed when using up/down volume commands. 
     </li>
-    <li>volumeStepThreshold<br>
+    <a id="Snapcast-attr-volumeStepThreshold"></a><li>volumeStepThreshold<br>
       Default: 7. When the volume is below this threshold, then the volumeStepSizeSmall setting is used for volume steps, rather than the normal volumeStepSize. 
     </li>
-    <li>volumeStepSizeSmall<br>
+    <a id="Snapcast-attr-volumeStepSizeSmall"></a><li>volumeStepSizeSmall<br>
       Default: 1. This typically smaller step size is used when using "volume up" or "volume down" and the current volume is smaller than the threshold. 
     </li>
-        <li>constraintDummy<br>
+    <a id="Snapcast-attr-constraintDummy"></a><li>constraintDummy<br>
     Links the Snapcast module to a dummy. The value of the dummy is then used as a selector for different sets of volumeConstraints. See the description of the volumeConstraint command. 
     </li>
-    <li>constraints<br>Defines a set of volume Constraints for each client and, optionally, based on the value of the dummy as defined with constraintDummy. This way there can be different volume profiles for e.g. weekdays or weekends. volumeConstraints mean, that the maximum volume of snapcast clients can be limited or even set to 0 during certain times, e.g. at night for the childrens room, etc.
+    <a id="Snapcast-attr-constraints"></a><li>constraints<br>Defines a set of volume Constraints for each client and, optionally, based on the value of the dummy as defined with constraintDummy. This way there can be different volume profiles for e.g. weekdays or weekends. volumeConstraints mean, that the maximum volume of snapcast clients can be limited or even set to 0 during certain times, e.g. at night for the childrens room, etc.
     the constraint argument is given in the folling format: <constraintSet>|hh:mm vol hh:mm vol ... [<constraintSet2>|hh:mm vol ... etc. The chain off <hh:mm> <volume> pairs defines a volume profile for 24 hours. It is equivalent to the temeratore setting of the homematic thermostates supported by FHEM.  
     <br>Example: standard|08:00 0 18:00 100 22:00 30 24:00 0,weekend|10:00 0 20:00 100 24:00 30</li>
     <br>In this example, there are two profiles defined. If the value of the associated dummy is "standard", then the standard profile is used. It mutes the client between midnight and 8 am, then allows full volume until 18:00, then limites the volume to 30 until 22:00 and then mutes the client for the rest of the day. The snapcast module does not increase the volume when a limited time is over, it only allows for increasing it manually again. 
