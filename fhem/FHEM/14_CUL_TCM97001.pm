@@ -1,20 +1,12 @@
 # From dancer0705
 #
 # Receive temperature sensor
-# Supported models:
-#  - "TCM97..."
-#  - "ABS700"
-#  - "TCM21...."
-#  - "Prologue"
-#  - "Rubicson"
-#  - "NC_WS"
-#  - "GT_WT_02"
-#  - "AURIOL"
-#  - "KW9010"
 #
 # Unsupported models are saved in a device named CUL_TCM97001_Unknown
 #
-# Copyright (C) 2016 Bjoern Hempel
+# Copyright (C)
+# 2016 Bjoern Hempel
+# 2022 Ralf9
 #
 # This program is free software; you can redistribute it and/or modify it under 
 # the terms of the GNU General Public License as published by the Free Software 
@@ -41,6 +33,14 @@
 # 22.10.2017 W174           rain         elektron-bbs/HomeAutoUser
 # 06.02.2018 W044  Ventus W155 Temp/Hum  pejonp
 # 06.02.2018 W132  Ventus W155 Wind/Speed/Direction  pejonp
+# 
+# 14.06.2020 update log Unkown: now in Unknow log output the verbose is also used by a renamed device unknown
+# 14.06.2020 fix Ventus W174, update log
+# 28.08.2020 add KW9015 (TFA 30.3161)
+# 10.01.2021 fix Battery at the model NC_WS
+# 05.04.2022 add Mebus HQ7312
+#            new attribute disableCreateUndefDevice: this can be used to deactivate the creation of new devices
+#            new attribute disableUnknownEvents: with this, the events can be deactivated for unknown messages
 ##############################################
 
 package main;
@@ -70,6 +70,7 @@ my %models = (
     "PFR_130"      => 'PFR_130',
     "Type1"       => 'Type1',
     "Mebus"       => 'Mebus',
+    "Mebus7312"   => 'Mebus7312',
     "Eurochron"   => 'Eurochron',
     "KW9010"      => 'KW9010',
     "KW9015"      => 'KW9015',
@@ -94,6 +95,8 @@ CUL_TCM97001_Initialize($)
                         "max-diff-rain:0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
                         "negation-batt:0,1 ".
                         "windDirectionInverse:0,1 ".
+                        "disableCreateUndefDevice:0,1 ".
+                        "disableUnknownEvents:0,1 ".
                         "model:".join(",", sort keys %models);
 
   $hash->{AutoCreate}=
@@ -120,6 +123,7 @@ CUL_TCM97001_Initialize($)
             "W174.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "rain4:Rain,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "W044.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "W132.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
+            "Mebus7312.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "Unknown_.*" => { autocreateThreshold => "2:10"}
         };
 }
@@ -410,19 +414,22 @@ CUL_TCM97001_Parse($$)
     $enableLongIDs = FALSE;
   }
   
-  my $def = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
+  my $hasUnknownDevice;
+  my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
   my $nameUnknown;
-  if ($def) {
-    $nameUnknown = $def->{NAME};
+  if ($defUnknown) {
+    $hasUnknownDevice = TRUE;
+    $nameUnknown = $defUnknown->{NAME};
   }
   else {
+    $hasUnknownDevice = FALSE;
     $nameUnknown = "Unknown";
   }
 
   my $id3 = hex($a[0] . $a[1]);
   #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
-  $def = $modules{CUL_TCM97001}{defptr}{$id3}; # test for already defined devices use old naming convention
+  my $def = $modules{CUL_TCM97001}{defptr}{$id3}; # test for already defined devices use old naming convention
   #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
   if(!$def) {
      $def = $modules{CUL_TCM97001}{defptr}{'CUL_TCM97001_'.$id3};  # use new naming convention
@@ -465,6 +472,7 @@ CUL_TCM97001_Parse($$)
 
   my $packageOK = FALSE;
   
+  my $deviceCode;
   my $batbit=undef;
   my $mode=undef;
   my $trend=undef;
@@ -547,7 +555,6 @@ CUL_TCM97001_Parse($$)
         $batbit = ((hex($a[4]) & 0x8) != 0x8);
         $mode = (hex($a[4]) & 0x4) >> 2;
       
-        my $deviceCode;
         if (!defined($modules{CUL_TCM97001}{defptr}{$tcm97id}))
         {
             if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
@@ -563,10 +570,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	  $name = $def->{NAME};
-      	} 
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
         $hasbatcheck = TRUE;
         $packageOK = TRUE;
@@ -604,7 +610,6 @@ CUL_TCM97001_Parse($$)
           Log3 $name, 5, "$iodev: CUL_TCM97001 Unknown Bit: $unknown";
       	}
         
-        my $deviceCode;
         if (!defined($modules{CUL_TCM97001}{defptr}{$tcm97id}))
         {
             if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
@@ -620,12 +625,10 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	  $name = $def->{NAME};
-      	} 
-      	
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
-        }        
+        }
+        else {
+          goto UNDEFINED_MODEL;
+        }
         $packageOK = TRUE;
         $hasbatcheck = TRUE;
         $hasmode = TRUE;
@@ -634,7 +637,7 @@ CUL_TCM97001_Parse($$)
     }	
   } elsif (length($msg) == 10) {
   	my $idType2 = hex($a[1] . $a[2]);
-    my $deviceCode = $idType2;
+    $deviceCode = $idType2;
     $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};   # test for already defined devices use old naming convention
     if(!$def) {
        $deviceCode = "CUL_TCM97001_" . $idType2;          # use new naming convention
@@ -672,7 +675,6 @@ CUL_TCM97001_Parse($$)
             $mode   = (hex($a[6]) & 0x1);
             $channel = (hex($a[6]) & 0xC) >> 2;
             $model="Mebus";
-            my $deviceCode;
      
          	if (!defined($modules{CUL_TCM97001}{defptr}{$idType2}))
          	{	
@@ -690,10 +692,9 @@ CUL_TCM97001_Parse($$)
           	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
           	if($def) {
               $name = $def->{NAME};
-            } 
-            if(!$def) {
-                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+            }
+            else {
+              goto UNDEFINED_MODEL;
             }
             $packageOK = TRUE;
             
@@ -799,11 +800,9 @@ CUL_TCM97001_Parse($$)
 			$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
 			if($def) {
 			 $name = $def->{NAME};
-			} 
-					
-			if(!$def) {
-			  Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-			  return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+			}
+			else {
+			  goto UNDEFINED_MODEL;
 			}
 
 			$hasbatcheck = TRUE;
@@ -822,7 +821,6 @@ CUL_TCM97001_Parse($$)
     
   } elsif (length($msg) == 12) { 
     my $bin = undef;
-    my $deviceCode;
     my $idType1 = hex($a[0] . $a[1]);
     #my $idType2 = hex($a[1] . $a[2]);
     #my $idType3 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
@@ -889,7 +887,7 @@ CUL_TCM97001_Parse($$)
 		Dispatch($hash, $dmsg, \%addvals);  ## Dispatch to other Modules 
 		return "";
       }
-      $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;  
+      $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;
       my $negative    = (hex($a[3])) & 0x8; 
       if ($negative == 0x8) {
         $temp = (~$temp & 0x07FF) + 1;
@@ -921,10 +919,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
         if($def) {
           $name = $def->{NAME};
-        }         
-        if(!$def) {
-            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-            return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
         if (defined($humidity)) {
           if ($humidity >= 20) {
@@ -992,10 +989,10 @@ CUL_TCM97001_Parse($$)
 			   $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
 			   $name = $def->{NAME};
 			   return "" if (checkRain($def, $iodev, $rain) == FALSE);
-            } else {
-               Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-               return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
-            }
+           }
+           else {
+               goto UNDEFINED_MODEL;
+           }
             Log3 $iodev,4, "$iodev: CUL_TCM97001 $name rain total: $rain l/qm";
             $readedModel=$model;
 				$packageOK = TRUE;
@@ -1132,7 +1129,6 @@ CUL_TCM97001_Parse($$)
           }
         }
     if ( checkValues($hash,"W044|TCM21....",$temp, $humidity) || $haswindspeed ||$haswind || $hasrain || $haschannel || $hasbatcheck ) {
-      my $deviceCode;
      	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
      	{	
           if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
@@ -1149,10 +1145,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	 $name = $def->{NAME};
-      	} 
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001_08: Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
       $hasbatcheck = TRUE;
       $packageOK = TRUE;
@@ -1220,10 +1215,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
         if($def) {
           $name = $def->{NAME};
-        }         
-        if(!$def) {
-            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-            return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+         }
+        else {
+          goto UNDEFINED_MODEL;
         }
         $hashumidity = TRUE;
         $hasbatcheck = TRUE;  
@@ -1286,10 +1280,9 @@ CUL_TCM97001_Parse($$)
             $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
             if($def) {
               $name = $def->{NAME};
-            }         
-            if(!$def) {
-                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+            }
+            else {
+              goto UNDEFINED_MODEL;
             }
             if ($deviceCode =~ m/_9_/) {
                 $def->{AlternativeDEFcode} = "CUL_TCM97001_$idType1";
@@ -1361,11 +1354,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	 $name = $def->{NAME};
-      	} 
-      	      	
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
         if ($deviceCode =~ m/_5_/) {
           $def->{AlternativeDEFcode} = "CUL_TCM97001_$idType1";
@@ -1421,11 +1412,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	 $name = $def->{NAME};
-      	} 
-      	      	
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
 
         $packageOK = TRUE;
@@ -1476,7 +1465,6 @@ CUL_TCM97001_Parse($$)
 
         $trend = (hex($a[7]) & 0x3); # in auriol_protocol_v20.pdf there is no trend bit
         $model="PFR_130";
-        my $deviceCode;
         my $pfrId = "";
      
      	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
@@ -1496,11 +1484,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	 $name = $def->{NAME};
-      	} 
-      	      	
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . $pfrId . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
 
         $hasbatcheck = TRUE;
@@ -1517,8 +1503,9 @@ CUL_TCM97001_Parse($$)
     #if (($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
     if (checkCRCKW9010($hash, $msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010" || $readedModel eq "KW9015")) {
         # Re: Tchibo Wetterstation 433 MHz - KW9010
+        # KW9015 (TFA 30.3161): Kanal ist immer 0 und Hum ist rain
         # See also http://forum.arduino.cc/index.php?PHPSESSID=ffoeoe9qeuv7rf4fh0d637hd74&topic=136836.msg1536416#msg1536416
-        #                 /------------------------------------- Random ID part one      
+        #                 /------------------------------------- Random ID part one
         #                /    / -------------------------------- Channel switch       
         #               /    /  /------------------------------- Random ID part two      
         #              /    /  /  / ---------------------------- Battery state 0 == Ok      
@@ -1613,8 +1600,7 @@ CUL_TCM97001_Parse($$)
               return "" if (checkRain($def, $iodev, $rain) == FALSE);
             }
             else {
-                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+              goto UNDEFINED_MODEL;
             }
             #$hashumidity = TRUE;
             $packageOK = TRUE;
@@ -1630,7 +1616,7 @@ CUL_TCM97001_Parse($$)
         }
     }
 
-    if ($readedModel eq "Auriol_IAN" || (hex($a[9]) >= 1 && hex($a[9]) <= 3 && $readedModel eq "Unknown")) {
+    if ($readedModel eq "Auriol_IAN" || (hex($a[7]) < 10 && hex($a[8]) < 10 && hex($a[9]) >= 1 && hex($a[9]) <= 3 && $readedModel eq "Unknown")) {
         # Auriol Message Format (rflink/Plugin_044.c):
         # 0    4    8    12   16   20   24   28   32   36
         # 1011 1111 1001 1010 0110 0001 1011 0100 1001 0001
@@ -1677,9 +1663,8 @@ CUL_TCM97001_Parse($$)
         if($def) {
           $name = $def->{NAME};
         }
-        if(!$def) {
-            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-            return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
+        else {
+          goto UNDEFINED_MODEL;
         }
         #if ($humidity >= 20) {
         $hashumidity = TRUE;
@@ -1693,6 +1678,66 @@ CUL_TCM97001_Parse($$)
         $readedModel=$model;
       } else {
         $name = $nameUnknown;
+      }
+    }
+    
+    if ($readedModel eq "Mebus7312" || (hex($a[6]) == 0xF && $readedModel eq "Unknown")) {
+      # https://forum.fhem.de/index.php/topic,123305.msg1178527.html#msg1178527
+      #
+      # 0    4    8    12   16   20   24   28   32
+      # iiii iiii bscc tttt tttt tttt 1111 hhhh hhhh
+      # i = ID
+      # s = sendmode (1=manual, 0=auto) ??? ist dies immer 0 oder aendert es sich beim druecken der Resettaste?
+      # b = battery indicator (1=low, 0=ok)
+      # c = channel
+      # t = Temperature
+      # h = humidity
+      $temp = hex($a[3].$a[4].$a[5]);
+      if ($temp >= 3840) {
+        $temp -= 4096;
+      }
+      $temp /= 10;
+      
+      $humidity = hex($a[7].$a[8]);
+      
+      if (checkValues($hash,"Mebus7312", $temp, $humidity)) {
+        $channel = ((hex($a[2])) & 0x3) + 1;
+        $batbit = (hex($a[2]) & 0x8) >> 3;
+        $model="Mebus7312";
+        
+        if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+        {
+          if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+          {
+            $deviceCode="CUL_TCM97001_".$idType1;
+            Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model, deviceCode: $deviceCode"; # deviceCode nur zum debuggen
+          } else {
+            $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+          }
+        } else  {  # Fallback for already defined devices use old naming convention
+          $deviceCode=$idType1;
+        }
+        
+        $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+        if($def) {
+          $name = $def->{NAME};
+        }
+        else {
+          goto UNDEFINED_MODEL;
+        }
+
+        if ($humidity > 0) {
+          $hashumidity = TRUE;
+        }
+        $hasbatcheck = TRUE;
+        $haschannel = TRUE;
+        #$hastrend = TRUE;     
+        $packageOK = TRUE;
+        #$hasmode = TRUE;
+        
+        $readedModel=$model;
+      } else {
+          $name = $nameUnknown;
       }
     }
     
@@ -1728,7 +1773,6 @@ CUL_TCM97001_Parse($$)
         $channel = 0;
         $trend = (hex($a[7]) & 0x3);
         $model="AURIOL";
-        my $deviceCode;
      
      	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
      	{	
@@ -1746,11 +1790,9 @@ CUL_TCM97001_Parse($$)
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
       	if($def) {
        	 $name = $def->{NAME};
-      	} 
-      	      	
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        else {
+          goto UNDEFINED_MODEL;
         }
 
         $hasbatcheck = TRUE;
@@ -1809,9 +1851,8 @@ CUL_TCM97001_Parse($$)
         if($def) {
           $name = $def->{NAME};
         }
-        if(!$def) {
-            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-            return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
+        else {
+          goto UNDEFINED_MODEL;
         }
         if ($humidity >= 20) {
           $hashumidity = TRUE;
@@ -1909,10 +1950,9 @@ CUL_TCM97001_Parse($$)
             readingsBulkUpdate($def, "israining", "no");
          }
          readingsBulkUpdate($def, "rain", $rain );
-         $state = "R: $rain";
-         if (defined($temp)) {
-            $state .= " T: $val";
-         }
+         
+         $state .= " " if (length($state) > 0);
+         $state .= "R: $rain";
          $logtext = " R: $rain";
          $hasrain = FALSE;
     }
@@ -2007,14 +2047,19 @@ CUL_TCM97001_Parse($$)
     return $name;
   } else {
     if (length($msg) == 8 || length($msg) == 10 || length($msg) == 12 || length($msg) == 14) {
-    my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
+    #my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
     
     if (!$defUnknown) {
       Log3 $iodev, 2, "$iodev: CUL_TCM97001 Unknown device Unknown msg:s$msg, please define it";
       return "UNDEFINED Unknown CUL_TCM97001 CUL_TCM97001_Unknown"; 
     } 
     $name = $defUnknown->{NAME};
-    Log3 $name, 4, "$iodev: CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
+    if ($readedModel eq "Unknown") {
+      Log3 $name, 4, "$iodev: CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
+    }
+    else {
+      Log3 $name, 4, "$iodev: CUL_TCM97001 Unknown msg $msg don't match to already defined Device $readedModel";
+    }
 
       my $rawlen = length($msg);
       my $rawVal = substr($msg, 0, $rawlen-2);
@@ -2030,8 +2075,13 @@ CUL_TCM97001_Parse($$)
 
       # for testing only
       #readingsBulkUpdate($defUnknown, "RAW", $rawVal);
-
-      readingsEndUpdate($defUnknown, 1);
+      
+      if (AttrVal($nameUnknown,'disableUnknownEvents',FALSE) == TRUE) {
+        readingsEndUpdate($defUnknown, 0);
+      }
+      else {
+        readingsEndUpdate($defUnknown, 1);
+      }
       if(defined($rssi)) {
         $defUnknown->{RSSI} = $rssi;
       }
@@ -2045,8 +2095,58 @@ CUL_TCM97001_Parse($$)
     }
   }
 
-
   return undef;
+
+  UNDEFINED_MODEL:
+  Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
+  if ($hasUnknownDevice == TRUE && AttrVal($nameUnknown, 'disableCreateUndefDevice', FALSE) == TRUE) {
+     my $readingModelName;
+     my $rn;
+     my $undefModelName = $model . substr($deviceCode, rindex($deviceCode,'_'));
+     if (do_undefModelReading($defUnknown, $iodev, $undefModelName, 'undefModel_a') == FALSE) { # Modell + ID passt nicht
+       if (do_undefModelReading($defUnknown, $iodev, $undefModelName, 'undefModel_b') == FALSE) { # Modell + ID passt nicht
+          if (ReadingsAge($nameUnknown, 'undefModel_b', 0) > ReadingsAge($nameUnknown, 'undefModel_a', 0)) { # ist undefModel_b aelter als undefModel_a?
+            readingsSingleUpdate($defUnknown, 'undefModel_b', "$undefModelName,$iodev,n=1" , 0);
+          }
+          else {
+            readingsSingleUpdate($defUnknown, 'undefModel_a', "$undefModelName,$iodev,n=1" , 0);
+          }
+       }
+     }
+     return "";
+  }
+  return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
+}
+
+sub do_undefModelReading {
+  my $defUnknown = shift;
+  my $iodev = shift;
+  my $undefModelName = shift;
+  my $readingNameUndefModel = shift;
+  
+  my $rn;
+  my $name = $defUnknown->{NAME};
+  my $undefModel = ReadingsVal($name, $readingNameUndefModel, '');
+  if ($undefModel eq '') {  # gibt es das reading undefModel_x noch nicht?
+    readingsSingleUpdate($defUnknown, $readingNameUndefModel, "$undefModelName,$iodev,n=0" , 0); # neues reading
+  }
+  else { # das reading undefModel_x gibts schon
+    my $readingModelName = substr($undefModel, 0, index($undefModel, ','));
+    if ($undefModelName eq $readingModelName) {  # passt Modell + ID? Ja, dann n um eins erhoehen
+       if (substr(ReadingsTimestamp($name, $readingNameUndefModel, 0),0,10) eq substr(FmtDateTime(time()),0,10)) { # der gleiche Tag?
+         $rn = substr($undefModel, rindex($undefModel,'=')+1);
+         $rn++;
+       }
+       else {
+         $rn = 1;
+       }
+       readingsSingleUpdate($defUnknown, $readingNameUndefModel, "$undefModelName,$iodev,n=$rn" , 0);
+    }
+    else { # Modell + ID passt nicht
+       return FALSE;
+    }
+  }
+  return TRUE;
 }
 
 1;
@@ -2067,13 +2167,18 @@ CUL_TCM97001_Parse($$)
     <li>ABS700</li>
     <li>AURIOL (older Sensors with only Temperature)</li>
     <li>Auriol_IAN (NC-3982, ADE WS 1503, Tchibo 65 722)</li>
+    <li>Auriol_Z31743B</li>
     <li>Eurochron</li>
     <li>GT_WT_02</li>
     <li>KW9010</li>
+    <li>KW9015 (TFA 30.3161)</li>
+    <li>Mebus</li>
+    <li>Mebus7312</li>
     <li>NC_WS (PEARL NC7159)</li>
     <li>TCM21....</li>
     <li>TCM218943</li>
     <li>TCM97...</li>
+    <li>Type1</li>
     <li>PFR-130 (rain)</li>
     <li>Prologue (GT-WT-01)</li>
     <li>Rubicson</li>
@@ -2113,6 +2218,11 @@ CUL_TCM97001_Parse($$)
       that a device is only received by the defined IO Device, e.g. by using
       different Frquencies (433MHz vs 868MHz)
       </li>
+    <li>disableCreateUndefDevice<br>
+         this can be used to deactivate the creation of new devices<br>
+         the new devices (Modell + ID, ioname, number) are saved in the device Unknown in the readings "undefModel_a" and "undefModel_b"</li>
+    <li>disableUnknownEvents<br>
+         with this, the events can be deactivated for unknown messages</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
@@ -2147,10 +2257,14 @@ CUL_TCM97001_Parse($$)
     <li>Eurochron</li>
     <li>GT_WT_02</li>
     <li>KW9010</li>
+    <li>KW9015 (TFA 30.3161)</li>
+    <li>Mebus</li>
+    <li>Mebus7312</li>
     <li>NC_WS (PEARL NC7159)</li>
     <li>TCM21....</li>
     <li>TCM218943</li>
     <li>TCM97...</li>
+    <li>Type1</li>
     <li>PFR-130 (rain)</li>
     <li>Prologue (GT-WT-01)</li>
     <li>Rubicson</li>
@@ -2188,6 +2302,11 @@ CUL_TCM97001_Parse($$)
       Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
       "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
       </li>
+    <li>disableCreateUndefDevice<br>
+         damit kann das Anlegen neuer Devices deaktiviert werden<br>
+         die neuen Devices (Modell + ID, ioname, Anzahl) werden im Device Unknown in den readings "undefModel_a" und "undefModel_b" gespeichert</li>
+    <li>disableUnknownEvents<br>
+         damit k&ouml;nnen die events bei unbekannten Nachrichten deaktiviert werden</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>

@@ -1,5 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_CUL_TCM97001:
+               add KW9015 (TFA 30.3161)
+               add Mebus HQ7312
+               update log Unkown
+               new attribute disableCreateUndefDevice:
+                  this can be used to deactivate the creation of new devices
+               new attribute disableUnknownEvents:
+                  with this, the events can be deactivated for unknown messages
+ - bugfix:  14_CUL_TCM97001:
+               fix Battery at the model NC_WS
+               fix Ventus W174, update log
  - change:  mqtt2.template: zigbee2mqtt now uses lowercase state
  - bugfix:  79_Klafs: minor bugfix for date format 
  - bugfix:  38_netatmo: fixed csrf error on home notification settings
