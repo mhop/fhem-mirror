@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.24.0   new sub encodeSpecChars
 # 1.23.1   correct version format
 # 1.23.0   new sub evalDecodeJSON
 # 1.22.0   new sub addCHANGED
@@ -44,7 +45,7 @@ eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no 
 use Data::Dumper;
 use Encode;
 
-# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+ use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                 # Error Code Modul
 use GPUtils qw( GP_Import GP_Export ); 
@@ -102,6 +103,7 @@ BEGIN {
           attr
           AttrVal
           asyncOutput
+          Log
           Log3
           data
           defs
@@ -977,7 +979,7 @@ sub _readCredOnBoot {
       return 1;
   }  
    
-  my ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) );
+  my ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) ), 2;
    
   if(!$username || !$passwd) {
       ($err,$sc) = _getCredentialsFromHash ($hash, $ctc);                           # nur Error und Credetials Shortcut lesen !
@@ -1038,7 +1040,7 @@ sub _readCredFromCache {
       return (1, $token);
   }
 
-  my ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) );
+  my ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) ), 2;
     
   if(!$username || !$passwd) {
       $err = qq{possible problem in splitting with separator "$sep"};
@@ -1054,8 +1056,22 @@ sub _readCredFromCache {
   my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd // "" : "********";
 
   Log3($name, 4, "$name - ".$sc." read from RAM: $username $logpw");
+  
+  $passwd = encodeSpecChars ($passwd);
 
 return (1, $username, $passwd);
+}
+
+######################################################################################
+#    UrlEncode spezielle Zeichen im Passwort u.ä.
+#    see https://help.fanruan.com/finereport-en/doc-view-1136.html
+#    substitute Chars: + / ? % # & =
+######################################################################################
+sub encodeSpecChars {
+  my $s = shift;
+  $s    =~ s/([\x25 \x23 \x26 \x2B \x2F \x3D \x3F])/sprintf "%%%02x", ord($1)/eg;
+  
+  return $s;
 }
 
 ###############################################################################
@@ -1229,7 +1245,7 @@ sub login {
   Log3($name, 4, "$name - --- Begin Function login ---");
   
   my ($success, $username, $password) = getCredentials($hash,0,"credentials",$sep);                      # Credentials abrufen
-  
+    
   if (!$success) {
       Log3($name, 2, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});
       delActiveToken($hash) if($type eq "SSCam");      
