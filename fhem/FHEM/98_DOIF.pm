@@ -6051,9 +6051,9 @@ sub dec
 
 sub y_h
 {
-  my ($value,$min,$max,$height,$mode) = @_;
-  my $offset=4.5;
-  $offset=0 if (defined $mode);
+  my ($value,$min,$max,$height,$val_sum,$mode) = @_;
+  my $offset=4;
+  $offset=0 if ($mode == 0);
   if ($value > $max) {
     $value=$max;
   } elsif ($value < $min) {
@@ -6077,9 +6077,17 @@ sub y_h
  
   $null=$max/($max-$min)*$height;
   if ($value <= 0) {
-    $y=$null;
+    if ($mode==2){
+      $y=int($null-$val_sum);
+    } else {
+      $y=$null;
+    }
   } else {
+  if ($mode==2){
+    $y=int($null+$offset-$val_sum-$h);
+   } else {
     $y=int($null+$offset-$h);
+   }
   }
   $null=undef if ($max == 0 or $min == 0);
   return ($y,$h,$null);
@@ -6100,13 +6108,18 @@ sub hsl_color
   
 sub cylinder_bars { 
   my ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,@values) = @_;
-  return(cylinder_mode ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,1,@values));
+  return(cylinder_mode ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,0,@values));
 }  
 
 sub cylinder {  
   my ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,@values) = @_;
-  return(cylinder_mode ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,undef,@values));
+  return(cylinder_mode ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,1,@values));
 }  
+
+sub cylinder_s {  
+  my ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,@values) = @_;
+  return(cylinder_mode ($header,$min,$max,$unit,$bwidth,$height,$size,$dec,2,@values));
+}
 
 sub cylinder_mode
 {
@@ -6147,7 +6160,7 @@ sub cylinder_mode
   my $width=30;
   my $heightoffset=4;
   
-  if (defined $mode) {
+  if ($mode == 0) {
     $width=7;
   }
   
@@ -6157,7 +6170,7 @@ sub cylinder_mode
       $values[$i+2]="" if (!defined $values[$i+2]);
       $lenmax=length($values[$i+2]) if (length($values[$i+2]) > $lenmax);
     }
-    if (defined $mode) {
+    if ($mode == 0) {
       $bwidth=@values/3*($width+2)+60+$lenmax*4.3;
     } else {
       $bwidth=90+$lenmax*4.3;
@@ -6178,7 +6191,7 @@ sub cylinder_mode
   $out.= '<linearGradient id="grad3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:grey;stop-opacity:0.2"/><stop offset="1" style="stop-color:rgb(0, 0, 0);stop-opacity:0.2"/></linearGradient>';
   for (my $i=0;$i<@values;$i+=3){  
     my $color=$values[$i+1];
-    $out.= sprintf('<linearGradient id="grad1_%s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:%s;stop-opacity:1"/><stop offset="1" style="stop-color:%s;stop-opacity:0.3"/></linearGradient>',$color,hsl_color($color),hsl_color($color));
+    $out.= sprintf('<linearGradient id="grad1_%s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:%s;stop-opacity:0.9"/><stop offset="1" style="stop-color:%s;stop-opacity:0.3"/></linearGradient>',$color,hsl_color($color),hsl_color($color));
   }
   $out.= '<linearGradient id="gradbackcyl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(32,32,32);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.9"/></linearGradient>';
   $out.= '<linearGradient id="gradbackbars" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(48, 48, 48);stop-opacity:0.9"/></linearGradient>';
@@ -6189,18 +6202,18 @@ sub cylinder_mode
   $out.= sprintf('<text text-anchor="middle" x="%d" y="13" style="fill:white; font-size:14px">%s</text>',$bwidth/2+11,$header) if ($header ne "");  
   
   $out.= sprintf('<g transform="translate(0,%d)">',$trans);
-  if (defined $mode) {
-	  $out.= sprintf('<rect x="15" y="0"  width="%d" height="%d" rx="3" ry="3" fill="url(#gradbackbars)"/>',!defined $mode ? $width:@values/3*($width+2)+2,$height+$heightoffset+2);
+  if ($mode == 0) {
+	  $out.= sprintf('<rect x="15" y="0"  width="%d" height="%d" rx="3" ry="3" fill="url(#gradbackbars)"/>',@values/3*($width+2)+2,$height+$heightoffset+2);
 	} else {
-    $out.= sprintf('<rect x="15" y="0"  width="%d" height="%d" rx="20" ry="2" fill="url(#grad3)"/>',!defined $mode ? $width:@values/3*($width+2)+2,$height+$heightoffset);
+    $out.= sprintf('<rect x="15" y="0"  width="%d" height="%d" rx="20" ry="2" fill="url(#grad3)"/>',$width,$height+$heightoffset);
     $out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="url(#grad0)"/>',$height,$width);
     $out.= sprintf('<rect x="15" y="0"  width="%d" height="4" rx="20" ry="2" fill="url(#grad0)"/>',$width);
   }
 
-  ($y,$val1,$null)=y_h(0,$min,$max,$height);
+  ($y,$val1,$null)=y_h(0,$min,$max,$height,0,$mode);
   my $xLeft=15;
   my $xBegin=$xLeft+33;
-  $xBegin=@values/3*($width+2)+20 if(defined $mode);
+  $xBegin=@values/3*($width+2)+20 if($mode == 0);
   
   $out.= sprintf('<text x="%d" y="%d" style="fill:white; font-size:10px">%s</text>',$xBegin,$height+$heightoffset+1,$min);
   $out.= sprintf('<text x="%d" y="%d" style="fill:white; font-size:10px">%s</text>',$xBegin,$null+$heightoffset+2,0) if (defined $null);
@@ -6208,14 +6221,17 @@ sub cylinder_mode
 
   my $yBegin=13+($height-@values*$heightval)/2;
   my $xValue=$xLeft;
+  my $yValue=$yBegin+$heightval-1;
+  my $val_sum_pos=0;
+  my $val_sum_neg=0;
   
   for (my $i=0;$i<@values;$i+=3){
-    my $yValue=$yBegin+$heightval-1;
+ 
     my $value=$values[$i];
     my $val=$value;
-    if (defined $mode) {
-      $xValue=$xLeft+$i/3*($width+2)+2 if (defined $mode);
-    }
+    
+    $xValue=$xLeft+$i/3*($width+2)+2 if ($mode == 0);
+
     if (!defined $value or $value eq "") {
       $val="N/A";
       $value=0;
@@ -6223,24 +6239,34 @@ sub cylinder_mode
     my $color=$values[$i+1];
     my $text=$values[$i+2];
     
-    ($y,$val1,$null)=y_h($value,$min,$max,$height,$mode);
-    if (!defined $mode) {
+    ($y,$val1,$null)=y_h($value,$min,$max,$height,($value > 0 ? $val_sum_pos: $val_sum_neg),$mode);
+
+    if ($mode) {
+      $out.= sprintf('<rect x="%d" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="#999999" stroke-width="0.3"/>',$xValue,$y,$width);
       $out.= sprintf('<rect x="%d" y="%d" width="%d" height="%d" rx="20" ry="2" fill="url(#grad1_%s)"/>',$xValue,$y,$width,$val1,$color);
-      $out.= sprintf('<rect x="%d" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="url(#grad1_%s)" stroke-width="0.5"/>',$xValue,$y,$width,$color);#,hsl_color($color,0));
     ##  $out.= sprintf('<rect x="%d" y="%d" width="%d" height="%d" rx="20" ry="2" fill="url(#grad1_%s)"/>',$xValue,$y,$width,$val1,$color);
     } else {
       $out.= sprintf('<rect x="%d" y="%d" width="%d" height="%d" rx="1" ry="1" fill="url(#grad1_%s)"/>',$xValue,$y+2,$width,$val1+2,$color);
     }
-
+    my $yText;
     if (defined $text and $text ne "") {
       $out.= sprintf('<text x="%d" y="%d" style="fill:%s; font-size:12px">%s</text>',$xBegin+10,$yBegin+$i*$heightval,hsl_color($color),$text.":");
-      if ($heightval == 10) {
-        $yValue+=7;
+    } else {
+      $yValue -=7;
+    }
+    if ($heightval == 10) {
+      $yText=$yValue+7;
+    } else {
+      $yText=$yValue-4;
+    }
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yText+$i*$heightval,hsl_color ($color),($val eq "N/A" ? $val:sprintf($format,$val)),$unit);
+    if ($mode == 2) {
+      if ($value> 0) {
+        $val_sum_pos+=($val1-4);
       } else {
-        $yValue-=4;
+        $val_sum_neg-=($val1-4);
       }
     }
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yValue+$i*$heightval,hsl_color ($color),($val eq "N/A" ? $val:sprintf($format,$val)),$unit);
   }  
 
   $out.= '</g>';
