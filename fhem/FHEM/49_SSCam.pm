@@ -185,6 +185,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.5" => "01.07.2022  fix noQuotesForSID using in streaming devices type mjpeg ",
   "9.10.4" => "03.06.2022  avoid warning 'No data for Cache with key: {LASTSNAP}' if no snap exists ",
   "9.10.3" => "23.11.2022  made SYNO.SurveillanceStation.AudioStream, SYNO.SurveillanceStation.VideoStream optional for SVS compatibility to 9.0.0 ",
   "9.10.2" => "03.11.2021  set SVS compatibility to 8.2.10 ",
@@ -2582,15 +2583,15 @@ sub _setrunView {                        ## no critic "not used"
       $hash->{HELPER}{ALIAS}      = "LiveView";
       $hash->{HELPER}{RUNVIEW}    = "live_open";
       $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "live_link") {
+  } 
+  elsif ($prop eq "live_link") {
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "link"; 
       $hash->{HELPER}{ALIAS}      = "LiveView";
       $hash->{HELPER}{RUNVIEW}    = "live_link";
       $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastrec_open") {
+  } 
+  elsif ($prop eq "lastrec_open") {
       if ($prop1) {
           $hash->{HELPER}{VIEWOPENROOM} = $prop1;
       } 
@@ -2603,36 +2604,36 @@ sub _setrunView {                        ## no critic "not used"
       $hash->{HELPER}{ALIAS}      = "LastRecording";
       $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
       $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  }  elsif ($prop eq "lastrec_fw") {                        # Video in iFrame eingebettet
+  }  
+  elsif ($prop eq "lastrec_fw") {                           # Video in iFrame eingebettet
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "iframe"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "lastrec";
       $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastrec_fw_MJPEG") {                   # “video/avi” – MJPEG format event
+  } 
+  elsif ($prop eq "lastrec_fw_MJPEG") {                     # “video/avi” – MJPEG format event
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "image"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "lastrec";
       $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {             # “video/mp4” – MPEG4/H.264 format event
+  } 
+  elsif ($prop eq "lastrec_fw_MPEG4/H.264") {               # “video/mp4” – MPEG4/H.264 format event
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "video"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "lastrec";
       $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "live_fw") {
+  } 
+  elsif ($prop eq "live_fw") {
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "image"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "live_fw";
       $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "live_fw_hls") {
+  } 
+  elsif ($prop eq "live_fw_hls") {
       if(!IsCapHLS($hash)) {
           return qq{API "SYNO.SurveillanceStation.VideoStream" is not available or Reading "CamStreamFormat" is not "HLS". May be your API version is 2.8 or lower.};
       }
@@ -2642,8 +2643,8 @@ sub _setrunView {                        ## no critic "not used"
       $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
       $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
       $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastsnap_fw") {
+  } 
+  elsif ($prop eq "lastsnap_fw") {
       $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if($prop1);       # Anzeige durch SSCamSTRM-Device ausgelöst
       $hash->{HELPER}{LSNAPBYDEV}     = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
       $hash->{HELPER}{OPENWINDOW}     = 0;
@@ -5707,8 +5708,8 @@ sub _Oprunliveview {
       if($part) {                                                                                           # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8) 
           $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;                                   
           $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;  # interne URL
-      
-      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+      } 
+      elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
   } 
@@ -7757,6 +7758,7 @@ sub streamDev {                                               ## no critic 'comp
     camid              => $hash->{CAMID},
     sid                => $hash->{HELPER}{SID},
     proto              => $hash->{PROTOCOL},
+    noQuotesForSID     => AttrVal($camname, "noQuotesForSID",0),
     cmdstop            => $cmdstop,
     cmdhlsreact        => $cmdhlsreact, 
     cmdmjpegrun        => $cmdmjpegrun,  
@@ -7858,6 +7860,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $ha                 = $params->{ha};
   my $hb                 = $params->{hb};
   my $hau                = $params->{hau};
+  my $noQuotesForSID     = $params->{noQuotesForSID};
   
   my $serveraddr         = $params->{serveraddr};
   my $serverport         = $params->{serverport};
@@ -7879,7 +7882,8 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $imgdosnap          = $params->{imgdosnap};  
   
   my ($link,$audiolink);
-  my $ret = "";
+  my $quote = $noQuotesForSID ? qq{"} : qq{};
+  my $ret   = "";
   
   if(ReadingsVal($camname, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot play back MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
@@ -7888,17 +7892,17 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   } 
   else {
       if($apivideostmsver) {                                  
-          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          $link = qq{$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$quote.$sid.$quote}; 
       } 
       elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
-          $link =~ s/"//gx;                                               # vermeidet Javascript Fehler "SyntaxError: " unterminated string literal"
+          $link =~ s/"/%22/gx if($link);                                               # vermeidet Javascript Fehler "SyntaxError: " unterminated string literal"
       }
       
       return $ret if(!$link);
       
       if($apiaudiostmver) {                                   
-          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$quote.$sid.$quote"; 
       }
       
       if(!$ftui) {
@@ -7974,6 +7978,7 @@ sub _streamDevLASTSNAP {                                       ## no critic 'not
   my ($link,$cause,$ret) = ("","","");
    
   my $cache = cache($camname, "c_init");                                                  # Cache initialisieren  
+  
   Log3($camname, 1, "$camname - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
   
   if(!$cache || $cache eq "internal" ) {
@@ -13288,7 +13293,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>noQuotesForSID</b><br>
     This attribute delete the quotes for SID and for StmKeys.  
     The attribute may be helpful in some cases to avoid errormessages "402 - permission denied" or "105 - 
-    Insufficient user privilege" and makes login possible.  
+    Insufficient user privilege" and makes login possible. <br>
+    (default: 0)  
   </li><br>
   
   <a name="pollcaminfoall"></a>
@@ -15314,7 +15320,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>noQuotesForSID</b><br>
     Dieses Attribut entfernt Quotes für SID bzw. der StmKeys. 
     Es kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" oder "105 - Insufficient user privilege"
-    vermeiden und ein login ermöglichen.  </li><br>                      
+    vermeiden und ein login ermöglichen. <br>
+    (default: 0)
+  </li><br>                      
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>

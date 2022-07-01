@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  49_SSCam: fix noQuotesForSID using in streaming devices type mjpeg
  - feature: 74_GardenaSmartDevice: add lona readings, [fix] - setter procedure
  - feature: 14_CUL_TCM97001:
                add KW9015 (TFA 30.3161)
