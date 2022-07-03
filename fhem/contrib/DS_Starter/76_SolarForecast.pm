@@ -3575,6 +3575,7 @@ sub ___switchConsumerOff {
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
   my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
+  my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
   
   my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch on Bedingung
@@ -3589,7 +3590,8 @@ sub ___switchConsumerOff {
            );
   }
   
-  if(($swoffcond || ($stopts && $t >= $stopts)) && ($auto && $offcom && simplifyCstate($pstate) =~ /started|starting|stopping/xs)) {                         
+  if(($swoffcond || ($stopts && $t >= $stopts)) && 
+     ($auto && $offcom && simplifyCstate($pstate) =~ /started|starting|stopping|interrupt|continu/xs)) {                         
       CommandSet(undef,"$cname $offcom");
       
       $paref->{ps} = "switching off:";
@@ -3605,7 +3607,7 @@ sub ___switchConsumerOff {
       
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
-  elsif (isInterruptible($hash, $c) && !isConsRcmd    ($hash, $c)  &&                                      # Consumer unterbrechen 
+  elsif (isInterruptible($hash, $c) && !isConsRcmd    ($hash, $c) && $mode eq 'can' &&                     # Consumer unterbrechen 
          isInTimeframe  ($hash, $c) && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
          $auto && $offcom) {
  
@@ -8641,9 +8643,11 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         zum automatischen Ausschalten erfüllt sein. <br><br>
 
         Mit dem optionalen Schlüssel <b>interruptable</b> kann während der geplanten Einschaltzeit eine automatische 
-        Unterbrechung sowie Wiedereinschaltung des Verbrauchers vorgenommen werden. Unterschreitet der PV Überschuß
-        die benötigte Energie, wird der Verbraucher ausgeschaltet (interrupted) und eingeschaltet wenn wieder
-        ausreichend PV Überschuß vorhanden ist (continued). Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst ! 
+        Unterbrechung sowie Wiedereinschaltung des Verbrauchers vorgenommen werden sofern der Schlüssel mode=must nicht
+        gesetzt ist.
+        Unterschreitet der PV Überschuß die benötigte Energie, wird der Verbraucher ausgeschaltet (interrupted) und 
+        eingeschaltet wenn wieder ausreichend PV Überschuß vorhanden ist (continued). 
+        Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst ! 
         <br><br>
          <ul>   
          <table>  
