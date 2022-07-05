@@ -130,6 +130,8 @@ sub KNXIO_Define {
 	my @arg = split(/[\s\t\n]+/x,$def);
 	my $name = $arg[0] // return 'KNXIO-define: no name specified';
 	$hash->{NAME} = $name;
+	$svnid =~ s/.*\.pm\s(.+)Z.*/$1 UTC/ix;
+	$hash->{SVN} = $svnid; # store svn info in dev hash
 
 	# handle mode X for FHEM2FHEM configs
 	if (scalar(@arg >=3) && $arg[2] eq 'X') {
