@@ -120,7 +120,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.65.0 "=> "03.07.2022  feature key interruptable for consumer  ",
+  "0.65.1 "=> "07.07.2022  change logic of __calcEnergyPieces function and the \%hef hash ",
+  "0.65.0 "=> "03.07.2022  feature key interruptable for consumer ",
   "0.64.2 "=> "23.06.2022  fix switch off by switch off condition in ___switchConsumerOff ",
   "0.64.1 "=> "07.06.2022  fixing simplifyCstate, sub ___setConsumerSwitchingState to improve safe consumer switching ",
   "0.64.0 "=> "04.06.2022  consumer type charger added, new attr createConsumptionRecReadings ",
@@ -565,14 +566,14 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
                    qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
                    ;
 
-my %hef = (                                                                                   # Energiedaktoren für Verbrauchertypen
-  "heater"         => { tot => 1.00, f => 0.33, m => 0.34, l => 0.33, mt => 240         },    # tot = Faktor nominaler Gesamtenergieverbrauch 
-  "other"          => { tot => 1.00, f => 0.25, m => 0.50, l => 0.25, mt => $defmintime },    # !!! Faktoren f,m,l MÜSSEN zusammen 1 ergeben !!!
-  "charger"        => { tot => 1.00, f => 0.33, m => 0.34, l => 0.33, mt => 120         },
-  "dishwasher"     => { tot => 0.13, f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # f   = Faktor Energieverbrauch in erster Stunde
-  "dryer"          => { tot => 1.00, f => 0.40, m => 0.40, l => 0.20, mt => 75          },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
-  "washingmachine" => { tot => 0.18, f => 0.30, m => 0.40, l => 0.30, mt => 120         },    # l   = Faktor Energieverbrauch in letzter Stunde
-);                                                                                            # mt  = default mintime (Minuten)
+my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
+  "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },     
+  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },    # f   = Faktor Energieverbrauch in erster Stunde
+  "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
+  "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
+  "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
+  "washingmachine" => { f => 0.30, m => 0.40, l => 0.30, mt => 120         },    
+);                                                                               
 
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{circular}                                                  # Ringspeicher
@@ -2810,9 +2811,6 @@ sub _manageConsumerData {
             
               push @$daref, "consumer${c}_currentPower<>". $pcurr." W";
           }
-          #else {
-          #    deleteReadingspec ($hash, "consumer${c}_currentPower") if(!$etotread);
-          #}
           
           if(defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
@@ -2951,6 +2949,8 @@ return;
 ###################################################################
 #    Energieverbrauch auf einzelne Stunden für Planungsgrundlage
 #    aufteilen
+#    Consumer specific epieces ermitteln + speichern
+#    (in Wh)
 ###################################################################
 sub __calcEnergyPieces {
   my $paref = shift;
@@ -2960,8 +2960,6 @@ sub __calcEnergyPieces {
   
   my $type  = $hash->{TYPE};
   
-  ## Consumer specific epieces ermitteln + speichern
-  ####################################################  
   my $etot = HistoryVal ($hash, $paref->{day}, sprintf("%02d",$paref->{nhour}), "csmt${c}", 0);
   
   if($etot) {
@@ -2989,32 +2987,19 @@ sub __calcEnergyPieces {
   my $hours   = ceil ($mintime / 60);                                                           # Laufzeit in h
   
   my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                    # gemessener nominaler Energieverbrauch in Wh
-  $ctote    //= ConsumerVal ($hash, $c, "power",         0) * $hours * $hef{$cotype}{tot};      # alternativer nominaler Energieverbrauch in Wh
+  $ctote    //= ConsumerVal ($hash, $c, "power",         0);                                    # alternativer nominaler Energieverbrauch in Wh
   
   my $epiecef = $ctote * $hef{$cotype}{f};                                                      # Gewichtung erste Laufstunde
   my $epiecel = $ctote * $hef{$cotype}{l};                                                      # Gewichtung letzte Laufstunde
   
-  my $epiecem = 0;
-  if ($hours-2 < 0) {
-      $epiecem = $ctote * $hef{$cotype}{m};
-  }  
-  elsif ($hours-2 == 0) {
-      $epiecem  = ($ctote * $hef{$cotype}{m}) / 2;
-      $epiecef += $epiecem;
-      $epiecel += $epiecem;
-  }
-  else {
-      $epiecem = ($ctote * $hef{$cotype}{m}) / ($hours-2);
-  }
+  my $epiecem = $ctote * $hef{$cotype}{m};
   
   for my $h (1..$hours) {
       my $he;
       $he = $epiecef                       if($h == 1               );                         # kalk. Energieverbrauch Startstunde
       $he = $epiecem                       if($h >  1 && $h < $hours);                         # kalk. Energieverbrauch Folgestunde(n)
       $he = $epiecel                       if($h == $hours          );                         # kalk. Energieverbrauch letzte Stunde
-      
-      $he = $epiecef + $epiecel + $epiecem if($h == $hours && $hours == 1);                    # kalk. Energieverbrauch wenn max. 1 Stunde Laufzeit
-      
+          
       $data{$type}{$name}{consumers}{$c}{epieces}{${h}} = sprintf('%.2f', $he);      
   }
   
@@ -4442,8 +4427,6 @@ sub collectAllRegConsumers {
       
       my $rauto     = $hc->{auto}     // q{};
       my $ctype     = $hc->{type}     // $defctype;
-      my $hours     = ($hc->{mintime} // $hef{$ctype}{mt}) / 60;
-      my $avgenergy = $hc->{power} * $hours * $hef{$ctype}{tot};                                   # Wh
       my $auto      = 1;
       $auto         = ReadingsVal ($consumer, $rauto, 1) if($rauto);                               # Reading für Ready-Bit -> Einschalten möglich ?
 
@@ -4451,7 +4434,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{alias}           = $alias;                                # Alias des Verbrauchers (Device)
       $data{$type}{$name}{consumers}{$c}{type}            = $hc->{type}      // $defctype;         # Typ des Verbrauchers
       $data{$type}{$name}{consumers}{$c}{power}           = $hc->{power};                          # Leistungsaufnahme des Verbrauchers in W
-      $data{$type}{$name}{consumers}{$c}{avgenergy}       = $avgenergy;                            # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{avgenergy}       = q{};                                   # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$type}{$name}{consumers}{$c}{mintime}         = $hc->{mintime}   // $hef{$ctype}{mt};  # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
       $data{$type}{$name}{consumers}{$c}{mode}            = $hc->{mode}      // $defcmode;         # Planungsmode des Verbrauchers
       $data{$type}{$name}{consumers}{$c}{icon}            = $hc->{icon}      // q{};               # Icon für den Verbraucher
@@ -7598,7 +7581,8 @@ return ($swtime, $swtimets);
 sub simplifyCstate {
   my $ps = shift;  
   
-  $ps = $ps =~ /planned/xs        ? 'planned'      : 
+  $ps = $ps =~ /planned/xs        ? 'planned'      :
+        $ps =~ /no\splanning/xs   ? 'suspended'    :
         $ps =~ /switching\son/xs  ? 'starting'     :
         $ps =~ /switched\son/xs   ? 'started'      :
         $ps =~ /switching\soff/xs ? 'stopping'     :
