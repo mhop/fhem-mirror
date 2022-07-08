@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.65.2 "=> "08.07.2022  change avgenergy to W p. hour ",
   "0.65.1 "=> "07.07.2022  change logic of __calcEnergyPieces function and the \%hef hash ",
   "0.65.0 "=> "03.07.2022  feature key interruptable for consumer ",
   "0.64.2 "=> "23.06.2022  fix switch off by switch off condition in ___switchConsumerOff ",
@@ -2908,13 +2909,13 @@ sub _manageConsumerData {
       
       if ($dnum) {  
           if($consumerco) {      
-              $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);                          # Durchschnittsverbrauch eines Tages aus History  
+              $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$runhours);                       # Durchschnittsverbrauch pro Stunde in Wh
           }
           else {
               delete $data{$type}{$name}{consumers}{$c}{avgenergy};
           }
           
-          $data{$type}{$name}{consumers}{$c}{avgruntime} = (ceil($runhours/$dnum)) * 60;                          # Durchschnittslaufzeit in Minuten 
+          $data{$type}{$name}{consumers}{$c}{avgruntime} = (ceil($runhours/$dnum)) * 60;                          # Durchschnittslaufzeit am Tag in Minuten 
       }
       
       $paref->{consumer} = $c;
@@ -2986,8 +2987,8 @@ sub __calcEnergyPieces {
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
   my $hours   = ceil ($mintime / 60);                                                           # Laufzeit in h
   
-  my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                    # gemessener nominaler Energieverbrauch in Wh
-  $ctote    //= ConsumerVal ($hash, $c, "power",         0);                                    # alternativer nominaler Energieverbrauch in Wh
+  my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                    # gemessener durchschnittlicher Energieverbrauch pro Stunde (Wh)
+  $ctote    //= ConsumerVal ($hash, $c, "power",         0);                                    # alternativer nominaler Energieverbrauch in W (bzw. Wh bezogen auf 1 h)
   
   my $epiecef = $ctote * $hef{$cotype}{f};                                                      # Gewichtung erste Laufstunde
   my $epiecel = $ctote * $hef{$cotype}{l};                                                      # Gewichtung letzte Laufstunde
@@ -7827,7 +7828,7 @@ return $def;
 #       powerthreshold  - Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird  
 #       energythreshold - Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird  
 #       upcurr          - Unit des aktuellen Verbrauchs
-#       avgenergy       - initialer / gemessener Durchschnittsverbrauch eines Tages
+#       avgenergy       - initialer / gemessener Durchschnittsverbrauch pro Stunde
 #       avgruntime      - durchschnittliche Einschalt- bzw. Zykluszeit (Minuten)
 #       epieces         - prognostizierte Energiescheiben (Hash)
 #       dswoncond       - Device zur Lieferung einer zusätzliche Einschaltbedingung
