@@ -32,6 +32,7 @@
 # 25/04/2022 changed 'state connected' logic (issue after handshake complete...)
 # 25/05/2022 first SVN version
 # 07/07/2022 cleanup, no functional changes
+# 09/07/2022 fix IOdevice ready check on set-cmd (KNXIO_write)
 
 
 package FHEM::KNXIO; ## no critic 'package'
@@ -308,7 +309,7 @@ sub KNXIO_ReadM {
 	# header format: 0x06 - header size / 0x10 - KNXNET-IPVersion / 0x0530 - Routing Indicator / 0xYYYY - Header size + size of cEMIFrame
 	my ($header, $header_routing, $total_length) = unpack('nnn',$buf);
 
-	Log3 ($name, 5, 'KNXIO_Read: -header=' . sprintf("%04x",$header) . ', -routing=' . sprintf("%04x",$header_routing) . ', TotalLength=' . $total_length . '(dezimal)');
+	Log3 ($name, 5, 'KNXIO_Read: -header=' . sprintf('%04x',$header) . ', -routing=' . sprintf('%04x',$header_routing) . ', TotalLength=' . $total_length . '(dezimal)');
 
 	if ($header != 0x0610 ) {
 		Log3 ($name, 1, 'KNXIO_Read: invalid header size or version');
@@ -346,7 +347,7 @@ sub KNXIO_ReadM {
 		return; # ignore with silence
 	}
 	else {
-		Log3 ($name, 4, 'KNXIO_Read: a packet with unsupported service type ' . sprintf("%04x",$header_routing) . ' was received. - discarded');
+		Log3 ($name, 4, 'KNXIO_Read: a packet with unsupported service type ' . sprintf('%04x',$header_routing) . ' was received. - discarded');
 		return;
 	}
 
@@ -471,7 +472,7 @@ sub KNXIO_Ready {
 
 	return if (! $init_done || exists($hash->{DNSWAIT}) || IsDisabled($name) == 1);
 	return if (exists($hash->{NEXT_OPEN}) && $hash->{NEXT_OPEN} > gettimeofday()); # avoid open loop 
-	return KNXIO_openDev($hash) if (ReadingsVal($hash, 'state', 'disconnected') ne 'connected');
+	return KNXIO_openDev($hash) if (ReadingsVal($name, 'state', 'disconnected') ne 'connected');
 	return;
 }
 
@@ -486,7 +487,7 @@ sub KNXIO_Write {
 
 	Log3 ($name, 5, 'KNXIO_write: started');
 	return if(!defined($fn) && $fn ne $TULID);
-	if (ReadingsVal($hash, 'state', 'disconnected') ne 'connected') {
+	if (ReadingsVal($name, 'state', 'disconnected') ne 'connected') {
 #	if ($hash->{STATE} ne 'connected') {
 		Log3 ($name, 3, 'KNXIO_write called while not connected! Msg: ' . $msg . ' lost');
 		return;
@@ -574,7 +575,7 @@ sub KNXIO_FingerPrint {
 	my $buf  = shift;
 	my $mode = $defs{$ioname}->{model};
 
-	substr( $buf, 1, 5, "-----" ); # ignore src addr
+	substr( $buf, 1, 5, '-----' ); # ignore src addr
 #	Log3 ($ioname, 5, 'KNXIO_Fingerprint: ' . $buf);
 #	return ( $ioname, $buf ); # ignore src addr
 	return ( q{}, $buf ); # ignore ioname & src addr
@@ -615,7 +616,7 @@ sub KNXIO_gethostbyname_Cb {
 	if ($error) {
 		delete $hash->{DeviceName};
 		delete $hash->{PORT};
-		Log3 ($name, 1, 'KNXIO-define: hostname could not be resolved: ' .  $error);
+		Log3 ($name, 1, 'KNXIO_define: hostname could not be resolved: ' .  $error);
 		return  'KNXIO-define: hostname could not be resolved: ' . $error;
 	}
 	my $host = ip2str($dhost);
@@ -671,7 +672,7 @@ sub KNXIO_openDev {
 	}
 	$host = $port if ($param =~ /UNIX:STREAM:/ix); 
 
-	Log3 ($name, 5, "KNXIO_openDev: $mode, $host, $port, reopen=$reopen");
+	Log3 ($name, 5, 'KNXIO_openDev: ' . $mode . ', ' . $host . ', ' . $port . ', reopen=' . $reopen);
 
 	my $ret = undef; # result
 
@@ -680,11 +681,11 @@ sub KNXIO_openDev {
 		delete $hash->{TCPDev}; # devio ?
 		$ret = TcpServer_Open($hash, $port, $host, 1);
 		if (defined($ret)) { # error
-			Log3 ($name, 2, "KNXIO_openDev: $name can't connect: $ret") if(!$reopen); 
+			Log3 ($name, 2, 'KNXIO_openDev: ' . $name . " can't connect: " . $ret) if(!$reopen); 
 		} 
 		$ret = TcpServer_MCastAdd($hash,$host);
 		if (defined($ret)) { # error
-			Log3 ($name, 2, "KNXIO_openDev: $name MC add failed: $ret") if(!$reopen);
+			Log3 ($name, 2, 'KNXIO_openDev: ' . $name . ' MC add failed: ' . $ret) if(!$reopen);
 		}
 
 		delete $hash->{NEXT_OPEN};
@@ -706,7 +707,7 @@ sub KNXIO_openDev {
 		my $conn = 0;
 		$conn = IO::Socket::INET->new(PeerAddr => "$host:$port", Type => SOCK_DGRAM, Proto => 'udp', Reuse => 1);
 		if (!($conn)) {
-			Log3 ($name, 2, "KNXIO_openDev: device $name can't connect: $ERRNO") if(!$reopen); # PBP
+			Log3 ($name, 2, 'KNXIO_openDev: device ' . $name  . " can't connect: " . $ERRNO) if(!$reopen); # PBP
 			$readyfnlist{"$name.$param"} = $hash;
 			readingsSingleUpdate($hash, 'state', 'disconnected', 0);
 			$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
@@ -863,7 +864,7 @@ sub KNXIO_disconnect {
 
 	DevIo_Disconnected($hash);
 
-	Log3 ($name, 1, 'KNXIO_disconnect: device ' . $name . 'disconnected, waiting to reappear');
+	Log3 ($name, 1, 'KNXIO_disconnect: device ' . $name . ' disconnected, waiting to reappear');
 
 	$readyfnlist{"$name.$param"} = $hash;               # Start polling
 	$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
@@ -899,7 +900,7 @@ sub KNXIO_closeDev {
 
 	RemoveInternalTimer($hash);
 
-	Log3 ($name, 5,'KNXIO_closeDev: device ' . $name . 'closed');
+	Log3 ($name, 5,'KNXIO_closeDev: device ' . $name . ' closed');
 
 	readingsSingleUpdate($hash, 'state', 'disconnected', 1);
 	DoTrigger($name, 'DISCONNECTED');
@@ -932,7 +933,7 @@ sub KNXIO_decodeEMI {
 			readingsSingleUpdate($hash, 'state', 'connected', 1);
 		}
 		else {
-			Log3 ($name, 3, 'KNXIO_decodeEMI: invalid message code' . sprintf("04x",$id));
+			Log3 ($name, 3, 'KNXIO_decodeEMI: invalid message code ' . sprintf("04x",$id));
 		}
 		return;
 	}
@@ -947,7 +948,8 @@ sub KNXIO_decodeEMI {
 	my $rwp = $acpicodes[$acpi];
 	if (! defined($rwp) || ($rwp eq 'invalid')) {
 		Log3 ($name, 3, 'KNXIO_decodeEMI: no valid acpi-code (read/reply/write) received, discard packet');
-		Log3 ($name, 4, "discarded packet: src=$src - dst=$dst - acpi=" . sprintf('%02x',$acpi) . " - leng=" . scalar(@data) . " - data=" . sprintf('%02x' x scalar(@data),@data));
+#		Log3 ($name, 4, 'discarded packet: src=' . $src . ' - dst=' . $dst . ' - acpi=' . sprintf('%02x',$acpi) . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
+#		Log3 ($name, 4, "discarded packet: src=$src - dst=$dst - acpi=" . sprintf('%02x',$acpi) . " - leng=" . scalar(@data) . " - data=" . sprintf('%02x' x scalar(@data),@data));
 		return;
 	}
 
@@ -979,7 +981,7 @@ sub KNXIO_decodeCEMI {
 	my ($ctrlbyte1, $ctrlbyte2, $src, $dst, $tcf, $acpi, @data) = unpack('x' . $addlen .  'CCnnCCC*',$buf);
 
 	if (($ctrlbyte1 & 0xF0) != 0xB0) { # standard frame/no repeat/broadcast - see 03_06_03 EMI_IMI specs
-		Log3 ($name, 4, 'KNXIO_decodeCEMI: wrong ctrlbyte1' . sprintf("%02x",$ctrlbyte1)  . ', discard packet');
+		Log3 ($name, 4, 'KNXIO_decodeCEMI: wrong ctrlbyte1 ' . sprintf("%02x",$ctrlbyte1)  . ', discard packet');
 		return;
 	}
 	my $prio = ($ctrlbyte1 & 0x0C) >>2; # priority
@@ -1001,7 +1003,7 @@ sub KNXIO_decodeCEMI {
 	my $rwp = $acpicodes[$acpi];
 	if (! defined($rwp) || ($rwp eq 'invalid')) { # not a groupvalue-read/write/reply
 		Log3 ($name, 3, 'KNXIO_decodeCEMI: no valid acpi-code (read/reply/write) received, discard packet');
-		Log3 ($name, 4, 'discarded packet: src=' . $src . ' - dst=' . $dst . ' - destaddrType=' . $dest_addrType . ' - prio=' . $prio . ' - hop_count=' . $hop_count . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
+#		Log3 ($name, 4, 'discarded packet: src=' . $src . ' - dst=' . $dst . ' - destaddrType=' . $dest_addrType . ' - prio=' . $prio . ' - hop_count=' . $hop_count . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
 		return;
 	}
 
