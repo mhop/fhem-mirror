@@ -1,4 +1,5 @@
 ###########################################
+###########################################
 # $Id$
 #
 # Comments start with #. Empty lines are ignored.
@@ -4466,7 +4467,7 @@ deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
 attr OMG_BT_ID devicetopic DEV_TPC
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,home/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT); $rets->{last_IO} = $1, $rets->{"rssi_$1"} = $rets->{rssi}; return $rets}
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT); $rets->{last_IO} = $1, $rets->{"rssi_$1"} = $rets->{rssi}; return $rets}
 attr OMG_BT_ID getList batteryPercent:noArg batteryPercent { my $id = ReadingsVal($NAME,'id','BT_ID'); qq($\DEVICETOPIC/commands/MQTTtoBT/config {"ble_read_address":"$id","ble_read_service":"180f","ble_read_char":"2a19","value_type":"HEX"}) }
 attr OMG_BT_ID setList beep:noArg { my $id = ReadingsVal($NAME,'id','BT_ID'); qq($\DEVICETOPIC/commands/MQTTtoBT/config {"ble_read_address":"$id","ble_read_service":"180f","ble_read_char":"2a19","value_type":"HEX","immediate":true}) }
 attr OMG_BT_ID event-on-change-reading .*
@@ -4477,7 +4478,7 @@ attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq 'FHEMWEB') }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220307
+setreading OMG_BT_ID attrTemplateVersion 20220705
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
