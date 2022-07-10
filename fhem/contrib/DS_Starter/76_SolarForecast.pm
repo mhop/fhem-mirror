@@ -120,7 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.65.3 "=> "10.07.2022  consumer with mode=must are now interruptable ",
+  "0.65.3 "=> "10.07.2022  consumer with mode=must are now interruptable, change hourscsme ",
   "0.65.2 "=> "08.07.2022  change avgenergy to W p. hour ",
   "0.65.1 "=> "07.07.2022  change logic of __calcEnergyPieces function and the \%hef hash ",
   "0.65.0 "=> "03.07.2022  feature key interruptable for consumer ",
@@ -6836,7 +6836,7 @@ sub setPVhistory {
       }      
   }
   
-  if($histname =~ /cyclescsm[0-9]+$/xs) {                                                         # Anzahl Tageszyklen des Verbrauchers
+  if($histname =~ /cyclescsm[0-9]+$/xs) {                                                          # Anzahl Tageszyklen des Verbrauchers
       $data{$type}{$name}{pvhist}{$day}{99}{$histname} = $val;        
   }
   
@@ -6854,7 +6854,7 @@ sub setPVhistory {
       }
       
       my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
-      $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = ceil ($minutes / $cycles / 60 ) if($cycles);       
+      $data{$type}{$name}{pvhist}{$day}{99}{"hourscsme${num}"} = ceil ($minutes / 60 ) if($cycles);       
   }
   
   if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
