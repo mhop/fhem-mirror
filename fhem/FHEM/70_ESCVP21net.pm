@@ -36,6 +36,7 @@
 #    1.01.15  add debug options
 #    1.01.16  add cyclicConnect to mitigate lost TCP connection issue
 #    1.01.17  add TW9400
+#    1.01.18  added undocumented settings (IMGPROC, IRIS,LIRIS)
 #
 ################################################################################
 #
@@ -69,7 +70,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.17";
+my $version = "1.01.18";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -77,12 +78,12 @@ eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS
 # key(s) in defaultsets and defaultresults will be overwritten,
 # if <type>sets/<type>result defines the same key(s)
 my %ESCVP21net_debugsets = (
-  "reRead"   => ":noArg",
-  "encode"   => ":noArg",
-  "decode"   => ":noArg",
-  "PWSTATUS" => ":get",
-  "cleanup"  => ":noArg",
-  "connect"  => ":noArg",
+  "reRead"          => ":noArg",
+  "encode"          => ":noArg",
+  "decode"          => ":noArg",
+  "PWSTATUS"        => ":get",
+  "cleanup"         => ":noArg",
+  "connect"         => ":noArg",
   "removeTimer"     => ":noArg",
   "closeDevice"     => ":noArg",
   "deleteNextOpen"  => ":noArg",
@@ -106,23 +107,25 @@ my %ESCVP21net_Miscsets = (
 
 # TW5650 sets
 my %ESCVP21net_TW5650sets = (
-  "ASPECT"  => ":get,Auto,Auto20,Normal,Full,Zoom",
+  "ASPECT"       => ":get,Auto,Auto20,Normal,Full,Zoom",
   "AUTOHOME"     => ":get,off,on",
   "AUTOKEYSTONE" => ":get,on,off",
-  "BTAUDIO" => ":get,on,off,toggle",
-  "CMODE"   => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
-  "HREVERSE" => ":get,Flip,Normal",
-  "ILLUM"   => ":get,on,off,toggle",
-  "LUMINANCE" => ":get,high,low,toggle",
-  "MCFI"    => ":get,off,low,normal,high",
-  "MSEL"     => ":get,black,blue,user",
-  "OVSCAN"  => ":get,off,4%,8%,auto",
-  "SIGNAL"  => ":get,none,2D,3D",
-  "SNO"     => ":get",
-  "SOURCE"	=> ":get,HDMI1,HDMI2,ScreenMirror,Input1,USB,LAN",
-  "VOLset"  => ":slider,0,1,20",
-  "VOL"     => ":get",
-  "VREVERSE" => ":get,Flip,Normal"
+  "BTAUDIO"      => ":get,on,off,toggle",
+  "CMODE"        => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
+  "HREVERSE"     => ":get,Flip,Normal",
+  "ILLUM"        => ":get,on,off,toggle",
+  "IMGPROC"      => ":get,fine,fast",
+  "IRIS"         => ":get,00,01,02",
+  "LUMINANCE"    => ":get,high,low,toggle",
+  "MCFI"         => ":get,off,low,normal,high",
+  "MSEL"         => ":get,black,blue,user",
+  "OVSCAN"       => ":get,off,4%,8%,auto",
+  "SIGNAL"       => ":get,none,2D,3D",
+  "SNO"          => ":get",
+  "SOURCE"       => ":get,HDMI1,HDMI2,ScreenMirror,Input1,USB,LAN",
+  "VOLset"       => ":slider,0,1,20",
+  "VOL"          => ":get",
+  "VREVERSE"     => ":get,Flip,Normal"
 );
 
 my %ESCVP21net_TW5650result = (
@@ -210,24 +213,27 @@ my %ESCVP21net_TW7400result = (
 
 # TW9400 sets
 my %ESCVP21net_TW9400sets = (
-  "4KENHANCE" => ":get,off,FullHD",
-  "ASPECT"    => ":get,Auto,Normal,Full,Zoom",
-  "AUTOHOME"  => ":get,off,on",
-  "CMODE"     => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigialCinema",
-  "DYNRANGE"  => ":get,Auto,SDR,HDR10,HLG",
-  "HREVERSE"  => ":get,Flip,Normal",
-  "ILLUM"     => ":get,on,off,toggle",
-  "IMGPRESET" => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
-  "LUMINANCE" => ":get,normal,eco,medium",
-  "MCFI"      => ":get,off,low,normal,high",
-  "MSEL"      => ":get,black,blus,user",
-  "OVSCAN"    => ":get,off,4%,8%,auto",
-  "PRODUCT"   => ":get,ModelName_on,ModelName_off",
-  "SIGNAL"    => ":get,none,2D,3D",
-  "SNO"       => ":get",
-  "SOURCE"    => ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
-  "VREVERSE"  => ":get,Flip,Normal",
-  "WLPWR"     => ":get,WLAN_on,WLAN_off"
+  "4KENHANCE"    => ":get,off,FullHD",
+  "ASPECT"       => ":get,Auto,Normal,Full,Zoom",
+  "AUTOHOME"     => ":get,off,on",
+  "CMODE"        => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigialCinema",
+  "DYNRANGE"     => ":get,Auto,SDR,HDR10,HLG",
+  "HREVERSE"     => ":get,Flip,Normal",
+  "ILLUM"        => ":get,on,off,toggle",
+  "IMGPRESET"    => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
+  "IMGPROC"      => ":get,fine,fast",
+  "IRIS"         => ":get,00,01,02",
+  "LIRIS"        => ":get,0,128,255",   
+  "LUMINANCE"    => ":get,normal,eco,medium",
+  "MCFI"         => ":get,off,low,normal,high",
+  "MSEL"         => ":get,black,blus,user",
+  "OVSCAN"       => ":get,off,4%,8%,auto",
+  "PRODUCT"      => ":get,ModelName_on,ModelName_off",
+  "SIGNAL"       => ":get,none,2D,3D",
+  "SNO"          => ":get",
+  "SOURCE"       => ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
+  "VREVERSE"     => ":get,Flip,Normal",
+  "WLPWR"        => ":get,WLAN_on,WLAN_off"
 );
 
 my %ESCVP21net_TW9400result = (
@@ -259,6 +265,9 @@ my %ESCVP21net_Scottysets = (
   "HREVERSE"     => ":get,Flip,Normal",
   "ILLUM"        => ":get,on,off,toggle",
   "IMGPRESET"    => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
+  "IMGPROC"      => ":get,fine,fast",
+  "IRIS"         => ":get,00,01,02",
+  "LIRIS"        => ":get,0,128,255",        
   "LUMINANCE"    => ":get,high,low,toggle",
   "MCFI"         => ":get,off,low,normal,high",
   "MSEL"         => ":get,black,blus,user",
@@ -356,6 +365,8 @@ my %ESCVP21net_data = (
   "IMGPRESET:Setting3"    => "03",
   "IMGPRESET:Setting4"    => "04",
   "IMGPRESET:Setting5"    => "05",
+  "IMGPROC:fine"          => "01",
+  "IMGPROC:fast"          => "02",
   "LUMINANCE:high"        => "00",
   "LUMINANCE:low"         => "01",
   "LUMINANCE:normal"      => "00",
@@ -439,7 +450,9 @@ my %ESCVP21net_defaultresults = (
   "IMGPRESET:02"     => "Setting2",
   "IMGPRESET:03"     => "Setting3",
   "IMGPRESET:04"     => "Setting4",
-  "IMGPRESET:05"     => "Setting5",  
+  "IMGPRESET:05"     => "Setting5",
+  "IMGPROC:01"       => "fine",
+  "IMGPROC:02"       => "fast",    
   "MCFI:00"          => "off",
   "MCFI:01"          => "low",
   "MCFI:02"          => "normal",
