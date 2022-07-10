@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.65.3 "=> "10.07.2022  consumer with mode=must are now interruptable ",
   "0.65.2 "=> "08.07.2022  change avgenergy to W p. hour ",
   "0.65.1 "=> "07.07.2022  change logic of __calcEnergyPieces function and the \%hef hash ",
   "0.65.0 "=> "03.07.2022  feature key interruptable for consumer ",
@@ -3593,7 +3594,7 @@ sub ___switchConsumerOff {
       
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
-  elsif (isInterruptible($hash, $c) && !isConsRcmd    ($hash, $c) && $mode eq 'can' &&                     # Consumer unterbrechen 
+  elsif (isInterruptible($hash, $c) && !isConsRcmd    ($hash, $c) &&                                       # Consumer unterbrechen 
          isInTimeframe  ($hash, $c) && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
          $auto && $offcom) {
  
@@ -8628,8 +8629,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         zum automatischen Ausschalten erfüllt sein. <br><br>
 
         Mit dem optionalen Schlüssel <b>interruptable</b> kann während der geplanten Einschaltzeit eine automatische 
-        Unterbrechung sowie Wiedereinschaltung des Verbrauchers vorgenommen werden sofern der Schlüssel mode=must nicht
-        gesetzt ist.
+        Unterbrechung sowie Wiedereinschaltung des Verbrauchers vorgenommen werden.
         Unterschreitet der PV Überschuß die benötigte Energie, wird der Verbraucher ausgeschaltet (interrupted) und 
         eingeschaltet wenn wieder ausreichend PV Überschuß vorhanden ist (continued). 
         Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst ! 
@@ -8646,8 +8646,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                            </td></tr>          
             <tr><td> <b>power</b>          </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                              </td></tr>            
             <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                         </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - der Verbaucher kann angeschaltet werden wenn genügend Energie bereitsteht (default)                                </td></tr>
-            <tr><td>                       </td><td><b>must</b> - der Verbaucher muß einmal am Tag angeschaltet werden auch wenn nicht genügend Energie vorhanden ist                </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - der Verbaucher wird eingeplant wenn wahrscheinlich genügend PV Überschuß verfügbar sein wird (default)             </td></tr>
+            <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird  </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                         </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)    </td></tr>
             <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
