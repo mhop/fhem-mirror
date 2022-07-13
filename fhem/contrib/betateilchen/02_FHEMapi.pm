@@ -135,7 +135,7 @@ sub FHEMapi_CGI() {
   # Match request first without trailing / in the link part
   if($request =~ m,^(/[^/]+)(/(.*)?)?$,) {
     my $link= $1;
-    my $filename= $3;
+    my $request= $3;
     my $name;
 
     # If FWEXT not found for this make a second try with a trailing slash in the link part
@@ -148,13 +148,13 @@ sub FHEMapi_CGI() {
     $name= $data{FWEXT}{$link}{deviceName};
 
 #    Debug "link= $link";
-#    Debug "filename= $filename";
+#    Debug "request= $request";
 #    Debug "name= $name";
 
     # return error if no such device
     return("text/plain; charset=utf-8", "No FHEMapi device for $link") unless($name);
 
-    return("text/plain; charset=utf-8", "42");
+    return("text/plain; charset=utf-8", $request);
 
 
 #     my $fullName = $filename;
