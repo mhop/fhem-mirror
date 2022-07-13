@@ -7,7 +7,7 @@
 # written by Dr. Boris Neubert 2012-08-27
 #
 ##############################################
-# $Id: 02_HTTPSRV.pm 20110 2019-09-05 17:30:20Z neubert $
+# $Id$
 
 package main;
 use strict;
