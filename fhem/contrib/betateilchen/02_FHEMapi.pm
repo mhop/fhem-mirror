@@ -154,33 +154,36 @@ sub FHEMapi_CGI() {
     # return error if no such device
     return("text/plain; charset=utf-8", "No FHEMapi device for $link") unless($name);
 
-    my $fullName = $filename;
-    foreach my $reading (split (/,/, AttrVal($name, "readings", "")))  {
-        my $value   = "";
-        if ($fullName =~ /^([^\?]+)\?(.*)($reading)=([^;&]*)([&;].*)?$/) {
-            $filename = $1;
-            $value    = $4;
-            Log3 $name, 5, "$name: set Reading $reading = $value";
-            readingsSingleUpdate($defs{$name}, $reading, $value, 1);
-        }
-    };
+    return("text/plain; charset=utf-8", "42");
 
-    # set directory index
-    $filename= AttrVal($name,"directoryindex","index.html") unless($filename);
-    $filename =~ s/\?.*//;
-    my $MIMEtype= filename2MIMEType($filename);
-    my $directory= $defs{$name}{fhem}{directory};
-    $filename= "$directory/$filename";
-    #Debug "read filename= $filename";
-    my @contents;
-    if(open(INPUTFILE, $filename)) {
-      binmode(INPUTFILE);
-      @contents= <INPUTFILE>;
-      close(INPUTFILE);
-      return("$MIMEtype; charset=utf-8", join("", @contents));
-    } else {
-      return("text/plain; charset=utf-8", "File not found: $filename");
-    }
+
+#     my $fullName = $filename;
+#     foreach my $reading (split (/,/, AttrVal($name, "readings", "")))  {
+#         my $value   = "";
+#         if ($fullName =~ /^([^\?]+)\?(.*)($reading)=([^;&]*)([&;].*)?$/) {
+#             $filename = $1;
+#             $value    = $4;
+#             Log3 $name, 5, "$name: set Reading $reading = $value";
+#             readingsSingleUpdate($defs{$name}, $reading, $value, 1);
+#         }
+#     };
+# 
+#     # set directory index
+#     $filename= AttrVal($name,"directoryindex","index.html") unless($filename);
+#     $filename =~ s/\?.*//;
+#     my $MIMEtype= filename2MIMEType($filename);
+#     my $directory= $defs{$name}{fhem}{directory};
+#     $filename= "$directory/$filename";
+#     #Debug "read filename= $filename";
+#     my @contents;
+#     if(open(INPUTFILE, $filename)) {
+#       binmode(INPUTFILE);
+#       @contents= <INPUTFILE>;
+#       close(INPUTFILE);
+#       return("$MIMEtype; charset=utf-8", join("", @contents));
+#     } else {
+#       return("text/plain; charset=utf-8", "File not found: $filename");
+#     }
 
   } else {
     return("text/plain; charset=utf-8", "Illegal request: $request");
