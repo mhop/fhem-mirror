@@ -76,7 +76,7 @@ sub FHEMapi_Define($$) {
 
   my @a = split("[ \t]+", $def, 5);
 
-  return "Usage: define <name> FHEMapi <infix> <directory> <friendlyname>"  if(int(@a) != 2);
+  return "Usage: define <name> FHEMapi"  if(int(@a) != 2);
   my $name= $a[0];
   my $infix= 'api';
   my $directory= 'www/api';
@@ -130,7 +130,7 @@ sub FHEMapi_CGI() {
 
   my ($request) = @_;   # /$infix/filename
 
-#  Debug "request= $request";
+  Debug "request= $request";
 
   # Match request first without trailing / in the link part
   if($request =~ m,^(/[^/]+)(/(.*)?)?$,) {
