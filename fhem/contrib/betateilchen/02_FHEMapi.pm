@@ -79,7 +79,7 @@ sub FHEMapi_Define($$) {
   return "Usage: define <name> FHEMapi <infix> <directory> <friendlyname>"  if(int(@a) != 2);
   my $name= $a[0];
   my $infix= 'api';
-  my $directory= AttrVal('global','modPath','.').'/api';
+  my $directory= AttrVal('global','modPath','.').'/www/api';
   my $friendlyname= 'FHEMapi';
 
   $hash->{fhem}{infix}= $infix;
