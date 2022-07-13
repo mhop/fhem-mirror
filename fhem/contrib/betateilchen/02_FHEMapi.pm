@@ -1,10 +1,8 @@
 ##############################################
 #
-#
 # 02_FHEMapi.pm
 #
-# forked from 02_HTTPSRV.pm
-# written by Dr. Boris Neubert 2012-08-27
+# forked from 02_HTTPSRV.pm written by Dr. Boris Neubert
 #
 ##############################################
 # $Id$
@@ -80,9 +78,9 @@ sub FHEMapi_Define($$) {
 
   return "Usage: define <name> FHEMapi <infix> <directory> <friendlyname>"  if(int(@a) != 5);
   my $name= $a[0];
-  my $infix= $a[2];
-  my $directory= $a[3];
-  my $friendlyname= $a[4];
+  my $infix= 'api'];
+  my $directory= AttrVal('global','modPath','.').'/api';
+  my $friendlyname= 'FHEMapi';
 
   $hash->{fhem}{infix}= $infix;
   $hash->{fhem}{directory}= $directory;
