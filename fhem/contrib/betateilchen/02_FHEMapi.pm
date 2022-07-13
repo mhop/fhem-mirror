@@ -76,7 +76,7 @@ sub FHEMapi_Define($$) {
 
   my @a = split("[ \t]+", $def, 5);
 
-  return "Usage: define <name> FHEMapi <infix> <directory> <friendlyname>"  if(int(@a) != 5);
+  return "Usage: define <name> FHEMapi <infix> <directory> <friendlyname>"  if(int(@a) != 2);
   my $name= $a[0];
   my $infix= 'api';
   my $directory= AttrVal('global','modPath','.').'/api';
