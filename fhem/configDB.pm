@@ -298,6 +298,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 }
 
 $configDB{type}              = $cfgDB_dbtype;
+$configDB{exclude}           = defined($dbconfig{exclude})     ? $dbconfig{exclude}     : '';
 $configDB{attr}{nostate}     = defined($dbconfig{nostate})     ? $dbconfig{nostate}     : 0;
 $configDB{attr}{rescue}      = defined($dbconfig{rescue})      ? $dbconfig{rescue}      : 0;
 $configDB{attr}{loadversion} = defined($dbconfig{loadversion}) ? $dbconfig{loadversion} : 0;
@@ -323,7 +324,7 @@ sub cfgDB_Init {
 	my $fhem_dbh = _cfgDB_Connect;
 
 #	create TABLE fhemversions ifnonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50))");
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50), VERSIONTAG CHAR(50))");
 
 #	create TABLE fhemconfig if nonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(64), P1 VARCHAR(64), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
@@ -362,6 +363,10 @@ sub cfgDB_Init {
 	} else {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemb64filesave(filename TEXT, content BLOB)");
 	}
+
+#   modify table for version tags if needed
+    eval {$fhem_dbh->do("SELECT versiontag from fhemversions where version = 0")};
+    $fhem_dbh->do("ALTER TABLE fhemversions ADD VERSIONTAG char(50)") if $@;
 
 # close database connection
 	$fhem_dbh->commit();
@@ -789,13 +794,19 @@ sub _cfgDB_ReadCfg {
 	$uuid =~ s/^\s+|\s+$//g;
     $configDB{loaded} = $uuid;
     Log 4, "configDB read config ".$configDB{loaded};
+    my @excluded = split(/,/,$configDB{exclude});
+    map { s/^\s+|\s+$//g; } @excluded;
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemconfig WHERE versionuuid = '$uuid' and device <>'configdb' order by version" );  
 
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		$row  = "$line[0] $line[1] $line[2]";
 		$row .= " $line[3]" if defined($line[3]);
-		push @dbconfig, $row;
+		if ( grep( /^$line[1]$/, @excluded ) ) {
+		  Log 1, "configDB excluding $line[1] ($row)" if $line[0] eq "define";
+		} else {
+          push @dbconfig, $row;
+		}
 	}
 	$fhem_dbh->disconnect();
 	return @dbconfig;
@@ -844,7 +855,7 @@ sub _cfgDB_Rotate {
     delete $data{saveID}; # no longer needed in memory
 	$configDB{loaded} = $uuid;
 	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
-	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid')");
+	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid', NULL)");
 	return $uuid;
 }
 
@@ -955,6 +966,7 @@ sub _cfgDB_Info {
 				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
 		$row	.= " attr: ".
 				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
+		$row    .= " tag: ".$line[8] if $line[8];
 		push @r, $row;
 	}
 	push @r, $l;
