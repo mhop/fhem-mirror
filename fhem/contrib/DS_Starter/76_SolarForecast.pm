@@ -120,6 +120,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.65.5 "=> "13.07.2022  extend isInterruptable and isAddSwitchOffCond ",
+  "0.65.4 "=> "11.07.2022  new function isConsumerLogOn, minor fixes ",
   "0.65.3 "=> "10.07.2022  consumer with mode=must are now interruptable, change hourscsme ",
   "0.65.2 "=> "08.07.2022  change avgenergy to W p. hour ",
   "0.65.1 "=> "07.07.2022  change logic of __calcEnergyPieces function and the \%hef hash ",
@@ -2323,7 +2325,7 @@ sub _specialActivities {
               $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
           }
           
-          deleteReadingspec ($hash, "consumer.*_planned.*"); 
+          # deleteReadingspec ($hash, "consumer.*_planned.*"); 
 
           writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben          
           
@@ -2835,21 +2837,9 @@ sub _manageConsumerData {
       ## Verbraucher - Laufzeit und Zyklen pro Tag ermitteln
       ## Laufzeit (in Minuten) wird pro Stunde erfasst
       ## bei Tageswechsel Rücksetzen in _specialActivities
-      #######################################################
-      my $nompower = ConsumerVal ($hash, $c, "power",   0);                                    # nominale Leistung lt. Typenschild
-      my $rpcurr   = ConsumerVal ($hash, $c, "rpcurr", "");                                    # Reading für akt. Verbrauch angegeben ?
-      
-      if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
-          $pcurr = $nompower;
-      }
-      
-      my $currpowerpercent = $pcurr;    
-      $currpowerpercent    = (($pcurr / $nompower) * 100) if($nompower > 0);
-      
-      $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
-      
+      #######################################################      
       my $starthour;
-      if($pcurr > $ethreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist aktiv
+      if(isConsumerLogOn ($hash, $c, $pcurr)) {                                                 # Verbraucher ist logisch "an"
             if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
@@ -3518,13 +3508,13 @@ sub ___switchConsumerOn {
           
           $state = qq{switching Consumer "$calias" to "$oncom"};
           
-          writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+          writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
           
           Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
-  elsif (isInterruptible($hash, $c) && isConsRcmd     ($hash, $c)  &&                             # unterbrochenen Consumer fortsetzen
-         isInTimeframe  ($hash, $c) && simplifyCstate ($pstate) =~ /interrupted|interrupting/xs &&
+  elsif (((isInterruptable($hash, $c) == 1 && isConsRcmd ($hash, $c)) || isInterruptable($hash, $c) == 3) &&   # unterbrochenen Consumer fortsetzen
+         isInTimeframe    ($hash, $c)      && simplifyCstate ($pstate) =~ /interrupted|interrupting/xs    &&
          $auto && $oncom) {
  
       CommandSet(undef,"$cname $oncom");
@@ -3535,7 +3525,8 @@ sub ___switchConsumerOn {
 
       delete $paref->{ps};
       
-      $state = qq{switching Consumer "$calias" to "$oncom", caution: continuing by surplus};
+      my $caution = isInterruptable($hash, $c) == 3 ? 'interrupt condition no longer present' : 'existing surplus';
+      $state      = qq{switching Consumer "$calias" to "$oncom", caution: $caution};
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
       
@@ -3566,7 +3557,8 @@ sub ___switchConsumerOff {
   
   my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch on Bedingung
-
+  my $caution;
+  
   Log3 ($name, 1, "$name - $err") if($err);
   
   if($debug) {                                                                                    # nur für Debugging
@@ -3587,15 +3579,15 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};      
       
-      my $caution = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
-      $state      = qq{switching Consumer "$calias" to "$offcom", caution: $caution};
+      $caution = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
+      $state   = qq{switching Consumer "$calias" to "$offcom", caution: $caution};
       
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+      writeDataToFile ($hash, "consumers", $csmcache.$name);                                                     # Cache File Consumer schreiben
       
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
-  elsif (isInterruptible($hash, $c) && !isConsRcmd    ($hash, $c) &&                                       # Consumer unterbrechen 
-         isInTimeframe  ($hash, $c) && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
+  elsif (((isInterruptable($hash, $c) == 1 && !isConsRcmd ($hash, $c)) || isInterruptable($hash, $c) == 2)   &&  # Consumer unterbrechen 
+         isInTimeframe    ($hash, $c)      && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
          $auto && $offcom) {
  
       CommandSet(undef,"$cname $offcom");
@@ -3606,7 +3598,8 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};
       
-      $state = qq{switching Consumer "$calias" to "$offcom", caution: surplus shortage};
+      $caution = isInterruptable($hash, $c) == 2 ? 'interrupt condition' : 'surplus shortage';
+      $state   = qq{switching Consumer "$calias" to "$offcom", caution: $caution};
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
       
@@ -3654,7 +3647,7 @@ sub ___setConsumerSwitchingState {
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
       
-      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
+      Log3 ($name, 2, "$name - $state");
   }
   elsif ($pstate eq 'stopping' && isConsumerPhysOff ($hash, $c)) {
       $paref->{ps}     = "switched off:";
@@ -3669,7 +3662,7 @@ sub ___setConsumerSwitchingState {
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
       
-      Log3 ($name, 2, "$name - $state (Automatic = $auto)");      
+      Log3 ($name, 2, "$name - $state");      
   }
   elsif ($pstate eq 'continuing' && isConsumerPhysOn ($hash, $c)) {
       $paref->{ps} = "continued:";
@@ -4424,7 +4417,7 @@ sub collectAllRegConsumers {
 
       my $interruptable = 0;
       if(exists $hc->{interruptable}) {
-          $interruptable = 1 if($hc->{interruptable} ne '0');
+          $interruptable = $hc->{interruptable} if($hc->{interruptable} ne '0');
       }      
       
       my $rauto     = $hc->{auto}     // q{};
@@ -7413,7 +7406,7 @@ sub isConsumerPhysOn {
 
   if(!$defs{$cname}) {
       Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "on" state can't be identified});
-      return;
+      return 0;
   }
   
   my $reg      = ConsumerVal ($hash, $c, "onreg",    "on"); 
@@ -7424,11 +7417,11 @@ sub isConsumerPhysOn {
       return 1;
   }
 
-return;
+return 0;
 }
 
 ################################################################
-#  Funktion liefert 1 wenn Consumer physisch "ausngeschaltet"
+#  Funktion liefert 1 wenn Consumer physisch "ausgeschaltet"
 #  ist, d.h. der Wert offreg des Readings rswstate wahr ist 
 ################################################################
 sub isConsumerPhysOff {
@@ -7440,7 +7433,7 @@ sub isConsumerPhysOff {
 
   if(!$defs{$cname}) {
       Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "off" state can't be identified});
-      return;
+      return 0;
   }
   
   my $reg      = ConsumerVal ($hash, $c, "offreg",     "off");
@@ -7451,7 +7444,53 @@ sub isConsumerPhysOff {
       return 1;
   }
 
-return;
+return 0;
+}
+
+################################################################
+#  Funktion liefert 1 wenn Consumer logisch "eingeschaltet"
+#  ist, d.h. wenn der Energieverbrauch über einem bestimmten
+#  Schwellenwert oder der prozentuale Verbrauch über dem
+#  Defaultwert $defpopercent ist.
+#
+#  Logisch "on" schließt physisch "on" mit ein.
+################################################################
+sub isConsumerLogOn {
+  my $hash  = shift;
+  my $c     = shift;
+  my $pcurr = shift // 0;
+  
+  my $name  = $hash->{NAME};
+  my $cname = ConsumerVal ($hash, $c, "name", "");                                         # Devicename Customer
+
+  if(!$defs{$cname}) {
+      Log3($name, 1, qq{$name - the consumer device "$cname" is invalid, the "on" state can't be identified});
+      return 0;
+  }
+  
+  if(isConsumerPhysOff($hash, $c)) {                                                       # Device ist physisch ausgeschaltet               
+      return 0;                    
+  }
+  
+  my $type       = $hash->{TYPE};
+  my $nompower   = ConsumerVal ($hash, $c, "power",           0);                          # nominale Leistung lt. Typenschild
+  my $rpcurr     = ConsumerVal ($hash, $c, "rpcurr",         "");                          # Reading für akt. Verbrauch angegeben ?
+  my $ethreshold = ConsumerVal ($hash, $c, "energythreshold", 0);                          # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird               
+  
+  if (!$rpcurr && isConsumerPhysOn($hash, $c)) {                                           # Workaround wenn Verbraucher ohne Leistungsmessung
+      $pcurr = $nompower;
+  }
+  
+  my $currpowerpercent = $pcurr;    
+  $currpowerpercent    = ($pcurr / $nompower) * 100 if($nompower > 0);
+  
+  $data{$type}{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
+  
+  if($pcurr > $ethreshold || $currpowerpercent > $defpopercent) {                          # Verbraucher ist logisch aktiv
+      return 1;
+  }
+  
+return 0;
 }
 
 ################################################################
@@ -7490,8 +7529,11 @@ return (0, $info, $err);
 }
 
 ################################################################
-#  Funktion liefert "1" wenn die vorrangige Ausschaltbedingung
-#  aus dem Schlüssel "swoffcond" im Consumer Attribut wahr ist
+#  Funktion liefert "1" wenn eine Ausschaltbedingung
+#  erfüllt ist 
+#  ("swoffcond" oder "interruptable" im Consumer Attribut)
+#  Der Inhalt von "interruptable" wird optional in $cond
+#  übergeben.
 #
 #  $info - den Info-Status
 #  $err  - einen Error-Status
@@ -7500,22 +7542,31 @@ return (0, $info, $err);
 sub isAddSwitchOffCond {
   my $hash = shift;
   my $c    = shift;
+  my $cond = shift // q{};
 
-  my $info = q{};
-  my $err  = q{};
+  my $info           = q{};
+  my $err            = q{};
+  my $dswoffcond     = q{};                                                       # Device zur Lieferung einer Ausschaltbedingung
+  my $rswoffcond     = q{};                                                       # Reading zur Lieferung einer Ausschaltbedingung
+  my $swoffcondregex = q{};                                                       # Regex der Ausschaltbedingung (wenn wahr)
   
-  my $dswoffcond = ConsumerVal ($hash, $c, "dswoffcond", "");                     # Device zur Lieferung einer vorrangigen Ausschaltbedingung
+  if ($cond) {
+      ($dswoffcond,$rswoffcond,$swoffcondregex) = split ":", $cond;
+  }
+  else {
+      $dswoffcond     = ConsumerVal ($hash, $c, "dswoffcond",     "");   
+      $rswoffcond     = ConsumerVal ($hash, $c, "rswoffcond",     "");             
+      $swoffcondregex = ConsumerVal ($hash, $c, "swoffcondregex", ""); 
+  }
   
   if($dswoffcond && !$defs{$dswoffcond}) {
-      $err = qq{ERROR - the device "$dswoffcond" doesn't exist! Check the key "swoffcond" in attribute "consumer${c}"};
+      $err = qq{ERROR - the device "$dswoffcond" doesn't exist! Check the key "swoffcond" or "interruptable" in attribute "consumer${c}"};
       return (0, $info, $err); 
-  }  
+  }              
   
-  my $rswoffcond     = ConsumerVal ($hash, $c, "rswoffcond",     "");             # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
-  my $swoffcondregex = ConsumerVal ($hash, $c, "swoffcondregex", "");             # Regex einer vorrangigen Ausschaltbedingung
-  my $condstate      = ReadingsVal ($dswoffcond, $rswoffcond,    "");
+  my $condstate = ReadingsVal ($dswoffcond, $rswoffcond, "");
   
-  if ($condstate && $condstate =~ m/^$swoffcondregex$/x) {                                                     
+  if ($condstate && $condstate =~ m/^$swoffcondregex$/x) {
       return (1, $info, $err);
   }
   
@@ -7545,13 +7596,31 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 }
 
 ################################################################
-#  ist Consumer $c unterbrechbar (1) oder nicht (0)
+#  ist Consumer $c unterbrechbar (1|2) oder nicht (0|3)
 ################################################################
-sub isInterruptible {
+sub isInterruptable {
   my $hash = shift;
   my $c    = shift;
 
-return ConsumerVal ($hash, $c, 'interruptable', 0);
+  my $intable = ConsumerVal ($hash, $c, 'interruptable', 0);
+  
+  if ($intable eq '0') {
+      return 0;
+  }
+  elsif ($intable eq '1') {
+      return 1;
+  }
+  
+  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable);
+  
+  if ($swoffcond) {
+      return 2;
+  }
+  else {
+      return 3;
+  }
+  
+return;
 }
 
 ################################################################
@@ -8608,7 +8677,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] <br>
                          [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [swstate=&lt;Readingname&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] <br>
                          [auto=&lt;Readingname&gt;] [pcurr=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]] <br>
-                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=0|1] </b><br><br>
+                         [swoncond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [swoffcond=&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt] [interruptable=&lt;Option&gt] </b><br><br>
         
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose.
@@ -8630,48 +8699,53 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
 
         Mit dem optionalen Schlüssel <b>interruptable</b> kann während der geplanten Einschaltzeit eine automatische 
         Unterbrechung sowie Wiedereinschaltung des Verbrauchers vorgenommen werden.
-        Unterschreitet der PV Überschuß die benötigte Energie, wird der Verbraucher ausgeschaltet (interrupted) und 
-        eingeschaltet wenn wieder ausreichend PV Überschuß vorhanden ist (continued). 
+        Der Verbraucher wird temporär ausgeschaltet (interrupted) und wieder eingeschaltet (continued) wenn die 
+        Interrupt-Bedingung nicht mehr vorliegt. 
         Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst ! 
         <br><br>
+        
          <ul>   
          <table>  
          <colgroup> <col width=12%> <col width=88%> </colgroup>
-            <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                               </td></tr>
-            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülamschine                                                                         </td></tr>
-            <tr><td>                       </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                        </td></tr>
-            <tr><td>                       </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                        </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                              </td></tr>
-            <tr><td>                       </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, etc.)                                                   </td></tr>
-            <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                            </td></tr>          
-            <tr><td> <b>power</b>          </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                              </td></tr>            
-            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                         </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - der Verbaucher wird eingeplant wenn wahrscheinlich genügend PV Überschuß verfügbar sein wird (default)             </td></tr>
-            <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird  </td></tr>
-            <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                         </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)    </td></tr>
-            <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                      </td></tr>
-            <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                       </td></tr>
-            <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                     </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                         </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                        </td></tr>
-            <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
-            <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                         </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                 </td></tr>
-            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                      </td></tr>
-            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.                         </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional).                                          </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                         </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                       </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional).                                                                </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                          </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                        </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                </td></tr>
-            <tr><td> <b>interruptable</b>  </td><td>Verbraucher darf (optional) unterbrechbar (1) oder nicht unterbrechbar (0) sein (default: 0)                                     </td></tr>
+            <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                        </td></tr>
+            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülamschine                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, etc.)                                                            </td></tr>
+            <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                     </td></tr>          
+            <tr><td> <b>power</b>          </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                       </td></tr>            
+            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - der Verbaucher wird eingeplant wenn wahrscheinlich genügend PV Überschuß verfügbar sein wird (default)                      </td></tr>
+            <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird           </td></tr>
+            <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                  </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)             </td></tr>
+            <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                  </td></tr>
+            <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                  </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                               </td></tr>
+            <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                </td></tr>
+            <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                              </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                                  </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                                 </td></tr>
+            <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                     </td></tr>
+            <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                  </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                          </td></tr>
+            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                         </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                               </td></tr>
+            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.                                  </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional).                                                   </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                  </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                         </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional).                                                                         </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                   </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                 </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                         </td></tr>
+            <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher (optional)                                                             </td></tr>
+            <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär unterbrochen falls der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
+            <tr><td>                       </td><td><b>1</b> - Verbraucher darf temporär unterbrochen werden falls der PV Überschuß die benötigte Energie unterschreitet                      </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading:Regex</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen Device/Readings auf den Regex matched  </td></tr>
+            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet.                                                     </td></tr>
          </table>
          </ul>
        <br>
