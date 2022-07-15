@@ -22,14 +22,46 @@
 # The module uses DevIo for communication. There is no blocking communication whatsoever. 
 # Communication to Snapcast goes through a TCP Socket, Writing and Reading are managed asynchronously.
 
-package main;
+package FHEM::Media::Snapcast;    ## no critic 'Package declaration'
+
 use strict;
 use warnings;
 use Scalar::Util qw(looks_like_number);
+use Time::HiRes qw(gettimeofday);
 use DevIo;
-use JSON;
+use JSON ();
+use GPUtils qw(GP_Import);
+use List::Util qw( max min );
 
-my %Snapcast_sets = (
+
+#-- Run before package compilation
+BEGIN {
+
+    # Import from main context
+    GP_Import(
+        qw(
+          defs
+          init_done
+          readingFnAttributes
+          readingsSingleUpdate
+          readingsBeginUpdate readingsEndUpdate
+          readingsBulkUpdate readingsBulkUpdateIfChanged
+          readingsDelete
+          AttrVal InternalVal
+          ReadingsVal ReadingsNum
+          Log3
+          InternalTimer RemoveInternalTimer
+          devspec2array
+          FmtDateTime
+          DevIo_OpenDev DevIo_CloseDev DevIo_SimpleRead DevIo_SimpleWrite
+          trim
+          )
+    );
+}
+
+sub ::Snapcast_Initialize { goto &Initialize }
+
+my %_sets = (
     update  => 0,
     volume  => 2,
     stream  => 2,
@@ -39,7 +71,7 @@ my %Snapcast_sets = (
     group   => 2,
 );
 
-my %Snapcast_client_sets = (
+my %_client_sets = (
     volume  => 1,
     stream  => 1,
     name    => 1,
@@ -48,7 +80,7 @@ my %Snapcast_client_sets = (
     group   => 1,
 );
 
-my %Snapcast_clientmethods = (
+my %_clientmethods = (
     name    => 'Client.SetName',
     volume  => 'Client.SetVolume',
     mute    => 'Client.SetVolume',
@@ -56,21 +88,20 @@ my %Snapcast_clientmethods = (
     latency => 'Client.SetLatency'
 );
 
-sub Snapcast_Initialize {
+sub Initialize {
     my $hash = shift // return;
-    $hash->{DefFn}    = \&Snapcast_Define;
-    $hash->{UndefFn}  = \&Snapcast_Undef;
-    $hash->{SetFn}    = \&Snapcast_Set;
-    $hash->{GetFn}    = \&Snapcast_Get;
-    $hash->{WriteFn}  = \&Snapcast_Write;
-    $hash->{ReadyFn}  = \&Snapcast_Ready;
-    $hash->{AttrFn}   = \&Snapcast_Attr;
-    $hash->{ReadFn}   = \&Snapcast_Read;
+    $hash->{DefFn}    = \&Define;
+    $hash->{UndefFn}  = \&Undef;
+    $hash->{SetFn}    = \&Set;
+    $hash->{GetFn}    = \&Get;
+    $hash->{ReadyFn}  = \&Ready;
+    $hash->{AttrFn}   = \&Attr;
+    $hash->{ReadFn}   = \&Read;
     $hash->{AttrList} = "streamnext:all,playing constraintDummy constraints disable:1 volumeStepSize volumeStepSizeSmall volumeStepSizeThreshold $readingFnAttributes";
     return;
 }
 
-sub Snapcast_Define {
+sub Define {
     my $hash = shift // return;
     my $def  = shift // return;
     my @arr  = split m{\s+}xms, $def;
@@ -84,7 +115,7 @@ sub Snapcast_Define {
         readingsSingleUpdate( $hash, 'state', 'defined', 1 );
         RemoveInternalTimer($hash);
         DevIo_CloseDev($hash);
-        return Snapcast_Client_Register_Server($hash);
+        return Client_Register_Server($hash);
     }
     $hash->{ip}   = $arr[1] // 'localhost';
     $hash->{port} = $arr[2] // '1705';
@@ -105,10 +136,10 @@ sub Snapcast_Connect {
         InternalTimer( gettimeofday() + 5, \&Snapcast_Connect, $hash, 0 );
         return;    # "init not done";
     }
-    return DevIo_OpenDev( $hash, 0, \&Snapcast_onConnect, );
+    return DevIo_OpenDev( $hash, 0, \&onConnect, );
 }
 
-sub Snapcast_Attr {
+sub Attr {
     my $cmd   = shift;
     my $name  = shift;
     my $attr  = shift // return;
@@ -126,26 +157,26 @@ sub Snapcast_Attr {
     return;
 }
 
-sub Snapcast_Undef {
+sub Undef {
     my $hash = shift // return;
     RemoveInternalTimer($hash);
     DevIo_CloseDev($hash);
-    Snapcast_Client_Unregister_Server($hash) if $hash->{MODE} eq 'client';
+    Client_Unregister_Server($hash) if $hash->{MODE} eq 'client';
     return;
 }
 
-sub Snapcast_Get {
+sub Get {
     return 'get is not supported by this module';
 }
 
-sub Snapcast_Set {
+sub Set {
     my ( $hash, @param ) = @_;
     return '"set Snapcast" needs at least one argument' if int @param < 2;
     my $name = shift @param;
     my $opt  = shift @param;
 
     #  my $clientmod;
-    my %snap_sets = $hash->{MODE} eq 'client' ? %Snapcast_client_sets : %Snapcast_sets;
+    my %snap_sets = $hash->{MODE} eq 'client' ? %_client_sets : %_sets;
     if ( !defined $snap_sets{$opt} ) {
         my @cList = keys %snap_sets;
         return "Unknown argument $opt, choose one of " . join( q{ }, @cList );
@@ -157,7 +188,7 @@ sub Snapcast_Set {
         Snapcast_getStatus($hash);
         return;
     }
-    if ( defined $Snapcast_clientmethods{$opt} ) {
+    if ( defined $_clientmethods{$opt} ) {
         my $client;
         Log3( $hash, 5, "snap: $opt command received" );
         if ( $hash->{MODE} eq 'client' ) {
@@ -178,28 +209,75 @@ sub Snapcast_Set {
 
         if ( $client eq 'all' ) {
             for my $i ( 1 .. ReadingsVal( $name, 'clients', 0 ) ) {
-                my $sclient = $hash->{STATUS}->{clients}->{$i}->{host}->{mac};
-                $sclient =~ s/\://g;
-                my $res = Snapcast_setClient( $hash, $sclient, $opt, $value );
+                #my $sclient = $hash->{STATUS}->{clients}->{$i}->{host}->{mac};
+                #$sclient =~ s/\://g; #$sclient =~ s{:}{}g; $client =~ s{#}{_}g;
+                my $sclient = $hash->{STATUS}->{clients}->{$i}->{id};
+                my $res = _setClient( $hash, $sclient, $opt, $value );
                 readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
             }
             return;
         }
-        my $res = Snapcast_setClient( $hash, $client, $opt, $value );
+        my @ids = grep {m{\A(?:clients_.+_group)\z}xms}
+                keys %{ $hash->{READINGS} };
+        my @group;
+        for my $sid ( @ids ) {
+            #= devspec2array("TYPE=Snapcast:FILTER=group=$client");
+            next if ReadingsVal($name, $_, '') ne $client;
+            #clients_84a93e695051#2_group 207ff3bc-5082-789c-c444-29471f4ce57e
+            if ( $sid =~ m{\Aclients_(.+)_group\z}xms ) {
+                push @group, $1;
+            }
+        }
+        if ( @group ) {
+            if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
+                Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
+                my @paramset;
+                my $grvol;
+                for my $sclient ( @group ) {
+                    $grvol += ReadingsNum( $name, "clients_${sclient}_volume", 0);
+                }
+                $grvol = int $grvol/@group;
+                my $change = $value - $grvol;
+                for my $sclient ( @group ) {
+                    my $sparm->{id} = ReadingsVal( $name, "clients_${sclient}_origid", undef) // next;#_getId( $hash, $sclient) // next;
+                    my $vol = ReadingsNum( $name, "clients_${sclient}_volume", 0) + $change;
+                    $vol = max( 0, min( 100, $vol ) );
+                    my $muteState = ReadingsVal( $name, "clients_${sclient}_muted", 'false' );
+                    $muteState = 'false' if $vol && ( $muteState eq 'true' || $muteState eq '1' );
+                    $sparm->{volume}->{muted} = $muteState;
+                    $sparm->{volume}->{percent} = $vol;
+                    my $payload = push @paramset, Snapcast_Encode( $hash, $_clientmethods{volume}, $sparm);
+                }
+                return if !@paramset;
+                my $payload = q{[};
+                $payload .= join q{,},@paramset;
+                $payload .= q{]}; #q{]\r\n};
+                Log3($hash,3,"SNAP: send batch $payload");
+                return DevIo_SimpleWrite( $hash, $payload, 2 );
+            }
+            for my $sclient ( @group ) {
+                $sclient =~ s{:}{}gx;
+                $sclient =~ s{[#]}{_}gx; 
+                my $res = _setClient( $hash, $sclient, $opt, $value );
+                readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
+            }
+            return;
+        }
+        my $res = _setClient( $hash, $client, $opt, $value );
         readingsSingleUpdate( $hash, 'lastError', $res, 1 ) if defined $res;
         return;
     }
-    return "$opt not implemented";
+    return "$opt not implemented yet!";
 }
 
-sub Snapcast_Read {
+sub Read {
     my $hash = shift // return;
     my $name = $hash->{NAME};
     my $buf;
     $buf = DevIo_SimpleRead($hash);
     return '' if !defined $buf;
     $buf = $hash->{PARTIAL} . $buf;
-    $buf =~ s/\r//g;
+    $buf =~ s{\r}{}gx;
     my $lastchr = substr( $buf, -1, 1 );
 
     if ( $lastchr ne "\n" ) {
@@ -215,11 +293,12 @@ sub Snapcast_Read {
 
     my @lines = split m{\n}x, $buf;
     for my $line (@lines) {
+        Log3( $name, 4, "Snapcast single line is: $line" );
 
         # Hier die Results parsen
-        my $decoded_json;
+        my $update;
         if (!eval {
-                $decoded_json = decode_json($line);
+                $update = JSON->new->decode($line);
                 1;
             }
             )
@@ -229,24 +308,34 @@ sub Snapcast_Read {
             readingsSingleUpdate( $hash, 'lastError', "Invalid JSON: $buf", 1 );
             return;
         }
-        my $update = $decoded_json;
-        if ( defined $hash->{IDLIST} && defined $hash->{IDLIST}->{ $update->{id} } ) {
+        if ( ref $update eq 'ARRAY' ) {
+            for my $elem ( @{$update} ) {
+                updateClientInGroup($hash,$elem);
+            }
+            return;
+        }
+        return if ref $update ne 'HASH';
+
+        my $s = $update->{params}->{data};
+
+        if (  defined $hash->{IDLIST} && $update->{id} && defined $hash->{IDLIST}->{ $update->{id} } ) {
             my $id = $update->{id};
 
             #Log3 $name,2, "id: $id ";
             if ( $hash->{IDLIST}->{$id}->{method} eq 'Server.GetStatus' ) {
                 delete $hash->{IDLIST}->{$id};
-                return Snapcast_parseStatus( $hash, $update );
+                return parseStatus( $hash, $update );
             }
             if ( $hash->{IDLIST}->{$id}->{method} eq 'Server.DeleteClient' ) {
                 delete $hash->{IDLIST}->{$id};
                 return;
             }
-            while ( my ( $key, $value ) = each %Snapcast_clientmethods ) {
+            while ( my ( $key, $value ) = each %_clientmethods ) {
                 if ( $value eq $hash->{IDLIST}->{$id}->{method} && $key ne 'mute' ) {    #exclude mute here because muting is now integrated in SetVolume
                     my $client = $hash->{IDLIST}->{$id}->{params}->{id};
 
-                    $client =~ s/\://g;
+                    $client =~ s{:}{}gx;
+                    $client =~ s{[#]}{_}gx;
                     Log3( $name, 5, "client: $client, key: $key, value: $value" );
 
                     if ( $key eq 'volume' ) {
@@ -259,7 +348,7 @@ sub Snapcast_Read {
                         readingsEndUpdate( $hash, 1 );
                         my $clientmodule = $hash->{$client};
                         my $clienthash   = $defs{$clientmodule};
-                        my $maxvol       = Snapcast_getVolumeConstraint($clienthash);
+                        my $maxvol       = getVolumeConstraint($clienthash) // 100;
 
                         if ( defined $clientmodule ) {
                             readingsBeginUpdate($clienthash);
@@ -276,30 +365,23 @@ sub Snapcast_Read {
                         #Log3 $name,2, "group: $group ";
                         for my $i ( 1 .. ReadingsVal( $name, 'clients', 0 ) ) {
                             $client = $hash->{STATUS}->{clients}->{$i}->{id};
-                            my $client_group = ReadingsVal( $hash->{NAME}, "clients_${client}_group", '' );
+                            my $client_group = ReadingsVal( $name, "clients_${client}_group", '' );
+                            next if $group ne $client_group;
 
-                            #Log3 $name,2, "client_group: $client_group ";
-                            my $clientmodule = $hash->{$client};
-                            my $clienthash   = $defs{$clientmodule};
-                            if ( $group eq $client_group ) {
-                                readingsBeginUpdate($hash);
-                                readingsBulkUpdateIfChanged( $hash, "clients_${client}_stream_id", $update->{result}->{stream_id} );
-                                readingsEndUpdate( $hash, 1 );
-                                if ( defined $clientmodule ) {
-                                    readingsBeginUpdate($clienthash);
-                                    readingsBulkUpdateIfChanged( $clienthash, 'stream_id', $update->{result}->{stream_id} );
-                                    readingsEndUpdate( $clienthash, 1 );
-                                }
-                            }
+                            readingsBeginUpdate($hash);
+                            readingsBulkUpdateIfChanged( $hash, "clients_${client}_stream_id", $update->{result}->{stream_id} );
+                            readingsEndUpdate( $hash, 1 );
+                            my $clienthash   = $defs{$hash->{$client}} // next;
+                            readingsBeginUpdate($clienthash);
+                            readingsBulkUpdateIfChanged( $clienthash, 'stream_id', $update->{result}->{stream_id} );
+                            readingsEndUpdate( $clienthash, 1 );
                         }
                     }
                     else {
                         readingsBeginUpdate($hash);
                         readingsBulkUpdateIfChanged( $hash, "clients_${client}_$key", $update->{result} );
                         readingsEndUpdate( $hash, 1 );
-                        my $clientmodule = $hash->{$client};
-                        my $clienthash   = $defs{$clientmodule} // return;
-                        return if !defined $clienthash;
+                        my $clienthash   = $defs{$hash->{$client}} // return;
                         readingsBeginUpdate($clienthash);
                         readingsBulkUpdateIfChanged( $clienthash, $key, $update->{result} );
                         readingsEndUpdate( $clienthash, 1 );
@@ -309,14 +391,12 @@ sub Snapcast_Read {
             delete $hash->{IDLIST}->{$id};
             return;
         }
-        elsif ( $update->{method} =~ /Client\.OnDelete/ ) {
-            my $s = $update->{params}->{data};
+
+        if ( $update->{method} eq 'Client.OnDelete' ) {
 
             #fhem "deletereading $name clients.*";
             for my $reading (
-                grep {m{\A(?:clients)}m}
-
-                #keys %{$hash{READINGS}} ) {
+                grep {m{\A(?:clients)}xms}
                 keys %{ $hash->{READINGS} }
                 )
             {
@@ -326,29 +406,35 @@ sub Snapcast_Read {
             Snapcast_getStatus($hash);
             return;
         }
-        elsif ( $update->{method} =~ /Client\./ ) {
-            my $c = $update->{params}->{data};
-            Snapcast_updateClient( $hash, $c, 0 );
+
+        if ( $update->{method} =~ m{\AClient\.}x ) {
+            updateClient( $hash, $s, 0 );
             return;
         }
-        elsif ( $update->{method} =~ /Stream\./ ) {
-            my $s = $update->{params}->{data};
-            Snapcast_updateStream( $hash, $s, 0 );
+
+        if ( $update->{method} =~ m{\A(?:Stream|Group)\.}x ) {
+            updateStream( $hash, $s, 0 );
             return;
         }
-        elsif ( $update->{method} =~ /Group\./ ) {
-            my $s = $update->{params}->{data};
-            Snapcast_updateStream( $hash, $s, 0 );
+#        elsif ( $update->{method} =~ m{\AGroup\.}x ) {
+#            updateStream( $hash, $s, 0 );
+#            return;
+#        }
+
+        if ( $update->{method} eq 'Server.OnUpdate' ) {
+            my $serverupdate->{result} = $update->{params};
+            parseStatus( $hash, $serverupdate );
             return;
         }
+
         Log3( $name, 2, "unknown JSON, please contact module maintainer: $buf" );
-        readingsSingleUpdate( $hash, 'lastError', "unknown JSON, please ontact module maintainer: $buf", 1 );
+        readingsSingleUpdate( $hash, 'lastError', "unknown JSON, please contact module maintainer: $buf", 1 );
         return 'unknown JSON received';
     }
     return;
 }
 
-sub Snapcast_Ready {
+sub Ready {
     my $hash = shift // return;
     my $name = $hash->{NAME};
     return if AttrVal( $name, 'disable', 0 );
@@ -362,11 +448,11 @@ sub Snapcast_Ready {
         readingsDelete( $hash, $reading );
     }
 
-    DevIo_OpenDev( $hash, 1, \&Snapcast_onConnect, sub() { } );
+    DevIo_OpenDev( $hash, 1, \&onConnect, sub() { } );
     return;
 }
 
-sub Snapcast_onConnect {
+sub onConnect {
     my $hash = shift // return;
     $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
     $hash->{CONNECTS}++;
@@ -375,7 +461,7 @@ sub Snapcast_onConnect {
     return;
 }
 
-sub Snapcast_updateClient {
+sub updateClient {
     my $hash    = shift // return;
     my $c       = shift // return;
     my $cnumber = shift // return;
@@ -392,7 +478,8 @@ sub Snapcast_updateClient {
     $hash->{STATUS}->{clients}->{$cnumber} = $c;
     my $id      = $c->{id} ? $c->{id} : $c->{host}->{mac};    # protocol version 2 has no id, but just the MAC, newer versions will have an ID.
     my $orig_id = $id;
-    $id =~ s/://g;
+    $id =~ s{:}{}gx;
+    $id =~ s{[#]}{_}gx;
     $hash->{STATUS}->{clients}->{$cnumber}->{id}     = $id;
     $hash->{STATUS}->{clients}->{$cnumber}->{origid} = $orig_id;
 
@@ -411,6 +498,7 @@ sub Snapcast_updateClient {
     readingsBulkUpdateIfChanged( $hash, "clients_${id}_group",     $c->{config}->{group_id} );
     readingsEndUpdate( $hash, 1 );
 
+    return if !$hash->{$id};
     my $clienthash = $defs{ $hash->{$id} } // return;
 
     readingsBeginUpdate($clienthash);
@@ -427,12 +515,45 @@ sub Snapcast_updateClient {
     readingsBulkUpdateIfChanged( $clienthash, 'group',     $c->{config}->{group_id} );
     readingsEndUpdate( $clienthash, 1 );
 
-    my $maxvol = Snapcast_getVolumeConstraint($clienthash);
-    Snapcast_setClient( $hash, $clienthash->{ID}, 'volume', $maxvol ) if $c->{config}->{volume}->{percent} > $maxvol;
+    my $maxvol = getVolumeConstraint($clienthash) // 100;
+    _setClient( $hash, $clienthash->{ID}, 'volume', $maxvol ) if $c->{config}->{volume}->{percent} > $maxvol;
     return;
 }
 
-sub Snapcast_updateStream {
+sub updateClientInGroup {
+    my $hash    = shift // return;
+    my $c       = shift // return;
+
+    my $cnumber = 1;
+    while ( defined $hash->{STATUS}->{clients}->{$cnumber} && $c->{params}->{id} ne $hash->{STATUS}->{clients}->{$cnumber}->{origid} ) {
+        $cnumber++;
+    }
+    if ( !defined $hash->{STATUS}->{clients}->{$cnumber} ) {
+        #Snapcast_getStatus($hash);
+        return;
+    }
+
+    return if !defined $c->{params};
+    my $id      = $c->{params}->{id} // return;    # recent version uses an ID.
+    $id =~ s{:}{}gx;
+    $id =~ s{[#]}{_}gx;
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, "clients_${id}_volume",    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
+    readingsBulkUpdateIfChanged( $hash, "clients_${id}_muted",     $c->{params}->{volume}->{muted} ? 'true' : 'false' ) if defined $c->{params}->{volume}->{muted};
+    readingsEndUpdate( $hash, 1 );
+
+    return if !$hash->{$id};
+    my $clienthash = $defs{ $hash->{$id} } // return;
+
+    readingsBeginUpdate($clienthash);
+    readingsBulkUpdateIfChanged( $clienthash, 'volume',    $c->{params}->{volume}->{percent} ) if defined $c->{params}->{volume}->{percent};
+    readingsBulkUpdateIfChanged( $clienthash, 'muted',     $c->{params}->{volume}->{muted} ? 'true' : 'false' ) if defined $c->{params}->{volume}->{muted};
+    readingsEndUpdate( $clienthash, 1 );
+    return;
+}
+
+sub updateStream {
     my $hash    = shift // return;
     my $s       = shift // return;
     my $snumber = shift // return;
@@ -451,27 +572,27 @@ sub Snapcast_updateStream {
     return;
 }
 
-sub Snapcast_Client_Register_Server {
+sub Client_Register_Server {
     my $hash = shift // return;
     return if $hash->{MODE} ne 'client';
     my $name   = $hash->{NAME} // return;
     my $server = $hash->{SERVER};
     if ( !defined $defs{$server} ) {
-        InternalTimer( gettimeofday() + 30, \&Snapcast_Client_Register_Server, $hash, 1 );    # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
+        InternalTimer( gettimeofday() + 30, \&Client_Register_Server, $hash, 1 );    # if server does not exists maybe it got deleted, recheck every 30 seconds if it reappears
         return;
     }
-    $server = $defs{$server};         # get the server hash
+    $server = $defs{$server};               # get the server hash
     $server->{ $hash->{ID} } = $name;
     Snapcast_getStatus($server);
     return;
 }
 
-sub Snapcast_Client_Unregister_Server {
+sub Client_Unregister_Server {
     my $hash = shift // return;
     return if $hash->{MODE} ne 'client';
     my $name   = $hash->{NAME};
     my $server = $hash->{SERVER};
-    $server = $defs{$server} // return;                                                       # get the server hash
+    $server = $defs{$server} // return;      # get the server hash
     readingsSingleUpdate( $server, "clients_$hash->{ID}_module", $name, 1 );
     delete $server->{ $hash->{ID} };
     return;
@@ -482,7 +603,7 @@ sub Snapcast_getStatus {
     return Snapcast_Do( $hash, 'Server.GetStatus', '' );
 }
 
-sub Snapcast_parseStatus {
+sub parseStatus {
     my $hash    = shift // return;
     my $status  = shift // return;
     my $streams = $status->{result}->{server}->{streams};
@@ -505,7 +626,7 @@ sub Snapcast_parseStatus {
                 for my $c (@clients) {
                     $c->{config}->{stream_id} = $groupstream;    # insert "stream" field for every client
                     $c->{config}->{group_id}  = $groupid;        # insert "group_id" field for every client
-                    Snapcast_updateClient( $hash, $c, $cnumber );
+                    updateClient( $hash, $c, $cnumber );
                     $cnumber++;
                 }
                 readingsBeginUpdate($hash);
@@ -518,7 +639,7 @@ sub Snapcast_parseStatus {
         my @streams = @{$streams};
         my $snumber = 1;
         for my $s (@streams) {
-            Snapcast_updateStream( $hash, $s, $snumber );
+            updateStream( $hash, $s, $snumber );
             $snumber++;
         }
         readingsBeginUpdate($hash);
@@ -526,19 +647,18 @@ sub Snapcast_parseStatus {
         readingsEndUpdate( $hash, 1 );
     }
 
-    #readingsEndUpdate($hash,1) if defined $groups || defined $streams;
     InternalTimer( gettimeofday() + 300, \&Snapcast_getStatus, $hash, 1 );    # every 5 Minutes, get the full update, also to apply changed vol constraints.
     return;
 }
 
-sub Snapcast_setClient {
+sub _setClient {
     my ( $hash, $id, $param, $value ) = @_;
     my $name = $hash->{NAME};
     Log3( $name, 4, "SNAP setClient: $hash->{NAME}, id $id, param $param, val $value" );
     my $cnumber = ReadingsVal( $name, "clients_${id}_nr", undef ) // return;
-    my $method  = $Snapcast_clientmethods{$param}                 // return;
+    my $method  = $_clientmethods{$param}                         // return;
 
-    my $paramset->{id} = Snapcast_getId( $hash, $id );
+    my $paramset->{id} = _getId( $hash, $id );
     Log3( $name, 4, "SNAP setClient still there: $hash->{NAME}, paramsetid $paramset->{id}" );
 
     if ( $param eq 'volumeConstraint' ) {
@@ -553,8 +673,8 @@ sub Snapcast_setClient {
              #$match = '_global_';
              #}
         for ( my $i = 0; $i < @values; $i += 2 ) {
-            return 'wrong timeformat 00:00 - 24:00 for time/volume pair' if $values[$i]       !~ /^(([0-1]?[0-9]|2[0-3]):[0-5][0-9])|24:00$/;
-            return 'wrong volumeformat 0 - 100 for time/volume pair'     if $values[ $i + 1 ] !~ /^(0?[0-9]?[0-9]|100)$/;
+            return 'wrong timeformat 00:00 - 24:00 for time/volume pair' if $values[$i]       !~ m{^(?:(?:[0-1]?[0-9]|2[0-3]):[0-5][0-9])|24:00$}x;
+            return 'wrong volumeformat 0 - 100 for time/volume pair'     if $values[ $i + 1 ] !~ m{^(?:0?[0-9]?[0-9]|100)$}x;
         }
         return;
     }
@@ -564,7 +684,7 @@ sub Snapcast_setClient {
         $param = 'stream_id';
         if ( $value eq "next" ) {                                             # just switch to the next stream, if last stream, jump to first one. This way streams can be cycled with a button press
             my $totalstreams  = ReadingsVal( $name, 'streams', 0 );
-            my $currentstream = Snapcast_getStreamNumber( $hash, ReadingsVal( $name, "clients_${id}_stream_id", '' ) );
+            my $currentstream = _getStreamNumber( $hash, ReadingsVal( $name, "clients_${id}_stream_id", '' ) );
             my $newstream     = $currentstream + 1;
             $newstream = 1 if $newstream > $totalstreams;                             #unless $newstream <= $totalstreams;
             $value     = ReadingsVal( $name, "streams_" . $newstream . "_id", '' );
@@ -577,18 +697,16 @@ sub Snapcast_setClient {
 
     if ( $param eq 'volume' ) {
 
-        #return undef unless defined($currentVol);
         return if !$value;
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
-        if ( $value =~ /^([\+\-])(\d{1,2})$/ ) {
+        if ( $value =~ m{\A([+-])(\d{1,2})\z}x ) {
             my $direction = $1;
             my $amount    = $2;
 
             #$value = eval($currentVol. $direction. $amount);
             $value = eval { $currentVol . $direction . $amount };
-            $value = 100 if $value > 100;
-            $value = 0   if $value < 0;
+            $value = max( 0, min( 100, $value ) );
         }
 
         # if volume is given with up or down argument, then increase or decrease according to volumeStepSize
@@ -600,8 +718,7 @@ sub Snapcast_setClient {
             else {
                 $value = $currentVol - $step;
             }
-            $value     = 100     if $value > 100;
-            $value     = 0       if $value < 0;
+            $value = max( 0, min( 100, $value ) );
             $muteState = 'false' if $value > 0 && ( $muteState eq 'true' || $muteState == 1 );
         }
         $volumeobject->{percent} = $value + 0;
@@ -637,8 +754,9 @@ sub Snapcast_Do {
     my $method  = shift // return;
     my $param   = shift // '';
     my $payload = Snapcast_Encode( $hash, $method, $param );
+    $payload .= "\r\n";
 
-    #Log3($hash,5,"SNAP: Do $payload");
+    #Log3($hash,3,"SNAP: Do $payload");
     return DevIo_SimpleWrite( $hash, $payload, 2 );
 }
 
@@ -658,13 +776,12 @@ sub Snapcast_Encode {
     $request->{params}                  = $param if $param ne '';
     $hash->{IDLIST}->{ $request->{id} } = $request;
     $request->{id}                      = $request->{id} + 0;
-    $json                               = encode_json($request) . "\r\n";
-    $json =~ s/\"true\"/true/;                                       # Snapcast needs bool values without "" but encode_json does not do this
-    $json =~ s/\"false\"/false/;
+    $json                               = JSON->new->encode($request);
+    $json =~ s{("(true|false|null)")}{$2}gxms;
     return $json;
 }
 
-sub Snapcast_getStreamNumber {
+sub _getStreamNumber {
     my $hash = shift         // return;
     my $id   = shift         // return;
     my $name = $hash->{NAME} // return;
@@ -674,21 +791,29 @@ sub Snapcast_getStreamNumber {
     return;
 }
 
-sub Snapcast_getId {
+sub _getId {
     my $hash   = shift // return;
     my $client = shift // return;
 
     my $name = $hash->{NAME} // return;
-    if ( $client =~ m/^([0-9a-f]{12}(\#*\d*|$))$/i ) {    # client is  ID
+
+    # client is ID
+    if ( $client =~ m/^([0-9a-f]{12}([#_]*\d*|$))$/i ) {
         for my $i ( 1 .. ReadingsVal( $name, 'streams', 1 ) ) {
             return $hash->{STATUS}->{clients}->{$i}->{origid}
                 if $client eq $hash->{STATUS}->{clients}->{$i}->{id};
         }
     }
+
+    # client is provided as device name?
+    if ( InternalVal($client,'TYPE','') eq 'Snapcast') {
+        my $def = InternalVal($client,'ID','');
+        return ReadingsVal($name,"clients_${def}_origid",undef);
+    }
     return 'unknown client';
 }
 
-sub Snapcast_getVolumeConstraint {
+sub getVolumeConstraint {
     my $hash   = shift // return;
     my $client = shift // return;
 
@@ -721,14 +846,16 @@ sub Snapcast_getVolumeConstraint {
     return $value;    # der aktuelle Auto-Wert wird zurückgegeben
 }
 
-
 1;
 
 __END__
 
 =pod
+
+=encoding utf8
+=item device
 =item summary    control and monitor Snapcast Servers and Clients
-=item summary_DE steuert und überwacht Snapcast Servers und Clients
+=item summary_DE Steuert und überwacht Snapcast Server und Clients
 
 =begin html
 

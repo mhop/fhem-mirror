@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  96_Snapcast: prevent crash in case of external group commands
  - feature: 70_ESCVP21net: added undocumented settings (IMGPROC, IRIS, LIRIS)
  - feature: 30_HUEBridge, 31_HUEDevice: support for Hue tap dial switch
  - change:  96_Snapcast: PBP code restructured (part I)
