@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 57_SSCal.pm 23365 2020-12-16 14:40:38Z DS_Starter $
+# $Id: 57_SSCal.pm 24736 2021-07-12 15:43:19Z DS_Starter $
 #########################################################################################################################
 #       57_SSCal.pm
 #
@@ -1561,10 +1561,10 @@ return;
 #                    Extrahiert empfangene Kalendertermine (Events)
 #############################################################################################
 sub extractEventlist {                                    ## no critic 'complexity'
-  my ($name) = @_;
-  my $hash   = $defs{$name};
-  my $data   = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
-  my $am     = AttrVal($name, "asyncMode", 0);
+  my $name = shift;
+  my $hash = $defs{$name};
+  my $data = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
+  my $am   = AttrVal($name, "asyncMode", 0);
   
   my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl,$es,$em,$eh);
   my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
@@ -1807,7 +1807,7 @@ sub extractEventlist {                                    ## no critic 'complexi
                           }
   
                           my $numOfAppointmentDay = _weekdayNumber ($rByDay);                            # liefert Nr des Wochentages: SU = 0 ... SA = 6                   
-                          
+                          Log3($name, 1, "$name - TEST - rByDay: $rByDay, numOfAppointmentDay: $numOfAppointmentDay");
                           for ($ci=-1; $ci<($count); $ci++) {
                               if ($rDayInterval > 0) {                                                   # Angabe "jeder x Wochentag" ist positiv (-2 wäre z.B. vom Ende des Monats zu zähelen)
                                   $bmonth += $interval if($ci>=0);
