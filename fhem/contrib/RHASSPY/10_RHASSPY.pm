@@ -5056,7 +5056,10 @@ sub handleIntentMediaControls {
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'MediaControls', $device );
 
     my $cmd = $mapping->{$command};
-    $cmd .= " $data->{Playlist}" if $command eq 'cmdPlaylist';
+    if ( $command eq 'cmdPlaylist') {
+        return respond( $hash, $data, getResponse($hash, 'NoValidData') ) if !defined $data->{Playlist};
+        $cmd .= " $data->{Playlist}";
+    }
 
     if ( $command eq 'cmdPlaySelected'|| $command eq 'cmdAddSelected' ) { #hand over method! playSelection or addSelection
         return respond( $hash, $data, getResponse($hash, 'NoMappingFound') ) if InternalVal($device, 'TYPE', 'unknown') ne 'MPD';
@@ -6167,6 +6170,17 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
       <li><code>homebridgeMapping</code> atm. is not used as source for appropriate mappings in RHASSPY.</li>
     </ul>
   </li>
+  
+  <a id="RHASSPY-siteId"></a>
+  <li><b>siteId</b>: To some extend, you may (indirectly) want or need a RHASSPY device to act as a satellite in the Rhasspy ecosystem. So it may be a good idea to add the siteId (no matter if it's the automatically generated one) to the satellite list in the intent recognition component in Rhasspy. Otherwise the following features will not work:
+    <ul>
+      <li><a href="#RHASSPY-get-test_file">Test</a> sentencies (single or read from a file)</li>
+      <li><a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a></li>
+      <li><a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a></li>
+    </ul>
+  </li>
+
+  
   <a id="RHASSPY-noChangeover"></a>
   <li><b>noChangeover</b>: By default, RHASSPY will first try to execute the intent as handed over by Rhasspy. In case there's no strict match, RHASSPY then will do a check, if the single device intent could be executed as group intent (vice versa; to do this, the {Group} key value will be used as {Device} key). Setting this key to '1' will completely prevent this check, '2' will stop changeover from single device intent to respective group intent, but allow to switch from group to single device.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
@@ -6322,12 +6336,11 @@ After changing something relevant within FHEM for either the data structure in</
   <li>
     <a id="RHASSPY-get-test_file"></a><b>test_file &lt;path and filename&gt;</b>
     <p>Checks the provided text file. Content will be sent to Rhasspy NLU for recognition (line by line), result will be written to the file '&lt;input without ending.txt&gt;_result.txt'. <i><b>stop</i></b> as filename will stop test mode if sth. goes wrong. No commands will be executed towards FHEM devices while test mode is active.</p>
-    <p>Note: To get test results, RHASSPY's siteId has to be configured for intent recognition in Rhasspy as well.</p>
+    <p>Note: To get test results, some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy is required!</p>
   </li>
   <li>
     <a id="RHASSPY-get-test_sentence"></a><b>test_sentence &lt;sentence to be analyzed&gt;</b>
-    <p>Checks the provided sentence for recognition by Rhasspy NLU. No commands to be executed as well.</p>
-    <p>Note: wrt. to RHASSPY's siteId for NLU see remark get test_file.</p>
+    <p>Checks the provided sentence for recognition by Rhasspy NLU. No commands to be executed as well, needs also <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy.</p>
   </li>
 </ul>
 
@@ -6518,7 +6531,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   </li>
   <li>
     <a id="RHASSPY-attr-rhasspyMsgDialog"></a><b>rhasspyMsgDialog</b>
-    <p>If some key in this attribute are set, RHASSPY will react somehow like a <a href="#msgDialog">msgDialog</a> device. This needs some configuration in the central <a href="#msgConfig">msgConfig</a> device first, and additionally for each RHASSPY instance a siteId has to be added to the intent recognition service.</p>
+    <p>If some key in this attribute are set, RHASSPY will react somehow like a <a href="#msgDialog">msgDialog</a> device. This needs some configuration in the central <a href="#msgConfig">msgConfig</a> device first, and <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
     Keys that may be set in this attribute:
      <ul>
         <li><i>allowed</i> The <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
@@ -6539,7 +6552,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   <li>
     <a id="RHASSPY-attr-rhasspySpeechDialog"></a><b>rhasspySpeechDialog</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>Optionally, you may want not to use the internal speach-to-text engine provided by Rhasspy (for one or several siteId's), but provide  simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: You will have to (de-) activate these parts of the Rhasspy ecosystem for the respective satellites manually!</p>
+    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
     Keys that may be set in this attribute:
      <ul>
         <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
@@ -6746,7 +6759,7 @@ yellow=rgb FFFF00</code></p>
   <li>GetState</li> To querry existing devices, {Device} is mandatory, keys {Room}, {Update}, {Type} and {Reading} (defaults to internal STATE) are optional.
   By omitting {Device}, you may request some options RHASSPY itself provides (may vary dependend on the room). {Type} keys for RHASSPY are <i>generic</i>, <i>control</i>, <i>info</i>, <i>scenes</i> and <i>rooms</i>.
   <li>MediaControls</li>
-  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available).<br>
+  {Device} and {Command} are mandatory, {Room} is optional. {Command} may be one of <i>cmdStop</i>, <i>cmdPlay</i>, <i>cmdPause</i>, <i>cmdFwd</i>, <i>cmdBack</i> or <i>cmdPlaylist</i> (the later only if there's an playlist command available, requires additional {Playlist} field).<br>
   <a href="#RHASSPY-experimental"><b>experimental!</b></a> If you put an <a href="#MPD">MPD</a> device under RHASSPY control, you may also have the option to use <i>cmdPlaySelected</i> and <i>cmdAddSelected</i> to replace or extend your current playlist using several additional fields:
   {ArtistId}, {AlbumId}, {Album}, {Artist}, {Albumartist}, {Title}, {Genre}, and {Name}. The first two will be treated as <i>musicbrainz_artistid</i> or <i>musicbrainz_albumid</i> respecively and (lower case) transfered to filter arguments as described in <a href="https://mpd.readthedocs.io/en/latest/protocol.html#filters">MPD documentation</a>. Additionally you may use {RandomNr} to shuffle the result and limit the songs added to the given number.
   <li>MediaChannels</li> (as configured by the user)
