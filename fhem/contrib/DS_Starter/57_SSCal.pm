@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       57_SSCal.pm
 #
-#       (c) 2019 - 2021 by Heiko Maaz
+#       (c) 2019 - 2022 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module integrate the Synology Calendar into FHEM
@@ -140,6 +140,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.10" => "16.07.2022  fix problem recurring MONTHLY appointment by day, ".
+                           "forum: https://forum.fhem.de/index.php/topic,106963.msg1228098.html#msg1228098 ",
   "2.4.9"  => "11.07.2021  set adaption of AUTH for DSM7 compatibility ",
   "2.4.8"  => "16.12.2020  accep umlauts in calendar name ",
   "2.4.7"  => "08.12.2020  fix handle code recognition in createAtDevices as single line ",
@@ -1563,16 +1565,16 @@ return;
 sub extractEventlist {                                    ## no critic 'complexity'
   my $name = shift;
   my $hash = $defs{$name};
-  my $data = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
+  my $data = delete $hash->{eventlist};                   # zentrales Eventhash löschen !
   my $am   = AttrVal($name, "asyncMode", 0);
   
   my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl,$es,$em,$eh);
   my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
-  my (undef,$tstart,$tend) = timeEdge($name);             # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
-  my $datetimestart        = FmtDateTime($tstart);
-  my $datetimeend          = FmtDateTime($tend);
+  my (undef,$tstart,$tend) = timeEdge    ($name);         # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my $datetimestart        = FmtDateTime ($tstart);
+  my $datetimeend          = FmtDateTime ($tend);
        
   my $n = 0;                                              # Zusatz f. lfd. Nr. zur Unterscheidung exakt zeitgleicher Events
   for my $key (keys %{$data->{data}}) {
@@ -1585,6 +1587,7 @@ sub extractEventlist {                                    ## no critic 'complexi
           ($nbdate,$nedate) = ("","");  
 
           my $uid = $data->{data}{$key}[$i]{ical_uid};                    # UID des Events    
+          
           extractIcal ($name,$data->{data}{$key}[$i]);                    # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
           
           my $isallday                         = $data->{data}{$key}[$i]{is_all_day};
@@ -1617,11 +1620,13 @@ sub extractEventlist {                                    ## no critic 'complexi
               
               if($ets < $tstart || $bts > $tend) {
                   Log3($name, 4, "$name - Ignore single event -> $data->{data}{$key}[$i]{summary} start: $bdate $btime, end: $edate $etime");
+                  
                   $ignore = 1;
                   $done   = 0; 
               } 
               elsif ($excl) {
                   Log3($name, 4, "$name - Ignored by Ical compare -> $data->{data}{$key}[$i]{summary} start: $bdate $btime, end: $edate $etime");
+                  
                   $ignore = 1;
                   $done   = 0;               
               } 
@@ -1650,10 +1655,11 @@ sub extractEventlist {                                    ## no critic 'complexi
               my $rr = $data->{data}{$key}[$i]{evt_repeat_setting}{repeat_rule};
               
               # Format: FREQ=YEARLY;COUNT=1;INTERVAL=2;BYMONTHDAY=15;BYMONTH=10;UNTIL=2020-12-31T00:00:00
-              my @para  = split(";", $rr);
+              my @para  = split ";", $rr;
               
               for my $par (@para) {
-                  my ($p1,$p2) = split("=", $par);
+                  my ($p1,$p2) = split "=", $par;
+                  
                   if ($p1 eq "FREQ") {
                       $freq = $p2;
                   } 
@@ -1791,12 +1797,13 @@ sub extractEventlist {                                    ## no critic 'complexi
                   
                   if ($byday) {                                                 # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
                       my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$numOfRatedDay,$rDaysToAddOrSub,$rNewTime);
-                      my @ByDays = split(",", $byday);                          # Array der Wiederholungstage
+                      my @ByDays = split ",", $byday;                           # Array der Wiederholungstage
                       
                       for my $rByDay (@ByDays) {
                           my $rByDayLength = length($rByDay);                   # die Länge des Strings       
                           my $rDayStr;                                          # Tag auf den das Datum gesetzt werden soll
                           my $rDayInterval;                                     # z.B. 2 = 2nd Tag des Monats oder -1 = letzter Tag des Monats
+                          
                           if ($rByDayLength > 2) {
                               $rDayStr      = substr($rByDay, -2);
                               $rDayInterval = int(substr($rByDay, 0, $rByDayLength - 2));
@@ -1806,8 +1813,8 @@ sub extractEventlist {                                    ## no critic 'complexi
                               $rDayInterval = 1;
                           }
   
-                          my $numOfAppointmentDay = _weekdayNumber ($rByDay);                            # liefert Nr des Wochentages: SU = 0 ... SA = 6                   
-                          Log3($name, 1, "$name - TEST - rByDay: $rByDay, numOfAppointmentDay: $numOfAppointmentDay");
+                          my $numOfAppointmentDay = _weekdayNumber ($rDayStr);                           # liefert Nr des Wochentages: SU = 0 ... SA = 6                   
+                          
                           for ($ci=-1; $ci<($count); $ci++) {
                               if ($rDayInterval > 0) {                                                   # Angabe "jeder x Wochentag" ist positiv (-2 wäre z.B. vom Ende des Monats zu zähelen)
                                   $bmonth += $interval if($ci>=0);
@@ -1815,7 +1822,7 @@ sub extractEventlist {                                    ## no critic 'complexi
                                   $bmonth %= 12 if($bmonth>12);
                                   $bmonth  = sprintf("%02d", $bmonth);
                                   
-                                  ($nbhh,$nbmm,$nbss)  = split(":", $nbtime);
+                                  ($nbhh,$nbmm,$nbss)  = split ":", $nbtime;
                                   my $firstOfNextMonth = fhemTimeLocal($nbss, $nbmm, $nbhh, 1, $bmonth-1, $byear-1900);
                                   ($nbss, $nbmm, $nbhh, $bmday, $bmonth, $byear, $numOfRatedDay, undef, undef) = localtime($firstOfNextMonth);  # den 1. des Monats sowie die dazu gehörige Nr. des Wochentages
   
@@ -1884,7 +1891,7 @@ sub extractEventlist {                                    ## no critic 'complexi
                   if ($byday) {                                                         # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
                       my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rNewTime);
                       my ($numOfRatedDay,$rDaysToAddOrSub);                   
-                      my @ByDays   = split(",", $byday);                                # Array der Wiederholungstage
+                      my @ByDays   = split ",", $byday;                                 # Array der Wiederholungstage
 
                       my $btsstart = $bts;
                       $ci = -1;
@@ -1899,7 +1906,7 @@ sub extractEventlist {                                    ## no critic 'complexi
                               
                               ($nbss, $nbmm, $nbhh, $bmday, $bmonth, $byear, $numOfRatedDay, undef, undef) = localtime($rNewTime);                                        
                               
-                              ($nbhh,$nbmm,$nbss) = split(":", $nbtime);
+                              ($nbhh,$nbmm,$nbss) = split ":", $nbtime;
 
                               if ($numOfRatedDay <= $numOfAppointmentDay) {                                  # Nr nächster Wochentag <= Planwochentag
                                   $rDaysToAddOrSub = $numOfAppointmentDay - $numOfRatedDay;
