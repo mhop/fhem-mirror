@@ -468,7 +468,8 @@ FW_Read($$)
                        } @FW_httpheader;
   if(!$hash->{encoding}) {
     my $ct = $FW_httpheader{"Content-Type"};
-    $hash->{encoding} = ($ct && $ct =~ m/charset\s*=\s*(\S*)/i ? $1 : $FW_encoding);
+    $hash->{encoding} =
+        ($ct && $ct =~ m/charset\s*=\s*(\S*)/i ? $1 : $FW_encoding);
   }
   delete($hash->{HDR});
 
@@ -679,7 +680,7 @@ FW_initInform($$)
   $FW_id2inform{$FW_id} = $me if($FW_id);
 
   my $filter = $me->{inform}{filter};
-  $filter =~ s/([[\]().+?])/\\$1/g if($filter =~ m/room=/); # Forum #80390
+  $filter =~ s/([[\]().+*?])/\\$1/g; #80390, #128362
   $filter = "NAME=.*" if($filter eq "room=all");
   $filter = "room!=.+" if($filter eq "room=Unsorted");
 
@@ -1982,8 +1983,10 @@ FW_sortIndex($)
 sub
 FW_showRoom()
 {
+  my $roomRe = $FW_room;
+  $roomRe =~ s/([[\]().+*?])/\\$1/g;
   return 0 if(!$FW_room ||
-              AttrVal($FW_wname,"forbiddenroom","") =~ m/\b$FW_room\b/);
+              AttrVal($FW_wname,"forbiddenroom","") =~ m/\b$roomRe\b/);
 
   %FW_hiddengroup = ();
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
