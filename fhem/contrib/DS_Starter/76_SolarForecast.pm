@@ -396,10 +396,10 @@ my %htitles = (                                                                 
                 DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>}                     },
   akorron  => { EN => qq{Enable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on},
                 DE => qq{Einschalten Autokorrektur mit:\nset <NAME> pvCorrectionFactor_Auto on}                    },
-  splus    => { EN => qq{PV surplus exists},
-                DE => qq{PV-&#220;berschu&#223; ist vorhanden}                                                     },
-  nosplus  => { EN => qq{no PV surplus present},
-                DE => qq{kein PV-&#220;berschu&#223; vorhanden}                                                    },
+  splus    => { EN => qq{PV surplus sufficient},
+                DE => qq{PV-&#220;berschu&#223; ausreichend}                                                       },
+  nosplus  => { EN => qq{PV surplus insufficient},
+                DE => qq{PV-&#220;berschu&#223; unzureichend}                                                      },
 );
 
 my %weather_ids = (
@@ -3508,13 +3508,15 @@ sub ___switchConsumerOn {
           
           $state = qq{switching Consumer "$calias" to "$oncom"};
           
-          writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+          writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
           
           Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
-  elsif (((isInterruptable($hash, $c) == 1 && isConsRcmd ($hash, $c)) || isInterruptable($hash, $c) == 3) &&   # unterbrochenen Consumer fortsetzen
-         isInTimeframe    ($hash, $c)      && simplifyCstate ($pstate) =~ /interrupted|interrupting/xs    &&
+  elsif (((isInterruptable($hash, $c) == 1 && isConsRcmd ($hash, $c)) ||                          # unterbrochenen Consumer fortsetzen
+          (isInterruptable($hash, $c) == 3 && isConsRcmd ($hash, $c)))    &&   
+         isInTimeframe    ($hash, $c)                                     && 
+         simplifyCstate   ($pstate) =~ /interrupted|interrupting/xs       &&
          $auto && $oncom) {
  
       CommandSet(undef,"$cname $oncom");
@@ -3586,8 +3588,8 @@ sub ___switchConsumerOff {
       
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
-  elsif (((isInterruptable($hash, $c) == 1 && !isConsRcmd ($hash, $c)) || isInterruptable($hash, $c) == 2)   &&  # Consumer unterbrechen 
-         isInTimeframe    ($hash, $c)      && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
+  elsif (((isInterruptable($hash, $c) && !isConsRcmd ($hash, $c)) || isInterruptable($hash, $c) == 2)   &&  # Consumer unterbrechen 
+         isInTimeframe    ($hash, $c) && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
          $auto && $offcom) {
  
       CommandSet(undef,"$cname $offcom");
@@ -8745,16 +8747,18 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär unterbrochen falls der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
             <tr><td>                       </td><td><b>1</b> - Verbraucher darf temporär unterbrochen werden falls der PV Überschuß die benötigte Energie unterschreitet                      </td></tr>
             <tr><td>                       </td><td><b>Device:Reading:Regex</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen Device/Readings auf den Regex matched  </td></tr>
-            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet.                                                     </td></tr>
+            <tr><td>                       </td><td>oder unzureichender PV Überschuß vorliegt.                                                                                                </td></tr>
+            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender PV Überschuß vorliegt.          </td></tr>
          </table>
          </ul>
        <br>
       
        <ul>
          <b>Beispiele: </b> <br>
-         attr &lt;name&gt; consumer01 wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
-         attr &lt;name&gt; consumer02 WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
-         attr &lt;name&gt; consumer03 Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:^-?([1-7][0-9]|[0-9])$ swoffcond:EcoFlow:data_data_socSum:100 <br>
+         attr &lt;name&gt; <b>consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
+         attr &lt;name&gt; <b>consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
+         attr &lt;name&gt; <b>consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:^-?([1-7][0-9]|[0-9])$ swoffcond:EcoFlow:data_data_socSum:100 <br>
+         attr &lt;name&gt; <b>consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=700 mode=must notbefore=07 mintime=480 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.az.wandthermostat:diff-temp:([0-9]).*  <br>
        </ul> 
        </li>  
        <br>
