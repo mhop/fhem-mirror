@@ -1736,7 +1736,7 @@ sub _attrconsumer {                      ## no critic "not used"
           return qq{The device "$codev" doesn't exist!};
       }
       
-      if(!$h->{type} || !$h->{power}) {
+      if(!$h->{type} || !exists $h->{power}) {
           return qq{The syntax of "$aName" is not correct. Please consider the commandref.};
       }
       
@@ -4264,7 +4264,10 @@ sub _calcSummaries {
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption     = int ($pvgen - $gfeedin - $batin + $batout);
   $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
+  
   my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
+  $surplus                = 0 if($surplus < 0);                                                         # wegen Vergleich nompower vs. surplus
+  
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
   $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen * 1 > 0);
