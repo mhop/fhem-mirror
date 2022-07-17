@@ -729,6 +729,7 @@ sub
 FW_addToWritebuffer($$@)
 {
   my ($hash, $txt, $callback, $nolimit, $encoded) = @_;
+  return 0 if(!defined($hash->{FD})); # No success
 
   $txt = Encode::encode($hash->{encoding}, $txt)
           if($hash->{encoding} && !$encoded && ($unicodeEncoding ||
