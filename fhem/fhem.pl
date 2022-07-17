@@ -407,7 +407,8 @@ my %ra = (
   "event-on-update-reading"    => { s=>",", c=>".attreour" },
   "event-on-change-reading"    => { s=>",", c=>".attreocr",   r=>":.*" },
   "timestamp-on-change-reading"=> { s=>",", c=>".attrtocr" },
-  "event-min-interval"         => { s=>",", c=>".attrminint", r=>":.*" },
+  "event-min-interval"         => { s=>",", c=>".attrminint", r=>":.*",
+                                    isNum=>1 },
   "oldreadings"                => { s=>",", c=>".or" },
   "devStateIcon"               => { s=>" ", r=>":.*", p=>"^{.*}\$",
                                     pv=>{"%name"=>1, "%state"=>1, "%type"=>1} },
@@ -3155,6 +3156,11 @@ CommandAttr($$)
         my @a = split($ra{$attrName}{s}, $lval) ;
         for my $v (@a) {
           my $v = $v; # resolve the reference to avoid changing @a itself
+          if($ra{$attrName}{isNum}) {
+            my @va = split(":", $v);
+            return "attr $sdev $attrName $v: argument is not a number" 
+                if(!defined($va[1]) || !looks_like_number($va[1]));
+          }
           $v =~ s/$ra{$attrName}{r}// if($ra{$attrName}{r});
           my $err ="Argument $v for attr $sdev $attrName is not a valid regexp";
           return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
