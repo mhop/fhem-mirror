@@ -185,6 +185,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
+                           "set 'part1type' to default => text/html instead of text/plain",
   "9.10.5" => "01.07.2022  fix noQuotesForSID using in streaming devices type mjpeg ",
   "9.10.4" => "03.06.2022  avoid warning 'No data for Cache with key: {LASTSNAP}' if no snap exists ",
   "9.10.3" => "23.11.2022  made SYNO.SurveillanceStation.AudioStream, SYNO.SurveillanceStation.VideoStream optional for SVS compatibility to 9.0.0 ",
@@ -841,9 +843,9 @@ sub Initialize {
                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
                      "pollcaminfoall ".
                      "ptzNoCapPrePat:1,0 ".
-                     "recChatTxt ".
-                     "recEmailTxt ".
-                     "recTelegramTxt ".
+                     "recChatTxt:textField-long ".
+                     "recEmailTxt:textField-long ".
+                     "recTelegramTxt:textField-long ".
                      "rectime ".
                      "recextend:1,0 ".
                      "smtpCc ".
@@ -854,9 +856,9 @@ sub Initialize {
                      "smtpSSLPort ".
                      "smtpTo ".
                      "smtpNoUseSSL:1,0 ".
-                     "snapChatTxt ".
-                     "snapEmailTxt ".
-                     "snapTelegramTxt ".
+                     "snapChatTxt:textField-long ".
+                     "snapEmailTxt:textField-long ".
+                     "snapTelegramTxt:textField-long ".
                      "snapGalleryBoost:0,1 ".
                      "snapGallerySize:Icon,Full ".
                      "snapGalleryNumber:$defSnum ".
@@ -1902,7 +1904,7 @@ sub _setsnapCams {                       ## no critic "not used"
   
   if($rawet) {
       $hash->{HELPER}{CANSENDSNAP} = 1;                                # zentraler Schnappschußversand wird aktiviert
-      $hash->{HELPER}{SMTPMSG} = $rawet;   
+      $hash->{HELPER}{SMTPMSG}     = $rawet;   
   }
   
   my ($csnap,$cmail) = ("","");
@@ -10130,7 +10132,7 @@ sub _sendTelegram {
    
    my %teleparams = (
        'subject'      => {                       'default'=>'',                          'required'=>0, 'set'=>1},
-       'part1type'    => {                       'default'=>'text/plain; charset=UTF-8', 'required'=>1, 'set'=>1},
+       'part1type'    => {                       'default'=>'text/html; charset=UTF-8',  'required'=>1, 'set'=>1},
        'part1txt'     => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Hashref der Bilddaten (Bilddaten base64 codiert), wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
@@ -10656,9 +10658,9 @@ sub _prepSendMail {
    
    $mt =~ s/['"]//gx;   
    
-   my($subj,$body) =  split(",", $mt, 2);
-   my $subjt       = (split("=>", $subj))[1];
-   my $bodyt       = (split("=>", $body))[1];
+   my($subj,$body) =  split ",", $mt, 2;
+   my $subjt       = (split "=>", $subj)[1];
+   my $bodyt       = (split "=>", $body)[1];
    
    $subjt = trim($subjt);
    $subjt =~ s/\$CAM/$calias/gx;
@@ -10739,7 +10741,7 @@ sub _sendEmail {
        'smtpTo'       => {'attr'=>'smtpTo',      'default'=>'',                          'required'=>1, 'set'=>1},
        'subject'      => {'attr'=>'subject',     'default'=>'',                          'required'=>1, 'set'=>1},
        'smtpCc'       => {'attr'=>'smtpCc',      'default'=>'',                          'required'=>0, 'set'=>1},
-       'part1type'    => {                       'default'=>'text/plain; charset=UTF-8', 'required'=>1, 'set'=>1},
+       'part1type'    => {                       'default'=>'text/html; charset=UTF-8',  'required'=>1, 'set'=>1},
        'part1txt'     => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'smtphost'     => {'attr'=>'smtpHost',    'default'=>'',                          'required'=>1, 'set'=>0},
