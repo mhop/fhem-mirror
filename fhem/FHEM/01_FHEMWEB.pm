@@ -680,7 +680,7 @@ FW_initInform($$)
   $FW_id2inform{$FW_id} = $me if($FW_id);
 
   my $filter = $me->{inform}{filter};
-  $filter =~ s/([[\]().+*?])/\\$1/g; #80390, #128362
+  # Regexp escaping moved to fhemweb.js (#80390, #128362, #128442 )
   $filter = "NAME=.*" if($filter eq "room=all");
   $filter = "room!=.+" if($filter eq "room=Unsorted");
 
