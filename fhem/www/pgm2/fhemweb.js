@@ -298,7 +298,7 @@ FW_jqueryReadyFn()
   var sa = location.search.substring(1).split("&");
   for(var i = 0; i < sa.length; i++) {
     var kv = sa[i].split("=");
-    FW_urlParams[kv[0]] = kv[1];
+    FW_urlParams[kv[0]] = decodeURIComponent(kv[1]);
   }
 
   $("select[id^=sel_attr],select[id^=sel_set],select[id^=sel_get]")
@@ -1290,7 +1290,9 @@ FW_longpoll()
   }
 
   if(filter == "") {
-    if(FW_urlParams.room)   filter="room="+FW_urlParams.room;
+    if(FW_urlParams.room)
+        filter="room="+FW_urlParams.room
+                      .replace(/[[\]().+*?]/g, function(r){return '\\'+r});
     if(FW_urlParams.detail) filter=FW_urlParams.detail;
   }
 
@@ -1302,7 +1304,8 @@ FW_longpoll()
     if(content) {
       var room = content.getAttribute("room");
       if(room)
-        filter="room="+room;
+        filter="room="+room
+                      .replace(/[[\]().+*?]/g, function(r){return '\\'+r});
     }
   }
 

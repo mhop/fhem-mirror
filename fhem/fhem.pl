@@ -1360,8 +1360,8 @@ devspec2array($;$$)
         };
 
         if($@) {
-          Log 1, "devspec2array $name: $@";
-          stacktrace();
+          warn "devspec2array $name: $@";
+          stacktrace() if(AttrVal("global", "stacktrace", 0));
           return $name;
         }
       }
