@@ -1360,8 +1360,7 @@ devspec2array($;$$)
         };
 
         if($@) {
-          warn "devspec2array $name: $@";
-          stacktrace() if(AttrVal("global", "stacktrace", 0));
+          warn "devspec2array $name: $@"; #128362
           return $name;
         }
       }
