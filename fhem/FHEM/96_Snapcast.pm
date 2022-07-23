@@ -273,7 +273,7 @@ sub Set {
                 push @group, $1;
             }
         }
-        Log3( $hash, 3, "Snap: groups are @group" );
+        #Log3( $hash, 3, "Snap: groups are @group" );
         if ( @group ) {
             if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
                 #Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
@@ -760,11 +760,11 @@ sub _setClient {
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
         if ( $value =~ m{\A([+-])(\d{1,2})\z}x ) {
-            my $direction = $1;
-            my $amount    = $2;
+            #my $direction = $1;
+            #my $amount    = $2;
 
             #$value = eval($currentVol. $direction. $amount);
-            $value = eval { $currentVol . $direction . $amount };
+            $value += $currentVol;
             $value = max( 0, min( 100, $value ) );
         }
 
