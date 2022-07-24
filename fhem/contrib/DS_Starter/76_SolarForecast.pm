@@ -120,6 +120,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.66.0 "=> "24.07.2022  insert function calcPeaklossByTemp to calculate peak power reduction by temperature ",
+  "0.65.8 "=> "23.07.2022  change calculation of cloud cover in calcRange function ",
+  "0.65.7 "=> "20.07.2022  change performance ratio in calcPVforecast to 0.85 ",
+  "0.65.6 "=> "20.07.2022  change __calcEnergyPieces for consumer types with \$hef{\$cotype}{f} == 1 ",
   "0.65.5 "=> "13.07.2022  extend isInterruptable and isAddSwitchOffCond ",
   "0.65.4 "=> "11.07.2022  new function isConsumerLogOn, minor fixes ",
   "0.65.3 "=> "10.07.2022  consumer with mode=must are now interruptable, change hourscsme ",
@@ -518,8 +522,6 @@ my %weather_ids = (
 );
 
 my @chours       = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten                              
-my $defpvme      = 16.52;                                                         # default Wirkungsgrad Solarmodule
-my $definve      = 98.3;                                                          # default Wirkungsgrad Wechselrichter
 my $kJtokWh      = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
 my $defmaxvar    = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval  = 70;                                                            # Standard Abfrageintervall
@@ -535,10 +537,14 @@ my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                   
 my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat  = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
-my $cldampdef    = 35;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
+my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+my $tempmodinc   = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+my $tempbasedef  = 25;                                                            # Temperatur Module bei Nominalleistung
+my $cldampdef    = 35;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $rdampdef     = 10;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rdampdef     = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base    = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my $maxconsumer  = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
@@ -572,7 +578,7 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
 
 my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
   "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },     
-  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },    # f   = Faktor Energieverbrauch in erster Stunde
+  "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
   "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
@@ -2976,13 +2982,17 @@ sub __calcEnergyPieces {
   
   my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
-  my $hours   = ceil ($mintime / 60);                                                           # Laufzeit in h
+  my $hours   = ceil ($mintime / 60);                                                          # Laufzeit in h
   
-  my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                    # gemessener durchschnittlicher Energieverbrauch pro Stunde (Wh)
-  $ctote    //= ConsumerVal ($hash, $c, "power",         0);                                    # alternativer nominaler Energieverbrauch in W (bzw. Wh bezogen auf 1 h)
+  my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                   # gemessener durchschnittlicher Energieverbrauch pro Stunde (Wh)
+  $ctote    //= ConsumerVal ($hash, $c, "power",         0);                                   # alternativer nominaler Energieverbrauch in W (bzw. Wh bezogen auf 1 h)
   
-  my $epiecef = $ctote * $hef{$cotype}{f};                                                      # Gewichtung erste Laufstunde
-  my $epiecel = $ctote * $hef{$cotype}{l};                                                      # Gewichtung letzte Laufstunde
+  if (int($hef{$cotype}{f}) == 1) {                                                            # bei linearen Verbrauchertypen die nominale Leistungsangabe verwenden statt Durchschnitt                                               
+      $ctote = ConsumerVal ($hash, $c, "power", 0);
+  }
+  
+  my $epiecef = $ctote * $hef{$cotype}{f};                                                     # Gewichtung erste Laufstunde
+  my $epiecel = $ctote * $hef{$cotype}{l};                                                     # Gewichtung letzte Laufstunde
   
   my $epiecem = $ctote * $hef{$cotype}{m};
   
@@ -6321,7 +6331,6 @@ sub calcPVforecast {
   
   my $type  = $hash->{TYPE};
   my $stch  = $data{$type}{$name}{strings};                                                           # String Configuration Hash
-  my $pr    = 1.0;                                                                                    # Performance Ratio (PR)
   my $fh1   = $fh+1;
   
   my $chour      = strftime "%H", localtime($t+($num*3600));                                          # aktuelle Stunde
@@ -6333,7 +6342,7 @@ sub calcPVforecast {
   my $hq         = "m";
   
   my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
-  my $raindamp   = AttrVal($name, "rainFactorDamping", $rdampdef);                                    # prozentuale Berücksichtigung des Regenkorrekturfaktors
+  my $raindamp   = AttrVal($name, "rainFactorDamping",   $rdampdef);                                  # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
@@ -6342,7 +6351,9 @@ sub calcPVforecast {
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
-  my $range      = calcRange ($cloudcover);                                                           # V 0.50.1                                                           # Range errechnen
+  my $range      = calcRange ($cloudcover);                                                           # Range errechnen
+  
+  my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
 
   ## Ermitteln des relevanten Autokorrekturfaktors
   if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
@@ -6374,30 +6385,45 @@ sub calcPVforecast {
   my ($lh,$sq);                                                                                    
   
   for my $st (@strings) {                                                                             # für jeden String der Config ..
-      my $peak   = $stch->{"$st"}{peak};                                                              # String Peak (kWp)
-      $peak     *= 1000;                                                                              # kWp in Wp umrechnen
-      my $ta     = $stch->{"$st"}{tilt};                                                              # Neigungswinkel Solarmodule
-      my $moddir = $stch->{"$st"}{dir};                                                               # Ausrichtung der Solarmodule
+      my $peak                 = $stch->{"$st"}{peak};                                                # String Peak (kWp)
       
-      my $af     = $hff{$ta}{$moddir} / 100;                                                          # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
+      $paref->{peak}           = $peak;
+      $paref->{cloudcover}     = $cloudcover;
+      $paref->{temp}           = $temp;
       
-      my $pv     = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $ccf * $rcf);
+      my ($peakloss, $modtemp) = calcPeaklossByTemp ($paref);                                         # Reduktion Peakleistung durch Temperaturkoeffizienten der Module (vorzeichengehaftet)
+      $peak                   += $peakloss;
+      
+      delete $paref->{peak};
+      delete $paref->{cloudcover};
+      delete $paref->{temp};
+      
+      $peak       *= 1000;                                                                            # kWp in Wp umrechnen
+      my $ta       = $stch->{"$st"}{tilt};                                                            # Neigungswinkel Solarmodule
+      my $moddir   = $stch->{"$st"}{dir};                                                             # Ausrichtung der Solarmodule
+      
+      my $af       = $hff{$ta}{$moddir} / 100;                                                        # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
+      
+      my $pv       = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef * $ccf * $rcf);
   
       $lh = {                                                                                         # Log-Hash zur Ausgabe
-          "moduleDirection"              => $moddir,
-          "modulePeakString"             => $peak." W",
-          "moduleTiltAngle"              => $ta,
-          "Area factor"                  => $af,
-          "Cloudcover"                   => $cloudcover,
-          "CloudRange"                   => $range,
-          "CloudFactorDamping"           => $clouddamp." %",
-          "Cloudfactor"                  => $ccf,
-          "Rainprob"                     => $rainprob,
-          "Rainfactor"                   => $rcf,
-          "RainFactorDamping"            => $raindamp." %",
-          "Radiation"                    => $rad,
-          "Factor kJ to kWh"             => $kJtokWh,
-          "PV generation forecast (raw)" => $pv." Wh"
+          "moduleDirection"                => $moddir,
+          "modulePeakString"               => $peak." W",
+          "moduleTiltAngle"                => $ta,
+          "Forecasted temperature"         => $temp." &deg;C",
+          "Module Temp (calculated)"       => $modtemp." &deg;C",
+          "Loss String Peak Power by Temp" => $peakloss." kWP",
+          "Area factor"                    => $af,
+          "Cloudcover"                     => $cloudcover,
+          "CloudRange"                     => $range,
+          "CloudFactorDamping"             => $clouddamp." %",
+          "Cloudfactor"                    => $ccf,
+          "Rainprob"                       => $rainprob,
+          "Rainfactor"                     => $rcf,
+          "RainFactorDamping"              => $raindamp." %",
+          "Radiation"                      => $rad,
+          "Factor kJ to kWh"               => $kJtokWh,
+          "PV generation forecast (raw)"   => $pv." Wh"
       };  
       
       $sq = q{};
@@ -6443,6 +6469,40 @@ sub calcPVforecast {
   Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: \n$sq");
  
 return $pvsum;
+}
+
+###################################################################
+# Zellen Leistungskorrektur Einfluss durch Wärmekoeffizienten 
+# berechnen
+#
+# Die Nominalleistung der Module wird bei 25 Grad 
+# Umgebungstemperatur und bei 1.000 Watt Sonneneinstrahlung 
+# gemessen. 
+# Steigt die Temperatur um 1 Grad Celsius sinkt die Modulleistung 
+# typisch um 0,4 Prozent. Solartellen können im Sommer 70°C heiß
+# werden.
+#
+# Das würde für eine 10 kWp Photovoltaikanlage folgenden 
+# Leistungsverlust bedeuten: 
+#
+#       Leistungsverlust = -0,4%/K * 45K * 10 kWp = 1,8 kWp
+#
+# https://www.enerix.de/photovoltaiklexikon/temperaturkoeffizient/
+#
+###################################################################
+sub calcPeaklossByTemp {
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $peak       = $paref->{peak}       // return (0,0);
+  my $cloudcover = $paref->{cloudcover} // return (0,0);                                    # vorhergesagte Wolkendecke Stunde X
+  my $temp       = $paref->{temp}       // return (0,0);                                    # vorhergesagte Temperatur Stunde X
+    
+  my $modtemp      = $temp + ($tempmodinc * (1 - ($cloudcover/100)));                       # kalkulierte Modultemperatur
+  
+  my $peakloss     = sprintf "%.2f", $tempcoeffdef * ($temp - $tempbasedef) * $peak / 100;
+
+return ($peakloss, $modtemp);
 }
 
 ################################################################
@@ -6678,7 +6738,8 @@ return;
 sub calcRange {
   my $range = shift;
   
-  $range = sprintf("%.0f", $range/10); 
+  #$range = sprintf "%.0f", $range/10; 
+  $range = sprintf "%.0f", $range; 
 
 return $range;
 }
@@ -7032,7 +7093,7 @@ sub listDataPool {
           my $cret;
           for my $ckey (sort keys %{$h->{$idx}}) {
               if(ref $h->{$idx}{$ckey} eq "HASH") {
-                  my $hk;
+                  my $hk = qq{};
                   for my $f (sort {$a<=>$b} keys %{$h->{$idx}{$ckey}}) {
                       $hk .= " " if($hk);
                       $hk .= "$f=".$h->{$idx}{$ckey}{$f};
@@ -7069,22 +7130,26 @@ sub listDataPool {
           my $batin   = CircularVal ($hash, $idx, "batin",      "-");
           my $batout  = CircularVal ($hash, $idx, "batout",     "-");
           
-          my $pvcf;
+          my $pvcf = qq{};
           if(ref $pvcorrf eq "HASH") {
               for my $f (sort {$a<=>$b} keys %{$h->{$idx}{pvcorrf}}) {
                   $pvcf .= " " if($pvcf);
                   $pvcf .= "$f=".$h->{$idx}{pvcorrf}{$f};
+                  my $ct = ($pvcf =~ tr/=// // 0) / 10;
+                  $pvcf .= "\n           " if($ct =~ /^([1-9])?$/);
               }
           }
           else {
               $pvcf = $pvcorrf;
           }
           
-          my $cfq;
+          my $cfq = qq{};
           if(ref $quality eq "HASH") {
               for my $q (sort {$a<=>$b} keys %{$h->{$idx}{quality}}) {
-                  $cfq .= " " if($cfq);
-                  $cfq .= "$q=".$h->{$idx}{quality}{$q};
+                  $cfq   .= " " if($cfq);
+                  $cfq   .= "$q=".$h->{$idx}{quality}{$q};
+                  my $ct1 = ($cfq =~ tr/=// // 0) / 10;
+                  $cfq   .= "\n              " if($ct1 =~ /^([1-9])?$/);                  
               }
           }
           else {
@@ -8648,8 +8713,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-cloudFactorDamping"></a>
        <li><b>cloudFactorDamping </b><br>
-         Prozentuale Berücksichtigung (Dämpfung) des Bewölkungprognosefaktors bei der solaren Vorhersage. <br>
-         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
+         Prozentuale Mehrgewichtung der Berücksichtigung des Bewölkungsfaktors bei der solaren Vorhersage. <br>
+         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
+         Prognose durch den Bewölkungsfaktor).<br>
          (default: 35)         
        </li>  
        <br> 
@@ -9046,8 +9112,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-rainFactorDamping"></a>
        <li><b>rainFactorDamping </b><br>
-         Prozentuale Berücksichtigung (Dämpfung) des Regenprognosefaktors bei der solaren Vorhersage. <br>
-         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
+         Prozentuale Mehrgewichtung der Berücksichtigung des Regenprognosefaktors bei der solaren Vorhersage. <br>
+         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
+         Prognose durch den Regenfaktor).<br>
          (default: 10)         
        </li>  
        <br> 
