@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.8";
+my $Signalbot_VERSION="3.9";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -160,6 +160,7 @@ sub Signalbot_Set($@) {					#
 	my $cmd = shift @args;
 	my $account = ReadingsVal($name,"account","none");
 	my $version = $hash->{helper}{version};
+	return "$name not initialized" if (!defined $version);
 	my $multi = $hash->{helper}{multi};
 	my @accounts;
 	@accounts =@{$hash->{helper}{accountlist}} if defined $hash->{helper}{accountlist};
@@ -538,6 +539,8 @@ sub Signalbot_prepareSend($@) {
 sub Signalbot_Get($@) {
 	my ($hash, $name, @args) = @_;
 	my $version = $hash->{helper}{version};	
+	return "$name not initialized" if (!defined $version);
+
 	my $numberOfArgs  = int(@args);
 	return "Signalbot_Get: No cmd specified for get" if ( $numberOfArgs < 1 );
 
@@ -1256,10 +1259,6 @@ sub Signalbot_CallDbus($@) {
 			}
 			my $b=$msg->get_body();
 			my 	@body=@$b;
-			if (!defined $hash->{$function}) {
-				LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Invalid callback: $function Args:".join(",",@body);
-				return;
-			}
 			LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": DBus callback: $function Args:".join(",",@body);
 			CallFn($hash->{NAME},$function,$hash,@body);
 		}

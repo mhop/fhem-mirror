@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.8"
+SCRIPTVERSION="3.9"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -8,7 +8,7 @@ SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
 SIGNALVERSION="0.9.2"	#Default for systems that don't hava Java17
-ALTVERSION="0.10.5"		#Default for systems with Java17
+ALTVERSION="0.10.9"		#Default for systems with Java17
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
@@ -24,7 +24,14 @@ J17=`apt-cache search --names-only 'openjdk-17-jdk-headless'`
 if ! [ "$JAVA_HOME" = "" ]; then
 	JAVACMD=$JAVA_HOME/bin/java
 fi
-JVER=`$JAVA_HOME/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+if [ -e "/opt/java" ]; then
+    JVER=`/opt/java/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+	if [ "$JVER" = "17.0" ]; then
+	  JAVACMD="/opt/java/bin/java"
+	  export JAVA_HOME="/opt/java"
+	 fi
+fi
+JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
 if [ "$J17" != "" ] || [ "$JVER" = "17.0" ]; then
   SIGNALVERSION=$ALTVERSION
   VEXT="-Linux"
@@ -172,7 +179,7 @@ fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
 IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
-KNOWN=("amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "amd64-glibc2.28-0.10.5" "amd64-glibc2.31-0.10.5" "armhf-glibc2.28-0.10.5" "armhf-glibc2.31-0.10.5")
+KNOWN=("amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "amd64-glibc2.28-0.10.9" "amd64-glibc2.31-0.10.9" "armhf-glibc2.28-0.10.9" "armhf-glibc2.31-0.10.9")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
@@ -207,7 +214,7 @@ echo "Signal version:               $SIGNALVERSION"
 echo "System library path:          $LIBPATH"
 echo "System architecture:          $ARCH"
 echo "System GLIBC version:         $GLIBC"
-echo "Using Java version:           $JAVA_VERSION"
+echo "Using Java version:           $JAVA_VERSION ($JAVACMD)"
 fi
 
 check_and_update() {
