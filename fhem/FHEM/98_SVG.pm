@@ -83,6 +83,7 @@ SVG_Initialize($)
     plotsize
     plotReplace:textField-long
     plotAsPngFix:1,0
+    plotAsPngPort
     startDate
     title
   );
@@ -2471,9 +2472,23 @@ sub
 plotAsPng(@)
 {
   my (@plotName) = @_;
-  my (@webs, $mimetype, $svgdata, $rsvg, $pngImg);
+  my ($mimetype, $svgdata, $rsvg, $pngImg);
 
-  @webs=devspec2array("TYPE=FHEMWEB");
+  my $svgName = $plotName[0];
+  if(!defined($defs{$svgName})) {
+    Log 1, "$svgName not found for plotAsPng()";
+    return;
+  }
+
+  my $devspec = "TYPE=FHEMWEB";
+  my $port    = AttrVal($svgName,'plotAsPngPort',undef);
+  $devspec   .= ":FILTER=i:PORT=$port" if(defined($port));
+
+  my @webs=devspec2array($devspec);
+  if(defined($port) and @webs == 0) {
+    Log 1, "No FHEMWEB device using port $port found for plotAsPng($svgName)";
+    return;
+  }
   foreach(@webs) {
     if(!InternalVal($_,'TEMPORARY',undef)) {
       $FW_wname = InternalVal($_,'NAME','');
@@ -2482,7 +2497,6 @@ plotAsPng(@)
     }
   }
 
-  my $svgName = $plotName[0];
   $FW_RET                 = undef;
   $FW_webArgs{dev}        = $svgName;
   $FW_webArgs{logdev}     = InternalVal($svgName, "LOGDEVICE", "");
@@ -2677,6 +2691,11 @@ plotAsPng(@)
         with complex CSS selectors, so the resulting PNG is black and white
         only. If this attribute is set to 1, the CSS selector complexity will
         be reduced.
+        </li><br>
+
+    <a id="SVG-attr-plotAsPngPort"></a>
+    <li>plotAsPngPort &lt;portNum&gt;<br>
+        Affects only the plotAsPng function: Use a specific FHEMWEB instance.
         </li><br>
 
     <a id="SVG-attr-plotfunction"></a>
@@ -2963,6 +2982,11 @@ plotAsPng(@)
         k&ouml;nnen nicht mit komplexen CSS Selektoren umgehen, und das
         Ergebnis ist ein schwarz/wei&szlig; Bild. Falls dieses Attribut auf 1
         gesetzt wird, werden die CSS Anweisungen vereinfacht.
+        </li><br>
+
+    <a id="SVG-attr-plotAsPngPort"></a>
+    <li>plotAsPngPort &lt;portNum&gt;<br>
+        Betrifft nur die plotAsPng Funktion: Verwendet eine bestimmte FHEMWEB Instanz.
         </li><br>
 
     <a id="SVG-attr-plotfunction"></a>
