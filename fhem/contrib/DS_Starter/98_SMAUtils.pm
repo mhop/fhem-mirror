@@ -17,6 +17,7 @@
 #################################################################
 # Versions History
 #
+# 2.4       27.07.2022     Forum: https://forum.fhem.de/index.php/topic,14624.msg1229389.html#msg1229389
 # 2.3       08.04.2022     SBFspot V3.9.4 support added by Obi-Wan
 # 2.2       16.09.2016     SMAUtils_Attr added
 # 2.1       16.09.2016     sub Define changed
@@ -273,7 +274,7 @@ readingsBeginUpdate($hash);
       
             if (index($readingsname, $substr) != -1) {
                 $value = ltrim($reading[1]);
-                $value =~ /(\d+(?:\.\d+)?)/;
+                $value =~ /(-?\d+(?:\.\d+)?)/;                      # Forum: https://forum.fhem.de/index.php/topic,14624.msg1229389.html#msg1229389
                 $readingsvalue = $1;
             }
       
