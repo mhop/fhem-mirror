@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 25176 2021-11-03 18:53:51Z DS_Starter $
+# $Id: 49_SSCam.pm 26244 2022-07-18 16:49:55Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2021 by Heiko Maaz
+#       (c) 2015-2022 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -185,6 +185,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.7" => "27.07.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME ",
+  "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
+                           "set 'part1type' to default => text/html instead of text/plain",
+  "9.10.5" => "01.07.2022  fix noQuotesForSID using in streaming devices type mjpeg ",
+  "9.10.4" => "03.06.2022  avoid warning 'No data for Cache with key: {LASTSNAP}' if no snap exists ",
   "9.10.3" => "23.11.2022  made SYNO.SurveillanceStation.AudioStream, SYNO.SurveillanceStation.VideoStream optional for SVS compatibility to 9.0.0 ",
   "9.10.2" => "03.11.2021  set SVS compatibility to 8.2.10 ",
   "9.10.1" => "18.07.2021  set SVS compatibility to 8.2.9 ",
@@ -839,9 +844,9 @@ sub Initialize {
                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
                      "pollcaminfoall ".
                      "ptzNoCapPrePat:1,0 ".
-                     "recChatTxt ".
-                     "recEmailTxt ".
-                     "recTelegramTxt ".
+                     "recChatTxt:textField-long ".
+                     "recEmailTxt:textField-long ".
+                     "recTelegramTxt:textField-long ".
                      "rectime ".
                      "recextend:1,0 ".
                      "smtpCc ".
@@ -852,9 +857,9 @@ sub Initialize {
                      "smtpSSLPort ".
                      "smtpTo ".
                      "smtpNoUseSSL:1,0 ".
-                     "snapChatTxt ".
-                     "snapEmailTxt ".
-                     "snapTelegramTxt ".
+                     "snapChatTxt:textField-long ".
+                     "snapEmailTxt:textField-long ".
+                     "snapTelegramTxt:textField-long ".
                      "snapGalleryBoost:0,1 ".
                      "snapGallerySize:Icon,Full ".
                      "snapGalleryNumber:$defSnum ".
@@ -1900,7 +1905,7 @@ sub _setsnapCams {                       ## no critic "not used"
   
   if($rawet) {
       $hash->{HELPER}{CANSENDSNAP} = 1;                                # zentraler Schnappschußversand wird aktiviert
-      $hash->{HELPER}{SMTPMSG} = $rawet;   
+      $hash->{HELPER}{SMTPMSG}     = $rawet;   
   }
   
   my ($csnap,$cmail) = ("","");
@@ -2581,15 +2586,15 @@ sub _setrunView {                        ## no critic "not used"
       $hash->{HELPER}{ALIAS}      = "LiveView";
       $hash->{HELPER}{RUNVIEW}    = "live_open";
       $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "live_link") {
+  } 
+  elsif ($prop eq "live_link") {
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "link"; 
       $hash->{HELPER}{ALIAS}      = "LiveView";
       $hash->{HELPER}{RUNVIEW}    = "live_link";
       $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastrec_open") {
+  } 
+  elsif ($prop eq "lastrec_open") {
       if ($prop1) {
           $hash->{HELPER}{VIEWOPENROOM} = $prop1;
       } 
@@ -2602,36 +2607,36 @@ sub _setrunView {                        ## no critic "not used"
       $hash->{HELPER}{ALIAS}      = "LastRecording";
       $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
       $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  }  elsif ($prop eq "lastrec_fw") {                        # Video in iFrame eingebettet
+  }  
+  elsif ($prop eq "lastrec_fw") {                           # Video in iFrame eingebettet
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "iframe"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "lastrec";
       $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastrec_fw_MJPEG") {                   # “video/avi” – MJPEG format event
+  } 
+  elsif ($prop eq "lastrec_fw_MJPEG") {                     # “video/avi” – MJPEG format event
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "image"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "lastrec";
       $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {             # “video/mp4” – MPEG4/H.264 format event
+  } 
+  elsif ($prop eq "lastrec_fw_MPEG4/H.264") {               # “video/mp4” – MPEG4/H.264 format event
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "video"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "lastrec";
       $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "live_fw") {
+  } 
+  elsif ($prop eq "live_fw") {
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "image"; 
       $hash->{HELPER}{ALIAS}      = " ";
       $hash->{HELPER}{RUNVIEW}    = "live_fw";
       $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "live_fw_hls") {
+  } 
+  elsif ($prop eq "live_fw_hls") {
       if(!IsCapHLS($hash)) {
           return qq{API "SYNO.SurveillanceStation.VideoStream" is not available or Reading "CamStreamFormat" is not "HLS". May be your API version is 2.8 or lower.};
       }
@@ -2641,8 +2646,8 @@ sub _setrunView {                        ## no critic "not used"
       $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
       $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
       $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-  
-  } elsif ($prop eq "lastsnap_fw") {
+  } 
+  elsif ($prop eq "lastsnap_fw") {
       $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if($prop1);       # Anzeige durch SSCamSTRM-Device ausgelöst
       $hash->{HELPER}{LSNAPBYDEV}     = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
       $hash->{HELPER}{OPENWINDOW}     = 0;
@@ -5706,8 +5711,8 @@ sub _Oprunliveview {
       if($part) {                                                                                           # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8) 
           $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;                                   
           $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;  # interne URL
-      
-      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+      } 
+      elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
   } 
@@ -7190,6 +7195,8 @@ sub __saveLastSnapToCache {
   my $name  = $paref->{name};
   my $data  = $paref->{data};                                                                 # decodierte JSON Daten
   
+  return if (!exists $data->{data}{data}[0]{imageData});                                      # kein Snap vorhanden
+  
   my $cache = cache($name, "c_init");                                                         # Cache initialisieren  
   
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
@@ -7754,6 +7761,7 @@ sub streamDev {                                               ## no critic 'comp
     camid              => $hash->{CAMID},
     sid                => $hash->{HELPER}{SID},
     proto              => $hash->{PROTOCOL},
+    noQuotesForSID     => AttrVal($camname, "noQuotesForSID",0),
     cmdstop            => $cmdstop,
     cmdhlsreact        => $cmdhlsreact, 
     cmdmjpegrun        => $cmdmjpegrun,  
@@ -7855,6 +7863,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $ha                 = $params->{ha};
   my $hb                 = $params->{hb};
   my $hau                = $params->{hau};
+  my $noQuotesForSID     = $params->{noQuotesForSID};
   
   my $serveraddr         = $params->{serveraddr};
   my $serverport         = $params->{serverport};
@@ -7876,7 +7885,8 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $imgdosnap          = $params->{imgdosnap};  
   
   my ($link,$audiolink);
-  my $ret = "";
+  my $quote = $noQuotesForSID ? qq{"} : qq{};
+  my $ret   = "";
   
   if(ReadingsVal($camname, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot play back MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
@@ -7885,17 +7895,17 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   } 
   else {
       if($apivideostmsver) {                                  
-          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          $link = qq{$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$quote.$sid.$quote}; 
       } 
       elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
-          $link =~ s/"//gx;                                               # vermeidet Javascript Fehler "SyntaxError: " unterminated string literal"
+          $link =~ s/"/%22/gx if($link);                                               # vermeidet Javascript Fehler "SyntaxError: " unterminated string literal"
       }
       
       return $ret if(!$link);
       
       if($apiaudiostmver) {                                   
-          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$quote.$sid.$quote"; 
       }
       
       if(!$ftui) {
@@ -7971,6 +7981,7 @@ sub _streamDevLASTSNAP {                                       ## no critic 'not
   my ($link,$cause,$ret) = ("","","");
    
   my $cache = cache($camname, "c_init");                                                  # Cache initialisieren  
+  
   Log3($camname, 1, "$camname - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
   
   if(!$cache || $cache eq "internal" ) {
@@ -9773,9 +9784,9 @@ sub _prepSendChat {
    
    if($subjt) {
        $subjt = trim($subjt);
-       $subjt =~ s/\$CAM/$calias/gx;
-       $subjt =~ s/\$DATE/$date/gx;
-       $subjt =~ s/\$TIME/$time/gx;
+       $subjt =~ s/[\$#]CAM/$calias/gx;
+       $subjt =~ s/[\$#]DATE/$date/gx;
+       $subjt =~ s/[\$#]TIME/$time/gx;
    }     
    
    my %chatmsg       = ();
@@ -10062,8 +10073,8 @@ sub __extractForChat {
       $fname = $tdir."/".$fname;
   }
   
-  $subject =~ s/\$FILE/$fname/gx;
-  $subject =~ s/\$CTIME/$ct/gx;
+  $subject =~ s/[\$#]FILE/$fname/gx;
+  $subject =~ s/[\$#]CTIME/$ct/gx;
  
 return ($subject,$fname);
 }
@@ -10094,9 +10105,9 @@ sub _prepSendTelegram {
    
    if($subjt) {
        $subjt = trim($subjt);
-       $subjt =~ s/\$CAM/$calias/gx;
-       $subjt =~ s/\$DATE/$date/gx;
-       $subjt =~ s/\$TIME/$time/gx;
+       $subjt =~ s/[\$#]CAM/$calias/gx;
+       $subjt =~ s/[\$#]DATE/$date/gx;
+       $subjt =~ s/\[\$#]TIME/$time/gx;
    }       
    
    my %telemsg       = ();
@@ -10122,7 +10133,7 @@ sub _sendTelegram {
    
    my %teleparams = (
        'subject'      => {                       'default'=>'',                          'required'=>0, 'set'=>1},
-       'part1type'    => {                       'default'=>'text/plain; charset=UTF-8', 'required'=>1, 'set'=>1},
+       'part1type'    => {                       'default'=>'text/html; charset=UTF-8',  'required'=>1, 'set'=>1},
        'part1txt'     => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'sdat'         => {                       'default'=>'',                          'required'=>0, 'set'=>1},  # Hashref der Bilddaten (Bilddaten base64 codiert), wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
@@ -10320,8 +10331,8 @@ sub __extractForTelegram {
       }
   }
   
-  $subject =~ s/\$FILE/$fname/gx;
-  $subject =~ s/\$CTIME/$ct/gx;
+  $subject =~ s/[\$#]FILE/$fname/gx;
+  $subject =~ s/[\$#]CTIME/$ct/gx;
  
 return ($data,$subject,$MediaStream,$fname);
 }
@@ -10648,19 +10659,19 @@ sub _prepSendMail {
    
    $mt =~ s/['"]//gx;   
    
-   my($subj,$body) =  split(",", $mt, 2);
-   my $subjt       = (split("=>", $subj))[1];
-   my $bodyt       = (split("=>", $body))[1];
+   my($subj,$body) =  split ",", $mt, 2;
+   my $subjt       = (split "=>", $subj)[1];
+   my $bodyt       = (split "=>", $body)[1];
    
    $subjt = trim($subjt);
-   $subjt =~ s/\$CAM/$calias/gx;
-   $subjt =~ s/\$DATE/$date/gx;
-   $subjt =~ s/\$TIME/$time/gx;
+   $subjt =~ s/[\$#]CAM/$calias/gx;
+   $subjt =~ s/[\$#]DATE/$date/gx;
+   $subjt =~ s/[\$#]TIME/$time/gx;
    
    $bodyt = trim($bodyt);
-   $bodyt =~ s/\$CAM/$calias/gx;
-   $bodyt =~ s/\$DATE/$date/gx;
-   $bodyt =~ s/\$TIME/$time/gx;
+   $bodyt =~ s/[\$#]CAM/$calias/gx;
+   $bodyt =~ s/[\$#]DATE/$date/gx;
+   $bodyt =~ s/[\$#]TIME/$time/gx;
    
    my %smtpmsg       = ();
    $smtpmsg{subject} = "$subjt";
@@ -10731,7 +10742,7 @@ sub _sendEmail {
        'smtpTo'       => {'attr'=>'smtpTo',      'default'=>'',                          'required'=>1, 'set'=>1},
        'subject'      => {'attr'=>'subject',     'default'=>'',                          'required'=>1, 'set'=>1},
        'smtpCc'       => {'attr'=>'smtpCc',      'default'=>'',                          'required'=>0, 'set'=>1},
-       'part1type'    => {                       'default'=>'text/plain; charset=UTF-8', 'required'=>1, 'set'=>1},
+       'part1type'    => {                       'default'=>'text/html; charset=UTF-8',  'required'=>1, 'set'=>1},
        'part1txt'     => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'part2type'    => {                       'default'=>'',                          'required'=>0, 'set'=>1},
        'smtphost'     => {'attr'=>'smtpHost',    'default'=>'',                          'required'=>1, 'set'=>0},
@@ -13285,7 +13296,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>noQuotesForSID</b><br>
     This attribute delete the quotes for SID and for StmKeys.  
     The attribute may be helpful in some cases to avoid errormessages "402 - permission denied" or "105 - 
-    Insufficient user privilege" and makes login possible.  
+    Insufficient user privilege" and makes login possible. <br>
+    (default: 0)  
   </li><br>
   
   <a name="pollcaminfoall"></a>
@@ -15311,7 +15323,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>noQuotesForSID</b><br>
     Dieses Attribut entfernt Quotes für SID bzw. der StmKeys. 
     Es kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" oder "105 - Insufficient user privilege"
-    vermeiden und ein login ermöglichen.  </li><br>                      
+    vermeiden und ein login ermöglichen. <br>
+    (default: 0)
+  </li><br>                      
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
