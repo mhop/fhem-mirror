@@ -211,10 +211,10 @@ sub HTTPAPI_CommandRef($) {
   my ($hash) = @_;
   my @contents;
   my $contents;
-  my $fileName = $gPath . '/03_HTTPAPI.pm';
+  my $fileName = $gPath . '/02_HTTPAPI.pm';
   if(open(INPUTFILE, $fileName)) {
     binmode(INPUTFILE);
-    @contents= <INPUTFILE>;
+    @contents = <INPUTFILE>;
     close(INPUTFILE);
     $contents = join("", @contents);
     $contents =~ /\n=begin.html([\s\S]*)\n=end.html/gs;
