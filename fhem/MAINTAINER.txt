@@ -52,6 +52,7 @@ FHEM/00_ZWDongle.pm          rudolfkoenig         ZWave
 FHEM/01_FHEMWEB.pm           rudolfkoenig         Frontends/FHEMWEB
 FHEM/02_FRAMEBUFFER.pm       kaihs                Frontends
 FHEM/02_FTUISRV.pm           viegener             Frontends/TabletUI
+FHEM/02_HTTPAPI.pm           klaus.schauer        Automatisierung
 FHEM/02_HTTPSRV.pm           neubert              Frontends
 FHEM/02_RSS.pm               neubert              Frontends/RSS
 FHEM/09_BS.pm                neubert              SlowRF
