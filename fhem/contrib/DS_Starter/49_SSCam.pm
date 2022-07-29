@@ -185,7 +185,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.10.7" => "27.07.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME ",
+  "9.10.7" => "29.07.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
   "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
                            "set 'part1type' to default => text/html instead of text/plain",
   "9.10.5" => "01.07.2022  fix noQuotesForSID using in streaming devices type mjpeg ",
@@ -10844,6 +10844,7 @@ sub __sendEmailblocking {                                                    ## 
   } 
  
   $subject = decode_utf8($subject);
+  
   my $mailmsg = MIME::Lite->new(
       From    => $from,
       To      => $to,
@@ -10851,15 +10852,10 @@ sub __sendEmailblocking {                                                    ## 
       Type    => 'multipart/mixed',    #'multipart/mixed', # was 'text/plain'
   );
   
-  ### Add the text message part:
-  ### (Note that "attach" has same arguments as "new"):
   $part1txt = decode_utf8($part1txt);
-  $mailmsg->attach(
-      Type => $part1type,
-      Data => $part1txt,
-  );
- 
+  
   ### Add image, Das Image liegt bereits als File vor
+  ####################################################
   if($image) {
       $mailmsg->attach(
           Type        => $part2type,
@@ -10886,8 +10882,20 @@ sub __sendEmailblocking {                                                    ## 
                   Filename    => $fname,
                   Disposition => 'attachment',
               );
+              
+              my $params = {
+                  hash  => $hash,
+                  name  => $name,
+                  txt   => $part1txt,
+                  fname => $fname,
+                  ct    => $ct
+              };
+              
+              $part1txt = __extractForEmail ($params);
+  
               Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for Email attachment") if($decoded); 
           }
+          
           BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0); 
       } 
       else {
@@ -10914,8 +10922,20 @@ sub __sendEmailblocking {                                                    ## 
                   Filename    => $fname,
                   Disposition => 'attachment',
               );
+              
+              my $params = {
+                  hash  => $hash,
+                  name  => $name,
+                  txt   => $part1txt,
+                  fname => $fname,
+                  ct    => $ct
+              };
+              
+              $part1txt = __extractForEmail ($params);
+              
               Log3($name, 4, "$name - Image data sequence [$key] decoded from CHI-Cache for Email attachment"); 
           }
+          
           BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
       }
   }
@@ -10935,8 +10955,20 @@ sub __sendEmailblocking {                                                    ## 
                   Filename    => $fname,
                   Disposition => 'attachment',
               );
+              
+              my $params = {
+                  hash  => $hash,
+                  name  => $name,
+                  txt   => $part1txt,
+                  fname => $fname,
+                  ct    => $ct
+              };
+              
+              $part1txt = __extractForEmail ($params);
+              
               Log3($name, 4, "$name - Video data sequence [$key] decoded from internal Cache for Email attachment"); 
           } 
+          
           BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);              
       } 
       else {
@@ -10963,11 +10995,30 @@ sub __sendEmailblocking {                                                    ## 
                   Filename    => $fname,
                   Disposition => 'attachment',
               );
+              
+              my $params = {
+                  hash  => $hash,
+                  name  => $name,
+                  txt   => $part1txt,
+                  fname => $fname,
+                  ct    => $ct
+              };
+              
+              $part1txt = __extractForEmail ($params);
+              
               Log3($name, 4, "$name - Video data sequence [$key] decoded from CHI-Cache for Email attachment"); 
           }
+          
           BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);     
       }
   }
+  
+  ### Add the text message part (Note that "attach" has same arguments as "new")
+  ###############################################################################
+  $mailmsg->attach(
+      Type => $part1type,
+      Data => $part1txt,
+  );
   
   $mailmsg->attr('content-type.charset' => 'UTF-8');
 
@@ -11087,6 +11138,22 @@ sub __sendEmailblocking {                                                    ## 
  
 return "$name|''|$ret";
 }
+
+####################################################################################################
+#                            Daten extrahieren für Email Versand
+####################################################################################################
+sub __extractForEmail {
+  my $paref = shift;
+  my $txt   = $paref->{txt}   // qq{};
+  my $fname = $paref->{fname} // qq{};
+  my $ct    = $paref->{ct}    // qq{};
+  
+  $txt =~ s/[\$#]FILE/$fname/gx;
+  $txt =~ s/[\$#]CTIME/$ct/gx;
+ 
+return $txt;
+}
+
 
 ####################################################################################################
 #                   Auswertungsroutine nichtblockierendes Send EMail
@@ -13411,15 +13478,17 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <a name="recEmailTxt"></a>
   <li><b>recEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of recordings after whose creation. <br>
-    The attribute has to be definied in the form as described. <br>    
-    You can use the following placeholders in "subject" and "body". <br><br>
+    The attribute must be defined in the specified form. <br>    
+    The following placeholders can be used in the subject or body. <br><br>
     
         <ul>   
         <table>  
         <colgroup> <col width=10%> <col width=90%> </colgroup>
           <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
-          <tr><td> $DATE  </td><td>- current date </td></tr>
+          <tr><td> $DATE  </td><td>- current date  </td></tr>
           <tr><td> $TIME  </td><td>- aktuelle time </td></tr>
+          <tr><td> $FILE  </td><td>- Filename of the (last) recording (only usable in body)      </td></tr>
+          <tr><td> $CTIME </td><td>- Creation time of the (last) recording (only usable in body) </td></tr>
         </table>
         </ul>     
         <br>
@@ -13576,8 +13645,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <a name="snapEmailTxt"></a>
   <li><b>snapEmailTxt subject => &lt;subject text&gt;, body => &lt;message text&gt; </b><br>
     Activates the Email shipping of snapshots after whose creation. <br>
-    The attribute has to be defined in the form as described. <br>
-    You can use the following placeholders in "subject" and "body". <br><br>
+    The attribute must be defined in the specified form. <br>
+    The following placeholders can be used in the subject or body. <br><br>
     
         <ul>   
         <table>  
@@ -13585,6 +13654,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
           <tr><td> $CAM   </td><td>- Device alias respectively the name of the camera in SVS if the device alias isn't set </td></tr>
           <tr><td> $DATE  </td><td>- current date </td></tr>
           <tr><td> $TIME  </td><td>- current time </td></tr>
+          <tr><td> $FILE  </td><td>- Filename of the (last) snapshot (only usable in body)      </td></tr>
+          <tr><td> $CTIME </td><td>- Creation time of the (last) snapshot (only usable in body) </td></tr>
         </table>
         </ul>     
         <br>
@@ -15440,14 +15511,16 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>recEmailTxt subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt; </b><br>
     Aktiviert den Emailversand von Aufnahmen nach deren Erstellung. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die folgenden Platzhalter im subject und body verwendet werden. <br><br>
+    Es können die folgenden Platzhalter im subject bzw. body verwendet werden. <br><br>
     
         <ul>   
         <table>  
         <colgroup> <col width=10%> <col width=90%> </colgroup>
           <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
           <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+          <tr><td> $TIME  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  </td><td>- Filename der (letzten) Aufnahme (nur in body verwendbar)        </td></tr>
+          <tr><td> $CTIME </td><td>- Erstellungszeit des (letzten) Aufnahme (nur in body verwendbar) </td></tr>
         </table>
         </ul>     
         <br>
@@ -15607,14 +15680,16 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     Aktiviert den Emailversand von Schnappschüssen nach deren Erstellung. Wurden mehrere Schnappschüsse ausgelöst, 
     werden sie gemeinsam in einer Mail versendet. <br>
     Das Attribut muß in der angegebenen Form definiert werden. <br>
-    Es können die folgenden Platzhalter im subject und body verwendet werden. <br><br>
+    Es können die folgenden Platzhalter im subject bzw. body verwendet werden. <br><br>
     
         <ul>   
         <table>  
         <colgroup> <col width=10%> <col width=90%> </colgroup>
           <tr><td> $CAM   </td><td>- Device-Alias bzw. der Name der Kamera in der SVS falls der Device-Alias nicht vorhanden ist </td></tr>
           <tr><td> $DATE  </td><td>- aktuelles Datum </td></tr>
-          <tr><td> $TIME  </td><td>- aktuelle Zeit </td></tr>
+          <tr><td> $TIME  </td><td>- aktuelle Zeit   </td></tr>
+          <tr><td> $FILE  </td><td>- Filename des (letzten) Schnappschusses (nur in body verwendbar)         </td></tr>
+          <tr><td> $CTIME </td><td>- Erstellungszeit des (letzten) Schnappschusses (nur in body verwendbar)  </td></tr>
         </table>
         </ul>     
         <br>    
