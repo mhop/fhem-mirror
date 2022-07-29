@@ -146,11 +146,11 @@ f18_tables()
   }
 
 
-  if(FW_urlParams.cmd == "style%20list" ||
-     FW_urlParams.cmd == "style%20select")
+  if(FW_urlParams.cmd == "style list" ||
+     FW_urlParams.cmd == "style select")
     $("div.fileList").each(function(){ f18_addPinToStyleDiv(this) });
 
-  if(FW_urlParams.cmd == "style%20select") 
+  if(FW_urlParams.cmd == "style select") 
     f18_special();
   else if(f18_getAttr("showDragger"))
     $("[data-name]").each(function(){ f18_addDragger(this) });
