@@ -34,28 +34,47 @@ sub HTTPAPI_Initialize($) {
   $hash->{ReadFn}  = "HTTPAPI_Read";
   $hash->{UndefFn} = "HTTPAPI_Undef";
   $hash->{AttrList} = "disable:0,1 devicesCtrl " . $readingFnAttributes;
+  $hash->{parseParams} = 1;
   return undef;
 }
 
 sub HTTPAPI_Define($$) {
-  my ($hash, $def) = @_;
-  my @param = split("[ \t][ \t]*", $def);
-  my ($name, $type, $apiName, $pport, $global) = split("[ \t]+", $def);
-  my $port;
-  if (defined $pport) {
-    $port = $pport;
-    $port =~ s/^IPV6://;
-    return "Usage: define <name> HTTPAPI [<infix>] [[IPV6:]<tcp-portnr>] [global|local|<hostname>]" if ($port !~ m/^\d+$/);
+  my ($hash, $a, $h) = @_;
+  my $name = $a->[0];
+  if (defined $a->[2]) {
+    $hash->{INFIX} = $a->[2];
+    $infix = $a->[2];
+  } elsif (exists $h->{infix}) {
+    $hash->{INFIX} = $h->{infix};
+    $infix = $h->{infix};
   } else {
-    $port = $tcpServPort;
+    $hash->{INFIX} = $infix;
+  }
+  # check if valid folder name
+  if ($hash->{INFIX} !~ /^[^\\\/\?\*\"\'\>\<\:\|]*$/) {
+    return "HTTPAPI: wrong syntax, correct is: define <name> HTTPAPI [infix=]<infix> [port=][[IPV6:]<port>] [global=][global|local|<hostname>]";
+  }
+  my ($pport, $port);
+  if (defined $a->[3]) {
+    $pport = $a->[3];
+  } elsif (exists $h->{port}) {
+    $pport = $h->{port};
+  } else {
     $pport = $tcpServPort;
   }
-  $global = $global // $tcpServAdr;
-  $global = undef if ($global eq 'local');
-  $infix = $apiName if (defined $apiName);
-  $hash->{INFIX} = $infix;
+  $port = $pport;
+  $port =~ s/^IPV6://;
+  return "HTTPAPI: wrong syntax, correct is: define <name> HTTPAPI [infix=]<infix> [port=][[IPV6:]<port>] [global=][global|local|<hostname>]" if ($port !~ m/^\d+$/);
+  if (defined $a->[4]) {
+    $hash->{GLOBAL} = $a->[4];
+  } elsif (exists $h->{global}) {
+    $hash->{GLOBAL} = $h->{global};
+  } else {
+    $hash->{GLOBAL} = $tcpServAdr;
+  }
+
   # open TCP server for HTTP API service
-  my $ret = TcpServer_Open($hash, $pport, $global);
+  my $ret = TcpServer_Open($hash, $pport, (($hash->{GLOBAL} eq 'local') ? undef : $hash->{GLOBAL}));
   if($ret && !$init_done) {
     Log3 $name, 1, "HTTPAPI $ret already exists";
     exit(1);
@@ -101,7 +120,7 @@ sub HTTPAPI_CGI($$$) {
       $fhemDevName = substr(($1 // $2), 1);
       # url decoding
       $fhemDevName =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-      if (defined $defs{$fhemDevName}) {
+      if (IsDevice($fhemDevName) && !IsDisabled($fhemDevName) && !IsIgnored($fhemDevName)) {
         # Control of the device allowed?
         my $devicesCtrl = AttrVal($name, 'devicesCtrl', undef);
         my $allowedDev;
@@ -195,7 +214,7 @@ sub HTTPAPI_CGI($$$) {
           return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > action $apiCmd unknown"))
         }
       } else {
-        return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > device $fhemDevName unknown"))
+        return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > device $fhemDevName unknown, disabled or ignored by the user"))
       }
     } else {
       return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute device missing"))
@@ -210,7 +229,7 @@ sub HTTPAPI_CGI($$$) {
 sub HTTPAPI_CommandRef($) {
   my ($hash) = @_;
   my $fileName = $gPath . '/02_HTTPAPI.pm';
-  my ($err, @contents) = FileRead($fileName);
+  my ($err, @contents) = FileRead({FileName => $fileName, ForceType => 'file'});
   return ($hash, 404, 'close', "text/plain; charset=utf-8", encode($encoding, "error=404 Not Found, file $fileName not found")) if ($err);
   my $contents = join("\n", @contents);
   $contents =~ /\n=begin.html([\s\S]*)\n=end.html/gs;
@@ -342,16 +361,16 @@ sub HTTPAPI_Undef($) {
   <a id="HTTPAPI-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HTTPAPI [&lt;infix&gt;] [[IPV6:]&lt;ip-port&gt;] [global|local|&lt;hostname&gt;]</code><br><br>
+    <code>define &lt;name&gt; HTTPAPI [infix=][&lt;apiName&gt;] [port=][[IPV6:]&lt;port&gt;] [global=][global|local|&lt;hostname&gt;]</code><br><br>
 
     Defines the HTTP API server.<br>
     <ul>
     <li>
-      <code>&lt;infix&gt;</code> is the portion behind the base URL (usually <code>http://&lt;hostname&gt;:&lt;ip-port&gt;/&lt;infix&gt;</code>).<br>
-      <code>[&lt;infix&gt] = api</code> is default.
+      <code>&lt;apiName&gt;</code> is the portion behind the base URL (usually <code>http://&lt;hostname&gt;:&lt;port&gt;/&lt;apiName&gt;</code>).<br>
+      <code>[&lt;apiName&gt] = api</code> is default.
     </li>
     <li>
-    <code>[[IPV6:]&lt;ip-port&gt;] = 8087</code> is default.<br>
+    <code>[[IPV6:]&lt;port&gt;] = 8087</code> is default.<br>
     To use IPV6, specify the portNumber as <code>IPV6:&lt;number&gt;</code>, in this case the perl module IO::Socket:INET6 will be requested.
     On Linux you may have to install it with <code>cpan -i IO::Socket::INET6</code> or <code>apt-get libio-socket-inet6-perl</code>.
     </li>
@@ -366,6 +385,8 @@ sub HTTPAPI_Undef($) {
     Example:
     <ul>
       <code>define httpapi HTTPAPI api 8087 global</code><br>
+      or<br>
+      <code>define httpapi HTTPAPI infix=api1 port=8089 global=local</code><br>
     </ul>
   </ul>
   <br><br>
@@ -441,9 +462,10 @@ sub HTTPAPI_Undef($) {
 
   <b>Usage information</b>
   <ul>
-    All links are relative to <code>http://&lt;ip-addr&gt;:&lt;ip-port&gt;/</code>.<br>
-    The <code>http://&lt;ip-addr&gt;:&lt;ip-port&gt;/&lt;apiName&gt;/</code> command displays the module-specific commandref.<br>
-    The response message is encoded to UTF-8.
+    <li>All links are relative to <code>http://&lt;ip-addr&gt;:&lt;port&gt;/</code>.</li>
+    <li>Commands are not executed if the disable or ignore attribute of the device is set. See also <a href="#HTTPAPI-attr-devicesCtrl">devicesCtrl</a>.</li>
+    <li>The <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/</code> command displays the module-specific commandref.</li>
+    <li>The response message is encoded to UTF-8.</li>
   </ul>
   <br><br>
 
