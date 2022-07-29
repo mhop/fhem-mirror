@@ -209,20 +209,12 @@ sub HTTPAPI_CGI($$$) {
 
 sub HTTPAPI_CommandRef($) {
   my ($hash) = @_;
-  my @contents;
-  my $contents;
   my $fileName = $gPath . '/02_HTTPAPI.pm';
-  if(open(INPUTFILE, $fileName)) {
-    binmode(INPUTFILE);
-    @contents = <INPUTFILE>;
-    close(INPUTFILE);
-    $contents = join("", @contents);
-    $contents =~ /\n=begin.html([\s\S]*)\n=end.html/gs;
-    return($hash, 200, 'close', "text/html; charset=utf-8", encode($encoding, $1));
-  } else {
-    return($hash, 404, 'close', "text/plain; charset=utf-8", encode($encoding, "error=404 Not Found, file $fileName not found"));
-  }
-  return;
+  my ($err, @contents) = FileRead($fileName);
+  return ($hash, 404, 'close', "text/plain; charset=utf-8", encode($encoding, "error=404 Not Found, file $fileName not found")) if ($err);
+  my $contents = join("\n", @contents);
+  $contents =~ /\n=begin.html([\s\S]*)\n=end.html/gs;
+  return ($hash, 200, 'close', "text/html; charset=utf-8", encode($encoding, $1));
 }
 
 sub HTTPAPI_Read($) {
@@ -388,7 +380,7 @@ sub HTTPAPI_Undef($) {
       </ul>
       Response:
       <ul>
-        <code>&lt;action&gt;=&lt;response&gt;|&lt;error&gt;=&lt;error message&gt;</code><br>
+        <code>&lt;action&gt;=&lt;response&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>
@@ -404,7 +396,7 @@ sub HTTPAPI_Undef($) {
       </ul>
       Response:
       <ul>
-        <code>&lt;device&gt;=&lt;cmd&gt;|&lt;error&gt;=&lt;error message&gt;</code><br>
+        <code>&lt;device&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>
@@ -420,7 +412,7 @@ sub HTTPAPI_Undef($) {
       </ul>
       Response:
       <ul>
-        <code>&lt;reading name&gt;=&lt;val&gt;|&lt;error&gt;=&lt;error message&gt;</code><br>
+        <code>&lt;reading name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
     <li>API command line for querying a reading<br>
@@ -430,7 +422,7 @@ sub HTTPAPI_Undef($) {
       </ul>
       Response:
       <ul>
-        <code>&lt;reading name&gt;=&lt;val&gt;|&lt;error&gt;=&lt;error message&gt;</code><br>
+        <code>&lt;reading name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
     <li>API command line for deleting a reading<br>
@@ -441,7 +433,7 @@ sub HTTPAPI_Undef($) {
       </ul>
       Response:
       <ul>
-        <code>&lt;reading name&gt;=|&lt;error&gt;=&lt;error message&gt;</code><br>
+        <code>&lt;reading name&gt;=|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>
