@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.0 "=> "31.07.2022  change _gethtml, _getftui ",
   "0.66.0 "=> "24.07.2022  insert function calcPeaklossByTemp to calculate peak power reduction by temperature ",
   "0.65.8 "=> "23.07.2022  change calculation of cloud cover in calcRange function ",
   "0.65.7 "=> "20.07.2022  change performance ratio in calcPVforecast to 0.85 ",
@@ -1580,9 +1581,9 @@ return centralTask ($hash);
 ###############################################################
 sub _gethtml {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   
-return pageAsHtml ($hash);
+return pageAsHtml ($name);
 }
 
 ###############################################################
@@ -1591,9 +1592,9 @@ return pageAsHtml ($hash);
 ###############################################################
 sub _getftui {
   my $paref = shift;
-  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   
-return pageAsHtml ($hash,"ftui");
+return pageAsHtml ($name, "ftui");
 }
 
 ###############################################################
@@ -4525,9 +4526,8 @@ return;
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
 sub pageAsHtml { 
-  my $hash = shift;
+  my $name = shift;
   my $ftui = shift;
-  my $name = $hash->{NAME};
   
   my $ret = "<html>";
   $ret   .= entryGraphic ($name);
@@ -8506,7 +8506,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <ul>
       <a id="SolarForecast-get-html"></a>
       <li><b>html </b> <br><br>
-      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben.
+      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben. <br>
+      Die Grafik kann abgerufen und in eigenen Code eingebettet werden. Auf einfache Weise kann dies durch die Definition
+      eines weblink-Devices vorgenommen werden: <br><br>
+      
+      <ul>
+        defmod wl.SolCast5 weblink htmlCode { FHEM::SolarForecast::pageAsHtml ('SolCast5') }
+      </ul>
+      <br>
+      'SolCast5' ist der Name des einzubindenden SolarForecast-Device.
       </li>      
     </ul>
     <br>
