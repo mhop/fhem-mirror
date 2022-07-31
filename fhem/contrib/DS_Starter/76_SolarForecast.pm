@@ -8511,7 +8511,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       eines weblink-Devices vorgenommen werden: <br><br>
       
       <ul>
-        defmod wl.SolCast5 weblink htmlCode { FHEM::SolarForecast::pageAsHtml ('SolCast5') }
+        define wl.SolCast5 weblink htmlCode { FHEM::SolarForecast::pageAsHtml ('SolCast5') }
       </ul>
       <br>
       'SolCast5' ist der Name des einzubindenden SolarForecast-Device.
