@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 60_allergy: alternative data source with Attribute alternative3Day
  - feature: 49_SSCAM: allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME
  - bugfix:  50_Signalbot: update contacts on startup, signal-cli 0.10.9
  - feature: 96_Snapcast: group volume now can be set

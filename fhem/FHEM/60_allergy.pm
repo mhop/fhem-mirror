@@ -27,39 +27,32 @@ use utf8;
 
 
 my %pollen_types = (  0 => "Unknown",
-                      1 => "Ahorn",
-                      2 => "Ambrosia",
-                      3 => "Beifuss",
-                      4 => "Birke",
-                      5 => "Brennnessel",
-                      6 => "Buche",
-                      7 => "Eiche",
-                      8 => "Erle",
-                      9 => "Esche",
-                      10 => "Fichte",
-                      11 => "Flieder",
-                      12 => "Gaensefuss",
-                      13 => "Gerste",
-                      14 => "Graeser",
-                      15 => "Hafer",
-                      16 => "Hasel",
-                      17 => "Holunder",
-                      18 => "Hopfen",
-                      19 => "Kiefer",
-                      20 => "Linde",
-                      21 => "Loewenzahn",
-                      22 => "Mais",
-                      23 => "Nessel",
-                      24 => "Pappel",
-                      25 => "Platane",
-                      26 => "Raps",
-                      27 => "Roggen",
-                      28 => "Rotbuche",
-                      29 => "Spitzwegerich",
-                      30 => "Tanne",
-                      31 => "Ulme",
-                      32 => "Weide",
-                      33 => "Weizen", );
+                      1 => "Erle",
+                      2 => "Birke",
+                      3 => "Hasel",
+                      4 => "Esche",
+                      5 => "Graeser",
+                      6 => "Ambrosia",
+                      7 => "Beifuss",
+                     15 => "Brennnessel",
+                     16 => "Plantane",
+                     17 => "Zypressen",
+                     18 => "Oelbaum",
+                     23 => "Pilzsporen",
+                    291 => "Roggen",
+                    294 => "Ulme",
+                    296 => "Weide",
+                    297 => "Eiche",
+                    298 => "Buche",
+                    313 => "Manna-Esche",
+                    318 => "Hopfenbuche",
+                    320 => "Wegerich",
+                    322 => "Knoeterich",
+                    324 => "Pappel",
+                    326 => "Edelkastanie",
+                    355 => "Linde",
+                    356 => "Ampfer",
+                    361 => "Hainbuche", );
 
 ##############################################################################
 
@@ -78,7 +71,7 @@ sub allergy_Initialize($) {
                           "updateEmpty:1,0 ".
                           "levelsFormat ".
                           "weekdaysFormat ".
-                          #"extended5Day:1,0 ".
+                          "alternative3Day:1,0 ".
                           $readingFnAttributes;
 }
 
@@ -170,8 +163,8 @@ sub allergy_GetUpdate($) {
 
   my $url="http://www.allergie.hexal.de/pollenflug/xml-interface-neu/pollen_de_7tage.php?plz=".$hash->{helper}{ZIPCODE};
 
-  if(AttrVal($name, "extended5Day", "0") eq "DEPRECATED") {
-    $url="https://pollenwarner-live.herokuapp.com/pollen/".$hash->{helper}{ZIPCODE};
+  if(AttrVal($name, "alternative3Day", "0") eq "1") {
+    $url="https://www.pollenwarndienst.at/index.php?eID=appinterface&action=getContamination&type=zip&value=".$hash->{helper}{ZIPCODE}."&show_polls=1%2C2%2C3%2C4%2C5%2C6%2C7%2C15%2C16%2C17%2C18%2C23%2C291%2C294%2C296%2C297%2C298%2C313%2C318%2C320%2C322%2C324%2C326%2C355%2C356%2C361&country_id=7&personal_contamination=false&lang_code=de&lang_id=0&pure_json=1&cordova=1&pasyfo=0";
   Log3 ($name, 4, "Getting URL $url");
     HttpUtils_NonblockingGet({
       url => $url,
@@ -328,47 +321,47 @@ sub allergy_ParseExtended($$$)
 
   readingsBeginUpdate($hash); # Start update readings
 
-  my $city = $json->{region};
-  readingsBulkUpdate($hash, "city", allergy_utf8clean($city)) if($json->{region});
-  my $day = $json->{date};
-  readingsBulkUpdate($hash, "date", $day) if($json->{date});
-  Log3 $name, 4, "Received data for postcode ".$json->{region};
+  my $city = $json->{result}->{locationtitle};
+  readingsBulkUpdate($hash, "city", allergy_utf8clean($city)) if($json->{result}->{locationtitle});
+  my $day = $json->{result}->{contamination_date_3};
+  readingsBulkUpdate($hash, "date", $day) if($json->{result}->{contamination_date_3});
+  Log3 $name, 4, "Received data for postcode ".$json->{result}->{locationtitle};
 
   my @daymax;
 
-  return undef if(!defined($json->{polls}));
+  return undef if(!defined($json->{result}->{contamination}));
   #Log3 $name, 1, "found polls ".ref($json->{polls});
 
-  foreach my $pollenid ( keys %{$json->{polls}}) {
-    my $pollenid = $json->{polls}->{$pollenid}->{id};
+  foreach my $pollenentry ( @{$json->{result}->{contamination}}) {
+    my $pollenid = $pollenentry->{poll_id};
     #Log3 $name, 1, "polls step ".$pollenid;
     my $pollenkey = 'Unknown';
     $pollenkey = $pollen_types{$pollenid} if( defined($pollen_types{$pollenid}) );
 
-    return undef if(!defined($json->{polls}->{$pollenid}->{forecast}));
+    return undef if(!defined($pollenentry->{contamination_1}));
     #Log3 $name, 1, "forecast ";
-    return undef if(ref($json->{polls}->{$pollenid}->{forecast}) ne "ARRAY");
+    #return undef if(ref($json->{polls}->{$pollenid}->{forecast}) ne "ARRAY");
 
     #my @forecast = $json->{polls}->{$pollenid}->{forecast};
 
-    my $daycode = 0;
-    while(defined($json->{polls}->{$pollenid}->{forecast}[$daycode])) {
+    my $daycode = 1;
+    while(defined($pollenentry->{'contamination_'.$daycode})) {
 
-      my $pollendata = int($json->{polls}->{$pollenid}->{forecast}[$daycode]);
+      my $pollendata = int($pollenentry->{'contamination_'.$daycode});
       #Log3 $name, 1, "forecast array".ref($pollendata);
 
       if (( AttrVal($hash->{NAME}, "updateEmpty", 0 ) gt 0 or $pollendata gt 0) and ( AttrVal($hash->{NAME}, "updateIgnored", 0 ) gt 0 or ( index(AttrVal($hash->{NAME}, "ignoreList", ""), $pollenkey ) == -1 )))
       {
-        readingsBulkUpdate($hash, "fc".($daycode+1)."_".$pollenkey, $levels[$pollendata]);
-        $daymax[$daycode] = $pollendata if(!defined($daymax[$daycode]) || $pollendata gt $daymax[$daycode]);
-        Log3 $name, 4, "Received pollen level for ".$pollenkey.": day".($daycode+1)." level ".$pollendata;
+        readingsBulkUpdate($hash, "fc".($daycode)."_".$pollenkey, $levels[$pollendata]);
+        $daymax[$daycode-1] = $pollendata if(!defined($daymax[$daycode-1]) || $pollendata gt $daymax[$daycode-1]);
+        Log3 $name, 4, "Received pollen level for ".$pollenkey.": day".($daycode)." level ".$pollendata;
       }
       else
       {
-        fhem( "deletereading $name fc".($daycode+1)."_".$pollenkey, 1 );
-        Log3 $name, 5, "Received pollen level for ".$pollenkey.": day".($daycode+1)." level ".$pollendata." (ignored)";
+        fhem( "deletereading $name fc".($daycode)."_".$pollenkey, 1 );
+        Log3 $name, 5, "Received pollen level for ".$pollenkey.": day".($daycode)." level ".$pollendata." (ignored)";
       }
-      $daymax[$daycode] = 0 if(!defined($daymax[$daycode]));
+      $daymax[$daycode-1] = 0 if(!defined($daymax[$daycode-1]));
       $daycode++;
     }
   }
@@ -408,14 +401,14 @@ sub allergy_Attr($$$)
       $attrVal = 1;
     } else {
       $attr{$name}{$attrName} = 0;
-      allergy_GetUpdate($hash);
+      InternalTimer( gettimeofday() + 2, "allergy_GetUpdate", $hash);
     }
   }
-  elsif ($attrName eq "extended5Day") {
+  elsif ($attrName eq "alternative3Day") {
     fhem("deletereading $name fc.*", 1);
     fhem("deletereading $name date", 1);
     my $hash = $defs{$name};
-    allergy_GetUpdate($hash);
+    InternalTimer( gettimeofday() + 2, "allergy_GetUpdate", $hash);
   }
 
   if( $cmd eq "set" ) {
@@ -555,6 +548,10 @@ sub allergy_utf8clean($) {
          <br>
          Localize Weekdays by adding them comma separated (default: Sun,Mon,Tue,Wed,Thu,Fr,Sat)
       </li><br>
+      <li><code>alternative3Day (Standard: 0|1)</code>
+         <br>
+         Alternative data source with 3 day forecast.
+      </li><br>
   </ul>
 </ul>
 
@@ -634,6 +631,10 @@ sub allergy_utf8clean($) {
       <li><code>weekdaysFormat (Standard: Sun,Mon,Tue,Wed,Thu,Fri,Sat)</code>
          <br>
          Lokalisierte Wochentage, durch Kommas getrennt.
+      </li><br>
+      <li><code>alternative3Day (Standard: 0|1)</code>
+         <br>
+         Alternative Datenquelle mit 3-Tage-Vorhersage.
       </li><br>
   </ul>
 </ul>
