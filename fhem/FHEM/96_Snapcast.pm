@@ -26,11 +26,11 @@ package FHEM::Media::Snapcast;    ## no critic 'Package declaration'
 
 use strict;
 use warnings;
-use Scalar::Util qw(looks_like_number);
-use Time::HiRes qw(gettimeofday);
+use Scalar::Util qw( looks_like_number );
+use Time::HiRes qw( gettimeofday );
 use DevIo;
 use JSON ();
-use GPUtils qw(GP_Import);
+use GPUtils qw( GP_Import );
 use List::Util qw( max min );
 
 
@@ -266,14 +266,14 @@ sub Set {
                 keys %{ $hash->{READINGS} };
         my @group;
         for my $sid ( @ids ) {
-            #= devspec2array("TYPE=Snapcast:FILTER=group=$client");
-            #next if ReadingsVal($name, $_, '') ne $client;
-            #clients_84a93e695051#2_group 207ff3bc-5082-789c-c444-29471f4ce57e
-            if ( $sid =~ m{\Aclients_(.+)_group\z}xms ) {
-                push @group, $1;
-            }
+            my $gr = ReadingsVal($name, $sid, ''); 
+            if ( $client eq $gr ) {
+                 $sid =~ m{\Aclients_(.+)_group\z}xms;
+                 push @group, $1; 
+            };
+            #clients_84a93e695051_2_group a269028b-7078-210f-0e75-54acd507faaa
         }
-        #Log3( $hash, 3, "Snap: groups are @group" );
+        Log3( $hash, 5, "Snap: group members for arg. $client are @group within @ids");
         if ( @group ) {
             if ( $opt eq 'volume' && looks_like_number($value) && $value !~ m{[+-]}x ) {
                 #Log3($hash,3,"SNAP: Group absolute volume command, volume: $value");
@@ -760,10 +760,6 @@ sub _setClient {
 
         # check if volume was given as increment or decrement, then find out current volume and calculate new volume
         if ( $value =~ m{\A([+-])(\d{1,2})\z}x ) {
-            #my $direction = $1;
-            #my $amount    = $2;
-
-            #$value = eval($currentVol. $direction. $amount);
             $value += $currentVol;
             $value = max( 0, min( 100, $value ) );
         }
@@ -778,8 +774,9 @@ sub _setClient {
                 $value = $currentVol - $step;
             }
             $value = max( 0, min( 100, $value ) );
-            $muteState = 'false' if $value > 0 && ( $muteState eq 'true' || $muteState == 1 );
+            $muteState = 'false' if ( $value > 0 && ( $muteState eq 'true' || $muteState == 1 ));
         }
+        return if !looks_like_number($value);
         $volumeobject->{percent} = $value + 0;
         $value = $volumeobject;
     }
