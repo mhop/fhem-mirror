@@ -609,10 +609,10 @@ attr DEVICE_CH3 setList \
   on:noArg $\DEVICETOPIC/l3/set {"state_l3":"ON"}\
   off:noArg $\DEVICETOPIC/l3/set {"state_l3":"OFF"}\
   toggle:noArg $\DEVICETOPIC/l3/set {"state_l3":"TOGGLE"}
-attr DEVICE_CH2 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
+attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220622
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220805
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
@@ -4149,15 +4149,15 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");return 1 if $d
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rgbw bulb. If you own a different type of bulb, this template could contain more options than your physical device might be able to handle. Just delete, what you don't need or use the full featured version to get extended options and then delete what you don't need...
 order:X_011
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)/LWT/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal('DEVICE','readingList','') =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/
-attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name,"hex",1)}
+attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name,'hex',1)}
 attr DEVICE webCmd brightness:hue:command
 attr DEVICE readingList \
   BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }\
@@ -4172,13 +4172,13 @@ attr DEVICE setList\
   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
-attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",255),ReadingsVal($name,"color_g",255),ReadingsVal($name,"color_b",255))}, hue:bulb_mode.*white {"0"}
+attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,'color_r',255),ReadingsVal($name,'color_g',255),ReadingsVal($name,'color_b',255))}, hue:bulb_mode.*white {"0"}
 attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE setExtensionsEvent 1
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model esp_milight_hub_rgbw_bulb
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220726
 
 #rgbw-group
 name:esp_milight_hub_make_rgbw_group
@@ -4186,10 +4186,11 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
 order:X_01a
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal('DEVICE','readingList','') =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 copy DEVICE milight_REMOTE_ID_0
 deletereading -q milight_REMOTE_ID_0 .*_.*
 attr milight_REMOTE_ID_0 icon light_control
@@ -4206,11 +4207,10 @@ attr milight_REMOTE_ID_0 setList\
   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}\
   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/0 {"$EVTPART0":"$EVTPART1"}
 attr milight_REMOTE_ID_0 setStateList on off
-#attr milight_REMOTE_ID_0 userReadings rgb:color_r.* {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 modify milight_REMOTE_ID_0 milight_REMOTE_ID_0
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr milight_REMOTE_ID_0 model esp_milight_hub_make_rgbw_group
-setreading milight_REMOTE_ID_0 attrTemplateVersion 20200522 or prior
+setreading milight_REMOTE_ID_0 attrTemplateVersion 20220726
 
 #rgbw_cct-bulb
 name:esp_milight_hub_rgb_cct_bulb
@@ -4218,11 +4218,11 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br><a href="https://forum.fhem.de/index.php/topic,86932.msg877986.html#msg877986">Source: Forum</a>
 order:X_01a1
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal('DEVICE','readingList','') =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
@@ -4243,7 +4243,6 @@ attr DEVICE setList\
   program:uzsuSelectRadio,Mode,Faster,Slower BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}\
   mode:select,0,1,2,3,4,5,6,7,8 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   dim:uzsuSelectRadio,Up,Down BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"command":"$EVTPART1"}
-#attr DEVICE userReadings rgb:color_r.* {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 attr DEVICE webCmd brightness:dim:hue:command:color_temp:program:saturation:mode
 attr DEVICE webCmdLabel   brightness:dim\
   :hue:command\
@@ -4254,7 +4253,7 @@ attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model esp_milight_hub_rgb_cct_bulb
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220726
 
 #cct-only-bulb
 name:esp_milight_hub_cct_only_bulb
@@ -4262,11 +4261,11 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br>simple CCT device
 order:X_01b
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal('DEVICE','readingList','') =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
@@ -4291,7 +4290,7 @@ attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model esp_milight_hub_cct_only_bulb
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220726
 
 #rgbw-bulb
 name:esp_milight_hub_max_features_bulb
@@ -4299,11 +4298,11 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more options than your physical device might be able to handle. Just delete, what you don't need...<br>NOTE: Development state is experimental! <br>NOTE: regex not working to extract remote channel... Topic is something like milight/updates/0xABCD/rgbw/0
 order:X_01x
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
-par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal('DEVICE','readingList','') =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light_control') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name,'hex',1)}
@@ -4335,7 +4334,7 @@ attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/of
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model esp_milight_hub_max_features_bulb
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220726
 
 #remote for event generation only
 name:esp_milight_hub_remote_events_only
@@ -4343,16 +4342,16 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE
 desc:For use with X_01_esp_milight_hub_bridge <br>See <a href="https://forum.fhem.de/index.php/topic,103493.0.html">Forum Thread</a> for examples how to control a MPD, HUEDevice bulbs or shutters by a MiLight remote.
 order:X_01y
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal('DEVICE','readingList','') =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE readingList \
   BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { }\
   BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }
 attr DEVICE model esp_milight_hub_remote_events_only
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20220726
 
 ###############
 #OpenMQTTGateway
