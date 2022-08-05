@@ -107,7 +107,7 @@ sub HTTPAPI_CGI($$$) {
   my $link;
   return($hash, 503, 'close', "text/plain; charset=utf-8", encode($encoding, "error=503 Service Unavailable")) if(IsDisabled($name));
 
-  if($request =~ m/^(\/$infix)\/(set|get|read|write)\?(.*)$/) {
+  if($request =~ m/^(\/$infix)\/(set|get|read|readtimestamp|write)\?(.*)$/) {
     $link = $1;
     $apiCmd = $2;
     $apiCmdString = $3;
@@ -148,13 +148,13 @@ sub HTTPAPI_CGI($$$) {
           } else {
             return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute action is missing"))
           }
-        } elsif ($apiCmd eq 'read') {
+        } elsif ($apiCmd =~ /^read|readtimestamp$/) {
           my $readingName;
           if ($apiCmdString =~ /&reading(\=[^&]*)?(?=&|$)|^reading(\=[^&]*)?(&|$)/) {
             $readingName = substr(($1 // $2), 1);
             # url decoding
             $readingName =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-            my $readingVal = ReadingsVal($fhemDevName, $readingName, undef);
+            my $readingVal = $apiCmd eq 'readtimestamp' ? ReadingsTimestamp($fhemDevName, $readingName, undef) : ReadingsVal($fhemDevName, $readingName, undef);
             #readingsSingleUpdate($defs{$name}, 'reponse', "$readingName=$readingVal", 1);
             if (defined $readingVal) {
               return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, "$readingName=$readingVal"));
@@ -384,6 +384,8 @@ sub HTTPAPI_Undef($) {
 
     Example:
     <ul>
+      <code>define httpapi HTTPAPI</code> (Configuration with default values)<br>
+      or<br>
       <code>define httpapi HTTPAPI api 8087 global</code><br>
       or<br>
       <code>define httpapi HTTPAPI infix=api1 port=8089 global=local</code><br>
@@ -444,6 +446,16 @@ sub HTTPAPI_Undef($) {
       Response:
       <ul>
         <code>&lt;reading name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+    <li>API command line for querying the timestamp of a reading<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/readtimestamp?device=&lt;devname&gt;&reading=&lt;name&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;reading name&gt;=&lt;timestamp&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
     <li>API command line for deleting a reading<br>
