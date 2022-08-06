@@ -601,6 +601,7 @@ attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
 loop:#:2:3
+defmod DEVICE_CH# MQTT2_\DEVICE
 attr DEVICE_CH# setList \
   on:noArg $\DEVICETOPIC/set {"state_l#":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state_l#":"OFF"}\
