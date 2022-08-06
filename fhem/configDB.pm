@@ -481,7 +481,8 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 	my ($internal) = shift;
 	$internal = defined($internal) ? $internal : 0;
 	my $c = "configdb";
-	my @dontSave = qw(configdb:rescue configdb:nostate configdb:loadversion 
+	my @dontSave = qw(configdb:rescue configdb:nostate configdb:loadversion
+	                  configdb:shortinfo 
 	                  global:configfile global:statefile global:version);
 	my (%devByNr, @rowList, %comments, $t, $out);
 
@@ -946,43 +947,40 @@ sub _cfgDB_Info {
 	my ($sql, $sth, @line, $row);
 
 # read versions table statistics
-	my $maxVersions = $configDB{attr}{maxversions};
-	$maxVersions = ($maxVersions) ? $maxVersions : 0;
-	push @r, " max Versions: $maxVersions" if($maxVersions);
-	push @r, " lastReorg:    ".$configDB{attr}{'lastReorg'};
-	my $count;
-	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
-	push @r, " config:       $count entries";
-	push @r, "";
 
-# read versions creation time
-	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
-			"WHERE COMMAND like '#created%' ORDER by v.VERSION";
-	$sth = $fhem_dbh->prepare( $sql );
-	$sth->execute();
-	while (@line = $sth->fetchrow_array()) {
-		$line[3] = "" unless defined $line[3];
-		$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
-				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
-		$row	.= " attr: ".
-				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
-		$row    .= " tag: ".$line[8] if $line[8];
-		push @r, $row;
-	}
+    $configDB{attr}{shortinfo} //= 0;
+    if ($configDB{attr}{shortinfo} == 0) {
+		my $maxVersions = $configDB{attr}{maxversions};
+		$maxVersions = ($maxVersions) ? $maxVersions : 0;
+		push @r, " max Versions: $maxVersions" if($maxVersions);
+		push @r, " lastReorg:    ".$configDB{attr}{'lastReorg'};
+		my $count;
+		$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
+		push @r, " config:       $count entries";
+		push @r, "";
+
+		# read versions creation time
+		$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
+				"WHERE COMMAND like '#created%' ORDER by v.VERSION";
+		$sth = $fhem_dbh->prepare( $sql );
+		$sth->execute();
+		while (@line = $sth->fetchrow_array()) {
+			$line[3] = "" unless defined $line[3];
+			$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
+					$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
+			$row	.= " attr: ".
+					$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
+			$row    .= " tag: ".$line[8] if $line[8];
+			push @r, $row;
+		}
+    } else {
+    	my $count;
+    	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemversions');
+    	push @r, " versions:     $count";
+		$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
+		push @r, " config:       $count entries";
+    }
 	push @r, $l;
-
-## read state table statistics
-#	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemstate');
-#	$f = ($count>1) ? "s" : "";
-## read state table creation time
-#	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate WHERE STATESTRING like '#%'" );  
-#	$sth->execute();
-#	while ($row = $sth->fetchrow_array()) {
-#		(undef,$row) = split(/#/,$row);
-#		$row = " state: $count entrie$f saved: $row";
-#		push @r, $row;
-#	}
-#	push @r, $l;
 
 	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemb64filesave group by filename");
 	$count = @$row;
@@ -1268,16 +1266,18 @@ sub _cfgDB_knownAttr {
     "(0|1) delete file from filesystem after import";
   $configDB{knownAttr}{dumpPath} =
     "(valid path) define path for database dump";
-#  $configDB{knownAttr}{loadversion}=
-#    "for internal use only";
   $configDB{knownAttr}{maxversions}=
     "(number) define maximum number of configurations stored in database";
   $configDB{knownAttr}{mysqldump}=
     "(valid parameter string) define additional parameters used for dump in mysql environment";
-#  $configDB{knownAttr}{nostate}=
-#    "for internal use only";
   $configDB{knownAttr}{private}=
     "(0|1) show or supress userdata in info output";
+  $configDB{knownAttr}{shortinfo}=
+    "(0|1) show detailed or short result in info output";
+#  $configDB{knownAttr}{loadversion}=
+#    "for internal use only";
+#  $configDB{knownAttr}{nostate}=
+#    "for internal use only";
 #  $configDB{knownAttr}{rescue}=
 #    "for internal use only";
 }
