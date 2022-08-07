@@ -859,7 +859,8 @@ sub _cfgDB_Rotate {
 	$configDB{loaded} = $uuid;
 	my $count = $fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
 	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid', NULL)");
-	Log3(undef,1,"configDB: more than 20 versions in database! Please consider setting a limit.") if ($count > 20);
+	Log3(undef,1,"configDB: more than 20 versions in database! Please consider setting a limit.") 
+	    if ($count > 20 && !defined($configDB{attr}{maxversions}));
 	return $uuid;
 }
 
