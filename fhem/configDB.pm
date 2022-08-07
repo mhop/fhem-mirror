@@ -855,8 +855,9 @@ sub _cfgDB_Rotate {
        $uuid =~ s/^\s+|\s+$//g;
     delete $data{saveID}; # no longer needed in memory
 	$configDB{loaded} = $uuid;
-	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
+	my $count = $fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
 	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid', NULL)");
+	Log3(undef,1,"configDB: more than 20 versions in database! Please consider setting a limit.") if ($count > 20);
 	return $uuid;
 }
 
