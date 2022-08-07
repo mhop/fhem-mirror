@@ -177,6 +177,8 @@
 # 2022-03-03             statefile versioning - completed
 #
 # 2022-03-14 - fixed     statefile problems with POSTGRESQL
+# 2022-08-06 - added     attribute shortinfo for use with configdb info
+# 2022-08-07 - added     log a message if more than 20 versions stored
 #
 ##############################################################################
 =cut
