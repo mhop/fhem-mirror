@@ -5297,6 +5297,64 @@ farewell:template has been applied successfully. <br>NOTE: additional code has b
 attr DEVICE model go_eCharger
 setreading DEVICE attrTemplateVersion 20210804
 
+###########################################
+name:hoymiles_microinverter_hub_bridge
+filter:TYPE=MQTT2_DEVICE
+desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778.
+order:W_05
+farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|devcontrol/[0-8]+/[0-8]+</i>.
+par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
+par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+attr DEVICE icon ICON
+attr DEVICE bridgeRegexp BASE_ID/([^/]+)/ch[0-9]+/.*:.* "BASE_ID_$1"
+attr DEVICE autocreate 1
+attr DEVICE readingList BASE_ID/version:.* version\
+  BASE_ID/free_heap:.* free_heap\
+  BASE_ID/uptime:.* uptime\
+  BASE_ID/device:.* device
+attr DEVICE setStateList on off
+attr DEVICE model hoymiles_microinverter_hub_bridge
+setreading DEVICE attrTemplateVersion 20200808
+{ AttrTemplate_Initialize() }
+
+
+name:hoymiles_microinverter_inverter
+prereq:{my @devices=devspec2array('model=hoymiles_microinverter_hub_bridge');return 1 if $devices[0];return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/ch0/U_AC:.*
+desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778<br>Represents a single microinverter.
+order:W_051
+par:INVERTERLONG_ID;INVERTERLONG_ID Base_Id plus inverter name as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+/[^/]+)/ch0/U_AC:, ? $1 : undef }
+par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)/[^/]+/ch0/U_AC:, ? $1 : undef }
+par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts with "0";{ AttrVal('DEVICE','setList','') =~ m,/devcontrol/([0-9]+)/[0-9]+, ? $1 : undef }
+par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+attr DEVICE icon ICON
+deletereading -q DEVICE .*_.*
+attr DEVICE readingList \
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+  INVERTERLONG_ID/ch0/I_AC:.* I_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
+  INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
+  INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
+  INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
+attr DEVICE setList \
+  on:noArg BASE_ID/devcontrol/INVERTER_NR/0 on\
+  off:noArg BASE_ID/devcontrol/INVERTER_NR/1 off\
+  limit BASE_ID/devcontrol/INVERTER_NR/11 $EVTPART1\
+  reboot:noArg BASE_ID/devcontrol/INVERTER_NR/2 restart
+attr DEVICE setStateList on off
+attr DEVICE model hoymiles_microinverter_inverter
+setreading DEVICE attrTemplateVersion 20200808
+
+
 
 ###########################################
 # provided as mqtt2_siedle.template by hydrotec
