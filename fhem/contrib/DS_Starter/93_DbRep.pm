@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 26054 2022-05-17 18:33:12Z DS_Starter $
+# $Id: 93_DbRep.pm 26283 2022-08-03 19:58:49Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.0"  => "10.08.2022  rework of DbRep_reduceLog ",
   "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
                "some code changes and bug fixes ",
   "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
@@ -2925,12 +2926,11 @@ sub _DbRep_collaggstr {
      $runtime_orig = $runtime;
      
      # Hilfsrechnungen
-     my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
-     my $cy   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
-     # my $icly = DbRep_IsLeapYear($name,$cy);                           
-     # my $inly = DbRep_IsLeapYear($name,$cy+1);                         # ist kommendes Jahr ein Schaltjahr ? 
+     my $rm   = strftime "%m", localtime($runtime);                       # Monat des aktuell laufenden Startdatums d. SQL-Select
+     my $cy   = strftime "%Y", localtime($runtime);                       # Jahr des aktuell laufenden Startdatums d. SQL-Select
      my $yf = 365;
-     $yf = 366 if(DbRep_IsLeapYear($name,$cy));                        # ist aktuelles Jahr ein Schaltjahr ?
+     $yf    = 366 if(DbRep_IsLeapYear($name,$cy));                        # ist aktuelles Jahr ein Schaltjahr ?
+     
      Log3 ($name, 5, "DbRep $name - current year:  $cy, endyear: $yestr");
                   
      $aggsec = $yf * 86400;
@@ -2948,13 +2948,14 @@ sub _DbRep_collaggstr {
          $runtime_string_first = strftime "%Y-01-01", localtime($runtime) if($i>1);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          $ll=1;
-        
-     } else {
+     } 
+     else {
          if(($runtime) > $epoch_seconds_end) {
              $runtime_string_first = strftime "%Y-01-01", localtime($runtime);                      
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
              $ll=1;
-         } else {
+         } 
+         else {
              $runtime_string_first = strftime "%Y-01-01", localtime($runtime) if($i>1);
              $runtime_string_next  = strftime "%Y-01-01", localtime($runtime+($yf * 86400));           
          } 
@@ -2988,15 +2989,16 @@ sub _DbRep_collaggstr {
      if ($ysstr == $yestr && $msstr == $mestr || $ry ==  $yestr && $rm == $mestr) {
          $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-         $ll=1;
-        
-     } else {
+         $ll=1; 
+     } 
+     else {
          if(($runtime) > $epoch_seconds_end) {
              #$runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>11);  # ausgebaut 24.02.2018
              $runtime_string_first = strftime "%Y-%m-01", localtime($runtime);                      
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
              $ll=1;
-         } else {
+         } 
+         else {
              $runtime_string_first = strftime "%Y-%m-01", localtime($runtime) if($i>1);
              $runtime_string_next  = strftime "%Y-%m-01", localtime($runtime+($dim*86400));      
          } 
@@ -3034,16 +3036,19 @@ sub _DbRep_collaggstr {
          if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
              $ll=1;
-         } else {
+         } 
+         else {
               $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime);
          }
-     } else {
+     } 
+     else {
          # weitere Durchläufe
          if(($runtime+$aggsec) > $epoch_seconds_end) {
              $runtime_string_first = strftime "%Y-%m-%d",          localtime($runtime_orig);
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
              $ll=1;
-         } else {
+         } 
+         else {
              $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig) ;
              $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);  
          }
@@ -3065,7 +3070,8 @@ sub _DbRep_collaggstr {
          $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          $ll=1;
-     } else {
+     } 
+     else {
          $runtime_string_next  = strftime "%Y-%m-%d", localtime($runtime+$aggsec);   
      }
      
@@ -3094,7 +3100,8 @@ sub _DbRep_collaggstr {
          $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr && $hs eq $he);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          $ll=1;
-     } else {
+     } 
+     else {
          $runtime_string_next  = strftime "%Y-%m-%d %H", localtime($runtime+$aggsec);   
      }
 
@@ -3121,7 +3128,8 @@ sub _DbRep_collaggstr {
          # $runtime_string_first = strftime "%Y-%m-%d %H:%M", localtime($runtime) if( $dsstr eq $destr && $ms eq $me);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          $ll=1;
-     } else {
+     } 
+     else {
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M", localtime($runtime+$aggsec);   
      }
 
@@ -8947,10 +8955,8 @@ sub DbRep_reduceLog {
     
     Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 
-    my ($dbh,$brt,$ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour);
-    my ($dbmodel,$average,$processingDay,$lastUpdH);
     my (%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
-    my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
+    my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0);
     
     BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
     
@@ -8961,19 +8967,20 @@ sub DbRep_reduceLog {
         next if($w =~ /\b(\d+(:\d+)?)\b/);
         push @b, $w;
     }
+    
     @a = @b;
     
     my ($pa,$ph) = parseParams(join ' ', @a);
     
-    my $avgstring = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'AVERAGE=HOUR' : 
-                    ($ph->{average} && $ph->{average} eq "day") ? 'AVERAGE=DAY'  : 
-                    q{};
+    my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average=hour' : 
+               ($ph->{average} && $ph->{average} eq "day") ? 'average=day'  : 
+               q{};
     
     # Korrektur des Select-Zeitraums + eine Stunde 
     # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
     my ($yyyy, $mm, $dd, $hh, $min, $sec) = $ots =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
     my $epoche                            = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
-    my $splus                             = $avgstring =~ /AVERAGE/ ? 3600 : 0;
+    my $splus                             = $mode =~ /average/i ? 3600 : 0;
     $ots                                  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoche+$splus);
     
     my $excludes = $ph->{EXCLUDE} // q{};
@@ -8982,7 +8989,8 @@ sub DbRep_reduceLog {
     if ($excludes) {
         @excludeRegex = split(',',$excludes);
     }
-               
+             
+    my ($dbh, $dbmodel);             
     ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
     return "$name|$err" if ($err);
                
@@ -9018,19 +9026,16 @@ sub DbRep_reduceLog {
     elsif ($IsTimeSet || $IsAggrSet) {
         $specs->{rsf} = $nts;
         $specs->{rsn} = $ots;
-        $sql = DbRep_createCommonSql ($specs);
+        $sql          = DbRep_createCommonSql ($specs);
     } 
     else {
         $sql = DbRep_createCommonSql ($specs);
     }
     
-    
     Log3 ($name, 3, "DbRep $name - reduce data older than: $ots (logical corrected), newer than: $nts");
     
-    Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
-    
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
-          .($avgstring ? "\n".$avgstring : '')
+          .($mode ? "\n".$mode : '')
           .($includes  ? "\nINCLUDE -> $includes " : 
            ((($idanz || $idevswc || $iranz || $irdswc) ? "\nINCLUDE -> " : '')
           . (($idanz || $idevswc)                      ? "Devs: ".($idevs ? $idevs : '').($idevswc ? $idevswc : '').' ' : '').(($iranz || $irdswc) ? "Readings: ".($ireading ? $ireading : '').($irdswc ? $irdswc : '') : '')
@@ -9043,304 +9048,108 @@ sub DbRep_reduceLog {
         
     my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
     
-    eval { $sth_del  = $dbh->prepare_cached("DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-           $sth_upd  = $dbh->prepare_cached("UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-           $sth_delD = $dbh->prepare_cached("DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-           $sth_updD = $dbh->prepare_cached("UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-           $sth_get  = $dbh->prepare($sql);
-         };
-    if ($@) {
-        $err = encode_base64($@, "");
-        Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-        return "$name|$err";
-    }
+    ($err, $sth_del)  = DbRep_prepareCachedOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    return "$name|$err" if ($err);
     
-    eval { $sth_get->execute(); };
-    if ($@) {
-        $err = encode_base64($@, "");
-        Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-        return "$name|$err";
-    }
+    ($err, $sth_upd)  = DbRep_prepareCachedOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+    return "$name|$err" if ($err);
     
-    #########################################   Start
+    ($err, $sth_delD) = DbRep_prepareCachedOnly ($name, $dbh, "DELETE FROM $table WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    return "$name|$err" if ($err);
     
-    # Ergebnsis von $sth_get->fetchrow_arrayref
+    ($err, $sth_updD) = DbRep_prepareCachedOnly ($name, $dbh, "UPDATE $table SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+    return "$name|$err" if ($err);
+    
+    ($err, $sth_get) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+    return "$name|$err" if ($err);
+    
+    
+    ## Start
+    ############################################
+    
+    # Ergebnis von $sth_get->fetchrow_arrayref:
     # $row->[0] = Datum (YYYY-MM-DD hh:mm:ss)
     # $row->[1] = Device
     # $row->[2] = leer
     # $row->[3] = Reading
     # $row->[4] = Value
     
+    my ($day,$hour, $processingDay);
+    
     do {
-        $row         = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];        # || execute last-day dummy
-        $ret         = 1;
-        ($day,$hour) = $row->[0] =~ /-(\d{2})\s(\d{2}):/;
+        my $row      = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];        # || execute last-day dummy
+        my $ts       = $row->[0];
+        my $device   = $row->[1];
+        my $reading  = $row->[3];
+        my $value    = $row->[4];
+        ($day,$hour) = $ts =~ /-(\d{2})\s(\d{2}):/;
         
         $rowCount++ if($day != 00);
         
+        ## verarbeiten der unten vorbereiteten Arrays und Hashes
+        #########################################################
+        
         if ($day != $currentDay) {
-            if ($currentDay) {                                                                       # nicht am ersten ausgeführten Tag
-                if (scalar @dayRows) {
-                    ($lastHour) = $dayRows[-1]->[0] =~ /(.*\d+\s\d{2}):/;
-                    $c          = 0;
+            if ($currentDay) {                                                             # nicht am ersten ausgeführten Tag
+                if (scalar @dayRows) {                                                     # alle Tageseinträge löschen
                     
-                    for my $delRow (@dayRows) {
-                        $c++ if($day != 00 || $delRow->[0] !~ /$lastHour/);
-                    }
+                    my $params = {
+                        name            => $name,
+                        day             => $day,
+                        dbh             => $dbh,
+                        sth_del         => $sth_del,
+                        table           => $table,
+                        dayRowsref      => \@dayRows,
+                        deletedCountref => \$deletedCount, 
+                        processingDay   => $processingDay
+                    };
+
+                    $err = _DbRep_rl_deleteDayRows ($params); 
+                    return "$name|$err" if ($err);                    
                     
-                    if($c) {
-                        $deletedCount += $c;
-                        
-                        Log3 ($name, 3, "DbRep $name - reduceLog deleting $c records of day: $processingDay");
-                        
-                        $dbh->{RaiseError} = 1;
-                        $dbh->{PrintError} = 0; 
-                        
-                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                        if ($@) {
-                            $err = encode_base64($@, "");
-                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                        }
-                        
-                        eval {
-                            my $i  = 0;
-                            my $k  = 1;
-                            my $th = ($#dayRows <= 2000)  ? 100  : 
-                                     ($#dayRows <= 30000) ? 1000 : 
-                                     10000;
-                            
-                            for my $delRow (@dayRows) {
-                                if($day != 00 || $delRow->[0] !~ /$lastHour/) {
-                                    
-                                    Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
-                                    
-                                    $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
-                                    $i++;
-                                    
-                                    if($i == $th) {
-                                        my $prog = $k * $i; 
-                                        
-                                        Log3 ($name, 3, "DbRep $name - reduceLog deletion progress of day: $processingDay is: $prog");
-                                        
-                                        $i = 0;
-                                        $k++;
-                                    }
-                                }
-                            }
-                        };
-                        
-                        if ($@) {
-                            $err = encode_base64($@, "");
-                            
-                            Log3 ($name, 2, "DbRep $name - reduceLog ! FAILED ! for day $processingDay: $@");
-                            
-                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                            if ($@) {
-                                $err = encode_base64($@, "");
-                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                            }
-                            $ret = 0;
-                        } 
-                        else {
-                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                            if ($@) {
-                                $err = encode_base64($@, "");
-                                Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                            }
-                        }
-                        $dbh->{RaiseError} = 0; 
-                        $dbh->{PrintError} = 1;
-                    }
                     @dayRows = ();
                 }
                 
-                if ($ret && $avgstring =~ /average/i) {
-                    $dbh->{RaiseError} = 1;
-                    $dbh->{PrintError} = 0; 
-                    
-                    eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                    if ($@) {
-                        $err = encode_base64($@, "");
-                        Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                    }
-                    
-                    eval {
-                        push(@averageUpd, {%hourlyKnown}) if($day != 00);
-                        
-                        $c = 0;
-                        for my $hourHash (@averageUpd) {                                                                                      # Only count for logging...
-                            for my $hourKey (keys %$hourHash) {
-                                $c++ if ($hourHash->{$hourKey}->[0] && scalar(@{$hourHash->{$hourKey}->[4]}) > 1);
-                            }
-                        }
-                        
-                        $updateCount += $c;
-                        
-                        Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c);        # else only push to @averageUpdD
-                        
-                        my $i  = 0;
-                        my $k  = 1;
-                        my $th = $c <= 2000  ? 100  : 
-                                 $c <= 30000 ? 1000 : 
-                                 10000;
-                        
-                        for my $hourHash (@averageUpd) {
-                            for my $hourKey (keys %$hourHash) {
-                                if ($hourHash->{$hourKey}->[0]) {                                                                             # true if reading is a number 
-                                    ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
-                                    
-                                    if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {                                                          # true if reading has multiple records this hour
-                                        
-                                        for (@{$hourHash->{$hourKey}->[4]}) { 
-                                            $sum += $_; 
-                                        }
-                                        
-                                        $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
-                                        $sum     = 0;
-                                        
-                                        Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
-                                        
-                                        $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
-                                        
-                                        $i++;
-                                        
-                                        if($i == $th) {
-                                            my $prog = $k * $i; 
-                                            Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
-                                            $i = 0;
-                                            $k++;
-                                        } 
-                                        
-                                        if ($avgstring =~ /average=day/i) {
-                                            push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
-                                        }
-                                    } 
-                                    else {
-                                        if ($avgstring =~ /average=day/i) {
-                                            push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
-                                        }
-                                    }
-                                }                                                       
-                            }
-                        }
+                if ($mode =~ /average/i) {                    
+           
+                    my $params = {
+                        name            => $name,
+                        day             => $day,
+                        dbh             => $dbh,
+                        sth_upd         => $sth_upd,
+                        mode            => $mode,
+                        table           => $table,
+                        hourlyKnownref  => \%hourlyKnown,
+                        averageUpdref   => \@averageUpd,
+                        averageUpdDref  => \@averageUpdD,
+                        updateCountref  => \$updateCount,
+                        processingDay   => $processingDay
                     };
+
+                    $err = _DbRep_rl_average ($params); 
+                    return "$name|$err" if ($err);           
                     
-                    if ($@) {
-                        $err = $@;
-                        
-                        Log3 ($name, 2, "DbRep $name - reduceLog average=hour ! FAILED ! for day $processingDay: $err");
-                        
-                        eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                        if ($@) {
-                            $err = encode_base64($@, "");
-                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                        }
-                        @averageUpdD = ();
-                    } 
-                    else {
-                        eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                        if ($@) {
-                            $err = encode_base64($@, "");
-                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                        }                           
-                    }
-                    
-                    $dbh->{RaiseError} = 0; 
-                    $dbh->{PrintError} = 1;
-                    @averageUpd        = ();
+                    @averageUpd = ();
                 }
                 
-                if ($avgstring =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
-                    $dbh->{RaiseError} = 1;
-                    $dbh->{PrintError} = 0;
-                    
-                    eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                    if ($@) {
-                        $err = encode_base64($@, "");
-                        Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                    }
-                    
-                    eval {
-                        for (@averageUpdD) {
-                            push(@{$averageHash{$_->[3].$_->[4]}->{tedr}}, [$_->[0], $_->[1], $_->[3], $_->[4]]);
-                            $averageHash{$_->[3].$_->[4]}->{sum} += $_->[2];
-                            $averageHash{$_->[3].$_->[4]}->{date} = $_->[5];
-                        }
-                        
-                        $c = 0;
-                        for (keys %averageHash) {
-                            
-                            if(scalar @{$averageHash{$_}->{tedr}} == 1) {
-                                delete $averageHash{$_};
-                            } 
-                            else {
-                                $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
-                            }
-                        }
-                        $deletedCount += $c;
-                        $updateCount  += keys(%averageHash);
-                        
-                        my ($id,$iu) = (0,0);
-                        my ($kd,$ku) = (1,1);
-                        my $thd      = ($c <= 2000)  ? 100  : 
-                                       ($c <= 30000) ? 1000 : 
-                                       10000;
-                        my $thu      = ((keys %averageHash) <= 2000)  ? 100  : 
-                                       ((keys %averageHash) <= 30000) ? 1000 :
-                                       10000;
-                        
-                        Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay") if(keys %averageHash);
-                        
-                        for my $reading (keys %averageHash) {
-                            $average  = sprintf('%.3f', $averageHash{$reading}->{sum}/scalar(@{$averageHash{$reading}->{tedr}}));
-                            $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
-                            
-                            for (@{$averageHash{$reading}->{tedr}}) {
-                                Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
-                                
-                                $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
-                                
-                                $id++;
-                                if($id == $thd) {
-                                    my $prog = $kd * $id; 
-                                    Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
-                                    $id = 0;
-                                    $kd++;
-                                }
-                            }
-                            
-                            Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
-                            
-                            $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
-                        
-                            $iu++;
-                            if($iu == $thu) {
-                                my $prog = $ku * $id; 
-                                Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
-                                $iu = 0;
-                                $ku++;
-                            }                           
-                        }
+                if ($mode =~ /average=day/i && scalar @averageUpdD) {                    
+
+                    my $params = {
+                        name            => $name,
+                        dbh             => $dbh,
+                        sth_delD        => $sth_delD,   
+                        sth_updD        => $sth_updD,                        
+                        table           => $table,
+                        averageUpdDref  => \@averageUpdD,
+                        averageHashref  => \%averageHash,
+                        deletedCountref => \$deletedCount, 
+                        updateCountref  => \$updateCount,
+                        processingDay   => $processingDay
                     };
-                    
-                    if ($@) {
-                        Log3 ($name, 3, "DbRep $name - reduceLog average=day ! FAILED ! for day $processingDay");
-                        eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                        if ($@) {
-                            $err = encode_base64($@, "");
-                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                        }
-                    } 
-                    else {
-                        eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                        if ($@) {
-                            $err = encode_base64($@, "");
-                            Log3 ($name, 2, "DbRep $name - DbRep_reduceLog - $@");
-                        }
-                    }
-                    
-                    $dbh->{RaiseError} = 0; 
-                    $dbh->{PrintError} = 1;
+
+                    $err = _DbRep_rl_averageDay ($params); 
+                    return "$name|$err" if ($err);
+
                 }
                 
                 %averageHash = ();
@@ -9353,65 +9162,365 @@ sub DbRep_reduceLog {
             $currentDay = $day;
         }
         
+        ## Füllen Arrays und Hashes
+        ############################
+        
         if ($hour != $currentHour) {                                              # forget records from last hour, but remember these for average
-            if ($avgstring =~ /average/i && keys(%hourlyKnown)) {
+            if ($mode =~ /average/i && keys(%hourlyKnown)) {
                 push(@averageUpd, {%hourlyKnown});
             }
             
             %hourlyKnown = ();
             $currentHour = $hour;
         }
-        
-        if (defined $hourlyKnown{$row->[1].$row->[3]}) {                          # remember first readings for device per h, other can be deleted
+            
+        if (defined $hourlyKnown{$device.$reading}) {                             # remember first readings for device per h, other can be deleted 
             push(@dayRows, [@$row]);
             
-            if ($avgstring =~ /average/i                   && 
-                defined($row->[4])                         && 
-                $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && 
-                $hourlyKnown{$row->[1].$row->[3]}->[0]) {
+            if ($mode =~ /average/i                     && 
+                defined($value)                         &&                     
+                $value =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && 
+                $hourlyKnown{$device.$reading}->[0]) {                         
                 
-                if ($hourlyKnown{$row->[1].$row->[3]}->[0]) {
-                    push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
+                if ($hourlyKnown{$device.$reading}->[0]) {
+                    push(@{$hourlyKnown{$device.$reading}->[4]}, $value);   
                 }
             }
         } 
         else {
-            $exclude = 0;
+            my $exclude = 0;
             
-            for (@excludeRegex) {
-                $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
+            for my $exreg (@excludeRegex) {
+                $exclude = 1 if("$device:$reading" =~ /^$exreg$/);                 
             }
             
             if ($exclude) {
                 $excludeCount++ if($day != 00);
             } 
             else {
-                $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
+                $hourlyKnown{$device.$reading} = (defined($value) && $value =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? 
+                                                 [$ts,$device,$row->[2],$reading,[$value]]                    : 
+                                                 [0];
             }
         }
-        $processingDay = (split(' ',$row->[0]))[0];
+        
+        $processingDay = (split ' ', $ts)[0];                                     # $ts = Datum (YYYY-MM-DD hh:mm:ss)
     
-    } while ($day != 00);                                      # die do...while-Anweisung überprüft die Bedingung am Ende jeder Iteration.
+    } while ($day != 00);                                                         # die do...while-Anweisung überprüft die Bedingung am Ende jeder Iteration.
     
     #########################################   Ende
     
-    $brt = time() - $startTime;
+    my $brt = time() - $startTime;
     
     my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                 .($avgstring =~ /average/i ? ", updated: $updateCount"   : '')
-                 .($excludeCount            ? ", excluded: $excludeCount" : '');
+                 .($mode =~ /average/i ? ", updated: $updateCount"   : '')
+                 .($excludeCount       ? ", excluded: $excludeCount" : '');
                
     Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
     
-    $ret = "reduceLog finished. $result";
-    
     $dbh->disconnect();
     
-    $ret = encode_base64($ret, "");
+    my $ret = encode_base64("reduceLog finished. $result", "");
     
     Log3 ($name, 5, "DbRep $name -> DbRep_reduceLogNbl finished");
     
 return "$name|$err|$ret|$brt";
+}
+
+####################################################################################################
+#           alle im @dayRows Array enthaltene DB Einträge löschen
+####################################################################################################
+sub _DbRep_rl_deleteDayRows {
+  my $paref           = shift;
+  my $name            = $paref->{name};
+  my $day             = $paref->{day};
+  my $dbh             = $paref->{dbh};
+  my $sth_del         = $paref->{sth_del};
+  my $table           = $paref->{table};
+  my $dayRowsref      = $paref->{dayRowsref};
+  my $deletedCountref = $paref->{deletedCountref};
+  my $processingDay   = $paref->{processingDay};
+  
+  my $err = q{};
+  
+  my @dayRows = @{$dayRowsref};
+  
+  #Log3 ($name, 3, "DbRep $name - content dayRows Array:\n".Dumper @dayRows);
+  
+  #my $lastHour = $dayRows[-1]->[0];
+  my $c        = 0;
+
+  for my $delRow (@dayRows) {
+      #$c++ if($delRow->[0] !~ /$lastHour/);
+      $c++;
+  }
+
+  if($c) {
+      ${$deletedCountref} += $c;
+    
+      Log3 ($name, 3, "DbRep $name - reduceLog deleting $c records of day: $processingDay");
+    
+      $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+      return $err if ($err);
+    
+      eval {
+          my $i  = 0;
+          my $k  = 1;
+          my $th = _DbRep_rl_logThreshold ($#dayRows);
+        
+          for my $delRow (@dayRows) {
+              #if($delRow->[0] !~ /$lastHour/) {
+                
+                  Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+                
+                  $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
+                  $i++;
+                
+                  if($i == $th) {
+                      my $prog = $k * $i; 
+                    
+                      Log3 ($name, 3, "DbRep $name - reduceLog deletion progress of day: $processingDay is: $prog");
+                    
+                      $i = 0;
+                      $k++;
+                  }
+              #}
+          }
+          1;
+      }
+      or do {
+          $err = encode_base64($@, "");
+        
+          Log3 ($name, 2, "DbRep $name - ERROR - reduceLog failed for day $processingDay: $@");
+        
+          DbRep_rollbackOnly ($name, $dbh);
+          return $err;
+      }; 
+
+      $err = DbRep_commitOnly ($name, $dbh);
+      return $err if ($err);
+  }
+
+return $err;
+}
+
+####################################################################################################
+#           Average (pro Stunde) in DB updaten und @averageUpdD füllen bei 
+#           $mode = average=day
+####################################################################################################
+sub _DbRep_rl_average {
+  my $paref           = shift;
+  my $name            = $paref->{name};
+  my $day             = $paref->{day};
+  my $dbh             = $paref->{dbh};
+  my $sth_upd         = $paref->{sth_upd};
+  my $mode            = $paref->{mode};
+  my $table           = $paref->{table};
+  my $hourlyKnownref  = $paref->{hourlyKnownref};
+  my $averageUpdref   = $paref->{averageUpdref};
+  my $averageUpdDref  = $paref->{averageUpdDref};
+  my $updateCountref  = $paref->{updateCountref};
+  my $processingDay   = $paref->{processingDay};
+  
+  my $err = q{};
+  
+  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+  return $err if ($err);
+  
+  #Log3 ($name, 3, "DbRep $name - content hourlyKnown Hash:\n".Dumper %$hourlyKnownref);
+
+  eval {
+      push(@$averageUpdref, {%$hourlyKnownref});
+    
+      my $c = 0;
+      
+      for my $hourHash (@$averageUpdref) {                                                                                      # Only count for logging...
+          for my $hourKey (keys %$hourHash) {
+              $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} >= 1);
+          }
+      }
+    
+      ${$updateCountref} += $c;
+    
+      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c);        # else only push to @averageUpdD
+      
+      my $sum = 0;
+      my $i   = 0;
+      my $k   = 1;
+      my $th  = _DbRep_rl_logThreshold ($c);
+      
+      #Log3 ($name, 3, "DbRep $name - content averageUpd Array:\n".Dumper @$averageUpdref);
+    
+      for my $hourHash (@$averageUpdref) {
+          for my $hourKey (keys %$hourHash) {
+              if ($hourHash->{$hourKey}->[0]) {                                                                             # true if reading is a number 
+                  my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
+                
+                  if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {                                                          # true if reading has multiple records this hour
+                    
+                      for my $val (@{$hourHash->{$hourKey}->[4]}) { 
+                          $sum += $val; 
+                      }
+                    
+                      my $average = sprintf '%.3f', $sum / scalar @{$hourHash->{$hourKey}->[4]};
+                      $sum        = 0;
+                    
+                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                    
+                      $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
+                    
+                      $i++;
+                    
+                      if($i == $th) {
+                          my $prog = $k * $i; 
+                        
+                          Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
+                        
+                          $i = 0;
+                          $k++;
+                      } 
+                    
+                      if ($mode =~ /average=day/i) {
+                          push(@$averageUpdDref, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                      }
+                  } 
+                  else {
+                      if ($mode =~ /average=day/i) {
+                          push(@$averageUpdDref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                      }
+                  }
+              }                                                       
+          }
+      }
+      1;
+  }
+  or do {
+      $err = encode_base64($@, "");
+    
+      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog average=hour failed for day $processingDay: $@");
+    
+      DbRep_rollbackOnly ($name, $dbh);
+      return $err;
+  };
+      
+  $err = DbRep_commitOnly ($name, $dbh);
+  return $err if ($err);
+
+return $err;
+}
+
+####################################################################################################
+#           Average Day in DB updaten
+####################################################################################################
+sub _DbRep_rl_averageDay {
+  my $paref           = shift;
+  my $name            = $paref->{name};
+  my $dbh             = $paref->{dbh};
+  my $sth_delD        = $paref->{sth_delD};
+  my $sth_updD        = $paref->{sth_updD};
+  my $table           = $paref->{table};
+  my $averageUpdDref  = $paref->{averageUpdDref};
+  my $averageHashref  = $paref->{averageHashref};
+  my $deletedCountref = $paref->{deletedCountref};
+  my $updateCountref  = $paref->{updateCountref};
+  my $processingDay   = $paref->{processingDay};
+  
+  my $err = q{};
+  
+  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+  return $err if ($err);
+  
+  #Log3 ($name, 3, "DbRep $name - content averageUpdD Array:\n".Dumper @$averageUpdDref);
+
+  eval {
+      for my $row (@$averageUpdDref) {
+          push @{${$averageHashref}{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];
+          ${$averageHashref}{$row->[3].$row->[4]}->{sum} += $row->[2];
+          ${$averageHashref}{$row->[3].$row->[4]}->{date} = $row->[5];
+      }
+    
+      my $c = 0;
+      
+      for my $key (keys %{$averageHashref}) {
+        
+          if(scalar @{${$averageHashref}{$key}->{tedr}} == 1) {
+              delete ${$averageHashref}{$key};
+          } 
+          else {
+              $c += (scalar @{${$averageHashref}{$key}->{tedr}} - 1);
+          }
+      }
+    
+      ${$deletedCountref} += $c;
+      ${$updateCountref}  += keys %{$averageHashref};
+    
+      my ($id,$iu) = (0,0);
+      my ($kd,$ku) = (1,1);
+      my $thd      = _DbRep_rl_logThreshold ($c);
+      my $thu      = _DbRep_rl_logThreshold (scalar keys %{$averageHashref});
+    
+      Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %{$averageHashref}).", deleting $c records of day: $processingDay") if(keys %{$averageHashref});
+    
+      for my $rdng (keys %{$averageHashref}) {
+          my $average  = sprintf '%.3f', ${$averageHashref}{$rdng}->{sum} / scalar @{${$averageHashref}{$rdng}->{tedr}};
+          my $lastUpdH = pop @{${$averageHashref}{$rdng}->{tedr}};
+        
+          for (@{${$averageHashref}{$rdng}->{tedr}}) {
+              Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
+            
+              $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
+            
+              $id++;
+            
+              if($id == $thd) {
+                  my $prog = $kd * $id;
+                
+                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
+                
+                  $id = 0;
+                  $kd++;
+              }
+          }
+        
+          Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=${$averageHashref}{$rdng}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+        
+          $sth_updD->execute( ${$averageHashref}{$rdng}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
+    
+          $iu++;
+          if($iu == $thu) {
+              my $prog = $ku * $id; 
+              Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
+              $iu = 0;
+              $ku++;
+          }                           
+      }
+      1;
+  }
+  or do {
+      $err = encode_base64($@, "");
+      Log3 ($name, 3, "DbRep $name - ERROR - reduceLog average=day failed for day $processingDay: $@");
+    
+      DbRep_rollbackOnly ($name, $dbh);
+      return $err;
+  };
+
+  $err = DbRep_commitOnly ($name, $dbh);
+  return $err if ($err);
+
+return $err;
+}
+
+####################################################################################################
+#           Grenzen für Logausgabe abhängig von der Zeilenanzahl
+####################################################################################################
+sub _DbRep_rl_logThreshold {
+  my $rn = shift;
+  
+  my $th = ($rn <= 2000)  ? 100  : 
+           ($rn <= 30000) ? 1000 : 
+           10000;
+
+return $th;
 }
 
 ####################################################################################################
@@ -10324,6 +10433,32 @@ return ($err, $sth);
 }
 
 ####################################################################################################
+#          nur SQL prepare Cached
+#          return $sth bei Erfolg
+####################################################################################################
+sub DbRep_prepareCachedOnly {
+  my $name = shift; 
+  my $dbh  = shift;
+  my $sql  = shift;
+  my $info = shift // "SQL prepare cached: $sql";
+  
+  my $err  = q{};
+  
+  my $sth;
+  
+  Log3 ($name, 4, "DbRep $name - $info");
+  
+  eval{ $sth = $dbh->prepare_cached($sql);
+      } 
+      or do { $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - ERROR - $@");
+              $dbh->disconnect;
+            };
+
+return ($err, $sth);
+}
+
+####################################################################################################
 #          SQL Query evaluieren und Return-String (bei Error in Verarbeitung) und $sth-String
 #          bei Erfolg
 ####################################################################################################
@@ -10420,6 +10555,34 @@ sub DbRep_commitOnly {
         }
         else {
             Log3 ($name, 4, "DbRep $name - data autocommitted");
+            1;
+        }
+      } 
+      or do { $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - ERROR - $@");
+              $dbh->disconnect;
+            };
+
+return $err;
+}
+
+####################################################################################################
+#          nur Datenbank "rollback"
+####################################################################################################
+sub DbRep_rollbackOnly {
+  my $name = shift; 
+  my $dbh  = shift;
+  my $info = shift // "transaction rollback";
+  
+  my $err  = q{};
+  
+  eval{ if(!$dbh->{AutoCommit}) {
+            $dbh->rollback();
+            Log3 ($name, 4, "DbRep $name - $info");
+            1;
+        }
+        else {
+            Log3 ($name, 4, "DbRep $name - data auto rollback");
             1;
         }
       } 
@@ -10812,7 +10975,7 @@ sub DbRep_normRelTime {
      $fdopt = ($aval =~ /FullDay/x && $toth >= 86400) ? 1 : 0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
  
- $fdopt = 1 if($hash->{LASTCMD} =~ /reduceLog/x);                     # reduceLog -> FullDay Option damit der ganze Tag berücksichtigt wird
+ $fdopt = 1 if($hash->{LASTCMD} =~ /reduceLog.*=day/x);               # reduceLog -> FullDay Option damit der ganze Tag berücksichtigt wird
  
  Log3($name, 4, "DbRep $name - FullDay option: $fdopt");
  
@@ -10832,13 +10995,11 @@ sub DbRep_corrRelTime {
  my ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst,$fyear,$cyear);
  (undef,undef,undef,undef,undef,$cyear,undef,undef,$isdst)          = localtime(time);       # aktuelles Jahr, Sommer/Winterzeit
  
- if($tdtn) {
-     # timeDiffToNow
+ if($tdtn) {                                                                                 # timeDiffToNow
      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,undef)           = localtime(time);       # Istzeit
      ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,$disdst) = localtime(time-$tim);  # Istzeit abzgl. Differenzzeit = Selektionsbeginnzeit
  } 
- else {
-     # timeOlderThan
+ else {                                                                                      # timeOlderThan
      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$disdst)         = localtime(time-$tim);  # Berechnung Selektionsendezeit
      my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";        # Selektionsstartzeit
      my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($mints =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
@@ -12570,12 +12731,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 26054 2022-05-17 18:33:12Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 26283 2022-08-03 19:58:49Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 26054 2022-05-17 18:33:12Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 26283 2022-08-03 19:58:49Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
