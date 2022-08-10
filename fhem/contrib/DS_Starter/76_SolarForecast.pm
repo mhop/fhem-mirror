@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.1 "=> "10.08.2022  fix warning, Forum: https://forum.fhem.de/index.php/topic,117864.msg1231050.html#msg1231050 ",
   "0.67.0 "=> "31.07.2022  change _gethtml, _getftui ",
   "0.66.0 "=> "24.07.2022  insert function calcPeaklossByTemp to calculate peak power reduction by temperature ",
   "0.65.8 "=> "23.07.2022  change calculation of cloud cover in calcRange function ",
@@ -2986,7 +2987,9 @@ sub __calcEnergyPieces {
   my $hours   = ceil ($mintime / 60);                                                          # Laufzeit in h
   
   my $ctote   = ConsumerVal ($hash, $c, "avgenergy", undef);                                   # gemessener durchschnittlicher Energieverbrauch pro Stunde (Wh)
-  $ctote    //= ConsumerVal ($hash, $c, "power",         0);                                   # alternativer nominaler Energieverbrauch in W (bzw. Wh bezogen auf 1 h)
+  $ctote      = $ctote ? 
+                $ctote : 
+                ConsumerVal ($hash, $c, "power", 0);                                           # alternativer nominaler Energieverbrauch in W (bzw. Wh bezogen auf 1 h)
   
   if (int($hef{$cotype}{f}) == 1) {                                                            # bei linearen Verbrauchertypen die nominale Leistungsangabe verwenden statt Durchschnitt                                               
       $ctote = ConsumerVal ($hash, $c, "power", 0);
