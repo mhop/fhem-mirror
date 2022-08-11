@@ -9344,7 +9344,7 @@ sub _DbRep_rl_updateHour {
 
   my $c = 0;
   
-  for my $hourHash (@$updateHourref) {                                                                                      # Only count for logging...
+  for my $hourHash (@$updateHourref) {                                                             # Only count for logging...
       for my $hourKey (keys %$hourHash) {
           $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} >= 1);
       }
@@ -9359,6 +9359,14 @@ sub _DbRep_rl_updateHour {
   my $i   = 0;
   my $k   = 1;
   my $th  = _DbRep_rl_logThreshold ($c);
+  
+  my $event = $mstr eq 'average' ? 'rl_av_h'  :
+              $mstr eq 'max'     ? 'rl_max_h' :
+              'rl_h';
+              
+  my $minutes = $mstr eq 'average' ? '30:00' :
+                $mstr eq 'max'     ? '59:59' :
+                '00:00';
   
   #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
 
@@ -9380,9 +9388,9 @@ sub _DbRep_rl_updateHour {
                       my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
                       $sum        = 0;
                     
-                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:$minutes, EVENT=$event, VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
                     
-                      $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
+                      $sth_upd->execute(("$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
                     
                       $i++;
                     
@@ -9396,7 +9404,7 @@ sub _DbRep_rl_updateHour {
                       } 
                     
                       if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
-                          push(@$updateDayref, ["$updDate $updHour:30:00", 'rl_av_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                          push(@$updateDayref, ["$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   } 
                   else {
@@ -9420,9 +9428,9 @@ sub _DbRep_rl_updateHour {
                       my $value = sprintf "%.${ndp}f", $max;
                       undef $max;
                     
-                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:59:59, EVENT='rl_max_h', VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:$minutes, EVENT=$event, VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
                     
-                      $sth_upd->execute(("$updDate $updHour:59:59", 'rl_max_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
+                      $sth_upd->execute(("$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
                     
                       $i++;
                     
@@ -9436,7 +9444,7 @@ sub _DbRep_rl_updateHour {
                       } 
                     
                       if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
-                          push(@$updateDayref, ["$updDate $updHour:59:59", 'rl_max_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                          push(@$updateDayref, ["$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   } 
                   else {
@@ -9522,6 +9530,14 @@ sub _DbRep_rl_updateDay {
   my ($kd,$ku) = (1,1);
   my $thd      = _DbRep_rl_logThreshold ($c);
   my $thu      = _DbRep_rl_logThreshold (scalar keys %updateHash);
+  
+  my $event = $mstr eq 'average' ? 'rl_av_d'  :
+              $mstr eq 'max'     ? 'rl_max_d' :
+              'rl_d';
+              
+  my $time  = $mstr eq 'average' ? '12:00:00' :
+              $mstr eq 'max'     ? '23:59:59' :
+              '00:00:00';
 
   Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
 
@@ -9548,9 +9564,9 @@ sub _DbRep_rl_updateDay {
                   }
               }
             
-              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} $time, EVENT=$event, VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
             
-              $sth_updD->execute( $updateHash{$uhk}->{date}." 12:00:00", 'rl_av_d', $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
+              $sth_updD->execute( $updateHash{$uhk}->{date}." $time", $event, $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
         
               $iu++;
               
@@ -9586,9 +9602,9 @@ sub _DbRep_rl_updateDay {
                   }
               }
             
-              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 23:59:59, EVENT='rl_max_d', VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 23:59:59, EVENT=$event, VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
             
-              $sth_updD->execute( $updateHash{$uhk}->{date}." 23:59:59", 'rl_max_d', $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
+              $sth_updD->execute( $updateHash{$uhk}->{date}." 23:59:59", $event, $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
         
               $iu++;
               
