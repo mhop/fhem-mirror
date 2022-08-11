@@ -8971,9 +8971,12 @@ sub DbRep_reduceLog {
     
     my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average'     : 
                ($ph->{average} && $ph->{average} eq "day") ? 'average=day' : 
+               (@$pa[1]        && @$pa[1] =~ /max/i)       ? 'max'         : 
+               ($ph->{max}     && $ph->{max} eq "day")     ? 'max=day'     : 
                q{};
                
-    my $mstr = $mode =~ /average/ ? 'average' :
+    my $mstr = $mode =~ /average/i ? 'average' :
+               $mode =~ /max/i     ? 'max'     :
                q{};
     
     # Korrektur des Select-Zeitraums + eine Stunde 
@@ -9116,7 +9119,7 @@ sub DbRep_reduceLog {
                     @dayRows = ();
                 }
                 
-                if ($mode =~ /average/i) {                    
+                if ($mode =~ /average|max/i) {                    
            
                     my $params = {
                         name            => $name,
@@ -9139,7 +9142,7 @@ sub DbRep_reduceLog {
                     @updateHour = ();
                 }
                 
-                if ($mode =~ /average=day/i && scalar @updateDay) {                    
+                if ($mode =~ /=day/i && scalar @updateDay) {                    
 
                     my $params = {
                         name            => $name,
@@ -9174,7 +9177,7 @@ sub DbRep_reduceLog {
         ############################
         
         if ($hour != $currentHour) {                                              # forget records from last hour, but remember these for average
-            if ($mode =~ /average/i && keys(%hourlyKnown)) {
+            if ($mode =~ /average|max/i && keys(%hourlyKnown)) {
                 push(@updateHour, {%hourlyKnown});
             }
             
@@ -9185,7 +9188,7 @@ sub DbRep_reduceLog {
         if (defined $hourlyKnown{$device.$reading}) {                             # das erste reading pro device und Stunde wird nicht in @dayRows (zum Löschen) gespeichert, die anderen können gelöscht werden 
             push(@dayRows, [@$row]);
             
-            if ($mode =~ /average/i                     && 
+            if ($mode =~ /average|max/i                 && 
                 defined($value)                         &&                     
                 DbRep_IsNumeric ($value)                &&                    
                 $hourlyKnown{$device.$reading}->[0]) {                         
@@ -9221,8 +9224,8 @@ sub DbRep_reduceLog {
     my $brt = time() - $startTime;
     
     my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                 .($mode =~ /average/i ? ", updated: $updateCount"   : '')
-                 .($excludeCount       ? ", excluded: $excludeCount" : '');
+                 .($mode =~ /average|max/i ? ", updated: $updateCount"   : '')
+                 .($excludeCount           ? ", excluded: $excludeCount" : '');
                
     Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
     
@@ -9336,46 +9339,50 @@ sub _DbRep_rl_updateHour {
   return $err if ($err);
   
   #Log3 ($name, 3, "DbRep $name - content hourlyKnown Hash:\n".Dumper %$hourlyKnownref);
+  
+  push(@$updateHourref, {%$hourlyKnownref});
+
+  my $c = 0;
+  
+  for my $hourHash (@$updateHourref) {                                                                                      # Only count for logging...
+      for my $hourKey (keys %$hourHash) {
+          $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} >= 1);
+      }
+  }
+
+  ${$updateCountref} += $c;
+
+  Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay") if($c);
+  
+  my $sum = 0;
+  my $max;
+  my $i   = 0;
+  my $k   = 1;
+  my $th  = _DbRep_rl_logThreshold ($c);
+  
+  #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
 
   eval {
-      push(@$updateHourref, {%$hourlyKnownref});
-    
-      my $c = 0;
-      
-      for my $hourHash (@$updateHourref) {                                                                                      # Only count for logging...
-          for my $hourKey (keys %$hourHash) {
-              $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} >= 1);
-          }
-      }
-    
-      ${$updateCountref} += $c;
-    
-      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay") if($c);
-      
-      my $sum = 0;
-      my $i   = 0;
-      my $k   = 1;
-      my $th  = _DbRep_rl_logThreshold ($c);
-      
-      #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
-    
       for my $hourHash (@$updateHourref) {
+          
           for my $hourKey (keys %$hourHash) {
-              if ($hourHash->{$hourKey}->[0]) {
-                  my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
-                
+              
+              next if (!$hourHash->{$hourKey}->[0]);
+              my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
+                           
+              if ($mstr eq 'average') {                                                            # Berechnung Average 
                   if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
                     
                       for my $val (@{$hourHash->{$hourKey}->[4]}) { 
                           $sum += $val; 
                       }
                     
-                      my $average = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
+                      my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
                       $sum        = 0;
                     
-                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
                     
-                      $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
+                      $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
                     
                       $i++;
                     
@@ -9388,16 +9395,56 @@ sub _DbRep_rl_updateHour {
                           $k++;
                       } 
                     
-                      if ($mode =~ /average=day/i) {  # timestamp,           event,     value,            device,                     reading
-                          push(@$updateDayref, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                      if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
+                          push(@$updateDayref, ["$updDate $updHour:30:00", 'rl_av_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   } 
                   else {
-                      if ($mode =~ /average=day/i) {
+                      if ($mode =~ /=day/i) {        # timestamp,                   event,                         value,                    device,                     reading,                  Date
                           push(@$updateDayref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   }
-              }                                                       
+              }
+              elsif ($mstr eq 'max') {                                                            # Berechnung Max
+                  if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {
+                    
+                      for my $val (@{$hourHash->{$hourKey}->[4]}) { 
+                          if (!defined $max) {
+                              $max = $val;
+                          }
+                          else {
+                              $max = $val if ($val > $max);
+                          }                          
+                      }
+                    
+                      my $value = sprintf "%.${ndp}f", $max;
+                      undef $max;
+                    
+                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:59:59, EVENT='rl_max_h', VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+                    
+                      $sth_upd->execute(("$updDate $updHour:59:59", 'rl_max_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
+                    
+                      $i++;
+                    
+                      if($i == $th) {
+                          my $prog = $k * $i; 
+                        
+                          Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating progress of day: $processingDay is: $prog");
+                        
+                          $i = 0;
+                          $k++;
+                      } 
+                    
+                      if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
+                          push(@$updateDayref, ["$updDate $updHour:59:59", 'rl_max_h', $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                      }
+                  } 
+                  else {
+                      if ($mode =~ /=day/i) {        # timestamp,                   event,                         value,                    device,                     reading,                  Date
+                          push(@$updateDayref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                      }
+                  }                  
+              }              
           }
       }
       1;
@@ -9444,70 +9491,116 @@ sub _DbRep_rl_updateDay {
   
   my %updateHash;
   
-  eval {
-      for my $row (@$updateDayref) {
-          push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];       # tedr -> time, event, device, reading
-          $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];
-          $updateHash{$row->[3].$row->[4]}->{date} = $row->[5];
-      }
-    
-      my $c = 0;
+  for my $row (@$updateDayref) {
+      push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];       # tedr -> time, event, device, reading
+      $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];                                                 # Summe aller Werte
+      $updateHash{$row->[3].$row->[4]}->{date} = $row->[5];
       
-      for my $key (keys %updateHash) {
+      if (!defined $updateHash{$row->[3].$row->[4]}->{max}) {                                               # Maximalwert
+          $updateHash{$row->[3].$row->[4]}->{max} = $row->[2];
+      }
+      else {
+          $updateHash{$row->[3].$row->[4]}->{max} = $row->[2] if ($row->[2] > $updateHash{$row->[3].$row->[4]}->{max});
+      } 
+  }
+
+  my $c = 0;
+  
+  for my $key (keys %updateHash) {
+      if(scalar @{$updateHash{$key}->{tedr}} == 1) {
+          delete $updateHash{$key};
+      } 
+      else {
+          $c += (scalar @{$updateHash{$key}->{tedr}} - 1);
+      }
+  }
+
+  ${$deletedCountref} += $c;
+  ${$updateCountref}  += keys %updateHash;
+
+  my ($id,$iu) = (0,0);
+  my ($kd,$ku) = (1,1);
+  my $thd      = _DbRep_rl_logThreshold ($c);
+  my $thu      = _DbRep_rl_logThreshold (scalar keys %updateHash);
+
+  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
+
+  eval {
+      if ($mstr eq 'average') {                                                               # Update Average 
+          for my $uhk (keys %updateHash) {
+              my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
+              my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
+            
+              for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
+                  Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$tedr->[2]' AND READING='$tedr->[3]' AND TIMESTAMP='$tedr->[0]'");
+                
+                  $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
+                
+                  $id++;
+                
+                  if($id == $thd) {
+                      my $prog = $kd * $id;
+                    
+                      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) deleting progress of day: $processingDay is: $prog");
+                    
+                      $id = 0;
+                      $kd++;
+                  }
+              }
+            
+              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+            
+              $sth_updD->execute( $updateHash{$uhk}->{date}." 12:00:00", 'rl_av_d', $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
         
-          if(scalar @{$updateHash{$key}->{tedr}} == 1) {
-              delete $updateHash{$key};
-          } 
-          else {
-              $c += (scalar @{$updateHash{$key}->{tedr}} - 1);
+              $iu++;
+              
+              if($iu == $thu) {
+                  my $prog = $ku * $id;
+                  
+                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating progress of day: $processingDay is: $prog");
+                  
+                  $iu = 0;
+                  $ku++;
+              }                           
           }
       }
-    
-      ${$deletedCountref} += $c;
-      ${$updateCountref}  += keys %updateHash;
-    
-      my ($id,$iu) = (0,0);
-      my ($kd,$ku) = (1,1);
-      my $thd      = _DbRep_rl_logThreshold ($c);
-      my $thu      = _DbRep_rl_logThreshold (scalar keys %updateHash);
-    
-      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
-    
-      for my $rdng (keys %updateHash) {
-          my $average  = sprintf "%.${ndp}f", $updateHash{$rdng}->{sum} / scalar @{$updateHash{$rdng}->{tedr}};
-          my $lastUpdH = pop @{$updateHash{$rdng}->{tedr}};
-        
-          for my $tedr (@{$updateHash{$rdng}->{tedr}}) {
-              Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$tedr->[2]' AND READING='$tedr->[3]' AND TIMESTAMP='$tedr->[0]'");
+      elsif ($mstr eq 'max') {                                                               # Update Max
+          for my $uhk (keys %updateHash) {
+              my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
+              my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
             
-              $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
-            
-              $id++;
-            
-              if($id == $thd) {
-                  my $prog = $kd * $id;
+              for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
+                  Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$tedr->[2]' AND READING='$tedr->[3]' AND TIMESTAMP='$tedr->[0]'");
                 
-                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) deleting progress of day: $processingDay is: $prog");
+                  $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
                 
-                  $id = 0;
-                  $kd++;
+                  $id++;
+                
+                  if($id == $thd) {
+                      my $prog = $kd * $id;
+                    
+                      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) deleting progress of day: $processingDay is: $prog");
+                    
+                      $id = 0;
+                      $kd++;
+                  }
               }
-          }
+            
+              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 23:59:59, EVENT='rl_max_d', VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+            
+              $sth_updD->execute( $updateHash{$uhk}->{date}." 23:59:59", 'rl_max_d', $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
         
-          Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$rdng}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
-        
-          $sth_updD->execute( $updateHash{$rdng}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
-    
-          $iu++;
-          
-          if($iu == $thu) {
-              my $prog = $ku * $id;
+              $iu++;
               
-              Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating progress of day: $processingDay is: $prog");
-              
-              $iu = 0;
-              $ku++;
-          }                           
+              if($iu == $thu) {
+                  my $prog = $ku * $id;
+                  
+                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating progress of day: $processingDay is: $prog");
+                  
+                  $iu = 0;
+                  $ku++;
+              }                           
+          }          
       }
       1;
   }
@@ -17128,22 +17221,34 @@ return;
                                  </li>
                                  
 
-    <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
+    <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [mode] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
                                  Reduziert historische Datensätze. <br><br>
                                  
-                                 <b>Arbeitsweise ohne Optionsangabe </b> <br><br>
+                                 <b>Arbeitsweise ohne Angabe von Befehlszeilenoperatoren </b> <br><br>
                                  
-                                 Es werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten 
-                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading reduziert.
-                                 Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten).
-                                 Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                               
-                                 Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
+                                 Es werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten Zeitgrenzen bereinigt.
+                                 Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten).                            
+                                 Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul ermittelt. <br>
+                                 Der Arbeitsmodus wird durch die optionale Angabe von <b>mode</b> bestimmt:
                                  <br><br>
                                  
-                                 Durch die optionale Angabe von <b>average</b> wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
-                                 Mit der Option <b>average=day</b> werden alle numerischen Werte eines Tages auf einen einzigen 
-                                 Mittelwert reduziert (impliziert 'average'). <br><br>
+                                 <ul>
+                                 <table>  
+                                 <colgroup> <col width=25%> <col width=75%> </colgroup>
+                                    <tr><td> <b>ohne Angabe von mode</b>    </td><td>:&nbsp;die Daten werden auf den ersten Eintrag pro Stunde je Device & Reading reduziert                </td></tr>
+                                    <tr><td> <b>average</b>                 </td><td>:&nbsp;numerische Werte werden auf einen Mittelwert pro Stunde je Device & Reading reduziert           </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
+                                    <tr><td> <b>average=day</b>             </td><td>:&nbsp;numerische Werte werden auf einen Mittelwert pro Tag je Device & Reading reduziert              </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.      </td></tr>                                      
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
+                                    <tr><td> <b>max</b>                     </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Stunde je Device & Reading reduziert            </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
+                                    <tr><td> <b>max=day</b>                 </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Tag je Device & Reading reduziert               </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.      </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
+                                 </table>
+                                 </ul>
+                                 <br>
                                  
                                  Mit den Attributen <b>device</b> und <b>reading</b> können die zu berücksichtigenden Datensätze eingeschlossen
                                  bzw. ausgeschlossen werden. Beide Eingrenzungen reduzieren die selektierten Daten und verringern den
@@ -17202,14 +17307,12 @@ return;
                                  </ul>
                                  <br>
                                  
-                                 <b>Arbeitsweise mit Optionsangabe </b> <br><br>
+                                 <b>Arbeitsweise mit Angabe von Befehlszeilenoperatoren </b> <br><br>
                                  
                                  Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als 
                                  <b>&lt;nn&gt;</b> Tage.
-                                 Durch die Angabe von <b>average</b> wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
-                                 Mit der Option <b>average=day</b> werden alle numerischen Werte eines Tages auf einen einzigen 
-                                 Mittelwert reduziert (impliziert 'average'). <br><br>
+                                 Der Arbeitsmodus wird durch die optionale Angabe von <b>mode</b> wie oben beschrieben bestimmt.
+                                 <br><br>
 
                                  Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen in reduceLog auszuschließen 
                                  bzw. einzuschließen und überschreiben die Einstellung der Attribute "device" und "reading", die in diesem Fall 
