@@ -8972,6 +8972,9 @@ sub DbRep_reduceLog {
     my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average'     : 
                ($ph->{average} && $ph->{average} eq "day") ? 'average=day' : 
                q{};
+               
+    my $mstr = $mode =~ /average/ ? 'average' :
+               q{};
     
     # Korrektur des Select-Zeitraums + eine Stunde 
     # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
@@ -8998,7 +9001,6 @@ sub DbRep_reduceLog {
     
     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
     
-    my $sql;
     my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table where ";
     my $addon   = "ORDER BY TIMESTAMP ASC";
     
@@ -9013,6 +9015,8 @@ sub DbRep_reduceLog {
         valfilter => $valfilter,
         addon     => $addon
     };
+    
+    my $sql;
     
     if($includes) {                                                                      # Option EX/INCLUDE wurde angegeben
         $sql = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $table WHERE "
@@ -9119,6 +9123,7 @@ sub DbRep_reduceLog {
                         dbh             => $dbh,
                         sth_upd         => $sth_upd,
                         mode            => $mode,
+                        mstr            => $mstr,
                         table           => $table,
                         hourlyKnownref  => \%hourlyKnown,
                         updateHourref   => \@updateHour,
@@ -9140,7 +9145,9 @@ sub DbRep_reduceLog {
                         name            => $name,
                         dbh             => $dbh,
                         sth_delD        => $sth_delD,   
-                        sth_updD        => $sth_updD,                        
+                        sth_updD        => $sth_updD,
+                        mode            => $mode,
+                        mstr            => $mstr,                        
                         table           => $table,
                         updateDayref    => \@updateDay,
                         deletedCountref => \$deletedCount, 
@@ -9305,8 +9312,8 @@ return $err;
 }
 
 ####################################################################################################
-#           Average (pro Stunde) in DB updaten und @updateDay füllen bei 
-#           $mode = average=day
+#           Mode (pro Stunde) in DB updaten und @updateDay füllen bei 
+#           $mode = *=day
 ####################################################################################################
 sub _DbRep_rl_updateHour {
   my $paref           = shift;
@@ -9314,6 +9321,7 @@ sub _DbRep_rl_updateHour {
   my $dbh             = $paref->{dbh};
   my $sth_upd         = $paref->{sth_upd};
   my $mode            = $paref->{mode};
+  my $mstr            = $paref->{mstr};
   my $table           = $paref->{table};
   my $hourlyKnownref  = $paref->{hourlyKnownref};
   my $updateHourref   = $paref->{updateHourref};
@@ -9342,7 +9350,7 @@ sub _DbRep_rl_updateHour {
     
       ${$updateCountref} += $c;
     
-      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c);        # else only push to @updateDay
+      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay") if($c);
       
       my $sum = 0;
       my $i   = 0;
@@ -9353,10 +9361,10 @@ sub _DbRep_rl_updateHour {
     
       for my $hourHash (@$updateHourref) {
           for my $hourKey (keys %$hourHash) {
-              if ($hourHash->{$hourKey}->[0]) {                                                                             # true if reading is a number 
+              if ($hourHash->{$hourKey}->[0]) {
                   my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
                 
-                  if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {                                                          # true if reading has multiple records this hour
+                  if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
                     
                       for my $val (@{$hourHash->{$hourKey}->[4]}) { 
                           $sum += $val; 
@@ -9374,13 +9382,13 @@ sub _DbRep_rl_updateHour {
                       if($i == $th) {
                           my $prog = $k * $i; 
                         
-                          Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
+                          Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating progress of day: $processingDay is: $prog");
                         
                           $i = 0;
                           $k++;
                       } 
                     
-                      if ($mode =~ /average=day/i) {
+                      if ($mode =~ /average=day/i) {  # timestamp,           event,     value,            device,                     reading
                           push(@$updateDayref, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   } 
@@ -9397,7 +9405,7 @@ sub _DbRep_rl_updateHour {
   or do {
       $err = encode_base64($@, "");
     
-      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog average=hour failed for day $processingDay: $@");
+      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $@");
     
       DbRep_rollbackOnly ($name, $dbh);
       return $err;
@@ -9410,7 +9418,7 @@ return $err;
 }
 
 ####################################################################################################
-#           Average Day in DB updaten
+#           Mode Day in DB updaten
 ####################################################################################################
 sub _DbRep_rl_updateDay {
   my $paref           = shift;
@@ -9418,6 +9426,8 @@ sub _DbRep_rl_updateDay {
   my $dbh             = $paref->{dbh};
   my $sth_delD        = $paref->{sth_delD};
   my $sth_updD        = $paref->{sth_updD};
+  my $mode            = $paref->{mode};
+  my $mstr            = $paref->{mstr};
   my $table           = $paref->{table};
   my $updateDayref    = $paref->{updateDayref};
   my $deletedCountref = $paref->{deletedCountref};
@@ -9436,7 +9446,7 @@ sub _DbRep_rl_updateDay {
   
   eval {
       for my $row (@$updateDayref) {
-          push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];
+          push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];       # tedr -> time, event, device, reading
           $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];
           $updateHash{$row->[3].$row->[4]}->{date} = $row->[5];
       }
@@ -9461,23 +9471,23 @@ sub _DbRep_rl_updateDay {
       my $thd      = _DbRep_rl_logThreshold ($c);
       my $thu      = _DbRep_rl_logThreshold (scalar keys %updateHash);
     
-      Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
+      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
     
       for my $rdng (keys %updateHash) {
           my $average  = sprintf "%.${ndp}f", $updateHash{$rdng}->{sum} / scalar @{$updateHash{$rdng}->{tedr}};
           my $lastUpdH = pop @{$updateHash{$rdng}->{tedr}};
         
-          for (@{$updateHash{$rdng}->{tedr}}) {
-              Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
+          for my $tedr (@{$updateHash{$rdng}->{tedr}}) {
+              Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$tedr->[2]' AND READING='$tedr->[3]' AND TIMESTAMP='$tedr->[0]'");
             
-              $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
+              $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
             
               $id++;
             
               if($id == $thd) {
                   my $prog = $kd * $id;
                 
-                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
+                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) deleting progress of day: $processingDay is: $prog");
                 
                   $id = 0;
                   $kd++;
@@ -9493,7 +9503,7 @@ sub _DbRep_rl_updateDay {
           if($iu == $thu) {
               my $prog = $ku * $id;
               
-              Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
+              Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating progress of day: $processingDay is: $prog");
               
               $iu = 0;
               $ku++;
@@ -9503,7 +9513,7 @@ sub _DbRep_rl_updateDay {
   }
   or do {
       $err = encode_base64($@, "");
-      Log3 ($name, 3, "DbRep $name - ERROR - reduceLog average=day failed for day $processingDay: $@");
+      Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $@");
     
       DbRep_rollbackOnly ($name, $dbh);
       return $err;
