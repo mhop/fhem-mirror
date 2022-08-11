@@ -8954,9 +8954,6 @@ sub DbRep_reduceLog {
     }
     
     Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
-
-    my (%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
-    my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0);
     
     BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
     
@@ -8972,22 +8969,23 @@ sub DbRep_reduceLog {
     
     my ($pa,$ph) = parseParams(join ' ', @a);
     
-    my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average=hour' : 
-               ($ph->{average} && $ph->{average} eq "day") ? 'average=day'  : 
+    my $mode = (@$pa[1]        && @$pa[1] =~ /average/i)   ? 'average'     : 
+               ($ph->{average} && $ph->{average} eq "day") ? 'average=day' : 
                q{};
     
     # Korrektur des Select-Zeitraums + eine Stunde 
     # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
-    my ($yyyy, $mm, $dd, $hh, $min, $sec) = $ots =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
-    my $epoche                            = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
-    my $splus                             = $mode =~ /average/i ? 3600 : 0;
-    $ots                                  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoche+$splus);
+    #my ($yyyy, $mm, $dd, $hh, $min, $sec) = $ots =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
+    #my $epoche                            = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
+    #my $splus                             = $mode =~ /average/i ? 3600 : 0;
+    #$ots                                  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoche+$splus);
     
     my $excludes = $ph->{EXCLUDE} // q{};
     my $includes = $ph->{INCLUDE} // q{};
     
+    my @excludeRegex;
     if ($excludes) {
-        @excludeRegex = split(',',$excludes);
+        @excludeRegex = split ',', $excludes;
     }
              
     my ($dbh, $dbmodel);             
@@ -9032,7 +9030,7 @@ sub DbRep_reduceLog {
         $sql = DbRep_createCommonSql ($specs);
     }
     
-    Log3 ($name, 3, "DbRep $name - reduce data older than: $ots (logical corrected), newer than: $nts");
+    Log3 ($name, 3, "DbRep $name - reduce data older than: $ots, newer than: $nts");
     
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
           .($mode ? "\n".$mode : '')
@@ -9074,7 +9072,11 @@ sub DbRep_reduceLog {
     # $row->[3] = Reading
     # $row->[4] = Value
     
+    my $ndp = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
+    
     my ($day,$hour, $processingDay);
+    my (%hourlyKnown,%averageHash,@dayRows,@averageUpd,@averageUpdD);
+    my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0);
     
     do {
         my $row      = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];        # || execute last-day dummy
@@ -9095,13 +9097,13 @@ sub DbRep_reduceLog {
                     
                     my $params = {
                         name            => $name,
-                        day             => $day,
                         dbh             => $dbh,
                         sth_del         => $sth_del,
                         table           => $table,
                         dayRowsref      => \@dayRows,
                         deletedCountref => \$deletedCount, 
-                        processingDay   => $processingDay
+                        processingDay   => $processingDay,
+                        ndp             => $ndp
                     };
 
                     $err = _DbRep_rl_deleteDayRows ($params); 
@@ -9114,7 +9116,6 @@ sub DbRep_reduceLog {
            
                     my $params = {
                         name            => $name,
-                        day             => $day,
                         dbh             => $dbh,
                         sth_upd         => $sth_upd,
                         mode            => $mode,
@@ -9123,7 +9124,8 @@ sub DbRep_reduceLog {
                         averageUpdref   => \@averageUpd,
                         averageUpdDref  => \@averageUpdD,
                         updateCountref  => \$updateCount,
-                        processingDay   => $processingDay
+                        processingDay   => $processingDay,
+                        ndp             => $ndp
                     };
 
                     $err = _DbRep_rl_average ($params); 
@@ -9144,7 +9146,8 @@ sub DbRep_reduceLog {
                         averageHashref  => \%averageHash,
                         deletedCountref => \$deletedCount, 
                         updateCountref  => \$updateCount,
-                        processingDay   => $processingDay
+                        processingDay   => $processingDay,
+                        ndp             => $ndp
                     };
 
                     $err = _DbRep_rl_averageDay ($params); 
@@ -9174,12 +9177,12 @@ sub DbRep_reduceLog {
             $currentHour = $hour;
         }
             
-        if (defined $hourlyKnown{$device.$reading}) {                             # remember first readings for device per h, other can be deleted 
+        if (defined $hourlyKnown{$device.$reading}) {                             # das erste reading pro device und Stunde wird nicht in @dayRows (zum Löschen) gespeichert, die anderen können gelöscht werden 
             push(@dayRows, [@$row]);
             
             if ($mode =~ /average/i                     && 
                 defined($value)                         &&                     
-                $value =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && 
+                DbRep_IsNumeric ($value)                &&                    
                 $hourlyKnown{$device.$reading}->[0]) {                         
                 
                 if ($hourlyKnown{$device.$reading}->[0]) {
@@ -9198,8 +9201,8 @@ sub DbRep_reduceLog {
                 $excludeCount++ if($day != 00);
             } 
             else {
-                $hourlyKnown{$device.$reading} = (defined($value) && $value =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? 
-                                                 [$ts,$device,$row->[2],$reading,[$value]]                    : 
+                $hourlyKnown{$device.$reading} = DbRep_IsNumeric ($value)                  ? 
+                                                 [$ts,$device,$row->[2],$reading,[$value]] : 
                                                  [0];
             }
         }
@@ -9233,7 +9236,6 @@ return "$name|$err|$ret|$brt";
 sub _DbRep_rl_deleteDayRows {
   my $paref           = shift;
   my $name            = $paref->{name};
-  my $day             = $paref->{day};
   my $dbh             = $paref->{dbh};
   my $sth_del         = $paref->{sth_del};
   my $table           = $paref->{table};
@@ -9311,7 +9313,6 @@ return $err;
 sub _DbRep_rl_average {
   my $paref           = shift;
   my $name            = $paref->{name};
-  my $day             = $paref->{day};
   my $dbh             = $paref->{dbh};
   my $sth_upd         = $paref->{sth_upd};
   my $mode            = $paref->{mode};
@@ -9321,6 +9322,7 @@ sub _DbRep_rl_average {
   my $averageUpdDref  = $paref->{averageUpdDref};
   my $updateCountref  = $paref->{updateCountref};
   my $processingDay   = $paref->{processingDay};
+  my $ndp             = $paref->{ndp};
   
   my $err = q{};
   
@@ -9362,7 +9364,7 @@ sub _DbRep_rl_average {
                           $sum += $val; 
                       }
                     
-                      my $average = sprintf '%.3f', $sum / scalar @{$hourHash->{$hourKey}->[4]};
+                      my $average = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
                       $sum        = 0;
                     
                       Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
@@ -9424,6 +9426,7 @@ sub _DbRep_rl_averageDay {
   my $deletedCountref = $paref->{deletedCountref};
   my $updateCountref  = $paref->{updateCountref};
   my $processingDay   = $paref->{processingDay};
+  my $ndp             = $paref->{ndp};
   
   my $err = q{};
   
@@ -9462,7 +9465,7 @@ sub _DbRep_rl_averageDay {
       Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %{$averageHashref}).", deleting $c records of day: $processingDay") if(keys %{$averageHashref});
     
       for my $rdng (keys %{$averageHashref}) {
-          my $average  = sprintf '%.3f', ${$averageHashref}{$rdng}->{sum} / scalar @{${$averageHashref}{$rdng}->{tedr}};
+          my $average  = sprintf "%.${ndp}f", ${$averageHashref}{$rdng}->{sum} / scalar @{${$averageHashref}{$rdng}->{tedr}};
           my $lastUpdH = pop @{${$averageHashref}{$rdng}->{tedr}};
         
           for (@{${$averageHashref}{$rdng}->{tedr}}) {
@@ -9487,9 +9490,12 @@ sub _DbRep_rl_averageDay {
           $sth_updD->execute( ${$averageHashref}{$rdng}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
     
           $iu++;
+          
           if($iu == $thu) {
-              my $prog = $ku * $id; 
+              my $prog = $ku * $id;
+              
               Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
+              
               $iu = 0;
               $ku++;
           }                           
@@ -12628,6 +12634,21 @@ return $val;
 }
 
 ################################################################
+#  Prüfung auf numerischen Wert (vorzeichenbehaftet)
+################################################################
+sub DbRep_IsNumeric {
+  my $val = shift // q{empty};
+  
+  my $ret = 0;
+  
+  if($val =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/xs) {
+      $ret = 1;
+  }
+  
+return $ret;
+}
+
+################################################################
 #  entfernt führende Mullen einer Zahl
 ################################################################
 sub DbRep_removeLeadingZero {
@@ -14307,14 +14328,15 @@ return;
                                  <ul>
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog </td></tr>
-                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
-                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
-                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                    <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog                                               </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog                                                </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection                                                            </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection                                                           </td></tr>
+                                    <tr><td> <b>numDecimalPlaces</b>                       </td><td>: defines the number of decimal places for numeric result values                                             </td></tr>
+                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced                                                   </td></tr>
+                                    <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced                                                   </td></tr>
+                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced                                                   </td></tr>
+                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced                                                   </td></tr>
                                     <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                  </table>
                                  </ul>
@@ -17124,14 +17146,15 @@ return;
                                  <ul>
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder Perl-Routine) vor dem Export ausführen </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder Perl-Routine) nach dem Export ausführen </td></tr>
-                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
-                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
-                                    <tr><td> <b>timestamp_end</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
-                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
-                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
+                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: FHEM Kommando (oder Perl-Routine) vor dem Export ausführen                                                          </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder Perl-Routine) nach dem Export ausführen                                                         </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten                                         </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten                                        </td></tr>                                      
+                                    <tr><td> <b>numDecimalPlaces</b>                       </td><td>: legt die Anzahl der Nachkommastellen bei numerischen Ergebniswerten fest                                            </td></tr>
+                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert                                              </td></tr>
+                                    <tr><td> <b>timestamp_end</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert                                              </td></tr>
+                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert                                              </td></tr>
+                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert                                              </td></tr>
                                     <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                  </table>
                                  </ul>
