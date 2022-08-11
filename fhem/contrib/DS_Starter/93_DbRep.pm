@@ -9081,7 +9081,7 @@ sub DbRep_reduceLog {
     
     my $ndp = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
     
-    my ($day,$hour, $processingDay);
+    my ($day, $hour, $processingDay, $params);
     my (%hourlyKnown,@dayRows,@updateHour,@updateDay);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0);
     
@@ -9102,7 +9102,7 @@ sub DbRep_reduceLog {
             if ($currentDay) {                                                             # nicht am ersten ausgeführten Tag
                 if (scalar @dayRows) {                                                     # alle Tageseinträge löschen
                     
-                    my $params = {
+                    $params = {
                         name            => $name,
                         dbh             => $dbh,
                         sth_del         => $sth_del,
@@ -9121,7 +9121,7 @@ sub DbRep_reduceLog {
                 
                 if ($mode =~ /average|max/i) {                    
            
-                    my $params = {
+                    $params = {
                         name            => $name,
                         dbh             => $dbh,
                         sth_upd         => $sth_upd,
@@ -9144,7 +9144,7 @@ sub DbRep_reduceLog {
                 
                 if ($mode =~ /=day/i && scalar @updateDay) {                    
 
-                    my $params = {
+                    $params = {
                         name            => $name,
                         dbh             => $dbh,
                         sth_delD        => $sth_delD,   
@@ -9356,8 +9356,7 @@ sub _DbRep_rl_updateHour {
 
   Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay") if($c);
   
-  my $max;
-  my $params;
+  my ($max, $params);
   my $sum = 0;
   my $i   = 0;
   my $k   = 1;
