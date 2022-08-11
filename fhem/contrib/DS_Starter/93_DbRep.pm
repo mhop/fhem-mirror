@@ -9075,7 +9075,7 @@ sub DbRep_reduceLog {
     my $ndp = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
     
     my ($day,$hour, $processingDay);
-    my (%hourlyKnown,%averageHash,@dayRows,@averageUpd,@averageUpdD);
+    my (%hourlyKnown,@dayRows,@updateHour,@updateDay);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0);
     
     do {
@@ -9121,20 +9121,20 @@ sub DbRep_reduceLog {
                         mode            => $mode,
                         table           => $table,
                         hourlyKnownref  => \%hourlyKnown,
-                        averageUpdref   => \@averageUpd,
-                        averageUpdDref  => \@averageUpdD,
+                        updateHourref   => \@updateHour,
+                        updateDayref    => \@updateDay,
                         updateCountref  => \$updateCount,
                         processingDay   => $processingDay,
                         ndp             => $ndp
                     };
 
-                    $err = _DbRep_rl_average ($params); 
+                    $err = _DbRep_rl_updateHour ($params); 
                     return "$name|$err" if ($err);           
                     
-                    @averageUpd = ();
+                    @updateHour = ();
                 }
                 
-                if ($mode =~ /average=day/i && scalar @averageUpdD) {                    
+                if ($mode =~ /average=day/i && scalar @updateDay) {                    
 
                     my $params = {
                         name            => $name,
@@ -9142,23 +9142,21 @@ sub DbRep_reduceLog {
                         sth_delD        => $sth_delD,   
                         sth_updD        => $sth_updD,                        
                         table           => $table,
-                        averageUpdDref  => \@averageUpdD,
-                        averageHashref  => \%averageHash,
+                        updateDayref    => \@updateDay,
                         deletedCountref => \$deletedCount, 
                         updateCountref  => \$updateCount,
                         processingDay   => $processingDay,
                         ndp             => $ndp
                     };
 
-                    $err = _DbRep_rl_averageDay ($params); 
+                    $err = _DbRep_rl_updateDay ($params); 
                     return "$name|$err" if ($err);
 
                 }
-                
-                %averageHash = ();
+
                 %hourlyKnown = ();
-                @averageUpd  = ();
-                @averageUpdD = ();
+                @updateHour  = ();
+                @updateDay   = ();
                 $currentHour = 99;
             }
             
@@ -9170,7 +9168,7 @@ sub DbRep_reduceLog {
         
         if ($hour != $currentHour) {                                              # forget records from last hour, but remember these for average
             if ($mode =~ /average/i && keys(%hourlyKnown)) {
-                push(@averageUpd, {%hourlyKnown});
+                push(@updateHour, {%hourlyKnown});
             }
             
             %hourlyKnown = ();
@@ -9307,10 +9305,10 @@ return $err;
 }
 
 ####################################################################################################
-#           Average (pro Stunde) in DB updaten und @averageUpdD füllen bei 
+#           Average (pro Stunde) in DB updaten und @updateDay füllen bei 
 #           $mode = average=day
 ####################################################################################################
-sub _DbRep_rl_average {
+sub _DbRep_rl_updateHour {
   my $paref           = shift;
   my $name            = $paref->{name};
   my $dbh             = $paref->{dbh};
@@ -9318,8 +9316,8 @@ sub _DbRep_rl_average {
   my $mode            = $paref->{mode};
   my $table           = $paref->{table};
   my $hourlyKnownref  = $paref->{hourlyKnownref};
-  my $averageUpdref   = $paref->{averageUpdref};
-  my $averageUpdDref  = $paref->{averageUpdDref};
+  my $updateHourref   = $paref->{updateHourref};
+  my $updateDayref    = $paref->{updateDayref};
   my $updateCountref  = $paref->{updateCountref};
   my $processingDay   = $paref->{processingDay};
   my $ndp             = $paref->{ndp};
@@ -9332,11 +9330,11 @@ sub _DbRep_rl_average {
   #Log3 ($name, 3, "DbRep $name - content hourlyKnown Hash:\n".Dumper %$hourlyKnownref);
 
   eval {
-      push(@$averageUpdref, {%$hourlyKnownref});
+      push(@$updateHourref, {%$hourlyKnownref});
     
       my $c = 0;
       
-      for my $hourHash (@$averageUpdref) {                                                                                      # Only count for logging...
+      for my $hourHash (@$updateHourref) {                                                                                      # Only count for logging...
           for my $hourKey (keys %$hourHash) {
               $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} >= 1);
           }
@@ -9344,16 +9342,16 @@ sub _DbRep_rl_average {
     
       ${$updateCountref} += $c;
     
-      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c);        # else only push to @averageUpdD
+      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c);        # else only push to @updateDay
       
       my $sum = 0;
       my $i   = 0;
       my $k   = 1;
       my $th  = _DbRep_rl_logThreshold ($c);
       
-      #Log3 ($name, 3, "DbRep $name - content averageUpd Array:\n".Dumper @$averageUpdref);
+      #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
     
-      for my $hourHash (@$averageUpdref) {
+      for my $hourHash (@$updateHourref) {
           for my $hourKey (keys %$hourHash) {
               if ($hourHash->{$hourKey}->[0]) {                                                                             # true if reading is a number 
                   my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
@@ -9383,12 +9381,12 @@ sub _DbRep_rl_average {
                       } 
                     
                       if ($mode =~ /average=day/i) {
-                          push(@$averageUpdDref, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                          push(@$updateDayref, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   } 
                   else {
                       if ($mode =~ /average=day/i) {
-                          push(@$averageUpdDref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
+                          push(@$updateDayref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
                   }
               }                                                       
@@ -9414,15 +9412,14 @@ return $err;
 ####################################################################################################
 #           Average Day in DB updaten
 ####################################################################################################
-sub _DbRep_rl_averageDay {
+sub _DbRep_rl_updateDay {
   my $paref           = shift;
   my $name            = $paref->{name};
   my $dbh             = $paref->{dbh};
   my $sth_delD        = $paref->{sth_delD};
   my $sth_updD        = $paref->{sth_updD};
   my $table           = $paref->{table};
-  my $averageUpdDref  = $paref->{averageUpdDref};
-  my $averageHashref  = $paref->{averageHashref};
+  my $updateDayref    = $paref->{updateDayref};
   my $deletedCountref = $paref->{deletedCountref};
   my $updateCountref  = $paref->{updateCountref};
   my $processingDay   = $paref->{processingDay};
@@ -9433,42 +9430,44 @@ sub _DbRep_rl_averageDay {
   $err = DbRep_beginDatabaseTransaction ($name, $dbh);
   return $err if ($err);
   
-  #Log3 ($name, 3, "DbRep $name - content averageUpdD Array:\n".Dumper @$averageUpdDref);
-
+  #Log3 ($name, 3, "DbRep $name - content updateDay Array:\n".Dumper @$updateDayref);
+  
+  my %updateHash;
+  
   eval {
-      for my $row (@$averageUpdDref) {
-          push @{${$averageHashref}{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];
-          ${$averageHashref}{$row->[3].$row->[4]}->{sum} += $row->[2];
-          ${$averageHashref}{$row->[3].$row->[4]}->{date} = $row->[5];
+      for my $row (@$updateDayref) {
+          push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];
+          $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];
+          $updateHash{$row->[3].$row->[4]}->{date} = $row->[5];
       }
     
       my $c = 0;
       
-      for my $key (keys %{$averageHashref}) {
+      for my $key (keys %updateHash) {
         
-          if(scalar @{${$averageHashref}{$key}->{tedr}} == 1) {
-              delete ${$averageHashref}{$key};
+          if(scalar @{$updateHash{$key}->{tedr}} == 1) {
+              delete $updateHash{$key};
           } 
           else {
-              $c += (scalar @{${$averageHashref}{$key}->{tedr}} - 1);
+              $c += (scalar @{$updateHash{$key}->{tedr}} - 1);
           }
       }
     
       ${$deletedCountref} += $c;
-      ${$updateCountref}  += keys %{$averageHashref};
+      ${$updateCountref}  += keys %updateHash;
     
       my ($id,$iu) = (0,0);
       my ($kd,$ku) = (1,1);
       my $thd      = _DbRep_rl_logThreshold ($c);
-      my $thu      = _DbRep_rl_logThreshold (scalar keys %{$averageHashref});
+      my $thu      = _DbRep_rl_logThreshold (scalar keys %updateHash);
     
-      Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %{$averageHashref}).", deleting $c records of day: $processingDay") if(keys %{$averageHashref});
+      Log3 ($name, 3, "DbRep $name - reduceLog (daily-average) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
     
-      for my $rdng (keys %{$averageHashref}) {
-          my $average  = sprintf "%.${ndp}f", ${$averageHashref}{$rdng}->{sum} / scalar @{${$averageHashref}{$rdng}->{tedr}};
-          my $lastUpdH = pop @{${$averageHashref}{$rdng}->{tedr}};
+      for my $rdng (keys %updateHash) {
+          my $average  = sprintf "%.${ndp}f", $updateHash{$rdng}->{sum} / scalar @{$updateHash{$rdng}->{tedr}};
+          my $lastUpdH = pop @{$updateHash{$rdng}->{tedr}};
         
-          for (@{${$averageHashref}{$rdng}->{tedr}}) {
+          for (@{$updateHash{$rdng}->{tedr}}) {
               Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
             
               $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
@@ -9485,9 +9484,9 @@ sub _DbRep_rl_averageDay {
               }
           }
         
-          Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=${$averageHashref}{$rdng}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+          Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$rdng}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
         
-          $sth_updD->execute( ${$averageHashref}{$rdng}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
+          $sth_updD->execute( $updateHash{$rdng}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
     
           $iu++;
           
