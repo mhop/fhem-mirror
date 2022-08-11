@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.2 "=> "11.08.2022  fix no disabled Link after restart and disable=1 ",
   "0.67.1 "=> "10.08.2022  fix warning, Forum: https://forum.fhem.de/index.php/topic,117864.msg1231050.html#msg1231050 ",
   "0.67.0 "=> "31.07.2022  change _gethtml, _getftui ",
   "0.66.0 "=> "24.07.2022  insert function calcPeaklossByTemp to calculate peak power reduction by temperature ",
@@ -4548,8 +4549,8 @@ sub entryGraphic {
   
   my $hash = $defs{$name};
   
-  # Setup Vollständigkeit prüfen
-  ###############################
+  # Setup Vollständigkeit/disabled prüfen
+  #########################################
   my $incomplete = _checkSetupComplete ($hash);
   return $incomplete if($incomplete);
   
@@ -4617,114 +4618,103 @@ sub entryGraphic {
   
   my $ret = q{};
   
-  if(IsDisabled($name)) {   
-      $ret .= "<table class='roomoverview'>";
-      $ret .= "<tr style='height:".$paref->{height}."px'>";
-      $ret .= "<td>";
-      $ret .= qq{SolarForecast device <a href="$FW_ME$FW_subdir?detail=$name">$name</a> is disabled}; 
-      $ret .= "</td>";
+  $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
+  
+  $ret .= "<html>";
+  $ret .= $html_start if (defined($html_start));
+  $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
+  $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
+  $ret .= "<tr><td class='solarfc'>";
+  
+  # Headerzeile generieren 
+  ##########################  
+  my $header       = _graphicHeader ($paref);
+  $paref->{header} = $header;
+  
+  # Verbraucherlegende und Steuerung
+  ###################################           
+  my $legendtxt       = _graphicConsumerLegend ($paref);
+  $paref->{legendtxt} = $legendtxt;
+  
+  $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
+  my $m = $paref->{modulo} % 2;
+  
+  if ($header) {                                                                                            # Header ausgeben 
+      $ret .= "<tr class='$htr{$m}{cl}'>";                                                                  
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td>";
       $ret .= "</tr>";
-      $ret .= "</table>";
-  } 
-  else {
-      $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
       
-      $ret .= "<html>";
-      $ret .= $html_start if (defined($html_start));
-      $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
-      $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
-      $ret .= "<tr><td class='solarfc'>";
-      
-      # Headerzeile generieren 
-      ##########################  
-      my $header       = _graphicHeader ($paref);
-      $paref->{header} = $header;
-      
-      # Verbraucherlegende und Steuerung
-      ###################################           
-      my $legendtxt       = _graphicConsumerLegend ($paref);
-      $paref->{legendtxt} = $legendtxt;
-      
-      $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
-      my $m = $paref->{modulo} % 2;
-      
-      if ($header) {                                                                                            # Header ausgeben 
-          $ret .= "<tr class='$htr{$m}{cl}'>";                                                                  
-          $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td>";
-          $ret .= "</tr>";
-          
-          $paref->{modulo}++;
-      }
-      
-      my $clegend = $paref->{clegend};
-      $m          = $paref->{modulo} % 2;
-      
-      if ($legendtxt && ($clegend eq 'top')) {
-          $ret .= "<tr class='$htr{$m}{cl}'>";
-          $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td>";
-          $ret .= "</tr>";
-          
-          $paref->{modulo}++;
-      }
-      
-      $m = $paref->{modulo} % 2;
-                  
-      if($gsel eq "both" || $gsel eq "forecast") {
-          my %hfch;
-          my $hfcg  = \%hfch;                                                                                   #(hfcg = hash forecast graphic)
-          
-          # Werte aktuelle Stunde
-          ########################## 
-          $paref->{hfcg}     = $hfcg;
-          $paref->{thishour} = _beamGraphicFirstHour ($paref);
-
-          # get consumer list and display it in Graphics
-          ################################################ 
-          _showConsumerInGraphicBeam ($paref);
-
-          # Werte restliche Stunden
-          ###########################
-          my $back         = _beamGraphicRemainingHours ($paref);
-          $paref->{maxVal} = $back->{maxVal};                                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
-          $paref->{maxCon} = $back->{maxCon};                                                                       
-          $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
-          $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
-
-          #Log3 ($hash,3,Dumper($hfcg));
-          
-          # Balkengrafik
-          ################
-          $ret .= _beamGraphic ($paref);   
-      }
-      
-      $m = $paref->{modulo} % 2;
-      
-      if($gsel eq "both" || $gsel eq "flow") {
-          $ret  .= "<tr class='$htr{$m}{cl}'>";
-          my $fg = _flowGraphic ($paref);
-          $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$fg</td>";
-          $ret  .= "</tr>";
-          
-          $paref->{modulo}++;
-      }
-      
-      $m = $paref->{modulo} % 2;
-      
-      # Legende unten
-      #################
-      if ($legendtxt && ($clegend eq 'bottom')) {
-          $ret .= "<tr class='$htr{$m}{cl}'>";
-          $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-          $ret .= "$legendtxt</td></tr>";
-      }
-      
-      $ret .= "</table>";
-      
-      $ret .= "</td></tr>";
-      $ret .= "</table>";
-      $ret .= $html_end if (defined($html_end));
-      $ret .= "</html>";
+      $paref->{modulo}++;
   }
+  
+  my $clegend = $paref->{clegend};
+  $m          = $paref->{modulo} % 2;
+  
+  if ($legendtxt && ($clegend eq 'top')) {
+      $ret .= "<tr class='$htr{$m}{cl}'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td>";
+      $ret .= "</tr>";
+      
+      $paref->{modulo}++;
+  }
+  
+  $m = $paref->{modulo} % 2;
+              
+  if($gsel eq "both" || $gsel eq "forecast") {
+      my %hfch;
+      my $hfcg  = \%hfch;                                                                                   #(hfcg = hash forecast graphic)
+      
+      # Werte aktuelle Stunde
+      ########################## 
+      $paref->{hfcg}     = $hfcg;
+      $paref->{thishour} = _beamGraphicFirstHour ($paref);
+
+      # get consumer list and display it in Graphics
+      ################################################ 
+      _showConsumerInGraphicBeam ($paref);
+
+      # Werte restliche Stunden
+      ###########################
+      my $back         = _beamGraphicRemainingHours ($paref);
+      $paref->{maxVal} = $back->{maxVal};                                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
+      $paref->{maxCon} = $back->{maxCon};                                                                       
+      $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
+      $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
+
+      #Log3 ($hash,3,Dumper($hfcg));
+      
+      # Balkengrafik
+      ################
+      $ret .= _beamGraphic ($paref);   
+  }
+  
+  $m = $paref->{modulo} % 2;
+  
+  if($gsel eq "both" || $gsel eq "flow") {
+      $ret  .= "<tr class='$htr{$m}{cl}'>";
+      my $fg = _flowGraphic ($paref);
+      $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$fg</td>";
+      $ret  .= "</tr>";
+      
+      $paref->{modulo}++;
+  }
+  
+  $m = $paref->{modulo} % 2;
+  
+  # Legende unten
+  #################
+  if ($legendtxt && ($clegend eq 'bottom')) {
+      $ret .= "<tr class='$htr{$m}{cl}'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret .= "$legendtxt</td></tr>";
+  }
+  
+  $ret .= "</table>";
+  
+  $ret .= "</td></tr>";
+  $ret .= "</table>";
+  $ret .= $html_end if (defined($html_end));
+  $ret .= "</html>";
  
 return $ret;
 }
@@ -4747,11 +4737,23 @@ sub _checkSetupComplete {
   my $dir   = ReadingsVal  ($name, "moduleDirection",          undef);                    # Modulausrichtung Konfig
   my $ta    = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
   
-  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peak || !defined $pv0 || !$dir || !$ta) {
-      my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
-      my $height = AttrNum ($name,    'beamHeight',  200);
-      my $lang   = AttrVal ("global", "language",   "EN");      
+  my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
+  my $height = AttrNum ($name,    'beamHeight',  200);
+  my $lang   = AttrVal ("global", "language",   "EN");
+  
+  if(IsDisabled($name)) {   
+      $ret .= "<table class='roomoverview'>";
+      $ret .= "<tr style='height:".$height."px'>";
+      $ret .= "<td>";
+      $ret .= qq{SolarForecast device $link is disabled}; 
+      $ret .= "</td>";
+      $ret .= "</tr>";
+      $ret .= "</table>";
       
+      return $ret;
+  } 
+  
+  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peak || !defined $pv0 || !$dir || !$ta) {    
       $ret    .= "<table class='roomoverview'>";
       $ret    .= "<tr style='height:".$height."px'>";
       $ret    .= "<td>";
