@@ -9285,15 +9285,17 @@ sub _DbRep_rl_deleteDayRows {
                 
                   $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
                   $i++;
-                
-                  if($i == $th) {
-                      my $prog = $k * $i; 
-                    
-                      Log3 ($name, 3, "DbRep $name - reduceLog deletion progress of day: $processingDay is: $prog");
-                    
-                      $i = 0;
-                      $k++;
-                  }
+                  
+                  my $params = {
+                      name          => $name,
+                      logtxt        => "deletion",
+                      iref          => \$i,
+                      kref          => \$k,
+                      th            => $th,
+                      processingDay => $processingDay
+                  };
+
+                  _DbRep_logProgress ($params);
               #}
           }
           1;
@@ -9354,8 +9356,9 @@ sub _DbRep_rl_updateHour {
 
   Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay") if($c);
   
-  my $sum = 0;
   my $max;
+  my $params;
+  my $sum = 0;
   my $i   = 0;
   my $k   = 1;
   my $th  = _DbRep_rl_logThreshold ($c);
@@ -9386,7 +9389,7 @@ sub _DbRep_rl_updateHour {
                       }
                     
                       my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
-                      $sum        = 0;
+                      $sum      = 0;
                     
                       Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:$minutes, EVENT=$event, VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
                     
@@ -9394,14 +9397,16 @@ sub _DbRep_rl_updateHour {
                     
                       $i++;
                     
-                      if($i == $th) {
-                          my $prog = $k * $i; 
-                        
-                          Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating progress of day: $processingDay is: $prog");
-                        
-                          $i = 0;
-                          $k++;
-                      } 
+                      $params = {
+                          name          => $name,
+                          logtxt        => "(hourly-$mstr) updating",
+                          iref          => \$i,
+                          kref          => \$k,
+                          th            => $th,
+                          processingDay => $processingDay
+                      };
+
+                      _DbRep_logProgress ($params);
                     
                       if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
                           push(@$updateDayref, ["$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
@@ -9433,16 +9438,18 @@ sub _DbRep_rl_updateHour {
                       $sth_upd->execute(("$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
                     
                       $i++;
-                    
-                      if($i == $th) {
-                          my $prog = $k * $i; 
-                        
-                          Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating progress of day: $processingDay is: $prog");
-                        
-                          $i = 0;
-                          $k++;
-                      } 
-                    
+                      
+                      $params = {
+                          name          => $name,
+                          logtxt        => "(hourly-$mstr) updating",
+                          iref          => \$i,
+                          kref          => \$k,
+                          th            => $th,
+                          processingDay => $processingDay
+                      };
+
+                      _DbRep_logProgress ($params);
+                                        
                       if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
                           push(@$updateDayref, ["$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
                       }
@@ -9526,6 +9533,7 @@ sub _DbRep_rl_updateDay {
   ${$deletedCountref} += $c;
   ${$updateCountref}  += keys %updateHash;
 
+  my $params;
   my ($id,$iu) = (0,0);
   my ($kd,$ku) = (1,1);
   my $thd      = _DbRep_rl_logThreshold ($c);
@@ -9553,15 +9561,17 @@ sub _DbRep_rl_updateDay {
                   $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
                 
                   $id++;
-                
-                  if($id == $thd) {
-                      my $prog = $kd * $id;
-                    
-                      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) deleting progress of day: $processingDay is: $prog");
-                    
-                      $id = 0;
-                      $kd++;
-                  }
+                  
+                  $params = {
+                      name          => $name,
+                      logtxt        => "(daily-$mstr) deleting",
+                      iref          => \$id,
+                      kref          => \$kd,
+                      th            => $thd,
+                      processingDay => $processingDay
+                  };
+
+                  _DbRep_logProgress ($params);
               }
             
               Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} $time, EVENT=$event, VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
@@ -9570,14 +9580,16 @@ sub _DbRep_rl_updateDay {
         
               $iu++;
               
-              if($iu == $thu) {
-                  my $prog = $ku * $id;
-                  
-                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating progress of day: $processingDay is: $prog");
-                  
-                  $iu = 0;
-                  $ku++;
-              }                           
+              $params = {
+                  name          => $name,
+                  logtxt        => "(daily-$mstr) updating",
+                  iref          => \$iu,
+                  kref          => \$ku,
+                  th            => $thu,
+                  processingDay => $processingDay
+              };
+
+              _DbRep_logProgress ($params);                          
           }
       }
       elsif ($mstr eq 'max') {                                                               # Update Max
@@ -9591,15 +9603,17 @@ sub _DbRep_rl_updateDay {
                   $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
                 
                   $id++;
-                
-                  if($id == $thd) {
-                      my $prog = $kd * $id;
-                    
-                      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) deleting progress of day: $processingDay is: $prog");
-                    
-                      $id = 0;
-                      $kd++;
-                  }
+                  
+                  $params = {
+                      name          => $name,
+                      logtxt        => "(daily-$mstr) deleting",
+                      iref          => \$id,
+                      kref          => \$kd,
+                      th            => $thd,
+                      processingDay => $processingDay
+                  };
+
+                  _DbRep_logProgress ($params);
               }
             
               Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 23:59:59, EVENT=$event, VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
@@ -9608,14 +9622,16 @@ sub _DbRep_rl_updateDay {
         
               $iu++;
               
-              if($iu == $thu) {
-                  my $prog = $ku * $id;
-                  
-                  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating progress of day: $processingDay is: $prog");
-                  
-                  $iu = 0;
-                  $ku++;
-              }                           
+              $params = {
+                  name          => $name,
+                  logtxt        => "(daily-$mstr) updating",
+                  iref          => \$iu,
+                  kref          => \$ku,
+                  th            => $thu,
+                  processingDay => $processingDay
+              };
+
+              _DbRep_logProgress ($params);                          
           }          
       }
       1;
@@ -9645,6 +9661,30 @@ sub _DbRep_rl_logThreshold {
            10000;
 
 return $th;
+}
+
+################################################################
+#   Logausgabe Fortschritt reduceLog
+################################################################
+sub _DbRep_logProgress {
+  my $paref           = shift;
+  my $name            = $paref->{name};
+  my $logtxt          = $paref->{logtxt};
+  my $iref            = $paref->{iref};
+  my $kref            = $paref->{kref};
+  my $th              = $paref->{th};
+  my $processingDay   = $paref->{processingDay};
+  
+  if(${$iref} == $th) {
+      my $prog = ${$kref} * ${$iref}; 
+    
+      Log3 ($name, 3, "DbRep $name - reduceLog $logtxt progress of day: $processingDay is: $prog");
+    
+      ${$iref} = 0;
+      ${$kref}++;
+  } 
+  
+return;
 }
 
 ####################################################################################################
