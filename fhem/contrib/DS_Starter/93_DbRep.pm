@@ -9239,7 +9239,7 @@ return "$name|$err|$ret|$brt";
 }
 
 ####################################################################################################
-#           alle im @dayRows Array enthaltene DB Einträge löschen
+#           reduceLog alle im @dayRows Array enthaltene DB Einträge löschen
 ####################################################################################################
 sub _DbRep_rl_deleteDayRows {
   my $paref           = shift;
@@ -9295,7 +9295,7 @@ sub _DbRep_rl_deleteDayRows {
                       processingDay => $processingDay
                   };
 
-                  _DbRep_logProgress ($params);
+                  _DbRep_rl_logProgress ($params);
               #}
           }
           1;
@@ -9317,7 +9317,8 @@ return $err;
 }
 
 ####################################################################################################
-#           Mode (pro Stunde) in DB updaten und @updateDay füllen bei 
+#           reduceLog
+#           Stundenupdates vornehmen und @updateDay füllen bei 
 #           $mode = *=day
 ####################################################################################################
 sub _DbRep_rl_updateHour {
@@ -9348,7 +9349,7 @@ sub _DbRep_rl_updateHour {
   
   for my $hourHash (@$updateHourref) {                                                             # Only count for logging...
       for my $hourKey (keys %$hourHash) {
-          $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} >= 1);
+          $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} > 1);
       }
   }
 
@@ -9366,120 +9367,164 @@ sub _DbRep_rl_updateHour {
               $mstr eq 'max'     ? 'rl_max_h' :
               'rl_h';
               
-  my $minutes = $mstr eq 'average' ? '30:00' :
-                $mstr eq 'max'     ? '59:59' :
-                '00:00';
+  my $updminutes = $mstr eq 'average' ? '30:00' :
+                   $mstr eq 'max'     ? '59:59' :
+                   '00:00';
   
   #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
+  
+  $paref->{updminutes} = $updminutes;
+  $paref->{event}      = $event;
+  $paref->{th}         = $th;
+  $paref->{iref}       = \$i;
+  $paref->{kref}       = \$k;
 
-  eval {
-      for my $hourHash (@$updateHourref) {
-          
-          for my $hourKey (keys %$hourHash) {
-              
-              next if (!$hourHash->{$hourKey}->[0]);
-              my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
-                           
-              if ($mstr eq 'average') {                                                            # Berechnung Average 
-                  if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
-                    
-                      for my $val (@{$hourHash->{$hourKey}->[4]}) { 
-                          $sum += $val; 
-                      }
-                    
-                      my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
-                      $sum      = 0;
-                    
-                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:$minutes, EVENT=$event, VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
-                    
-                      $sth_upd->execute(("$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
-                    
-                      $i++;
-                    
-                      $params = {
-                          name          => $name,
-                          logtxt        => "(hourly-$mstr) updating",
-                          iref          => \$i,
-                          kref          => \$k,
-                          th            => $th,
-                          processingDay => $processingDay
-                      };
-
-                      _DbRep_logProgress ($params);
-                    
-                      if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
-                          push(@$updateDayref, ["$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
-                      }
-                  } 
-                  else {
-                      if ($mode =~ /=day/i) {        # timestamp,                   event,                         value,                    device,                     reading,                  Date
-                          push(@$updateDayref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
-                      }
-                  }
-              }
-              elsif ($mstr eq 'max') {                                                            # Berechnung Max
-                  if (scalar @{$hourHash->{$hourKey}->[4]} >= 1) {
-                    
-                      for my $val (@{$hourHash->{$hourKey}->[4]}) { 
-                          if (!defined $max) {
-                              $max = $val;
-                          }
-                          else {
-                              $max = $val if ($val > $max);
-                          }                          
-                      }
-                    
-                      my $value = sprintf "%.${ndp}f", $max;
-                      undef $max;
-                    
-                      Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:$minutes, EVENT=$event, VALUE=$value WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
-                    
-                      $sth_upd->execute(("$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
-                    
-                      $i++;
-                      
-                      $params = {
-                          name          => $name,
-                          logtxt        => "(hourly-$mstr) updating",
-                          iref          => \$i,
-                          kref          => \$k,
-                          th            => $th,
-                          processingDay => $processingDay
-                      };
-
-                      _DbRep_logProgress ($params);
-                                        
-                      if ($mode =~ /=day/i) {        # timestamp,           event,     value,            device,                     reading,             Date
-                          push(@$updateDayref, ["$updDate $updHour:$minutes", $event, $value, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
-                      }
-                  } 
-                  else {
-                      if ($mode =~ /=day/i) {        # timestamp,                   event,                         value,                    device,                     reading,                  Date
-                          push(@$updateDayref, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]);
-                      }
-                  }                  
-              }              
-          }
-      }
-      1;
-  }
-  or do {
-      $err = encode_base64($@, "");
-    
-      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $@");
-    
-      DbRep_rollbackOnly ($name, $dbh);
-      return $err;
-  };
+  for my $hourHash (@$updateHourref) {
       
+      for my $hourKey (keys %$hourHash) {
+          
+          next if (!$hourHash->{$hourKey}->[0]);
+          my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
+          
+          $paref->{updDate} = $updDate;
+          $paref->{updHour} = $updHour;
+          $paref->{timestamp}  = $hourHash->{$hourKey}->[0];
+          $paref->{device}     = $hourHash->{$hourKey}->[1];
+          $paref->{reading}    = $hourHash->{$hourKey}->[3];
+          $paref->{oldvalue}   = $hourHash->{$hourKey}->[4]->[0];
+                                     
+          if ($mstr eq 'average') {                                                            # Berechnung Average 
+              if (scalar @{$hourHash->{$hourKey}->[4]} > 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
+                  
+                  $i++;
+                  
+                  for my $val (@{$hourHash->{$hourKey}->[4]}) { 
+                      $sum += $val; 
+                  }
+                
+                  my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
+                  $sum      = 0;
+                  
+                  $paref->{logtxt}     = "(hourly-$mstr) updating";
+                  $paref->{newvalue}   = $value;
+                  
+                  $err = __DbRep_rl_updateHourDatabase ($paref);
+                  
+                  if ($err) {
+                      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $err");
+                      $err = encode_base64($err, "");
+                    
+                      DbRep_rollbackOnly ($name, $dbh);
+                      return $err;
+                  }
+              } 
+              else {                  
+                  __DbRep_rl_onlyFillDayArray ($paref);
+              }
+          }
+          elsif ($mstr eq 'max') {                                                            # Berechnung Max
+              if (scalar @{$hourHash->{$hourKey}->[4]} > 1) {
+                  
+                  $i++;
+                  
+                  for my $val (@{$hourHash->{$hourKey}->[4]}) { 
+                      if (!defined $max) {
+                          $max = $val;
+                      }
+                      else {
+                          $max = $val if ($val > $max);
+                      }                          
+                  }
+                
+                  my $value = sprintf "%.${ndp}f", $max;
+                  undef $max;
+                  
+                  $paref->{logtxt}     = "(hourly-$mstr) updating";
+                  $paref->{newvalue}   = $value;
+                  
+                  $err = __DbRep_rl_updateHourDatabase ($paref);
+                  
+                  if ($err) {
+                      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $err");
+                      $err = encode_base64($err, "");
+                    
+                      DbRep_rollbackOnly ($name, $dbh);
+                      return $err;
+                  }
+              } 
+              else {
+                  __DbRep_rl_onlyFillDayArray ($paref);
+              }                  
+          }              
+      }
+  }
+       
   $err = DbRep_commitOnly ($name, $dbh);
   return $err if ($err);
 
 return $err;
 }
 
+################################################################
+#   reduceLog Stundenupdate Datenbank und
+#   füllen Tages Update Array
+################################################################
+sub __DbRep_rl_updateHourDatabase {
+  my $paref        = shift;
+  my $name         = $paref->{name};
+  my $mode         = $paref->{mode};
+  my $table        = $paref->{table};
+  my $sth_upd      = $paref->{sth_upd};
+  my $updateDayref = $paref->{updateDayref};
+  my $updDate      = $paref->{updDate};
+  my $updHour      = $paref->{updHour};
+  my $updminutes   = $paref->{updminutes};
+  my $event        = $paref->{event};
+  my $newvalue     = $paref->{newvalue};
+  my $device       = $paref->{device};
+  my $reading      = $paref->{reading};
+  my $timestamp    = $paref->{timestamp};
+  my $oldvalue     = $paref->{oldvalue};
+  
+  Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updDate $updHour:$updminutes, EVENT=$event, VALUE=$newvalue WHERE DEVICE=$device AND READING=$reading AND TIMESTAMP=$timestamp AND VALUE=$oldvalue");
+
+  eval { $sth_upd->execute("$updDate $updHour:$updminutes", $event, $newvalue, $device, $reading, $timestamp, $oldvalue);
+       }
+       or do { return $@;
+             };
+
+  _DbRep_rl_logProgress ($paref);
+
+  if ($mode =~ /=day/i) {
+      push(@$updateDayref, ["$updDate $updHour:$updminutes", $event, $newvalue, $device, $reading, $updDate]);
+  }
+  
+return;
+}
+
+################################################################
+#   reduceLog Tages Array füllen
+################################################################
+sub __DbRep_rl_onlyFillDayArray {
+  my $paref        = shift;
+  my $mode         = $paref->{mode};
+  my $updateDayref = $paref->{updateDayref};
+  my $timestamp    = $paref->{timestamp};
+  my $event        = $paref->{event};
+  my $oldvalue     = $paref->{oldvalue};
+  my $device       = $paref->{device};
+  my $reading      = $paref->{reading};
+  my $updDate      = $paref->{updDate};  
+  
+  if ($mode =~ /=day/i) {
+      push(@$updateDayref, [$timestamp, $event, $oldvalue, $device, $reading, $updDate]);
+  }
+  
+return;
+}
+
 ####################################################################################################
-#           Mode Day in DB updaten
+#           reduceLog Tagesupdates vornehmen
 ####################################################################################################
 sub _DbRep_rl_updateDay {
   my $paref           = shift;
@@ -9545,103 +9590,112 @@ sub _DbRep_rl_updateDay {
   my $time  = $mstr eq 'average' ? '12:00:00' :
               $mstr eq 'max'     ? '23:59:59' :
               '00:00:00';
+              
+  $paref->{time}   = $time;
+  $paref->{event}  = $event;
 
   Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
 
-  eval {
-      if ($mstr eq 'average') {                                                               # Update Average 
-          for my $uhk (keys %updateHash) {
-              my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
-              my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
-            
-              for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
-                  Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$tedr->[2]' AND READING='$tedr->[3]' AND TIMESTAMP='$tedr->[0]'");
-                
-                  $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
-                
-                  $id++;
-                  
-                  $params = {
-                      name          => $name,
-                      logtxt        => "(daily-$mstr) deleting",
-                      iref          => \$id,
-                      kref          => \$kd,
-                      th            => $thd,
-                      processingDay => $processingDay
-                  };
-
-                  _DbRep_logProgress ($params);
-              }
-            
-              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} $time, EVENT=$event, VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
-            
-              $sth_updD->execute( $updateHash{$uhk}->{date}." $time", $event, $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
+  if ($mstr eq 'average') {                                                               # Update Average 
+      for my $uhk (keys %updateHash) {
+          my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
+          my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
         
-              $iu++;
+          for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
+              $id++;
               
-              $params = {
-                  name          => $name,
-                  logtxt        => "(daily-$mstr) updating",
-                  iref          => \$iu,
-                  kref          => \$ku,
-                  th            => $thu,
-                  processingDay => $processingDay
-              };
-
-              _DbRep_logProgress ($params);                          
+              $paref->{logtxt}    = "(daily-$mstr) deleting";
+              $paref->{iref}      = \$id;
+              $paref->{kref}      = \$kd;
+              $paref->{th}        = $thd;
+              $paref->{timestamp} = $tedr->[0];
+              $paref->{device}    = $tedr->[2];
+              $paref->{reading}   = $tedr->[3];
+              
+              $err = __DbRep_rl_deleteDayDatabase ($paref);
+              
+              if ($err) {
+                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
+                  $err = encode_base64($err, "");
+                
+                  DbRep_rollbackOnly ($name, $dbh);
+                  return $err;
+              }
           }
-      }
-      elsif ($mstr eq 'max') {                                                               # Update Max
-          for my $uhk (keys %updateHash) {
-              my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
-              my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
-            
-              for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
-                  Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$tedr->[2]' AND READING='$tedr->[3]' AND TIMESTAMP='$tedr->[0]'");
-                
-                  $sth_delD->execute(($tedr->[2], $tedr->[3], $tedr->[0]));
-                
-                  $id++;
-                  
-                  $params = {
-                      name          => $name,
-                      logtxt        => "(daily-$mstr) deleting",
-                      iref          => \$id,
-                      kref          => \$kd,
-                      th            => $thd,
-                      processingDay => $processingDay
-                  };
-
-                  _DbRep_logProgress ($params);
-              }
-            
-              Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$updateHash{$uhk}->{date} 23:59:59, EVENT=$event, VALUE=$value WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
-            
-              $sth_updD->execute( $updateHash{$uhk}->{date}." 23:59:59", $event, $value, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0] );
+          
+          $iu++;
         
-              $iu++;
-              
-              $params = {
-                  name          => $name,
-                  logtxt        => "(daily-$mstr) updating",
-                  iref          => \$iu,
-                  kref          => \$ku,
-                  th            => $thu,
-                  processingDay => $processingDay
-              };
+              $paref->{logtxt}    = "(daily-$mstr) updating";
+              $paref->{iref}      = \$iu;
+              $paref->{kref}      = \$ku;
+              $paref->{th}        = $thu;
+              $paref->{date}      = $updateHash{$uhk}->{date};
+              $paref->{timestamp} = $lastUpdH->[0];
+              $paref->{device}    = $lastUpdH->[2];
+              $paref->{reading}   = $lastUpdH->[3];
+              $paref->{value}     = $value;
 
-              _DbRep_logProgress ($params);                          
-          }          
+              $err = __DbRep_rl_updateDayDatabase ($paref);
+              
+              if ($err) {
+                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
+                  $err = encode_base64($err, "");
+                
+                  DbRep_rollbackOnly ($name, $dbh);
+                  return $err;
+              }                          
       }
-      1;
   }
-  or do {
-      $err = encode_base64($@, "");
-      Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $@");
-    
-      DbRep_rollbackOnly ($name, $dbh);
-      return $err;
-  };
+  elsif ($mstr eq 'max') {                                                               # Update Max
+      for my $uhk (keys %updateHash) {
+          my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
+          my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
+        
+          for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
+              $id++;
+              
+              $paref->{logtxt}    = "(daily-$mstr) deleting";
+              $paref->{iref}      = \$id;
+              $paref->{kref}      = \$kd;
+              $paref->{th}        = $thd;
+              $paref->{timestamp} = $tedr->[0];
+              $paref->{device}    = $tedr->[2];
+              $paref->{reading}   = $tedr->[3];
+              
+              $err = __DbRep_rl_deleteDayDatabase ($paref);
+              
+              if ($err) {
+                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
+                  $err = encode_base64($err, "");
+                
+                  DbRep_rollbackOnly ($name, $dbh);
+                  return $err;
+              }
+          }
+          
+          $iu++;
+          
+              $paref->{logtxt}    = "(daily-$mstr) updating";
+              $paref->{iref}      = \$iu;
+              $paref->{kref}      = \$ku;
+              $paref->{th}        = $thu;
+              $paref->{date}      = $updateHash{$uhk}->{date};
+              $paref->{timestamp} = $lastUpdH->[0];
+              $paref->{device}    = $lastUpdH->[2];
+              $paref->{reading}   = $lastUpdH->[3];
+              $paref->{value}     = $value;
+
+              $err = __DbRep_rl_updateDayDatabase ($paref);
+              
+              if ($err) {
+                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
+                  $err = encode_base64($err, "");
+                
+                  DbRep_rollbackOnly ($name, $dbh);
+                  return $err;
+              }                         
+      }          
+  }
 
   $err = DbRep_commitOnly ($name, $dbh);
   return $err if ($err);
@@ -9649,8 +9703,60 @@ sub _DbRep_rl_updateDay {
 return $err;
 }
 
+################################################################
+#   reduceLog Tageswerte löschen
+################################################################
+sub __DbRep_rl_deleteDayDatabase {
+  my $paref        = shift;
+  my $name         = $paref->{name};
+  my $table        = $paref->{table};
+  my $sth_delD     = $paref->{sth_delD};
+  my $device       = $paref->{device};
+  my $reading      = $paref->{reading};
+  my $timestamp    = $paref->{timestamp};
+  
+  Log3 ($name, 4, "DbRep $name - DELETE FROM $table WHERE DEVICE='$device' AND READING='$reading' AND TIMESTAMP='$timestamp'");
+
+  eval { $sth_delD->execute($device, $reading, $timestamp);
+       }
+       or do { return $@;
+             };
+
+  _DbRep_rl_logProgress ($paref);
+  
+return;
+}
+
+################################################################
+#   reduceLog Tageswerte updaten
+################################################################
+sub __DbRep_rl_updateDayDatabase {
+  my $paref        = shift;
+  my $name         = $paref->{name};
+  my $table        = $paref->{table};
+  my $sth_updD     = $paref->{sth_updD};
+  my $event        = $paref->{event};
+  my $device       = $paref->{device};
+  my $reading      = $paref->{reading};
+  my $value        = $paref->{value};
+  my $date         = $paref->{date};
+  my $time         = $paref->{time};
+  my $timestamp    = $paref->{timestamp};
+  
+  Log3 ($name, 4, "DbRep $name - UPDATE $table SET TIMESTAMP=$date $time, EVENT=$event, VALUE=$value WHERE (DEVICE=$device) AND (READING=$reading) AND (TIMESTAMP=$timestamp)");
+
+  eval { $sth_updD->execute("$date $time", $event, $value, $device, $reading, $timestamp);
+       }
+       or do { return $@;
+             };
+
+  _DbRep_rl_logProgress ($paref);
+  
+return;
+}
+
 ####################################################################################################
-#           Grenzen für Logausgabe abhängig von der Zeilenanzahl
+#           reduceLog Grenzen für Logausgabe abhängig von der Zeilenanzahl
 ####################################################################################################
 sub _DbRep_rl_logThreshold {
   my $rn = shift;
@@ -9663,9 +9769,9 @@ return $th;
 }
 
 ################################################################
-#   Logausgabe Fortschritt reduceLog
+#   reduceLog Logausgabe Fortschritt
 ################################################################
-sub _DbRep_logProgress {
+sub _DbRep_rl_logProgress {
   my $paref           = shift;
   my $name            = $paref->{name};
   my $logtxt          = $paref->{logtxt};
