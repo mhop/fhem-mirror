@@ -9359,8 +9359,7 @@ sub _DbRep_rl_updateHour {
       return $err if ($err);
   }
   
-  my ($max, $params);
-  my $sum = 0;
+  my $params;
   my $i   = 0;
   my $k   = 1;
   my $th  = _DbRep_rl_logThreshold ($c);
@@ -9395,17 +9394,18 @@ sub _DbRep_rl_updateHour {
           $paref->{reading}    = $hourHash->{$hourKey}->[3];
           $paref->{oldvalue}   = $hourHash->{$hourKey}->[4]->[0];
                                      
-          if ($mstr eq 'average') {                                                            # Berechnung Average 
+          if ($mstr eq 'average') {                                                           # Berechnung Average 
               if (scalar @{$hourHash->{$hourKey}->[4]} > 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
                   
                   $i++;
+                  
+                  my $sum = 0;
                   
                   for my $val (@{$hourHash->{$hourKey}->[4]}) { 
                       $sum += $val; 
                   }
                 
                   my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
-                  $sum      = 0;
                   
                   $paref->{logtxt}     = "(hourly-$mstr) updating";
                   $paref->{newvalue}   = $value;
@@ -9429,6 +9429,8 @@ sub _DbRep_rl_updateHour {
                   
                   $i++;
                   
+                  my $max;
+                  
                   for my $val (@{$hourHash->{$hourKey}->[4]}) { 
                       if (!defined $max) {
                           $max = $val;
@@ -9439,7 +9441,6 @@ sub _DbRep_rl_updateHour {
                   }
                 
                   my $value = sprintf "%.${ndp}f", $max;
-                  undef $max;
                   
                   $paref->{logtxt}     = "(hourly-$mstr) updating";
                   $paref->{newvalue}   = $value;
