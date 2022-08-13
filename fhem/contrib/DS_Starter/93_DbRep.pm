@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.50.0"  => "10.08.2022  rework of DbRep_reduceLog ",
+  "8.50.0"  => "12.08.2022  rework of DbRep_reduceLog - add max, max=day ",
   "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
                "some code changes and bug fixes ",
   "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
@@ -9269,7 +9269,7 @@ sub _DbRep_rl_deleteDayRows {
       ${$deletedCountref} += $c;
     
       Log3 ($name, 3, "DbRep $name - reduceLog deleting $c records of day: $processingDay");
-    
+
       $err = DbRep_beginDatabaseTransaction ($name, $dbh);
       return $err if ($err);
     
@@ -9338,9 +9338,6 @@ sub _DbRep_rl_updateHour {
   
   my $err = q{};
   
-  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
-  return $err if ($err);
-  
   #Log3 ($name, 3, "DbRep $name - content hourlyKnown Hash:\n".Dumper %$hourlyKnownref);
   
   push(@$updateHourref, {%$hourlyKnownref});
@@ -9352,10 +9349,15 @@ sub _DbRep_rl_updateHour {
           $c++ if ($hourHash->{$hourKey}->[0] && scalar @{$hourHash->{$hourKey}->[4]} > 1);
       }
   }
-
+  
   ${$updateCountref} += $c;
 
-  Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay") if($c);
+  if($c) {
+      Log3 ($name, 3, "DbRep $name - reduceLog (hourly-$mstr) updating $c records of day: $processingDay");
+      
+      $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+      return $err if ($err);
+  }
   
   my ($max, $params);
   my $sum = 0;
@@ -9459,8 +9461,10 @@ sub _DbRep_rl_updateHour {
       }
   }
        
-  $err = DbRep_commitOnly ($name, $dbh);
-  return $err if ($err);
+  if($c) {      
+      $err = DbRep_commitOnly ($name, $dbh);
+      return $err if ($err);
+  }
 
 return $err;
 }
@@ -9543,9 +9547,6 @@ sub _DbRep_rl_updateDay {
   
   my $err = q{};
   
-  $err = DbRep_beginDatabaseTransaction ($name, $dbh);
-  return $err if ($err);
-  
   #Log3 ($name, 3, "DbRep $name - content updateDay Array:\n".Dumper @$updateDayref);
   
   my %updateHash;
@@ -9594,9 +9595,14 @@ sub _DbRep_rl_updateDay {
   $paref->{time}   = $time;
   $paref->{event}  = $event;
 
-  Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay") if(keys %updateHash);
-
-  if ($mstr eq 'average') {                                                               # Update Average 
+  if(keys %updateHash) {
+      Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay");
+      
+      $err = DbRep_beginDatabaseTransaction ($name, $dbh);
+      return $err if ($err);
+  }
+  
+  if ($mstr eq 'average') {                                                               # Day Average 
       for my $uhk (keys %updateHash) {
           my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
           my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
@@ -9646,7 +9652,7 @@ sub _DbRep_rl_updateDay {
               }                          
       }
   }
-  elsif ($mstr eq 'max') {                                                               # Update Max
+  elsif ($mstr eq 'max') {                                                               # Day Max
       for my $uhk (keys %updateHash) {
           my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
           my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
@@ -9697,8 +9703,10 @@ sub _DbRep_rl_updateDay {
       }          
   }
 
-  $err = DbRep_commitOnly ($name, $dbh);
-  return $err if ($err);
+  if(keys %updateHash) {      
+      $err = DbRep_commitOnly ($name, $dbh);
+      return $err if ($err);
+  }
 
 return $err;
 }
