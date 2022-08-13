@@ -17403,18 +17403,14 @@ return;
                                  
                                  <ul>
                                  <table>  
-                                 <colgroup> <col width=25%> <col width=75%> </colgroup>
-                                    <tr><td> <b>ohne Angabe von mode</b>    </td><td>:&nbsp;die Daten werden auf den ersten Eintrag pro Stunde je Device & Reading reduziert                </td></tr>
-                                    <tr><td> <b>average</b>                 </td><td>:&nbsp;numerische Werte werden auf einen Mittelwert pro Stunde je Device & Reading reduziert           </td></tr>
-                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
-                                    <tr><td> <b>average=day</b>             </td><td>:&nbsp;numerische Werte werden auf einen Mittelwert pro Tag je Device & Reading reduziert              </td></tr>
-                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.      </td></tr>                                      
-                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
-                                    <tr><td> <b>max</b>                     </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Stunde je Device & Reading reduziert            </td></tr>
-                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
-                                    <tr><td> <b>max=day</b>                 </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Tag je Device & Reading reduziert               </td></tr>
-                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.      </td></tr>
-                                    <tr><td>                                </td><td>&nbsp;&nbsp;(nicht numerische Werte werden wie ohne mode Angabe behandelt)                             </td></tr>
+                                 <colgroup> <col width=20%> <col width=80%> </colgroup>
+                                    <tr><td> <b>ohne Angabe von mode</b>    </td><td>:&nbsp;die Daten werden auf den ersten Eintrag pro Stunde je Device & Reading reduziert                            </td></tr>
+                                    <tr><td> <b>average</b>                 </td><td>:&nbsp;numerische Werte werden auf einen Mittelwert pro Stunde je Device & Reading reduziert, sonst wie ohne mode  </td></tr>
+                                    <tr><td> <b>average=day</b>             </td><td>:&nbsp;numerische Werte werden auf einen Mittelwert pro Tag je Device & Reading reduziert, sonst wie ohne mode     </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>                                      
+                                    <tr><td> <b>max</b>                     </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Stunde je Device & Reading reduziert, sonst wie ohne mode   </td></tr>
+                                    <tr><td> <b>max=day</b>                 </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Tag je Device & Reading reduziert, sonst wie ohne mode      </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>
                                  </table>
                                  </ul>
                                  <br>
