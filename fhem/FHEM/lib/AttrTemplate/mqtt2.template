@@ -127,7 +127,7 @@ setreading DEVICE attrTemplateVersion 20210121
 name:zigbee2mqtt_bridge
 desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
-order:L_01 
+order:L_01
 farewell:template has been applied successfully. <br>Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|zigbee2mqtt/[A-Za-z0-9._]+/set</i>.
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic","") =~ m,[\b]?([^/:]+)(/.+)?, ? $1 : AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)/bridge/.+, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
@@ -173,14 +173,14 @@ attr DEVICE setList\
   z_last_seen:disable,ISO_8601,epoch,ISO_8601_local $\DEVICETOPIC/bridge/config/last_seen $EVTPART1\
   z_ban:textField $\DEVICETOPIC/bridge/config/ban $EVTPART1\
   z_rename:textField $\DEVICETOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
-  z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset 
+  z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
 setreading DEVICE attrTemplateVersion 20220328
-# Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
+# Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371
 
 
 
@@ -532,7 +532,7 @@ setreading DEVICE attrTemplateVersion 20220622
 # zigbee2mqtt 2 channel device
 name:zigbee2mqtt_2channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
-desc:For zigbee2mqtt 2 channel device. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested updated version, should work with LLKZMK11LM, Ubisys S2 (-R), 
+desc:For zigbee2mqtt 2 channel device. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested updated version, should work with LLKZMK11LM, Ubisys S2 (-R),
 order:L_05c
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
@@ -540,7 +540,7 @@ par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','mess
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}); return $ret }
-attr DEVICE jsonMap state:availability state_l1:state state_l2:0 
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/l1/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/l1/set {"state":"OFF"}\
@@ -584,7 +584,7 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220622
 # zigbee2mqtt 3 channel device
 name:zigbee2mqtt_3channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
-desc:For zigbee2mqtt 3 channel device like Silvercrest Steckerleiste »Zigbee Smart Home«. <br>NOTE: Two additional devices will be created for further channels.<br>NOTE: Untested updated version 
+desc:For zigbee2mqtt 3 channel device like Silvercrest Steckerleiste »Zigbee Smart Home«. <br>NOTE: Two additional devices will be created for further channels.<br>NOTE: Untested updated version
 order:L_05e
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
@@ -592,7 +592,7 @@ par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','mess
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}); return $ret }
-attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0 
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state_l1":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state_l1":"OFF"}\
@@ -1028,7 +1028,7 @@ attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:0 Channel_0:0 Cha
 option:{ JSONMAPTYPE == 2 }
 attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 Channel_5:0 HSBColor:0 Color:rgb
 option:{ JSONMAPTYPE == 3 }
-attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 Channel_5:0 Color:rgb Channel_4:white 
+attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 Channel_5:0 Color:rgb Channel_4:white
 option:{ JSONMAPTYPE == 4 }
 attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:pct Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 Channel_5:0 HSBColor:0 Color:0
 option:global
@@ -1130,7 +1130,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices and other Tasmota flashed devices with power measuring abilities.<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 order:A_01c
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=CALLSPEECHRECOGN
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
@@ -1337,7 +1337,7 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { my %ret; while ($EVENT =~ /.Id...([A-F0-9]{12})...Temperature..([-]?[\d]+\.[\d]+)./g) { $ret{"Temperatur_".$1}=$2; }; return \%ret; }\
   TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
-farewell:template has been applied successfully. You might want to edit readingList attribute to avoid double info or let autocreate add more entries. 
+farewell:template has been applied successfully. You might want to edit readingList attribute to avoid double info or let autocreate add more entries.
 attr DEVICE model tasmota_use_DS18x20_id
 setreading DEVICE attrTemplateVersion 20210515
 
@@ -1381,8 +1381,8 @@ desc:sonoff 2 channel device flashed with Tasmota. <br>NOTE: a second device wil
 order:A_02
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
-par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 } 
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
 copy DEVICE DEVICE_CH2
 defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_CH2
@@ -1399,7 +1399,7 @@ attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
 
@@ -1411,8 +1411,8 @@ order:A_02a1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE",'readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE",'readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE",'readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
-par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 } 
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
 attr DEVICE setExtensionsEvent 1
 attr DEVICE setStateList on off toggle
@@ -1438,7 +1438,7 @@ attr DEVICE,DEVICE_CH2 model tasmota_2channel_split_energy
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210728
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
 
@@ -1503,7 +1503,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
-par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 par:BCKLGCMND;Send out configuration command via backlog?;{ 1 }
 par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
 set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
@@ -1552,14 +1552,14 @@ For calibration, use of more than one shutter device and further information on 
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_invert_1
 setreading DEVICE attrTemplateVersion 20210607
-option:{ CALLSPEECHRECOGN } 
+option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_blind
 
 
 # tasmota 2ch as shutter device.
 name:tasmota_2ch_shutter_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Configures a dual chanel tasmota device as shutter; needs some configuration of firmware compilation to operate, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template tasmota_2ch_shutter_invert_1 instead. 
+desc:Configures a dual chanel tasmota device as shutter; needs some configuration of firmware compilation to operate, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template tasmota_2ch_shutter_invert_1 instead.
 order:A_02b1
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -1577,7 +1577,7 @@ setreading DEVICE attrTemplateVersion 20210607
 # tasmota 4ch as double shutter device.
 name:tasmota_4ch_two_shutters_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Configures a four channel tasmota device as two shutters; needs some additional configuration via web-interface to operate properly, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,115859.0.html">Forum Thread</a><br>NOTE: This template will configure the shutters in Homematic-style with pct 100% = open. 
+desc:Configures a four channel tasmota device as two shutters; needs some additional configuration via web-interface to operate properly, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,115859.0.html">Forum Thread</a><br>NOTE: This template will configure the shutters in Homematic-style with pct 100% = open.
 order:A_02b2
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -1619,7 +1619,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
-par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 par:BCKLGCMND;Send out configuration command via backlog?;{ 1 }
 par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal('DEVICE','icon','fts_shutter_updown') }
 set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
@@ -1666,7 +1666,7 @@ For calibration, tilt range settings, use of more than one shutter device and fu
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
 setreading DEVICE attrTemplateVersion 20220218
-option:{ CALLSPEECHRECOGN } 
+option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_blind
 
 
@@ -1995,7 +1995,7 @@ setreading DEVICE attrTemplateVersion 20210515
 
 name:tasmota_8channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:sonoff 8 channel device flashed with Tasmota. <br>NOTE: several additional devices will be created for channels 2 to 8 
+desc:sonoff 8 channel device flashed with Tasmota. <br>NOTE: several additional devices will be created for channels 2 to 8
 order:A_04c1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -2235,7 +2235,7 @@ name:tasmota_bt2tasmota_bridge
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:This is a very early version of a template meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details on bluetooth2tasmota visit https://tasmota.github.io/docs/Bluetooth_ESP32/ and  https://tasmota.github.io/docs/Commands/#ble-esp32<br>NOTE: Initial version, not yet tested...<br>Most likely will be subject to changes!!!
 order:A_06t01
-farewell:template has been applied successfully.\n Note: some changes have been applied to the mcu firmware settings. Incoming messages from bluetooth devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active. 
+farewell:template has been applied successfully.\n Note: some changes have been applied to the mcu firmware settings. Incoming messages from bluetooth devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active.
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal('DEVICE','readingList','') =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -2272,7 +2272,7 @@ name:tasmota_zigbee2tasmota_bridge
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:This template is meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details on zigbee2tasmota visit https://tasmota.github.io/docs/Zigbee/<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Needs still some changes!!!
 order:A_01u01
-farewell:template has been applied successfully.\n Note: some changes have been applied to the mcu firmware settings. Incoming messages from zigbee devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active. 
+farewell:template has been applied successfully.\n Note: some changes have been applied to the mcu firmware settings. Incoming messages from zigbee devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active.
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -2356,7 +2356,7 @@ attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE setExtensionsEvent 1
 attr DEVICE jsonMap Dimmer:brightness Power:state Device:0 Hue:hue Sat:saturation CT:ct
 deletereading -q DEVICE (?!associatedWith|IODev).*
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model tasmota_zigbee2tasmota_light_dimmer
 setreading DEVICE attrTemplateVersion 20210811
@@ -2418,7 +2418,7 @@ attr DEVICE setStateList on off
 attr DEVICE setExtensionsEvent 1
 attr DEVICE jsonMap Power:state Device:0
 deletereading -q DEVICE (?!associatedWith|IODev).*
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 option:global
 attr DEVICE model tasmota_zigbee2tasmota_single_switch
@@ -2449,7 +2449,7 @@ attr DEVICE_CH2 readingList \
   TELETOPIC:.* { return if $EVENT !~ m/.Endpoint..2/; $EVENT =~ s/"Power":1/"Power":"on"/g; $EVENT =~ s/"Power":0/"Power":"off"/g; $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef  }
 attr DEVICE_CH2 setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","Endpoint":2,"send":{"Power":"On"}}\
   off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","Endpoint":2,"send":{"Power":"Off"}}
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 option:global
 attr DEVICE,DEVICE_CH2 model tasmota_zigbee2tasmota_2channel_split
@@ -2487,7 +2487,7 @@ par:ICON;ICON as set, defaults to tradfri_remote;{ AttrVal("DEVICE","icon","trad
 attr DEVICE icon ICON
 attr DEVICE readingList \
 TELETOPIC:.* { $EVENT =~ m,(([0-9])([0-9])([0-9])([0-9])!([0-9][0-9])), ? { 'state'=>"${5}${4}${3}${2}$6" } : $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
-attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batteryVoltage Temperature:temperature 
+attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batteryVoltage Temperature:temperature
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model tasmota_zigbee2tasmota_remote_control
 setreading DEVICE attrTemplateVersion 20210811
@@ -2703,7 +2703,7 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly1_w_energy_measuring
 setreading DEVICE attrTemplateVersion 20220408
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
@@ -2712,7 +2712,7 @@ attr DEVICE userReadings NEWUSERREADINGS
 name:shelly1_w_energy_measuring_washer_example
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 order:A_10b1
-desc:Example how to configure a single relay Shelly device offering energy measuring like Shelly 1PM or Shelly Plug S to visualise state of a machine behind the plug. Icons will not allow to turn the machine off. 
+desc:Example how to configure a single relay Shelly device offering energy measuring like Shelly 1PM or Shelly Plug S to visualise state of a machine behind the plug. Icons will not allow to turn the machine off.
 par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate shelly1_w_energy_measuring CALLSPEECHRECOGN=0
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen"; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem'; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"relay_0_power","")." W":'Standby'; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>"; "<div> $show ".FW_makeImage($pic)." $text </div>" }
@@ -3001,7 +3001,7 @@ attr DEVICE_CH2 setList \
 attr DEVICE_CH2 devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen"; my $light = ReadingsVal($name,"state","off"); my $cons = ReadingsVal($name,"relay_1_power","unknown"); my $temp = ReadingsVal($name,"temperature","-100");"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C<b></b>"}
 attr DEVICE,DEVICE_CH2 model shelly25_split
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220127
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
 # shelly4pro using original firmware
@@ -3263,7 +3263,7 @@ attr DEVICE model shellydw
 setreading DEVICE attrTemplateVersion 20200812
 
 # shelly ix3 using original firmware
-# source info: https://forum.fhem.de/index.php/topic,114973.msg1092039.html#msg1092039 
+# source info: https://forum.fhem.de/index.php/topic,114973.msg1092039.html#msg1092039
 name:shelly_ix3
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly ix3 using original firmware. <br>Note: untested attrTemplate
@@ -3379,7 +3379,7 @@ attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
   pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_light
-  
+
 #shellydimmer
 # contributed by zeppelin, https://forum.fhem.de/index.php/topic,94495.msg994764.html#msg994764
 name:shellydimmer
@@ -3579,7 +3579,7 @@ attr DEVICE stateFormat <a href="http://ip" target="_blank">\
 online\
 </a>\
 state
-attr DEVICE jsonMap switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip 
+attr DEVICE jsonMap switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip
 attr DEVICE model shellyPlus_i4
 setreading DEVICE attrTemplateVersion 20220128
 
@@ -3691,7 +3691,7 @@ state
 deletereading -q DEVICE (?!associatedWith|IODev).*
 setreading DEVICE attrTemplateVersion 20200531
 set DEVICE attrTemplate set_associatedWith \CHANNELS=5 \MAKECOPIES=1
-rename DEVICE_CH5 DEVICE_USB 
+rename DEVICE_CH5 DEVICE_USB
 attr DEVICE_CH2 readingList DEVNAME/relay/1:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
   DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
   DEVNAME/ip:.* ip
@@ -3785,8 +3785,8 @@ attr DEVICE_CH7 setList on:noArg CMNDTOPIC setr=xxxxxx1x\
 attr DEVICE_CH8 setList on:noArg CMNDTOPIC setr=xxxxxxx1\
   off:noArg CMNDTOPIC setr=xxxxxxx0
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplate speechcontrol_type_switch
-  
-  
+
+
 name:8channel_ethernet_board_unified
 filter:TYPE=MQTT2_DEVICE
 desc:For use with some 8-channel ethernet boards. Might be usefull for other stuff based on TI's <a href="https://www.waveshare.com/wiki/DP83848_Ethernet_Board">DP83848 ethernet chipset</a>.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,107536.msg1016379.html#msg1016379">Forum Thread</a>. You have to configure MQTT first, might be found under http://<device-ip-adress>/zm.cgi!
@@ -3843,7 +3843,7 @@ di3\
 di4\
 di5\
 di6
-attr DEVICE webCmd : 
+attr DEVICE webCmd :
 copy DEVICE DEVICE_CH2
 defmod DEVICE_CH2 MQTT2_\DEVICE DEVICE_CH2
 deleteattr DEVICE_CH2 stateFormat
@@ -3898,7 +3898,7 @@ di3\
 di4\
 di5\
 di6
-attr DEVICE webCmd : 
+attr DEVICE webCmd :
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model 6channel_ethernet_board_6input_unified
 setreading DEVICE attrTemplateVersion 20200602
@@ -4114,8 +4114,8 @@ setreading DEVICE attrTemplateVersion 20201110
 ###############
 #ESP Milight Hub
 #use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub
-#recommended structure of the topic pattern milight/:device_id/:device_type/:group_id 
-#as set in the settings section in the bridge's web interface 
+#recommended structure of the topic pattern milight/:device_id/:device_type/:group_id
+#as set in the settings section in the bridge's web interface
 #
 #The ESP-Milight-Hub bridge device
 #Atm there are no furter commands to be set to the esp itself
@@ -4183,7 +4183,7 @@ setreading DEVICE attrTemplateVersion 20220726
 name:esp_milight_hub_make_rgbw_group
 prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
-desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
+desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available.
 order:X_01a
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal('DEVICE','readingList','') =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
@@ -4356,7 +4356,7 @@ setreading DEVICE attrTemplateVersion 20220726
 #OpenMQTTGateway
 #use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki
 #recommended structure of the topic pattern home/OpenMQTTGateway.*/.*
-#as set in the settings section in the GW's web interface 
+#as set in the settings section in the GW's web interface
 #
 #OpenMQTTGateway - Microcontroller
 #Atm there are no furter commands to be set to the esp itself
@@ -4737,7 +4737,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 # The rockrobo device for valetudo RE
 name:roborockRE
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*\/valetudo.*
-desc:use this for a rooted Xiamoni Vacuum / Roborock with valetudo RE installed. For details visit https://github.com/rand256/valetudo/wiki<br>NOTE: Only tested with Gen1, Forum Board MQTT<br> 
+desc:use this for a rooted Xiamoni Vacuum / Roborock with valetudo RE installed. For details visit https://github.com/rand256/valetudo/wiki<br>NOTE: Only tested with Gen1, Forum Board MQTT<br>
 order:X_03a
 par:BASE_TOPIC; is typically valetudo; {(split '/',ReadingsVal("DEVICE",'subscriptions','valetudo/rockrobo'))[0]}
 par:DEV_ID;     is typically rockrobo; {(split '/',ReadingsVal("DEVICE",'subscriptions','valetudo/rockrobo'))[1]}
@@ -5105,7 +5105,7 @@ setreading DEVICE attrTemplateVersion 20211220
 ###########################################
 # The sonos2mqtt bridge device (entire hex id of devices as bridgeRegexp)
 name:sonos2mqtt_bridge
-desc:The sonos2mqtt bridge device, Forum #111711 and Wiki 
+desc:The sonos2mqtt bridge device, Forum #111711 and Wiki
 filter:TYPE=MQTT2_DEVICE
 order:M_05
 par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",'sonos') }
@@ -5125,7 +5125,7 @@ attr DEVICE devicetopic BASE_TOPIC
 setreading DEVICE attrTemplateVersion 20210301
 
 name:sonos2mqtt_bridge_comfort
-desc:The sonos2mqtt bridge adds 1 notify device for setup speakers, Forum #111711 and Wiki 
+desc:The sonos2mqtt bridge adds 1 notify device for setup speakers, Forum #111711 and Wiki
 filter:TYPE=MQTT2_DEVICE
 order:M_05c
 { Svn_GetFile("contrib/AttrTemplate/99_sonos2mqttUtils.pm", "FHEM/99_sonos2mqttUtils.pm", sub(){ CommandReload(undef, "99_sonos2mqttUtils") }) }
@@ -5140,7 +5140,7 @@ defmod n_configSonos notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+|MQTT2_RINCON_[
 setreading DEVICE attrTemplateVersion 20210303
 
 name:sonos2mqtt_speaker
-desc:A basic sonos2mqtt speaker device, Forum #111711 and Wiki 
+desc:A basic sonos2mqtt speaker device, Forum #111711 and Wiki
 filter:TYPE=MQTT2_DEVICE
 order:M_05b
 par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",'sonos') }
@@ -5300,9 +5300,9 @@ setreading DEVICE attrTemplateVersion 20210804
 ###########################################
 name:hoymiles_microinverter_hub_bridge
 filter:TYPE=MQTT2_DEVICE
-desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778.
-order:W_05
-farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|devcontrol/[0-8]+/[0-8]+</i>.
+desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
+order:W_06
+farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|devcontrol/[0-8]+/[0-8]+</i>. For the single microinverters, please be patient, until the Readings concerning the AC will have been sent in.
 par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
@@ -5314,21 +5314,37 @@ attr DEVICE readingList BASE_ID/version:.* version\
   BASE_ID/device:.* device
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_hub_bridge
-setreading DEVICE attrTemplateVersion 20200808
+setreading DEVICE attrTemplateVersion 20200812
 { AttrTemplate_Initialize() }
 
 
 name:hoymiles_microinverter_inverter
 prereq:{my @devices=devspec2array('model=hoymiles_microinverter_hub_bridge');return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/ch0/U_AC:.*
-desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778<br>Represents a single microinverter.
-order:W_051
-par:INVERTERLONG_ID;INVERTERLONG_ID Base_Id plus inverter name as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+/[^/]+)/ch0/U_AC:, ? $1 : undef }
-par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,[\b]?([^/:]+)/[^/]+/ch0/U_AC:, ? $1 : undef }
-par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts with "0";{ AttrVal('DEVICE','setList','') =~ m,/devcontrol/([0-9]+)/[0-9]+, ? $1 : undef }
+desc:Early version, device represents a single microinverter. Use this with "ahoy" firmware for ESP8266+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
+order:W_061
+par:BASE_ID;BASE_ID as set on the esp (e.g. inverters). No CID;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^/:\s]+)[/][^/]+/ch0/U_AC:,m ? $1 : undef }
+par:INVERTERLONG_ID;INVERTERLONG_ID Base_Id plus inverter name as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^/:]+[/][^/]+)/ch0/U_AC:,m ? $1 : undef }
+par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts with "0";{ AttrVal('DEVICE','setList','') =~ m,/devcontrol/([0-9]+)/[0-9]+,m ? $1 : undef }
+par:RADIO_SINGLE;inverter has just one channel;{ undef }
+par:RADIO_DOUBLE;inverter has two channels;{ undef }
+par:RADIO_QUATTRO;inverter has four channels;{ undef }
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
+option:{ RADIO_SINGLE }
+attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+  INVERTERLONG_ID/ch0/I_AC:.* I_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1
+option:{ RADIO_DOUBLE }
 attr DEVICE readingList \
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/I_AC:.* I_AC\
@@ -5345,6 +5361,32 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
   INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
   INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2
+option:{ RADIO_QUATTRO }
+attr DEVICE readingList \
+  INVERTERLONG_ID/ch0/U_AC:.* U_AC\
+  INVERTERLONG_ID/ch0/I_AC:.* I_AC\
+  INVERTERLONG_ID/ch0/P_AC:.* P_AC\
+  INVERTERLONG_ID/ch0/Freq:.* Freq\
+  INVERTERLONG_ID/ch0/Temp:.* temperature\
+  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1\
+  INVERTERLONG_ID/ch2/I_DC:.* I_DC2\
+  INVERTERLONG_ID/ch2/P_DC:.* P_DC2\
+  INVERTERLONG_ID/ch2/YieldDay:.* YieldDay2\
+  INVERTERLONG_ID/ch2/YieldTotal:.* YieldTotal2\
+  INVERTERLONG_ID/ch3/I_DC:.* I_DC3\
+  INVERTERLONG_ID/ch3/P_DC:.* P_DC3\
+  INVERTERLONG_ID/ch3/YieldDay:.* YieldDay3\
+  INVERTERLONG_ID/ch3/YieldTotal:.* YieldTotal3\
+  INVERTERLONG_ID/ch4/I_DC:.* I_DC4\
+  INVERTERLONG_ID/ch4/P_DC:.* P_DC4\
+  INVERTERLONG_ID/ch4/YieldDay:.* YieldDay4\
+  INVERTERLONG_ID/ch4/YieldTotal:.* YieldTotal4
+option:global
 attr DEVICE setList \
   on:noArg BASE_ID/devcontrol/INVERTER_NR/0 on\
   off:noArg BASE_ID/devcontrol/INVERTER_NR/1 off\
@@ -5352,7 +5394,7 @@ attr DEVICE setList \
   reboot:noArg BASE_ID/devcontrol/INVERTER_NR/2 restart
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20200808
+setreading DEVICE attrTemplateVersion 20200812
 
 
 
