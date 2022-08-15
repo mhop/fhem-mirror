@@ -9359,7 +9359,7 @@ sub _DbRep_rl_updateHour {
       return $err if ($err);
   }
   
-  my $params;
+  my ($params, $value);
   my $i   = 0;
   my $k   = 1;
   my $th  = _DbRep_rl_logThreshold ($c);
@@ -9387,78 +9387,42 @@ sub _DbRep_rl_updateHour {
           next if (!$hourHash->{$hourKey}->[0]);
           my ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
           
-          $paref->{updDate} = $updDate;
-          $paref->{updHour} = $updHour;
+          $paref->{updDate}    = $updDate;
+          $paref->{updHour}    = $updHour;
           $paref->{timestamp}  = $hourHash->{$hourKey}->[0];
           $paref->{device}     = $hourHash->{$hourKey}->[1];
           $paref->{reading}    = $hourHash->{$hourKey}->[3];
           $paref->{oldvalue}   = $hourHash->{$hourKey}->[4]->[0];
-                                     
-          if ($mstr eq 'average') {                                                           # Berechnung Average 
-              if (scalar @{$hourHash->{$hourKey}->[4]} > 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
-                  
-                  $i++;
-                  
-                  my $sum = 0;
-                  
-                  for my $val (@{$hourHash->{$hourKey}->[4]}) { 
-                      $sum += $val; 
-                  }
-                
-                  my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHash->{$hourKey}->[4]};
-                  
-                  $paref->{logtxt}     = "(hourly-$mstr) updating";
-                  $paref->{newvalue}   = $value;
-                  
-                  $err = __DbRep_rl_updateHourDatabase ($paref);
-                  
-                  if ($err) {
-                      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $err");
-                      $err = encode_base64($err, "");
-                    
-                      DbRep_rollbackOnly ($name, $dbh);
-                      return $err;
-                  }
-              } 
-              else {                  
-                  __DbRep_rl_onlyFillDayArray ($paref);
+                                      
+          if (scalar @{$hourHash->{$hourKey}->[4]} > 1) {                                 # wahr wenn reading hat mehrere Datensätze diese Stunde
+              
+              $i++;
+              
+              $paref->{hourHashKeyRef} = $hourHash->{$hourKey}->[4];
+              
+              if ($mstr eq 'average') {                                                   # Berechnung Average
+                  $value = __DbRep_rl_calcAverageHourly ($paref);
               }
-          }
-          elsif ($mstr eq 'max') {                                                            # Berechnung Max
-              if (scalar @{$hourHash->{$hourKey}->[4]} > 1) {
-                  
-                  $i++;
-                  
-                  my $max;
-                  
-                  for my $val (@{$hourHash->{$hourKey}->[4]}) { 
-                      if (!defined $max) {
-                          $max = $val;
-                      }
-                      else {
-                          $max = $val if ($val > $max);
-                      }                          
-                  }
+              elsif ($mstr eq 'max') {                                                    # Berechnung Max
+                  $value = __DbRep_rl_calcMaxHourly ($paref);
+              }
+              
+              $paref->{logtxt}   = "(hourly-$mstr) updating";
+              $paref->{newvalue} = $value;
+              
+              $err = __DbRep_rl_updateHourDatabase ($paref);
+              
+              if ($err) {
+                  Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $err");
+                  $err = encode_base64($err, "");
                 
-                  my $value = sprintf "%.${ndp}f", $max;
-                  
-                  $paref->{logtxt}     = "(hourly-$mstr) updating";
-                  $paref->{newvalue}   = $value;
-                  
-                  $err = __DbRep_rl_updateHourDatabase ($paref);
-                  
-                  if ($err) {
-                      Log3 ($name, 2, "DbRep $name - ERROR - reduceLog $mstr failed for day $processingDay: $err");
-                      $err = encode_base64($err, "");
-                    
-                      DbRep_rollbackOnly ($name, $dbh);
-                      return $err;
-                  }
-              } 
-              else {
-                  __DbRep_rl_onlyFillDayArray ($paref);
-              }                  
-          }              
+                  DbRep_rollbackOnly ($name, $dbh);
+                  return $err;
+              }
+          } 
+          else {                  
+              __DbRep_rl_onlyFillDayArray ($paref);
+          }            
       }
   }
        
@@ -9468,6 +9432,51 @@ sub _DbRep_rl_updateHour {
   }
 
 return $err;
+}
+
+####################################################################################################
+#           reduceLog stündlichen average Wert berechnen
+####################################################################################################
+sub __DbRep_rl_calcAverageHourly {
+  my $paref          = shift;
+  my $name           = $paref->{name};
+  my $hourHashKeyRef = $paref->{hourHashKeyRef};
+  my $ndp            = $paref->{ndp};
+  
+  my $sum = 0;
+  
+  for my $val (@{$hourHashKeyRef}) { 
+      $sum += $val;   
+  }
+
+  my $value = sprintf "%.${ndp}f", $sum / scalar @{$hourHashKeyRef};
+
+return $value;
+}
+
+####################################################################################################
+#           reduceLog stündlichen Max Wert berechnen
+####################################################################################################
+sub __DbRep_rl_calcMaxHourly {
+  my $paref          = shift;
+  my $name           = $paref->{name};
+  my $hourHashKeyRef = $paref->{hourHashKeyRef};
+  my $ndp            = $paref->{ndp};
+  
+  my $max;
+  
+  for my $val (@{$hourHashKeyRef}) {
+      if (!defined $max) {
+          $max = $val;
+      }
+      else {
+          $max = $val if ($val > $max);
+      }      
+  }
+
+  my $value = sprintf "%.${ndp}f", $max;
+
+return $value;
 }
 
 ################################################################
