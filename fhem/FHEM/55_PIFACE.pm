@@ -469,15 +469,19 @@ sub PIFACE_Shutdown($) {
   The use of PIFACE module requires some preparatory work. The module needs the <a href=http://wiringpi.com>Wiring Pi</a> tool.
   <ul>
     <br>
-    Raspbian Wheezy<br>
-    <li>Install it with<br>
-      <code>git clone git://git.drogon.net/wiringPi<br>
-        cd wiringPi<br>
-        ./build</code><br>
+    Raspberry Pi OS Bullseye<br>
+    The current WiringPi software package can be found at <code>https://github.com/WiringPi/WiringPi/</code>.
+    Please note the current version number for the download path and the file name.<br>.
+    <li>Install 64 bit version with<br>
+      <code>wget https://github.com/WiringPi/WiringPi/releases/download/x.y/wiringpi-x.y-arm64.deb<br>
+        dpkg -i wiringpi-x.y-arm64.deb</code><br>
+    </li>
+    <li>Install 32 bit version with<br>
+      <code>wget https://github.com/WiringPi/WiringPi/releases/download/x.y/wiringpi-x.y-armhf.deb<br>
+        dpkg -i wiringpi-x.y-armhf.deb</code><br>
     </li>
     <li>PiFace Digital need the SPI pins on the Raspberry Pi to be enabled in order to function.
-    Start <code>sudo raspi-config</code>, select <code>Advanced Options</code>
-    and set the <code>A5 SPI</code> option to "Yes".
+    Start <code>sudo raspi-config</code> and set the <code>SPI</code> option to "Yes".
     </li>
     <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
     <code>gpio -x mcp23s17:200:0:0 readall</code><br>
@@ -494,13 +498,12 @@ sub PIFACE_Shutdown($) {
   </ul>
   <ul>
     <br>
-    Raspbian Jessie / Stretch / Buster<br>
+    Raspberry Pi OS Jessie / Stretch / Buster<br>
     <li>Install it with<br>
       <code>sudo apt-get install wiringpi</code><br>
     </li>
     <li>PiFace Digital need the SPI pins on the Raspberry Pi to be enabled in order to function.
-    Start <code>sudo raspi-config</code>, select <code>9 Advanced Options</code>
-    and set the <code>A6 SPI</code> option to "Yes".
+    Start <code>sudo raspi-config</code> and set the <code>SPI</code> option to "Yes".
     </li>
     <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
     <code>gpio -x mcp23s17:200:0:0 readall</code><br>
