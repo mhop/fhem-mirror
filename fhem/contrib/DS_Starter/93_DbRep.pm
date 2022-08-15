@@ -9562,16 +9562,20 @@ sub _DbRep_rl_updateDay {
   my %updateHash;
   
   for my $row (@$updateDayref) {
-      push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];       # tedr -> time, event, device, reading
-      $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];                                                 # Summe aller Werte
       $updateHash{$row->[3].$row->[4]}->{date} = $row->[5];
-      
-      if (!defined $updateHash{$row->[3].$row->[4]}->{max}) {                                               # Maximalwert
-          $updateHash{$row->[3].$row->[4]}->{max} = $row->[2];
+      push @{$updateHash{$row->[3].$row->[4]}->{tedr}}, [$row->[0], $row->[1], $row->[3], $row->[4]];           # tedr -> time, event, device, reading
+       
+      if ($mstr eq 'average') {                                                                                 # Day Average 
+          $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];                                                 # Summe aller Werte
       }
-      else {
-          $updateHash{$row->[3].$row->[4]}->{max} = $row->[2] if ($row->[2] > $updateHash{$row->[3].$row->[4]}->{max});
-      } 
+      elsif ($mstr eq 'max') {                                                                                  # Day Max
+          if (!defined $updateHash{$row->[3].$row->[4]}->{max}) {
+              $updateHash{$row->[3].$row->[4]}->{max} = $row->[2];
+          }
+          else {
+              $updateHash{$row->[3].$row->[4]}->{max} = $row->[2] if ($row->[2] > $updateHash{$row->[3].$row->[4]}->{max});
+          } 
+      }
   }
 
   my $c = 0;
@@ -9588,7 +9592,7 @@ sub _DbRep_rl_updateDay {
   ${$deletedCountref} += $c;
   ${$updateCountref}  += keys %updateHash;
 
-  my $params;
+  my ($params, $value);
   my ($id,$iu) = (0,0);
   my ($kd,$ku) = (1,1);
   my $thd      = _DbRep_rl_logThreshold ($c);
@@ -9611,107 +9615,62 @@ sub _DbRep_rl_updateDay {
       $err = DbRep_beginDatabaseTransaction ($name, $dbh);
       return $err if ($err);
   }
-  
-  if ($mstr eq 'average') {                                                               # Day Average 
-      for my $uhk (keys %updateHash) {
-          my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
-          my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
-        
-          for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
-              $id++;
-              
-              $paref->{logtxt}    = "(daily-$mstr) deleting";
-              $paref->{iref}      = \$id;
-              $paref->{kref}      = \$kd;
-              $paref->{th}        = $thd;
-              $paref->{timestamp} = $tedr->[0];
-              $paref->{device}    = $tedr->[2];
-              $paref->{reading}   = $tedr->[3];
-              
-              $err = __DbRep_rl_deleteDayDatabase ($paref);
-              
-              if ($err) {
-                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
-                  $err = encode_base64($err, "");
-                
-                  DbRep_rollbackOnly ($name, $dbh);
-                  return $err;
-              }
-          }
+   
+  for my $uhk (keys %updateHash) {
           
-          $iu++;
-        
-              $paref->{logtxt}    = "(daily-$mstr) updating";
-              $paref->{iref}      = \$iu;
-              $paref->{kref}      = \$ku;
-              $paref->{th}        = $thu;
-              $paref->{date}      = $updateHash{$uhk}->{date};
-              $paref->{timestamp} = $lastUpdH->[0];
-              $paref->{device}    = $lastUpdH->[2];
-              $paref->{reading}   = $lastUpdH->[3];
-              $paref->{value}     = $value;
-
-              $err = __DbRep_rl_updateDayDatabase ($paref);
-              
-              if ($err) {
-                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
-                  $err = encode_base64($err, "");
-                
-                  DbRep_rollbackOnly ($name, $dbh);
-                  return $err;
-              }                          
+      if ($mstr eq 'average') {                                                                          # Day Average
+          $value = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
       }
-  }
-  elsif ($mstr eq 'max') {                                                               # Day Max
-      for my $uhk (keys %updateHash) {
-          my $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
-          my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
-        
-          for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
-              $id++;
-              
-              $paref->{logtxt}    = "(daily-$mstr) deleting";
-              $paref->{iref}      = \$id;
-              $paref->{kref}      = \$kd;
-              $paref->{th}        = $thd;
-              $paref->{timestamp} = $tedr->[0];
-              $paref->{device}    = $tedr->[2];
-              $paref->{reading}   = $tedr->[3];
-              
-              $err = __DbRep_rl_deleteDayDatabase ($paref);
-              
-              if ($err) {
-                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
-                  $err = encode_base64($err, "");
-                
-                  DbRep_rollbackOnly ($name, $dbh);
-                  return $err;
-              }
-          }
-          
-          $iu++;
-          
-              $paref->{logtxt}    = "(daily-$mstr) updating";
-              $paref->{iref}      = \$iu;
-              $paref->{kref}      = \$ku;
-              $paref->{th}        = $thu;
-              $paref->{date}      = $updateHash{$uhk}->{date};
-              $paref->{timestamp} = $lastUpdH->[0];
-              $paref->{device}    = $lastUpdH->[2];
-              $paref->{reading}   = $lastUpdH->[3];
-              $paref->{value}     = $value;
+      elsif ($mstr eq 'max') {                                                                           # Day Max
+          $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
+      }
+      
+      my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
 
-              $err = __DbRep_rl_updateDayDatabase ($paref);
-              
-              if ($err) {
-                  Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
-                  $err = encode_base64($err, "");
-                
-                  DbRep_rollbackOnly ($name, $dbh);
-                  return $err;
-              }                         
-      }          
-  }
+      for my $tedr (@{$updateHash{$uhk}->{tedr}}) {
+          $id++;
+          
+          $paref->{logtxt}    = "(daily-$mstr) deleting";
+          $paref->{iref}      = \$id;
+          $paref->{kref}      = \$kd;
+          $paref->{th}        = $thd;
+          $paref->{timestamp} = $tedr->[0];
+          $paref->{device}    = $tedr->[2];
+          $paref->{reading}   = $tedr->[3];
+          
+          $err = __DbRep_rl_deleteDayDatabase ($paref);
+          
+          if ($err) {
+              Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
+              $err = encode_base64($err, "");
+            
+              DbRep_rollbackOnly ($name, $dbh);
+              return $err;
+          }
+      }
+      
+      $iu++;
+
+      $paref->{logtxt}    = "(daily-$mstr) updating";
+      $paref->{iref}      = \$iu;
+      $paref->{kref}      = \$ku;
+      $paref->{th}        = $thu;
+      $paref->{date}      = $updateHash{$uhk}->{date};
+      $paref->{timestamp} = $lastUpdH->[0];
+      $paref->{device}    = $lastUpdH->[2];
+      $paref->{reading}   = $lastUpdH->[3];
+      $paref->{value}     = $value;
+
+      $err = __DbRep_rl_updateDayDatabase ($paref);
+      
+      if ($err) {
+          Log3 ($name, 3, "DbRep $name - ERROR - reduceLog $mstr=day failed for day $processingDay: $err");
+          $err = encode_base64($err, "");
+        
+          DbRep_rollbackOnly ($name, $dbh);
+          return $err;
+      }
+  }  
 
   if(keys %updateHash) {      
       $err = DbRep_commitOnly ($name, $dbh);
