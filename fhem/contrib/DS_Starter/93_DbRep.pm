@@ -8973,10 +8973,13 @@ sub DbRep_reduceLog {
                ($ph->{average} && $ph->{average} eq "day") ? 'average=day' : 
                (@$pa[1]        && @$pa[1] =~ /max/i)       ? 'max'         : 
                ($ph->{max}     && $ph->{max} eq "day")     ? 'max=day'     : 
+               (@$pa[1]        && @$pa[1] =~ /min/i)       ? 'min'         : 
+               ($ph->{min}     && $ph->{min} eq "day")     ? 'min=day'     :
                q{};
                
     my $mstr = $mode =~ /average/i ? 'average' :
                $mode =~ /max/i     ? 'max'     :
+               $mode =~ /min/i     ? 'min'     :
                q{};
     
     # Korrektur des Select-Zeitraums + eine Stunde 
@@ -9119,7 +9122,7 @@ sub DbRep_reduceLog {
                     @dayRows = ();
                 }
                 
-                if ($mode =~ /average|max/i) {                    
+                if ($mode =~ /average|max|min/i) {                    
            
                     $params = {
                         name            => $name,
@@ -9177,7 +9180,7 @@ sub DbRep_reduceLog {
         ############################
         
         if ($hour != $currentHour) {                                              # forget records from last hour, but remember these for average
-            if ($mode =~ /average|max/i && keys(%hourlyKnown)) {
+            if ($mode =~ /average|max|min/i && keys(%hourlyKnown)) {
                 push(@updateHour, {%hourlyKnown});
             }
             
@@ -9188,7 +9191,7 @@ sub DbRep_reduceLog {
         if (defined $hourlyKnown{$device.$reading}) {                             # das erste reading pro device und Stunde wird nicht in @dayRows (zum Löschen) gespeichert, die anderen können gelöscht werden 
             push(@dayRows, [@$row]);
             
-            if ($mode =~ /average|max/i                 && 
+            if ($mode =~ /average|max|min/i             && 
                 defined($value)                         &&                     
                 DbRep_IsNumeric ($value)                &&                    
                 $hourlyKnown{$device.$reading}->[0]) {                         
@@ -9224,8 +9227,8 @@ sub DbRep_reduceLog {
     my $brt = time() - $startTime;
     
     my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                 .($mode =~ /average|max/i ? ", updated: $updateCount"   : '')
-                 .($excludeCount           ? ", excluded: $excludeCount" : '');
+                 .($mode =~ /average|max|min/i ? ", updated: $updateCount"   : '')
+                 .($excludeCount               ? ", excluded: $excludeCount" : '');
                
     Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
     
@@ -9366,10 +9369,12 @@ sub _DbRep_rl_updateHour {
   
   my $event = $mstr eq 'average' ? 'rl_av_h'  :
               $mstr eq 'max'     ? 'rl_max_h' :
+              $mstr eq 'min'     ? 'rl_min_h' :
               'rl_h';
               
   my $updminutes = $mstr eq 'average' ? '30:00' :
                    $mstr eq 'max'     ? '59:59' :
+                   $mstr eq 'min'     ? '00:01' :
                    '00:00';
   
   #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
@@ -9405,6 +9410,9 @@ sub _DbRep_rl_updateHour {
               }
               elsif ($mstr eq 'max') {                                                    # Berechnung Max
                   $value = __DbRep_rl_calcMaxHourly ($paref);
+              }
+              elsif ($mstr eq 'min') {                                                    # Berechnung Min
+                  $value = __DbRep_rl_calcMinHourly ($paref);
               }
               
               $paref->{logtxt}   = "(hourly-$mstr) updating";
@@ -9475,6 +9483,31 @@ sub __DbRep_rl_calcMaxHourly {
   }
 
   my $value = sprintf "%.${ndp}f", $max;
+
+return $value;
+}
+
+####################################################################################################
+#           reduceLog stündlichen Min Wert berechnen
+####################################################################################################
+sub __DbRep_rl_calcMinHourly {
+  my $paref          = shift;
+  my $name           = $paref->{name};
+  my $hourHashKeyRef = $paref->{hourHashKeyRef};
+  my $ndp            = $paref->{ndp};
+  
+  my $min;
+  
+  for my $val (@{$hourHashKeyRef}) {
+      if (!defined $min) {
+          $min = $val;
+      }
+      else {
+          $min = $val if ($val < $min);
+      }      
+  }
+
+  my $value = sprintf "%.${ndp}f", $min;
 
 return $value;
 }
@@ -9576,6 +9609,14 @@ sub _DbRep_rl_updateDay {
               $updateHash{$row->[3].$row->[4]}->{max} = $row->[2] if ($row->[2] > $updateHash{$row->[3].$row->[4]}->{max});
           } 
       }
+      elsif ($mstr eq 'min') {                                                                                  # Day Min
+          if (!defined $updateHash{$row->[3].$row->[4]}->{min}) {
+              $updateHash{$row->[3].$row->[4]}->{min} = $row->[2];
+          }
+          else {
+              $updateHash{$row->[3].$row->[4]}->{min} = $row->[2] if ($row->[2] < $updateHash{$row->[3].$row->[4]}->{min});
+          } 
+      }     
   }
 
   my $c = 0;
@@ -9600,14 +9641,16 @@ sub _DbRep_rl_updateDay {
   
   my $event = $mstr eq 'average' ? 'rl_av_d'  :
               $mstr eq 'max'     ? 'rl_max_d' :
+              $mstr eq 'min'     ? 'rl_min_d' :
               'rl_d';
               
   my $time  = $mstr eq 'average' ? '12:00:00' :
               $mstr eq 'max'     ? '23:59:59' :
+              $mstr eq 'min'     ? '00:00:01' :
               '00:00:00';
               
-  $paref->{time}   = $time;
-  $paref->{event}  = $event;
+  $paref->{time}  = $time;
+  $paref->{event} = $event;
 
   if(keys %updateHash) {
       Log3 ($name, 3, "DbRep $name - reduceLog (daily-$mstr) updating ".(keys %updateHash).", deleting $c records of day: $processingDay");
@@ -9622,7 +9665,10 @@ sub _DbRep_rl_updateDay {
           $value = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum} / scalar @{$updateHash{$uhk}->{tedr}};
       }
       elsif ($mstr eq 'max') {                                                                           # Day Max
-          $value    = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
+          $value = sprintf "%.${ndp}f", $updateHash{$uhk}->{max};
+      }
+      elsif ($mstr eq 'min') {                                                                           # Day Min
+          $value = sprintf "%.${ndp}f", $updateHash{$uhk}->{min};
       }
       
       my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
@@ -17379,6 +17425,9 @@ return;
                                     <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>                                      
                                     <tr><td> <b>max</b>                     </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Stunde je Device & Reading reduziert, sonst wie ohne mode   </td></tr>
                                     <tr><td> <b>max=day</b>                 </td><td>:&nbsp;numerische Werte werden auf den Maximalwert pro Tag je Device & Reading reduziert, sonst wie ohne mode      </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>
+                                    <tr><td> <b>min</b>                     </td><td>:&nbsp;numerische Werte werden auf den Minimalwert pro Stunde je Device & Reading reduziert, sonst wie ohne mode   </td></tr>
+                                    <tr><td> <b>min=day</b>                 </td><td>:&nbsp;numerische Werte werden auf den Minimalwert pro Tag je Device & Reading reduziert, sonst wie ohne mode      </td></tr>
                                     <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>
                                  </table>
                                  </ul>
