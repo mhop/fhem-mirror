@@ -1570,6 +1570,8 @@ FileLog_regexpFn($$)
         devspec:reading:minInterval triples.  You may use regular expressions
         for reading. The data will only be written, if at least minInterval
         seconds elapsed since the last event of the matched type.
+        Note: only readings existing at the time the attribute is set will be
+        considered.
         </li><br>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
@@ -1898,6 +1900,8 @@ FileLog_regexpFn($$)
         "devspec:readings:minInterval" Tripel. readings kann ein regexp sein.
         Die Daten werden nur dann geschrieben, falls seit dem letzten Auftreten
         des gleichen Events mindestens minInterval Sekunden vergangen sind.
+        Achtung: nur solche Readings werden geprueft, die zum Zeitpunkt des
+        Attribut setzens existiert haben.
         </li><br>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>

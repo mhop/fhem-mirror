@@ -1321,8 +1321,10 @@ FW_longpoll()
   if(FW_serverGenerated)
     since = FW_serverLastMsg + (FW_serverGenerated-FW_serverFirstMsg);
 
+  let inform = encodeURIComponent("type=status;filter="+filter+
+                                  ";since="+since+";fmt=JSON"); // 128651
   var query = "?XHR=1"+
-              "&inform=type=status;filter="+filter+";since="+since+";fmt=JSON"+
+              "&inform="+inform+
               '&fw_id='+$("body").attr('fw_id')+
               "&timestamp="+new Date().getTime();
 
