@@ -5390,12 +5390,14 @@ option:global
 attr DEVICE setList \
   on:noArg BASE_ID/devcontrol/INVERTER_NR/0 on\
   off:noArg BASE_ID/devcontrol/INVERTER_NR/1 off\
-  limit BASE_ID/devcontrol/INVERTER_NR/11 $EVTPART1\
-  reboot:noArg BASE_ID/devcontrol/INVERTER_NR/2 restart
+  reboot:noArg BASE_ID/devcontrol/INVERTER_NR/2 restart\
+  limit BASE_ID/devcontrol/INVERTER_NR/11/0 $EVTPART1\
+  limit_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/1 $EVTPART1\
+  limit_persistent_abs BASE_ID/devcontrol/INVERTER_NR/11/256 $EVTPART1\
+  limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20200812
-
+setreading DEVICE attrTemplateVersion 20200816
 
 
 ###########################################
