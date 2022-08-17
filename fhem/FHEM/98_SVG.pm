@@ -541,7 +541,7 @@ SVG_PEdit($$$$)
 
   my $sl = "$FW_ME/SVG_WriteGplot?detail=$d&showFileLogData=1";
   if(defined($FW_pos{zoom}) && defined($FW_pos{off})) {
-    $sl .= "&pos=zoom=$FW_pos{zoom};off=$FW_pos{off}";
+    $sl .= "&pos=zoom%3D$FW_pos{zoom}%3Boff%3D$FW_pos{off}";
   }
   my $ro="";
   if(exists($conf{readonly})) {
@@ -629,7 +629,7 @@ SVG_zoomLink($$$)
     } elsif($val eq "20years") {
       $w_off =                         int($w_off/240);
     }
-    $cmd .= "zoom=$val;off=$w_off";
+    $cmd .= "zoom%3D$val%3Boff%3D$w_off";
 
   } else {
 
@@ -637,7 +637,7 @@ SVG_zoomLink($$$)
     $off=($val ? $val+$off : $off);
     my $zoom=$FW_pos{zoom};
     $zoom = 0 if(!$zoom);
-    $cmd .= "zoom=$zoom;off=$off";
+    $cmd .= "zoom%3D$zoom%3Boff%3D$off";
 
   }
 
