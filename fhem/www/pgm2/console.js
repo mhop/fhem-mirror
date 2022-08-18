@@ -101,9 +101,9 @@ consFill()
   if(FW_pollConn)
     FW_closeConn();
 
-  var query = "?XHR=1"+
-       "&inform=type=raw;withLog="+withLog+";filter="+
-       encodeURIComponent(consFilter)+consFType+
+  var query = "?XHR=1&inform="+
+        encodeURIComponent("type=raw;withLog="+withLog+
+                                   ";filter="+consFilter+consFType)+
        "&fw_id="+$("body").attr('fw_id')+
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
