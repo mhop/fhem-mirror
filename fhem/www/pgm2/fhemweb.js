@@ -1269,8 +1269,8 @@ FW_longpoll()
 
   // Build the notify filter for the backend
   var filter = $("body").attr("longpollfilter");
-  if(filter == null)
-    filter = "";
+  filter = filter ? decodeURIComponent(filter) : "";
+
   var retry;
   if(filter == "") {
     $("embed").each(function() {        // wait for all embeds to be there
