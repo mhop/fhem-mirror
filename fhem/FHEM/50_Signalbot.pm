@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.9";
+my $Signalbot_VERSION="3.10";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -62,6 +62,8 @@ use vars qw($FW_RET);
 	"setPin"				=> "s", #V0.10.0
 	"removePin"				=> "", #V0.10.0
 	"getGroup"				=> "ay", #V0.10.0
+	"addDevice"				=> "s",
+	"listDevices"			=> "",
 	"sendEndSessionMessage" => "as",		#unused
 	"sendRemoteDeleteMessage" => "xas",		#unused
 	"sendGroupRemoteDeletemessage" => "xay",#unused
@@ -166,7 +168,9 @@ sub Signalbot_Set($@) {					#
 	@accounts =@{$hash->{helper}{accountlist}} if defined $hash->{helper}{accountlist};
 	my $sets=	"send:textField ".
 				"updateProfile:textField ".
-				"reply:textField ";
+				"reply:textField ".
+				"addDevice:textField ".
+				"removeDevice:textField ";
 	$sets.=	"addContact:textField ".
 				"createGroup:textField ".
 				"invite:textField ".
@@ -177,7 +181,7 @@ sub Signalbot_Set($@) {					#
 				"joinGroup:textField " if $version <1000;
 	$sets.=		"group:widgetList,13,select,addMembers,removeMembers,addAdmins,removeAdmins,invite,create,delete,block,unblock,update,".
 				"quit,join,1,textField contact:widgetList,5,select,add,delete,block,unblock,1,textField " if $version >=1000;
-	my $sets_reg=	"link:noArg ".
+	my $sets_reg=	"link:textField ".
 					"register:textField ";
 	$sets_reg	.=	"captcha:textField " if defined ($hash->{helper}{register});
 	$sets_reg	.=	"verify:textField " if defined ($hash->{helper}{verification});
@@ -222,7 +226,8 @@ sub Signalbot_Set($@) {					#
 		my $ret = Signalbot_setAccount($hash, $number);
 		# undef is success
 		if (!defined $ret) {
-			Signalbot_refreshGroups($hash);
+			$ret=Signalbot_setup($hash);
+			$hash->{STATE} = $ret if defined $ret;
 			$hash->{helper}{qr}=undef;
 			$hash->{helper}{register}=undef;
 			$hash->{helper}{verification}=undef;
@@ -232,16 +237,27 @@ sub Signalbot_Set($@) {					#
 		$ret = Signalbot_setAccount($hash,$account);
 		return "Error changing account, using previous account $account";
 	} elsif ($cmd eq "link") {
-		my $qrcode=Signalbot_CallS($hash,"link","FHEM");
+		my $acname=shift @args;
+		$acname="FHEM" if (!defined $acname);
+		my $qrcode=Signalbot_CallS($hash,"link",$acname);
 		if (defined $qrcode) {
 			my $qr_url = "https://chart.googleapis.com/chart?cht=qr&chs=200x200"."&chl=";
 			$qr_url .= uri_escape($qrcode);
 			$hash->{helper}{qr}=$qr_url;
+			$hash->{helper}{uri}=$qrcode;
 			$hash->{helper}{register}=undef;
 			$hash->{helper}{verification}=undef;
 			return undef;
 		}
 		return "Error creating device link:".$hash->{helper}{lasterr};
+	} elsif ($cmd eq "addDevice") {
+		my $url = shift @args;
+		my $ret = Signalbot_CallS($hash,"addDevice",$url);
+		LogUnicode $hash->{NAME}, 3 , $hash->{NAME}.": AddDevice for ".$url." returned:" .$ret;
+		return $ret;
+	} elsif ($cmd eq "removeDevice") {
+		my $devID = shift @args;
+		return Signalbot_removeDevice($hash,$devID);
 	} elsif ( $cmd eq "register") {
 		my $account= shift @args;
 		return "Number needs to start with '+' followed by digits" if !defined Signalbot_checkNumber($account);
@@ -550,7 +566,7 @@ sub Signalbot_Get($@) {
 	if ($cmd eq "?") {
 		my $gets="favorites:noArg accounts:noArg helpUnicode:noArg ";
 		$gets.="contacts:all,nonblocked ".
-			"groups:all,active,nonblocked " if $account ne "none";
+			"groups:all,active,nonblocked devices:noArg " if $account ne "none";
 		$gets .="groupProperties:textField " if $version >= 1000;
 		return "Signalbot_Get: Unknown argument $cmd, choose one of ".$gets;
 	}
@@ -569,6 +585,17 @@ sub Signalbot_Get($@) {
 		my @numlist=@{$hash->{helper}{accountlist}};
 		$ret=$ret.join("\n",@numlist);
 		return $ret;
+	} elsif ($cmd eq "devices") {
+		my $ret=Signalbot_CallS($hash,"listDevices");
+		my $str="Linked devices:\n\n";
+		foreach my $dev (@$ret) {
+			my ($devpath,$devid,$devname)=@$dev;
+			if ($devid eq 1 && $devname eq "") {
+				$devname="main device";
+			}
+			$str.=sprintf("%2i %s\n",$devid,$devname);
+		}
+	return $str;
 	} elsif ($cmd eq "favorites") {
 		my $favs = AttrVal($name,"favorites","");
 		$favs =~ s/[\n\r]//g;
@@ -1218,6 +1245,14 @@ sub	Signalbot_getGroupProperties($@) {
 	return Signalbot_CallDbus($hash,1,$path,'GetAll',$prototype,'org.freedesktop.DBus.Properties','org.asamk.Signal.Group');
 }
 
+sub Signalbot_removeDevice($@) {
+	my ($hash,$devid) = @_;
+	return "DeviceID needs to be numeric" if (!looks_like_number($devid));
+	return "You should not remove the main device" if $devid eq 1;
+	my $path=$hash->{helper}{signalpath}."/Devices/".$devid;
+	my @emptylist;
+	return Signalbot_CallDbus($hash,1,$path,'removeDevice','','org.asamk.Signal',@emptylist);
+}
 
 sub Signalbot_CallDbus($@) {
 	my ($hash,$sync,$path,$function,$prototype,$interface,@args) = @_;
@@ -2011,6 +2046,7 @@ sub Signalbot_Detail {
 		$ret .= "</td>";
 		$ret .= "<td><br>&nbsp;Scan this QR code to link FHEM to your existing Signal device<\/td>";
 		$ret .= "</tr>";
+		$ret .= "URI:".$hash->{helper}{uri}."<br>";
 		$ret .= "</table><br>After successfully scanning and accepting the QR code on your phone, wait ~1min to let signal-cli sync and then execute <b>set reinit</b><br>";
 		$ret .= "If you already have other accounts active, you might additionally have to do a <b>set signalAccount<br></b>"
 	}
@@ -2433,19 +2469,29 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		Typically registration requires you to solve a captcha to protect spam to phone numbers. The registration wizard will typically guide you through the process.<br>
 		If the captcha is accepted use "set verify" to enter the verification code and finish registration.<br>
 		</li>
-		<li><b>set verify &ltverifcation code&gt</b><br>
+		<li><b>set verify &ltverification code&gt</b><br>
 		<a id="Signalbot-set-verify"></a>
 		Last step in the registration process. Use this command to provide the verifcation code you got via SMS or voice call.<br>
 		If this step is finished successfully, Signalbot is ready to be used.<br>
 		</li>
-		<li><b>set link</b><br>
+		<li><b>set link &ltmy name&gt</b><br>
 		<a id="Signalbot-set-link"></a>
 		Alternative to registration: Link your Signal Messenger used with your smartphone to FHEM. A qr-code will be displayed that you can scan with your phone under settings->linked devices.<br>
+		Use the optional name to identify your instance - if empty "FHEM" is used.<br>
 		Note: This is not the preferred method, since FHEM will receive all the messages you get on your phone which can cause unexpected results.<br>
 		</li>
 		<li><b>set reinit</b><br>
 		<a id="Signalbot-set-reinit"></a>
 		Re-Initialize the module. For testing purposes when module stops receiving, has other issues or has been updated. Should not be necessary.<br>
+		</li>
+		<li><b>set addDevice &ltdevice URI&gt</b><br>
+		<a id="Signalbot-set-addDevice"></a>
+		Add another Signal instance as linked device. Typically the URI is presented as QR-Code though other Signalbot instances will display them as text when using the "set link" function. It starts with "sgnl://linkdevice..." <br>
+		</li>
+		<li><b>set removeDevice &ltdeviceID&gt</b><br>
+		<a id="Signalbot-set-removeDevice"></a>
+		Remove a linked device that was added to this instance with "addDevice". The deviceID can be retrieved with "get devices". If only one device is linked the id would typically be "2" as "1" is the main device.<br>
+		You can only remove a device from the main device, otherwise you will get an authorization failed error.<br>
 		</li>
 		<li><b>set group &ltgroup command&gt &ltgroupname&gt &ltargument&gt</b><br>
 		<a id="Signalbot-set-group"></a>
@@ -2487,12 +2533,16 @@ For German documentation see <a href="https://wiki.fhem.de/wiki/Signalbot">Wiki<
 		</li>
 		<li><b>get accounts</b><br>
 			<a id="Signalbot-get-accounts"></a>
-			Lists all accounts (phone numbers) registered on this computer. Only available when not attached to an account (account=none).
+			Lists all accounts (phone numbers) registered on this computer.<br>
 			Use register or link to create new accounts.<br>
 		</li>
 		<li><b>get favorites</b><br>
 			<a id="Signalbot-get-favorites"></a>
 			Lists the defined favorites in the attribute "favorites" in a readable format<br>
+		</li>
+		<li><b>get devices</b><br>
+			<a id="Signalbot-get-devices"></a>
+			Lists the defined devices linked to this devices. The ID "1" typically is this device and if no devices are linked this will be the only entry shown.<br>
 		</li>
 		<li><b>get helpUnicode</b><br>
 			<a id="Signalbot-get-helpUnicode"></a>
