@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.50.0"  => "12.08.2022  rework of DbRep_reduceLog - add max, max=day ",
+  "8.50.0"  => "20.08.2022  rework of DbRep_reduceLog - add max, max=day, min, min=day, sum, sum=day ",
   "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
                "some code changes and bug fixes ",
   "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
@@ -8975,19 +8975,15 @@ sub DbRep_reduceLog {
                ($ph->{max}     && $ph->{max} eq "day")     ? 'max=day'     : 
                (@$pa[1]        && @$pa[1] =~ /min/i)       ? 'min'         : 
                ($ph->{min}     && $ph->{min} eq "day")     ? 'min=day'     :
+               (@$pa[1]        && @$pa[1] =~ /sum/i)       ? 'sum'         : 
+               ($ph->{sum}     && $ph->{sum} eq "day")     ? 'sum=day'     :
                q{};
                
     my $mstr = $mode =~ /average/i ? 'average' :
                $mode =~ /max/i     ? 'max'     :
                $mode =~ /min/i     ? 'min'     :
+               $mode =~ /sum/i     ? 'sum'     :
                q{};
-    
-    # Korrektur des Select-Zeitraums + eine Stunde 
-    # (Forum: https://forum.fhem.de/index.php/topic,53584.msg1177799.html#msg1177799)
-    #my ($yyyy, $mm, $dd, $hh, $min, $sec) = $ots =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
-    #my $epoche                            = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900);
-    #my $splus                             = $mode =~ /average/i ? 3600 : 0;
-    #$ots                                  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoche+$splus);
     
     my $excludes = $ph->{EXCLUDE} // q{};
     my $includes = $ph->{INCLUDE} // q{};
@@ -9122,7 +9118,7 @@ sub DbRep_reduceLog {
                     @dayRows = ();
                 }
                 
-                if ($mode =~ /average|max|min/i) {                    
+                if ($mode =~ /average|max|min|sum/i) {                    
            
                     $params = {
                         name            => $name,
@@ -9180,7 +9176,7 @@ sub DbRep_reduceLog {
         ############################
         
         if ($hour != $currentHour) {                                              # forget records from last hour, but remember these for average
-            if ($mode =~ /average|max|min/i && keys(%hourlyKnown)) {
+            if ($mode =~ /average|max|min|sum/i && keys(%hourlyKnown)) {
                 push(@updateHour, {%hourlyKnown});
             }
             
@@ -9191,7 +9187,7 @@ sub DbRep_reduceLog {
         if (defined $hourlyKnown{$device.$reading}) {                             # das erste reading pro device und Stunde wird nicht in @dayRows (zum Löschen) gespeichert, die anderen können gelöscht werden 
             push(@dayRows, [@$row]);
             
-            if ($mode =~ /average|max|min/i             && 
+            if ($mode =~ /average|max|min|sum/i         && 
                 defined($value)                         &&                     
                 DbRep_IsNumeric ($value)                &&                    
                 $hourlyKnown{$device.$reading}->[0]) {                         
@@ -9227,8 +9223,8 @@ sub DbRep_reduceLog {
     my $brt = time() - $startTime;
     
     my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                 .($mode =~ /average|max|min/i ? ", updated: $updateCount"   : '')
-                 .($excludeCount               ? ", excluded: $excludeCount" : '');
+                 .($mode =~ /average|max|min|sum/i ? ", updated: $updateCount"   : '')
+                 .($excludeCount                   ? ", excluded: $excludeCount" : '');
                
     Log3 ($name, 3, "DbRep $name - reduceLog finished. $result");
     
@@ -9260,11 +9256,9 @@ sub _DbRep_rl_deleteDayRows {
   
   #Log3 ($name, 3, "DbRep $name - content dayRows Array:\n".Dumper @dayRows);
   
-  #my $lastHour = $dayRows[-1]->[0];
   my $c        = 0;
 
   for my $delRow (@dayRows) {
-      #$c++ if($delRow->[0] !~ /$lastHour/);
       $c++;
   }
 
@@ -9281,25 +9275,22 @@ sub _DbRep_rl_deleteDayRows {
           my $k  = 1;
           my $th = _DbRep_rl_logThreshold ($#dayRows);
         
-          for my $delRow (@dayRows) {
-              #if($delRow->[0] !~ /$lastHour/) {
-                
-                  Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
-                
-                  $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
-                  $i++;
-                  
-                  my $params = {
-                      name          => $name,
-                      logtxt        => "deletion",
-                      iref          => \$i,
-                      kref          => \$k,
-                      th            => $th,
-                      processingDay => $processingDay
-                  };
+          for my $delRow (@dayRows) {          
+              Log3 ($name, 5, "DbRep $name - DELETE FROM $table WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+            
+              $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
+              $i++;
+              
+              my $params = {
+                  name          => $name,
+                  logtxt        => "deletion",
+                  iref          => \$i,
+                  kref          => \$k,
+                  th            => $th,
+                  processingDay => $processingDay
+              };
 
-                  _DbRep_rl_logProgress ($params);
-              #}
+              _DbRep_rl_logProgress ($params);
           }
           1;
       }
@@ -9370,11 +9361,13 @@ sub _DbRep_rl_updateHour {
   my $event = $mstr eq 'average' ? 'rl_av_h'  :
               $mstr eq 'max'     ? 'rl_max_h' :
               $mstr eq 'min'     ? 'rl_min_h' :
+              $mstr eq 'sum'     ? 'rl_sum_h' :
               'rl_h';
               
   my $updminutes = $mstr eq 'average' ? '30:00' :
                    $mstr eq 'max'     ? '59:59' :
                    $mstr eq 'min'     ? '00:01' :
+                   $mstr eq 'sum'     ? '00:00' :
                    '00:00';
   
   #Log3 ($name, 3, "DbRep $name - content updateHour Array:\n".Dumper @$updateHourref);
@@ -9414,6 +9407,9 @@ sub _DbRep_rl_updateHour {
               elsif ($mstr eq 'min') {                                                    # Berechnung Min
                   $value = __DbRep_rl_calcMinHourly ($paref);
               }
+              elsif ($mstr eq 'sum') {                                                    # Berechnung Summary
+                  $value = __DbRep_rl_calcSumHourly ($paref);
+              }             
               
               $paref->{logtxt}   = "(hourly-$mstr) updating";
               $paref->{newvalue} = $value;
@@ -9508,6 +9504,26 @@ sub __DbRep_rl_calcMinHourly {
   }
 
   my $value = sprintf "%.${ndp}f", $min;
+
+return $value;
+}
+
+####################################################################################################
+#           reduceLog stündlichen summary Wert berechnen
+####################################################################################################
+sub __DbRep_rl_calcSumHourly {
+  my $paref          = shift;
+  my $name           = $paref->{name};
+  my $hourHashKeyRef = $paref->{hourHashKeyRef};
+  my $ndp            = $paref->{ndp};
+  
+  my $sum = 0;
+  
+  for my $val (@{$hourHashKeyRef}) { 
+      $sum += $val;   
+  }
+
+  my $value = sprintf "%.${ndp}f", $sum;
 
 return $value;
 }
@@ -9616,7 +9632,10 @@ sub _DbRep_rl_updateDay {
           else {
               $updateHash{$row->[3].$row->[4]}->{min} = $row->[2] if ($row->[2] < $updateHash{$row->[3].$row->[4]}->{min});
           } 
-      }     
+      }
+      elsif ($mstr eq 'sum') {                                                                                  # Day Summary 
+          $updateHash{$row->[3].$row->[4]}->{sum} += $row->[2];                                                 # Summe aller Werte
+      }    
   }
 
   my $c = 0;
@@ -9642,11 +9661,13 @@ sub _DbRep_rl_updateDay {
   my $event = $mstr eq 'average' ? 'rl_av_d'  :
               $mstr eq 'max'     ? 'rl_max_d' :
               $mstr eq 'min'     ? 'rl_min_d' :
+              $mstr eq 'sum'     ? 'rl_sum_d' :
               'rl_d';
               
   my $time  = $mstr eq 'average' ? '12:00:00' :
               $mstr eq 'max'     ? '23:59:59' :
               $mstr eq 'min'     ? '00:00:01' :
+              $mstr eq 'sum'     ? '12:00:00' :
               '00:00:00';
               
   $paref->{time}  = $time;
@@ -9669,6 +9690,9 @@ sub _DbRep_rl_updateDay {
       }
       elsif ($mstr eq 'min') {                                                                           # Day Min
           $value = sprintf "%.${ndp}f", $updateHash{$uhk}->{min};
+      }
+      elsif ($mstr eq 'sum') {                                                                           # Day Summary
+          $value = sprintf "%.${ndp}f", $updateHash{$uhk}->{sum};
       }
       
       my $lastUpdH = pop @{$updateHash{$uhk}->{tedr}};
@@ -17428,6 +17452,9 @@ return;
                                     <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>
                                     <tr><td> <b>min</b>                     </td><td>:&nbsp;numerische Werte werden auf den Minimalwert pro Stunde je Device & Reading reduziert, sonst wie ohne mode   </td></tr>
                                     <tr><td> <b>min=day</b>                 </td><td>:&nbsp;numerische Werte werden auf den Minimalwert pro Tag je Device & Reading reduziert, sonst wie ohne mode      </td></tr>
+                                    <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>
+                                    <tr><td> <b>sum</b>                     </td><td>:&nbsp;numerische Werte werden auf die Summe pro Stunde je Device & Reading reduziert, sonst wie ohne mode         </td></tr>
+                                    <tr><td> <b>sum=day</b>                 </td><td>:&nbsp;numerische Werte werden auf die Summe pro Tag je Device & Reading reduziert, sonst wie ohne mode            </td></tr>
                                     <tr><td>                                </td><td>&nbsp;&nbsp;Die FullDay-Option (es werden immer volle Tage selektiert) wird impliziert verwendet.                  </td></tr>
                                  </table>
                                  </ul>
