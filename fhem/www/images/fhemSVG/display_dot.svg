@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="220px" height="100px" viewBox="-110 -50 220 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" stroke="none" fill="#000000">
+<g id="display_dot_char">
+<g id="display_dot_row">
+<rect id="display_dot_dot" x="-5" y="-5" width="10" height="10"/>
+<use xlink:href="#display_dot_dot" transform="translate(-12,0)"/>
+<use xlink:href="#display_dot_dot" transform="translate(-24,0)"/>
+<use xlink:href="#display_dot_dot" transform="translate(12,0)"/>
+<use xlink:href="#display_dot_dot" transform="translate(24,0)"/>
+</g>
+<use xlink:href="#display_dot_row" transform="translate(0,-12)"/>
+<use xlink:href="#display_dot_row" transform="translate(0,-24)"/>
+<use xlink:href="#display_dot_row" transform="translate(0,-36)"/>
+<use xlink:href="#display_dot_row" transform="translate(0,12)"/>
+<use xlink:href="#display_dot_row" transform="translate(0,24)"/>
+<use xlink:href="#display_dot_row" transform="translate(0,36)"/>
+</g>
+<use xlink:href="#display_dot_char" transform="translate(-72,0)"/>
+<use xlink:href="#display_dot_char" transform="translate(72,0)"/>
+</svg>
