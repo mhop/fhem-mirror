@@ -1,4 +1,4 @@
-REV 26337
+REV 26340
 DIR unused
 UPD 2022-08-20_07:45:02 382212 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -749,8 +749,8 @@ UPD 2022-08-20_07:45:07 4741184 docs/commandref.html
 UPD 2022-08-17_22:17:59 2855040 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-08-20_07:45:10 288358 docs/commandref_modular.html
-UPD 2022-08-20_07:45:12 299492 docs/commandref_modular_DE.html
+UPD 2022-08-21_07:45:11 288358 docs/commandref_modular.html
+UPD 2022-08-21_07:45:12 299492 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1376,6 +1376,14 @@ UPD 2017-09-07_07:45:02 5233 www/images/fhemSVG/dash_button.svg
 UPD 2015-07-28_14:05:32 4825 www/images/fhemSVG/day_night.svg
 UPD 2019-08-15_07:45:02 5368 www/images/fhemSVG/dead.svg
 UPD 2019-02-09_07:45:03 5320 www/images/fhemSVG/debian.svg
+UPD 2022-08-21_07:45:03 1056 www/images/fhemSVG/display_7seg.svg
+UPD 2022-08-21_07:45:03 3903 www/images/fhemSVG/display_alpha.svg
+UPD 2022-08-21_07:45:03 5049 www/images/fhemSVG/display_backlight.svg
+UPD 2022-08-21_07:45:03 4405 www/images/fhemSVG/display_blink.svg
+UPD 2022-08-21_07:45:03 4085 www/images/fhemSVG/display_cursor.svg
+UPD 2022-08-21_07:45:03 1160 www/images/fhemSVG/display_dot.svg
+UPD 2022-08-21_07:45:03 3690 www/images/fhemSVG/display_mixed.svg
+UPD 2022-08-21_07:45:03 2921 www/images/fhemSVG/display_num.svg
 UPD 2019-02-08_07:45:02 2305 www/images/fhemSVG/docker.svg
 UPD 2017-11-14_07:45:02 15434 www/images/fhemSVG/dog_silhouette.svg
 UPD 2020-07-26_07:45:03 1194 www/images/fhemSVG/door_shutter.svg
