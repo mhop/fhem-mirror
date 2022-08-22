@@ -533,7 +533,7 @@ sub td {
   push @r, sprintf("%dd", $d) if $d> 0;
   if($m>0 || $s>0) {
     my $t= sprintf("%d:%02d", $h, $m);
-    $t+= sprintf("\'%02d", $s) if $s> 0;
+    $t.= sprintf("\'%02d", $s) if $s> 0;
     push @r, $t;
   } else {
     push @r, sprintf("%dh", $h) if $h> 0;
