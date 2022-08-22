@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.3 "=> "22.08.2022  show cloudcover in weather __weatherOnBeam ",
   "0.67.2 "=> "11.08.2022  fix no disabled Link after restart and disable=1 ",
   "0.67.1 "=> "10.08.2022  fix warning, Forum: https://forum.fhem.de/index.php/topic,117864.msg1231050.html#msg1231050 ",
   "0.67.0 "=> "31.07.2022  change _gethtml, _getftui ",
@@ -5293,7 +5294,8 @@ sub _beamGraphicFirstHour {
       $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "confc", 0);
 
       # $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", 999);
-      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "weatherid", 999);
+      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
+      $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
   }
   else {
       $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
@@ -5362,7 +5364,8 @@ sub _beamGraphicRemainingHours {
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
               $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "confc", 0);
               
-              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "weatherid", 999);
+              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
+              $hfcg->{$i}{wcc}     = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
           }
           else {
               $nh = sprintf('%02d', $i+$offset);
@@ -5373,9 +5376,10 @@ sub _beamGraphicRemainingHours {
       }
 
       if (defined($nh)) {
-          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",  0);
-          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, "confc",       0);
-          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid", 999);
+          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",   0);
+          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, "confc",        0);
+          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid",  999);
+          $hfcg->{$i}{wcc}     = NexthoursVal ($hash, 'NextHour'.$nh, 'cloudcover', '-');
           #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
 
@@ -5757,6 +5761,9 @@ sub __weatherOnBeam {
           my ($icon_name, $title) = $hfcg->{$i}{weather} > 100             ? 
                                     weather_icon($hfcg->{$i}{weather}-100) : 
                                     weather_icon($hfcg->{$i}{weather});
+                                    
+          my $wcc                 = $hfcg->{$i}{wcc};                                                        # Bewölkungsgrad ergänzen
+          $title                 .= ': '.$wcc;
           
           if($icon_name eq 'unknown') {              
               Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
