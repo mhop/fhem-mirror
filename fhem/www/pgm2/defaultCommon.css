@@ -131,7 +131,7 @@ div.detLink { display:inline-block; margin-right:0.5em; }
 select [value^=l0] { color: red; }
 select [value^=l1] { color: green; }
 select [value^=l2] { color: blue; }
-select [value^=l3] { color: pink; }
+select [value^=l3] { color: magenta; }
 select [value^=l4] { color: brown; }
 select [value^=l5] { color: black; }
 select [value^=l6] { color: olive; }
