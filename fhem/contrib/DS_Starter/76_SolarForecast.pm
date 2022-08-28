@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.5 "=> "28.08.2022  add checkRegex ",
   "0.67.4 "=> "28.08.2022  ___switchConsumerOn -> no switch on if additional switch off condition is true ".
                            "__setConsRcmdState -> Consumer can be switched on in case of missing PV power if key power=0 is set ".
                            "new process and additional split for hysteresis ",
@@ -1742,6 +1743,8 @@ sub _attrconsumer {                      ## no critic "not used"
   
   return if(!$init_done);                                                                  # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959
   
+  my $err;
+  
   if($cmd eq "set") {
       my ($a,$h) = parseParams ($aVal);
       my $codev  = $a->[0] // "";
@@ -1767,12 +1770,40 @@ sub _attrconsumer {                      ## no critic "not used"
           return qq{The mode "$h->{mode}" isn't allowed!}
       }
       
-      if($h->{interruptable}) {                                                           # Check Hysterese auf numeric
-          my (undef,undef,undef,$hyst) = split ":", $h->{interruptable};
+      if($h->{interruptable}) {                                                            # Check Regex/Hysterese
+          my (undef,undef,$regex,$hyst) = split ":", $h->{interruptable};
+          
+          $err = checkRegex ($regex);
+          return $err if($err);
+          
           if ($hyst && !IsNumeric ($hyst)) {
               return qq{The hysteresis of key "interruptable" must be a numeric value like "0.5" or "2"};
           }
-      } 
+      }
+
+      if($h->{swoncond}) {                                                                 # Check Regex
+          my (undef,undef,$regex) = split ":", $h->{swoncond};
+          
+          $err = checkRegex ($regex);
+          return $err if($err);
+      }      
+
+      if($h->{swoffcond}) {                                                                # Check Regex
+          my (undef,undef,$regex) = split ":", $h->{swoffcond};
+          
+          $err = checkRegex ($regex);
+          return $err if($err);
+      }  
+      
+      if($h->{swstate}) {                                                                # Check Regex
+          my (undef,$onregex,$offregex) = split ":", $h->{swstate};
+          
+          $err = checkRegex ($onregex);
+          return $err if($err);
+          
+          $err = checkRegex ($offregex);
+          return $err if($err);
+      }
   } 
   else {      
       my $day  = strftime "%d", localtime(time);                                           # aktueller Tag  (range 01 to 31)
@@ -7800,6 +7831,22 @@ sub simplifyCstate {
         "unknown";
                 
 return $ps;
+}
+
+################################################################
+#  Prüfung eines übergebenen Regex
+################################################################
+sub checkRegex {
+  my $regexp = shift // return;
+  
+  eval { "Hallo" =~ m/^$regexp$/;
+         1;
+       } 
+       or do { my $err = (split " at", $@)[0];
+               return "Bad regexp: ".$err;
+             };
+  
+return;
 }
 
 ###############################################################################
