@@ -564,6 +564,7 @@ my $caicondef    = 'clock@gold';                                                
 
 my $defflowGSize = 300;                                                           # default flowGraphicSize
 my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+my $defhyst      = 0;                                                             # default Hysterese
 
                                                                                   # Default CSS-Style
 my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
@@ -3588,7 +3589,7 @@ sub ___switchConsumerOff {
   my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
   my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
-  my $hyst    = ConsumerVal ($hash, $c, "hysteresis",        0);                                  # Hysterese
+  my $hyst    = ConsumerVal ($hash, $c, "hysteresis", $defhyst);                                  # Hysterese
   
   my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch off Bedingung
@@ -4493,7 +4494,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{rswoffcond}      = $rswoffcond      // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
       $data{$type}{$name}{consumers}{$c}{swoffcondregex}  = $swoffcondregex  // q{};               # Regex einer vorrangigen Ausschaltbedingung
       $data{$type}{$name}{consumers}{$c}{interruptable}   = $interruptable;                        # Ein-Zustand des Verbrauchers ist unterbrechbar
-      $data{$type}{$name}{consumers}{$c}{hysteresis}      = $hyst            // 0;                 # Hysterese
+      $data{$type}{$name}{consumers}{$c}{hysteresis}      = $hyst            // $defhyst;          # Hysterese
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
