@@ -120,6 +120,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.4 "=> "28.08.2022  ___switchConsumerOn -> no switch on if additional switch off condition is true ".
+                           "__setConsRcmdState -> Consumer can be switched on in case of missing PV power if key power=0 is set ".
+                           "new process and additional split for hysteresis ",
   "0.67.3 "=> "22.08.2022  show cloudcover in weather __weatherOnBeam ",
   "0.67.2 "=> "11.08.2022  fix no disabled Link after restart and disable=1 ",
   "0.67.1 "=> "10.08.2022  fix warning, Forum: https://forum.fhem.de/index.php/topic,117864.msg1231050.html#msg1231050 ",
@@ -1762,6 +1765,13 @@ sub _attrconsumer {                      ## no critic "not used"
       if($h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
           return qq{The mode "$h->{mode}" isn't allowed!}
       }
+      
+      if($h->{interruptable}) {                                                           # Check Hysterese auf numeric
+          my (undef,undef,undef,$hyst) = split ":", $h->{interruptable};
+          if ($hyst && !IsNumeric ($hyst)) {
+              return qq{The hysteresis of key "interruptable" must be a numeric value like "0.5" or "2"};
+          }
+      } 
   } 
   else {      
       my $day  = strftime "%d", localtime(time);                                           # aktueller Tag  (range 01 to 31)
@@ -3181,7 +3191,7 @@ sub __planSwitchTimes {
   }
   
   if($debug) {                                                                                         # nur für Debugging
-      Log (1, "DEBUG> $name - consumer: $c, epiece1: $epiece1");
+      Log (1, qq{DEBUG> $name consumer "$c" - epiece1: $epiece1});
   }
   
   my $mode     = ConsumerVal ($hash, $c, "mode",          "can");
@@ -3195,9 +3205,9 @@ sub __planSwitchTimes {
   
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
       if($debug) {                                                                                     # nur für Debugging
-          Log (1, "DEBUG> $name - consumer: $c, mode: $mode, relevant hash: mtimes");
+          Log (1, qq{DEBUG> $name consumer "$c" - mode: $mode, relevant hash: mtimes});
           for my $m (sort{$a<=>$b} keys %mtimes) {                                                   
-              Log (1, "DEBUG> $name - hash: mtimes, surplus: $mtimes{$m}{surplus}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}"); 
+              Log (1, qq{DEBUG> $name consumer "$c" - hash: mtimes, surplus: $mtimes{$m}{surplus}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}}); 
           }
       }
       
@@ -3234,9 +3244,9 @@ sub __planSwitchTimes {
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
       if($debug) {                                                                                     # nur für Debugging
-          Log (1, "DEBUG> $name - consumer: $c, mode: $mode, relevant hash: max");
+          Log (1, qq{DEBUG> $name consumer "$c" - mode: $mode, relevant hash: max});
           for my $o (sort{$a<=>$b} keys %max) {                                                   
-              Log (1, "DEBUG> $name - hash: max, surplus: $max{$o}{surplus}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}"); 
+              Log (1, qq{DEBUG> $name consumer "$c" - hash: max, surplus: $max{$o}{surplus}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}}); 
           }
       }
       
@@ -3430,7 +3440,7 @@ sub __setConsRcmdState {
   my $nompower = ConsumerVal ($hash, $c, "power", 0);                                 # Consumer nominale Leistungsaufnahme (W)
   my $ccr      = AttrVal     ($name, 'createConsumptionRecReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   
-  if ($surplus >= $nompower) {
+  if (!$nompower || $surplus >= $nompower) {
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;               # Einschalten des Consumers günstig
   }
   else {
@@ -3485,19 +3495,25 @@ sub ___switchConsumerOn {
   my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
   
-  my ($swoncond,$info,$err) = isAddSwitchOnCond ($hash, $c);                                      # zusätzliche Switch on Bedingung
-
+  my ($swoncond,$swoffcond,$info,$err);
+  ($swoncond,$info,$err)  = isAddSwitchOnCond  ($hash, $c);                                       # zusätzliche Switch on Bedingung
+  Log3 ($name, 1, "$name - $err") if($err);
+  
+  ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                       # zusätzliche Switch off Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
   
   if ($debug) {                                                                                   # nur für Debugging
-      Log (1, qq{DEBUG> $name - Parameters for switch on decision consumer "$c": }.
-              qq{swoncond: $swoncond, auto mode: $auto, on-command: $oncom, }.
+      Log (1, qq{DEBUG> $name consumer "$c" - general switching parameters: }.
+              qq{auto mode: $auto, }.
               qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef").", ".
               qq{timestamp: $t}              
-           );
+           ); 
+      Log (1, qq{DEBUG> $name consumer "$c" - Context of switching "on": }.
+              qq{swoncond: $swoncond, on-command: $oncom }              
+           );           
   }
  
-  if ($swoncond && $auto && $oncom && 
+  if ($auto && $oncom && $swoncond && !$swoffcond &&                                              # kein Einschalten wenn zusätzliche Switch off Bedingung zutrifft
       simplifyCstate($pstate) =~ /planned|priority|starting/xs && 
       isInTimeframe ($hash, $c)) {                                                                # Verbraucher Start ist geplant && Startzeit überschritten
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                   # Consumer Planungsmode
@@ -3572,18 +3588,17 @@ sub ___switchConsumerOff {
   my $cname   = ConsumerVal ($hash, $c, "name",             "");                                  # Consumer Device Name
   my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
   my $mode    = ConsumerVal ($hash, $c, "mode",      $defcmode);                                  # Consumer Planungsmode
+  my $hyst    = ConsumerVal ($hash, $c, "hysteresis",        0);                                  # Hysterese
   
   my $offcom                 = ConsumerVal        ($hash, $c, "offcom", "");                      # Set Command für "off"
-  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch on Bedingung
+  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch off Bedingung
   my $caution;
   
   Log3 ($name, 1, "$name - $err") if($err);
   
   if($debug) {                                                                                    # nur für Debugging
-      Log (1, qq{DEBUG> $name - Parameters for switch off decision consumer "$c": }.
-              qq{swoffcond: $swoffcond, auto mode: $auto, off-command: $offcom, }.
-              qq{planning state: $pstate, stop timestamp: }.($stopts ? $stopts : "undef").", ".
-              qq{timestamp: $t}              
+      Log (1, qq{DEBUG> $name consumer "$c" - Context of switching "off": }.
+              qq{swoffcond: $swoffcond, off-command: $offcom }             
            );
   }
   
@@ -3604,8 +3619,8 @@ sub ___switchConsumerOff {
       
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
-  elsif (((isInterruptable($hash, $c) && !isConsRcmd ($hash, $c)) || isInterruptable($hash, $c) == 2)   &&  # Consumer unterbrechen 
-         isInTimeframe    ($hash, $c) && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs &&
+  elsif (((isInterruptable($hash, $c, $hyst) && !isConsRcmd ($hash, $c)) || isInterruptable($hash, $c, $hyst) == 2) &&       # Consumer unterbrechen 
+         isInTimeframe    ($hash, $c)        && simplifyCstate ($pstate) =~ /started|continued|interrupting/xs      &&
          $auto && $offcom) {
  
       CommandSet(undef,"$cname $offcom");
@@ -3616,7 +3631,7 @@ sub ___switchConsumerOff {
 
       delete $paref->{ps};
       
-      $caution = isInterruptable($hash, $c) == 2 ? 'interrupt condition' : 'surplus shortage';
+      $caution = isInterruptable($hash, $c, $hyst) == 2 ? 'interrupt condition' : 'surplus shortage';
       $state   = qq{switching Consumer "$calias" to "$offcom", caution: $caution};
       
       writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
@@ -4437,8 +4452,10 @@ sub collectAllRegConsumers {
       }
 
       my $interruptable = 0;
-      if(exists $hc->{interruptable}) {
-          $interruptable = $hc->{interruptable} if($hc->{interruptable} ne '0');
+      my ($hyst);
+      if(exists $hc->{interruptable} && $hc->{interruptable} ne '0') {
+          $interruptable         = $hc->{interruptable};
+          ($interruptable,$hyst) = $interruptable =~ /(.*):(.*)$/xs if($interruptable ne '1');
       }      
       
       my $rauto     = $hc->{auto}     // q{};
@@ -4476,6 +4493,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{rswoffcond}      = $rswoffcond      // q{};               # Reading zur Lieferung einer vorrangigen Ausschaltbedingung
       $data{$type}{$name}{consumers}{$c}{swoffcondregex}  = $swoffcondregex  // q{};               # Regex einer vorrangigen Ausschaltbedingung
       $data{$type}{$name}{consumers}{$c}{interruptable}   = $interruptable;                        # Ein-Zustand des Verbrauchers ist unterbrechbar
+      $data{$type}{$name}{consumers}{$c}{hysteresis}      = $hyst            // 0;                 # Hysterese
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -7599,9 +7617,9 @@ sub isAddSwitchOnCond {
   
   my $rswoncond     = ConsumerVal ($hash, $c, "rswoncond",     "");             # Reading zur Lieferung einer zusätzlichen Einschaltbedingung
   my $swoncondregex = ConsumerVal ($hash, $c, "swoncondregex", "");             # Regex einer zusätzliche Einschaltbedingung
-  my $condstate     = ReadingsVal ($dswoncond, $rswoncond,     "");
+  my $condval       = ReadingsVal ($dswoncond, $rswoncond,     "");             # Wert zum Vergleich mit Regex
   
-  if ($condstate =~ m/^$swoncondregex$/x) {                                                     
+  if ($condval =~ m/^$swoncondregex$/x) {                                                     
       return (1, $info, $err);
   }
   
@@ -7625,6 +7643,7 @@ sub isAddSwitchOffCond {
   my $hash = shift;
   my $c    = shift;
   my $cond = shift // q{};
+  my $hyst = shift // 0;                                                          # Hysterese
 
   my $info           = q{};
   my $err            = q{};
@@ -7646,13 +7665,22 @@ sub isAddSwitchOffCond {
       return (0, $info, $err); 
   }              
   
-  my $condstate = ReadingsVal ($dswoffcond, $rswoffcond, "");
+  my $condval = ReadingsVal ($dswoffcond, $rswoffcond, "");
   
-  if ($condstate && $condstate =~ m/^$swoffcondregex$/x) {
+  if ($hyst && IsNumeric ($condval)) {                                            # Hysterese berücksichtigen
+      $condval -= $hyst;
+  }
+  
+  if ($condval && $condval =~ m/^$swoffcondregex$/x) {
+      $info = qq{value "$condval" (hysteresis = $hyst) match the Regex "$swoffcondregex" \n}.
+              qq{-> Switch-off condition or interrupt in the "switch-off context", DO NOT switch on or DO NOT continue in the "switch-on context"\n}
+              ; 
       return (1, $info, $err);
   }
   
-  $info = qq{The device "$dswoffcond", reading "$rswoffcond" doesn't match the Regex "$swoffcondregex"};  
+  $info = qq{The device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n}.
+          qq{-> DO NOT Switch-off or DO NOT interrupt in the "switch-off context", Switching on or continuing in the "switch-on" context\n}
+          ;  
 
 return (0, $info, $err);
 }
@@ -7683,7 +7711,9 @@ return ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0);
 sub isInterruptable {
   my $hash = shift;
   my $c    = shift;
-
+  my $hyst = shift // 0;
+  
+  my $name    = $hash->{NAME};
   my $intable = ConsumerVal ($hash, $c, 'interruptable', 0);
   
   if ($intable eq '0') {
@@ -7693,7 +7723,13 @@ sub isInterruptable {
       return 1;
   }
   
-  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable);
+  my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable, $hyst);
+  Log3 ($name, 1, "$name - $err") if($err);
+  
+  my $debug = AttrVal ($name, "debug", 0);
+  if ($debug) {                                                                                   # nur für Debugging
+      Log (1, qq{DEBUG> $name consumer "$c" - isInterruptable Info: $info});                                   
+  }
   
   if ($swoffcond) {
       return 2;
@@ -7703,6 +7739,21 @@ sub isInterruptable {
   }
   
 return;
+}
+
+################################################################
+#  Prüfung auf numerischen Wert (vorzeichenbehaftet)
+################################################################
+sub IsNumeric {
+  my $val = shift // q{empty};
+  
+  my $ret = 0;
+  
+  if($val =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/xs) {
+      $ret = 1;
+  }
+  
+return $ret;
 }
 
 ################################################################
@@ -7991,7 +8042,7 @@ return $def;
 #       swoffcondregex  - Regex einer einer vorrangige Ausschaltbedingung
 #       isIntimeframe   - ist Zeit innerhalb der Planzeit ein/aus
 #       interruptable   - Consumer "on" ist während geplanter "ein"-Zeit unterbrechbar
-#
+#       hysteresis      - Hysterese
 # $def: Defaultwert
 #
 ####################################################################################################################
@@ -8795,6 +8846,11 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         Die verbleibende Laufzeit wird durch einen Interrupt nicht beeinflusst ! 
         <br><br>
         
+        Der Schlüssel <b>power</b> gibt die nominale Leistungsaufnahme des Verbrauchers gemäß seines Datenblattes an.
+        Dieser Wert wird verwendet um das Schalten des Verbrauchers in Abhängigkeit des aktuellen PV-Überschusses zu
+        steuern. Ist <b>power=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichenden PV-Überschuß geschaltet.
+        <br><br>
+        
          <ul>   
          <table>  
          <colgroup> <col width=12%> <col width=88%> </colgroup>
@@ -8805,7 +8861,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                                       </td></tr>
             <tr><td>                       </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, etc.)                                                            </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                     </td></tr>          
-            <tr><td> <b>power</b>          </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                       </td></tr>            
+            <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                       </td></tr>            
+            <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                             </td></tr>
             <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                  </td></tr>
             <tr><td>                       </td><td><b>can</b>  - der Verbaucher wird eingeplant wenn wahrscheinlich genügend PV Überschuß verfügbar sein wird (default)                      </td></tr>
             <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird           </td></tr>
@@ -8824,30 +8881,33 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                         </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                               </td></tr>
             <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.                                  </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional).                                                   </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.               </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                  </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                         </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional).                                                                         </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                      </td></tr>
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                   </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                 </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                         </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher (optional)                                                             </td></tr>
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär unterbrochen falls der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
             <tr><td>                       </td><td><b>1</b> - Verbraucher darf temporär unterbrochen werden falls der PV Überschuß die benötigte Energie unterschreitet                      </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading:Regex</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen Device/Readings auf den Regex matched  </td></tr>
-            <tr><td>                       </td><td>oder unzureichender PV Überschuß vorliegt.                                                                                                </td></tr>
-            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender PV Überschuß vorliegt.          </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysterese]</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen                            </td></tr>
+            <tr><td>                       </td><td>Device/Readings auf den Regex matched oder unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                  </td></tr>
+            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender                                 </td></tr>
+            <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                            </td></tr>
+            <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                              </td></tr>
+            <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                  </td></tr>
          </table>
          </ul>
        <br>
       
        <ul>
          <b>Beispiele: </b> <br>
-         attr &lt;name&gt; <b>consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
-         attr &lt;name&gt; <b>consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
-         attr &lt;name&gt; <b>consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:^-?([1-7][0-9]|[0-9])$ swoffcond:EcoFlow:data_data_socSum:100 <br>
-         attr &lt;name&gt; <b>consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=700 mode=must notbefore=07 mintime=480 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.az.wandthermostat:diff-temp:([0-9]).*  <br>
+         <b>attr &lt;name&gt; consumer01</b> wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh:5 <br>
+         <b>attr &lt;name&gt; consumer02</b> WPxw type=heater mode=can power=3000 mintime=180 on="on-for-timer 3600" notafter=12 auto=automatic                     <br>
+         <b>attr &lt;name&gt; consumer03</b> Shelly.shellyplug2 type=other power=300 mode=must icon=it_ups_on_battery mintime=120 on=on off=off swstate=state:on:off auto=automatic pcurr=relay_0_power:W etotal:relay_0_energy_Wh:Wh swoncond=EcoFlow:data_data_socSum:-?([1-7][0-9]|[0-9]) swoffcond:EcoFlow:data_data_socSum:100 <br>
+         <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2             <br>
        </ul> 
        </li>  
        <br>
