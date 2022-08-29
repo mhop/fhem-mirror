@@ -25,7 +25,7 @@ package main;
 
 use strict;
 use warnings;
-use List::Util qw[min max];
+#use List::Util qw[min max];
 use Data::Dumper;
 
 #####################################
@@ -49,7 +49,7 @@ sub dev_proxy_Initialize($) {
   $hash->{NotifyFn}  = "dev_proxy_Notify";
   $hash->{SetFn}     = "dev_proxy_Set";
   $hash->{AttrFn}    = "dev_proxy_Attr";
-  $hash->{AttrList}  = "observedReadings setList mapValues mapReadings ". "disable disabledForIntervals ". $readingFnAttributes;
+  $hash->{AttrList}  = "observedReadings setList:textField-long mapValues:textField-long mapReadings:textField-long ". "disable disabledForIntervals useSetExtensions ". $readingFnAttributes;
 
 }
 
@@ -257,8 +257,8 @@ sub dev_proxy_computeCombReading($$) {
     return join(" ", keys %{ $tm });
   }
   
-  my $maxV = max(@values);
-  my $minV = min(@values);
+  my $maxV = List::Util::max(@values);
+  my $minV = List::Util::min(@values);
   #if($maxV-$minV<10) {
     return $minV+($maxV-$minV)/2;
   #}
@@ -354,13 +354,32 @@ sub dev_proxy_Set($@){
        $setList.=" ";
       }
     }
-    $setList =~ s/\n/ /g;  
-    return "Unknown argument $command, choose one of $setList";
+    $setList =~ s/\n/ /g;
+    if(AttrVal($name,"useSetExtensions",undef)) {
+      return SetExtensions($hash, $setList, $name, $command, @values);
+    } else {
+      return "Unknown argument $command, choose one of $setList";
+    }
+  }
+
+  if (AttrVal($name,"useSetExtensions",undef)) {
+    if ($command =~ m/^(blink|intervals|(off-|on-)(for-timer|till)|toggle)/) {
+      Log3($hash->{NAME},5,"calling SetExtensions(...) for $command");
+      my $setList = AttrVal($name, "setList", undef);
+      return SetExtensions($hash, $setList, $name, $command, @values);
+    }
   }
 
   if(int(@values)>0 && !defined($hash->{READINGS}->{$command})) {
-    return "Unknown reading $command";
+    if(AttrVal($name,"useSetExtensions",undef)) {
+      my $setList = AttrVal($name, "setList", undef);
+      return SetExtensions($hash, $setList, $name, $command, @values);
+    } else {
+      return "Unknown reading $command";
+    }
   }
+
+  SetExtensionsCancel($hash);
   
   my $ret;
   my @devList = keys %{$hash->{CONTENT}};
@@ -557,7 +576,7 @@ sub dev_proxy_cleanup_readings($) {
       <br>
     </li><br>
     <li>
-      mapValues: Erlaubt &Auml;nderungen/Umrechnungen an den Werte der Readings 
+      mapValues: Erlaubt &Auml;nderungen/Umrechnungen an den Werten der Readings 
       ggf. abh&auml;ngig von den jeweiligen Device- und Readingsnamen.
       Umrechnungstabellen k&ouml;nnen je nach Richtung ('in' aus Notify oder 'out' f&uuml;r set) getrennt definiert werden.
       Falls die Definition mit dem Richtungsprefix nicht existiert oder kein Ergebnis liefert, 
@@ -589,6 +608,11 @@ sub dev_proxy_cleanup_readings($) {
       <br>
       Beispiel: <br>
       <code>attr &lt;name&gt; mapReadings Rollo1:pct:position Rollo2:pct:position</code>
+    </li><br>
+    <li>
+      useSetExtensions: bestimmt, ob <a href="#setExtensions">set extensions</a> unterst&uuml;tzt werden. M&ouml;gliche Werte: 0,1
+      <br>Beispiel: <br>
+      <p><code>attr &lt;name&gt; useSetExtensions &lt;flags&gt;</code><br/>
     </li>
   </ul>
   <br>
