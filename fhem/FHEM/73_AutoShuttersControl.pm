@@ -707,7 +707,7 @@ __END__
                         are used for shading. Defaults to 120.
                     </li>
                     <a id="AutoShuttersControl-attr-ASC_Shading_BetweenTheTime"></a>
-                    <li><strong>ASC_Shading_BetweenTheTime</strong> - Limit the time slots for shading functionality. Example: 9:00-13:00 11:25-15:30</li>
+                    <li><strong>ASC_Shading_BetweenTheTime</strong> - Limit the time slots for shading functionality. Example: 09:00-13:00 11:25-15:30</li>
                 </ul>
             </blockquote>
         </ul>
@@ -1137,7 +1137,7 @@ __END__
                 <a id="AutoShuttersControl-attr-ASC_Shading_WaitingPeriod"></a>
                 <li><strong>ASC_Shading_WaitingPeriod</strong> - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten f&uuml;r die Beschattung stattfinden soll (default: 1200)</li>
                 <a id="AutoShuttersControl-attr-ASC_Shading_BetweenTheTime"></a>
-                <li><strong>ASC_Shading_BetweenTheTime</strong> - das Fahren in die Beschattung erfolgt bei Angabe nur innerhalb des Zeitraumes, Bsp: 9:00-13:00 11:25-15:30</li>
+                <li><strong>ASC_Shading_BetweenTheTime</strong> - das Fahren in die Beschattung erfolgt bei Angabe nur innerhalb des Zeitraumes, Bsp: 09:00-13:00 11:25-15:30</li>
             </ul></p>
             <a id="AutoShuttersControl-attr-ASC_ShuttersPlace"></a>
             <li><strong>ASC_ShuttersPlace - window/terrace/awning</strong> - Wenn dieses Attribut auf terrace gesetzt ist, das Residence Device in den Status "gone" geht und SelfDefense aktiv ist (ohne das das Reading selfDefense gesetzt sein muss), wird das Rollo geschlossen. awning steht für Markise und wirkt sich auf die Beschattungssteuerung aus. (default: window)</li>
@@ -1158,7 +1158,7 @@ __END__
             <a id="AutoShuttersControl-attr-ASC_WiggleValue"></a>
             <li><strong>ASC_WiggleValue</strong> - Wert um welchen sich die Position des Rollladens &auml;ndern soll (default: 5)</li>
             <a id="AutoShuttersControl-attr-ASC_WindParameters"></a>
-            <li><strong>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION]</strong> / Angabe von Max Wert ab dem f&uuml;r Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist der TRIGGERMAX Wert mit -1 an zu geben. (default: '50:20 ClosedPosition')</li>
+            <li><strong>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION]</strong> / ACHTUNG! Wird nur beachtet wenn ASC_WindProtection auf on gesetzt ist. - Angabe von Max Wert ab dem f&uuml;r Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist der TRIGGERMAX Wert mit -1 an zu geben. (default: '50:20 ASC_Closed_Pos')</li>
             <a id="AutoShuttersControl-attr-ASC_WindowRec_PosAfterDayClosed"></a>
             <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
             <a id="AutoShuttersControl-attr-ASC_WindowRec"></a>
@@ -1323,7 +1323,7 @@ __END__
         <tr><td>Sunrise</td><td>1=Morgenfahrt wurde durchgef&uuml;hrt, 0=noch keine Morgenfahrt durchgef&uuml;hrt</td></tr>
         <tr><td>RoommatesStatus</td><td>aktueller Status der/des Roommate/s f&uuml;r den Rollladen</td></tr>
         <tr><td>RoommatesLastStatus</td><td>letzter Status der/des Roommate/s f&uuml;r den Rollladen</td></tr>
-        <tr><td>ShadingStatus</td><td>Ausgabe des aktuellen Shading Status, „in“, „out“, „in reserved“, „out reserved“</td></tr>
+        <tr><td>ShadingStatus</td><td>Ausgabe des aktuellen Shading Status, „in“, �����out“, „in reserved“, „out reserved“</td></tr>
         <tr><td>ShadingStatusTimestamp</td><td>Timestamp des letzten Beschattungsstatus</td></tr>
         <tr><td>IfInShading</td><td>Befindet sich der Rollladen, in Abh&auml;ngigkeit des Shading Mode, in der Beschattung</td></tr>
         <tr><td>DelayCmd</td><td>letzter Fahrbefehl welcher in die Warteschlange kam. Grund z.B. Partymodus.</td></tr>
@@ -1462,7 +1462,7 @@ __END__
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.10.23",
+  "version": "v0.10.24",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],

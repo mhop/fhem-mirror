@@ -153,7 +153,8 @@ sub _RainProtected {
 }
 
 sub _RainUnprotected {
-    my $h = shift;
+    my $h         = shift;
+    my $targetPos = $FHEM::Automation::ShuttersControl::shutters->getLastPos;
 
     my $shuttersDev = $h->{shuttersdevice};
     $FHEM::Automation::ShuttersControl::shutters->setShuttersDev($shuttersDev);
@@ -170,28 +171,34 @@ sub _RainUnprotected {
           ->setRainUnprotectionDelayObj('none');
     }
 
-    $FHEM::Automation::ShuttersControl::shutters->setDriveCmd(
-        (
-              $FHEM::Automation::ShuttersControl::shutters->getIsDay
-            ? $FHEM::Automation::ShuttersControl::shutters->getLastPos
-            : (
-                $FHEM::Automation::ShuttersControl::shutters->getShuttersPlace
-                  eq 'awning'
-                ? $FHEM::Automation::ShuttersControl::shutters->getOpenPos
-                : (
-                    $FHEM::Automation::ShuttersControl::shutters
-                      ->getPrivacyDownStatus == 2
-                    ? $FHEM::Automation::ShuttersControl::shutters
-                      ->getPrivacyDownPos
-                    : $FHEM::Automation::ShuttersControl::shutters
-                      ->getClosedPos
-                )
-            )
-        )
-    ) if ( IsAfterShuttersTimeBlocking($shuttersDev) );
+    if (   $FHEM::Automation::ShuttersControl::shutters->getIsDay
+        && !$FHEM::Automation::ShuttersControl::shutters->getIfInShading
+        && $FHEM::Automation::ShuttersControl::shutters->getLastPos ==
+        $FHEM::Automation::ShuttersControl::shutters->getShadingPos )
+    {
+        $targetPos = $FHEM::Automation::ShuttersControl::shutters->getOpenPos;
+    }
+    else {
+        $targetPos = $FHEM::Automation::ShuttersControl::shutters->getLastPos;
+    }
+
+    if (  !$FHEM::Automation::ShuttersControl::shutters->getIsDay
+        && $FHEM::Automation::ShuttersControl::shutters->getShuttersPlace ne
+        'awning' )
+    {
+        $targetPos = (
+            $FHEM::Automation::ShuttersControl::shutters->getPrivacyDownStatus
+              == 2
+            ? $FHEM::Automation::ShuttersControl::shutters->getPrivacyDownPos
+            : $FHEM::Automation::ShuttersControl::shutters->getClosedPos
+        );
+    }
 
     $FHEM::Automation::ShuttersControl::shutters->setRainProtectionStatus(
         'unprotected');
+
+    $FHEM::Automation::ShuttersControl::shutters->setDriveCmd($targetPos)
+      if ( IsAfterShuttersTimeBlocking($shuttersDev) );
 
     return;
 }

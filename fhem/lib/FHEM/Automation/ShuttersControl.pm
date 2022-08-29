@@ -1764,7 +1764,11 @@ sub SetCmdFn {
     return
       if ( $shutters->getASCenable eq 'off'
         || $ascDev->getASCenable eq 'off'
-        || $idleDetection !~ m{^$idleDetectionValue$}xms );
+        || $idleDetection !~ m{^$idleDetectionValue$}xms
+        || $FHEM::Automation::ShuttersControl::shutters
+        ->getWindProtectionStatus eq 'protected'
+        || $FHEM::Automation::ShuttersControl::shutters
+        ->getRaindProtectionStatus eq 'protected' );
 
     if ( $shutters->getStatus != $posValue ) {
         $shutters->setLastPos( $shutters->getStatus );
