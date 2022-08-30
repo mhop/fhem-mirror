@@ -1768,7 +1768,7 @@ sub SetCmdFn {
         || $FHEM::Automation::ShuttersControl::shutters
         ->getWindProtectionStatus eq 'protected'
         || $FHEM::Automation::ShuttersControl::shutters
-        ->getRaindProtectionStatus eq 'protected' );
+        ->getRainProtectionStatus eq 'protected' );
 
     if ( $shutters->getStatus != $posValue ) {
         $shutters->setLastPos( $shutters->getStatus );
