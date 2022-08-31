@@ -8912,8 +8912,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                       </td></tr>            
             <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                             </td></tr>
             <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                  </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - der Verbaucher wird eingeplant wenn wahrscheinlich genügend PV Überschuß verfügbar sein wird (default)                      </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                         </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers unterbleibt bei ungenügendem PV-Überschuß.                    </td></tr>
             <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird           </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.       </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                  </td></tr>
             <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)             </td></tr>
             <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                  </td></tr>
