@@ -2012,6 +2012,8 @@ sub getDeviceByName {
     return 0 if $droom; #no further check if explicit room was requested!
 
     my @maybees;
+    my $oldType = $intent =~ m,(MediaChannels|Colors),x;
+
     for (sort keys %{$hash->{helper}{devicemap}{rhasspyRooms}}) {
         my $dev = $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$name};
         #return $device if $device;
@@ -2022,7 +2024,7 @@ sub getDeviceByName {
                   && defined $hash->{helper}{devicemap}{devices}{$dev}->{prio} 
                   && defined $hash->{helper}{devicemap}{devices}{$dev}{prio}->{outsideRoom}
                   && $hash->{helper}{devicemap}{devices}{$dev}{prio}->{outsideRoom} =~ m{\b$type\b}xms;
-            if ( $intent ) {
+            if ( $intent && !$oldType ) {
                 if ( $type ) {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent}
@@ -2032,6 +2034,14 @@ sub getDeviceByName {
                 } else {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{intents}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent};
+                }
+            } elsif ( $intent && $oldType ) {
+                if ( $type ) {
+                    push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{$intent}
+                        && defined $hash->{helper}{devicemap}{devices}{$dev}->{$intent}
+                        && defined $hash->{helper}{devicemap}{devices}{$dev}->{$intent}->{$type};
+                } else {
+                    push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{$intent};
                 }
             } else { 
                 push @maybees, $dev;
@@ -5223,14 +5233,13 @@ sub handleIntentMediaChannels {
     Log3($hash->{NAME}, 5, "handleIntentMediaChannels called");
 
     # Mindestens Channel muss übergeben worden sein
-    return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') ) if !exists $data->{Channel};
+    my $channel = $data->{Channel} // return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') );
 
     my $room = getRoomName($hash, $data);
-    my $channel = $data->{Channel};
 
     # Passendes Gerät suchen
     my $device = exists $data->{Device}
-        ? getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, 'MediaChannels', 'MediaChannels' )
+        ? getDeviceByName( $hash, $room, $data->{Device}, $data->{Room}, $channel, 'MediaChannels' )
         : getDeviceByMediaChannel($hash, $room, $channel);
     return respond( $hash, $data, getResponse($hash, 'NoMediaChannelFound') ) if !defined $device;
     return getNeedsClarification( $hash, $data, 'ParadoxData', 'Room', [$data->{Device}, $data->{Room}] ) if !$device;
@@ -6122,6 +6131,9 @@ sieht funktional aus, bisher keine Beschwerden...
 
 #Who am I / Who are you?
 Personenbezogene Kommunikation? möglich, erwünscht, typische Anwendungsszenarien...?
+
+#https://community.rhasspy.org/t/simultaneously-receiving-commands-from-multiple-satellites/3810/3
+Instead i have to check whether the next message is a repeat.
 
 =end ToDo
 
