@@ -584,7 +584,7 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220622
 # zigbee2mqtt 3 channel device
 name:zigbee2mqtt_3channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
-desc:For zigbee2mqtt 3 channel device like Silvercrest Steckerleiste »Zigbee Smart Home«. <br>NOTE: Two additional devices will be created for further channels.<br>NOTE: Untested updated version
+desc:For zigbee2mqtt 3 channel device like Silvercrest Steckerleiste »Zigbee Smart Home«. <br>NOTE: Two additional devices will be created for further channels.<br>NOTE: Might need a FHEM restart to work properly.
 order:L_05e
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
@@ -611,7 +611,7 @@ attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption
 attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220806
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220901
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
@@ -5323,8 +5323,8 @@ prereq:{my @devices=devspec2array('model=hoymiles_microinverter_hub_bridge');ret
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/ch0/U_AC:.*
 desc:Early version, device represents a single microinverter. Use this with "ahoy" firmware for ESP8266+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
 order:W_061
-par:BASE_ID;BASE_ID as set on the esp (e.g. inverters). No CID;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^/:\s]+)[/][^/]+/ch0/U_AC:,m ? $1 : undef }
-par:INVERTERLONG_ID;INVERTERLONG_ID Base_Id plus inverter name as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^/:]+[/][^/]+)/ch0/U_AC:,m ? $1 : undef }
+par:BASE_ID;BASE_ID as set on the esp (e.g. inverters). No CID;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^:\s]+)/[^/]+/ch0/U_AC:,m ? $1 : undef }
+par:INVERTERLONG_ID;INVERTERLONG_ID Base_Id plus inverter name as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^:]+/[^/]+)/ch0/U_AC:,m ? $1 : undef }
 par:INVERTER_NR;INVERTER_NR - order nr. in your setup. Note: numbering starts with "0";{ AttrVal('DEVICE','setList','') =~ m,/devcontrol/([0-9]+)/[0-9]+,m ? $1 : undef }
 par:RADIO_SINGLE;inverter has just one channel;{ undef }
 par:RADIO_DOUBLE;inverter has two channels;{ undef }
@@ -5340,6 +5340,11 @@ attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
+  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
+  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
@@ -5353,6 +5358,11 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
+  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
+  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
@@ -5370,6 +5380,11 @@ attr DEVICE readingList \
   INVERTERLONG_ID/ch0/Temp:.* temperature\
   INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
   INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
+  INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
+  INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
+  INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
+  INVERTERLONG_ID/ch0/PowerLimit:.* limit\
   INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
   INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
   INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
@@ -5397,7 +5412,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20200816
+setreading DEVICE attrTemplateVersion 20200901
 
 
 ###########################################
