@@ -2012,7 +2012,7 @@ sub getDeviceByName {
     return 0 if $droom; #no further check if explicit room was requested!
 
     my @maybees;
-    my $oldType = $intent =~ m,(MediaChannels|Colors),x;
+    my $oldType = $intent =~ m,MediaChannels,x;
 
     for (sort keys %{$hash->{helper}{devicemap}{rhasspyRooms}}) {
         my $dev = $hash->{helper}{devicemap}{rhasspyRooms}{$_}{$name};
@@ -2036,6 +2036,7 @@ sub getDeviceByName {
                         && defined $hash->{helper}{devicemap}{devices}{$dev}{intents}->{$intent};
                 }
             } elsif ( $intent && $oldType ) {
+                $intent = 'Channels' if $intent eq 'MediaChannels';
                 if ( $type ) {
                     push @maybees, $dev if defined $hash->{helper}{devicemap}{devices}{$dev}->{$intent}
                         && defined $hash->{helper}{devicemap}{devices}{$dev}->{$intent}
