@@ -120,6 +120,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.67.6 "=> "02.09.2022  add ___setPlanningDeleteMeth, consumer can be planned across daily boundaries ",
   "0.67.5 "=> "28.08.2022  add checkRegex ",
   "0.67.4 "=> "28.08.2022  ___switchConsumerOn -> no switch on if additional switch off condition is true ".
                            "__setConsRcmdState -> Consumer can be switched on in case of missing PV power if key power=0 is set ".
@@ -885,6 +886,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   $paref->{stopts}   = $stopts;                                                 # Unix Timestamp für geplanten Switch off
 
   ___setConsumerPlanningState ($paref);
+  ___setPlanningDeleteMeth    ($paref);
   
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
   my $calias    = ConsumerVal ($hash, $c, "alias",     "");
@@ -1437,14 +1439,10 @@ sub _setreset {                          ## no critic "not used"
       
       if ($c) {
           deleteConsumerPlanning ($hash, $c);
-          my $calias = ConsumerVal ($hash, $c, "alias", "");
-          Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
       }
       else {
           for my $cs (keys %{$data{$type}{$name}{consumers}}) {
               deleteConsumerPlanning ($hash, $cs);
-              my $calias = ConsumerVal ($hash, $cs, "alias", "");
-              Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
           }           
       }
       
@@ -2319,6 +2317,24 @@ sub _specialActivities {
   $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   push @$daref, "LastHourGridconsumptionReal<>".$gcon." Wh<>".$ts1; 
   
+  ## Planungsdaten spezifisch löschen (Anfang und Ende nicht am selben Tag)
+  ##########################################################################
+  
+  for my $c (keys %{$data{$type}{$name}{consumers}}) {                                        
+      next if(ConsumerVal ($hash, $c, "plandelete", "regular") eq "regular");
+      
+      my $planswitchoff = ConsumerVal    ($hash, $c, "planswitchoff", $t);
+      my $pstate        = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
+      
+      if ($t > $planswitchoff && $pstate =~ /planned|finished|unknown/xs) {
+          deleteConsumerPlanning ($hash, $c);
+          
+          $data{$type}{$name}{consumers}{$c}{minutesOn}       = 0;
+          $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 0;
+          $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
+      }
+  }
+  
   ## zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
   #############################################################################
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {                                 
@@ -2331,7 +2347,8 @@ sub _specialActivities {
   }
 
   ## bestimmte einmalige Aktionen
-  ##################################  
+  ##################################
+
   my $tlim = "00";                                                                                              
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
@@ -2367,17 +2384,15 @@ sub _specialActivities {
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
           
-          for my $c (keys %{$data{$type}{$name}{consumers}}) {
+          for my $c (keys %{$data{$type}{$name}{consumers}}) {                              # Planungsdaten regulär löschen
+              next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");       
+              
               deleteConsumerPlanning ($hash, $c);
-              my $calias = ConsumerVal ($hash, $c, "alias", "");
-              Log3 ($name, 3, qq{$name - Consumer planning of "$calias" deleted});
               
               $data{$type}{$name}{consumers}{$c}{minutesOn}       = 0;
               $data{$type}{$name}{consumers}{$c}{numberDayStarts} = 0;
               $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
-          }
-          
-          # deleteReadingspec ($hash, "consumer.*_planned.*"); 
+          } 
 
           writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben          
           
@@ -2891,7 +2906,7 @@ sub _manageConsumerData {
       ## bei Tageswechsel Rücksetzen in _specialActivities
       #######################################################      
       my $starthour;
-      if(isConsumerLogOn ($hash, $c, $pcurr)) {                                                 # Verbraucher ist logisch "an"
+      if(isConsumerLogOn ($hash, $c, $pcurr)) {                                               # Verbraucher ist logisch "an"
             if(ConsumerVal ($hash, $c, "onoff", "off") eq "off") {               
                 $data{$type}{$name}{consumers}{$c}{startTime}       = $t;
                 $data{$type}{$name}{consumers}{$c}{onoff}           = "on";
@@ -3298,12 +3313,57 @@ sub __planSwitchTimes {
   
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
   
+  if($planstate) {
+      Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate});
+  }
+  
   writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
   
-  Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
+  ___setPlanningDeleteMeth ($paref);
   
 return;
 }
+
+################################################################
+#          Consumer Zeiten MUST planen
+################################################################
+sub ___planMust {
+  my $paref    = shift;
+  my $hash     = $paref->{hash};
+  my $name     = $paref->{name};
+  my $c        = $paref->{consumer};
+  my $maxref   = $paref->{maxref};
+  my $elem     = $paref->{elem};
+  my $mintime  = $paref->{mintime};
+  my $stopdiff = $paref->{stopdiff};
+
+  my $type     = $hash->{TYPE};
+
+  my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
+  my $half                          = ceil ($mintime / 2 / 60);                                      # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
+  my $startts                       = $maxts - ($half * 3600); 
+  my (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
+  
+  $paref->{starttime}               = $starttime;
+  $starttime                        = ___switchonTimelimits ($paref);
+  delete $paref->{starttime};
+  
+  $startts                          = timestringToTimestamp ($starttime);
+  my $stopts                        = $startts + $stopdiff;
+  
+  $paref->{ps}      = "planned:";
+  $paref->{startts} = $startts;                                                                       # Unix Timestamp für geplanten Switch on       
+  $paref->{stopts}  = $stopts;                                                                        # Unix Timestamp für geplanten Switch off
+
+  ___setConsumerPlanningState ($paref);
+
+  delete $paref->{ps};
+  delete $paref->{startts};
+  delete $paref->{stopts};
+
+return;
+}
+
 
 ################################################################
 #     Planungsdaten bzw. aktuelle Planungszustände setzen  
@@ -3353,46 +3413,6 @@ return;
 }
 
 ################################################################
-#          Consumer Zeiten MUST planen
-################################################################
-sub ___planMust {
-  my $paref    = shift;
-  my $hash     = $paref->{hash};
-  my $name     = $paref->{name};
-  my $c        = $paref->{consumer};
-  my $maxref   = $paref->{maxref};
-  my $elem     = $paref->{elem};
-  my $mintime  = $paref->{mintime};
-  my $stopdiff = $paref->{stopdiff};
-
-  my $type     = $hash->{TYPE};
-
-  my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
-  my $half                          = ceil ($mintime / 2 / 60);                                      # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
-  my $startts                       = $maxts - ($half * 3600); 
-  my (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
-  
-  $paref->{starttime}               = $starttime;
-  $starttime                        = ___switchonTimelimits ($paref);
-  delete $paref->{starttime};
-  
-  $startts                          = timestringToTimestamp ($starttime);
-  my $stopts                        = $startts + $stopdiff;
-  
-  $paref->{ps}      = "planned:";
-  $paref->{startts} = $startts;                                                                       # Unix Timestamp für geplanten Switch on       
-  $paref->{stopts}  = $stopts;                                                                        # Unix Timestamp für geplanten Switch off
-
-  ___setConsumerPlanningState ($paref);
-
-  delete $paref->{ps};
-  delete $paref->{startts};
-  delete $paref->{stopts};
-
-return;
-}
-
-################################################################
 #   Einschaltgrenzen berücksichtigen und Korrektur 
 #   zurück liefern
 ################################################################
@@ -3429,6 +3449,35 @@ sub ___switchonTimelimits {
   }
 
 return $starttime;
+}
+
+################################################################
+#   Löschmethode der Planungsdaten setzen
+################################################################
+sub ___setPlanningDeleteMeth {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  
+  my $type  = $hash->{TYPE};
+
+  my $sonkey  = ConsumerVal ($hash, $c, "planswitchon",  "");
+  my $soffkey = ConsumerVal ($hash, $c, "planswitchoff", "");
+  
+  if($sonkey && $soffkey) {
+      my $onday  = strftime "%d", localtime($sonkey);
+      my $offday = strftime "%d", localtime($soffkey);
+      
+      if ($offday ne $onday) {                                                          # Planungsdaten spezifische Löschmethode
+          $data{$type}{$name}{consumers}{$c}{plandelete} = "specific";
+      }
+      else {                                                                            # Planungsdaten Löschmethode jeden Tag in Stunde 0 (_specialActivities)
+          $data{$type}{$name}{consumers}{$c}{plandelete} = "regular";
+      }      
+  }
+  
+return;
 }
 
 ################################################################
@@ -5812,8 +5861,8 @@ sub __weatherOnBeam {
                                     weather_icon($hfcg->{$i}{weather}-100) : 
                                     weather_icon($hfcg->{$i}{weather});
                                     
-          my $wcc                 = $hfcg->{$i}{wcc};                                                        # Bewölkungsgrad ergänzen
-          $title                 .= ': '.$wcc;
+          #my $wcc                 = $hfcg->{$i}{wcc};                                                        # Bewölkungsgrad ergänzen
+          #$title                 .= ': '.$wcc;
           
           if($icon_name eq 'unknown') {              
               Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
@@ -7511,16 +7560,18 @@ sub deleteConsumerPlanning {
   my $hash = shift;
   my $c    = shift;  
   
-  my $type = $hash->{TYPE};
-  my $name = $hash->{NAME};
+  my $type   = $hash->{TYPE};
+  my $name   = $hash->{NAME};
+  my $calias = ConsumerVal ($hash, $c, "alias", "");
   
   delete $data{$type}{$name}{consumers}{$c}{planstate};
   delete $data{$type}{$name}{consumers}{$c}{planswitchon};
   delete $data{$type}{$name}{consumers}{$c}{planswitchoff};
-  
-  # $data{$type}{$name}{consumers}{$c}{isIntimeframe} = 0;
+  delete $data{$type}{$name}{consumers}{$c}{plandelete};
   
   deleteReadingspec ($hash, "consumer${c}.*" );
+  
+  Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
 
 return;
 }
