@@ -3709,6 +3709,7 @@ EvalSpecials($%)
   if(defined($specials{"%EVENT"})) {
     foreach my $part (split(" ", $specials{"%EVENT"})) {
       $specials{"%EVTPART$idx"} = $part;
+      last if($idx >= 20);
       $idx++;
     }
   }
@@ -5342,7 +5343,10 @@ json2nameValue($;$$$$)
         $esc = !$esc;
       } elsif($s eq '"' && !$esc) {
         my $val = substr($t,1,$off-1);
-        $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
+        if($val =~ m/\\u([0-9A-F]{4})/i) {
+          $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
+          $val = Encode::encode("UTF-8", $val) if(!$unicodeEncoding); #128932
+        }
         my %t = ( n =>"\n", '"'=>'"', '\\'=>'\\' );
         $val =~ s/\\([n"\\])/$t{$1}/ge;
         return (undef, $val, substr($t,$off+1));
