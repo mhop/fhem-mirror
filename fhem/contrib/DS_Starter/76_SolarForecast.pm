@@ -5861,9 +5861,13 @@ sub __weatherOnBeam {
                                     weather_icon($hfcg->{$i}{weather}-100) : 
                                     weather_icon($hfcg->{$i}{weather});
                                     
-          my $wcc                 = $hfcg->{$i}{wcc};                                                        # Bewölkungsgrad ergänzen
-          #Log3 ($name, 2, "$name - wcc: $wcc");
-          $title                 .= ': '.$wcc if(IsNumeric ($wcc));
+          my $wcc = $hfcg->{$i}{wcc};                                                                        # Bewölkungsgrad ergänzen
+          
+          if(IsNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
+              $wcc += 0;
+          }
+
+          $title .= ': '.$wcc;
           
           if($icon_name eq 'unknown') {              
               Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
