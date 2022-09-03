@@ -1718,7 +1718,12 @@ CommandSave($$)
   @structChangeHist = ();
   DoTrigger("global", "SAVE", 1);
 
-  restoreDir_saveFile($restoreDir, $attr{global}{statefile}) if(!configDBUsed());
+  if(!configDBUsed()) {
+    my @t = localtime(gettimeofday());
+    my $stf = ResolveDateWildcards(AttrVal("global", "statefile",  ""), @t);
+    restoreDir_saveFile($restoreDir, $stf);
+  }
+
   $data{saveID} = createUniqueId(); # for configDB, #126323
   my $ret = WriteStatefile();
 
