@@ -889,10 +889,12 @@ MQTT2_SERVER_ReadDebug($$)
       restarted.
       </li><br>
 
+    <a id="MQTT2_SERVER-attr-sslVersion"></a>
     <li>sslVersion<br>
        See the global attribute sslVersion.
        </li><br>
 
+    <a id="MQTT2_SERVER-attr-sslCertPrefix"></a>
     <li>sslCertPrefix<br>
        Set the prefix for the SSL certificate, default is certs/server-, see
        also the SSL attribute.
