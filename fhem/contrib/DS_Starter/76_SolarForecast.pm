@@ -5863,9 +5863,10 @@ sub __weatherOnBeam {
                                     
           my $wcc = $hfcg->{$i}{wcc};                                                                        # Bewölkungsgrad ergänzen
           
-          if(IsNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
-              $wcc += 0;
-          }
+          $wcc = $wcc =~ /(-?\d+(\.\d+)?)/ ? $1 : "-";
+          #if(IsNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
+          #    $wcc += 0;
+          #}
 
           $title .= ': '.$wcc;
           
