@@ -120,7 +120,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.67.6 "=> "02.09.2022  add ___setPlanningDeleteMeth, consumer can be planned across daily boundaries ",
+  "0.67.6 "=> "02.09.2022  add ___setPlanningDeleteMeth, consumer can be planned across daily boundaries ".
+                           "fix JS Fehler (__weatherOnBeam) Forum: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661 ",
   "0.67.5 "=> "28.08.2022  add checkRegex ",
   "0.67.4 "=> "28.08.2022  ___switchConsumerOn -> no switch on if additional switch off condition is true ".
                            "__setConsRcmdState -> Consumer can be switched on in case of missing PV power if key power=0 is set ".
@@ -5863,11 +5864,10 @@ sub __weatherOnBeam {
                                     
           my $wcc = $hfcg->{$i}{wcc};                                                                        # Bewölkungsgrad ergänzen
           
-          $wcc = $wcc =~ /(-?\d+(\.\d+)?)/ ? $1 : "-";
-          #if(IsNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
-          #    $wcc += 0;
-          #}
-
+          if(IsNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
+              $wcc += 0;
+          }
+          
           $title .= ': '.$wcc;
           
           if($icon_name eq 'unknown') {              
