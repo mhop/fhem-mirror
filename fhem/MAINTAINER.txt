@@ -82,6 +82,7 @@ FHEM/10_NeuronPin.pm         klausw               Sonstige Systeme
 FHEM/10_OWServer.pm          neubert/mfr69bs      1Wire
 FHEM/10_pilight_ctrl.pm      risiko               Sonstige Systeme
 FHEM/10_RESIDENTS.pm         loredo               Automatisierung
+FHEM/10_RHASSPY.pm           Beta-User            Frontends/Sprachsteuerung http://forum.fhem.de/index.php/topic,129050.0.html
 FHEM/10_SD_GT.PM             sidey/elektron-bbs   SlowRF
 FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
 FHEM/10_UNIRoll.pm           C_Herrmann           SlowRF

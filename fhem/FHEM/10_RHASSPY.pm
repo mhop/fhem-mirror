@@ -6216,7 +6216,7 @@ attr rhasspyMQTT2 subscriptions setByTheProgram</code></p>
 </p>
 <p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:1884<br>
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
-attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized hermes/hotword/+/detected &lt;additional subscriptions for other MQTT-Modules&gt;
+attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized hermes/hotword/+/detected hermes/hotword/toggleOn hermes/hotword/toggleOff hermes/tts/say &lt;additional subscriptions for other MQTT-Modules&gt;
 <p>define Rhasspy RHASSPY baseUrl=http://192.168.1.210:12101 defaultRoom="Büro Lisa" language=de devspec=genericDeviceType=.+,device_a1,device_xy handleHotword=1</code></p>
 </li>
 </ul>
@@ -6229,8 +6229,10 @@ attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionSt
 hermes/dialogueManager/sessionStarted<br>
 hermes/dialogueManager/sessionEnded<br>
 hermes/nlu/intentNotRecognized<br>
-hermes/hotword/+/detected</code></p>
-
+hermes/hotword/+/detected<br>
+hermes/hotword/toggleOn<br>
+hermes/hotword/toggleOff<br>
+hermes/tts/say</code></p>
 <p><b>Important</b>: After defining the RHASSPY module, you are supposed to manually set the attribute <i>IODev</i> to force a non-dynamic IO assignement. Use e.g. <code>attr &lt;deviceName&gt; IODev &lt;m2client&gt;</code>.</p>
 
 <p><a id="RHASSPY-list"></a><b>Note:</b> RHASSPY consolidates a lot of data from different sources. The <b>final data structure RHASSPY uses at runtime</b> will be shown by the <a href="#list">list command</a>. It's highly recommended to have a close look at this data structure, especially when starting with RHASSPY or in case something doesn't work as expected!<br> 
