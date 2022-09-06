@@ -5338,17 +5338,17 @@ attr DEVICE readingList INVERTERLONG_ID/ch0/U_AC:.* U_AC\
   INVERTERLONG_ID/ch0/P_AC:.* P_AC\
   INVERTERLONG_ID/ch0/Freq:.* Freq\
   INVERTERLONG_ID/ch0/Temp:.* temperature\
-  INVERTERLONG_ID/ch0/YieldDay:.* YieldDay\
-  INVERTERLONG_ID/ch0/YieldTotal:.* YieldTotal\
+  INVERTERLONG_ID/ch0/YieldDay:.* {}\
+  INVERTERLONG_ID/ch0/YieldTotal:.* {}\
   INVERTERLONG_ID/ch0/FWVersion:.* FWVersion\
   INVERTERLONG_ID/ch0/FWBuildYear:.* FWBuildYear\
   INVERTERLONG_ID/ch0/FWBuildMonthDay:.* FWBuildMonthDay\
   INVERTERLONG_ID/ch0/HWPartId:.* HWPartId\
   INVERTERLONG_ID/ch0/PowerLimit:.* limit\
-  INVERTERLONG_ID/ch1/I_DC:.* I_DC1\
-  INVERTERLONG_ID/ch1/P_DC:.* P_DC1\
-  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay1\
-  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal1
+  INVERTERLONG_ID/ch1/I_DC:.* I_DC\
+  INVERTERLONG_ID/ch1/P_DC:.* P_DC\
+  INVERTERLONG_ID/ch1/YieldDay:.* YieldDay\
+  INVERTERLONG_ID/ch1/YieldTotal:.* YieldTotal
 option:{ RADIO_DOUBLE }
 attr DEVICE readingList \
   INVERTERLONG_ID/ch0/U_AC:.* U_AC\
@@ -5412,7 +5412,7 @@ attr DEVICE setList \
   limit_persistent_pct:slider,2,1,100 BASE_ID/devcontrol/INVERTER_NR/11/257 $EVTPART1
 attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
-setreading DEVICE attrTemplateVersion 20200901
+setreading DEVICE attrTemplateVersion 20200905
 
 
 ###########################################
