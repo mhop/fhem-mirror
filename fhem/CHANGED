@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: NOTE: !! syntax of set ... changeValue" is changed !!
  - feature: 10_RHASSPY: new module for Rhasspy integration (from contrib)
  - bugfix:  73_AutoShuttersControl: fix can't locate object method after update
  - bugfix:  73_AutoShuttersControl: fix many reported bugs

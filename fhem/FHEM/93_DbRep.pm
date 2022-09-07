@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.1"  => "05.09.2022  DbRep_setLastCmd, change changeValue syntax, minor fixes ",
   "8.50.0"  => "20.08.2022  rework of DbRep_reduceLog - add max, max=day, min, min=day, sum, sum=day ",
   "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
                "some code changes and bug fixes ",
@@ -638,13 +639,14 @@ sub DbRep_Set {
   return if(IsDisabled($name));
     
   if ($opt =~ /eraseReadings/) {
-       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-       DbRep_delread($hash);                             # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
+       DbRep_setLastCmd (@a);
+       DbRep_delread    ($hash);                                            # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
        return;
   }
   
   if ($opt eq "dumpMySQL" && $hash->{ROLE} ne "Agent") {
-       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+       DbRep_setLastCmd (@a);
+       
        if ($prop eq "serverSide") {
            Log3 ($name, 3, "DbRep $name - ################################################################");
            Log3 ($name, 3, "DbRep $name - ###             New database serverSide dump                 ###");
@@ -656,31 +658,34 @@ sub DbRep_Set {
            Log3 ($name, 3, "DbRep $name - ################################################################");
        }
        
-       DbRep_beforeproc($hash, "dump");
-       DbRep_Main($hash, $opt, $prop);
+       DbRep_beforeproc ($hash, "dump");
+       DbRep_Main       ($hash, $opt, $prop);
        
        return;
   }
   
   if ($opt eq "dumpSQLite" && $hash->{ROLE} ne "Agent") {
-       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+       DbRep_setLastCmd (@a);
        
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                    New SQLite dump                       ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        
-       DbRep_beforeproc($hash, "dump");
-       DbRep_Main($hash, $opt, $prop);
+       DbRep_beforeproc ($hash, "dump");
+       DbRep_Main       ($hash, $opt, $prop);
        
        return;
   }
   
   if ($opt eq "repairSQLite" && $hash->{ROLE} ne "Agent") {
        $prop = $prop ? $prop : 36000;
-       if($prop) {
-           unless($prop =~ /^(\d+)$/) { return " The Value of $opt is not valid. Use only figures 0-9 without decimal places !";};
+       
+       unless ($prop =~ /^(\d+)$/) { 
+           return " The Value of $opt is not valid. Use only figures 0-9 without decimal places !";
        }
-       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+
+       DbRep_setLastCmd ($name, $opt, $prop);
+       
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                New SQLite repair attempt                 ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
@@ -700,7 +705,7 @@ sub DbRep_Set {
            return qq{The command "$opt" needs an argument.};
        }
        
-       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt"; 
+       DbRep_setLastCmd (@a); 
        
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###             New database Restore/Recovery                ###");
@@ -713,7 +718,7 @@ sub DbRep_Set {
   }
   
   if ($opt =~ /optimizeTables|vacuum/ && $hash->{ROLE} ne "Agent") {
-       $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+       DbRep_setLastCmd (@a);
        
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###          New optimize table / vacuum execution           ###");
@@ -726,14 +731,14 @@ sub DbRep_Set {
   }
   
   if ($opt =~ m/delSeqDoublets|delDoublets/ && $hash->{ROLE} ne "Agent") {
-     if ($opt eq "delSeqDoublets") {
-         $prop //= "adviceRemain";
-     }     
-     elsif ($opt eq "delDoublets") {
-         $prop //= "adviceDelete";
-     }
+      if ($opt eq "delSeqDoublets") {
+          $prop //= "adviceRemain";
+      }     
+      elsif ($opt eq "delDoublets") {
+          $prop //= "adviceDelete";
+      }
       
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";  
+      DbRep_setLastCmd ($name, $opt, $prop); 
       
       if ($prop =~ /delete/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
@@ -745,14 +750,13 @@ sub DbRep_Set {
   }
   
   if ($opt =~ m/reduceLog/ && $hash->{ROLE} ne "Agent") {
-      if ($hash->{HELPER}{RUNNING_REDUCELOG} && $hash->{HELPER}{RUNNING_REDUCELOG}{pid} !~ m/DEAD/) {  
+      if ($hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}} && $hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}}{pid} !~ m/DEAD/) {  
           return "reduceLog already in progress. Please wait for the current process to finish.";
       } 
       else {
-          delete $hash->{HELPER}{RUNNING_REDUCELOG};
-          my @b = @a;
-          shift(@b);
-          $hash->{LASTCMD}           = join(" ",@b);
+          delete $hash->{HELPER}{$dbrep_hmainf{reduceLog}{pk}};
+          DbRep_setLastCmd (@a);
+          
           $hash->{HELPER}{REDUCELOG} = \@a;
           
           Log3 ($name, 3, "DbRep $name - ################################################################");
@@ -781,39 +785,43 @@ sub DbRep_Set {
   }
   
   if ($opt eq "cancelDump" && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      DbRep_setLastCmd (@a);
       BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+      
       Log3 ($name, 3, "DbRep $name -> running Dump has been canceled");
+      
       ReadingsSingleUpdateValue ($hash, "state", "Dump canceled", 1);
       return;
   } 
   
   if ($opt eq "cancelRepair" && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      DbRep_setLastCmd (@a);
       BlockingKill($hash->{HELPER}{RUNNING_REPAIR});
+      
       Log3 ($name, 3, "DbRep $name -> running Repair has been canceled");
+      
       ReadingsSingleUpdateValue ($hash, "state", "Repair canceled", 1);
       return;
   } 
   
   if ($opt eq "cancelRestore" && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      DbRep_setLastCmd (@a);
       BlockingKill($hash->{HELPER}{RUNNING_RESTORE});
+      
       Log3 ($name, 3, "DbRep $name -> running Restore has been canceled");
+      
       ReadingsSingleUpdateValue ($hash, "state", "Restore canceled", 1);
       return;
   }
   
   if ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";  
-      
-      DbRep_Main($hash, $opt);
-      
+      DbRep_setLastCmd (@a);  
+      DbRep_Main       ($hash, $opt);
       return;
   }  
   
   if ($opt eq "index" && $hash->{ROLE} ne "Agent") {
-       $hash->{LASTCMD} = $prop ? "$opt $prop " : "$opt";
+       DbRep_setLastCmd (@a);
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
@@ -837,18 +845,18 @@ sub DbRep_Set {
   }
   
   if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop " : "$opt";
-      my $table        = $prop // "history";
+      my $table = $prop // "history";
       
-      DbRep_Main ($hash, $opt, $table);
+      DbRep_setLastCmd ($name, $opt, $table); 
+      DbRep_Main       ($hash, $opt, $table);
       
       return;      
   } 
   elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      my $table        = $prop // "history";
+      my $table = $prop // "history";
       
-      DbRep_Main ($hash, $opt, $table);    
+      DbRep_setLastCmd ($name, $opt, $table);
+      DbRep_Main       ($hash, $opt, $table);    
       
       return;
   }
@@ -864,14 +872,15 @@ sub DbRep_Set {
   }
   #######################################################################################################
    
-  if ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+  if ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {      
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
       }
+      
       if ($prop && $prop =~ /deleteOther/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       } 
+      
       if ($prop && $prop =~ /writeToDB/) {
           if (!AttrVal($hash->{NAME}, "device", "") || AttrVal($hash->{NAME}, "device", "") =~ /[%*:=,]/ || AttrVal($hash->{NAME}, "reading", "") =~ /[,\s]/) {
               return "<html>If you want write results back to database, attributes \"device\" and \"reading\" must be set.<br>
@@ -880,49 +889,54 @@ sub DbRep_Set {
           }
       }
       
-      DbRep_Main ($hash,$opt,$prop);    
+      DbRep_setLastCmd (@a);  
+      DbRep_Main       ($hash,$opt,$prop);    
   } 
   elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {      
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }     
 
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      delete $hash->{HELPER}{DELENTRIES};      
+      delete $hash->{HELPER}{DELENTRIES};
+      DbRep_setLastCmd (@a);      
       
       shift @a;
       shift @a;
       $hash->{HELPER}{DELENTRIES} = \@a if(@a);
       
-      DbRep_Main ($hash,$opt);
+      DbRep_Main       ($hash,$opt);
   } 
-  elsif ($opt eq "deviceRename") {
+  elsif ($opt eq "deviceRename") {      
       shift @a;
       shift @a;
       $prop                 = join " ", @a;                                     # Device Name kann Leerzeichen enthalten
-      my ($olddev, $newdev) = split ",", $prop;
-      $hash->{LASTCMD}      = $prop ? "$opt $prop" : "$opt";    
+      my ($olddev, $newdev) = split ",", $prop; 
       
-      if (!$olddev || !$newdev) {return qq{Both entries "old device name" and "new device name" are needed. Use "set $name deviceRename olddevname,newdevname"};}
+      if (!$olddev || !$newdev) {
+          return qq{Both entries "old device name" and "new device name" are needed. Use "set $name deviceRename olddevname,newdevname"};
+      }
       
       $hash->{HELPER}{OLDDEV}  = $olddev;
       $hash->{HELPER}{NEWDEV}  = $newdev;
       
-      DbRep_Main ($hash, $opt, $prop);
+      DbRep_setLastCmd ($name, $opt, "$olddev,$newdev");
+      DbRep_Main       ($hash, $opt, $prop);
   } 
   elsif ($opt eq "readingRename") {
       shift @a;
       shift @a;
       $prop                   = join " ", @a;                                   # Readingname kann Leerzeichen enthalten
-      $hash->{LASTCMD}        = $prop ? "$opt $prop" : "$opt";
       my ($oldread, $newread) = split ",", $prop;
       
-      if (!$oldread || !$newread) {return qq{Both entries "old reading name" and "new reading name" are needed. Use "set $name readingRename oldreadingname,newreadingname"};}
+      if (!$oldread || !$newread) {
+          return qq{Both entries "old reading name" and "new reading name" are needed. Use "set $name readingRename oldreadingname,newreadingname"};
+      }
       
       $hash->{HELPER}{OLDREAD} = $oldread;
       $hash->{HELPER}{NEWREAD} = $newread;
 
-      DbRep_Main ($hash, $opt, $prop);    
+      DbRep_setLastCmd ($name, $opt, "$oldread,$newread");
+      DbRep_Main       ($hash, $opt, $prop);    
   } 
   elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") {
       shift @a;
@@ -930,7 +944,7 @@ sub DbRep_Set {
       $prop = join " ", @a;  
       
       if (!$prop) {
-          return qq{Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. "Unit" is optional. Spaces are not allowed !};      
+          return qq{Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit],[<Device>],[<Reading>]'. Parameters included in "[...]" are optional. Spaces are not allowed !};      
       }
       
       my ($i_date, $i_time, $i_value, $i_unit, $i_device, $i_reading) = split ",", $prop;
@@ -939,7 +953,7 @@ sub DbRep_Set {
       $i_reading //= AttrVal($name, "reading", "");                                            # Reading aus Attr lesen wenn nicht im insert angegeben
 
       if (!$i_date || !$i_time || !defined $i_value) {
-          return qq{At least data for "Date", "Time" and "Value" is needed to insert. "Unit" is optional. Inputformat is "YYYY-MM-DD,HH:MM:SS,<Value>,<Unit>"};
+          return qq{At least data for "Date", "Time" and "Value" is needed to insert. Inputformat is "YYYY-MM-DD,HH:MM:SS,<Value>,<Unit>"};
       }
 
       if ($i_date !~ /^(\d{4})-(\d{2})-(\d{2})$/x || $i_time !~ /^(\d{2}):(\d{2}):(\d{2})$/x) {
@@ -959,20 +973,17 @@ sub DbRep_Set {
       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
        
       eval { my $ts = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-       
       if ($@) {
           my @l = split (/at/, $@);
           return " Timestamp is out of range - $l[0]";         
       }
       
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      
-      DbRep_Main ($hash, $opt, "$i_timestamp,$i_device,$i_reading,$i_value,$i_unit");  
+      DbRep_setLastCmd ($name, $opt, $prop);
+      DbRep_Main       ($hash, $opt, "$i_timestamp,$i_device,$i_reading,$i_value,$i_unit");  
   } 
   elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
-      $prop        // push @a, AttrVal($name, "expimpfile", "");
       my ($ar, $hr) = parseParams(join ' ', @a);
-      my $f         = $ar->[2] // "";
+      my $f         = $ar->[2] // AttrVal($name, "expimpfile", "");
       
       if (!$f) {
           return qq{"$opt" needs a file as argument or the attribute "expimpfile" (path and filename) to be set !};
@@ -984,24 +995,21 @@ sub DbRep_Set {
           return qq{The "MAXLINES" parameter must be a integer value !} if($e !~ /^MAXLINES=\d+$/);
       }
       
-      $prop            = $e ? $f." ".$e : $f;
-      $hash->{LASTCMD} = $opt.' '.$prop;
+      $prop = $e ? $f." ".$e : $f;
       
-      DbRep_Main ($hash, $opt, $prop);
+      DbRep_setLastCmd ($name, $opt, $prop);
+      DbRep_Main       ($hash, $opt, $prop);
   } 
-  elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
-      $prop        // push @a, AttrVal($name, "expimpfile", "");
-      
+  elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {      
       my ($ar, $hr) = parseParams(join ' ', @a);
-      my $f         = $ar->[2] // "";
+      my $f         = $ar->[2] // AttrVal($name, "expimpfile", "");
       
       if (!$f) {
           return qq{"$opt" needs a file as an argument or the attribute "expimpfile" (path and filename) to be set !};
       }
       
-      $hash->{LASTCMD} = $opt.' '.$f;
-      
-      DbRep_Main ($hash, $opt, $f);  
+      DbRep_setLastCmd ($name, $opt, $f);
+      DbRep_Main       ($hash, $opt, $f);  
   } 
   elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
@@ -1119,46 +1127,38 @@ sub DbRep_Set {
           }
       }
       
-      $hash->{LASTCMD} = $sqlcmd ? "$opt $sqlcmd" : "$opt";
+      #$hash->{LASTCMD} = $sqlcmd ? "$opt $sqlcmd" : "$opt";
       
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
       
-      DbRep_Main ($hash, $opt, $sqlcmd);   
+      DbRep_setLastCmd ($name, $opt, $sqlcmd);
+      DbRep_Main       ($hash, $opt, $sqlcmd);   
   }
-  elsif ($opt =~ /changeValue/) {
-      shift @a;
-      shift @a;
-      $prop            = join(" ", @a);
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+  elsif ($opt =~ /changeValue/) {      
+      my ($ac, $hc) = parseParams(join ' ', @a);
       
-      unless($prop =~ m/^\s*(".*",".*")\s*$/) {return "Both entries \"old string\", \"new string\" are needed. Use \"set $name changeValue \"old string\",\"new string\" (use quotes)";}
+      my $oldval = $hc->{old};
+      my $newval = $hc->{new};
       
-      my $complex          = 0;
-      my ($oldval,$newval) = ($prop =~ /^\s*"(.*?)","(.*?)"\s*$/);
-
-      if($newval =~ m/[{}]/) {
-          if($newval =~ m/^\s*(\{.*\})\s*$/s) {
-              $newval  = $1;
-              $complex = 1;
-              
-              my %specials = (
-                 "%VALUE" => $name,
-                 "%UNIT"  => $name,
-              );
-              
-              $newval = EvalSpecials($newval, %specials);
-          } 
-          else {
-              return "The expression of \"new string\" has to be included in \"{ }\" ";
-          }
+      if (!$oldval || !$newval) {
+          return qq{Both entries old="old string" new="new string" are needed.};
       }
+      
+      my $complex = 0;
+
+      if($newval =~ m/^\s*\{"(.*)"\}\s*$/s) {
+          $newval  = $1;
+          $complex = 1;
+      }
+      
       $hash->{HELPER}{COMPLEX} = $complex;
       $hash->{HELPER}{OLDVAL}  = $oldval;
       $hash->{HELPER}{NEWVAL}  = $newval;
 
-      DbRep_Main ($hash, $opt, $prop);   
+      DbRep_setLastCmd ($name, $opt, "old=$oldval new=$newval");
+      DbRep_Main       ($hash, $opt, $prop);   
   }  
   elsif ($opt =~ m/syncStandby/ && $hash->{ROLE} ne "Agent") {   
       unless($prop) {
@@ -1166,10 +1166,10 @@ sub DbRep_Set {
       }
       
       if(!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
-          return "The device \"$prop\" doesn't exist or is not a DbLog-device. ";
+          return qq{The device "$prop" doesn't exist or is not a DbLog-device.};
       }
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt"; 
-         
+ 
+      DbRep_setLastCmd (@a);
       DbRep_Main       ($hash, $opt, $prop);    
   }
   else {
@@ -1225,21 +1225,19 @@ sub DbRep_Get {
       return "Dump is running - try again later !"                                if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       return "The operation \"$opt\" isn't available with database type $dbmodel" if($dbmodel ne 'MYSQL');
       
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      
-      DbRep_Main ($hash, $opt, $prop);
+      DbRep_setLastCmd (@a);
+      DbRep_Main       ($hash, $opt, $prop);
   } 
   elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
-      
-      DbRep_Main ($hash, $opt, $prop);
+      DbRep_setLastCmd (@a);
+      DbRep_Main       ($hash, $opt, $prop);
   } 
   elsif ($opt eq "blockinginfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       
-      $hash->{LASTCMD} = $prop ? "$opt $prop" : "$opt";
+      DbRep_setLastCmd          (@a);
       DbRep_delread             ($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);   
       DbRep_getblockinginfo     ($hash);
@@ -1247,9 +1245,9 @@ sub DbRep_Get {
   elsif ($opt eq "minTimestamp" || $opt eq "initData") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       
-      $hash->{LASTCMD}           = $prop ? "$opt $prop" : "$opt";
       $hash->{HELPER}{IDRETRIES} = 3;                                           # Anzahl wie oft versucht wird initiale Daten zu holen      
 
+      DbRep_setLastCmd          (@a);
       DbRep_delread             ($hash); 
       ReadingsSingleUpdateValue ($hash, "state", "running", 1); 
       
@@ -1268,7 +1266,8 @@ sub DbRep_Get {
       
       my $sqlcmd       = join " ", @cmd;
       $sqlcmd          =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
-      $hash->{LASTCMD} = $sqlcmd ? "$opt $sqlcmd" : "$opt";
+
+      DbRep_setLastCmd ($name, $opt, $sqlcmd);
       
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($name, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
@@ -1899,7 +1898,8 @@ sub DbRep_firstconnect {
       my $fadef     = $hash->{MODEL} eq "Client" ? 1 : 0;                      # fastStart default immer 1 für Clients (0 für Agenten)
       
       if (AttrVal($name, "fastStart", $fadef) && $prop eq "onBoot" ) {
-          $hash->{LASTCMD} = "initial database connect stopped due to attribute 'fastStart'";
+          DbRep_setLastCmd ($name, "initial database connect stopped due to attribute 'fastStart'");
+          
           return;
       } 
       
@@ -2382,9 +2382,11 @@ sub DbRep_Main {
      return;
  }
  
- if (exists($hash->{HELPER}{RUNNING_PID}) && $hash->{ROLE} ne "Agent") {
-     Log3 ($name, 3, "DbRep $name - WARNING - running process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new operation");
-     BlockingKill($hash->{HELPER}{RUNNING_PID});
+ ## eventuell bereits laufenden BlockingCall beenden
+ #####################################################
+ if (exists($hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}) && $hash->{ROLE} ne "Agent") {
+     Log3 ($name, 3, "DbRep $name - WARNING - running process $hash->{HELPER}{$dbrep_hmainf{$opt}{pk}}{pid} will be killed now to start a new operation");
+     BlockingKill($hash->{HELPER}{$dbrep_hmainf{$opt}{pk}});
  }
  
  # initiale Datenermittlung wie minimal Timestamp, Datenbankstrukturen, ...
@@ -4536,10 +4538,10 @@ sub DbRep_diffvalDone {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, (!$valid ? "-" : defined $rv ? sprintf "%.${ndp}f", $rv : "-"));
   }
 
-  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateValue     ($hash, "diff_overrun_limit_".$difflimit, $rowsrej) if($rowsrej);
-  ReadingsBulkUpdateValue     ($hash, "less_data_in_period", $ncpstr) if($ncpstr);
-  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":$state);
+  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone)                   if($hash->{LASTCMD} =~ /writeToDB/);
+  ReadingsBulkUpdateValue     ($hash, "diff_overrun_limit_".$difflimit, $rowsrej)        if($rowsrej);
+  ReadingsBulkUpdateValue     ($hash, "less_data_in_period", $ncpstr)                    if($ncpstr);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,($ncpstr||$rowsrej) ? "Warning" : $state);
   
   readingsEndUpdate           ($hash, 1);
   
@@ -5206,7 +5208,7 @@ sub DbRep_changeVal {
   my $db        = $hash->{DATABASE};
   my $complex   = $hash->{HELPER}{COMPLEX};                              # einfache oder komplexe Werteersetzung
  
-  my ($sql,$urow,$sth,$old,$new);
+  my ($sql,$urow,$sth);
  
   my $bst = [gettimeofday];                                              # Background-Startzeit
  
@@ -5221,11 +5223,11 @@ sub DbRep_changeVal {
  
   $err = DbRep_beginDatabaseTransaction ($name, $dbh);
   return "$name|$err" if ($err);
+  
+  my $old = delete $hash->{HELPER}{OLDVAL};
+  my $new = delete $hash->{HELPER}{NEWVAL};
  
- if (!$complex) {
-     $old = delete $hash->{HELPER}{OLDVAL};
-     $new = delete $hash->{HELPER}{NEWVAL};
-     
+ if (!$complex) {     
      Log3 ($name, 5, qq{DbRep $name -> Change old value "$old" to new value "$new" in database $db});
      
      $old =~ s/'/''/g;                                            # escape ' with ''
@@ -5271,8 +5273,6 @@ sub DbRep_changeVal {
      $urow = $sth->rows;
  } 
  else {
-     $old = delete $hash->{HELPER}{OLDVAL};
-     $new = delete $hash->{HELPER}{NEWVAL};
      $old =~ s/'/''/g;                                                           # escape ' with ''
      
      my @tsa = split("\\|", $ts);                                                # Timestampstring to Array
@@ -5284,7 +5284,7 @@ sub DbRep_changeVal {
      my $addon   = $old =~ /%/ ? "AND VALUE LIKE '$old'" : "AND VALUE='$old'";
      
      for my $row (@tsa) {                                                        # DB-Abfrage zeilenweise für jeden Array-Eintrag
-         my @ra                     = split("#", $row);
+         my @ra                    = split("#", $row);
          my $runtime_string        = $ra[0];
          my $runtime_string_first  = $ra[1];
          my $runtime_string_next   = $ra[2];
@@ -5312,6 +5312,7 @@ sub DbRep_changeVal {
              my $oval  = $value;                                     # Selektkriterium für Update alter Valuewert
              my $VALUE = $value;
              my $UNIT  = $unit;
+             
              eval $new;
              if ($@) {
                  $err = encode_base64($@,"");
@@ -8942,7 +8943,7 @@ sub DbRep_reduceLog {
     my $ots        = $paref->{rsn} // "";
 
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
-    my $rlpar      = join " ", @a;
+    #my $rlpar      = join " ", @a;
     
     my $err = q{};
     
@@ -12972,6 +12973,19 @@ return $val;
 }
 
 ################################################################
+# setzt Internal LASTCMD
+################################################################
+sub DbRep_setLastCmd {
+  my (@vars) = @_;
+
+  my $name         = shift(@vars);
+  my $hash         = $defs{$name};
+  $hash->{LASTCMD} = join(" ",@vars);
+  
+return;
+}
+
+################################################################
 #        Werte aus BlockingCall heraus setzen
 #   Erwartete Liste:
 #   @setl = $name,$setread,$helper
@@ -13656,33 +13670,31 @@ return;
                                  
     <li><b> cancelDump </b>   -  stops a running database dump. </li> <br>
                                  
-    <li><b> changeValue </b>  -  changes the saved value of readings.
-                                 If the selection is limited to particular device/reading-combinations by  
-                                 <a href="#DbRepattr">attribute</a> "device" respectively "reading", it is considered as well
-                                 as possibly defined time limits by time attributes (time.*).  <br>
-                                 If no limits are set, the whole database is scanned and the specified value will be 
-                                 changed. <br><br>
+    <li><b> changeValue </b>  -  changes the stored value of a reading.
+                                 If the selection is limited to certain device/reading combinations by the attributes  
+                                 <a href="#DbRepattr">attribute</a> "device" or "reading", they are taken into account 
+                                 in the same way as set time limits (attributes time.*).  <br>
+                                 If these constraints are missing, the entire database is searched and the specified value is 
+                                 is changed. <br><br>
                                  
                                  <ul>
                                  <b>Syntax: </b> <br>
-                                 set &lt;name&gt; changeValue "&lt;old string&gt;","&lt;new string&gt;"  <br><br>
+                                 set &lt;name&gt; changeValue old="&lt;old string&gt;" new="&lt;new string&gt;"  <br><br>
                                  
-                                 The strings have to be quoted and separated by comma.
-                                 A "string" can be: <br>
+                                 The "string" can be: <br>
                                 
-                                <table>  
-                                <colgroup> <col width=15%> <col width=85%> </colgroup>
-                                   <tr><td><b>&lt;old string&gt; :</b> </td><td><li>a simple string with/without spaces, e.g. "OL 12" </li>
-                                                                                                      <li>a string with usage of SQL-wildcard, e.g. "%OL%" </li> </td></tr>
-                                   <tr><td> </td><td> </td></tr>
-                                   <tr><td> </td><td> </td></tr>
-                                   <tr><td><b>&lt;new string&gt; :</b> </td><td><li>a simple string with/without spaces, e.g. "12 kWh" </li>
-                                                                                                      <li>Perl code embedded in "{}" with quotes, e.g. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
-                                                                                                          The perl expression the variables $VALUE and $UNIT are committed to. 
-                                                                                                          The variables are changable within the perl code. The returned value 
-                                                                                                          of VALUE and UNIT are saved into the database field VALUE respectively 
-                                                                                                          UNIT of the dataset. </li></td></tr>
-                                 </table>
+                                   <table>  
+                                      <colgroup> <col width=20%> <col width=80%> </colgroup>
+                                      <tr><td><b>&lt;old String&gt; :</b>   </td><td><li>a simple string with/without spaces, e.g. "OL 12" </li>                                        </td></tr>
+                                      <tr><td>                              </td><td><li>a string with use of SQL wildcard, e.g. "%OL%"    </li>                                        </td></tr>
+                                      <tr><td> </td><td> </td></tr>
+                                      <tr><td> </td><td> </td></tr>
+                                      <tr><td><b>&lt;new String&gt; :</b>   </td><td><li>a simple string with/without spaces, e.g. "12 kWh" </li>                                       </td></tr>
+                                      <tr><td>                              </td><td><li>Perl code enclosed in {"..."} including quotes, e.g. {"($VALUE,$UNIT) = split(" ",$VALUE)"}    </td></tr>
+                                      <tr><td>                              </td><td>The variables $VALUE and $UNIT are passed to the Perl expression. They can be changed              </td></tr>
+                                      <tr><td>                              </td><td>within the Perl code. The returned value of $VALUE and $UNIT is stored                             </td></tr>
+                                      <tr><td>                              </td><td>in the VALUE or UNIT field of the record. </li>                                                    </td></tr>
+                                   </table>
                                  <br>
                                  
                                  <b>Examples: </b> <br>
@@ -13692,10 +13704,10 @@ return;
                                  set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
                                  # contains the field VALUE the substring "OL", it is changed to "12 OL". <br><br>
                                  
-                                 set &lt;name&gt; changeValue "12 kWh","{($VALUE,$UNIT) = split(" ",$VALUE)}"  <br>
+                                 set &lt;name&gt; changeValue "12 kWh",{"($VALUE,$UNIT) = split(" ",$VALUE)"}  <br>
                                  # the old field value "12 kWh" is splitted to VALUE=12 and UNIT=kWh and saved into the database fields <br><br>
 
-                                 set &lt;name&gt; changeValue "24%","{$VALUE = (split(" ",$VALUE))[0]}"  <br>
+                                 set &lt;name&gt; changeValue "24%",{"$VALUE = (split(" ",$VALUE))[0]"}  <br>
                                  # if the old field value begins with "24", it is splitted and VALUE=24 is saved (e.g. "24 kWh")
                                  <br><br>
                                  
@@ -16475,21 +16487,21 @@ return;
                                  
                                  <ul>
                                    <b>Syntax: </b> <br>
-                                   set &lt;name&gt; changeValue "&lt;alter String&gt;","&lt;neuer String&gt;"  <br><br>
+                                   set &lt;name&gt; changeValue old="&lt;alter String&gt;" new="&lt;neuer String&gt;"  <br><br>
                                  
                                    "String" kann sein: <br>
                                  
                                    <table>  
-                                      <colgroup> <col width=15%> <col width=85%> </colgroup>
-                                      <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
-                                                                                                        <li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li> </td></tr>
+                                      <colgroup> <col width=20%> <col width=80%> </colgroup>
+                                      <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>                                  </td></tr>
+                                      <tr><td>                              </td><td><li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li>                                  </td></tr>
                                       <tr><td> </td><td> </td></tr>
                                       <tr><td> </td><td> </td></tr>
-                                      <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
-                                                                                                          <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
-                                                                                                          Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
-                                                                                                          des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
-                                                                                                          VALUE bzw. UNIT des Datensatzes gespeichert. </li></td></tr>
+                                      <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>                                 </td></tr>
+                                      <tr><td>                              </td><td><li>Perl Code eingeschlossen in {"..."} inkl. Quotes, z.B. {"($VALUE,$UNIT) = split(" ",$VALUE)"}  </td></tr>
+                                      <tr><td>                              </td><td>Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb            </td></tr>
+                                      <tr><td>                              </td><td>des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld         </td></tr>
+                                      <tr><td>                              </td><td>VALUE bzw. UNIT des Datensatzes gespeichert. </li>                                                 </td></tr>
                                    </table>
                                 </ul>
                                 <br>
@@ -16502,10 +16514,10 @@ return;
                                  set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
                                  # enthält das Feld VALUE den Teilstring "OL", wird es in "12 OL" geändert. <br><br>
                                  
-                                 set &lt;name&gt; changeValue "12 kWh","{($VALUE,$UNIT) = split(" ",$VALUE)}"  <br>
+                                 set &lt;name&gt; changeValue "12 kWh",{"($VALUE,$UNIT) = split(" ",$VALUE)"}  <br>
                                  # der alte Feldwert "12 kWh" wird in VALUE=12 und UNIT=kWh gesplittet und in den Datenbankfeldern gespeichert <br><br>
 
-                                 set &lt;name&gt; changeValue "24%","{$VALUE = (split(" ",$VALUE))[0]}"  <br>
+                                 set &lt;name&gt; changeValue "24%",{"$VALUE = (split(" ",$VALUE))[0]"}  <br>
                                  # beginnt der alte Feldwert mit "24", wird er gesplittet und VALUE=24 gespeichert (z.B. "24 kWh")
                                  <br><br>
                                  
