@@ -97,7 +97,12 @@ sub MOBILEALERTSGW_Get ($$@) {
         my $destpaddr;
         my $command;
 
-        if ( $gateway =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/ ) {
+        if ( !defined($gateway)) {
+            $gateway   = "000000000000";
+            $destpaddr = sockaddr_in( 8003, INADDR_BROADCAST );
+            $command   = 1;
+        }
+        elsif ( $gateway =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/ ) {
             $destpaddr = sockaddr_in( 8003, inet_aton($gateway) );
             $gateway   = "000000000000";
             $command   = 1;

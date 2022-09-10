@@ -256,7 +256,7 @@ sub MOBILEALERTS_Parse ($$) {
         if ( defined &$sub ) {
 
             #no strict "refs";
-            &{ \&$sub }( $hash, substr $message, 12, $packageLength - 12 );
+            &{ \&$sub }( $hash, substr($message, 12, $packageLength - 12), substr($message, 12));
 
             #use strict "refs";
             MOBILEALERTS_readingsBulkUpdate( $hash, 0, "lastMsg",
@@ -305,14 +305,14 @@ sub MOBILEALERTS_Parse ($$) {
     return $res;
 }
 
-sub MOBILEALERTS_Parse_02_ce ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_02_ce ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10100/MA10101" );
-    MOBILEALERTS_Parse_ce( $hash, $message );
+    MOBILEALERTS_Parse_ce( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_15_ce ($$) {
+sub MOBILEALERTS_Parse_15_ce ($$$) {
     my ( $hash, $message ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10880" );
@@ -373,7 +373,7 @@ sub MOBILEALERTS_Parse_15_ce ($$) {
         "$channel $state_name" );
 }
 
-sub MOBILEALERTS_Parse_ce ($$) {
+sub MOBILEALERTS_Parse_ce ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $temperature, $prevTemperature ) =
       unpack( "nnn", $message );
@@ -397,7 +397,7 @@ sub MOBILEALERTS_Parse_ce ($$) {
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "state", "T: " . $temperature );
 }
 
-sub MOBILEALERTS_Parse_0f_d2 ($$) {
+sub MOBILEALERTS_Parse_0f_d2 ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $temperatureIn, $temperatureOut, $prevTemperatureIn,
         $prevTemperatureOut )
@@ -436,14 +436,14 @@ sub MOBILEALERTS_Parse_0f_d2 ($$) {
         "In T: " . $temperatureIn . " Out T: " . $temperatureOut );
 }
 
-sub MOBILEALERTS_Parse_03_d2 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_03_d2 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10200" );
-    MOBILEALERTS_Parse_d2( $hash, $message );
+    MOBILEALERTS_Parse_d2( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_d2 ($$) {
+sub MOBILEALERTS_Parse_d2 ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $temperature, $humidity, $prevTemperature, $prevHumidity )
       = unpack( "nnnnn", $message );
@@ -476,14 +476,14 @@ sub MOBILEALERTS_Parse_d2 ($$) {
         "T: " . $temperature . " H: " . $humidity );
 }
 
-sub MOBILEALERTS_Parse_04_d4 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_04_d4 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10350" );
-    MOBILEALERTS_Parse_d4( $hash, $message );
+    MOBILEALERTS_Parse_d4( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_d4 ($$) {
+sub MOBILEALERTS_Parse_d4 ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $temperature, $humidity, $wetness,
         $prevTemperature, $prevHumidity, $prevWetness )
@@ -521,7 +521,7 @@ sub MOBILEALERTS_Parse_d4 ($$) {
         "T: " . $temperature . " H: " . $humidity . " " . $wetness );
 }
 
-sub MOBILEALERTS_Parse_05_da ($$) {
+sub MOBILEALERTS_Parse_05_da ($$$) {
     my ( $hash, $message ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "WL2000" );
@@ -579,14 +579,14 @@ sub MOBILEALERTS_Parse_05_da ($$) {
           . $co2 );
 }
 
-sub MOBILEALERTS_Parse_07_da ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_07_da ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10410" );
-    MOBILEALERTS_Parse_da( $hash, $message );
+    MOBILEALERTS_Parse_da( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_da ($$) {
+sub MOBILEALERTS_Parse_da ($$$) {
     my ( $hash, $message ) = @_;
     my (
         $txCounter,      $temperatureIn,      $humidityIn,
@@ -632,7 +632,7 @@ sub MOBILEALERTS_Parse_da ($$) {
           . $humidityOut );
 }
 
-sub MOBILEALERTS_Parse_18_e0 ($$) {
+sub MOBILEALERTS_Parse_18_e0 ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $txCounter2, $temperature, $humidity, $airPressure ) =
       unpack( "nCnCn", $message );
@@ -665,14 +665,14 @@ sub MOBILEALERTS_Parse_18_e0 ($$) {
         "T: " . $temperature . " H: " . $humidity . " A: " . $airPressure );
 }
 
-sub MOBILEALERTS_Parse_08_e1 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_08_e1 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10650" );
-    MOBILEALERTS_Parse_e1( $hash, $message );
+    MOBILEALERTS_Parse_e1( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_e1 ($$) {
+sub MOBILEALERTS_Parse_e1 ($$$) {
     my ( $hash, $message ) = @_;
     my @eventTime;
     ( my ( $txCounter, $temperature, $eventCounter ), @eventTime[ 0 .. 8 ] ) =
@@ -735,14 +735,14 @@ sub MOBILEALERTS_Parse_e1 ($$) {
         "T: " . $temperature . " C: " . $eventCounter );
 }
 
-sub MOBILEALERTS_Parse_0b_e2 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_0b_e2 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10660" );
-    MOBILEALERTS_Parse_e2( $hash, $message );
+    MOBILEALERTS_Parse_e2( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_e2 ($$) {
+sub MOBILEALERTS_Parse_e2 ($$$) {
     my ( $hash, $message ) = @_;
     my @dirTable = (
         "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -771,14 +771,14 @@ sub MOBILEALERTS_Parse_e2 ($$) {
         "D: " . $dirTable[$dir] . " W: " . $windSpeed . " G: " . $gustSpeed );
 }
 
-sub MOBILEALERTS_Parse_0e_d8 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_0e_d8 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "TFA30.3312.02" );
-    MOBILEALERTS_Parse_d8( $hash, $message );
+    MOBILEALERTS_Parse_d8( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_d8 ($$) {
+sub MOBILEALERTS_Parse_d8 ($$$) {
     my ( $hash, $message ) = @_;
     my (
         $txCounter,    $temperature,      $humidity, $prevTemperature,
@@ -822,14 +822,14 @@ sub MOBILEALERTS_Parse_d8 ($$) {
         "T: " . $temperature . " H: " . $humidity );
 }
 
-sub MOBILEALERTS_Parse_10_d3 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_10_d3 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10800" );
-    MOBILEALERTS_Parse_d3( $hash, $message );
+    MOBILEALERTS_Parse_d3( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_d3 ($$) {
+sub MOBILEALERTS_Parse_d3 ($$$) {
     my ( $hash, $message ) = @_;
     my @data;
     ( my ($txCounter), @data[ 0 .. 3 ] ) = unpack( "nnnnn", $message );
@@ -861,14 +861,14 @@ sub MOBILEALERTS_Parse_d3 ($$) {
     }
 }
 
-sub MOBILEALERTS_Parse_12_d9 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_12_d9 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10230" );
-    MOBILEALERTS_Parse_d9( $hash, $message );
+    MOBILEALERTS_Parse_d9( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_d9 ($$) {
+sub MOBILEALERTS_Parse_d9 ($$$) {
     my ( $hash, $message ) = @_;
     my (
         $txCounter,   $humidity3h,  $humidity24h, $humidity7d,
@@ -922,21 +922,21 @@ sub MOBILEALERTS_Parse_d9 ($$) {
           . $humidity30d );
 }
 
-sub MOBILEALERTS_Parse_06_d6 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_06_d6 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10300/MA10700" );
-    MOBILEALERTS_Parse_d6( $hash, $message );
+    MOBILEALERTS_Parse_d6( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_09_d6 ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_09_d6 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "MA10320PRO" );
-    MOBILEALERTS_Parse_d6( $hash, $message );
+    MOBILEALERTS_Parse_d6( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_d6 ($$) {
+sub MOBILEALERTS_Parse_d6 ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $temperatureIn, $temperatureOut, $humidityIn,
         $prevTemperatureIn, $prevTemperatureOut, $prevHumidityIn )
@@ -986,7 +986,7 @@ sub MOBILEALERTS_Parse_d6 ($$) {
           . $temperatureOut );
 }
 
-sub MOBILEALERTS_Parse_01_d2 ($$) {
+sub MOBILEALERTS_Parse_01_d2 ($$$) {
     my ( $hash, $message ) = @_;
     my ( $txCounter, $temperatureIn, $temperatureOut, $prevTemperatureIn,
         $prevTemperatureOut )
@@ -1025,14 +1025,14 @@ sub MOBILEALERTS_Parse_01_d2 ($$) {
         "In T: " . $temperatureIn . " Out T: " . $temperatureOut );
 }
 
-sub MOBILEALERTS_Parse_11_ea ($$) {
-    my ( $hash, $message ) = @_;
+sub MOBILEALERTS_Parse_11_ea ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
     MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
         "TFA30.3060.01.IT" );
-    MOBILEALERTS_Parse_ea( $hash, $message );
+    MOBILEALERTS_Parse_ea( $hash, $message, $messagefull );
 }
 
-sub MOBILEALERTS_Parse_ea ($$) {
+sub MOBILEALERTS_Parse_ea ($$$) {
     my ( $hash, $message ) = @_;
     my (
         $txCounter,         $temperature1,     $humidity1,
@@ -1158,6 +1158,50 @@ sub MOBILEALERTS_Parse_ea ($$) {
           . " 3 T: "
           . $temperature3 . " H: "
           . $humidity3 );
+}
+
+sub MOBILEALERTS_Parse_0a_cb($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
+    my ( $txCounter, $temperature ) =
+      unpack( "nn", $messagefull );
+
+    MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
+        "MA 10860" );
+
+    # Alarm
+    my $alarm_ch1 = "off";
+    my $alarm_ch2 = "off";
+    my $alarm_ch3 = "off";
+    my $alarm_ch4 = "off";
+    $alarm_ch1 = "on" if( ($temperature & 0x8000) == 0x8000);
+    $alarm_ch2 = "on" if( ($temperature & 0x4000) == 0x4000);
+    $alarm_ch3 = "on" if( ($temperature & 0x2000) == 0x2000);
+    $alarm_ch4 = "on" if( ($temperature & 0x1000) == 0x1000);
+
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "alarm1", $alarm_ch1);
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "alarm2", $alarm_ch2);
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "alarm3", $alarm_ch3);
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "alarm4", $alarm_ch4);
+    # Oberen Bits werden fuer Alarm benutzt
+    $temperature = $temperature & 0x0fff; 
+
+    # txCounter
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "txCounter",
+        MOBILEALERTS_decodeTxCounter($txCounter) );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "triggered",
+        MOBILEALERTS_triggeredTxCounter($txCounter) );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "batteryState",
+        MOBILEALERTS_batteryStateTxCounter($txCounter) );
+    # temperature
+    $temperature =
+      MOBILEALERTS_decodeTemperature($temperature) +
+      $hash->{".corrTemperature"};
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperature", $temperature );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperatureString",
+        MOBILEALERTS_temperatureToString($temperature) );
+    # state
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "state", "T: " . $temperature .
+    " " . $alarm_ch1 . " " . $alarm_ch2 ." " . $alarm_ch3 . " " . $alarm_ch4);
 }
 
 sub MOBILEALERTS_decodeTxCounter($) {
@@ -1508,7 +1552,7 @@ sub MOBILEALERTS_ActionDetector($) {
   The MOBILEALERTS is a fhem module for the german MobileAlerts devices and TFA WEATHERHUB devices.
   <br><br>
   The fhem module represents a MobileAlerts device. The connection is provided by the <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> module.
-  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10880<br>
+  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10238, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10860, MA10880<br>
   Supported but untested: ./.<br>
   <br>
 
@@ -1557,9 +1601,10 @@ sub MOBILEALERTS_ActionDetector($) {
     <li>lastEvent, lastEvent&lt;X&gt; ,lastEventString, lastEvent&lt;X&gt;String<br>Time when last event (rain) happend (MA10650 only).</li>
     <li>mmRain, mmRainActHour, mmRainLastHour, mmRainActDay, mmRainYesterday<br>Rain since reset of counter, current hour, last hour, current day, yesterday.</li>
     <li>direction, directionInt<br>Direction of wind.</li>
-    <li>windSpeed, gustSpeed<br>Windspeed.</li>
+    <li>windSpeed, gustSpeed<br>Windspeed in m/s.</li>
     <li>airPressure<br>Barometric pressure in hPa</li>
     <li>airPressureString<br>Barometric pressure as String</li>
+    <li>alarm1, alarm2, alarm3, alarm4<br>Active Alarms (values: on/off)</li>
   </ul>
   <br>  
 
@@ -1607,8 +1652,8 @@ sub MOBILEALERTS_ActionDetector($) {
   <br><br>
   Dieses FHEM Modul stellt jeweils ein MobileAlerts Ger&auml;t dar. Die Verbindung wird durch das 
   <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> Modul bereitgestellt.<br>
-  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10880<br>
-  Unterst&uuml;zt aber ungetestet: MA10238<br>
+  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10238, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10860, MA10880<br>
+  Unterst&uuml;zt aber ungetestet: ./.<br>
   <br>
 
   <a name="MOBILEALERTSdefine"></a>
@@ -1656,9 +1701,10 @@ sub MOBILEALERTS_ActionDetector($) {
     <li>lastEvent, lastEvent&lt;X&gt; ,lastEventString, lastEvent&lt;X&gt;String<br>Zeitpunkt wann das letzte Event (Regen) stattgefunden hat (nur MA10650).</li>
     <li>mmRain, mmRainActHour, mmRainLastHour, mmRainActDay, mmRainYesterday<br>Regen seit dem letzten Reset des Counters, in der aktuellen Stunde, seit der letzten Stunden, am aktuellen Tagn, gestern.</li>
     <li>direction, directionInt<br>Richtung des Winds.</li>
-    <li>windSpeed, gustSpeed<br>Windgeschwindigkeit.</li>
+    <li>windSpeed, gustSpeed<br>Windgeschwindigkeit in m/s.</li>
     <li>airPressure<br>Luftdruck in hPa</li>
     <li>airPressureString<br>Luftdruck in hPa als Zeichenkette</li>
+    <li>alarm1, alarm2, alarm3, alarm4<br>Aktive Alarme (Werte: on/off)</li>
   </ul>
   <br>    
 
