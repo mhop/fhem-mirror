@@ -26,6 +26,8 @@
 #########################################################################################################################
 
 # Version History
+# 0.0.4  10.09.2022 add pattern parameter: https://metacpan.org/pod/DateTime::Format::Strptime#STRPTIME-PATTERN-TOKENS
+#                   add strict parameter:  https://metacpan.org/pod/DateTime::Format::Strptime#DateTime::Format::Strptime-%3Enew(%25args) 
 # 0.0.3  13.03.2022 publish func reqModFail
 # 0.0.2  12.03.2022 check required Perl modules 
 # 0.0.1  10.03.2022 initial
@@ -90,6 +92,7 @@ sub convertTimeZone {
   return "required perl module not installed: ".$rmf if($rmf);
 
   my $name      = $paref->{name}      // $pkg;
+  my $pattern   = $paref->{pattern}   // '%Y-%m-%d %H:%M:%S';
   my $dtstring  = $paref->{dtstring}  // q{};
   my $tzcurrent = $paref->{tzcurrent} // 'local';
   my $tzconv    = $paref->{tzconv}    // 'UTC';
@@ -103,7 +106,8 @@ sub convertTimeZone {
       $ms = '.'.$1; 
   }
   
-  my $strptime = new DateTime::Format::Strptime ( pattern   => '%Y-%m-%d %H:%M:%S',
+  my $strptime = new DateTime::Format::Strptime ( pattern   => $pattern,
+                                                  strict    => 0,
                                                   time_zone => $tzcurrent,
                                                 );
 
