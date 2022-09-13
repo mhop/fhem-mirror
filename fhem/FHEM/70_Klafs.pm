@@ -22,18 +22,21 @@
 #
 ##############################################################################
 package main;
-
 use strict;
 use warnings;
+
+package FHEM::Klafs;
+
+sub ::Klafs_Initialize { goto &Initialize }
+
 use Carp qw(carp);
 use Scalar::Util    qw(looks_like_number);
 use Time::HiRes     qw(gettimeofday);
 use JSON            qw(decode_json encode_json);
-#use Encode          qw(encode_utf8 decode_utf8);
 use Time::Piece;
 use Time::Local;
-#use Data::Dumper;
 use HttpUtils;
+use GPUtils qw(:all);
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
 my %sets = (
@@ -49,22 +52,44 @@ my %gets = (
         SaunaID       => 'noArg',
         );
 
-###################################
-sub KLAFS_Initialize {
-    my $hash = shift;
+BEGIN {
 
-    Log3 ($hash, 5, 'KLAFS_Initialize: Entering');
-    $hash->{DefFn}    = \&Klafs_Define;
-    $hash->{UndefFn}  = \&Klafs_Undef;
-    $hash->{SetFn}    = \&Klafs_Set;
-    $hash->{AttrFn}   = \&Klafs_Attr;
-    $hash->{GetFn}    = \&Klafs_Get;
-    $hash->{RenameFn} = \&Klafs_Rename;
+  GP_Import(qw(
+    readingsBeginUpdate
+    readingsBulkUpdate
+    readingsEndUpdate
+    readingsSingleUpdate
+    Log3
+    defs
+    init_done
+    InternalTimer
+    strftime
+    RemoveInternalTimer
+    readingFnAttributes
+    AttrVal
+    notifyRegexpChanged
+    ReadingsVal
+    HttpUtils_NonblockingGet
+    HttpUtils_BlockingGet
+  ))
+};
+
+###################################
+sub Initialize {
+    my $hash = shift;
+    
+    Log3 ($hash, 5, 'Klafs_Initialize: Entering');
+    $hash->{DefFn}    = \&Define;
+    $hash->{UndefFn}  = \&Undef;
+    $hash->{SetFn}    = \&Set;
+    $hash->{AttrFn}   = \&Attr;
+    $hash->{GetFn}    = \&Get;
+    $hash->{RenameFn} = \&Rename;
     $hash->{AttrList} = 'username saunaid pin interval disable:1,0 ' . $main::readingFnAttributes;
     return;
 }
 
-sub Klafs_Attr
+sub Attr
 {
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
   my $hash = $defs{$name};
@@ -104,17 +129,17 @@ sub Klafs_Attr
 }
 
 ###################################
-sub Klafs_Define {
+sub Define {
     my $hash = shift;
     my $def  = shift;
 
     return $@ if !FHEM::Meta::SetInternals($hash);
     my @args = split m{\s+}, $def;
-    my $usage = qq (syntax: define <name> KLAFS);
+    my $usage = qq (syntax: define <name> Klafs);
     return $usage if ( @args != 2 );
     my ( $name, $type ) = @args;
 
-    Log3 ($name, 5, "KLAFS $name: called function KLAFS_Define()");
+    Log3 ($name, 5, "Klafs $name: called function Klafs_Define()");
 
     $hash->{NAME} = $name;
     $hash->{helper}->{passObj} = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
@@ -134,10 +159,10 @@ sub Klafs_Define {
 }
 
 ###################################
-sub Klafs_Undef {
+sub Undef {
     my $hash = shift // return;
     my $name = $hash->{NAME};
-    Log3 ($name, 5, "KLAFS  $name: called function KLAFS_Undefine()");
+    Log3 ($name, 5, "Klafs  $name: called function Klafs_Undefine()");
 
     # De-Authenticate
     Klafs_CONNECTED( $hash, 'deauthenticate',1 );
@@ -148,7 +173,7 @@ sub Klafs_Undef {
     return;
 }
 
-sub Klafs_Rename
+sub Rename
 {
         my $name_new = shift // return;
         my $name_old = shift // return;
@@ -188,6 +213,7 @@ sub Klafs_CONNECTED {
 # API AUTHENTICATION
 #
 ##############################################################
+
 sub Klafs_Auth{
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -250,6 +276,8 @@ sub Klafs_Auth{
     return;
 }
 
+
+
 # Antwortheader aus dem Login auslesen fuer das Cookie
 sub Klafs_AuthResponse {
   my ($param, $err, $data) = @_;
@@ -265,7 +293,7 @@ sub Klafs_AuthResponse {
        my %umlaute = ("&#228;" => "ae", "&#252;" => "ue", "&#196;" => "Ae", "&#214;" => "Oe", "&#246;" => "oe", "&#220;" => "Ue", "&#223;" => "ss");
        my $umlautkeys = join ("|", keys(%umlaute));
        $err=~ s/($umlautkeys)/$umlaute{$1}/g;
-       Log3 ($name, 1, "KLAFS $name: $err");
+       Log3 ($name, 1, "Klafs $name: $err");
        $hash->{Klafs}->{LoginFailures} = $hash->{Klafs}->{LoginFailures}+1;
        readingsBulkUpdate( $hash, 'last_errormsg', $err );
        readingsBulkUpdate( $hash, 'LoginFailures', $hash->{Klafs}->{LoginFailures});
@@ -292,6 +320,7 @@ sub Klafs_AuthResponse {
   readingsEndUpdate($hash,1);
   return;
 }
+
 ##############################################################
 #
 # Cookie pruefen und Readings erneuern
@@ -363,6 +392,8 @@ sub klafs_getStatus{
       return;
 }
 
+
+
 sub klafs_getStatusResponse {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
@@ -425,6 +456,8 @@ sub klafs_getStatusResponse {
   return;
 }
 
+
+
 sub Klafs_GETProfile {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
@@ -481,6 +514,8 @@ sub Klafs_GETProfile {
   return;
 }
 
+
+
 sub Klafs_GETSettings {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
@@ -534,25 +569,26 @@ sub Klafs_GETSettings {
   return;
 }
 
+
 ###################################
-sub Klafs_Get {
+sub Get {
     my ( $hash, @a ) = @_;
 
     my $name = $hash->{NAME};
     my $what;
-    Log3 ($name, 5, "KLAFS $name: called function KLAFS_Get()");
+    Log3 ($name, 5, "Klafs $name: called function Klafs_Get()");
 
     return "argument is missing" if ( @a < 2 );
 
     $what = $a[1];
 
 
-    return _KLAFS_help($hash) if ( $what =~ /^(help)$/ );
-    return _KLAFS_saunaid($hash) if ( $what =~ /^(SaunaID)$/ );
+    return _Klafs_help($hash) if ( $what =~ /^(help)$/ );
+    return _Klafs_saunaid($hash) if ( $what =~ /^(SaunaID)$/ );
     return "$name get with unknown argument $what, choose one of " . join(" ", sort keys %gets); 
 }
 
-sub _KLAFS_help {
+sub _Klafs_help {
     return << 'EOT';
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 | Set Parameter                                                                                                                                            |
@@ -632,7 +668,7 @@ sub Klafs_GetSaunaIDs_Receive {
     return;
 }
 
-sub _KLAFS_saunaid {
+sub _Klafs_saunaid {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
     
@@ -644,7 +680,7 @@ sub _KLAFS_saunaid {
 
 
 ###################################
-sub Klafs_Set {
+sub Set {
     my ( $hash, $name, $cmd, @args ) = @_;
     return if $hash->{Klafs}->{LoginFailures} > 0 and !$cmd;
 
@@ -663,7 +699,7 @@ sub Klafs_Set {
     my $FIFTEEN_MINS = (15 * 60);
     my $now = time;
     if (my $diff = $now % $FIFTEEN_MINS) {
-     $now += $FIFTEEN_MINS - $diff;
+   $now += $FIFTEEN_MINS - $diff;
     }
     my $next = scalar localtime $now;
     # doppelte Leerzeichen bei einstelligen Datumsangaben entfernen
@@ -694,7 +730,7 @@ sub Klafs_Set {
 
     # on ()
     if ( $cmd eq "on" ) {
-       Log3 ($name, 2, "KLAFS set $name " . $cmd);
+       Log3 ($name, 2, "Klafs set $name " . $cmd);
         
        klafs_getStatus($hash);
        my $mode        = shift @args;
@@ -894,7 +930,7 @@ sub Klafs_Set {
            if($level =~ /:/ || $Time =~ /:/){
              if($level =~ /:/){
                my @Timer = split(/:/,$level);
-               $std = $Timer[0];
+            $std = $Timer[0];
                $min = $Timer[1];
                if($std < 10){
                  if(substr($std,0,1) eq "0"){
@@ -1017,7 +1053,7 @@ sub Klafs_Set {
                                                                                  my %umlaute = ("&#228;" => "ae", "&#252;" => "ue", "&#196;" => "Ae", "&#214;" => "Oe", "&#246;" => "oe", "&#220;" => "Ue", "&#223;" => "ss");
                                                                                  my $umlautkeys = join ("|", keys(%umlaute));
                                                                                  $err=~ s/($umlautkeys)/$umlaute{$1}/g;
-                                                                                 Log3 ($name, 1, "KLAFS $name: $err");
+                                                                                 Log3 ($name, 1, "Klafs $name: $err");
                                                                                  readingsBulkUpdate( $hash, "last_errormsg", "$err", 1 );
                                                                                }
                                                                                readingsEndUpdate($hash, 1);
@@ -1039,7 +1075,7 @@ sub Klafs_Set {
     
     # sauna off
     }elsif ( $cmd eq "off" ) {
-       Log3 ($name, 2, "KLAFS set $name " . $cmd);
+       Log3 ($name, 2, "Klafs set $name " . $cmd);
        klafs_getStatus($hash);
 
        my $aspxauth = $hash->{Klafs}->{cookie};
@@ -1138,8 +1174,9 @@ sub Klafs_Set {
         . join( " ",
         map { "$_" . ( $sets{$_} ? ":$sets{$_}" : "" ) } keys %sets );
     }
-    return;
+return;
 }
+
 
 ##############################################################
 #
@@ -1153,7 +1190,7 @@ sub Klafs_Whowasi() { return (split('::',(caller(2))[3]))[1] || ''; }
 sub Klafs_DoUpdate {
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},Klafs_Whoami());
-    Log3 ($name, 5, "$name doUpdate() called.");
+    Log3 ($name, 5, "$name Klafs_DoUpdate() called.");
     
   RemoveInternalTimer($hash);
   if (Klafs_CONNECTED($hash) eq 'disabled') {
@@ -1161,27 +1198,26 @@ sub Klafs_DoUpdate {
     return;
   }
   
-  
-
-  InternalTimer( time() + $hash->{Klafs}->{interval}, $self, $hash, 0 );
+   InternalTimer(time() + $hash->{Klafs}->{interval}, \&Klafs_DoUpdate, $hash, 0);
         if (time() >= $hash->{Klafs}->{expire} && $hash->{Klafs}->{CONNECTED} ne "disconnected" && $hash->{Klafs}->{CONNECTED} ne "initialized") {
-                Log3 ($name, 2, "$name - LOGIN TOKEN MISSING OR EXPIRED - DoUpdate");
+                Log3 ($name, 2, "$name - LOGIN TOKEN MISSING OR EXPIRED - Klafs_DoUpdate");
                 Klafs_CONNECTED($hash,'disconnected',1);
 
         } elsif ($hash->{Klafs}->{CONNECTED} eq 'connected') {
                 Log3 ($name, 4, "$name - Update with device: " . $hash->{Klafs}->{saunaid});
                 klafs_getStatus($hash);
         } elsif ($hash->{Klafs}->{CONNECTED} eq 'disconnected' || $hash->{Klafs}->{CONNECTED} eq "initialized") {
-          # Das übernimmt eigentlich das notify unten. Hier wird es gebraucht, wenn innerhalb 5 Minuten nach den letzten Reconnect die Verbindung abbricht, dann muss der Login das DoUpdate übernehmen
+          # Das übernimmt eigentlich das notify unten. Hier wird es gebraucht, wenn innerhalb 5 Minuten nach den letzten Reconnect die Verbindung abbricht, dann muss der Login das Klafs_DoUpdate übernehmen
           # Login wird 5 Minuten nach den letzten Login verhindert vom Modul.
           Log3 ($name, 4, "$name - Reconnect within 5 Minutes");
                 Klafs_Auth($hash);
         } elsif ($hash->{Klafs}->{CONNECTED} eq 'authenticated') {
                 Log3 ($name, 4, "$name - Update with device: " . $hash->{Klafs}->{saunaid});
-                klafs_getStatus($hash);
+               klafs_getStatus($hash);
         }
 return;
 }
+
 
 1;
 
@@ -1195,7 +1231,7 @@ __END__
 =item summary_DE Klafs Saunasteuerung
 =begin html
 
-<a name="Klafs"></a>
+<a id="Klafs"></a>
 <h3>Klafs Sauna control</h3>
 <ul>
    The module receives data and sends commands to the Klafs app.<br>
@@ -1223,7 +1259,7 @@ __END__
    </ul>
    <ul>
       <br>
-      <code>define &lt;name&gt; KLAFS &lt;Intervall&gt;</code><br>
+      <code>define &lt;name&gt; Klafs &lt;Intervall&gt;</code><br>
       <code>attr &lt;name&gt; &lt;saunaid&gt; &lt;xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx&gt;</code><br>
       <code>attr &lt;name&gt; &lt;username&gt; &lt;xxxxxx&gt;</code><br>
       <code>attr &lt;name&gt; &lt;pin&gt; &lt;1234&gt;</code><br>
@@ -1236,7 +1272,7 @@ __END__
    <b>Example of a module definition:</b><br>
    <ul>
       <br>
-      <code>define mySauna KLAFS</code><br>
+      <code>define mySauna Klafs</code><br>
       <code>attr mySauna saunaid ab0c123d-ef4g-5h67-8ij9-k0l12mn34op5</code><br>
       <code>attr mySauna username user01</code><br>
       <code>attr mySauna pin 1234</code><br>
@@ -1489,7 +1525,7 @@ __END__
    </ul>
    <ul>
       <br>
-      <code>define &lt;name&gt; KLAFS &lt;Intervall&gt;</code><br>
+      <code>define &lt;name&gt; Klafs &lt;Intervall&gt;</code><br>
       <code>attr &lt;name&gt; &lt;saunaid&gt; &lt;xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx&gt;</code><br>
       <code>attr &lt;name&gt; &lt;username&gt; &lt;xxxxxx&gt;</code><br>
       <code>attr &lt;name&gt; &lt;pin&gt; &lt;1234&gt;</code><br>
@@ -1502,7 +1538,7 @@ __END__
    <b>Beispiel f&uuml;r eine Moduldefinition:</b><br>
    <ul>
       <br>
-      <code>define mySauna KLAFS</code><br>
+      <code>define mySauna Klafs</code><br>
       <code>attr mySauna saunaid ab0c123d-ef4g-5h67-8ij9-k0l12mn34op5</code><br>
       <code>attr mySauna username user01</code><br>
       <code>attr mySauna pin 1234</code><br>
