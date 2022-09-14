@@ -1,6 +1,6 @@
-REV 26396
+REV 26399
 DIR unused
-UPD 2022-09-13_07:45:02 382715 ./CHANGED
+UPD 2022-09-14_07:45:02 382843 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-09-07_07:45:09 46102 ./MAINTAINER.txt
 UPD 2022-08-08_07:45:03 46286 ./configDB.pm
@@ -344,7 +344,7 @@ UPD 2020-09-25_07:45:05 37620 FHEM/70_HYDRAWISE.pm
 UPD 2019-12-24_07:45:11 47354 FHEM/70_JSONMETER.pm
 UPD 2016-12-30_07:45:02 58070 FHEM/70_Jabber.pm
 UPD 2022-03-31_07:45:02 70371 FHEM/70_KODI.pm
-UPD 2022-06-22_07:45:02 76378 FHEM/70_Klafs.pm
+UPD 2022-09-14_07:45:02 76695 FHEM/70_Klafs.pm
 UPD 2019-06-26_07:45:02 104225 FHEM/70_LaMetric2.pm
 UPD 2018-04-16_07:45:03 46243 FHEM/70_MEDIAPORTAL.pm
 UPD 2019-01-31_07:45:02 66307 FHEM/70_NEUTRINO.pm
@@ -654,7 +654,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-09-11_07:45:07 387787 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-09-14_07:45:02 388725 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -746,12 +746,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-09-13_07:45:07 4805665 docs/commandref.html
-UPD 2022-09-13_07:45:09 2859324 docs/commandref_DE.html
+UPD 2022-09-14_07:45:07 4805683 docs/commandref.html
+UPD 2022-09-14_07:45:09 2859324 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-09-13_07:45:10 289986 docs/commandref_modular.html
-UPD 2022-09-13_07:45:12 301130 docs/commandref_modular_DE.html
+UPD 2022-09-14_07:45:10 289986 docs/commandref_modular.html
+UPD 2022-09-14_07:45:12 301130 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
