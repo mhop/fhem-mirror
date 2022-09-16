@@ -26,21 +26,26 @@ package FHEM::SolarForecast;                              ## no critic 'package'
 use strict;
 use warnings;
 use POSIX;
-use GPUtils qw(GP_Import GP_Export);                      # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import GP_Export);                                       # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday);
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;         ## no critic 'eval'
+
+eval "use FHEM::Meta;1"                  or my $modMetaAbsent = 1;         ## no critic 'eval'
+eval "use FHEM::Utility::CTZ qw(:all);1" or my $ctzAbsent     = 1;         ## no critic 'eval'
+
 use Encode;
 use Color;
 use utf8;
-eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # Debian: apt-get install libjson-perl
+use HttpUtils;
+eval "use JSON;1;" or my $jsonabs = "JSON";                                ## no critic 'eval' # Debian: apt-get install libjson-perl
 
 use FHEM::SynoModules::SMUtils qw(
                                    evaljson  
                                    moduleVersion
                                    trim
-                                 );                       # Hilfsroutinen Modul
+                                 );                                        # Hilfsroutinen Modul
 
 use Data::Dumper; 
+use Storable 'dclone';
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
                                  
 # Run before module compilation
@@ -71,6 +76,7 @@ BEGIN {
           FmtTime
           FW_makeImage
           getKeyValue
+          HttpUtils_NonblockingGet
           init_done
           InternalTimer
           IsDisabled
@@ -120,6 +126,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.0 "=> "15.09.2022  integrate SolCast API, change attribute Wh/kWh to Wh_kWh, rename Reading nextPolltime to ".
+                           "nextCycletime, rework plant config check, minor (bug)fixes ",
   "0.67.6 "=> "02.09.2022  add ___setPlanningDeleteMeth, consumer can be planned across daily boundaries ".
                            "fix JS Fehler (__weatherOnBeam) Forum: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661 ",
   "0.67.5 "=> "28.08.2022  add checkRegex ",
@@ -130,9 +138,9 @@ my %vNotesIntern = (
   "0.67.2 "=> "11.08.2022  fix no disabled Link after restart and disable=1 ",
   "0.67.1 "=> "10.08.2022  fix warning, Forum: https://forum.fhem.de/index.php/topic,117864.msg1231050.html#msg1231050 ",
   "0.67.0 "=> "31.07.2022  change _gethtml, _getftui ",
-  "0.66.0 "=> "24.07.2022  insert function calcPeaklossByTemp to calculate peak power reduction by temperature ",
+  "0.66.0 "=> "24.07.2022  insert function ___calcPeaklossByTemp to calculate peak power reduction by temperature ",
   "0.65.8 "=> "23.07.2022  change calculation of cloud cover in calcRange function ",
-  "0.65.7 "=> "20.07.2022  change performance ratio in calcPVforecast to 0.85 ",
+  "0.65.7 "=> "20.07.2022  change performance ratio in __calcDWDforecast to 0.85 ",
   "0.65.6 "=> "20.07.2022  change __calcEnergyPieces for consumer types with \$hef{\$cotype}{f} == 1 ",
   "0.65.5 "=> "13.07.2022  extend isInterruptable and isAddSwitchOffCond ",
   "0.65.4 "=> "11.07.2022  new function isConsumerLogOn, minor fixes ",
@@ -197,7 +205,7 @@ my %vNotesIntern = (
                            "consider switch on Time limits (consumer keys notbefore/notafter) ",
   "0.49.5" => "01.06.2021  change pv correction factor to 1 if no historical factors found (only with automatic correction) ",
   "0.49.4" => "01.06.2021  fix wrong display at month change and using historyHour ",
-  "0.49.3" => "31.05.2021  improve calcPVforecast pvcorrfactor for multistring configuration ",
+  "0.49.3" => "31.05.2021  improve __calcDWDforecast pvcorrfactor for multistring configuration ",
   "0.49.2" => "31.05.2021  fix time calc in sub forecastGraphic ",
   "0.49.1" => "30.05.2021  no consumer check during start Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959  ",
   "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend, no negative val Current_SelfConsumption, Current_PV ",
@@ -248,10 +256,10 @@ my %vNotesIntern = (
   "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
   "0.17.0" => "20.03.2021  new attr cloudFactorDamping / rainFactorDamping, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
-  "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
+  "0.15.3" => "19.03.2021  corrected weather consideration for call __calcDWDforecast ",
   "0.15.2" => "19.03.2021  some bug fixing ",
   "0.15.1" => "18.03.2021  replace ThisHour_ by NextHour00_ ",
-  "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDForecastValues ",
+  "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDRadiationValues ",
   "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumption total in currentMeterdev ",
   "0.13.0" => "16.03.2021  changed sub forecastGraphic from Wzut ",
   "0.12.0" => "16.03.2021  switch etoday to etotal ",
@@ -262,9 +270,9 @@ my %vNotesIntern = (
                            "cachefile pvhist is persistent ",
   "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 ",
   "0.7.0"  => "01.03.2021  add function DbLog_splitFn ",
-  "0.6.0"  => "27.01.2021  change calcPVforecast from formula 1 to formula 2 ",
+  "0.6.0"  => "27.01.2021  change __calcDWDforecast from formula 1 to formula 2 ",
   "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
-  "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to calcPVforecast, add reset pvCorrection ",
+  "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to __calcDWDforecast, add reset pvCorrection ",
   "0.3.0"  => "21.01.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
   "0.2.0"  => "20.01.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
@@ -304,6 +312,8 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_21     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_Auto   => { fn => \&_setpvCorrectionFactorAuto    },
   reset                     => { fn => \&_setreset                     },
+  roofIdentPair             => { fn => \&_setroofIdentPair             },
+  moduleRoofTops            => { fn => \&_setmoduleRoofTops            },
   moduleTiltAngle           => { fn => \&_setmoduleTiltAngle           },
   moduleDirection           => { fn => \&_setmoduleDirection           },
   writeHistory              => { fn => \&_setwriteHistory              },
@@ -319,6 +329,8 @@ my %hget = (                                                                # Ha
   pvCircular        => { fn => \&_getlistPVCircular,         needcred => 0 },
   forecastQualities => { fn => \&_getForecastQualities,      needcred => 0 },
   nextHours         => { fn => \&_getlistNextHours,          needcred => 0 },
+  roofTopData       => { fn => \&_getRoofTopData,            needcred => 0 },
+  solCastData       => { fn => \&_getlistSolCastData,        needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -348,35 +360,39 @@ my %hff = (                                                                     
 
 my %hqtxt = (                                                                                                 # Hash (Setup) Texte
   cfd    => { EN => qq{Please select the Weather forecast device with "set LINK currentForecastDev"}, 
-              DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentForecastDev" an}                },
-  crd    => { EN => qq{Please select the Radiation forecast device with "set LINK currentRadiationDev"},
-              DE => qq{Bitte geben sie das Strahlungsvorhersage Device mit "set LINK currentRadiationDev" an}           },
+              DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentForecastDev" an}                    },
+  crd    => { EN => qq{Please select the radiation forecast service with "set LINK currentRadiationDev"},
+              DE => qq{Bitte geben sie den Strahlungsvorhersage Dienst mit "set LINK currentRadiationDev" an}               },
   cid    => { EN => qq{Please specify the Inverter device with "set LINK currentInverterDev"},
-              DE => qq{Bitte geben sie das Wechselrichter Device mit "set LINK currentInverterDev" an}                  },
+              DE => qq{Bitte geben sie das Wechselrichter Device mit "set LINK currentInverterDev" an}                      },
   mid    => { EN => qq{Please specify the device for energy measurement with "set LINK currentMeterDev"},
-              DE => qq{Bitte geben sie das Device zur Energiemessung mit "set LINK currentMeterDev" an}                 },
+              DE => qq{Bitte geben sie das Device zur Energiemessung mit "set LINK currentMeterDev" an}                     },
   ist    => { EN => qq{Please define all of your used string names with "set LINK inverterStrings"},
-              DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}        },
-  mps    => { EN => qq{Please specify the total peak power for every string with "set LINK modulePeakString"},
-              DE => qq{Bitte geben sie die Gesamtspitzenleistung von jedem String mit "set LINK modulePeakString" an}   },
+              DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}            },
+  mps    => { EN => qq{Please enter the DC peak power of each string with "set LINK modulePeakString"},
+              DE => qq{Bitte geben sie die DC Spitzenleistung von jedem String mit "set LINK modulePeakString" an}          },
   mdr    => { EN => qq{Please specify the module direction with "set LINK moduleDirection"},
-              DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                          },
+              DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                              },
   mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
-              DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
-  awd    => { EN => qq{Waiting for solar forecast data ...},
-              DE => qq{Warten auf Solarvorhersagedaten ...}                                                             },
+              DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                           },
+  rip    => { EN => qq{Please specify at least one combination Rooftop-ID/SolCast-API with "set LINK roofIdentPair"},
+              DE => qq{Bitte geben Sie mindestens eine Kombination Rooftop-ID/SolCast-API mit "set LINK roofIdentPair" an}  },  
+  mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "set LINK moduleRoofTops"},
+              DE => qq{Bitte setzen Sie die Zuordnung String / Rooftop Identifikation mit "set LINK moduleRoofTops"}        },  
+  awd    => { EN => qq{LINK is waiting for solar forecast data ...},
+              DE => qq{LINK wartet auf Solarvorhersagedaten ...}                                                            },
   cnsm   => { EN => qq{Consumer},
-              DE => qq{Verbraucher}                                                                                     },
+              DE => qq{Verbraucher}                                                                                         },
   eiau   => { EN => qq{Off/On},
-              DE => qq{Aus/Ein}                                                                                         },
+              DE => qq{Aus/Ein}                                                                                             },
   auto   => { EN => qq{Auto},
-              DE => qq{Auto}                                                                                            },
+              DE => qq{Auto}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
-              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                          },
-  strok  => { EN => qq{Congratulations &#128522, your string configuration checked without found errors !},
-              DE => qq{Herzlichen Glückwunsch &#128522, Ihre String-Konfiguration wurde ohne gefundene Fehler geprüft!} },
-  strnok => { EN => qq{Oh no &#128577, your string configuration is inconsistent.\nPlease check the settings of modulePeakString, moduleDirection, moduleTiltAngle !},
-              DE => qq{Oh nein &#128577, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen von modulePeakString, moduleDirection, moduleTiltAngle !}},
+              DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
+  strok  => { EN => qq{Congratulations &#128522, your system configuration has been checked and is error-free !},
+              DE => qq{Herzlichen Glückwunsch &#128522, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei !}       },
+  strnok => { EN => qq{Oh no &#128577, your string configuration is inconsistent.\nPlease check the settings !},
+              DE => qq{Oh nein &#128577, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !} },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -541,11 +557,13 @@ my $pvhcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_"; 
 my $pvccache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 my $plantcfg     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
 my $csmcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
+my $scpicache    = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
 
 my $calcmaxd     = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my $whistrepeat  = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
+my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
+my $scapirepeat  = 3600;                                                          # Abrufintervall SolCast API 
 
 my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
 my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
@@ -603,6 +621,7 @@ my %hef = (                                                                     
 # $data{$type}{$name}{nexthours}                                                 # NextHours Werte
 # $data{$type}{$name}{consumers}                                                 # Consumer Hash
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration
+# $data{$type}{$name}{solcastapi}                                                # Zwischenspeicher Vorhersagewerte SolCast API
 
 ################################################################
 #               Init Fn
@@ -681,7 +700,7 @@ sub Initialize {
                                 "showNight:1,0 ".
                                 "showWeather:1,0 ".
                                 "spaceSize ".
-                                "Wh/kWh:Wh,kWh ".
+                                "Wh_kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".
                                 "weatherColorNight:colorpicker,RGB ".
                                 $consumer.                                
@@ -732,6 +751,10 @@ sub Define {
   
   $params->{file}       = $csmcache.$name;                                         # Cache File Consumer lesen wenn vorhanden
   $params->{cachename}  = "consumers";
+  _readCacheFile ($params);
+  
+  $params->{file}       = $scpicache.$name;                                        # Cache File SolCast API Werte lesen wenn vorhanden
+  $params->{cachename}  = "solcastapi";
   _readCacheFile ($params);
     
   readingsSingleUpdate($hash, "state", "initialized", 1);
@@ -798,14 +821,19 @@ sub Set {
                currentMeterDev
                energyH4Trigger
                inverterStrings
+               moduleRoofTops
                powerTrigger
                pvCorrection
+               roofIdentPair
                pvHistory
              );
   my $resets = join ",",@re; 
   
   @fcdevs = devspec2array("TYPE=DWD_OpenData");
   $fcd    = join ",", @fcdevs if(@fcdevs);
+  
+  push @fcdevs, 'SolCast-API';
+  my $rdd = join ",", @fcdevs;
 
   for my $h (@chours) {
       push @cfs, "pvCorrectionFactor_".sprintf("%02d",$h); 
@@ -822,7 +850,7 @@ sub Set {
   $setlist = "Unknown argument $opt, choose one of ".
              "consumerImmediatePlanning:$cons ".
              "currentForecastDev:$fcd ".
-             "currentRadiationDev:$fcd ".
+             "currentRadiationDev:$rdd ".
              "currentBatteryDev:textField-long ".
              "currentInverterDev:textField-long ".
              "currentMeterDev:textField-long ".
@@ -831,10 +859,12 @@ sub Set {
              "modulePeakString ".
              "moduleTiltAngle ".
              "moduleDirection ".
+             "moduleRoofTops ".
              "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:on,off ".
              "reset:$resets ".
+             "roofIdentPair ".
              "writeHistory:noArg ".
              $cf
              ;
@@ -902,7 +932,7 @@ return;
 }
 
 ################################################################
-#                      Setter currentForecastDev
+#       Setter currentForecastDev (Wetterdaten)
 ################################################################
 sub _setcurrentForecastDev {              ## no critic "not used"
   my $paref = shift;
@@ -911,7 +941,7 @@ sub _setcurrentForecastDev {              ## no critic "not used"
   my $prop  = $paref->{prop} // return qq{no forecast device specified};
 
   if(!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData") {
-      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};                      #' :)
+      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
 
   readingsSingleUpdate($hash, "currentForecastDev", $prop, 1);
@@ -930,13 +960,93 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no radiation device specified};
 
-  if(!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData") {
-      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};                      #' :)
+  if($prop ne 'SolCast-API' && (!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData")) {
+      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
+  
+  if (isSolCastUsed ($hash)) {                                                         
+      return "The library FHEM::Utility::CTZ is missed. Please update FHEM completely." if($ctzAbsent);
+      
+      my $rmf = reqModFail();
+      return "You have to install the required perl module: ".$rmf if($rmf);
+  }  
 
   readingsSingleUpdate($hash, "currentRadiationDev", $prop, 1);
   createNotifyDev     ($hash);
   writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  setModel            ($hash);                                             # Model setzen
+
+return;
+}
+
+################################################################
+#                      Setter roofIdentPair
+################################################################
+sub _setroofIdentPair {                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  }
+  
+  my ($a,$h) = parseParams ($arg);
+  my $pk  = $a->[0] // "";
+  
+  if(!$pk) {
+      return qq{Every roofident pair needs a pairkey! Use: <pairkey> rtid=<Rooftop ID> apikey=<api key>};
+  }
+  
+  if(!$h->{rtid} || !$h->{apikey}) {
+      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  }  
+  
+  my $type = $hash->{TYPE};
+  
+  $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
+  $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
+  
+  writeDataToFile     ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
+  
+  my $msg = qq{The roofident pair "$pk" has been saved. You can check it by the "get $name solCastData" command.};
+  
+return $msg;
+}
+
+################################################################
+#                 Setter moduleRoofTops
+################################################################
+sub _setmoduleRoofTops {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg} // return qq{no module RoofTop was provided};
+  
+  my ($a,$h) = parseParams ($arg); 
+  
+  if(!keys %$h) {
+      return qq{The provided module RoofTop has wrong format};
+  }
+  
+  while (my ($is, $pk) = each %$h) {
+      my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+      my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+      
+      if(!$rtid || !$apikey) {
+          return qq{The roofIdentPair "$pk" of String "$is" has no Rooftop-ID and/or SolCast-API key assigned ! \n}.
+                 qq{Set the roofIdentPair "$pk" previously with "set $name roofIdentPair".} ;
+      }     
+  }
+
+  readingsSingleUpdate($hash, "moduleRoofTops", $arg, 1);
+  
+  my $ret = createStringConfig ($hash);
+  return $ret if($ret);
+  
+  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -981,11 +1091,17 @@ sub _setinverterStrings {                ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no inverter strings specified};
+  
+  if ($prop =~ /\?/xs) {
+      return qq{The inverter string designation is wrong. An inverter string name must not contain a '?' character!};
+  }
 
   readingsSingleUpdate($hash, "inverterStrings", $prop,    1);
   writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   
-return qq{REMINDER - After setting or changing "inverterStrings" please check / set all module parameter (e.g. moduleTiltAngle) again !};
+return qq{NOTE: After setting or changing "inverterStrings" please check }.
+       qq{/ set all module parameter (e.g. moduleTiltAngle) again ! \n}.
+       qq{Use "set $name plantConfiguration check" to validate your Setup.};
 }
 
 ################################################################
@@ -1240,7 +1356,7 @@ sub _setplantConfiguration {             ## no critic "not used"
   } 
   
   if($arg eq "check") {      
-      my $ret = checkStringConfig ($hash); 
+      my $ret = checkPlantConfig ($hash); 
       return qq{<html>$ret</html>};
   }
   
@@ -1390,17 +1506,39 @@ sub _setreset {                          ## no critic "not used"
   
   if($prop eq "powerTrigger") {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);           # Anlagenkonfiguration File schreiben
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
   
   if($prop eq "energyH4Trigger") {
       deleteReadingspec ($hash, "energyH4Trigger.*");
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);           # Anlagenkonfiguration File schreiben
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      return;
+  }
+  
+  if($prop eq "moduleRoofTops") {
+      deleteReadingspec ($hash, "moduleRoofTops");
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
   readingsDelete($hash, $prop);
+  
+  if($prop eq "roofIdentPair") {
+      my $pk   = $paref->{prop1} // "";                                       # ein bestimmter PairKey angegeben ?
+      
+      if ($pk) {
+          delete $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk};
+          Log3 ($name, 3, qq{$name - roofIdentPair: pair key "$pk" deleted});
+      }
+      else {
+          delete $data{$type}{$name}{solcastapi}{'?IdPair'};
+          Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
+      }      
+      
+      writeDataToFile ($hash, "solcastapi", $scpicache.$name);                # Cache File SolCast API Werte schreiben
+      return;
+  }
   
   if($prop eq "currentMeterDev") {
       readingsDelete($hash, "Current_GridConsumption");
@@ -1549,6 +1687,8 @@ sub Get {
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
                 "pvHistory:noArg ".
+                "roofTopData:noArg ".
+                "solCastData:noArg ".
                 "valCurrent:noArg "
                 ;
                 
@@ -1562,15 +1702,291 @@ sub Get {
   };
   
   if($hget{$opt} && defined &{$hget{$opt}{fn}}) {
-      my $ret = q{}; 
+      my $ret = q{};
+      
       if (!$hash->{CREDENTIALS} && $hget{$opt}{needcred}) {                
           return qq{Credentials of $name are not set."};
       }
-      $ret = &{$hget{$opt}{fn}} ($params);
+      
+      $params->{force} = 1 if($opt eq 'roofTopData');
+      
+      $ret = &{$hget{$opt}{fn}} ($params);                              # forcierter (manueller) Abruf SolCast API
       return $ret;
   }
   
 return $getlist;
+}
+
+################################################################
+#                Getter roofTop data
+################################################################
+sub _getRoofTopData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $force = $paref->{force} // 0;
+  my $t     = $paref->{t}     // time;
+    
+  if (!$force) {                                                                              # regulärer SolCast API Abruf
+      my $date   = strftime "%Y-%m-%d", localtime($t);
+      my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');  
+      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
+
+      if ($t < $srtime || $t > $sstime) {
+          readingsSingleUpdate($hash, 'nextSolCastCall', 'between next SunRise and SunSet', 1);
+          return qq{The current time is not between sunrise and sunset};
+      }
+      
+      my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
+      
+      if ($lrt && $t < $lrt + $scapirepeat) {
+          my $rt = $lrt + $scapirepeat - $t;
+          readingsSingleUpdate($hash, 'nextSolCastCall', 'after '.(timestampToTimestring ($lrt + $scapirepeat))[0], 1);
+          return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
+      }
+  }
+  
+  $paref->{allstrings} = ReadingsVal($name, "inverterStrings", "");
+  
+  __solCast_ApiRequest ($paref);
+  
+return;
+}
+
+###############################################################
+#                SolCast Api Request
+###############################################################
+sub __solCast_ApiRequest {
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $allstrings = $paref->{allstrings} // return;                                # alle Strings
+
+  my $string;
+  ($string, $allstrings) = split ",", $allstrings, 2;
+  #return if(!$string);
+  
+  my $rft    = ReadingsVal ($name, "moduleRoofTops", "");
+  my ($a,$h) = parseParams ($rft);
+  
+  my $pk     = $h->{$string} // q{};
+  my $roofid = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+  my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+  
+  if(!$roofid || !$apikey) {
+      my $err = qq{The roofIdentPair "$pk" of String "$string" has no Rooftop-ID and/or SolCast-API key assigned !};
+      readingsSingleUpdate($hash, "state", $err, 1);
+      return $err;
+  }
+  
+  my $url = "https://api.solcast.com.au/rooftop_sites/".
+            $roofid.
+            "/forecasts?format=json".
+            "&api_key=".
+            $apikey;
+
+  Log3 ($name, 4, qq{$name - Request SolCast API: $url});
+  
+  my $caller = (caller(0))[3];                                          # Rücksprungmarke
+   
+  my $param = {
+      url        => $url,
+      timeout    => 30,
+      hash       => $hash,
+      caller     => \&$caller,
+      allstrings => $allstrings,
+      string     => $string,
+      method     => "GET",
+      callback   => \&__solCast_ApiResponse
+  };
+  
+  HttpUtils_NonblockingGet ($param); 
+  
+return;
+}
+
+###############################################################
+#                  SolCast Api Response
+###############################################################
+sub __solCast_ApiResponse {
+  my $paref      = shift;
+  my $err        = shift;
+  my $myjson     = shift;
+  
+  my $hash       = $paref->{hash};
+  my $name       = $hash->{NAME};
+  my $caller     = $paref->{caller};
+  my $string     = $paref->{string};
+  my $allstrings = $paref->{allstrings};
+  
+  my ($msg,$starttmstr);
+
+  if ($err ne "") {
+      $msg = 'SolCast API server response: '.$err; 
+      
+      Log3 ($name, 2, "$name - $msg");
+   
+      readingsSingleUpdate($hash, "state", $msg, 1);
+      return;
+  } 
+  elsif ($myjson ne "") {                                                          # Evaluiere ob Daten im JSON-Format empfangen wurden
+      my ($success) = evaljson($hash, $myjson);
+      my $type      = $hash->{TYPE};
+      
+      if(!$success) {
+          $msg = 'ERROR - invalid SolCast API server response'; 
+          
+          Log3 ($name, 2, "$name - $msg");
+          
+          readingsSingleUpdate($hash, "state", $msg, 1);
+          return;
+      }
+    
+      my $jdata = decode_json ($myjson);
+      my $debug = AttrVal     ($name, "debug", 0);
+      
+      if($debug) {                                                                                         # nur für Debugging
+          Log (1, qq{DEBUG> $name SolCast API server response for string "$string":\n}. Dumper $jdata);
+      }
+      
+      ## bei Überschreitung Limit kommt:
+      ####################################
+      #  'response_status' => {
+      #                         'message' => 'You have exceeded your free daily limit.',
+      #                         'errors' => [],
+      #                         'error_code' => 'TooManyRequests'
+      #                       }
+      
+      if (defined $jdata->{'response_status'}) {
+          $msg = 'SolCast API server response: '.$jdata->{'response_status'}{'message'};
+          
+          Log3 ($name, 3, "$name - $msg");
+          
+          readingsSingleUpdate($hash, "state", $msg, 1);
+          return;
+      }
+      
+      my $k = 0;              
+      
+      while ($jdata->{'forecasts'}[$k]) {                                       # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
+          my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
+          ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
+                    
+          next if ($err);
+          
+          delete $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
+
+          $k += 1;          
+      } 
+      
+      $k = 0;              
+
+      while ($jdata->{'forecasts'}[$k]) {
+          my $petstr  = $jdata->{'forecasts'}[$k]{'period_end'};
+          my $pvest   = $jdata->{'forecasts'}[$k]{'pv_estimate'};
+          my $pvest10 = $jdata->{'forecasts'}[$k]{'pv_estimate10'};
+          my $pvest90 = $jdata->{'forecasts'}[$k]{'pv_estimate90'};
+          my $period  = $jdata->{'forecasts'}[$k]{'period'}; 
+          $period     =~ s/.*(\d\d).*/$1/;
+          
+          ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
+                    
+          if ($err) {              
+              Log3 ($name, 2, "$name - $err");
+              
+              readingsSingleUpdate($hash, "state", $err, 1);
+              return;
+          }
+          
+          if($debug) {                                                                                         # nur für Debugging
+              if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
+                  Log (1, qq{DEBUG> $name SolCast API Hash - Start Date/Time: }.             $starttmstr);
+                  Log (1, qq{DEBUG> $name SolCast API Hash - pv_estimate already present: }. $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate});
+                  Log (1, qq{DEBUG> $name SolCast API Hash - pv_estimate to add: }.          ($pvest * ($period/60) * 1000));
+              }
+          }
+          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate}   += sprintf "%.0f", ($pvest   * ($period/60) * 1000);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} += sprintf "%.0f", ($pvest10 * ($period/60) * 1000);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} += sprintf "%.0f", ($pvest90 * ($period/60) * 1000);
+
+          $k += 1;          
+      }
+  }
+  
+  my $t = time;
+  ___setLastAPIcalltime ($hash, $t);
+  
+  my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $t);
+  readingsSingleUpdate($hash, 'nextSolCastCall', 'after '.(timestampToTimestring ($lrt + $scapirepeat))[0], 1);
+  
+  my $param = {
+      hash       => $hash,
+      name       => $name,
+      allstrings => $allstrings
+  };
+  
+return &$caller($param);
+}
+
+###############################################################
+#      SolCast API: berechne Startzeit aus 'period_end' 
+###############################################################
+sub ___convPendToPstart {
+  my $name   = shift;
+  my $petstr = shift;
+
+  my $cpar = {
+      name      => $name,
+      pattern   => '%Y-%m-%dT%H:%M:%S',
+      dtstring  => $petstr,
+      tzcurrent => 'UTC',
+      tzconv    => 'local',
+      writelog  => 0
+  };
+  
+  my ($err, $cpets) = convertTimeZone ($cpar);
+  
+  if ($err) {
+      $err = 'ERROR while converting time zone: '.$err;
+      return $err;
+  }
+  
+  my ($cdatest,$ctimestr) = split " ", $cpets;                                            # Datumstring YYYY-MM-TT / Zeitstring hh:mm:ss
+  my ($chrst,$cminutstr)  = split ":", $ctimestr;
+  $chrst                  = int ($chrst);
+
+  if ($cminutstr eq '00') {                                                               # Zeit/Periodenkorrektur
+      $chrst -= 1;
+      
+      if($chrst < 0) {
+          my $nt     = (timestringToTimestamp ($cdatest.' 00:00:00')) - 3600;
+          $nt        = (timestampToTimestring ($nt))[1];
+          ($cdatest) = split " ", $nt;
+          $chrst     = 23;       
+      }
+  }
+  
+  my $starttmstr = $cdatest." ".(sprintf "%02d", $chrst).":00:00";                        # Startzeit von pv_estimate
+                
+return ($err, $starttmstr);
+}
+
+################################################################
+#  Zeitstempel letzter Abruf SolCast API setzen
+#  $t - Unix Timestamp
+################################################################
+sub ___setLastAPIcalltime {
+  my $hash = shift;
+  my $t    = shift // time;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                                # letzter Abrufzeitstempel
+
+return;
 }
 
 ###############################################################
@@ -1676,6 +2092,18 @@ sub _getlistvalConsumerMaster {
 return $ret;
 }
 
+###############################################################
+#                       Getter solCastData
+###############################################################
+sub _getlistSolCastData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $ret   = listDataPool ($hash, "solcastdata");
+                    
+return $ret;
+}
+
 ################################################################
 sub Attr {
   my $cmd   = shift;
@@ -1775,7 +2203,7 @@ sub _attrconsumer {                      ## no critic "not used"
           $err = checkRegex ($regex);
           return $err if($err);
           
-          if ($hyst && !IsNumeric ($hyst)) {
+          if ($hyst && !isNumeric ($hyst)) {
               return qq{The hysteresis of key "interruptable" must be a numeric value like "0.5" or "2"};
           }
       }
@@ -1928,9 +2356,10 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  writeDataToFile ($hash, "pvhist",    $pvhcache.$name);             # Cache File für PV History schreiben
-  writeDataToFile ($hash, "circular",  $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeDataToFile ($hash, "consumers", $csmcache.$name);             # Cache File Consumer schreiben
+  writeDataToFile ($hash, "pvhist",      $pvhcache.$name);             # Cache File für PV History schreiben
+  writeDataToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeDataToFile ($hash, "consumers",   $csmcache.$name);             # Cache File Consumer schreiben
+  writeDataToFile ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
   
 return; 
 }
@@ -1999,12 +2428,20 @@ sub Delete {
   if ($error) {
       Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
   }
+  
+  $error = qq{};
+  $file  = $scpicache.$name;                                                  # File SolCast API Werte löschen
+  $error = FileDelete($file); 
+  
+  if ($error) {
+      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
+  }
       
 return;
 }
 
 ################################################################
-#        Timer für historische Daten schreiben
+#        Timer für Cache File Daten schreiben
 ################################################################
 sub periodicWriteCachefiles {
   my $hash = shift;
@@ -2081,6 +2518,7 @@ sub _savePlantConfig {
                      moduleDirection
                      modulePeakString
                      moduleTiltAngle
+                     moduleRoofTops
                      powerTrigger
                      energyH4Trigger
                    );
@@ -2114,38 +2552,37 @@ sub centralTask {
   #    delete $data{$type}{$name}{consumers}{$c}{OnOff};
   #}
   
-  #deleteReadingspec ($hash, "Today_Hour.*_Consumption");
-  #deleteReadingspec ($hash, "ThisHour_.*");
-  #deleteReadingspec ($hash, "Today_PV");
-  #deleteReadingspec ($hash, "Tomorrow_PV");
-  #deleteReadingspec ($hash, "Next04Hours_PV");
-  #deleteReadingspec ($hash, "Next.*HoursPVforecast");
-  #deleteReadingspec ($hash, "moduleEfficiency");
-  #deleteReadingspec ($hash, "RestOfDay_PV");
   #deleteReadingspec ($hash, "CurrentHourPVforecast");
   #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast"); 
+  deleteReadingspec ($hash, "nextPolltime"); 
+  delete $data{$type}{$name}{solcastapi}{'All'};
+  delete $data{$type}{$name}{solcastapi}{'#All'};
+  
+  ###############################################################
 
-  my $interval = controlParams ($name); 
+  my $interval = controlParams ($name);
+
+  setModel ($hash);                                                                                # Model setzen  
   
   if($init_done == 1) {
       if(!$interval) {
           $hash->{MODE} = "Manual";
-          readingsSingleUpdate($hash, "nextPolltime", "Manual", 1);
+          readingsSingleUpdate($hash, "nextCycletime", "Manual", 1);
       } 
       else {
           my $new = gettimeofday()+$interval; 
           InternalTimer($new, "FHEM::SolarForecast::centralTask", $hash, 0);                       # Wiederholungsintervall
-          $hash->{MODE} = "Automatic - next polltime: ".FmtTime($new);
-          readingsSingleUpdate($hash, "nextPolltime", FmtTime($new), 1);
+          $hash->{MODE} = "Automatic - next Cycletime: ".FmtTime($new);
+          readingsSingleUpdate($hash, "nextCycletime", FmtTime($new), 1);
       }
       
       return if(IsDisabled($name));
       
       readingsSingleUpdate($hash, "state", "running", 1);
-
-      my $stch = $data{$type}{$name}{strings};                                                     # String Config Hash
-      if (!keys %{$stch}) {
+      
+      if (!keys %{$data{$type}{$name}{strings}}) {
           my $ret = createStringConfig ($hash);                                                    # die String Konfiguration erstellen
+      
           if ($ret) {
               readingsSingleUpdate($hash, "state", $ret, 1);
               return;
@@ -2155,10 +2592,10 @@ sub centralTask {
       my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
       my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
-      my $chour   = strftime "%H", localtime($t);                                                  # aktuelle Stunde 
-      my $minute  = strftime "%M", localtime($t);                                                  # aktuelle Minute
-      my $day     = strftime "%d", localtime($t);                                                  # aktueller Tag  (range 01 to 31)
-      my $dayname = strftime "%a", localtime($t);                                                  # aktueller Wochentagsname
+      my $chour   = strftime "%H",       localtime($t);                                            # aktuelle Stunde 
+      my $minute  = strftime "%M",       localtime($t);                                            # aktuelle Minute
+      my $day     = strftime "%d",       localtime($t);                                            # aktueller Tag  (range 01 to 31)
+      my $dayname = strftime "%a",       localtime($t);                                            # aktueller Wochentagsname
 
       my $centpars = {
           hash    => $hash,
@@ -2178,28 +2615,35 @@ sub centralTask {
       Log3 ($name, 4, "$name - ################################################################");
       Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
       
-      collectAllRegConsumers     ($centpars);                                                        # alle Verbraucher Infos laden
+      collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
+      _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
+      _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
       
-      _specialActivities         ($centpars);                                                        # zusätzliche Events generieren + Sonderaufgaben
-      _transferWeatherValues     ($centpars);                                                        # Wetterwerte übertragen
-      _transferDWDForecastValues ($centpars);                                                        # Forecast Werte übertragen  
-      _transferInverterValues    ($centpars);                                                        # WR Werte übertragen
-      _transferMeterValues       ($centpars);                                                        # Energy Meter auswerten    
-      _transferBatteryValues     ($centpars);                                                        # Batteriewerte einsammeln
-      _manageConsumerData        ($centpars);                                                        # Consumerdaten sammeln und planen  
-      _estConsumptionForecast    ($centpars);                                                        # erwarteten Verbrauch berechnen
-      _evaluateThresholds        ($centpars);                                                        # Schwellenwerte bewerten und signalisieren  
-      _calcReadingsTomorrowPVFc  ($centpars);                                                        # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
-      _calcSummaries             ($centpars);                                                        # Zusammenfassungen erstellen
+      if (isSolCastUsed ($hash)) {
+          _getRoofTopData                 ($centpars);                                    # SolCast API Strahlungswerte abrufen          
+          _transferSolCastRadiationValues ($centpars);                                    # SolCast API Strahlungswerte übertragen 
+      }
+      else {
+          _transferDWDRadiationValues ($centpars);                                        # DWD Strahlungswerte übertragen    
+      }
+
+      _transferInverterValues     ($centpars);                                            # WR Werte übertragen
+      _transferMeterValues        ($centpars);                                            # Energy Meter auswerten    
+      _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
+      _manageConsumerData         ($centpars);                                            # Consumerdaten sammeln und planen  
+      _estConsumptionForecast     ($centpars);                                            # erwarteten Verbrauch berechnen
+      _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren  
+      _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
+      _calcSummaries              ($centpars);                                            # Zusammenfassungen erstellen
 
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
       }
       
-      calcVariance           ($centpars);                                                            # Autokorrektur berechnen
-      saveEnergyConsumption  ($centpars);                                                            # Energie Hausverbrauch speichern
+      calcVariance           ($centpars);                                                # Autokorrektur berechnen
+      saveEnergyConsumption  ($centpars);                                                # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                                   # Abschluß state      
+      readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                       # Abschluß state      
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -2218,59 +2662,87 @@ sub createStringConfig {                 ## no critic "not used"
   my $type = $hash->{TYPE};
   
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
-  
-  my @istrings = split ",", ReadingsVal ($name, "inverterStrings", "");                           # Stringbezeichner
+  my @istrings = split ",", ReadingsVal ($name, "inverterStrings", undef);                        # Stringbezeichner
   
   if(!@istrings) {
       return qq{Define all used strings with command "set $name inverterStrings" first.};
   }
   
-  my $tilt     = ReadingsVal ($name, "moduleTiltAngle", "");                                      # Modul Neigungswinkel für jeden Stringbezeichner
-  my ($at,$ht) = parseParams ($tilt);
- 
-  while (my ($key, $value) = each %$ht) {
-      if ($key ~~ @istrings) {
-          $data{$type}{$name}{strings}{"$key"}{tilt} = $value;
-      }
-      else {
-          return qq{Check "moduleTiltAngle" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
-      }
-  }
+  my $peak = ReadingsVal ($name, "modulePeakString", "");                                         # kWp für jeden Stringbezeichner
+  return qq{Please complete command "set $name modulePeakString".} if(!$peak);
   
-  my $peak     = ReadingsVal ($name, "modulePeakString", "");                                    # kWp für jeden Stringbezeichner
   my ($aa,$ha) = parseParams ($peak);
- 
-  while (my ($key, $value) = each %$ha) {
-      if ($key ~~ @istrings) {
-          $data{$type}{$name}{strings}{"$key"}{peak} = $value;
+  delete $data{$type}{$name}{current}{allstringspeak};
+  
+  while (my ($strg, $pp) = each %$ha) {
+      if ($strg ~~ @istrings) {
+          $data{$type}{$name}{strings}{$strg}{peak}     = $pp;
+          $data{$type}{$name}{current}{allstringspeak} += $pp * 1000;                             # insgesamt installierte Peakleistung in W
       }
       else {
-          return qq{Check "modulePeakString" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+          return qq{Check "modulePeakString" -> the stringname "$strg" is not defined as valid string in reading "inverterStrings"};
       }
   }
   
-  my $dir      = ReadingsVal ($name, "moduleDirection", "");                                    # Modul Ausrichtung für jeden Stringbezeichner
-  my ($ad,$hd) = parseParams ($dir);
- 
-  while (my ($key, $value) = each %$hd) {
-      if ($key ~~ @istrings) {
-          $data{$type}{$name}{strings}{"$key"}{dir} = $value;
+  if (!isSolCastUsed ($hash)) {                                                                   # DWD Strahlungsquelle
+      my $tilt = ReadingsVal ($name, "moduleTiltAngle", "");                                      # Modul Neigungswinkel für jeden Stringbezeichner
+      return qq{Please complete command "set $name moduleTiltAngle".} if(!$tilt);
+      
+      my ($at,$ht) = parseParams ($tilt);
+     
+      while (my ($key, $value) = each %$ht) {
+          if ($key ~~ @istrings) {
+              $data{$type}{$name}{strings}{$key}{tilt} = $value;
+          }
+          else {
+              return qq{Check "moduleTiltAngle" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+          }
       }
-      else {
-          return qq{Check "moduleDirection" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+      
+      my $dir = ReadingsVal ($name, "moduleDirection", "");                                      # Modul Ausrichtung für jeden Stringbezeichner
+      return qq{Please complete command "set $name moduleDirection".} if(!$dir);
+      
+      my ($ad,$hd) = parseParams ($dir);
+     
+      while (my ($key, $value) = each %$hd) {
+          if ($key ~~ @istrings) {
+              $data{$type}{$name}{strings}{$key}{dir} = $value;
+          }
+          else {
+              return qq{Check "moduleDirection" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+          }
       }
-  }  
+  }
+  else {                                                                                         # SolCast-API Strahlungsquelle
+      my $mrt = ReadingsVal ($name, "moduleRoofTops", "");                                       # RoofTop Konfiguration -> Zuordnung <pk>
+      return qq{Please complete command "set $name moduleRoofTops".} if(!$mrt);
+      
+      my ($ad,$hd) = parseParams ($mrt);
+     
+      while (my ($is, $pk) = each %$hd) {
+          if ($is ~~ @istrings) {
+              $data{$type}{$name}{strings}{$is}{pk} = $pk;
+          }
+          else {
+              return qq{Check "moduleRoofTops" -> the stringname "$is" is not defined as valid string in reading "inverterStrings"};
+          }
+      } 
+  }
   
   if(!keys %{$data{$type}{$name}{strings}}) {
-      return qq{The string configuration is empty.\nPlease check the settings of inverterStrings, modulePeakString, moduleDirection, moduleTiltAngle};
+      return qq{The string configuration seems to be incomplete. \n}.
+             qq{Please check the settings of inverterStrings, modulePeakString, moduleDirection, moduleTiltAngle }.
+             qq{and/or moduleRoofTops if SolCast-API is used.};
   }
   
   my @sca = keys %{$data{$type}{$name}{strings}};                                               # Gegencheck ob nicht mehr Strings in inverterStrings enthalten sind als eigentlich verwendet
   my @tom;
+  
   for my $sn (@istrings) {
       next if ($sn ~~ @sca);
       push @tom, $sn;      
   }
+  
   if(@tom) {
       return qq{Some Strings are not used. Please delete this string names from "inverterStrings" :}.join ",",@tom;
   }
@@ -2382,7 +2854,7 @@ sub _specialActivities {
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
           
-          delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag löschen
+          delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
           
           for my $c (keys %{$data{$type}{$name}{consumers}}) {                              # Planungsdaten regulär löschen
@@ -2395,7 +2867,9 @@ sub _specialActivities {
               $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
           } 
 
-          writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben          
+          writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben
+
+          __delSolCastObsoleteData ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash          
           
           $hash->{HELPER}{H00DONE} = 1;
       }
@@ -2407,11 +2881,38 @@ sub _specialActivities {
 return;
 }
 
+#############################################################################
+#            solcastapi Hash veraltete Daten löschen
+#############################################################################
+sub __delSolCastObsoleteData {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $date  = $paref->{date};                                              # aktuelles Datum
+  
+  my $type  = $hash->{TYPE};
+  
+  if (!keys %{$data{$type}{$name}{solcastapi}}) {
+      return;
+  } 
+  
+  my $refts = timestringToTimestamp ($date.' 00:00:00');                   # Referenztimestring
+
+  for my $idx (sort keys %{$data{$type}{$name}{solcastapi}}) {             # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
+      for my $scd (sort keys %{$data{$type}{$name}{solcastapi}{$idx}}) {
+          my $ds = timestringToTimestamp ($scd);
+          delete $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
+      }
+  }
+  
+return;
+}
+
 ################################################################
-#    Forecast Werte Device (DWD_OpenData) ermitteln und 
-#    übertragen
+#    Strahlungsvorhersage Werte von DWD Device 
+#    ermitteln und übertragen
 ################################################################
-sub _transferDWDForecastValues {               
+sub _transferDWDRadiationValues {               
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -2422,7 +2923,6 @@ sub _transferDWDForecastValues {
   my $raname = ReadingsVal($name, "currentRadiationDev", "");                                  # Radiation Forecast Device
   return if(!$raname || !$defs{$raname});
   
-  my ($time_str,$epoche);
   my $type = $hash->{TYPE};
   my $uac  = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
     
@@ -2437,9 +2937,15 @@ sub _transferDWDForecastValues {
           next;
       }
       
-      my $fh1 = $fh+1;
-      my $fh2 = $fh1 == 24 ? 23 : $fh1;
-      my $rad = ReadingsVal($raname, "fc${fd}_${fh2}_Rad1h", 0);
+      my $fh1      = $fh+1;
+      my $fh2      = $fh1 == 24 ? 23 : $fh1;
+      my $rad      = ReadingsVal($raname, "fc${fd}_${fh2}_Rad1h", 0);
+      
+      my $time_str = "NextHour".sprintf "%02d", $num;
+      my $wantts   = $t + (3600 * $num);                                                      
+      my $wantdt   = (timestampToTimestring ($wantts))[1];
+      my ($hod)    = $wantdt =~ /\s(\d{2}):/xs;                                                
+      $hod         = sprintf "%02d", int ($hod)+1;                                            # Stunde des Tages
       
       Log3 ($name, 5, "$name - collect Radiation data: device=$raname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$rad");
       
@@ -2448,23 +2954,18 @@ sub _transferDWDForecastValues {
           name => $name,
           rad  => $rad,
           t    => $t,
+          hod  => $hod,
           num  => $num,
           uac  => $uac,
-          fh   => $fh,
+          fh1  => $fh1,
           fd   => $fd,
           day  => $paref->{day}
       };
       
-      my $calcpv              = calcPVforecast ($params);                                     # Vorhersage gewichtet kalkulieren
-                                       
-      $time_str               = "NextHour".sprintf "%02d", $num;
-      $epoche                 = $t + (3600*$num);                                                      
-      my ($ta,$tsdef,$realts) = timestampToTimestring ($epoche);
-      my ($hod)               = $tsdef =~ /\s(\d{2}):/xs;                                     # Stunde des Tages
-      $hod                    = sprintf "%02d", int ($hod)+1;
+      my $calcpv = __calcDWDforecast ($params);                                               # Vorhersage gewichtet kalkulieren
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
-      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $tsdef;
+      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $wantdt;
       $data{$type}{$name}{nexthours}{$time_str}{hourofday}  = $hod;
       $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
       $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $rad;                           # nur Info: original Vorhersage Strahlungsdaten
@@ -2490,6 +2991,487 @@ sub _transferDWDForecastValues {
       
 return;
 }
+
+##################################################################################################
+#            PV Forecast Rad1h in kWh / Wh
+# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
+#
+#    * Faktor für Umwandlung kJ in kWh:   0.00027778
+#    * Eigene Modulfläche in qm z.B.:     31,04
+#    * Wirkungsgrad der Module in % z.B.: 16,52
+#    * Wirkungsgrad WR in % z.B.:         98,3
+#    * Korrekturwerte wegen Ausrichtung/Verschattung etc.
+#
+# Die Formel wäre dann: 
+# Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
+#
+# Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
+#
+#    * Globalstrahlung:                G =  kJ / m2
+#    * Korrektur mit Flächenfaktor f:  Gk = G * f
+#    * Globalstrahlung (STC):          1 kW/m2
+#    * Peak Leistung String (kWp):     Pnenn = x kW
+#    * Performance Ratio:              PR (typisch 0,85 bis 0,9)
+#    * weitere Korrekturwerte für Regen, Wolken etc.: Korr
+#
+#    pv (kWh) = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr
+#    pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
+#
+# Die Abhängigkeit der Strahlungsleistung der Sonnenenergie nach Wetterlage und Jahreszeit ist 
+# hier beschrieben: 
+# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+#
+# !!! PV Berechnungsgrundlagen !!!
+# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
+# http://www.ing-büro-junge.de/html/photovoltaik.html
+# 
+##################################################################################################
+sub __calcDWDforecast {            
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $rad   = $paref->{rad};               # Nominale Strahlung aus DWD Device
+  my $num   = $paref->{num};               # Nexthour 
+  my $uac   = $paref->{uac};               # Nutze Autokorrektur (on/off)
+  my $t     = $paref->{t};                 # aktueller Unix Timestamp
+  my $hod   = $paref->{hod};               # Stunde des Tages
+  my $fh1   = $paref->{fh1};
+  my $fd    = $paref->{fd};
+  
+  my $type  = $hash->{TYPE};
+  
+  my $stch  = $data{$type}{$name}{strings};                                                           # String Configuration Hash
+  
+  my $reld       = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
+  
+  my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $raindamp   = AttrVal($name, "rainFactorDamping",   $rdampdef);                                  # prozentuale Berücksichtigung des Regenkorrekturfaktors
+  my @strings    = sort keys %{$stch};
+  
+  my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
+
+  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  
+  my $range      = calcRange ($cloudcover);                                                           # Range errechnen
+  
+  my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
+
+  ## Ermitteln des relevanten Autokorrekturfaktors
+  ##################################################
+  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);             # PV Korrekturfaktor (auto oder manuell)
+  my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
+  my $hcfound    = "use manual correction factor";
+  my $hq         = "m";
+  
+  if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
+      $hcfound   = "yes";                                                                             # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
+      $hq      //= 0;
+      if (!defined $hc) {
+          $hcfound = "no";
+          $hc      = 1;                                                                               # keine Korrektur  
+          $hq      = 0;
+      }
+  }
+  
+  $hc = sprintf "%.2f", $hc;
+  
+  ######
+
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf}    = $hc."/".$hq;
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
+
+  if($fd == 0 && $fh1) {
+      $paref->{pvcorrf}  = $hc."/".$hq;
+      $paref->{nhour}    = sprintf("%02d",$fh1);
+      $paref->{histname} = "pvcorrfactor";
+      setPVhistory ($paref);
+      delete $paref->{histname};  
+  }
+  
+  my $pvsum   = 0;      
+  my $peaksum = 0; 
+  my ($lh,$sq);                                                                                    
+  
+  for my $st (@strings) {                                                                             # für jeden String der Config ..
+      my $peak                 = $stch->{$st}{peak};                                                  # String Peak (kWp)
+      
+      $paref->{peak}           = $peak;
+      $paref->{cloudcover}     = $cloudcover;
+      $paref->{temp}           = $temp;
+      
+      my ($peakloss, $modtemp) = ___calcPeaklossByTemp ($paref);                                      # Reduktion Peakleistung durch Temperaturkoeffizienten der Module (vorzeichengehaftet)
+      $peak                   += $peakloss;
+      
+      delete $paref->{peak};
+      delete $paref->{cloudcover};
+      delete $paref->{temp};
+      
+      $peak      *= 1000;                                                                             # kWp in Wp umrechnen
+      my $ta      = $stch->{"$st"}{tilt};                                                             # Neigungswinkel Solarmodule
+      my $moddir  = $stch->{"$st"}{dir};                                                              # Ausrichtung der Solarmodule
+      
+      my $af      = $hff{$ta}{$moddir} / 100;                                                         # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
+      
+      my $pv      = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef * $ccf * $rcf);
+  
+      $lh = {                                                                                         # Log-Hash zur Ausgabe
+          "moduleDirection"                => $moddir,
+          "modulePeakString"               => $peak." W",
+          "moduleTiltAngle"                => $ta,
+          "Forecasted temperature"         => $temp." &deg;C",
+          "Module Temp (calculated)"       => $modtemp." &deg;C",
+          "Loss String Peak Power by Temp" => $peakloss." kWP",
+          "Area factor"                    => $af,
+          "Cloudcover"                     => $cloudcover,
+          "CloudRange"                     => $range,
+          "CloudFactorDamping"             => $clouddamp." %",
+          "Cloudfactor"                    => $ccf,
+          "Rainprob"                       => $rainprob,
+          "Rainfactor"                     => $rcf,
+          "RainFactorDamping"              => $raindamp." %",
+          "Radiation"                      => $rad,
+          "Factor kJ to kWh"               => $kJtokWh,
+          "Estimated PV generation (calc)" => $pv." Wh",
+      };  
+      
+      $sq = q{};
+      for my $idx (sort keys %{$lh}) {
+          $sq .= $idx." => ".$lh->{$idx}."\n";             
+      }
+
+      Log3 ($name, 4, "$name - PV forecast calc (raw) for $reld Hour ".sprintf("%02d",$hod)." string $st ->\n$sq");
+      
+      $pvsum   += $pv;
+      $peaksum += $peak;                                                                            
+  }
+  
+  $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
+  
+  $pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden
+  $pvsum  = $peaksum if($pvsum > $peaksum);                                                          # Vorhersage nicht größer als die Summe aller PV-Strings Peak
+      
+  my $invcapacity = CurrentVal ($hash, "invertercapacity", 0);                                       # Max. Leistung des Invertrs
+  
+  if ($invcapacity && $pvsum > $invcapacity) {
+      $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
+      Log3 ($name, 4, "$name - PV forecast limited to $pvsum Watt due to inverter capacity");
+  }
+      
+  my $logao         = qq{};
+  $paref->{pvsum}   = $pvsum;
+  $paref->{peaksum} = $peaksum;
+  ($pvsum, $logao)  = ___70percentRule ($paref); 
+  
+  $lh = {                                                                                            # Log-Hash zur Ausgabe
+      "CloudCorrFoundInStore"  => $hcfound,
+      "PV correction factor"   => $hc,
+      "PV correction quality"  => $hq,
+      "PV generation forecast" => $pvsum." Wh ".$logao,
+  };
+  
+  $sq = q{};
+  for my $idx (sort keys %{$lh}) {
+      $sq .= $idx." => ".$lh->{$idx}."\n";             
+  }
+  
+  Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$hod)." summary: \n$sq");
+ 
+return $pvsum;
+}
+
+################################################################
+#  SolCast-API Strahlungsvorhersage Werte aus solcastapi-Hash 
+#  übertragen und ggf. manipulieren
+################################################################
+sub _transferSolCastRadiationValues {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};                                                                     # Epoche Zeit
+  my $chour = $paref->{chour};
+  my $date  = $paref->{date};
+  my $daref = $paref->{daref};
+  
+  my $type = $hash->{TYPE};
+  my $uac  = ReadingsVal($name, 'pvCorrectionFactor_Auto', 'off');                             # Auto- oder manuelle Korrektur
+  
+  return if(!keys %{$data{$type}{$name}{solcastapi}});
+  
+  my @strings = sort keys %{$data{$type}{$name}{strings}};  
+  return if(!@strings);
+
+  for my $num (0..47) {      
+      my ($fd,$fh) = _calcDayHourMove ($chour, $num);
+      
+      if($fd > 1) {                                                                           # überhängende Werte löschen 
+          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
+          next;
+      }
+      
+      my $fh1      = $fh+1;
+      my $wantts   = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
+      my $wantdt   = (timestampToTimestring ($wantts))[1];
+      
+      my $time_str = "NextHour".sprintf "%02d", $num;
+      my ($hod)    = $wantdt =~ /\s(\d{2}):/xs;                                               
+      $hod         = sprintf "%02d", int ($hod)+1;                                           # Stunde des Tages
+      
+      my $params = {
+          hash    => $hash,
+          name    => $name,
+          wantdt  => $wantdt,
+          hod     => $hod,
+          fd      => $fd,
+          fh1     => $fh1,
+          num     => $num,
+          uac     => $uac
+      };
+      
+      my $est = __calcSolCastEstimates ($params);
+      
+      $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $est;
+      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $wantdt;
+      $data{$type}{$name}{nexthours}{$time_str}{hourofday}  = $hod;
+      $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
+      $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = '-';                            # nur Info (nicht bei SolCast API)
+  
+      if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+          $data{$type}{$name}{circular}{sprintf "%02d",$fh1}{pvfc} = $est;
+      } 
+      
+      if($fd == 0 && int $est > 0) {                                                          # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
+          push @$daref, "Today_Hour".sprintf ("%02d",$fh1)."_PVforecast<>$est Wh";             
+      }
+      
+      if($fd == 0 && $fh1) {
+          $paref->{calcpv}   = $est;
+          $paref->{histname} = 'pvfc';
+          $paref->{nhour}    = sprintf "%02d", $fh1;
+          setPVhistory ($paref); 
+          delete $paref->{histname};
+      }
+  }
+  
+  push @$daref, ".lastupdateForecastValues<>".$t;                                             # Statusreading letzter update
+      
+return;
+}
+
+################################################################
+#       SolCast PV estimates berechnen
+################################################################
+sub __calcSolCastEstimates {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $wantdt  = $paref->{wantdt};
+  my $hod     = $paref->{hod};
+  my $fd      = $paref->{fd};
+  my $fh1     = $paref->{fh1};
+  my $num     = $paref->{num};
+  my $uac     = $paref->{uac};
+  
+  my $type    = $hash->{TYPE};
+  
+  my $reld    = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
+  
+  my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $raindamp   = AttrVal($name, "rainFactorDamping",   $rdampdef);                                  # prozentuale Berücksichtigung des Regenkorrekturfaktors
+
+  my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "rainprob", 0);            # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
+
+  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "cloudcover", 0);          # effektive Wolkendecke nächste Stunde X
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
+
+  my $range      = calcRange ($cloudcover);                                                           # Bewölkungs-Range errechnen
+  my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
+  
+  ## Ermitteln des relevanten Autokorrekturfaktors
+  ##################################################
+  my $pvcorr  = ReadingsNum ($name, "pvCorrectionFactor_".sprintf ("%02d", $fh1), 1.00);              # PV Korrekturfaktor (auto oder manuell)
+  my $hc      = $pvcorr;                                                                              # Voreinstellung RAW-Korrekturfaktor 
+  my $hcfound = "use manual correction factor";
+  my $hq      = "m";
+  
+  if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
+      $hcfound   = "yes";                                                                             # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf ("%02d",$fh1), $range, undef);                 # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
+      $hq      //= 0;
+      if (!defined $hc) {
+          $hcfound = "no";
+          $hc      = 1;                                                                               # keine Korrektur  
+          $hq      = 0;
+      }
+  }
+  
+  $hc = sprintf "%.2f", $hc;
+  
+  ######
+  
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf ("%02d",$num)}{pvcorrf}    = $hc."/".$hq;
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf ("%02d",$num)}{cloudrange} = $range;
+  
+  if($fd == 0 && $fh1) {
+      $paref->{pvcorrf}  = $hc."/".$hq;
+      $paref->{nhour}    = sprintf "%02d", $fh1;
+      $paref->{histname} = "pvcorrfactor";
+      setPVhistory ($paref);
+      delete $paref->{histname};  
+  }
+  
+  my ($lh,$sq);
+  my $pvsum   = 0;
+  my $peaksum = 0;
+  
+  for my $string (sort keys %{$data{$type}{$name}{strings}}) {
+      my $peak                 = $data{$type}{$name}{strings}{$string}{peak};                         # String Peak (kWp)
+      
+      $paref->{peak}           = $peak;
+      $paref->{cloudcover}     = $cloudcover;
+      $paref->{temp}           = $temp;
+      
+      my ($peakloss, $modtemp) = ___calcPeaklossByTemp ($paref);                                      # Reduktion Peakleistung durch Temperaturkoeffizienten der Module (vorzeichengehaftet)
+      $peak                   += $peakloss;
+      
+      delete $paref->{peak};
+      delete $paref->{cloudcover};
+      delete $paref->{temp};
+      
+      $peak *= 1000;
+      
+      my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate', 0);
+      my $pv  = sprintf "%.1f", ($est * $ccf * $rcf);
+
+      $lh = {                                                                                         # Log-Hash zur Ausgabe
+          "Starttime"                         => $wantdt,
+          "modulePeakString"                  => $peak." W",
+          "Forecasted temperature"            => $temp." &deg;C",
+          "Module Temp (calculated)"          => $modtemp." &deg;C",
+          "Loss String Peak Power by Temp"    => $peakloss." kWP",
+          "Cloudcover"                        => $cloudcover,
+          "CloudRange"                        => $range,
+          "CloudFactorDamping"                => $clouddamp." %",
+          "Cloudfactor"                       => $ccf,
+          "Rainprob"                          => $rainprob,
+          "Rainfactor"                        => $rcf,
+          "RainFactorDamping"                 => $raindamp." %",
+          "Estimated PV generation (raw)"     => $est." Wh",
+          "Estimated PV generation (calc)"    => $pv." Wh",
+      };
+      
+      $sq = q{};
+      for my $idx (sort keys %{$lh}) {
+          $sq .= $idx." => ".$lh->{$idx}."\n";             
+      }
+      
+      Log3 ($name, 4, "$name - PV estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
+
+      $pvsum   += $pv;
+      $peaksum += $peak;      
+  }  
+  
+  $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
+    
+  $pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden  
+  $pvsum  = $peaksum if($pvsum > $peaksum);                                                          # Vorhersage nicht größer als die Summe aller PV-Strings Peak
+  
+  my $invcapacity = CurrentVal ($hash, "invertercapacity", 0);                                       # Max. Leistung des Invertrs
+  
+  if ($invcapacity && $pvsum > $invcapacity) {
+      $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
+      Log3 ($name, 4, "$name - PV forecast limited to $pvsum Watt due to inverter capacity");
+  }
+  
+  my $logao         = qq{};
+  $paref->{pvsum}   = $pvsum;
+  $paref->{peaksum} = $peaksum;
+  ($pvsum, $logao)  = ___70percentRule ($paref); 
+  
+  $lh = {                                                                                            # Log-Hash zur Ausgabe
+      "CloudCorrFoundInStore"  => $hcfound,
+      "PV correction factor"   => $hc,
+      "PV correction quality"  => $hq,
+      "PV generation forecast" => $pvsum." Wh ".$logao,
+  };
+  
+  $sq = q{};
+  for my $idx (sort keys %{$lh}) {
+      $sq .= $idx." => ".$lh->{$idx}."\n";             
+  }
+  
+  Log3 ($name, 4, "$name - PV estimate for $reld Hour ".sprintf ("%02d", $hod)." summary: \n$sq");
+    
+return $pvsum;
+}
+
+###################################################################
+# Zellen Leistungskorrektur Einfluss durch Wärmekoeffizienten 
+# berechnen
+#
+# Die Nominalleistung der Module wird bei 25 Grad 
+# Umgebungstemperatur und bei 1.000 Watt Sonneneinstrahlung 
+# gemessen. 
+# Steigt die Temperatur um 1 Grad Celsius sinkt die Modulleistung 
+# typisch um 0,4 Prozent. Solartellen können im Sommer 70°C heiß
+# werden.
+#
+# Das würde für eine 10 kWp Photovoltaikanlage folgenden 
+# Leistungsverlust bedeuten: 
+#
+#       Leistungsverlust = -0,4%/K * 45K * 10 kWp = 1,8 kWp
+#
+# https://www.enerix.de/photovoltaiklexikon/temperaturkoeffizient/
+#
+###################################################################
+sub ___calcPeaklossByTemp {
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $peak       = $paref->{peak}       // return (0,0);
+  my $cloudcover = $paref->{cloudcover} // return (0,0);                                    # vorhergesagte Wolkendecke Stunde X
+  my $temp       = $paref->{temp}       // return (0,0);                                    # vorhergesagte Temperatur Stunde X
+    
+  my $modtemp      = $temp + ($tempmodinc * (1 - ($cloudcover/100)));                       # kalkulierte Modultemperatur
+  
+  my $peakloss     = sprintf "%.2f", $tempcoeffdef * ($temp - $tempbasedef) * $peak / 100;
+
+return ($peakloss, $modtemp);
+}
+
+################################################################
+#                 70% Regel kalkulieren
+################################################################
+sub ___70percentRule {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $pvsum   = $paref->{pvsum};
+  my $peaksum = $paref->{peaksum};
+  my $num     = $paref->{num};                                                          # Nexthour 
+  
+  my $logao = qq{};
+  my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "confc", 0);
+  my $max70 = $peaksum/100 * 70;
+  
+  if(AttrVal ($name, "follow70percentRule", "0") eq "1" && $pvsum > $max70) {      
+      $pvsum = $max70;
+      $logao = qq{(reduced by 70 percent rule)};
+  }  
+
+  if(AttrVal ($name, "follow70percentRule", "0") eq "dynamic" && $pvsum > $max70 + $confc) {
+      $pvsum = $max70 + $confc;
+      $logao = qq{(reduced by 70 percent dynamic rule)};
+  }  
+  
+  $pvsum = int $pvsum;
+ 
+return ($pvsum, $logao);
+}
+
 
 ################################################################
 #    Wetter Werte aus dem angebenen Wetterdevice extrahieren
@@ -3873,10 +4855,10 @@ sub __getPlanningStateAndTimes {
   
   my $starttime = '';
   my $stoptime  = '';
-  $starttime    = timestampToTimestring ($startts) if($startts);
-  $stoptime     = timestampToTimestring ($stopts)  if($stopts);
+  $starttime    = (timestampToTimestring ($startts))[0] if($startts);
+  $stoptime     = (timestampToTimestring ($stopts))[0]  if($stopts);
   
-return ($pstate,$starttime,$stoptime);
+return ($pstate, $starttime, $stoptime);
 }
 
 ################################################################
@@ -4578,7 +5560,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{hysteresis}      = $hyst            // $defhyst;          # Hysterese
   }
   
-  Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
+  # Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
     
 return;
 }
@@ -4693,7 +5675,7 @@ sub entryGraphic {
       caicon         => AttrVal ($name,    'consumerAdviceIcon',       $caicondef),            # Consumer AdviceIcon
       clegend        => AttrVal ($name,    'consumerLegend',           'icon_top'),            # Lage und Art Cunsumer Legende
       lotype         => AttrVal ($name,    'layoutType',                 'single'),
-      kw             => AttrVal ($name,    'Wh/kWh',                         'Wh'),
+      kw             => AttrVal ($name,    'Wh_kWh',                         'Wh'),
       height         => AttrNum ($name,    'beamHeight',                      200),
       width          => $width,
       fsize          => AttrNum ($name,    'spaceSize',                        24),
@@ -4781,8 +5763,6 @@ sub entryGraphic {
       $paref->{maxCon} = $back->{maxCon};                                                                       
       $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
       $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
-
-      #Log3 ($hash,3,Dumper($hfcg));
       
       # Balkengrafik
       ################
@@ -4826,17 +5806,23 @@ return $ret;
 sub _checkSetupComplete {                                
   my $hash  = shift;
   my $ret   = q{};
+  
   my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
   
   my $is    = ReadingsVal  ($name, "inverterStrings",          undef);                    # String Konfig
-  my $fcdev = ReadingsVal  ($name, "currentForecastDev",       undef);                    # Forecast Device (Wetter)
-  my $radev = ReadingsVal  ($name, "currentRadiationDev",      undef);                    # Forecast Device (Wetter) 
+  my $fcdev = ReadingsVal  ($name, "currentForecastDev",       undef);                    # Device Vorhersage Wetterdaten (Bewölkung etc.)
+  my $radev = ReadingsVal  ($name, "currentRadiationDev",      undef);                    # Device Strahlungsdaten Vorhersage
   my $indev = ReadingsVal  ($name, "currentInverterDev",       undef);                    # Inverter Device
   my $medev = ReadingsVal  ($name, "currentMeterDev",          undef);                    # Meter Device
-  my $peak  = ReadingsVal  ($name, "modulePeakString",         undef);                    # String Peak
-  my $pv0   = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);
+  
+  my $peaks = ReadingsVal  ($name, "modulePeakString",         undef);                    # String Peak
   my $dir   = ReadingsVal  ($name, "moduleDirection",          undef);                    # Modulausrichtung Konfig
   my $ta    = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
+  my $mrt   = ReadingsVal  ($name, "moduleRoofTops",           undef);                    # RoofTop Konfiguration (SolCast API)
+  my $rip   = 1 if(exists $data{$type}{$name}{solcastapi}{'?IdPair'});                    # es existiert mindestens ein Paar RoofTop-ID / API-Key
+  
+  my $pv0   = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);                    # der erste PV ForeCast Wert
   
   my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
   my $height = AttrNum ($name,    'beamHeight',  200);
@@ -4854,7 +5840,9 @@ sub _checkSetupComplete {
       return $ret;
   } 
   
-  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peak || !defined $pv0 || !$dir || !$ta) {    
+  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peaks ||
+     (isSolCastUsed ($hash) ? (!$rip || !$mrt) : (!$dir || !$ta )) || 
+     !defined $pv0) {    
       $ret    .= "<table class='roomoverview'>";
       $ret    .= "<tr style='height:".$height."px'>";
       $ret    .= "<td>";
@@ -4874,13 +5862,19 @@ sub _checkSetupComplete {
       elsif(!$is) {
           $ret .= $hqtxt{ist}{$lang}; 
       }
-      elsif(!$peak) {
+      elsif(!$peaks) {                                           
           $ret .= $hqtxt{mps}{$lang};  
       }
-      elsif(!$dir) {
+      elsif(!$rip && isSolCastUsed ($hash)) {                                             # Verwendung SolCast API
+          $ret .= $hqtxt{rip}{$lang};  
+      } 
+      elsif(!$mrt && isSolCastUsed ($hash)) {                                             # Verwendung SolCast API
+          $ret .= $hqtxt{mrt}{$lang};  
+      }
+      elsif(!$dir && !isSolCastUsed ($hash))  {                                           # Verwendung DWD Strahlungsdevice
           $ret .= $hqtxt{mdr}{$lang};
       }
-      elsif(!$ta) {
+      elsif(!$ta && !isSolCastUsed ($hash))   {                                           # Verwendung DWD Strahlungsdevice
           $ret .= $hqtxt{mta}{$lang};  
       }
       elsif(!defined $pv0) {
@@ -5862,9 +6856,9 @@ sub __weatherOnBeam {
                                     weather_icon($hfcg->{$i}{weather}-100) : 
                                     weather_icon($hfcg->{$i}{weather});
                                     
-          my $wcc = $hfcg->{$i}{wcc};                                                                        # Bewölkungsgrad ergänzen
+          my $wcc = $hfcg->{$i}{wcc} // "-";                                                                 # Bewölkungsgrad ergänzen
           
-          if(IsNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
+          if(isNumeric ($wcc)) {                                                                             # Javascript Fehler vermeiden: https://forum.fhem.de/index.php/topic,117864.msg1233661.html#msg1233661                                  
               $wcc += 0;
           }
           
@@ -6401,257 +7395,6 @@ sub useNumHistDays {
 return ($usenhd, $nhd);
 }
 
-##################################################################################################
-#            PV Forecast Rad1h in kWh / Wh
-# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
-#
-#    * Faktor für Umwandlung kJ in kWh:   0.00027778
-#    * Eigene Modulfläche in qm z.B.:     31,04
-#    * Wirkungsgrad der Module in % z.B.: 16,52
-#    * Wirkungsgrad WR in % z.B.:         98,3
-#    * Korrekturwerte wegen Ausrichtung/Verschattung etc.
-#
-# Die Formel wäre dann: 
-# Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
-#
-# Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
-#
-#    * Globalstrahlung:                G =  kJ / m2
-#    * Korrektur mit Flächenfaktor f:  Gk = G * f
-#    * Globalstrahlung (STC):          1 kW/m2
-#    * Peak Leistung String (kWp):     Pnenn = x kW
-#    * Performance Ratio:              PR (typisch 0,85 bis 0,9)
-#    * weitere Korrekturwerte für Regen, Wolken etc.: Korr
-#
-#    pv (kWh) = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr
-#    pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
-#
-# Die Abhängigkeit der Strahlungsleistung der Sonnenenergie nach Wetterlage und Jahreszeit ist 
-# hier beschrieben: 
-# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
-#
-# !!! PV Berechnungsgrundlagen !!!
-# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
-# http://www.ing-büro-junge.de/html/photovoltaik.html
-# 
-##################################################################################################
-sub calcPVforecast {            
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $rad   = $paref->{rad};               # Nominale Strahlung aus DWD Device
-  my $num   = $paref->{num};               # Nexthour 
-  my $uac   = $paref->{uac};               # Nutze Autokorrektur (on/off)
-  my $t     = $paref->{t};                 # aktueller Unix Timestamp
-  my $fh    = $paref->{fh};
-  my $fd    = $paref->{fd};
-  
-  my $type  = $hash->{TYPE};
-  my $stch  = $data{$type}{$name}{strings};                                                           # String Configuration Hash
-  my $fh1   = $fh+1;
-  
-  my $chour      = strftime "%H", localtime($t+($num*3600));                                          # aktuelle Stunde
-  my $reld       = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
-  
-  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1.00);            # PV Korrekturfaktor (auto oder manuell)
-  my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
-  my $hcfound    = "use manual correction factor";
-  my $hq         = "m";
-  
-  my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
-  my $raindamp   = AttrVal($name, "rainFactorDamping",   $rdampdef);                                  # prozentuale Berücksichtigung des Regenkorrekturfaktors
-  my @strings    = sort keys %{$stch};
-  
-  my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
-
-  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
-  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
-  
-  my $range      = calcRange ($cloudcover);                                                           # Range errechnen
-  
-  my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
-
-  ## Ermitteln des relevanten Autokorrekturfaktors
-  if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
-      $hcfound   = "yes";                                                                             # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh+1), $range, undef);                 # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
-      $hq      //= 0;
-      if (!defined $hc) {
-          $hcfound = "no";
-          $hc      = 1;                                                                               # keine Korrektur  
-          $hq      = 0;
-      }
-  }
-  
-  $hc = sprintf "%.2f", $hc;
-
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf}    = $hc."/".$hq;
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
-
-  if($fd == 0 && $fh1) {
-      $paref->{pvcorrf}  = $hc."/".$hq;
-      $paref->{nhour}    = sprintf("%02d",$fh1);
-      $paref->{histname} = "pvcorrfactor";
-      setPVhistory ($paref);
-      delete $paref->{histname};  
-  }
-  
-  my $pvsum   = 0;      
-  my $peaksum = 0; 
-  my ($lh,$sq);                                                                                    
-  
-  for my $st (@strings) {                                                                             # für jeden String der Config ..
-      my $peak                 = $stch->{"$st"}{peak};                                                # String Peak (kWp)
-      
-      $paref->{peak}           = $peak;
-      $paref->{cloudcover}     = $cloudcover;
-      $paref->{temp}           = $temp;
-      
-      my ($peakloss, $modtemp) = calcPeaklossByTemp ($paref);                                         # Reduktion Peakleistung durch Temperaturkoeffizienten der Module (vorzeichengehaftet)
-      $peak                   += $peakloss;
-      
-      delete $paref->{peak};
-      delete $paref->{cloudcover};
-      delete $paref->{temp};
-      
-      $peak       *= 1000;                                                                            # kWp in Wp umrechnen
-      my $ta       = $stch->{"$st"}{tilt};                                                            # Neigungswinkel Solarmodule
-      my $moddir   = $stch->{"$st"}{dir};                                                             # Ausrichtung der Solarmodule
-      
-      my $af       = $hff{$ta}{$moddir} / 100;                                                        # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
-      
-      my $pv       = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $prdef * $ccf * $rcf);
-  
-      $lh = {                                                                                         # Log-Hash zur Ausgabe
-          "moduleDirection"                => $moddir,
-          "modulePeakString"               => $peak." W",
-          "moduleTiltAngle"                => $ta,
-          "Forecasted temperature"         => $temp." &deg;C",
-          "Module Temp (calculated)"       => $modtemp." &deg;C",
-          "Loss String Peak Power by Temp" => $peakloss." kWP",
-          "Area factor"                    => $af,
-          "Cloudcover"                     => $cloudcover,
-          "CloudRange"                     => $range,
-          "CloudFactorDamping"             => $clouddamp." %",
-          "Cloudfactor"                    => $ccf,
-          "Rainprob"                       => $rainprob,
-          "Rainfactor"                     => $rcf,
-          "RainFactorDamping"              => $raindamp." %",
-          "Radiation"                      => $rad,
-          "Factor kJ to kWh"               => $kJtokWh,
-          "PV generation forecast (raw)"   => $pv." Wh"
-      };  
-      
-      $sq = q{};
-      for my $idx (sort keys %{$lh}) {
-          $sq .= $idx." => ".$lh->{$idx}."\n";             
-      }
-
-      Log3 ($name, 4, "$name - PV forecast calc (raw) for $reld Hour ".sprintf("%02d",$chour+1)." string $st ->\n$sq");
-      
-      $pvsum   += $pv;
-      $peaksum += $peak;                                                                            
-  }
-  
-  $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # insgesamt installierte Peakleistung in W
-  
-  $pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden
-  $pvsum  = $peaksum if($pvsum > $peaksum);                                                          # Vorhersage nicht größer als die Summe aller PV-Strings Peak
-      
-  my $invcapacity = CurrentVal ($hash, "invertercapacity", 0);                                       # Max. Leistung des Invertrs
-  
-  if ($invcapacity && $pvsum > $invcapacity) {
-      $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
-      Log3 ($name, 4, "$name - PV forecast limited to $pvsum Watt due to inverter capacity");
-  }
-      
-  my $logao         = qq{};
-  $paref->{pvsum}   = $pvsum;
-  $paref->{peaksum} = $peaksum;
-  ($pvsum, $logao)  = _70percentRule ($paref); 
-  
-  $lh = {                                                                                            # Log-Hash zur Ausgabe
-      "CloudCorrFoundInStore"  => $hcfound,
-      "PV correction factor"   => $hc,
-      "PV correction quality"  => $hq,
-      "PV generation forecast" => $pvsum." Wh ".$logao,
-  };
-  
-  $sq = q{};
-  for my $idx (sort keys %{$lh}) {
-      $sq .= $idx." => ".$lh->{$idx}."\n";             
-  }
-  
-  Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: \n$sq");
- 
-return $pvsum;
-}
-
-###################################################################
-# Zellen Leistungskorrektur Einfluss durch Wärmekoeffizienten 
-# berechnen
-#
-# Die Nominalleistung der Module wird bei 25 Grad 
-# Umgebungstemperatur und bei 1.000 Watt Sonneneinstrahlung 
-# gemessen. 
-# Steigt die Temperatur um 1 Grad Celsius sinkt die Modulleistung 
-# typisch um 0,4 Prozent. Solartellen können im Sommer 70°C heiß
-# werden.
-#
-# Das würde für eine 10 kWp Photovoltaikanlage folgenden 
-# Leistungsverlust bedeuten: 
-#
-#       Leistungsverlust = -0,4%/K * 45K * 10 kWp = 1,8 kWp
-#
-# https://www.enerix.de/photovoltaiklexikon/temperaturkoeffizient/
-#
-###################################################################
-sub calcPeaklossByTemp {
-  my $paref      = shift;
-  my $hash       = $paref->{hash};
-  my $name       = $paref->{name};
-  my $peak       = $paref->{peak}       // return (0,0);
-  my $cloudcover = $paref->{cloudcover} // return (0,0);                                    # vorhergesagte Wolkendecke Stunde X
-  my $temp       = $paref->{temp}       // return (0,0);                                    # vorhergesagte Temperatur Stunde X
-    
-  my $modtemp      = $temp + ($tempmodinc * (1 - ($cloudcover/100)));                       # kalkulierte Modultemperatur
-  
-  my $peakloss     = sprintf "%.2f", $tempcoeffdef * ($temp - $tempbasedef) * $peak / 100;
-
-return ($peakloss, $modtemp);
-}
-
-################################################################
-#                 70% Regel kalkulieren
-################################################################
-sub _70percentRule {
-  my $paref   = shift;
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $pvsum   = $paref->{pvsum};
-  my $peaksum = $paref->{peaksum};
-  my $num     = $paref->{num};                                                          # Nexthour 
-  
-  my $logao = qq{};
-  my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "confc", 0);
-  my $max70 = $peaksum/100 * 70;
-  
-  if(AttrVal ($name, "follow70percentRule", "0") eq "1" && $pvsum > $max70) {      
-      $pvsum = $max70;
-      $logao = qq{(reduced by 70 percent rule)};
-  }  
-
-  if(AttrVal ($name, "follow70percentRule", "0") eq "dynamic" && $pvsum > $max70 + $confc) {
-      $pvsum = $max70 + $confc;
-      $logao = qq{(reduced by 70 percent dynamic rule)};
-  }  
-  
-  $pvsum = int $pvsum;
- 
-return ($pvsum, $logao);
-}
-
 ################################################################
 #       Abweichung PVreal / PVforecast berechnen
 #       bei eingeschalteter automat. Korrektur
@@ -7092,7 +7835,8 @@ return;
 ################################################################
 sub listDataPool {                 
   my $hash = shift;
-  my $htol = shift;  
+  my $htol = shift;
+  
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
@@ -7341,49 +8085,132 @@ sub listDataPool {
           }     
       }
   }
+  
+  my $git = sub {
+      my $it     = shift;
+      my @sorted = sort keys %$it;
+      my $key    = shift @sorted;
+      
+      my $ret = {};
+      $ret    = { $key => $it->{$key} } if($key);
+      
+      return $ret;
+  };
+  
+  if ($htol eq "solcastdata") {
+      $h = $data{$type}{$name}{solcastapi};
+      if (!keys %{$h}) {
+          return qq{SolCast API values cache is empty.};
+      }    
+
+      my $pve   = q{};
+      my $itref = dclone $h;                                                         # Deep Copy von $h
+      
+      for my $idx (sort keys %{$itref}) {
+          my $s1;          
+          my $sp1 = _ldpspaces ($idx, q{});
+          $sq    .= $idx." => ";
+          
+          while (my ($tag, $item) = each %{$git->($itref->{$idx})}) {
+              $sq .= ($s1 ? $sp1 : "").$tag." => ";
+              
+              if (ref $item eq "HASH") {
+                  my $s2;                  
+                  my $sp2 = _ldpspaces ($tag, $sp1);
+                  
+                  while (my ($tag1, $item1) = each %{$git->($itref->{$idx}{$tag})}) {
+                      $sq .= ($s2 ? $sp2 : "")."$tag1: ".$item1."\n";                     
+                      $s2  = 1;
+                      delete $itref->{$idx}{$tag}{$tag1};
+                  }
+              }
+              
+              $s1  = 1; 
+              $sq .= "\n" if($sq !~ /\n$/xs);
+              
+              delete $itref->{$idx}{$tag};            
+          }          
+      }
+  }
       
 return $sq;
 }
 
 ################################################################
-#        liefert aktuelle Stringkonfiguration
-#        inkl. Vollständigkeitscheck
+#  Berechnung führende Spaces für Hashanzeige
+#  $str - String dessen Länge für die Anzahl Spaces 
+#         herangezogen wird
+#  $sp  - vorhandener Space-String der erweitert wird
 ################################################################
-sub checkStringConfig {                 
+sub _ldpspaces {
+  my $str   = shift;
+  my $sp    = shift // q{};
+  my $const = shift // 4;
+  
+  my $le  = $const + length $str;
+  my $spn = $sp;
+  
+  for (my $i = 0; $i < $le; $i++) {
+      $spn .= " ";
+  }
+  
+return $spn;
+}
+
+################################################################
+#        validiert die aktuelle Anlagenkonfiguration
+################################################################
+sub checkPlantConfig {                 
   my $hash = shift;
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $stch = $data{$type}{$name}{strings};
   my $lang = AttrVal ("global", 'language', 'EN');
   
+  my $sc;
+  my $cf = 0;                                                  # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
+  
+  my $err = createStringConfig ($hash);
+  
+  if ($err) {
+      $cf  = 1;
+      $sc .= $err."<br><br>";
+  }
+ 
+  my $stch = $data{$type}{$name}{strings};
+    
   my $sub = sub { 
       my $string = shift;
-      my $ret;          
-      for my $key (sort keys %{$stch->{"$string"}}) {
+      my $ret;
+      
+      for my $key (sort keys %{$stch->{$string}}) {
           $ret    .= ", " if($ret);
-          $ret    .= $key.": ".$stch->{"$string"}{$key};
+          $ret    .= $key.": ".$stch->{$string}{$key};
       }
+      
       return $ret;
   };
-        
-  if (!keys %{$stch}) {
-      return qq{String configuration is empty.};
-  }
-  
-  my $sc;
-  my $cf = 0;
+    
   for my $sn (sort keys %{$stch}) {
       my $sp = $sn." => ".$sub->($sn)."<br>";
-      $cf    = 1 if($sp !~ /dir.*?peak.*?tilt/x);             # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
-      $sc   .= $sp;
+      
+      if (!isSolCastUsed ($hash)) {                            # Strahlungsdevice DWD
+          $cf = 1 if($sp !~ /dir.*?peak.*?tilt/x);             # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+      }
+      else {                                                   # Strahlungsdevice SolCast-API
+          $cf = 1 if($sp !~ /peak.*?pk/x);                     # Test Vollständigkeit
+      }
+      
+      $sc .= $sp;
   }
   
+  $sc .= "<br><br>"; 
+  
   if($cf) {                             
-      $sc .= "<br><br>".encode ("utf8", $hqtxt{strnok}{$lang});
+      $sc .= encode ("utf8", $hqtxt{strnok}{$lang});
   }
   else {
-      $sc .= "<br><br>".encode ("utf8", $hqtxt{strok}{$lang});
+      $sc .= encode ("utf8", $hqtxt{strok}{$lang});
   }
       
 return $sc;
@@ -7425,19 +8252,20 @@ sub timestampToTimestring {
   
   my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                      # Standard f. z.B. Readingstimstamp
   $year += 1900;                                                                            
-  $mon++;  
+  $mon++; 
+  
   my $realts = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);
   my $tsdef  = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante für Logging-Timestamps etc. (Minute/Sekunde == 00)
   my $tsfull = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit
   
-  if(AttrVal("global","language","EN") eq "DE") {
-      $ts = sprintf("%02d.%02d.%04d %02d:%s", $lday,$lmonth,$lyear,$lhour,"00:00");
+  if(AttrVal("global", "language", "EN") eq "DE") {
+      $ts = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);
   } 
   else {
       $ts = $tsdef;
   }
   
-return ($ts,$tsdef,$realts,$tsfull);
+return ($ts, $tsdef, $realts, $tsfull);
 }
 
 ################################################################
@@ -7541,7 +8369,7 @@ sub createNotifyDev {
       }
       
       push @nd, $fcdev;
-      push @nd, $radev if($radev ne $fcdev);
+      push @nd, $radev if($radev ne $fcdev && $radev !~ /SolCast-API/xs);
       push @nd, $indev;
       push @nd, $medev;
       push @nd, $badev;
@@ -7579,6 +8407,23 @@ sub deleteConsumerPlanning {
   
   Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
 
+return;
+}
+
+################################################################
+#  Internal MODEL und Model abhängige Setzungen / Löschungen
+################################################################
+sub setModel {
+  my $hash = shift;
+  
+  if (isSolCastUsed ($hash)) {
+      $hash->{MODEL} = 'SolCastAPI';
+  }
+  else {
+      $hash->{MODEL} = 'DWD';
+      deleteReadingspec ($hash, 'nextSolCastCall');
+  }
+  
 return;
 }
 
@@ -7756,7 +8601,7 @@ sub isAddSwitchOffCond {
   
   my $condval = ReadingsVal ($dswoffcond, $rswoffcond, "");
   
-  if ($hyst && IsNumeric ($condval)) {                                            # Hysterese berücksichtigen
+  if ($hyst && isNumeric ($condval)) {                                            # Hysterese berücksichtigen
       $condval -= $hyst;
   }
   
@@ -7833,7 +8678,7 @@ return;
 ################################################################
 #  Prüfung auf numerischen Wert (vorzeichenbehaftet)
 ################################################################
-sub IsNumeric {
+sub isNumeric {
   my $val = shift // q{empty};
   
   my $ret = 0;
@@ -7844,6 +8689,23 @@ sub IsNumeric {
   
 return $ret;
 }
+
+################################################################
+#  Prüfung auf Verwendung von SolCast API
+################################################################
+sub isSolCastUsed {
+  my $hash = shift;
+  
+  my $api = ReadingsVal ($hash->{NAME}, 'currentRadiationDev', 'DWD');
+  my $ret = 0;
+  
+  if($api =~ /SolCast/xs) {
+      $ret = 1;
+  }
+  
+return $ret;
+}
+
 
 ################################################################
 #  liefert die Zeit des letzten Schaltvorganges
@@ -8049,7 +8911,7 @@ return ($pvcorrf, $quality);
 # $hod: nächste Stunde (NextHour00, NextHour01,...)
 # $key: starttime  - Startzeit der abgefragten nächsten Stunde
 #       hourofday  - Stunde des Tages
-#       pvforecast - PV Vorhersage
+#       pvforecast - PV Vorhersage in Wh
 #       weatherid  - DWD Wetter id 
 #       cloudcover - DWD Wolkendichte
 #       cloudrange - berechnete Bewölkungsrange
@@ -8169,6 +9031,43 @@ sub ConsumerVal {
 return $def;
 }
 
+############################################################################################################
+# Wert des solcastapi-Hash zurückliefern
+# Usage:
+# SolCastAPIVal ($hash, $tring, $ststr, $key, $def)
+#
+# $tring:  Stringname aus "inverterStrings" (?All für allg. Werte)
+# $ststr:  Startzeit der Form YYYY-MM-DD hh:00:00
+# $key:    pv_estimate - PV Schätzung in Wh
+# $def:    Defaultwert   
+# 
+# Sonderabfragen
+# SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
+# SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
+# SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
+# SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'apikey',              $def) - API-Key, <pk> = Paarschlüssel
+#
+############################################################################################################
+sub SolCastAPIVal {
+  my $hash   = shift;
+  my $string = shift;
+  my $ststr  = shift;
+  my $key    = shift;
+  my $def    = shift;
+  
+  my $name   = $hash->{NAME};
+  my $type   = $hash->{TYPE};
+  
+  if(defined $data{$type}{$name}{solcastapi}                         &&
+     defined $data{$type}{$name}{solcastapi}{$string}                &&
+     defined $data{$type}{$name}{solcastapi}{$string}{$ststr}        &&
+     defined $data{$type}{$name}{solcastapi}{$string}{$ststr}{$key}) {
+     return  $data{$type}{$name}{solcastapi}{$string}{$ststr}{$key};
+  }
+
+return $def;
+}
+
 1;
 
 =pod
@@ -8191,11 +9090,13 @@ return $def;
 Das Modul SolarForecast erstellt auf Grundlage der Werte aus generischen Quellendevices eine 
 Vorhersage für den solaren Ertrag und integriert weitere Informationen als Grundlage für darauf aufbauende Steuerungen. <br>
 
-Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (DWD) prognostizierten Globalstrahlung am 
-Anlagenstandort. Im zugeordneten DWD_OpenData Device ist die passende Wetterstation mit dem Attribut "forecastStation" 
+Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (DWD) oder der 
+<a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a> prognostizierten Globalstrahlung am 
+Anlagenstandort. Die Nutzung der SolCast API beschränkt sich auf die kostenlose Version unter Verwendung von Rooftop Sites.
+In zugeordneten DWD_OpenData Device(s) ist die passende Wetterstation mit dem Attribut "forecastStation" 
 festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
-Abhängig von den DWD-Daten und der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.)
-wird auf Grundlage der prognostizierten Globalstrahlung eine wahrscheinliche PV Erzeugung der kommenden Stunden ermittelt. <br>
+Abhängig von den Strahlungs- und Wetterdaten sowie der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.)
+wird auf eine wahrscheinliche PV Erzeugung der kommenden Stunden ermittelt. <br>
 Darüber hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine Verbrauchsprognose verwendet. <br>
 Das Modul errechnet aus den Prognosewerten einen zukünftigen Energieüberschuß der zur Betriebsplanung von Verbrauchern
 genutzt wird. Der Nutzer kann Verbraucher (z.B. Schaltsteckdosen) direkt im Modul registrieren und die Planung der 
@@ -8217,17 +9118,17 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     Nach der Definition des Devices sind zwingend Vorhersage-Devices des Typs DWD_OpenData zuzuordnen sowie weitere 
     anlagenspezifische Angaben mit den entsprechenden set-Kommandos zu hinterlegen. <br>
-    Mit nachfolgenden set-Kommandos werden die Quellendevices und Quellenreadings für maßgebliche Informationen 
+    Mit nachfolgenden set-Kommandos werden die Quellen(devices) für maßgebliche Informationen 
     hinterlegt: <br><br>
 
       <ul>
          <table>
          <colgroup> <col width=35%> <col width=65%> </colgroup>
-            <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches Wetterdaten liefert     </td></tr>
-            <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device welches Strahlungsdaten liefert </td></tr>
-            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert            </td></tr>
-            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert               </td></tr>
-            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert      </td></tr>            
+            <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches Wetterdaten liefert                      </td></tr>
+            <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device welches Strahlungsdaten liefert bzw. SolCast-API </td></tr>
+            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                             </td></tr>
+            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                </td></tr>
+            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert                       </td></tr>            
          </table>
       </ul>
       <br>
@@ -8311,7 +9212,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a id="SolarForecast-set-currentForecastDev"></a>
       <li><b>currentForecastDev </b> <br><br> 
       
-      Legt das Device (Typ DWD_OpenData) fest, welches die Wetterdaten (Bewölkung, Niederschlag, usw.) liefert. 
+      Legt das Device (Typ DWD_OpenData) fest, welches die benötigten Wetterdaten (Bewölkung, Niederschlag, 
+      Sonnenauf- bzw. untergang usw.) liefert. 
       Ist noch kein Device dieses Typs vorhanden, muß es manuell definiert werden 
       (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
@@ -8409,8 +9311,21 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a id="SolarForecast-set-currentRadiationDev"></a>
       <li><b>currentRadiationDev </b> <br><br> 
       
-      Legt das Device (Typ DWD_OpenData) fest, welches die solaren Strahlungsdaten liefert. Ist noch kein Device dieses Typs
-      vorhanden, muß es manuell definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+      Legt die Quelle zur Lieferung der solaren Strahlungsdaten fest. Es kann ein Device vom Typ DWD_OpenData oder 
+      die SolCast API ausgewählt werden. <br><br>
+      
+      Bei Nutzung der SolCast API müssen vorab ein oder mehrere API-keys (Accounts) sowie ein oder mehrere Rooftop-ID's/
+      auf der <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast</a> Webseite angelegt werden.
+      Ein Rooftop ist im SolarForecast-Kontext mit einem <a href="#SolarForecast-set-inverterStrings">inverterString</a> 
+      gleichzusetzen. <br>
+      Es wird empfohlen bei Einsatz der SolCast API die Attribute <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
+      <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> <b>explizit auf 0</b> bzw. 
+      <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a> auf <b>"off"</b> zu setzen.
+      
+      <br><br>
+      
+      Soll der DWD-Dienst zur Lieferung von Strahlungsdaten dienen und ist noch kein Device des Typs DWD_OpenData vorhanden, 
+      muß es manuell definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
 
       <ul>
@@ -8452,7 +9367,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a id="SolarForecast-set-inverterStrings"></a>
       <li><b>inverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br><br>  
       
-      Bezeichnungen der am Wechselrichter aktiven Strings. Diese Bezeichnungen werden als Schlüssel in den weiteren 
+      Bezeichnungen der aktiven Strings. Diese Bezeichnungen werden als Schlüssel in den weiteren 
       Settings verwendet. <br><br>
       
       <ul>
@@ -8465,7 +9380,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-set-modulePeakString"></a>
-      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br> 
+      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
       
       Die Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des 
       Readings <b>inverterStrings</b>. <br><br>
@@ -8480,7 +9395,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-set-moduleDirection"></a>
-      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>  
+      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br> 
+      (nur bei Verwendung des DWD_OpenData RadiationDev) <br><br>
       
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des 
       Readings <b>inverterStrings</b>. <br>
@@ -8510,8 +9426,28 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <br>
     
     <ul>
+      <a id="SolarForecast-set-moduleRoofTops"></a>
+      <li><b>moduleRoofTops &lt;Stringname1&gt;=&lt;pk&gt; [&lt;Stringname2&gt;=&lt;pk&gt; &lt;Stringname3&gt;=&lt;pk&gt; ...] </b> <br>
+      (nur bei Verwendung der SolCast API) <br><br>
+      
+      Es erfolgt die Zuordnung des Strings "StringnameX" zu einem Schlüssel &lt;pk&gt;. Der Schlüssel &lt;pk&gt; wurde mit dem 
+      Setter <a href="#SolarForecast-set-roofIdentPair">roofIdentPair</a> angelegt. Damit wird bei Abruf des Rooftops (=String) 
+      in der SolCast API die zu verwendende Rooftop-ID sowie der entsprechende API-Key festgelegt. <br> 
+      Der StringnameX ist ein Schlüsselwert des Readings <b>inverterStrings</b>. 
+      <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; moduleRoofTops Ostdach=p1 Südgarage=p2 S3=p3 <br>
+      </ul>      
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
       <a id="SolarForecast-set-moduleTiltAngle"></a>
-      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br><br>  
+      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br>  
+      (nur bei Verwendung des DWD_OpenData RadiationDev) <br><br>
       
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
       Mögliche Neigungswinkel sind: 0,10,20,25,30,40,45,50,60,70,80,90 (0 = waagerecht, 90 = senkrecht). <br><br>
@@ -8575,8 +9511,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
       Zukünftig erwartete PV Erzeugungen werden mit den gespeicherten Korrekturfaktoren optimiert. <br> 
-      Bei aktivierter Autokorrektur haben die Attribute <a href="#cloudFactorDamping">cloudFactorDamping</a> und
-      <a href="#rainFactorDamping">rainFactorDamping</a> nur noch eine untergeordnete Bedeutung. <br>
+      Bei aktivierter Autokorrektur haben die Attribute <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
+      <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> nur noch eine untergeordnete Bedeutung. <br>
       <b>Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
       (default: off)      
@@ -8618,8 +9554,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                           </td></tr>
             <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                            </td></tr>
             <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                      </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>löscht die aktuell ermittelten PV Tageskorrekturfaktoren                                                             </td></tr>
-            <tr><td>                           </td><td>Um PV Korrekturfaktoren einer bestimmte Stunde aus pvCircular zu löschen:                                            </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht die aktuellen und gespeicherten PV Korrekturfaktoren                                                          </td></tr>
+            <tr><td>                           </td><td>Um PV Korrekturfaktoren einer bestimmten Stunde aus pvCircular zu löschen:                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection circular &lt;Stunde&gt;  </ul>                                               </td></tr>    
             <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection circular 10)       </ul>                                               </td></tr>            
             <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus pvCircular zu löschen:                                         </td></tr>
@@ -8629,8 +9565,39 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08) </ul>                  </td></tr>
             <tr><td>                           </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                                        </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </ul> </td></tr>
+            <tr><td> <b>moduleRoofTops</b>     </td><td>löscht die SolCast API Rooftops                                                                                      </td></tr>
+            <tr><td> <b>roofIdentPair</b>      </td><td>löscht alle gespeicherten SolCast API Rooftop-ID / API-Key Paare                                                     </td></tr>
+            <tr><td>                           </td><td>Um ein bestimmtes Paar zu löschen ist dessen Schlüssel &lt;pk&gt; anzugeben:                                         </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset roofIdentPair &lt;pk&gt;   (z.B. set &lt;name&gt; reset roofIdentPair p1) </ul>           </td></tr>
+
          </table>
       </ul>      
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-roofIdentPair"></a>
+      <li><b>roofIdentPair &lt;pk&gt; rtid=&lt;Rooftop-ID&gt; apikey=&lt;SolCast API Key&gt; </b> <br>
+       (nur bei Verwendung der SolCast API) <br><br>
+       
+       Der Abruf jedes in <a href='https://toolkit.solcast.com.au/rooftop-sites' target='_blank'>SolCast Rooftop Sites</a> 
+       angelegten Rooftops ist mit der Angabe eines Paares <b>Rooftop-ID</b> und <b>API-Key</b> zu identifizieren. <br>
+       Der Schlüssel &lt;pk&gt; kennzeichnet eindeutig ein verbundenes Paar Rooftop-ID / API-Key. Es können beliebig viele 
+       Paare nacheinander angelegt werden. In dem Fall ist jeweils ein neuer Name für "&lt;pk&gt;" zu verwenden.
+       <br><br>
+       
+       Der Schlüssel &lt;pk&gt; wird im Setter <a href="#SolarForecast-set-moduleRoofTops">moduleRoofTops</a> der abzurufenden 
+       Rooftops (=Strings) zugeordnet.
+       <br><br>
+       
+       <ul>
+        <b>Beispiele: </b> <br>
+        set &lt;name&gt; roofIdentPair p1 rtid="92fc-6796-f574-ae5f" apikey="oNHDbkKuC_eGEvZe7ECLl6-T1jLyfOgC" <br>
+        set &lt;name&gt; roofIdentPair p2 rtid=f574-ae5f-"92fc-6796" apikey="eGEvZe7ECLl6_T1jLyfOgC_oNHDbkKuC" <br>
+       </ul>              
+       
+        <br>    
       </li>
     </ul>
     <br>
@@ -8697,7 +9664,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <colgroup> <col width=8%> <col width=92%> </colgroup>
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
-            <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung                                                             </td></tr>
+            <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung (Wh)                                                             </td></tr>
             <tr><td> <b>today</b>     </td><td>=1 wenn Startdatum am aktuellen Tag                                                </td></tr>
             <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch                                                        </td></tr>
             <tr><td> <b>wid</b>       </td><td>ID des vorhergesagten Wetters                                                      </td></tr> 
@@ -8779,6 +9746,39 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </table>
       </ul>
       
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-roofTopData"></a>
+      <li><b>roofTopData </b> <br>
+      (nur bei Verwendung der SolCast API) <br><br>
+      
+      Die erwarteten solaren Strahlungsdaten der definierten RoofTops werden von der SolCast API abgerufen. 
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-solCastData"></a>
+      <li><b>solCastData </b> <br>
+      (nur bei Verwendung der SolCast API) <br><br>
+      
+      Listet die im Kontext der SolCast-API gespeicherten Daten auf.
+      Verwaltungsdatensätze sind mit einem führenden '?' gekennzeichnet. 
+      Die von der API gelieferten Vorhersagedaten bzgl. des PV Ertrages (Wh) sind auf eine Stunde konsolidiert.
+      <br><br>
+      
+      <ul>
+         <table>  
+         <colgroup> <col width=40%> <col width=60%> </colgroup>
+            <tr><td> <b>lastretrieval_time</b>      </td><td>Zeit des letzten SolCast API Abrufs             </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b> </td><td>Unix Timestamp des letzten SolCast API Abrufs   </td></tr>
+            <tr><td> <b>pv_estimate</b>             </td><td>erwartete PV Erzeugung von SolCast API (Wh)     </td></tr>
+                                                            
+         </table>
+      </ul>
       </li>      
     </ul>
     <br>
@@ -8980,8 +9980,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                               </td></tr>
             <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                </td></tr>
             <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                              </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                                  </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Verbraucher nicht nach angegebener Stunde (01..23) einschalten (optional)                                                                 </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Stunde (01..23) einplanen (optional)                                                     </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Stunde (01..23) einplanen (optional)                                                    </td></tr>
             <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                     </td></tr>
             <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                  </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                          </td></tr>
@@ -9359,10 +10359,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-Wh/kWh"></a>
-       <li><b>Wh/kWh &lt;Wh | kWh&gt; </b><br>
+       <a id="SolarForecast-attr-Wh_kWh"></a>
+       <li><b>Wh_kWh &lt;Wh | kWh&gt; </b><br>
          Definiert die Anzeigeeinheit in Wh oder in kWh auf eine Nachkommastelle gerundet. <br>
-         (default: W)
+         (default: Wh)
        </li>
        <br>   
 
@@ -9424,13 +10424,16 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         "Encode": 0,
         "Color": 0,
         "utf8": 0,
+        "HttpUtils": 0,
         "JSON": 4.020,
-        "Data::Dumper": 0,
         "FHEM::SynoModules::SMUtils": 1.0220,
         "Time::HiRes": 0        
       },
       "recommends": {
-        "FHEM::Meta": 0
+        "FHEM::Meta": 0,
+        "FHEM::Utility::CTZ": 0,
+        "Storable": 0,
+        "Data::Dumper": 0
       },
       "suggests": {
       }
