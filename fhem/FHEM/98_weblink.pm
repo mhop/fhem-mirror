@@ -237,10 +237,10 @@ webdev_AWaddPos($$$)
 =item summary_DE HTTP Link fuer das FHEMWEB Frontend
 =begin html
 
-<a name="weblink"></a>
+<a id="weblink"></a>
 <h3>weblink</h3>
 <ul>
-  <a name="weblinkdefine"></a>
+  <a id="weblinkdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; weblink
@@ -279,16 +279,16 @@ webdev_AWaddPos($$$)
     </ul>
   </ul>
 
-  <a name="weblinkset"></a>
+  <a id="weblink-set"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="weblinkget"></a>
+  <a id="weblink-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="weblinkattr"></a>
+  <a id="weblink-attr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="htmlattr"></a>
+    <a id="weblink-attr-htmlattr"></a>
     <li>htmlattr<br>
       HTML attributes to be used for link, image and iframe type of links.
       E.g.:<br>
@@ -299,7 +299,7 @@ webdev_AWaddPos($$$)
         </code>
       </ul></li>
 
-    <a name="nodetaillink"></a>
+    <a id="weblink-nodetaillink"></a>
     <li>nodetaillink<br>
       Show no detail link for the types image and iframe.
       </li>
