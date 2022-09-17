@@ -2007,8 +2007,10 @@ sub ___setLastAPIcalltime {
   my $type = $hash->{TYPE};
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                                # letzter Abrufzeitstempel
-
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                    # letzter Abrufzeitstempel
+  
+  $data{$type}{$name}{current}{todaySolCastAPIcalls} += 1;
+  
 return;
 }
 
@@ -2874,6 +2876,9 @@ sub _specialActivities {
                   
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
+          delete $data{$type}{$name}{current}{todaySolCastAPIcalls};
+          delete $data{$type}{$name}{current}{todayMaxEstValue};
+          delete $data{$type}{$name}{current}{todayMaxEstTimestamp};
           
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
@@ -3507,7 +3512,7 @@ sub _calcMaxEstimateToday {
  
   return if (!keys %{$data{$type}{$name}{nexthours}});
   
-  my $maxest = 0;
+  my $maxest = CurrentVal ($hash, 'todayMaxEstValue', 0);
   
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $today = NexthoursVal ($hash, $idx, 'today', 0);
@@ -9003,24 +9008,30 @@ sub NexthoursVal {
 return $def;
 }
 
-#############################################################################
+###################################################################################################
 # Wert des current-Hash zurückliefern
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: generation          - aktuelle PV Erzeugung
-#       genslidereg         - Schieberegister PV Erzeugung (Array)
-#       h4fcslidereg        - Schieberegister 4h PV Forecast (Array)
-#       consumerdevs        - alle registrierten Consumerdevices (Array)
-#       gridconsumption     - aktueller Netzbezug
-#       powerbatin          - Batterie Ladeleistung
-#       powerbatout         - Batterie Entladeleistung
-#       temp                - aktuelle Außentemperatur
-#       tomorrowconsumption - Verbrauch des kommenden Tages
-#       invertercapacity    - Bemessungsleistung der Wechselrichters (max. W)
+# $key: generation           - aktuelle PV Erzeugung
+#       genslidereg          - Schieberegister PV Erzeugung (Array)
+#       h4fcslidereg         - Schieberegister 4h PV Forecast (Array)
+#       consumption          - aktueller Verbrauch (W)
+#       consumerdevs         - alle registrierten Consumerdevices (Array)
+#       gridconsumption      - aktueller Netzbezug
+#       powerbatin           - Batterie Ladeleistung
+#       powerbatout          - Batterie Entladeleistung
+#       temp                 - aktuelle Außentemperatur
+#       surplus              - aktueller PV Überschuß
+#       tomorrowconsumption  - Verbrauch des kommenden Tages
+#       invertercapacity     - Bemessungsleistung der Wechselrichters (max. W)
+#       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
+#       todayMaxEstTimestamp - Zeitstempel des erwarteten maximalen PV Ertrages am aktuellen Tag
+#       todayMaxEstValue     - Wert (Wh) des erwarteten maximalen PV Ertrages am aktuellen Tag
+#       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
 # $def: Defaultwert
 #
-#############################################################################
+###################################################################################################
 sub CurrentVal {
   my $hash = shift;
   my $key  = shift;
