@@ -520,9 +520,10 @@ HttpUtils_Connect2NonblockingSSL($$)
     }
   };
   if($@) {
-    Log3 $hash, $hash->{loglevel}, $@;
+    my $err = $@;
+    Log3 $hash, $hash->{loglevel}, $err;
     HttpUtils_Close($hash);
-    return $hash->{callback}($hash, $@);
+    return $hash->{callback}($hash, $err);
   }
 
   $hash->{FD} = $hash->{conn}->fileno();
