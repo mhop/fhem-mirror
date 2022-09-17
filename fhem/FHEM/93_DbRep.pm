@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.2"  => "17.09.2022  release setter 'index' for device model 'Agent' ",
   "8.50.1"  => "05.09.2022  DbRep_setLastCmd, change changeValue syntax, minor fixes ",
   "8.50.0"  => "20.08.2022  rework of DbRep_reduceLog - add max, max=day, min, min=day, sum, sum=day ",
   "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
@@ -603,6 +604,7 @@ sub DbRep_Set {
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
                 "deviceRename ".
+                "index:".$indl." ".
                 (($hash->{ROLE} ne "Agent") ? "delDoublets:adviceDelete,delete "         : "").
                 (($hash->{ROLE} ne "Agent") ? "delEntries "                              : "").
                 (($hash->{ROLE} ne "Agent") ? "changeValue "                             : "").
@@ -623,7 +625,6 @@ sub DbRep_Set {
                 (($hash->{ROLE} ne "Agent") ? "tableCurrentFillup:noArg "                : "").
                 (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg "                 : "").
                 (($hash->{ROLE} ne "Agent") ? "countEntries:history,current "            : "").              
-                (($hash->{ROLE} ne "Agent") ? "index:".$indl." "                         : "").
                 (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime "          : "").
                 (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime "      : "").
                 (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete "                     : "").                
@@ -820,7 +821,7 @@ sub DbRep_Set {
       return;
   }  
   
-  if ($opt eq "index" && $hash->{ROLE} ne "Agent") {
+  if ($opt eq "index") {
        DbRep_setLastCmd (@a);
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
