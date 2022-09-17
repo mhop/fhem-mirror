@@ -2591,14 +2591,14 @@ sub centralTask {
       
       readingsSingleUpdate($hash, "state", "running", 1);
       
-      if (!keys %{$data{$type}{$name}{strings}}) {
+      #if (!keys %{$data{$type}{$name}{strings}}) {
           my $ret = createStringConfig ($hash);                                                    # die String Konfiguration erstellen
       
           if ($ret) {
               readingsSingleUpdate($hash, "state", $ret, 1);
               return;
           }
-      }      
+      #}      
       
       my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
@@ -3122,8 +3122,8 @@ sub __calcDWDforecast {
       delete $paref->{temp};
       
       $peak      *= 1000;                                                                             # kWp in Wp umrechnen
-      my $ta      = $stch->{"$st"}{tilt};                                                             # Neigungswinkel Solarmodule
-      my $moddir  = $stch->{"$st"}{dir};                                                              # Ausrichtung der Solarmodule
+      my $ta      = $stch->{$st}{tilt};                                                               # Neigungswinkel Solarmodule
+      my $moddir  = $stch->{$st}{dir};                                                                # Ausrichtung der Solarmodule
       
       my $af      = $hff{$ta}{$moddir} / 100;                                                         # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
       
