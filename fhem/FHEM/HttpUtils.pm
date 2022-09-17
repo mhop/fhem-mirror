@@ -510,12 +510,19 @@ HttpUtils_Connect2NonblockingSSL($$)
 
   $hash->{conn}->blocking(0);
   $par->{SSL_startHandshake} = 0;
-  if(!IO::Socket::SSL->start_SSL($hash->{conn}, $par) ||
-     $hash->{conn}->connect_SSL() ||
-     $! != EWOULDBLOCK) {
+  eval {
+    if(!IO::Socket::SSL->start_SSL($hash->{conn}, $par) ||
+       $hash->{conn}->connect_SSL() ||
+       $! != EWOULDBLOCK) {
+      HttpUtils_Close($hash);
+      return $hash->{callback}($hash,
+                  "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
+    }
+  };
+  if($@) {
+    Log3 $hash, $hash->{loglevel}, $@;
     HttpUtils_Close($hash);
-    return $hash->{callback}($hash,
-                "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
+    return $hash->{callback}($hash, $@);
   }
 
   $hash->{FD} = $hash->{conn}->fileno();
