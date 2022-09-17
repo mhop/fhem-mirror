@@ -3236,10 +3236,11 @@ sub _transferSolCastRadiationValues {
           name    => $name,
           wantdt  => $wantdt,
           hod     => $hod,
-          fd      => $fd,
           fh1     => $fh1,
           num     => $num,
-          uac     => $uac
+          uac     => $uac,
+          fd      => $fd,
+          day     => $paref->{day}
       };
       
       my $est = __calcSolCastEstimates ($params);
@@ -7877,7 +7878,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{temp}     = q{};      
   }
   
-  Log3 ($name, 5, "$name - set PV History day: $day, hour: $nhour, hash: $histname, val: $val");
+  Log3 ($name, 5, "$name - set PV History Day: $day, Hour: $nhour, Key: $histname, Value: $val");
     
 return;
 }
