@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
   "0.68.0 "=> "15.09.2022  integrate SolCast API, change attribute Wh/kWh to Wh_kWh, rename Reading nextPolltime to ".
                            "nextCycletime, rework plant config check, minor (bug)fixes ",
   "0.67.6 "=> "02.09.2022  add ___setPlanningDeleteMeth, consumer can be planned across daily boundaries ".
@@ -239,7 +240,7 @@ my %vNotesIntern = (
   "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
   "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
   "0.31.0" => "06.04.2021  extend currentMeterDev by gfeedin, feedtotal ",
-  "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries, new setter energyH4Trigger ",
+  "0.30.0" => "05.04.2021  estimate readings to the minute in sub _createSummaries, new setter energyH4Trigger ",
   "0.29.0" => "03.04.2021  new setter powerTrigger ",
   "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
   "0.27.0" => "02.04.2021  additional readings ",
@@ -387,6 +388,10 @@ my %hqtxt = (                                                                   
               DE => qq{Aus/Ein}                                                                                             },
   auto   => { EN => qq{Auto},
               DE => qq{Auto}                                                                                                },
+  bnsas  => { EN => qq{between the next sunrise and sunset},
+              DE => qq{zwischen dem nächsten Sonnenauf- und untergang}                                                      },
+  after  => { EN => qq{after},
+              DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
   strok  => { EN => qq{Congratulations &#128522, your system configuration has been checked and is error-free !},
@@ -524,7 +529,7 @@ my %weather_ids = (
   '79'  => { s => '0', icon => 'weather_frost',            txtd => 'Eiskörner (gefrorene Regentropfen)',                                       txte => 'Ice grains (frozen raindrops)'                                              },
 
   '80'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regenschauer',                                                    txte => 'light rain shower'                                                          },
-  '81'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger oder starkerRegenschauer',                                         txte => 'moderate or heavy rain shower'                                              },
+  '81'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger oder starker Regenschauer',                                         txte => 'moderate or heavy rain shower'                                              },
   '82'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'sehr starker Regenschauer',                                                txte => 'very heavy rain shower'                                                     },
   '83'  => { s => '0', icon => 'weather_snow',             txtd => 'mäßiger oder starker Schneeregenschauer',                                  txte => 'moderate or heavy sleet shower'                                             },
   '84'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
@@ -1728,12 +1733,13 @@ sub _getRoofTopData {
   my $t     = $paref->{t}     // time;
     
   if (!$force) {                                                                              # regulärer SolCast API Abruf
+      my $lang   = AttrVal ('global', 'language', 'EN');
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');  
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
       if ($t < $srtime || $t > $sstime) {
-          readingsSingleUpdate($hash, 'nextSolCastCall', 'between next SunRise and SunSet', 1);
+          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{bnsas}{$lang}, 1);
           return qq{The current time is not between sunrise and sunset};
       }
       
@@ -1741,7 +1747,7 @@ sub _getRoofTopData {
       
       if ($lrt && $t < $lrt + $scapirepeat) {
           my $rt = $lrt + $scapirepeat - $t;
-          readingsSingleUpdate($hash, 'nextSolCastCall', 'after '.(timestampToTimestring ($lrt + $scapirepeat))[0], 1);
+          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($lrt + $scapirepeat))[0], 1);
           return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
@@ -1753,9 +1759,15 @@ sub _getRoofTopData {
 return;
 }
 
-###############################################################
+################################################################################################
 #                SolCast Api Request
-###############################################################
+#
+# noch testen und einbauen Abruf aktuelle Daten ohne Rooftops 
+# (aus https://www.solarquotes.com.au/blog/how-to-use-solcast/):
+# https://api.solcast.com.au/pv_power/estimated_actuals?longitude=12.067722&latitude=51.285272&
+# capacity=5130&azimuth=180&tilt=30&format=json&api_key=....
+#
+################################################################################################
 sub __solCast_ApiRequest {
   my $paref      = shift;
   my $hash       = $paref->{hash};
@@ -1764,7 +1776,6 @@ sub __solCast_ApiRequest {
 
   my $string;
   ($string, $allstrings) = split ",", $allstrings, 2;
-  #return if(!$string);
   
   my $rft    = ReadingsVal ($name, "moduleRoofTops", "");
   my ($a,$h) = parseParams ($rft);
@@ -2626,7 +2637,8 @@ sub centralTask {
       else {
           _transferDWDRadiationValues ($centpars);                                        # DWD Strahlungswerte übertragen    
       }
-
+      
+      _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten    
       _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
@@ -2634,7 +2646,7 @@ sub centralTask {
       _estConsumptionForecast     ($centpars);                                            # erwarteten Verbrauch berechnen
       _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren  
       _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
-      _calcSummaries              ($centpars);                                            # Zusammenfassungen erstellen
+      _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
 
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
@@ -3472,6 +3484,116 @@ sub ___70percentRule {
 return ($pvsum, $logao);
 }
 
+################################################################
+#    den Maximalwert PV Vorhersage für Heute ermitteln 
+#    und mit seinem Zeitparamter im current Hash speichern
+################################################################
+sub _calcMaxEstimateToday {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+ 
+  my $type  = $hash->{TYPE}; 
+ 
+  return if (!keys %{$data{$type}{$name}{nexthours}});
+  
+  my $maxest = 0;
+  
+  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
+      my $today = NexthoursVal ($hash, $idx, 'today', 0);
+      next if(!$today);
+      
+      my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
+      next if($pvfc <= $maxest);
+      
+      my $stt = NexthoursVal ($hash, $idx, 'starttime', '');
+      next if(!$stt);
+      
+      $maxest                                            = $pvfc;
+      $data{$type}{$name}{current}{todayMaxEstValue}     = $maxest;
+      $data{$type}{$name}{current}{todayMaxEstTimestamp} = timestringToTimestamp ($stt);
+  }
+    
+return;
+}
+
+################################################################
+#    Werte Inverter Device ermitteln und übertragen
+################################################################
+sub _transferInverterValues {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
+  my $daref = $paref->{daref};  
+
+  my $indev  = ReadingsVal($name, "currentInverterDev", "");
+  my ($a,$h) = parseParams ($indev);
+  $indev     = $a->[0] // "";
+  return if(!$indev || !$defs{$indev});
+             
+  my $type = $hash->{TYPE};
+  
+  my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
+  my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
+                                                      
+  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if($h->{capacity});         # optionale Angabe max. WR-Leistung
+  
+  return if(!$pvread || !$edread);
+  
+  Log3 ($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etotal=$edread ($etunit)");
+  
+  my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
+  my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                        # aktuelle Erzeugung (W)  
+  $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
+  
+  push @$daref, "Current_PV<>". $pv." W";                                          
+  $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  
+  push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
+  limitArray ($data{$type}{$name}{current}{genslidereg}, $defslidenum);
+  
+  my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
+  my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh) 
+  
+  my $nhour  = $chour+1;
+  
+  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", 0);               # etotal zu Beginn einer Stunde
+  
+  my $ethishour;
+  if(!$histetot) {                                                                            # etotal der aktuelle Stunde gesetzt ?                                          
+      $paref->{etotal}   = $etotal;
+      $paref->{nhour}    = sprintf("%02d",$nhour);
+      $paref->{histname} = "etotal";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+      
+      my $etot   = CurrentVal ($hash, "etotal", $etotal);
+      $ethishour = int ($etotal - $etot);
+  }
+  else {
+      $ethishour = int ($etotal - $histetot);
+  }
+  
+  $data{$type}{$name}{current}{etotal} = $etotal;                                             # aktuellen etotal des WR speichern
+  
+  if($ethishour < 0) {
+      $ethishour = 0;
+  }
+  
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal<>".$ethishour." Wh";       
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  
+  $paref->{ethishour} = $ethishour;
+  $paref->{nhour}     = sprintf("%02d",$nhour);
+  $paref->{histname}  = "pvrl";
+  setPVhistory ($paref);
+  delete $paref->{histname};
+
+return;
+}
 
 ################################################################
 #    Wetter Werte aus dem angebenen Wetterdevice extrahieren
@@ -3572,84 +3694,6 @@ sub _transferWeatherValues {
       }
   }
       
-return;
-}
-
-################################################################
-#    Werte Inverter Device ermitteln und übertragen
-################################################################
-sub _transferInverterValues {               
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
-  my $chour = $paref->{chour};
-  my $day   = $paref->{day};
-  my $daref = $paref->{daref};  
-
-  my $indev  = ReadingsVal($name, "currentInverterDev", "");
-  my ($a,$h) = parseParams ($indev);
-  $indev     = $a->[0] // "";
-  return if(!$indev || !$defs{$indev});
-             
-  my $type = $hash->{TYPE};
-  
-  my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
-  my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
-                                                      
-  $data{$type}{$name}{current}{invertercapacity} = $h->{capacity} if($h->{capacity});         # optionale Angabe max. WR-Leistung
-  
-  return if(!$pvread || !$edread);
-  
-  Log3 ($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etotal=$edread ($etunit)");
-  
-  my $pvuf = $pvunit =~ /^kW$/xi ? 1000 : 1;
-  my $pv   = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                        # aktuelle Erzeugung (W)  
-  $pv      = $pv < 0 ? 0 : sprintf("%.0f", $pv);                                              # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718, https://forum.fhem.de/index.php/topic,117864.msg1166201.html#msg1166201
-  
-  push @$daref, "Current_PV<>". $pv." W";                                          
-  $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-  
-  push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
-  limitArray ($data{$type}{$name}{current}{genslidereg}, $defslidenum);
-  
-  my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
-  my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh) 
-  
-  my $nhour  = $chour+1;
-  
-  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", 0);               # etotal zu Beginn einer Stunde
-  
-  my $ethishour;
-  if(!$histetot) {                                                                            # etotal der aktuelle Stunde gesetzt ?                                          
-      $paref->{etotal}   = $etotal;
-      $paref->{nhour}    = sprintf("%02d",$nhour);
-      $paref->{histname} = "etotal";
-      setPVhistory ($paref);
-      delete $paref->{histname};
-      
-      my $etot   = CurrentVal ($hash, "etotal", $etotal);
-      $ethishour = int ($etotal - $etot);
-  }
-  else {
-      $ethishour = int ($etotal - $histetot);
-  }
-  
-  $data{$type}{$name}{current}{etotal} = $etotal;                                             # aktuellen etotal des WR speichern
-  
-  if($ethishour < 0) {
-      $ethishour = 0;
-  }
-  
-  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal<>".$ethishour." Wh";       
-  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-  
-  $paref->{ethishour} = $ethishour;
-  $paref->{nhour}     = sprintf("%02d",$nhour);
-  $paref->{histname}  = "pvrl";
-  setPVhistory ($paref);
-  delete $paref->{histname};
-
 return;
 }
 
@@ -5267,7 +5311,7 @@ return;
 ################################################################
 #               Zusammenfassungen erstellen
 ################################################################
-sub _calcSummaries {  
+sub _createSummaries {  
   my $paref  = shift;
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
@@ -5349,12 +5393,18 @@ sub _calcSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
   
-  my $gcon    = CurrentVal ($hash, "gridconsumption",     0);                                           # aktueller Netzbezug
+  my $gcon    = CurrentVal ($hash, "gridconsumption",         0);                                       # aktueller Netzbezug
   my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
-  my $pvgen   = CurrentVal ($hash, "generation",          0);
-  my $gfeedin = CurrentVal ($hash, "gridfeedin",          0);
-  my $batin   = CurrentVal ($hash, "powerbatin",          0);                                           # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, "powerbatout",         0);                                           # aktuelle Batterieentladung
+  my $pvgen   = CurrentVal ($hash, "generation",              0);
+  my $gfeedin = CurrentVal ($hash, "gridfeedin",              0);
+  my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
+  my $tdmev   = CurrentVal ($hash, "todayMaxEstValue",      '-');                                       # heute PV Estimate Wert
+  my $tdmets  = CurrentVal ($hash, "todayMaxEstTimestamp",  '-');                                       # heute PV Estimate Zeitstempel
+  
+  if ($tdmets && $tdmets ne '-') {
+      $tdmets = (timestampToTimestring ($tdmets))[0];
+  }
   
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption     = int ($pvgen - $gfeedin - $batin + $batout);
@@ -5386,6 +5436,8 @@ sub _calcSummaries {
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast<>".            (int $todaySum->{PV}).     " Wh";
+  push @$daref, "Today_MaxPVforecast<>".         $tdmev.                    " Wh";
+  push @$daref, "Today_MaxPVforecastTime<>".     $tdmets;
   
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
@@ -6015,7 +6067,8 @@ sub _graphicHeader {
       } 
       elsif ($pcfa eq "off") {
           $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;
-          $acicon = "<a title='$htitles{akorron}{$lang}'</a>off";         
+          #$acicon = "<a title='$htitles{akorron}{$lang}'</a>-";  
+          $acicon = FW_makeImage('-', $htitles{akorron}{$lang});
       } 
       elsif ($pcfa =~ /standby/ix) {
           my ($rtime) = $pcfa =~ /for (.*?) hours/x;
