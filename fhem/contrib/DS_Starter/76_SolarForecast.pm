@@ -1881,6 +1881,12 @@ sub __solCast_ApiResponse {
       
       while ($jdata->{'forecasts'}[$k]) {                                       # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
+          
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                 # ersten Datanesatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+              $k += 1;
+              next;                           
+          }
+          
           ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
                     
           next if ($err);
@@ -1894,6 +1900,12 @@ sub __solCast_ApiResponse {
 
       while ($jdata->{'forecasts'}[$k]) {
           my $petstr  = $jdata->{'forecasts'}[$k]{'period_end'};
+          
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                 # ersten Datanesatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+              $k += 1;
+              next;                           
+          }
+          
           my $pvest   = $jdata->{'forecasts'}[$k]{'pv_estimate'};
           my $pvest10 = $jdata->{'forecasts'}[$k]{'pv_estimate10'};
           my $pvest90 = $jdata->{'forecasts'}[$k]{'pv_estimate90'};
@@ -2591,14 +2603,11 @@ sub centralTask {
       
       readingsSingleUpdate($hash, "state", "running", 1);
       
-      #if (!keys %{$data{$type}{$name}{strings}}) {
-          my $ret = createStringConfig ($hash);                                                    # die String Konfiguration erstellen
-      
-          if ($ret) {
-              readingsSingleUpdate($hash, "state", $ret, 1);
-              return;
-          }
-      #}      
+      my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
+      if ($ret) { 
+          readingsSingleUpdate($hash, "state", $ret, 1);
+          return;
+      }     
       
       my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
