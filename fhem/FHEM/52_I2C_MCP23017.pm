@@ -130,7 +130,7 @@ sub I2C_MCP23017_Init($$) {																										#Geraet beim anlegen/booten
 				data => 			$regval,
 				}) if (defined $hash->{I2C_Address});
 		} else {
-			return "no IODev assigned to '$hash->{NAME}'";
+			Log3 $hash, 3, "no IODev assigned to '$hash->{NAME}'";
 		}
 		
 	}
@@ -226,7 +226,7 @@ sub I2C_MCP23017_Attr(@) {
 				data => 			$regval,
 				}) if (defined $hash->{I2C_Address});
 		} else {
-			return "no IODev assigned to '$hash->{NAME}'";
+			Log3 $hash, 3, "no IODev assigned to '$hash->{NAME}'";
 		}
  }
  return ($msg) ? $msg : undef;
@@ -296,7 +296,7 @@ sub I2C_MCP23017_SetRegPair {																									#set register pair for Por
 				}) if (defined $hash->{I2C_Address});
 				}
 	} else {
-		return "no IODev assigned to '$hash->{NAME}'";
+		Log3 $hash, 3, "no IODev assigned to '$hash->{NAME}'";
 	}
 }
 ###############################################################################
