@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
   "0.68.0 "=> "15.09.2022  integrate SolCast API, change attribute Wh/kWh to Wh_kWh, rename Reading nextPolltime to ".
                            "nextCycletime, rework plant config check, minor (bug)fixes ",
@@ -568,7 +569,9 @@ my $calcmaxd     = 30;                                                          
 my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
-my $scapirepeat  = 3600;                                                          # Abrufintervall SolCast API 
+
+my $apirepetdef  = 3600;                                                          # default Abrufintervall SolCast API 
+my $apimaxreqs   = 50;                                                            # max. täglich mögliche Requests SolCast API  
 
 my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
 my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
@@ -1441,6 +1444,12 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", $prop, 1);
   
   if($prop eq "off") {
+      for my $n (1..24) {
+          $n     = sprintf "%02d", $n;
+          my $rv = ReadingsVal ($name, "pvCorrectionFactor_${n}", "");
+          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*") if($rv !~ /manual/xs);
+      }
+      
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
   
@@ -1745,9 +1754,9 @@ sub _getRoofTopData {
       
       my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
       
-      if ($lrt && $t < $lrt + $scapirepeat) {
-          my $rt = $lrt + $scapirepeat - $t;
-          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($lrt + $scapirepeat))[0], 1);
+      if ($lrt && $t < $lrt + $apirepetdef) {
+          my $rt = $lrt + $apirepetdef - $t;
+          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($lrt + $apirepetdef))[0], 1);
           return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
@@ -1938,10 +1947,10 @@ sub __solCast_ApiResponse {
   }
   
   my $t = time;
-  ___setLastAPIcalltime ($hash, $t);
+  ___setLastAPIcallKeyData ($hash, $t);
   
   my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $t);
-  readingsSingleUpdate($hash, 'nextSolCastCall', 'after '.(timestampToTimestring ($lrt + $scapirepeat))[0], 1);
+  readingsSingleUpdate($hash, 'nextSolCastCall', 'after '.(timestampToTimestring ($lrt + $apirepetdef))[0], 1);
   
   my $param = {
       hash       => $hash,
@@ -1996,10 +2005,10 @@ return ($err, $starttmstr);
 }
 
 ################################################################
-#  Zeitstempel letzter Abruf SolCast API setzen
+#  Kennzahlen des letzten Abruf SolCast API setzen
 #  $t - Unix Timestamp
 ################################################################
-sub ___setLastAPIcalltime {
+sub ___setLastAPIcallKeyData {
   my $hash = shift;
   my $t    = shift // time;
   
@@ -2009,7 +2018,11 @@ sub ___setLastAPIcalltime {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                    # letzter Abrufzeitstempel
   
-  $data{$type}{$name}{current}{todaySolCastAPIcalls} += 1;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls} += 1;
+  
+  my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
+  my $madr = $apimaxreqs / $asc;                                                                                    # max. tägliche Anzahl API Abrufe
+  my $darr = $apimaxreqs - SolCastAPIVal ($hash, '?All', '?All', 'todaySolCastAPIcalls', 0);                        # verbleibende SolCast API Calls am aktuellen Tag
   
 return;
 }
@@ -2686,6 +2699,7 @@ sub createStringConfig {                 ## no critic "not used"
   
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
   my @istrings = split ",", ReadingsVal ($name, "inverterStrings", undef);                        # Stringbezeichner
+  $data{$type}{$name}{current}{allstringscount} = scalar @istrings;                               # Anzahl der Anlagenstrings 
   
   if(!@istrings) {
       return qq{Define all used strings with command "set $name inverterStrings" first.};
@@ -2876,7 +2890,7 @@ sub _specialActivities {
                   
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
-          delete $data{$type}{$name}{current}{todaySolCastAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
           delete $data{$type}{$name}{current}{todayMaxEstValue};
           delete $data{$type}{$name}{current}{todayMaxEstTimestamp};
           
@@ -3524,8 +3538,7 @@ sub _calcMaxEstimateToday {
       my $stt = NexthoursVal ($hash, $idx, 'starttime', '');
       next if(!$stt);
       
-      $maxest                                            = $pvfc;
-      $data{$type}{$name}{current}{todayMaxEstValue}     = $maxest;
+      $data{$type}{$name}{current}{todayMaxEstValue}     = $pvfc;
       $data{$type}{$name}{current}{todayMaxEstTimestamp} = timestringToTimestamp ($stt);
   }
     
@@ -9026,6 +9039,7 @@ return $def;
 #       tomorrowconsumption  - Verbrauch des kommenden Tages
 #       invertercapacity     - Bemessungsleistung der Wechselrichters (max. W)
 #       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
+#       allstringscount      - aktuelle Anzahl der Anlagenstrings
 #       todayMaxEstTimestamp - Zeitstempel des erwarteten maximalen PV Ertrages am aktuellen Tag
 #       todayMaxEstValue     - Wert (Wh) des erwarteten maximalen PV Ertrages am aktuellen Tag
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
