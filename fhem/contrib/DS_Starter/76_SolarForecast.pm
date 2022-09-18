@@ -126,7 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto ",
+  "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
   "0.68.0 "=> "15.09.2022  integrate SolCast API, change attribute Wh/kWh to Wh_kWh, rename Reading nextPolltime to ".
                            "nextCycletime, rework plant config check, minor (bug)fixes ",
@@ -699,6 +699,7 @@ sub Initialize {
                                 "maxVariancePerDay ".
                                 "maxValBeam ".
                                 "numHistDays:slider,1,1,30 ".
+                                "optimizeSolCastAPIreqInterval:1,0 ".
                                 "preferredChargeBattery:slider,0,1,100 ".
                                 "rainFactorDamping:slider,0,1,100 ".
                                 "sameWeekdaysForConsfc:1,0 ".
@@ -1752,11 +1753,12 @@ sub _getRoofTopData {
           return qq{The current time is not between sunrise and sunset};
       }
       
-      my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', 0);
+      my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp',            0);
+      my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $apirepetdef);
       
-      if ($lrt && $t < $lrt + $apirepetdef) {
-          my $rt = $lrt + $apirepetdef - $t;
-          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($lrt + $apirepetdef))[0], 1);
+      if ($lrt && $t < $lrt + $apiitv) {
+          my $rt = $lrt + $apiitv - $t;
+          #readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($lrt + $apiitv))[0], 1);
           return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
       }
   }
@@ -1949,9 +1951,6 @@ sub __solCast_ApiResponse {
   my $t = time;
   ___setLastAPIcallKeyData ($hash, $t);
   
-  my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $t);
-  readingsSingleUpdate($hash, 'nextSolCastCall', 'after '.(timestampToTimestring ($lrt + $apirepetdef))[0], 1);
-  
   my $param = {
       hash       => $hash,
       name       => $name,
@@ -2018,11 +2017,44 @@ sub ___setLastAPIcallKeyData {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                    # letzter Abrufzeitstempel
   
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls} += 1;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
   
-  my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
-  my $madr = $apimaxreqs / $asc;                                                                                    # max. tägliche Anzahl API Abrufe
-  my $darr = $apimaxreqs - SolCastAPIVal ($hash, '?All', '?All', 'todaySolCastAPIcalls', 0);                        # verbleibende SolCast API Calls am aktuellen Tag
+  ## Berechnung des optimalen Request Intervalls
+  ################################################  
+  if (AttrVal($name, 'optimizeSolCastAPIreqInterval', 0)) {
+      my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
+      my $madr = $apimaxreqs / $asc;                                                                                    # kalkulieren max. tägliche Anzahl API Abrufe
+      
+      my %seen;
+      my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
+      my @unique = grep { !$seen{$_}++ } @as;                                                             
+      my $upc    = scalar @unique;
+      $madr     *= $upc;
+      
+      # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
+      
+      my $darr = $madr - SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);                                 # verbleibende SolCast API Calls am aktuellen Tag
+      $darr    = 0 if($darr < 0);
+      
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
+      
+      my $date   = strftime "%Y-%m-%d", localtime($t);  
+      my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
+      my $dart   = $sstime - $t;                                                                                        # verbleibende Sekunden bis Sonnenuntergang
+      $dart      = 0 if($dart < 0);
+      
+      #$data{$type}{$name}{current}{secondsUntilSunSet} = $dart;
+ 
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $darr) if($dart && $darr);
+  }
+  else {
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
+  }
+  
+  my $lang   = AttrVal ('global', 'language', 'EN');
+  my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef);
+  readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv))[0], 1);
   
 return;
 }
@@ -2167,13 +2199,24 @@ sub Attr {
     
   if ($cmd eq "set") {
       if ($aName eq "interval") {
-          unless ($aVal =~ /^[0-9]+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
+          unless ($aVal =~ /^[0-9]+$/x) {
+              return qq{The value for $aName is not valid. Use only figures 0-9 !};
+          }
           InternalTimer(gettimeofday()+1.0, "FHEM::SolarForecast::centralTask", $hash, 0);
       }  
         
       if ($aName eq "maxVariancePerDay") {
-          unless ($aVal =~ /^[0-9.]+$/x) {return "The value for $aName is not valid. Use only numbers with optional decimal places !";}
-      }         
+          unless ($aVal =~ /^[0-9.]+$/x) {
+              return qq{The value for $aName is not valid. Use only numbers with optional decimal places !};
+          }
+      }
+      
+      if ($init_done == 1 && $aName eq "optimizeSolCastAPIreqInterval") {
+          if (!isSolCastUsed ($hash)) {
+              return qq{The attribute $aName is only valid for device model "SolCastAPI".};
+          }
+      }
+      
   }
     
   my $params = {
@@ -2595,6 +2638,8 @@ sub centralTask {
   deleteReadingspec ($hash, "nextPolltime"); 
   delete $data{$type}{$name}{solcastapi}{'All'};
   delete $data{$type}{$name}{solcastapi}{'#All'};
+  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
+  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIInterval};
   
   ###############################################################
 
@@ -2654,6 +2699,8 @@ sub centralTask {
       _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
       
+      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+      
       if (isSolCastUsed ($hash)) {
           _getRoofTopData                 ($centpars);                                    # SolCast API Strahlungswerte abrufen          
           _transferSolCastRadiationValues ($centpars);                                    # SolCast API Strahlungswerte übertragen 
@@ -2672,14 +2719,13 @@ sub centralTask {
       _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
       _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
 
-      if(@da) {
-          createReadingsFromArray ($hash, \@da, 1);
-      }
+      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+
       
-      calcVariance           ($centpars);                                                # Autokorrektur berechnen
-      saveEnergyConsumption  ($centpars);                                                # Energie Hausverbrauch speichern
+      calcVariance           ($centpars);                                                 # Autokorrektur berechnen
+      saveEnergyConsumption  ($centpars);                                                 # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                       # Abschluß state      
+      readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                        # Abschluß state      
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -2698,7 +2744,7 @@ sub createStringConfig {                 ## no critic "not used"
   my $type = $hash->{TYPE};
   
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
-  my @istrings = split ",", ReadingsVal ($name, "inverterStrings", undef);                        # Stringbezeichner
+  my @istrings = split ",", ReadingsVal ($name, "inverterStrings", "");                           # Stringbezeichner
   $data{$type}{$name}{current}{allstringscount} = scalar @istrings;                               # Anzahl der Anlagenstrings 
   
   if(!@istrings) {
@@ -2890,7 +2936,7 @@ sub _specialActivities {
                   
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
           delete $data{$type}{$name}{current}{todayMaxEstValue};
           delete $data{$type}{$name}{current}{todayMaxEstTimestamp};
           
@@ -8376,7 +8422,9 @@ return $timestamp;
 sub createReadingsFromArray {
   my $hash  = shift;
   my $daref = shift;
-  my $doevt = shift // 0;  
+  my $doevt = shift // 0; 
+
+  return if(!scalar @$daref);
   
   readingsBeginUpdate($hash);
   
@@ -8386,6 +8434,8 @@ sub createReadingsFromArray {
   }
 
   readingsEndUpdate($hash, $doevt);
+  
+  undef @$daref;
   
 return;
 }
@@ -9132,6 +9182,9 @@ return $def;
 # Sonderabfragen
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
+# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Requests
+# SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Requests
+# SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall                             
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'apikey',              $def) - API-Key, <pk> = Paarschlüssel
 #
@@ -9204,9 +9257,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     </ul>
     <br>
     
-    Nach der Definition des Devices sind zwingend Vorhersage-Devices des Typs DWD_OpenData zuzuordnen sowie weitere 
+    Nach der Definition des Devices sind in Abhängigkeit der verwendeten Prognosequellen zwingend weitere 
     anlagenspezifische Angaben mit den entsprechenden set-Kommandos zu hinterlegen. <br>
-    Mit nachfolgenden set-Kommandos werden die Quellen(devices) für maßgebliche Informationen 
+    Mit nachfolgenden set-Kommandos werden für die Funktion des Moduls maßgebliche Informationen 
     hinterlegt: <br><br>
 
       <ul>
@@ -9216,18 +9269,26 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device welches Strahlungsdaten liefert bzw. SolCast-API </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                             </td></tr>
             <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                </td></tr>
-            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert                       </td></tr>            
+            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)    </td></tr>
+            <tr><td> <b>inverterStrings</b>      </td><td>Bezeichner der vohandenen Anlagenstrings                             </td></tr>
+            <tr><td> <b>moduleDirection</b>      </td><td>Ausrichtung (Azimuth) der Anlagenstrings                             </td></tr>                        
+            <tr><td> <b>modulePeakString</b>     </td><td>die DC-Peakleistung der Anlagenstrings                               </td></tr> 
+            <tr><td> <b>roofIdentPair</b>        </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)               </td></tr>
+            <tr><td> <b>moduleRoofTops</b>       </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                  </td></tr>
+            <tr><td> <b>moduleTiltAngle</b>      </td><td>die Neigungswinkel der der Anlagenmodule                             </td></tr>            
          </table>
       </ul>
       <br>
       
     Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
     (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto on) bestimmt 
-    werden. <br><br>
+    werden. Weiterhin kann mit den Attributen <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
+    <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> der Beeinflussungsgrad von Bewölkungs- und 
+    Regenprognosen eingestellt werden. <br><br>
     
     <b>Hinweis</b><br>
-    Es wird empfohlen die automatische Vorhersagekorrektur unmittelbar einzuschalten, da das SolarForecast Device etliche Tage
-    benötigt um eine Optimierung der Korrekturfaktoren zu erreichen.    
+    Bei Nutzung des DWD für die solare Vorhersage wird empfohlen die automatische Vorhersagekorrektur unmittelbar 
+    einzuschalten, da das SolarForecast Device eine lange Zeit benötigt um die Optimierung der Korrekturfaktoren zu erreichen.    
  
     <br><br>
   </ul>
@@ -9470,7 +9531,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a id="SolarForecast-set-modulePeakString"></a>
       <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br>
       
-      Die Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des 
+      Die DC Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des 
       Readings <b>inverterStrings</b>. <br><br>
       
       <ul>
@@ -9681,8 +9742,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <ul>
         <b>Beispiele: </b> <br>
-        set &lt;name&gt; roofIdentPair p1 rtid="92fc-6796-f574-ae5f" apikey="oNHDbkKuC_eGEvZe7ECLl6-T1jLyfOgC" <br>
-        set &lt;name&gt; roofIdentPair p2 rtid=f574-ae5f-"92fc-6796" apikey="eGEvZe7ECLl6_T1jLyfOgC_oNHDbkKuC" <br>
+        set &lt;name&gt; roofIdentPair p1 rtid=92fc-6796-f574-ae5f apikey=oNHDbkKuC_eGEvZe7ECLl6-T1jLyfOgC <br>
+        set &lt;name&gt; roofIdentPair p2 rtid=f574-ae5f-92fc-6796 apikey=eGEvZe7ECLl6_T1jLyfOgC_oNHDbkKuC <br>
        </ul>              
        
         <br>    
@@ -9861,10 +9922,12 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <ul>
          <table>  
          <colgroup> <col width=40%> <col width=60%> </colgroup>
-            <tr><td> <b>lastretrieval_time</b>      </td><td>Zeit des letzten SolCast API Abrufs             </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b> </td><td>Unix Timestamp des letzten SolCast API Abrufs   </td></tr>
-            <tr><td> <b>pv_estimate</b>             </td><td>erwartete PV Erzeugung von SolCast API (Wh)     </td></tr>
-                                                            
+            <tr><td> <b>lastretrieval_time</b>      </td><td>Zeit des letzten SolCast API Abrufs                      </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b> </td><td>Unix Timestamp des letzten SolCast API Abrufs            </td></tr>
+            <tr><td> <b>pv_estimate</b>             </td><td>erwartete PV Erzeugung von SolCast API (Wh)              </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>       </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
+            <tr><td> <b>todayRemaingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Requests am aktuellen Tag  </td></tr>
+            <tr><td> <b>currentAPIinterval</b>      </td><td>das aktuell verwendete API Abrufintervall                </td></tr>            
          </table>
       </ul>
       </li>      
@@ -10373,6 +10436,16 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>numHistDays </b><br>
          Anzahl der historischen Tage aus Cache 'pvHistory' die zur Autokorrektur der PV Vorhersage verwendet werden. <br>
          (default: alle verfügbaren Daten in pvHistory und pvCircular)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-optimizeSolCastAPIreqInterval"></a>
+       <li><b>optimizeSolCastAPIreqInterval </b><br>
+         (nur bei Verwendung der SolCast API) <br><br>
+         Das default Abrufintervall der SolCast API beträgt fest 1 Stunde. Ist dieses Attribut gesetzt erfolgt ein dynamische
+         Anpassung des Intervalls mit dem Ziel die maximal möglichen Abrufe innerhalb von Sonnenauf- und untergang 
+         auszunutzen. <br>
+         (default: 0)
        </li>
        <br>
        
