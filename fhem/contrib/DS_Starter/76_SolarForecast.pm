@@ -1893,7 +1893,7 @@ sub __solCast_ApiResponse {
       while ($jdata->{'forecasts'}[$k]) {                                       # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                 # ersten Datanesatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                 # ersten Datensatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
               $k += 1;
               next;                           
           }
@@ -2926,6 +2926,7 @@ sub _specialActivities {
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
+          deleteReadingspec ($hash, "Today_MaxPVforecast.*");
           
           if(ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") eq "on") {
               for my $n (1..24) {
@@ -2937,8 +2938,6 @@ sub _specialActivities {
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
-          delete $data{$type}{$name}{current}{todayMaxEstValue};
-          delete $data{$type}{$name}{current}{todayMaxEstTimestamp};
           
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
@@ -3567,16 +3566,16 @@ sub _calcMaxEstimateToday {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $daref = $paref->{daref}; 
  
   my $type  = $hash->{TYPE}; 
  
   return if (!keys %{$data{$type}{$name}{nexthours}});
   
-  my $maxest = CurrentVal ($hash, 'todayMaxEstValue', 0);
+  my $maxest = ReadingsNum($name, 'Today_MaxPVforecast', 0);
   
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
-      my $today = NexthoursVal ($hash, $idx, 'today', 0);
-      next if(!$today);
+      next if(!NexthoursVal ($hash, $idx, 'today', 0));
       
       my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
       next if($pvfc <= $maxest);
@@ -3584,8 +3583,8 @@ sub _calcMaxEstimateToday {
       my $stt = NexthoursVal ($hash, $idx, 'starttime', '');
       next if(!$stt);
       
-      $data{$type}{$name}{current}{todayMaxEstValue}     = $pvfc;
-      $data{$type}{$name}{current}{todayMaxEstTimestamp} = timestringToTimestamp ($stt);
+      push @$daref, "Today_MaxPVforecast<>".     $pvfc." Wh";
+      push @$daref, "Today_MaxPVforecastTime<>". $stt;
   }
     
 return;
@@ -5473,12 +5472,6 @@ sub _createSummaries {
   my $gfeedin = CurrentVal ($hash, "gridfeedin",              0);
   my $batin   = CurrentVal ($hash, "powerbatin",              0);                                       # aktuelle Batterieladung
   my $batout  = CurrentVal ($hash, "powerbatout",             0);                                       # aktuelle Batterieentladung
-  my $tdmev   = CurrentVal ($hash, "todayMaxEstValue",      '-');                                       # heute PV Estimate Wert
-  my $tdmets  = CurrentVal ($hash, "todayMaxEstTimestamp",  '-');                                       # heute PV Estimate Zeitstempel
-  
-  if ($tdmets && $tdmets ne '-') {
-      $tdmets = (timestampToTimestring ($tdmets))[0];
-  }
   
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption     = int ($pvgen - $gfeedin - $batin + $batout);
@@ -5510,8 +5503,6 @@ sub _createSummaries {
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast<>".            (int $todaySum->{PV}).     " Wh";
-  push @$daref, "Today_MaxPVforecast<>".         $tdmev.                    " Wh";
-  push @$daref, "Today_MaxPVforecastTime<>".     $tdmets;
   
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
@@ -9090,8 +9081,6 @@ return $def;
 #       invertercapacity     - Bemessungsleistung der Wechselrichters (max. W)
 #       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
 #       allstringscount      - aktuelle Anzahl der Anlagenstrings
-#       todayMaxEstTimestamp - Zeitstempel des erwarteten maximalen PV Ertrages am aktuellen Tag
-#       todayMaxEstValue     - Wert (Wh) des erwarteten maximalen PV Ertrages am aktuellen Tag
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
 # $def: Defaultwert
 #
