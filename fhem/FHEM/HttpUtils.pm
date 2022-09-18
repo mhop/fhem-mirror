@@ -519,6 +519,7 @@ HttpUtils_Connect2NonblockingSSL($$)
                   "$! ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr()));
     }
   };
+  return if(!$hash->{conn}); # HttpClose was called in the EVAL
   if($@) {
     my $err = $@;
     Log3 $hash, $hash->{loglevel}, $err;
