@@ -786,7 +786,11 @@ SVG_readgplotfile($$$)
   }
 
   ($err1, @svgplotfile) = FileRead($gplot_pgm);
-  ($err2, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot") if($err1);
+  if($err1) {
+    ($err2, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot");
+    @svgplotfile = grep { $_ !~ m/set readonly/ } @svgplotfile;
+    
+  }
   return ($err1, undef) if($err2);
   my ($plotfnCnt, $srcNum) = (0,0);
   my @empty;
