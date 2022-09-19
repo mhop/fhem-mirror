@@ -336,7 +336,7 @@ if ($reading eq 'grouplist'){
   return join(',', sort @out)
 }
 if ($reading eq 'favlist'){
-sonos2mqtt_getList ($name,'Favorites')
+    return sonos2mqtt_getList ($name,'Favorites')
 }
 
 if ($reading eq 'Input') {
