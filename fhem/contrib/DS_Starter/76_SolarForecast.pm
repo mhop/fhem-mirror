@@ -2023,7 +2023,7 @@ sub ___setLastAPIcallKeyData {
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                    # letzter Abrufzeitstempel
   
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls} += 1;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
   
   ## Berechnung des optimalen Request Intervalls
   ################################################  
@@ -2039,7 +2039,7 @@ sub ___setLastAPIcallKeyData {
       
       # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
       
-      my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0) / ($asc * $upc));                                 # verbleibende SolCast API Calls am aktuellen Tag
+      my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));                                 # verbleibende SolCast API Calls am aktuellen Tag
       $darr    = 0 if($darr < 0);
       
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
@@ -2648,6 +2648,7 @@ sub centralTask {
   delete $data{$type}{$name}{solcastapi}{'#All'};
   delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
   delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIInterval};
+  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
   
   ###############################################################
 
@@ -2945,7 +2946,7 @@ sub _specialActivities {
                   
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
           
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
@@ -9180,7 +9181,7 @@ return $def;
 # Sonderabfragen
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
-# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Requests
+# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',       $def) - heute ausgeführte API Requests
 # SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Requests
 # SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall                             
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
@@ -9924,9 +9925,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>lastretrieval_time</b>      </td><td>Zeit des letzten SolCast API Abrufs                      </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b> </td><td>Unix Timestamp des letzten SolCast API Abrufs            </td></tr>
             <tr><td> <b>pv_estimate</b>             </td><td>erwartete PV Erzeugung von SolCast API (Wh)              </td></tr>
-            <tr><td> <b>todayDoneAPIcalls</b>       </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
-            <tr><td> <b>todayRemaingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Requests am aktuellen Tag  </td></tr>           
-         </table>
+            <tr><td> <b>todayDoneAPIrequests</b>    </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
+            <tr><td> <b>todayRemaingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Abrufe am aktuellen Tag    </td></tr>           
+            <tr><td> <b>                            </td><td>(ein Abruf kann mehrere API Requests ausführen)          </td></tr>                   
+         </table> 
       </ul>
       </li>      
     </ul>
