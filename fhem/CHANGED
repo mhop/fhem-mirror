@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: reduce memory allocation of reduceLog command
  - change:  88_HMCCU: Bug fixes and improvements
  - change:  93_DbRep: enable setter 'index' for device model 'Agent'
  - bugfix:  70_Klafs: Transferred to namespace of FHEM. 
