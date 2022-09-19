@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
   "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
   "0.68.0 "=> "15.09.2022  integrate SolCast API, change attribute Wh/kWh to Wh_kWh, rename Reading nextPolltime to ".
@@ -1841,19 +1842,21 @@ sub __solCast_ApiResponse {
   my $string     = $paref->{string};
   my $allstrings = $paref->{allstrings};
   
+  my $type       = $hash->{TYPE};
+  
   my ($msg,$starttmstr);
 
   if ($err ne "") {
       $msg = 'SolCast API server response: '.$err; 
       
       Log3 ($name, 2, "$name - $msg");
-   
+      
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
       readingsSingleUpdate($hash, "state", $msg, 1);
       return;
   } 
   elsif ($myjson ne "") {                                                          # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson($hash, $myjson);
-      my $type      = $hash->{TYPE};
       
       if(!$success) {
           $msg = 'ERROR - invalid SolCast API server response'; 
@@ -1884,6 +1887,7 @@ sub __solCast_ApiResponse {
           
           Log3 ($name, 3, "$name - $msg");
           
+          $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
           readingsSingleUpdate($hash, "state", $msg, 1);
           return;
       }
@@ -1950,6 +1954,8 @@ sub __solCast_ApiResponse {
   
   my $t = time;
   ___setLastAPIcallKeyData ($hash, $t);
+  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
   
   my $param = {
       hash       => $hash,
@@ -2033,7 +2039,7 @@ sub ___setLastAPIcallKeyData {
       
       # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
       
-      my $darr = $madr - SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);                                 # verbleibende SolCast API Calls am aktuellen Tag
+      my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0) / ($asc * $upc));                                 # verbleibende SolCast API Calls am aktuellen Tag
       $darr    = 0 if($darr < 0);
       
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
@@ -2047,6 +2053,8 @@ sub ___setLastAPIcallKeyData {
  
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $darr) if($dart && $darr);
+      
+      # Log3 ($name, 1, qq{$name - madr: $madr, darr: $darr, dart: $dart, interval: }. SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', ""));
   }
   else {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
@@ -5426,6 +5434,7 @@ sub _createSummaries {
   for my $h (1..47) {
       my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
       my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "confc",      0);
+      my $istdy = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "today",      1);
          
       if($h == 1) {
           $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
@@ -5456,7 +5465,7 @@ sub _createSummaries {
       $restOfDaySum->{PV}          += $pvfc  if($h <= $rdh);
       $restOfDaySum->{Consumption} += $confc if($h <= $rdh);
       
-      $tomorrowSum->{PV}           += $pvfc if($h >  $rdh);
+      $tomorrowSum->{PV}           += $pvfc if(!$istdy);
   }
   
   for my $th (1..24) {
@@ -9911,12 +9920,12 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <ul>
          <table>  
          <colgroup> <col width=40%> <col width=60%> </colgroup>
+            <tr><td> <b>currentAPIinterval</b>      </td><td>das aktuell verwendete API Abrufintervall                </td></tr> 
             <tr><td> <b>lastretrieval_time</b>      </td><td>Zeit des letzten SolCast API Abrufs                      </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b> </td><td>Unix Timestamp des letzten SolCast API Abrufs            </td></tr>
             <tr><td> <b>pv_estimate</b>             </td><td>erwartete PV Erzeugung von SolCast API (Wh)              </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>       </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
-            <tr><td> <b>todayRemaingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Requests am aktuellen Tag  </td></tr>
-            <tr><td> <b>currentAPIinterval</b>      </td><td>das aktuell verwendete API Abrufintervall                </td></tr>            
+            <tr><td> <b>todayRemaingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Requests am aktuellen Tag  </td></tr>           
          </table>
       </ul>
       </li>      
