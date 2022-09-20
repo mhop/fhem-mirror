@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 222611615';
+my $HMCCU_VERSION = '5.0 222632130';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -10028,7 +10028,7 @@ sub HMCCU_BuildURL ($$)
 		$password = HMCCU_Decrypt ($encpass);
 	}
 	my $auth = ($username ne '' && $password ne '') ? "$username:$password".'@' : '';
-		
+
 	if ($backend eq 'rega') {
 		$url = $hash->{prot}."://$auth".$hash->{host}.':'.
 			$HMCCU_REGA_PORT{$hash->{prot}}.'/tclrega.exe';
@@ -10686,8 +10686,7 @@ sub HMCCU_MaxHashEntries ($$)
       	Acknowledge "device was unreachable" messages in CCU.
       </li><br/>
       <li><b>set &lt;name&gt; authentication [&lt;username&gt; &lt;password&gt;]</b><br/>
-      	Set credentials for CCU authentication. Authentication must be activated by setting flag
-      	'authenticate' in attribute 'ccuflags'.<br/>
+      	Set credentials for CCU authentication.<br/>
       	When executing this command without arguments, the credentials are deleted.
       </li><br/>
       <li><b>set &lt;name&gt; clear [&lt;reading-exp&gt;]</b><br/>

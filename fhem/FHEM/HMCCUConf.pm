@@ -717,16 +717,16 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' }
 	},
 	'SHUTTER_CONTACT' => {
-		'STATE' => { '0' => 'close', '1' => 'open', 'false' => 'close', 'true' => 'open' }
+		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'SHUTTER_CONTACT_TRANSCEIVER' => {
-		'STATE' => { '0' => 'close', '1' => 'open', 'false' => 'close', 'true' => 'open' }
+		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'ROTARY_HANDLE_SENSOR' => {
-		'STATE' => { '0' => 'close', '1' => 'tilted', '2' => 'open' }
+		'STATE' => { '0' => 'closed', '1' => 'tilted', '2' => 'open' }
 	},
 	'ROTARY_HANDLE_TRANSCEIVER' => {
-		'STATE' => { '0' => 'close', '1' => 'tilted', '2' => 'open' }
+		'STATE' => { '0' => 'closed', '1' => 'tilted', '2' => 'open' }
 	},
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {
 		'STATE' => { '0' => 'ok', '1' => 'alarm', 'false' => 'ok', 'true' => 'alarm' }
@@ -747,29 +747,29 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
 	},
 	'BLIND' => {
-		'LEVEL' =>     { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' },
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' },
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
 	},
 	'BLIND_TRANSMITTER' => {
-		'LEVEL' =>     { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' }
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' }
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
-		'LEVEL' =>     { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' },
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' },
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
 	},
 	'JALOUSIE' => {
-		'LEVEL' =>       { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' },
-		'LEVEL_SLATS' => { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' },
+		'LEVEL' =>       { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' },
+		'LEVEL_SLATS' => { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' },
 		'DIRECTION' =>   { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>     { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
 	},
 	'SHUTTER_TRANSMITTER' => {
-		'LEVEL' =>     { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' }
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' }
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
-		'LEVEL' => { '0' => 'close', '100' => 'open', 'close' => '0', 'open' => '100' }
+		'LEVEL' => { '0' => 'closed', '100' => 'open', 'closed' => '0', 'open' => '100' }
 	},
 	'DIMMER' => {
 		'LEVEL' =>     { '0' => 'off', '100' => 'on', 'off' => '0', 'on' => '100' },
@@ -788,7 +788,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		'SET_TEMPERATURE' =>       { '4.5' => 'off', '30.5' => 'on' },
-		'WINDOW_OPEN_REPORTING' => { '0' => 'close', '1' => 'open', 'false' => 'close', 'true' => 'open' }
+		'WINDOW_OPEN_REPORTING' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
 		'SET_TEMPERATURE' => { '4.5' => 'off', '30.5' => 'on' }
@@ -796,7 +796,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'SET_POINT_TEMPERATURE' => { '4.5' => 'off', '30.5' => 'on' },
 		'SET_POINT_MODE' =>        { '0' => 'auto', '1' => 'manual', '2' => 'boost', '3' => 'off' },
-		'WINDOW_STATE' =>          { '0' => 'close', '1' => 'open', 'false' => 'close', 'true' => 'open' }
+		'WINDOW_STATE' =>          { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'CLIMATECONTROL_REGULATOR' => {
 		'SETPOINT' => { '4.5' => 'off', '30.5' => 'on' }		
@@ -805,7 +805,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'ALARMSTATE' => { '0' => 'noAlarm', '1' => 'alarm', 'false' => 'noAlarm', 'true' => 'alarm' }
 	},
 	'WINMATIC' => {
-		'LEVEL' => { '0' => 'close', '100' => 'open', '-0.005' => 'locked' }
+		'LEVEL' => { '0' => 'closed', '100' => 'open', '-0.005' => 'locked' }
 	},
 	'DEFAULT' => {
 		'AES_KEY' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' },

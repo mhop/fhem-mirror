@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 222611615';
+my $HMCCUDEV_VERSION = '5.0 222632130';
 
 ######################################################################
 # Initialize module
