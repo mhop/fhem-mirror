@@ -21,11 +21,9 @@
 #     Forum: https://forum.fhem.de/index.php?topic=127701
 #
 ##############################################################################
-package main;
+package FHEM::Klafs;
 use strict;
 use warnings;
-
-package FHEM::Klafs;
 
 sub ::Klafs_Initialize { goto &Initialize }
 
