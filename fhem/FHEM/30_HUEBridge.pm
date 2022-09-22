@@ -2595,7 +2595,7 @@ HUEBridge_dispatch($$$;$)
 
               my(undef, $t, $id) = split( '/', $data->{id_v1} );
               if( !defined($t) || !defined($id) ) {
-                Log3 $name, 3, "$name: EventStream: ignoring event type $data->{type}";
+                Log3 $name, 4, "$name: EventStream: ignoring event type $data->{type}";
                 Log3 $name, 5, Dumper $data;
                 next;
               }
