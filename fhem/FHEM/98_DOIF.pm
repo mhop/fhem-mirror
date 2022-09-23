@@ -961,7 +961,9 @@ sub AggrIntDoIf
     }
   }
   
-  if (defined $reading) {
+  $reading = "" if (!defined $reading);
+  
+  if ($reading ne "") {
     if ($reading =~ /^"(.*)"$/) {
       $readingRegex = $1;
     }
@@ -972,7 +974,7 @@ sub AggrIntDoIf
     foreach my $reading ((defined $readingRegex) ? grep {/$readingRegex/} keys %{$defs{$name}{READINGS}} : $reading) {
       $value="";
       $number="";
-      if (defined($reading)) {
+      if ($reading ne "") {
         if (defined $defs{$name}{READINGS}{$reading}) {
           $value=$defs{$name}{READINGS}{$reading}{VAL};
           $number = ($value =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
