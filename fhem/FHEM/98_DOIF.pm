@@ -6244,7 +6244,7 @@ sub cylinder_mode
   $out.= sprintf('<text x="%d" y="%d" style="fill:white; font-size:10px">%s</text>',$xBegin,$null+$heightoffset+2,0) if (defined $null);
   $out.= sprintf('<text x="%d" y="%d" style="fill:white; font-size:10px">%s</text>',$xBegin,+$heightoffset,$max);  
 
-  my $yBegin=13+($height-@values*$heightval)/2;
+  my $yBegin=14+($height-@values*$heightval)/2;
   my $xValue=$xLeft;
   my $yValue=$yBegin+$heightval-1;
   my $val_sum_pos=0;
@@ -6276,11 +6276,11 @@ sub cylinder_mode
     my $yText;
     if (defined $text and $text ne "") {
       $out.= sprintf('<text x="%d" y="%d" style="fill:%s; font-size:12px">%s</text>',$xBegin+10,$yBegin+$i*$heightval,hsl_color($color),$text.":");
-    } else {
-      $yValue -=7;
-    }
-    if ($heightval == 10) {
-      $yText=$yValue+7;
+      if ($heightval == 10) {
+        $yText=$yValue+7;
+      } else {
+        $yText=$yValue-4;
+      }
     } else {
       $yText=$yValue-4;
     }
