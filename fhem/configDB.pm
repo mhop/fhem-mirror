@@ -664,6 +664,22 @@ sub cfgDB_MigrationImport {
 		push @files, $fn;
 	}
 
+# find LightScene configurations
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=LightScene','CONFIGFILE');
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
+	}
+
+# find RHASSPY configurations
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=RHASSPY','CONFIGFILE');
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
+	}
+
 # find holiday files
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=holiday','NAME');
