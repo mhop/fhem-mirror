@@ -750,7 +750,7 @@ sub DistributionErrHandle2 {
             ::asyncOutput( $param->{cl}, "Request Error: $err\r\n" )
               if ( $param->{cl} && $param->{cl}{canAsyncOutput} );
 
-            return;
+            return $json;
         }
 
         ::readingsBulkUpdate( $hash, 'lastError',
