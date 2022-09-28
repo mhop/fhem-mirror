@@ -71,8 +71,9 @@ SVG_Initialize($)
   my @attrList = qw(
     captionLeft:1,0"
     captionPos:right,left,auto
-    endPlotNow
-    endPlotToday
+    endPlotNow:1,0
+    endPlotNowByHour:1,0
+    endPlotToday:1,0
     fixedoffset
     fixedrange
     label
@@ -1655,7 +1656,7 @@ SVG_render($$$$$$$$$$)
   # Compute & draw vertical tics, grid and labels
   my $ddur = ($tosec-$fromsec)/86400;
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
-  $aligntext = $aligntics = 0;
+  $aligntext = $aligntics = "none";
 
   if($ddur <= 0.05) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 300; $tstep = 60;
@@ -1668,17 +1669,19 @@ SVG_render($$$$$$$$$$)
 
   } elsif($ddur <= 1.1) {       # +0.1 -> DST
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 4*3600; $tstep = 3600;
+    $aligntext = $aligntics = "hour"
+        if(SVG_Attr($parent_name, $name, "endPlotNowByHour", undef));
 
   } elsif ($ddur <= 7.1) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 24*3600; $tstep = 6*3600;
 
   } elsif ($ddur <= 31.1) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 7*24*3600; $tstep = 24*3600;
-    $aligntext = 1;
+    $aligntext = "week";
 
   } elsif ($ddur <= 732.1) {
     $first_tag=". 6";   $tag=". 1";   $step = 28*24*3600; $tstep = 28*24*3600;
-    $aligntext = 2; $aligntics = 2;
+    $aligntext = $aligntics = "month";
 
   } else {
     $step = (($ddur / 365.2425) / 20) * 365 * 86400;
@@ -1687,7 +1690,7 @@ SVG_render($$$$$$$$$$)
     }
     $tstep = $step;
     $first_tag="";   $tag=". 6";
-    $aligntext = 3; $aligntics = 3;
+    $aligntext = $aligntics = "year";
   }
 
   my $barwidth = $tstep;
@@ -1770,7 +1773,7 @@ SVG_render($$$$$$$$$$)
   } else { # times
     for(my $i = $fromsec; $i < $tosec; $i += $step) {
       $i = SVG_time_align($i,$aligntext);
-      if($aligntext >= 2) { # center month and year
+      if($aligntext eq "month" || $aligntext eq "year") { # center
         $off1 = int($x+($i-$fromsec+$step/2)*$tmul);
       } else {
         $off1 = int($x+($i-$fromsec)*$tmul);
@@ -2416,29 +2419,36 @@ sub
 SVG_time_align($$)
 {
   my ($v,$align) = @_;
-  my $wl = $FW_webArgs{detail};
-  return $v if(!$align);
-  if($align == 1) {             # Look for the beginning of the week
+  return $v if($align eq "none");
+
+  # Look for the beginning of the next ...
+  if($align eq "hour") {
+    return int(($v+(3600-60))/3600)*3600;
+
+  } elsif($align eq "week") {
+    my $wl = $FW_webArgs{detail};
     for(;;) {
       my @a = localtime($v);
       return $v if($a[6] == SVG_Attr($FW_wname, $wl, "plotWeekStartDay", 0));
       $v += 86400;
     }
-  }
-  if($align == 2) {             # Look for the beginning of the month
+
+  } elsif($align eq "month") {
     for(;;) {
       my @a = localtime($v);
       return $v if($a[3] == 1);
       $v += 86400;
     }
-  }
-  if($align == 3) {             # Look for the beginning of the year
+
+  } elsif($align eq "year") {
     for(;;) {
       my @a = localtime($v);
       return $v if($a[7] == 0);
       $v += 86400;
     }
   }
+
+  return $v;
 }
 
 sub
@@ -2599,6 +2609,13 @@ plotAsPng(@)
         end at current time. Else the whole day, the 6 hour period starting at
         0, 6, 12 or 18 hour or the whole hour will be shown. This attribute
         is not used if the SVG has the attribute startDate defined.
+        </li><br>
+
+    <a id="SVG-attr-endPlotNowByHour"></a>
+    <li>endPlotNowByHour<br>
+        If endPlotNow and this attribute are set to 1 and the zoom-level is
+        "day", then the displayed hour ticks will be rounded to the complete
+        hour.
         </li><br>
 
     <a id="SVG-attr-endPlotToday"></a>
@@ -2895,6 +2912,13 @@ plotAsPng(@)
         Ansonsten wird der gesamte Tag oder eine 6 Stunden Periode (0, 6, 12,
         18 Stunde) gezeigt. Dieses Attribut wird nicht verwendet, wenn das SVG
         Attribut startDate benutzt wird.<br>
+        </li><br>
+
+    <a id="SVG-attr-endPlotNowByHour"></a>
+    <li>endPlotNowByHour<br>
+        Falls endPlotNow und dieses Attribut auf 1 gesetzt sind, und Zoom-Level
+        ein Tag ist, dann werden die angezeigten Zeitmarker auf die volle
+        Stunde gerundet.
         </li><br>
 
     <a id="SVG-id-endPlotToday"></a>
