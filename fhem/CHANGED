@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  37_SHC: Support current smarthomatic version.
+                    Basestation uses 115200 Baud by default and CRC.
+                    EnvSensor supports particulate matter sensor.
  - bugfix:  73_NUKIBridge: Fix 503 Unavailable message
  - change:  88_HMCCU: Switched close to closed
  - bugfix:  70_Klafs: package main was removed from source code

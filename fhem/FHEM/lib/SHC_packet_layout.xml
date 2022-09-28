@@ -260,6 +260,10 @@
 					<Value>80</Value>
 					<Name>Thermostat</Name>
 				</Element>
+				<Element>
+					<Value>90</Value>
+					<Name>TeaMaker</Name>
+				</Element>
 			</EnumValue>
 			<UIntValue>
 				<ID>VersionMajor</ID>
@@ -289,6 +293,34 @@
 				<MinVal>0</MinVal>
 				<MaxVal>4294967295</MaxVal>
 			</UIntValue>
+		</Message>
+		<Message>
+			<Name>HardwareError</Name>
+			<Description>Reports detected problems with the hardware.</Description>
+			<MessageID>3</MessageID>
+			<MessageType>8</MessageType>
+			<Validity>test</Validity>
+			<EnumValue>
+				<ID>ErrorCode</ID>
+				<Description>Lists the type of error that occurred.</Description>
+				<Bits>8</Bits>
+				<Element>
+					<Value>0</Value>
+					<Name>ExternalReset</Name>
+				</Element>
+				<Element>
+					<Value>1</Value>
+					<Name>BrownOutReset</Name>
+				</Element>
+				<Element>
+					<Value>2</Value>
+					<Name>WatchdogReset</Name>
+				</Element>
+				<Element>
+					<Value>3</Value>
+					<Name>TransceiverWatchdogReset</Name>
+				</Element>
+			</EnumValue>
 		</Message>
 		<Message>
 			<Name>BatteryStatus</Name>
@@ -554,6 +586,47 @@
 				<MinVal>0</MinVal>
 				<MaxVal>16383</MaxVal>
 			</UIntValue>
+		</Message>
+		<Message>
+			<Name>ParticulateMatter</Name>
+			<Description/>
+			<MessageID>3</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>TypicalParticleSize</ID>
+				<Description>Typical Particle Size [1/100 μm]. Use 1023 when value invalid.</Description>
+				<Bits>10</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>1023</MaxVal>
+			</UIntValue>
+			<Array>
+				<Length>5</Length>
+				<UIntValue>
+					<ID>Size</ID>
+					<Description>Maximum particle size [1/10 µm] which is considered in the MassConcentration and NumberConcentration. Use 0 when the array element is not used.</Description>
+					<Bits>8</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>255</MaxVal>
+					<DefaultVal>0</DefaultVal>
+				</UIntValue>
+				<UIntValue>
+					<ID>MassConcentration</ID>
+					<Description>Mass concentration [1/10 μg/m3], considering the defined size. Use 1023 when the value is invalid.</Description>
+					<Bits>10</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>1023</MaxVal>
+				</UIntValue>
+				<UIntValue>
+					<ID>NumberConcentration</ID>
+					<Description>Number concentration [1/10 #/cm3], considering the defined size. Use 4095 when the value is invalid.</Description>
+					<Bits>12</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>4095</MaxVal>
+				</UIntValue>
+			</Array>
 		</Message>
 	</MessageGroup>
 	<MessageGroup>
