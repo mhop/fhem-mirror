@@ -3294,10 +3294,10 @@ name:shelly_TRV
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly-TRV using original firmware <br>early version
 order:A_16d
-par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
+par:DEV_TPC;"shellies/" and Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+)/> ? $1 : undef }
 par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
 attr DEVICE icon ICON
-attr DEVICE devicetopic shellies/DEVNAME
+attr DEVICE devicetopic DEV_TPC
 attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/settings:.* { json2nameValue($EVENT,'',$JSONMAP) }\
