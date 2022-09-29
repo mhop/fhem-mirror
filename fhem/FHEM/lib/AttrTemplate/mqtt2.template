@@ -3289,6 +3289,40 @@ attr DEVICE devStateIcon 0:off 1:on
 attr DEVICE model shelly_ix3
 setreading DEVICE attrTemplateVersion 20210108
 
+# shellyTRV using original firmware
+name:shelly_TRV
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shelly-TRV using original firmware <br>early version
+order:A_16d
+par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic shellies/DEVNAME
+attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/settings:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/online:.* online\
+  $\DEVICETOPIC/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  boost:on,off {my $val=$EVTPART1 eq 'on'; qq($\DEVICETOPIC/thermostat/0/command/accelerated_heating $val)}\
+  mode:auto,manual {my $val=$EVTPART1 eq 'auto'; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
+  profile:slider,1,1,5,1 $\DEVICETOPIC/thermostat/0/command/schedule_profile $EVTPART1\
+  desired-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/target_t $EVTPART1\
+  external-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/ext_t $EVTPART1\
+  valve:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_pos $EVTPART1\
+  valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
+  boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
+  set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1\
+attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent 
+attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE setStateList on off
+attr DEVICE model shelly_TRV
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20220929
+
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
 # shellyrgbw2 color mode
@@ -4467,7 +4501,7 @@ deletereading -q OMG_BT_ID (?!associatedWith|IODev).*
 attr OMG_BT_ID devicetopic DEV_TPC
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT); $rets->{last_IO} = $1, $rets->{"rssi_$1"} = $rets->{rssi}; return $rets}
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $EVENT =~ m,characteristic...0x2a19.*read[^\d]+([\d]+), ? return { batteryPercent => hex($1) } : $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; my $rets = json2nameValue($EVENT); $rets->{last_IO} = $1; $rets->{"rssi_$1"} = $rets->{rssi}; return $rets}
 attr OMG_BT_ID getList batteryPercent:noArg batteryPercent { my $id = ReadingsVal($NAME,'id','BT_ID'); qq($\DEVICETOPIC/commands/MQTTtoBT/config {"ble_read_address":"$id","ble_read_service":"180f","ble_read_char":"2a19","value_type":"HEX"}) }
 attr OMG_BT_ID setList beep:noArg { my $id = ReadingsVal($NAME,'id','BT_ID'); qq($\DEVICETOPIC/commands/MQTTtoBT/config {"ble_read_address":"$id","ble_read_service":"180f","ble_read_char":"2a19","value_type":"HEX","immediate":true}) }
 attr OMG_BT_ID event-on-change-reading .*
@@ -4478,7 +4512,7 @@ attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq 'FHEMWEB') }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
 set DEVICE attrTemplate set_IODev_in_channels SUBCHANNELS=OMG_BT_ID
-setreading OMG_BT_ID attrTemplateVersion 20220705
+setreading OMG_BT_ID attrTemplateVersion 20220929
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
