@@ -101,75 +101,65 @@ sub init_datafield_positions_noarray($$$$$)
 {
   my ($messageGroupID, $messageID, $field, $arrayLength, $arrayElementBits) = @_;
 
-  given ($field->nodeName) {
-    when ('UIntValue') {
-      my $id   = ($field->findnodes("ID"))[0]->textContent;
-      my $bits = ($field->findnodes("Bits"))[0]->textContent;
+  if ($field->nodeName eq "UIntValue") {
+    my $id   = ($field->findnodes("ID"))[0]->textContent;
+    my $bits = ($field->findnodes("Bits"))[0]->textContent;
 
-      # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
+    # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
 
-      $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
-        new UIntValue($id, $offset, $bits, $arrayLength, $arrayElementBits);
+    $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
+      new UIntValue($id, $offset, $bits, $arrayLength, $arrayElementBits);
 
-      $offset += $bits;
+    $offset += $bits;
+  } elsif ($field->nodeName eq "IntValue") {
+    my $id   = ($field->findnodes("ID"))[0]->textContent;
+    my $bits = ($field->findnodes("Bits"))[0]->textContent;
+
+    # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
+
+    $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
+      new IntValue($id, $offset, $bits, $arrayLength, $arrayElementBits);
+
+    $offset += $bits;
+  } elsif ($field->nodeName eq "FloatValue") {
+    my $id   = ($field->findnodes("ID"))[0]->textContent;
+    my $bits = 32;
+
+    # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
+
+    $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
+      new FloatValue($id, $offset, $arrayLength, $arrayElementBits);
+
+    $offset += $bits;
+  } elsif ($field->nodeName eq "BoolValue") {
+    my $id   = ($field->findnodes("ID"))[0]->textContent;
+    my $bits = 1;
+
+    # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
+
+    $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
+      new BoolValue($id, $offset, $arrayLength, $arrayElementBits);
+
+    $offset += $bits;
+  } elsif ($field->nodeName eq "EnumValue") {
+    my $id   = ($field->findnodes("ID"))[0]->textContent;
+    my $bits = ($field->findnodes("Bits"))[0]->textContent;
+
+    # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
+
+    my $object = new EnumValue($id, $offset, $bits, $arrayLength, $arrayElementBits);
+    $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} = $object;
+
+    for my $element ($field->findnodes("Element")) {
+      my $value = ($element->findnodes("Value"))[0]->textContent;
+      my $name  = ($element->findnodes("Name"))[0]->textContent;
+
+      $object->addValue($name, $value);
+
+      # print "Enum value " . $value . " -> " . $name . "\n";
     }
 
-    when ('IntValue') {
-      my $id   = ($field->findnodes("ID"))[0]->textContent;
-      my $bits = ($field->findnodes("Bits"))[0]->textContent;
-
-      # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
-
-      $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
-        new IntValue($id, $offset, $bits, $arrayLength, $arrayElementBits);
-
-      $offset += $bits;
-    }
-
-    when ('FloatValue') {
-      my $id   = ($field->findnodes("ID"))[0]->textContent;
-      my $bits = 32;
-
-      # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
-
-      $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
-        new FloatValue($id, $offset, $arrayLength, $arrayElementBits);
-
-      $offset += $bits;
-    }
-
-    when ('BoolValue') {
-      my $id   = ($field->findnodes("ID"))[0]->textContent;
-      my $bits = 1;
-
-      # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
-
-      $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} =
-        new BoolValue($id, $offset, $arrayLength, $arrayElementBits);
-
-      $offset += $bits;
-    }
-
-    when ('EnumValue') {
-      my $id   = ($field->findnodes("ID"))[0]->textContent;
-      my $bits = ($field->findnodes("Bits"))[0]->textContent;
-
-      # print "Data field " . $id . " starts at " . $offset . " with " . $bits . " bits.\n";
-
-      my $object = new EnumValue($id, $offset, $bits, $arrayLength, $arrayElementBits);
-      $dataFields{$messageGroupID . "-" . $messageID . "-" . $id} = $object;
-
-      for my $element ($field->findnodes("Element")) {
-        my $value = ($element->findnodes("Value"))[0]->textContent;
-        my $name  = ($element->findnodes("Name"))[0]->textContent;
-
-        $object->addValue($name, $value);
-
-		# print "Enum value " . $value . " -> " . $name . "\n";
-      }
-
-      $offset += $bits;
-    }
+    $offset += $bits;
   }
 }
 
