@@ -1779,7 +1779,7 @@ SVG_render($$$$$$$$$$)
         $off1 = int($x+($i-$fromsec)*$tmul);
       }
       $t = SVG_fmtTime($tag, $i);
-      if($off1 == $x) {
+      if($off1 < $x+10) { # first text, too close to the date field
         SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
                   "text-anchor=\"left\">$t</text>";
       } elsif ($off1 < $x+$w-8) {
