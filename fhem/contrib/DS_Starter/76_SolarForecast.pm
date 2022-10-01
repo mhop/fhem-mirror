@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.4 "=> "01.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ",
   "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
   "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
@@ -1843,6 +1844,7 @@ sub __solCast_ApiResponse {
   my $allstrings = $paref->{allstrings};
   
   my $type       = $hash->{TYPE};
+  my $t          = time;
   
   my ($msg,$starttmstr);
 
@@ -1886,6 +1888,8 @@ sub __solCast_ApiResponse {
           $msg = 'SolCast API server response: '.$jdata->{'response_status'}{'message'};
           
           Log3 ($name, 3, "$name - $msg");
+          
+          ___setLastAPIcallKeyData ($hash, $t);
           
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
           readingsSingleUpdate($hash, "state", $msg, 1);
@@ -1952,7 +1956,6 @@ sub __solCast_ApiResponse {
       }
   }
   
-  my $t = time;
   ___setLastAPIcallKeyData ($hash, $t);
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = 'success';
@@ -2020,8 +2023,8 @@ sub ___setLastAPIcallKeyData {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                    # letzter Abrufzeitstempel
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];           # letzte Abrufzeit
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                        # letzter Abrufzeitstempel
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
   
@@ -2039,7 +2042,7 @@ sub ___setLastAPIcallKeyData {
       
       # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
       
-      my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));                                 # verbleibende SolCast API Calls am aktuellen Tag
+      my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));            # verbleibende SolCast API Calls am aktuellen Tag
       $darr    = 0 if($darr < 0);
       
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
@@ -2062,6 +2065,7 @@ sub ___setLastAPIcallKeyData {
   
   my $lang   = AttrVal ('global', 'language', 'EN');
   my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef);
+  
   readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv))[0], 1);
   
 return;
@@ -3581,19 +3585,28 @@ sub _calcMaxEstimateToday {
  
   return if (!keys %{$data{$type}{$name}{nexthours}});
   
-  my $maxest = ReadingsNum($name, 'Today_MaxPVforecast', 0);
+  my $maxest = ReadingsNum($name, 'Today_MaxPVforecast',       0);
+  my $maxtim = ReadingsVal($name, 'Today_MaxPVforecastTime', '-');
+  my $doold  = 1;
   
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
       next if(!NexthoursVal ($hash, $idx, 'today', 0));
       
       my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
-      next if($pvfc <= $maxest);
+      next if($pvfc < $maxest);
       
       my $stt = NexthoursVal ($hash, $idx, 'starttime', '');
       next if(!$stt);
       
+      $doold = 0;
+      
       push @$daref, "Today_MaxPVforecast<>".     $pvfc." Wh";
       push @$daref, "Today_MaxPVforecastTime<>". $stt;
+  }
+  
+  if ($doold) {
+      push @$daref, "Today_MaxPVforecast<>".     $maxest." Wh";
+      push @$daref, "Today_MaxPVforecastTime<>". $maxtim;     
   }
     
 return;
