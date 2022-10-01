@@ -4706,8 +4706,9 @@ sub ___switchConsumerOn {
   Log3 ($name, 1, "$name - $err") if($err);
   
   if ($debug) {                                                                                   # nur für Debugging
+      my $cons = CurrentVal ($hash, 'consumption', 0);
       Log (1, qq{DEBUG> $name consumer "$c" - general switching parameters: }.
-              qq{auto mode: $auto, }.
+              qq{auto mode: $auto, current Consumption: $cons W, }.
               qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef").", ".
               qq{timestamp: $t}              
            ); 
