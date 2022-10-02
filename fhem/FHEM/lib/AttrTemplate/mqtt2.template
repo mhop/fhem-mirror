@@ -238,7 +238,7 @@ par:ICON;ICON as set, defaults to light_control;{ AttrVal('DEVICE','icon','light
 attr DEVICE icon ICON
 attr DEVICE webCmd toggle:on:off:brightness:ct
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
+attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
@@ -248,7 +248,7 @@ attr DEVICE setList \
 attr DEVICE jsonMap color_temp:ct color_temp_startup:ct_startup
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_cct
-setreading DEVICE attrTemplateVersion 20220909
+setreading DEVICE attrTemplateVersion 20221002
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgb_hex
@@ -3291,10 +3291,10 @@ setreading DEVICE attrTemplateVersion 20210108
 
 # shellyTRV using original firmware
 name:shelly_TRV
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*,TYPE=MQTT2_DEVICE:FILTER=devicetopic=.*shellies.*
 desc:shelly-TRV using original firmware <br>early version
 order:A_16d
-par:DEV_TPC;"shellies/" and Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+)/> ? $1 : undef }
+par:DEV_TPC;"shellies/" and Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+)> ? $1 : undef }
 par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
 attr DEVICE icon ICON
 attr DEVICE devicetopic DEV_TPC
@@ -3312,7 +3312,7 @@ attr DEVICE setList \
   valve:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_pos $EVTPART1\
   valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
-  set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1\
+  set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
 attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent 
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
 attr DEVICE webCmd desired-temp
@@ -3321,7 +3321,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20220929
+setreading DEVICE attrTemplateVersion 20221001
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
