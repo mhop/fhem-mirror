@@ -126,7 +126,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.68.4 "=> "01.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ",
+  "0.68.4 "=> "02.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
+                           "add SolCast section in _graphicHeader ",
   "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
   "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
@@ -391,6 +392,20 @@ my %hqtxt = (                                                                   
               DE => qq{Aus/Ein}                                                                                             },
   auto   => { EN => qq{Auto},
               DE => qq{Auto}                                                                                                },
+  lupt   => { EN => qq{last&nbsp;update:},
+              DE => qq{Stand:}                                                                                              },
+  autoct => { EN => qq{automatic&nbsp;correction:},
+              DE => qq{automatische&nbsp;Korrektur:}                                                                        },
+  lbpcq  => { EN => qq{correction&nbsp;quality&nbsp;current&nbsp;hour:},
+              DE => qq{Korrekturqualität&nbsp;akt.&nbsp;Stunde:}                                                            },
+  lblPvh => { EN => qq{next&nbsp;4h:},
+              DE => qq{nächste&nbsp;4h:}                                                                                    },
+  lblPRe => { EN => qq{remain&nbsp;today:},
+              DE => qq{Rest&nbsp;heute:}                                                                                    },
+  lblPTo => { EN => qq{tomorrow:},
+              DE => qq{morgen:}                                                                                             },
+  lblPCu => { EN => qq{actual:},
+              DE => qq{aktuell:}                                                                                            },
   bnsas  => { EN => qq{from the upcoming sunrise},
               DE => qq{ab dem kommenden Sonnenaufgang}                                                                      },
   after  => { EN => qq{after},
@@ -4703,12 +4718,13 @@ sub ___switchConsumerOn {
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
       my $nompow = ConsumerVal ($hash, $c, 'power', '-');
       my $sp     = CurrentVal  ($hash, 'surplus',  0);
-      Log (1, qq{DEBUG> $name consumer "$c" - general switching parameters: }.
+      
+      Log (1, qq{DEBUG> $name consumer "$c" - general switching parameters => }.
               qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
               qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef").", ".
               qq{timestamp: $t}              
            ); 
-      Log (1, qq{DEBUG> $name consumer "$c" - Context of switching "on": }.
+      Log (1, qq{DEBUG> $name consumer "$c" - current Context is switching "on" => }.
               qq{swoncond: $swoncond, on-command: $oncom }              
            );           
   }
@@ -4797,7 +4813,7 @@ sub ___switchConsumerOff {
   Log3 ($name, 1, "$name - $err") if($err);
   
   if($debug) {                                                                                    # nur für Debugging
-      Log (1, qq{DEBUG> $name consumer "$c" - Context of switching "off": }.
+      Log (1, qq{DEBUG> $name consumer "$c" - current Context is switching "off" => }.
               qq{swoffcond: $swoffcond, off-command: $offcom }             
            );
   }
@@ -6084,23 +6100,13 @@ sub _graphicHeader {
       $pvCu .= "&nbsp;W";
   }
   
-  my $lupt    = "last&nbsp;update:";
-  my $autoct  = "automatic&nbsp;correction:";
-  my $lbpcq   = "correction&nbsp;quality&nbsp;current&nbsp;hour:";      
-  my $lblPv4h = "next&nbsp;4h:";
-  my $lblPvRe = "remain&nbsp;today:";
-  my $lblPvTo = "tomorrow:";
-  my $lblPvCu = "actual:";
- 
-  if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
-      $lupt    = "Stand:";
-      $autoct  = "automatische&nbsp;Korrektur:";
-      $lbpcq   = encode("utf8", "Korrekturqualität&nbsp;akt.&nbsp;Stunde:");          
-      $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
-      $lblPvRe = "Rest&nbsp;heute:";
-      $lblPvTo = "morgen:";
-      $lblPvCu = "aktuell:";
-  }
+  my $lupt    = $hqtxt{lupt}{$lang};
+  my $autoct  = $hqtxt{autoct}{$lang};
+  my $lbpcq   = encode("utf8", $hqtxt{lbpcq}{$lang});     
+  my $lblPv4h = encode("utf8", $hqtxt{lblPvh}{$lang}); 
+  my $lblPvRe = $hqtxt{lblPRe}{$lang};
+  my $lblPvTo = $hqtxt{lblPTo}{$lang};
+  my $lblPvCu = $hqtxt{lblPCu}{$lang};
   
   ## Header Start
   #################
@@ -6109,9 +6115,11 @@ sub _graphicHeader {
   # Header Link + Status + Update Button     
   #########################################      
   if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-      my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+      my ($upicon,$scicon,$img);
       
-      $lup = "$year-$month-$day&nbsp;$time";
+      my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+      $lup                            = "$year-$month-$day&nbsp;$time";
+      
       if($lang eq "DE") {
          $lup = "$day.$month.$year&nbsp;$time"; 
       }
@@ -6123,10 +6131,42 @@ sub _graphicHeader {
       }
 
       my $upstate = ReadingsVal($name, "state", "");
+      
+      ## SolCast Sektion
+      ####################
+      my $api = isSolCastUsed ($hash) ? 'SolCast:' : q{};
+      
+      if($api) {
+          my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
+          
+          if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
+              my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+              $lrt                         = "$sly-$slmo-$sld&nbsp;$slt";
+              
+              if($lang eq "DE") {
+                 $lrt = "$sld.$slmo.$sly&nbsp;$slt"; 
+              }
+          }
+          
+          $api    .= '&nbsp;'.$lrt;
+          my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
+          
+          if ($scrm eq 'success') {
+              $img    = FW_makeImage('10px-kreis-gruen.png', $scrm);
+              $scicon = "<a>$img</a>";
+          } 
+          else {
+              $img    = FW_makeImage('10px-kreis-rot.png', $scrm);
+              $scicon = "<a>$img</a>";
+          }
+          
+          $api .= '&nbsp;&nbsp;'.$scicon;
+          $api .= '&nbsp;&nbsp;('.SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= '/'.SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls', 0).')';
+      }
 
       ## Update-Icon
-      ##############
-      my ($upicon,$img);
+      ################
       if ($upstate =~ /updated|successfully|switched/ix) {
           $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang});
           $upicon = "<a onClick=$cmdupdate>$img</a>";
@@ -6179,7 +6219,7 @@ sub _graphicHeader {
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
  
-      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b> $dlink </b></td><td colspan="3" align="left" $dstyle> $lupt   &nbsp; $lup &nbsp; $upicon </td><td>                                                         </td></tr>};
+      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b> $dlink </b></td><td colspan="3" align="left" $dstyle> $lupt   &nbsp; $lup &nbsp; $upicon </td><td colspan="3" align="left" $dstyle> $api                   </td></tr>};
       $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b>        </b></td><td colspan="3" align="left" $dstyle> $autoct &nbsp;             $acicon </td><td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon </td></tr>};
   }
   
@@ -8754,7 +8794,7 @@ sub isAddSwitchOffCond {
       return (1, $info, $err);
   }
   
-  $info = qq{The device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n}.
+  $info = qq{device: "$dswoffcond", reading: "$rswoffcond" , value: "$condval" (hysteresis = $hyst) doesn't match Regex: "$swoffcondregex" \n}.
           qq{-> DO NOT Switch-off or DO NOT interrupt in the "switch-off context", Switching on or continuing in the "switch-on" context\n}
           ;  
 
@@ -9191,7 +9231,7 @@ return $def;
 # Sonderabfragen
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
-# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',       $def) - heute ausgeführte API Requests
+# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
 # SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Requests
 # SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall                             
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
