@@ -1,4 +1,4 @@
-REV 26457
+REV 26461
 DIR unused
 UPD 2022-09-29_07:45:02 383449 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -613,7 +613,7 @@ UPD 2020-06-07_07:45:04 15872 FHEM/firmware/ArduCounter-ESP32-bootloader_dio_40m
 UPD 2020-06-07_07:45:04 3072 FHEM/firmware/ArduCounter-ESP32-partitions.bin
 UPD 2020-06-07_07:45:04 863488 FHEM/firmware/ArduCounter-ESP32.bin
 UPD 2020-06-07_07:45:04 917728 FHEM/firmware/ArduCounter-ESP32T.bin
-UPD 2020-06-07_07:45:04 390928 FHEM/firmware/ArduCounter-ESP8266.bin
+UPD 2022-10-02_07:45:03 396160 FHEM/firmware/ArduCounter-ESP8266.bin
 UPD 2020-06-07_07:45:04 45378 FHEM/firmware/ArduCounter-NANO.hex
 UPD 2020-06-11_07:45:05 2428 FHEM/firmware/ArduCounter-platformio-sample.ini
 UPD 2020-06-11_07:45:05 92455 FHEM/firmware/ArduCounter.cpp
@@ -750,8 +750,8 @@ UPD 2022-09-29_07:45:06 4806626 docs/commandref.html
 UPD 2022-09-29_07:45:09 2859621 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-10-01_07:45:10 290174 docs/commandref_modular.html
-UPD 2022-10-01_07:45:12 301327 docs/commandref_modular_DE.html
+UPD 2022-10-02_07:45:11 290174 docs/commandref_modular.html
+UPD 2022-10-02_07:45:12 301327 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
