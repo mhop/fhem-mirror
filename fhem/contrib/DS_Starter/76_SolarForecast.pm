@@ -3586,7 +3586,6 @@ sub _calcMaxEstimateToday {
   
   my $maxest = ReadingsNum($name, 'Today_MaxPVforecast',       0);
   my $maxtim = ReadingsVal($name, 'Today_MaxPVforecastTime', '-');
-  my $doold  = 1;
   
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
       next if(!NexthoursVal ($hash, $idx, 'today', 0));
@@ -3597,16 +3596,12 @@ sub _calcMaxEstimateToday {
       my $stt = NexthoursVal ($hash, $idx, 'starttime', '');
       next if(!$stt);
       
-      $doold = 0;
-      
-      push @$daref, "Today_MaxPVforecast<>".     $pvfc." Wh";
-      push @$daref, "Today_MaxPVforecastTime<>". $stt;
+      $maxest = $pvfc;
+      $maxtim = $stt;
   }
   
-  if ($doold) {
-      push @$daref, "Today_MaxPVforecast<>".     $maxest." Wh";
-      push @$daref, "Today_MaxPVforecastTime<>". $maxtim;     
-  }
+  push @$daref, "Today_MaxPVforecast<>".     $maxest." Wh";
+  push @$daref, "Today_MaxPVforecastTime<>". $maxtim;     
     
 return;
 }
