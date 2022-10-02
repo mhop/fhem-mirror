@@ -4702,7 +4702,7 @@ sub ___switchConsumerOn {
   if ($debug) {                                                                                   # nur für Debugging
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
       my $nompow = ConsumerVal ($hash, $c, 'power', '-');
-      my $sp     = CurrentVal  ($hash, 'consumption',  0);
+      my $sp     = CurrentVal  ($hash, 'surplus',  0);
       Log (1, qq{DEBUG> $name consumer "$c" - general switching parameters: }.
               qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
               qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef").", ".
