@@ -917,9 +917,8 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));  
 
-  my $startts  = time;  
-  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
-  my $stopdiff = ceil        ($mintime * 60);  
+  my $startts  = time;
+  my $stopdiff = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
   my $stopts   = $startts + $stopdiff;                                      
   
   $paref->{consumer} = $c;
