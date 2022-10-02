@@ -31,7 +31,7 @@ sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
 
-my $HMCCUDEV_VERSION = '5.0 222632130';
+my $HMCCUDEV_VERSION = '5.0 222751518';
 
 ######################################################################
 # Initialize module
@@ -52,7 +52,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccuaggregate:textField-long ccucalculate:textField-long '. 
-		'ccuflags:multiple-strict,ackState,hideStdReadings,replaceStdReadings,noBoundsChecking,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
+		'ccuflags:multiple-strict,ackState,hideStdReadings,replaceStdReadings,noBoundsChecking,logCommand,noReadings,trace,simulate,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
 		'ccureadingfilter:textField-long '.
 		'ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc '.
 		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix devStateFlags '.

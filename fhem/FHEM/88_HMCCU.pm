@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 222632130';
+my $HMCCU_VERSION = '5.0 222751518';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -7426,7 +7426,7 @@ sub HMCCU_ExecuteRoleCommand ($@)
 
 		# Align new value with min/max boundaries
 		if (exists($cmd->{min}) && exists($cmd->{max}) && HMCCU_IsFltNum($cmd->{min}) && HMCCU_IsFltNum($cmd->{max})) {
-			# Use mode = 0 in HMCCU_ScaleValue to get the min and max value allowed
+			# Use mode = 2 in HMCCU_ScaleValue to get the min and max value allowed
 			HMCCU_Trace ($clHash, 2, "MinMax: value=$value, min=$cmd->{min}, max=$cmd->{max}");
 			my $scMin = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{min}, 2);
 			my $scMax = HMCCU_ScaleValue ($clHash, $channel, $cmd->{dpt}, $cmd->{max}, 2);
@@ -9171,12 +9171,12 @@ sub HMCCU_SetMultipleParameters ($$$;$)
 	my ($clHash, $address, $params, $paramSet) = @_;
 	$paramSet //= 'VALUES';
 	$address =~ s/:d$//;
+	my $clName = $clHash->{NAME};
 
 	my ($add, $chn) = HMCCU_SplitChnAddr ($address, 'd');
 	return (-1, undef) if ($paramSet eq 'VALUES' && $chn eq 'd');
 	
 	foreach my $p (sort keys %$params) {
-		HMCCU_Trace ($clHash, 2, "Parameter=$address.$paramSet.$p chn=$chn Value=$params->{$p}");
 		return (-8, undef) if (
 			($paramSet eq 'VALUES' && !HMCCU_IsValidParameter ($clHash, $address, 'VALUES', $p, 2)) ||
 			($paramSet eq 'MASTER' && !HMCCU_IsValidParameter ($clHash, $address, 'MASTER', $p))
@@ -9184,7 +9184,10 @@ sub HMCCU_SetMultipleParameters ($$$;$)
 		if ($params->{$p} !~ /:(STRING|BOOL|INTEGER|FLOAT|DOUBLE)$/) {
 			$params->{$p} = HMCCU_ScaleValue ($clHash, $chn, $p, $params->{$p}, 1, $paramSet);
 		}
+		HMCCU_Trace ($clHash, 2, "set parameter=$address.$paramSet.$p chn=$chn value=$params->{$p}");
 	}
+
+	return 0 if (HMCCU_IsFlag ($clName, 'simulate'));
 
 	return HMCCU_RPCParamsetRequest ($clHash, 'putParamset', $address, $paramSet, $params);
 }
@@ -9237,8 +9240,6 @@ sub HMCCU_SetMultipleDatapoints ($$)
 		return -4 if (exists($clHash->{ccudevstate}) && $clHash->{ccudevstate} eq 'deleted');
 		return -21 if (IsDisabled ($clHash->{NAME}));
 	
-		HMCCU_Trace ($clHash, 2, "dpt=$p, value=$v");
-
 		# Check client device type and datapoint
 		my $clType = $clHash->{TYPE};
 		my $ccuType = $clHash->{ccutype};
@@ -9272,6 +9273,9 @@ sub HMCCU_SetMultipleDatapoints ($$)
 				$v = HMCCU_GetEnumValues ($ioHash, $paramDef, $dpt, $v);
 			}
 		}
+
+		HMCCU_Trace ($clHash, 2, "set dpt=$p, value=$v");
+
 #		my $dptType = HMCCU_GetDatapointAttr ($ioHash, $ccuType, $chn, $dpt, 'type');
 #		$v = "'".$v."'" if (defined($dptType) && $dptType == $HMCCU_TYPE_STRING);
 		my $c = '(datapoints.Get("'.$int.'.'.$add.':'.$chn.'.'.$dpt.'")).State('.$v.");\n";
@@ -9284,6 +9288,9 @@ sub HMCCU_SetMultipleDatapoints ($$)
 		}
 	}
 	
+	HMCCU_Trace ($clHash, 2, "cmd=$cmd");
+	return 0 if (HMCCU_IsFlag ($clName, 'simulate'));
+
 	if ($ccuFlags =~ /nonBlocking/) {
 		# Execute command (non blocking)
 		HMCCU_HMCommandNB ($clHash, $cmd, undef);
@@ -9298,7 +9305,10 @@ sub HMCCU_SetMultipleDatapoints ($$)
 
 ######################################################################
 # Scale, spread and/or shift datapoint value.
-# Mode: 0 = Get/Multiply, 1 = Set/Divide, 2 = Scale min/max value
+# Mode:
+#   0 = Get/Multiply/Scale up
+#   1 = Set/Divide/Scale down
+#   2 = Scale min/max value
 # Supports reversing of value if value range is specified. Syntax for
 # Rule is:
 #   [ChannelNo.]Datapoint:Factor
@@ -9315,8 +9325,11 @@ sub HMCCU_ScaleValue ($$$$$;$)
 	my $name = $hash->{NAME};
 	my $ioHash = HMCCU_GetHash ($hash);
 
-#	my $boundsChecking = HMCCU_IsFlag ($name, 'noBoundsChecking') ? 0 : 1;
-	my $boundsChecking = $dpt =~ /^LEVEL/ && ($value == -0.005 || $value == 1.005 || $value == 1.01) ? 0 : 1;
+	my $boundsChecking = (
+		$mode == 2 ||
+		($mode == 0 && $dpt =~ /^LEVEL/ && ($value == -0.005 || $value == 1.005 || $value == 1.01)) ||
+		($mode == 1 && $dpt =~ /^LEVEL/ && ($value == -0.5 || $value == 100.5 || $value == 101))
+	) ? 0 : 1;
 
 	# Get parameter definition and min/max values
 	my $min;
@@ -9416,16 +9429,15 @@ sub HMCCU_ScaleValue ($$$$$;$)
 	elsif (defined($unit) && ($unit eq 'minutes' || $unit eq 's')) {
 		$value = HMCCU_ConvertTime ($value, $unit, $mode);
 	}
-	elsif (defined($unit) && $unit =~ /^([0-9]+)%$/ && $boundsChecking) {
-		# percentage values. Values < 0 won't be scaled
+	elsif (defined($unit) && $unit =~ /^([0-9]+)%$/) {
 		my $f = $1;
 		$min //= 0;
 		$max //= 1.0;
 		if ($mode == 0 || $mode == 2) {
-			$value = HMCCU_MinMax ($value, $min, $max)*$f;
+			$value = $boundsChecking ? HMCCU_MinMax ($value, $min, $max)*$f : $value*$f;
 		}
 		else {
-			$value = HMCCU_MinMax($value, $min*$f, $max*$f)/$f;
+			$value = $boundsChecking ? HMCCU_MinMax($value, $min*$f, $max*$f)/$f : $value/$f;
 		}
 	}
 	

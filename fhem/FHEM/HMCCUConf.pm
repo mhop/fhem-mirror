@@ -368,7 +368,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'close' => 'V:LEVEL:0',
 		'up' => 'V:LEVEL:?delta=+20',
 		'down' => 'V:LEVEL:?delta=-20',
-		'oldPos' => 'V:LEVEL:1.005',
+		'oldPos' => 'V:LEVEL:100.5',
 		'stop' => 'V:STOP:1'
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
@@ -535,7 +535,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'WINMATIC' => {
 		'open' => 'V:LEVEL:100',
 		'close' => 'V:LEVEL:0',
-		'lock' => 'V:LEVEL:-0.005',
+		'lock' => 'V:LEVEL:-0.5',
 		'pct' => 'V:LEVEL:?level',
 		'stop' => 'V:STOP:1'
 	}
@@ -805,7 +805,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		'ALARMSTATE' => { '0' => 'noAlarm', '1' => 'alarm', 'false' => 'noAlarm', 'true' => 'alarm' }
 	},
 	'WINMATIC' => {
-		'LEVEL' => { '0' => 'closed', '100' => 'open', '-0.005' => 'locked' }
+		'LEVEL' => { '0' => 'closed', '100' => 'open', '-0.5' => 'locked' }
 	},
 	'DEFAULT' => {
 		'AES_KEY' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' },
