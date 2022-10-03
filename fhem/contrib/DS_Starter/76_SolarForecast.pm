@@ -127,7 +127,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
-                           "add SolCast section in _graphicHeader, change default colors and settings ",
+                           "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ",
   "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
   "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
@@ -2053,15 +2053,15 @@ sub ___setLastAPIcallKeyData {
   ## Berechnung des optimalen Request Intervalls
   ################################################  
   my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
-  my $madr = $apimaxreqs / $asc;                                                                                    # kalkulieren max. tägliche Anzahl API Abrufe
+  my $madr = $apimaxreqs / $asc;                                                                                    # vorläufige max. tägliche Anzahl API Requests
   
   my %seen;
   my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
   my @unique = grep { !$seen{$_}++ } @as;                                                             
   my $upc    = scalar @unique;
-  $madr     *= $upc;
-  
-  # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
+  $madr     *= $upc;                                                                                                # max. tägliche Anzahl API Requests                                                                    
+
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier} = ($asc * $upc);
   
   my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));            # verbleibende SolCast API Calls am aktuellen Tag
   $darr    = 0 if($darr < 0);
@@ -2071,7 +2071,7 @@ sub ___setLastAPIcallKeyData {
   if (AttrVal($name, 'optimizeSolCastAPIreqInterval', 0)) {      
       my $date   = strftime "%Y-%m-%d", localtime($t);  
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
-      my $dart   = $sstime - $t;                                                                                        # verbleibende Sekunden bis Sonnenuntergang
+      my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
       
       #$data{$type}{$name}{current}{secondsUntilSunSet} = $dart;
@@ -5438,15 +5438,16 @@ sub _createSummaries {
   my $type   = $hash->{TYPE};
   $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
   
-  ## Vorhersagen
-  ################
-  my $next1HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $next2HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $next3HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $next4HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  ## Initialisierung
+  ####################
+  my $next1HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $next2HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $next3HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $next4HoursSum = { "PV" => 0, "Consumption" => 0 };
+  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0 };
+  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
+  my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
+  my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
   
   my $rdh              = 24 - $chour - 1;                                                             # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
   my $remainminutes    = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
@@ -5504,7 +5505,8 @@ sub _createSummaries {
   }
   
   for my $th (1..24) {
-      $todaySum->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
+      $todaySumFc->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
+      $todaySumRe->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVreal",     0);
   }
   
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
@@ -5546,7 +5548,8 @@ sub _createSummaries {
   push @$daref, "NextHours_Sum04_PVforecast<>".  (int $next4HoursSum->{PV})." Wh";
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PVforecast<>".            (int $todaySum->{PV}).     " Wh";
+  push @$daref, "Today_PVforecast<>".            (int $todaySumFc->{PV}).   " Wh";
+  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh";
   
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
@@ -6168,8 +6171,15 @@ sub _graphicHeader {
           }
           
           $api .= '&nbsp;&nbsp;'.$scicon;
-          $api .= '&nbsp;&nbsp;('.SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-          $api .= '/'.SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls', $apimaxreqs).')';
+          $api .= '&nbsp;&nbsp;(';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= '/';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls', $apimaxreqs) * 
+                  SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);
+          $api .= ')';
+          
+          
+          
       }
 
       ## Update-Icon
@@ -8355,7 +8365,8 @@ sub checkPlantConfig {
   my $lang = AttrVal ("global", 'language', 'EN');
   
   my $sc;
-  my $cf = 0;                                                  # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
+  my $result = { 'stringconfig' => '', 'result' => '', 'state' => '', 'note' => '', 'fault' => 0 };       # Ergebnishash
+  my $cf     = 0;                                                                                          # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
   
   my $err = createStringConfig ($hash);
   
@@ -8399,6 +8410,24 @@ sub checkPlantConfig {
   else {
       $sc .= encode ("utf8", $hqtxt{strok}{$lang});
   }
+  
+  my $out  = qq{<html>};
+  $out    .= qq{<b>Plant Configuration check Info</b> <br><br>};
+  $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
+  $out    .= qq{<tr><td> <b>Object</b> </td><td> <b>Result</b> </td><td> <b>State</b> </td><td> <b>Note</b> </td></tr>};
+  $out    .= qq{<tr><td>               </td><td>               </td><td>              </td><td>             </td></tr>};
+
+  for my $key (sort keys %{$result}) {
+      $out .= qq{<tr>};
+      $out .= qq{<td> $result->{stringconfig} </td>};
+      $out .= qq{<td> $result->{result}       </td>};
+      $out .= qq{<td style="text-align: center"> $result->{state}  </td>};
+      $out .= qq{<td style="text-align: center"> $result->{note}   </td>};
+      $out .= qq{</tr>};
+  }
+
+  $out .= qq{</table>};
+  $out .= qq{</html>};
       
 return $sc;
 }
@@ -9227,7 +9256,7 @@ sub ConsumerVal {
 return $def;
 }
 
-############################################################################################################
+#############################################################################################################################
 # Wert des solcastapi-Hash zurückliefern
 # Usage:
 # SolCastAPIVal ($hash, $tring, $ststr, $key, $def)
@@ -9241,12 +9270,13 @@ return $def;
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
 # SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
-# SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Requests
+# SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Aufrufe (ungl. Requests !)
+# SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier',$def) - APIcalls = APIRequests * solCastAPIcallMultiplier
 # SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall                             
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'apikey',              $def) - API-Key, <pk> = Paarschlüssel
 #
-############################################################################################################
+#############################################################################################################################
 sub SolCastAPIVal {
   my $hash   = shift;
   my $string = shift;
