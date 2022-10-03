@@ -126,8 +126,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.68.4 "=> "02.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
-                           "add SolCast section in _graphicHeader ",
+  "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
+                           "add SolCast section in _graphicHeader, change default colors and settings ",
   "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
   "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
@@ -606,9 +606,17 @@ my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);    
 my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
 my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
-my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
 
+my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
 my $defflowGSize = 300;                                                           # default flowGraphicSize
+my $histhourdef  = -2;                                                            # default Anzeige vorangegangene Stunden
+my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag Default Farbe
+my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht Default Farbe
+my $b1coldef     = 'FFAC63';                                                      # Default Farbe Beam 1
+my $b1fontcoldef = '0D0D0D';                                                      # Default Schriftfarbe Beam 1
+my $b2coldef     = 'C4C4A7';                                                      # Default Farbe Beam 2
+my $b2fontcoldef = '000000';                                                      # Default Schriftfarbe Beam 2
+  
 my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
 my $defhyst      = 0;                                                             # default Hysterese
 
@@ -706,7 +714,7 @@ sub Initialize {
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast,none ".                                     
                                 "headerDetail:all,co,pv,pvco,statusLink ".
-                                "historyHour:slider,-23,-1,0 ".
+                                "historyHour:slider,0,-1,-23 ".
                                 "hourCount:slider,4,1,24 ".                                                                
                                 "hourStyle ".
                                 "htmlStart ".
@@ -2044,23 +2052,23 @@ sub ___setLastAPIcallKeyData {
   
   ## Berechnung des optimalen Request Intervalls
   ################################################  
-  if (AttrVal($name, 'optimizeSolCastAPIreqInterval', 0)) {
-      my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
-      my $madr = $apimaxreqs / $asc;                                                                                    # kalkulieren max. tägliche Anzahl API Abrufe
-      
-      my %seen;
-      my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
-      my @unique = grep { !$seen{$_}++ } @as;                                                             
-      my $upc    = scalar @unique;
-      $madr     *= $upc;
-      
-      # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
-      
-      my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));            # verbleibende SolCast API Calls am aktuellen Tag
-      $darr    = 0 if($darr < 0);
-      
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
-      
+  my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
+  my $madr = $apimaxreqs / $asc;                                                                                    # kalkulieren max. tägliche Anzahl API Abrufe
+  
+  my %seen;
+  my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
+  my @unique = grep { !$seen{$_}++ } @as;                                                             
+  my $upc    = scalar @unique;
+  $madr     *= $upc;
+  
+  # $data{$type}{$name}{current}{solCastTodayMaxAPIcalls} = $madr;
+  
+  my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));            # verbleibende SolCast API Calls am aktuellen Tag
+  $darr    = 0 if($darr < 0);
+  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
+  
+  if (AttrVal($name, 'optimizeSolCastAPIreqInterval', 0)) {      
       my $date   = strftime "%Y-%m-%d", localtime($t);  
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
       my $dart   = $sstime - $t;                                                                                        # verbleibende Sekunden bis Sonnenuntergang
@@ -5800,7 +5808,6 @@ sub entryGraphic {
   ###################################   
   my $width      = AttrNum ($name, 'beamWidth',           6);                              # zu klein ist nicht problematisch  
   my $maxhours   = AttrNum ($name, 'hourCount',          24);
-  my $colorw     = AttrVal ($name, 'weatherColor', 'FFFFFF');                              # Wetter Icon Farbe
   
   my $alias      = AttrVal ($name, "alias", $name);                                        # Linktext als Aliasname oder Devicename setzen
   my $gsel       = AttrVal ($name, 'graphicSelect', 'both');                               # Auswahl der anzuzeigenden Grafiken
@@ -5817,17 +5824,17 @@ sub entryGraphic {
       maxhours       => $maxhours,
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
-      offset         => AttrNum ($name,    'historyHour',                       0),
+      offset         => AttrNum ($name,    'historyHour',            $histhourdef),
       hourstyle      => AttrVal ($name,    'hourStyle',                        ''),
-      colorfc        => AttrVal ($name,    'beam1Color',                 '000000'),
-      colorc         => AttrVal ($name,    'beam2Color',                 'C4C4A7'),
-      fcolor1        => AttrVal ($name,    'beam1FontColor',             'C4C4A7'),
-      fcolor2        => AttrVal ($name,    'beam2FontColor',             '000000'),  
-      beam1cont      => AttrVal ($name,    'beam1Content',           'pvForecast'),
+      colorfc        => AttrVal ($name,    'beam1Color',                $b1coldef),
+      colorc         => AttrVal ($name,    'beam2Color',                $b2coldef),
+      fcolor1        => AttrVal ($name,    'beam1FontColor',        $b1fontcoldef),
+      fcolor2        => AttrVal ($name,    'beam2FontColor',        $b2fontcoldef),  
+      beam1cont      => AttrVal ($name,    'beam1Content',               'pvReal'),
       beam2cont      => AttrVal ($name,    'beam2Content',           'pvForecast'), 
       caicon         => AttrVal ($name,    'consumerAdviceIcon',       $caicondef),            # Consumer AdviceIcon
       clegend        => AttrVal ($name,    'consumerLegend',           'icon_top'),            # Lage und Art Cunsumer Legende
-      lotype         => AttrVal ($name,    'layoutType',                 'single'),
+      lotype         => AttrVal ($name,    'layoutType',                 'double'),
       kw             => AttrVal ($name,    'Wh_kWh',                         'Wh'),
       height         => AttrNum ($name,    'beamHeight',                      200),
       width          => $width,
@@ -5836,8 +5843,8 @@ sub entryGraphic {
       show_night     => AttrNum ($name,    'showNight',                         0),            # alle Balken (Spalten) anzeigen ?
       show_diff      => AttrVal ($name,    'showDiff',                       'no'),            # zusätzliche Anzeige $di{} in allen Typen
       weather        => AttrNum ($name,    'showWeather',                       1),
-      colorw         => $colorw,
-      colorwn        => AttrVal ($name,    'weatherColorNight',           $colorw),            # Wetter Icon Farbe Nacht
+      colorw         => AttrVal ($name,    'weatherColor',            $wthcolddef),            # Wetter Icon Farbe Tag
+      colorwn        => AttrVal ($name,    'weatherColorNight',       $wthcolndef),            # Wetter Icon Farbe Nacht
       wlalias        => AttrVal ($name,    'alias',                         $name),
       header         => AttrNum ($name,    'showHeader',                        1), 
       hdrDetail      => AttrVal ($name,    'headerDetail',                  'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
@@ -6162,7 +6169,7 @@ sub _graphicHeader {
           
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '&nbsp;&nbsp;('.SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-          $api .= '/'.SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls', 0).')';
+          $api .= '/'.SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls', $apimaxreqs).')';
       }
 
       ## Update-Icon
@@ -10383,7 +10390,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <a id="SolarForecast-attr-historyHour"></a>
        <li><b>historyHour </b><br>
          Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
-         (default: 0)
+         (default: -2)
        </li>
        <br>
        
