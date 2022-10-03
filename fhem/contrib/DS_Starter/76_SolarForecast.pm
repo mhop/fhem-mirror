@@ -4658,12 +4658,11 @@ sub __setConsRcmdState {
   my $type  = $hash->{TYPE};
 
   my $surplus  = CurrentVal  ($hash, "surplus",     0);                                   # aktueller Energieüberschuß
-  my $ccons    = CurrentVal  ($hash, 'consumption', 0);                                   # aktueller Verbrauch
   my $nompower = ConsumerVal ($hash, $c, "power",   0);                                   # Consumer nominale Leistungsaufnahme (W)
   my $ccr      = AttrVal     ($name, 'createConsumptionRecReadings', '');                 # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons  = isConsumerPhysOn($hash, $c) ? $ccons : $ccons + $nompower;               # resultierender Verbauch nach Einschaltung Consumer
+  my $rescons  = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                             # resultierender Verbauch nach Einschaltung Consumer
   
-  if (!$nompower || $surplus + $ccons >= $rescons) {
+  if (!$nompower || $surplus - $rescons > 0) {
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                   # Einschalten des Consumers günstig
   }
   else {
