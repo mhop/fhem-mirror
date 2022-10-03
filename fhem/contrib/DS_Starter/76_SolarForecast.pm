@@ -6979,17 +6979,19 @@ sub _beamGraphic {
           }
       }
 
-      if ($show_diff eq 'bottom') {                                                                              # zusätzliche diff Anzeige
+      if ($show_diff eq 'bottom') {                                                                                                      # zusätzliche diff Anzeige
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
-          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;'); # negative Zahlen in Fettschrift, 0 aber ohne +
+          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;');                    # negative Zahlen in Fettschrift, 0 aber ohne +
           $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
       }
 
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
-      $ret .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
+      $ret .= $hfcg->{$i}{time} == $thishour ?                                                                                           # wenn Hervorhebung nur bei gestztem Attr 'historyHour' ? dann hinzufügen: "&& $offset < 0"
+                                   '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : 
+                                   $hfcg->{$i}{time_str};
       
       if($hfcg->{$i}{time} == $thishour) {
-          $thishour = 99;                                                                                        # nur einmal verwenden !
+          $thishour = 99;                                                                                                                # nur einmal verwenden !
       }
       
       $ret .="</td></tr></table></td>";                                                   
