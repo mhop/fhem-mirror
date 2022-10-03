@@ -127,7 +127,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
-                           "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ",
+                           "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ".
+                           "fix sub __setConsRcmdState ",
   "0.68.3 "=> "19.09.2022  fix calculation of currentAPIinterval ",
   "0.68.2 "=> "18.09.2022  fix function _setpvCorrectionFactorAuto, new attr optimizeSolCastAPIreqInterval, change createReadingsFromArray ",
   "0.68.1 "=> "17.09.2022  new readings Today_MaxPVforecast, Today_MaxPVforecastTime ",
@@ -4651,17 +4652,19 @@ sub __setConsRcmdState {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $c     = $paref->{consumer};                                                     # aktueller Unixtimestamp
+  my $c     = $paref->{consumer};                                                         # aktueller Unixtimestamp
   my $daref = $paref->{daref};
   
   my $type  = $hash->{TYPE};
 
-  my $surplus  = CurrentVal  ($hash, "surplus",   0);                                 # aktueller Energieüberschuß
-  my $nompower = ConsumerVal ($hash, $c, "power", 0);                                 # Consumer nominale Leistungsaufnahme (W)
-  my $ccr      = AttrVal     ($name, 'createConsumptionRecReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
+  my $surplus  = CurrentVal  ($hash, "surplus",     0);                                   # aktueller Energieüberschuß
+  my $ccons    = CurrentVal  ($hash, 'consumption', 0);                                   # aktueller Verbrauch
+  my $nompower = ConsumerVal ($hash, $c, "power",   0);                                   # Consumer nominale Leistungsaufnahme (W)
+  my $ccr      = AttrVal     ($name, 'createConsumptionRecReadings', '');                 # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
+  my $rescons  = isConsumerPhysOn($hash, $c) ? $ccons : $ccons + $nompower;               # resultierender Verbauch nach Einschaltung Consumer
   
-  if (!$nompower || $surplus >= $nompower) {
-      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;               # Einschalten des Consumers günstig
+  if (!$nompower || $surplus + $ccons >= $rescons) {
+      $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                   # Einschalten des Consumers günstig
   }
   else {
       $data{$type}{$name}{consumers}{$c}{isConsumptionRecommended} = 0;
@@ -8663,7 +8666,7 @@ sub isConsumerPhysOn {
       return 0;
   }
   
-  my $reg      = ConsumerVal ($hash, $c, "onreg",    "on"); 
+  my $reg      = ConsumerVal ($hash, $c, "onreg",       "on"); 
   my $rswstate = ConsumerVal ($hash, $c, "rswstate", "state");           # Reading mit Schaltstatus
   my $swstate  = ReadingsVal ($cname, $rswstate,     "undef");
   
