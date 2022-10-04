@@ -3292,7 +3292,7 @@ setreading DEVICE attrTemplateVersion 20210108
 # shellyTRV using original firmware
 name:shelly_TRV
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*,TYPE=MQTT2_DEVICE:FILTER=devicetopic=.*shellies.*
-desc:shelly-TRV using original firmware <br>early version
+desc:shelly-TRV using original firmware <br>see https://forum.fhem.de/index.php/topic,129394.0.html for details
 order:A_16d
 par:DEV_TPC;"shellies/" and Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+)> ? $1 : undef }
 par:ICON;ICON as set, defaults to temp_control;{ AttrVal('DEVICE','icon','temp_control') }
@@ -3304,9 +3304,9 @@ attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSON
   $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
-  boost:on,off {my $val=$EVTPART1 eq 'on'; qq($\DEVICETOPIC/thermostat/0/command/accelerated_heating $val)}\
-  mode:auto,manual {my $val=$EVTPART1 eq 'auto'; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
-  profile:slider,1,1,5,1 $\DEVICETOPIC/thermostat/0/command/schedule_profile $EVTPART1\
+  accelerated_heating:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/accelerated_heating $val)}\
+  schedule:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
+  schedule_profile:slider,1,1,5,1 $\DEVICETOPIC/thermostat/0/command/schedule_profile $EVTPART1\
   desired-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/target_t $EVTPART1\
   external-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/ext_t $EVTPART1\
   valve:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_pos $EVTPART1\
@@ -3321,7 +3321,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221001
+setreading DEVICE attrTemplateVersion 20221004
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
