@@ -8381,6 +8381,7 @@ sub checkPlantConfig {
   my $result = {                                                                                    # Ergebnishash
       'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
       'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
+      'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
   };
   
   my $sub = sub { 
@@ -8502,40 +8503,57 @@ sub checkPlantConfig {
       }  
   }
   
-  ## Attr. Settings für SolCast
-  ###############################
+  ## Settings bei Nutzung SolCast
+  #################################
   if (isSolCastUsed ($hash)) {
-      $result->{'SolCast Settings'}{state}  = $ok;
-      $result->{'SolCast Settings'}{result} = '';
-      $result->{'SolCast Settings'}{note}   = '';
-      $result->{'SolCast Settings'}{warn}   = 0; 
-
       my $cfd = AttrVal     ($name, 'cloudFactorDamping',      ''); 
       my $rfd = AttrVal     ($name, 'rainFactorDamping',       ''); 
       my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto', '');
       
       if ($cfd eq '' || $cfd != 0) {
-          $result->{'SolCast Settings'}{state}   = $warn;
-          $result->{'SolCast Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd"<br>};
-          $result->{'SolCast Settings'}{note}   .= qq{It is recommended to set cloudFactorDamping explicitly to "0"<br>};
-          $result->{'SolCast Settings'}{warn}    = 1;
+          $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd" <br>};
+          $result->{'Common Settings'}{note}   .= qq{It is recommended to set cloudFactorDamping explicitly to "0" <br>};
+          $result->{'Common Settings'}{warn}    = 1;
       }
       
       if ($rfd eq '' || $rfd != 0) {
-          $result->{'SolCast Settings'}{state}   = $warn;
-          $result->{'SolCast Settings'}{result} .= qq{Attribute rainFactorDamping is set to "$rfd"<br>};
-          $result->{'SolCast Settings'}{note}   .= qq{It is recommended to set rainFactorDamping explicitly to "0"<br>};
-          $result->{'SolCast Settings'}{warn}    = 1;
+          $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{Attribute rainFactorDamping is set to "$rfd" <br>};
+          $result->{'Common Settings'}{note}   .= qq{It is recommended to set rainFactorDamping explicitly to "0" <br>};
+          $result->{'Common Settings'}{warn}    = 1;
       }
       
       if (!$pcf || $pcf ne 'off') {
-          $result->{'SolCast Settings'}{state}   = $warn;
-          $result->{'SolCast Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf"<br>};
-          $result->{'SolCast Settings'}{note}   .= qq{It is recommended to set pvCorrectionFactor_Auto to "off"<br>};
-          $result->{'SolCast Settings'}{warn}    = 1;
+          $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
+          $result->{'Common Settings'}{note}   .= qq{It is recommended to set pvCorrectionFactor_Auto to "off" <br>};
+          $result->{'Common Settings'}{warn}    = 1;
       }
       
-      $result->{'SolCast Settings'}{result} = 'fullfilled' if(!$result->{'SolCast Settings'}{warn});
+      if(!$result->{'Common Settings'}{warn}) {
+          $result->{'Common Settings'}{result}  = 'fullfilled';
+          $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
+          $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping rainFactorDamping pvCorrectionFactor_Auto <br>};
+      }
+  }
+  
+  ## Settings bei Nutzung DWD Radiation
+  #######################################
+  if (!isSolCastUsed ($hash)) {
+      my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto', '');
+      
+       if (!$pcf || $pcf ne 'on') {
+          $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
+          $result->{'Common Settings'}{note}   .= qq{It is recommended to set pvCorrectionFactor_Auto to "on" <br>};
+          $result->{'Common Settings'}{warn}    = 1;
+      }
+      
+      if(!$result->{'Common Settings'}{warn}) {
+          $result->{'Common Settings'}{result}  = 'fullfilled';
+          $result->{'Common Settings'}{note}   .= qq{checked parameter:<br>pvCorrectionFactor_Auto}; 
+      }
   }
   
   ## Ausgabe
