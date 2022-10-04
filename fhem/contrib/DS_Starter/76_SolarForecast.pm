@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.5 "=> "03.10.2022  extent plant configuration check ",
   "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
                            "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ".
                            "fix sub __setConsRcmdState ",
@@ -397,6 +398,8 @@ my %hqtxt = (                                                                   
               DE => qq{Stand:}                                                                                              },
   autoct => { EN => qq{automatic&nbsp;correction:},
               DE => qq{automatische&nbsp;Korrektur:}                                                                        },
+  plntck => { EN => qq{Plant Configurationcheck Information},
+              DE => qq{Informationen zur Anlagenkonfigurationspr&uuml;fung}                                                 },
   lbpcq  => { EN => qq{correction&nbsp;quality&nbsp;current&nbsp;hour:},
               DE => qq{Korrekturqualität&nbsp;akt.&nbsp;Stunde:}                                                            },
   lblPvh => { EN => qq{next&nbsp;4h:},
@@ -413,10 +416,12 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
-  strok  => { EN => qq{Congratulations &#128522, your system configuration has been checked and is error-free !},
-              DE => qq{Herzlichen Glückwunsch &#128522, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei !}       },
-  strnok => { EN => qq{Oh no &#128577, your string configuration is inconsistent.\nPlease check the settings !},
-              DE => qq{Oh nein &#128577, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !} },
+  strok  => { EN => qq{Congratulations &#128522;, your system configuration has been checked and is error-free !},
+              DE => qq{Herzlichen Glückwunsch &#128522;, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei !}           },
+  strwn  => { EN => qq{Looks quite good &#128528;, the check of the plant configuration showed only warnings !},
+              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab nur Warnungen !}                 },  
+  strnok => { EN => qq{Oh no &#128577;, your string configuration is inconsistent.\nPlease check the settings !},
+              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !} },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -3602,7 +3607,7 @@ sub _calcMaxEstimateToday {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $daref = $paref->{daref}; 
+  my $daref = $paref->{daref};
  
   my $type  = $hash->{TYPE}; 
  
@@ -3614,11 +3619,11 @@ sub _calcMaxEstimateToday {
   for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
       next if(!NexthoursVal ($hash, $idx, 'today', 0));
       
+      my $stt = NexthoursVal ($hash, $idx, 'starttime', '');      
+      next if (!$stt);
+      
       my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
       next if($pvfc < $maxest);
-      
-      my $stt = NexthoursVal ($hash, $idx, 'starttime', '');
-      next if(!$stt);
       
       $maxest = $pvfc;
       $maxtim = $stt;
@@ -8364,21 +8369,20 @@ sub checkPlantConfig {
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $lang = AttrVal ("global", 'language', 'EN');
-  
-  my $sc;
-  my $result = { 'stringconfig' => '', 'result' => '', 'state' => '', 'note' => '', 'fault' => 0 };       # Ergebnishash
-  my $cf     = 0;                                                                                          # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
-  
-  my $err = createStringConfig ($hash);
-  
-  if ($err) {
-      $cf  = 1;
-      $sc .= $err."<br><br>";
-  }
- 
+  my $lang = AttrVal ("global", 'language', 'EN');  
   my $stch = $data{$type}{$name}{strings};
-    
+  my $cf   = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
+  my $wn   = 0;                                                                                     # Warnung wenn 1
+  
+  my $ok   = FW_makeImage('10px-kreis-gruen.png', '');
+  my $nok  = FW_makeImage('10px-kreis-rot.png',   '');
+  my $warn = FW_makeImage('10px-kreis-gelb.png',  '');
+  
+  my $result = {                                                                                    # Ergebnishash
+      'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
+      'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
+  };
+  
   my $sub = sub { 
       my $string = shift;
       my $ret;
@@ -8390,48 +8394,189 @@ sub checkPlantConfig {
       
       return $ret;
   };
+  
+  ## Check Strings
+  ##################
+  
+  my $err = createStringConfig ($hash);
+  
+  if ($err) {
+      $result->{'String Configuration'}{state}  = $nok;
+      $result->{'String Configuration'}{result} = $err;
+      $result->{'String Configuration'}{fault}  = 1;
+  }
     
   for my $sn (sort keys %{$stch}) {
       my $sp = $sn." => ".$sub->($sn)."<br>";
+      $result->{'String Configuration'}{result} .= $sn." => ".$sub->($sn)."<br>";
       
-      if (!isSolCastUsed ($hash)) {                            # Strahlungsdevice DWD
-          $cf = 1 if($sp !~ /dir.*?peak.*?tilt/x);             # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+      if (!isSolCastUsed ($hash)) {                                                             # Strahlungsdevice DWD
+          $result->{'String Configuration'}{fault} = 1 if($sp !~ /dir.*?peak.*?tilt/x);         # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
       }
-      else {                                                   # Strahlungsdevice SolCast-API
-          $cf = 1 if($sp !~ /peak.*?pk/x);                     # Test Vollständigkeit
+      else {                                                                                    # Strahlungsdevice SolCast-API
+          $result->{'String Configuration'}{fault} = 1 if($sp !~ /peak.*?pk/x);                 # Test Vollständigkeit
       }
-      
-      $sc .= $sp;
   }
   
-  $sc .= "<br><br>"; 
+  ## Check Attribute DWD Wetterdevice
+  #####################################
+  my $fcname = ReadingsVal($name, 'currentForecastDev', '');                                   
   
-  if($cf) {                             
-      $sc .= encode ("utf8", $hqtxt{strnok}{$lang});
+  if (!$fcname || !$defs{$fcname}) {
+      $result->{'DWD Weather Attributes'}{state}  = $nok;
+      $result->{'DWD Weather Attributes'}{result} = qq{The DWD device "$fcname" doesn't exist};
+      $result->{'DWD Weather Attributes'}{fault}  = 1;    
   }
   else {
-      $sc .= encode ("utf8", $hqtxt{strok}{$lang});
+      $result->{'DWD Weather Attributes'}{note} = qq{checked attributes of device "$fcname":<br>}. join ' ', @dweattrmust; 
+      $err                                      = checkdwdattr ($name, $fcname, \@dweattrmust);
+      
+      if ($err) {
+          $result->{'DWD Weather Attributes'}{state}  = $nok;
+          $result->{'DWD Weather Attributes'}{result} = $err;
+          $result->{'DWD Weather Attributes'}{fault}  = 1;
+      }
+      else {
+          $result->{'DWD Weather Attributes'}{result} = 'fullfilled';
+      }
   }
   
+  ## Check Attribute DWD Radiation Device
+  #########################################
+  if (!isSolCastUsed ($hash)) {
+      $result->{'DWD Radiation Attributes'}{state}  = $ok;
+      $result->{'DWD Radiation Attributes'}{result} = '';
+      $result->{'DWD Radiation Attributes'}{note}   = '';
+      $result->{'DWD Radiation Attributes'}{fault}  = 0;
+
+      my $raname = ReadingsVal($name, 'currentRadiationDev', '');                                   
+      
+      if (!$raname || !$defs{$raname}) {
+          $result->{'DWD Radiation Attributes'}{state}  = $nok;
+          $result->{'DWD Radiation Attributes'}{result} = qq{The DWD device "$raname" doesn't exist};
+          $result->{'DWD Radiation Attributes'}{fault}  = 1;    
+      }
+      else {
+          $result->{'DWD Radiation Attributes'}{note} = qq{checked attributes of device "$raname":<br>}. join ' ', @draattrmust; 
+          $err                                        = checkdwdattr ($name, $raname, \@draattrmust);
+          
+          if ($err) {
+              $result->{'DWD Radiation Attributes'}{state}  = $nok;
+              $result->{'DWD Radiation Attributes'}{result} = $err;
+              $result->{'DWD Radiation Attributes'}{fault}  = 1;
+          }
+          else {
+              $result->{'DWD Radiation Attributes'}{result} = 'fullfilled';
+          }
+      }
+  }
+  
+  ## Check Roof Ident Pair Settings
+  ###################################
+  if (isSolCastUsed ($hash)) {
+      $result->{'Roof Ident Pair Settings'}{state}  = $ok;
+      $result->{'Roof Ident Pair Settings'}{result} = '';
+      $result->{'Roof Ident Pair Settings'}{note}   = '';
+      $result->{'Roof Ident Pair Settings'}{fault}  = 0;
+
+      my $rft    = ReadingsVal($name, "moduleRoofTops", "");
+      my ($a,$h) = parseParams ($rft); 
+      
+      while (my ($is, $pk) = each %$h) {
+          my $rtid   = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'rtid',   '');
+          my $apikey = SolCastAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
+          
+          if(!$rtid || !$apikey) {
+              my $res  = qq{String "$is" has no Roof Ident Pair "$pk" defined or has no Rooftop-ID and/or SolCast-API key assigned. <br>};
+              my $note = qq{Set the Roof Ident Pair "$pk" with "set $name roofIdentPair". <br>};
+              
+              $result->{'Roof Ident Pair Settings'}{state}   = $nok;
+              $result->{'Roof Ident Pair Settings'}{result} .= $res;
+              $result->{'Roof Ident Pair Settings'}{note}   .= $note;
+              $result->{'Roof Ident Pair Settings'}{fault}   = 1;
+          }
+          else {
+              $result->{'Roof Ident Pair Settings'}{result}  = 'fullfilled' if(!$result->{'Roof Ident Pair Settings'}{fault});
+              $result->{'Roof Ident Pair Settings'}{note}   .= qq{checked "$is" Roof Ident Pair "$pk":<br>rtid=$rtid, apikey=$apikey <br>};
+          }          
+      }  
+  }
+  
+  ## Attr. Settings für SolCast
+  ###############################
+  if (isSolCastUsed ($hash)) {
+      $result->{'SolCast Settings'}{state}  = $ok;
+      $result->{'SolCast Settings'}{result} = '';
+      $result->{'SolCast Settings'}{note}   = '';
+      $result->{'SolCast Settings'}{warn}   = 0; 
+
+      my $cfd = AttrVal     ($name, 'cloudFactorDamping',      ''); 
+      my $rfd = AttrVal     ($name, 'rainFactorDamping',       ''); 
+      my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto', '');
+      
+      if ($cfd eq '' || $cfd != 0) {
+          $result->{'SolCast Settings'}{state}   = $warn;
+          $result->{'SolCast Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd"<br>};
+          $result->{'SolCast Settings'}{note}   .= qq{It is recommended to set cloudFactorDamping explicitly to "0"<br>};
+          $result->{'SolCast Settings'}{warn}    = 1;
+      }
+      
+      if ($rfd eq '' || $rfd != 0) {
+          $result->{'SolCast Settings'}{state}   = $warn;
+          $result->{'SolCast Settings'}{result} .= qq{Attribute rainFactorDamping is set to "$rfd"<br>};
+          $result->{'SolCast Settings'}{note}   .= qq{It is recommended to set rainFactorDamping explicitly to "0"<br>};
+          $result->{'SolCast Settings'}{warn}    = 1;
+      }
+      
+      if (!$pcf || $pcf ne 'off') {
+          $result->{'SolCast Settings'}{state}   = $warn;
+          $result->{'SolCast Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf"<br>};
+          $result->{'SolCast Settings'}{note}   .= qq{It is recommended to set pvCorrectionFactor_Auto to "off"<br>};
+          $result->{'SolCast Settings'}{warn}    = 1;
+      }
+      
+      $result->{'SolCast Settings'}{result} = 'fullfilled' if(!$result->{'SolCast Settings'}{warn});
+  }
+  
+  ## Ausgabe
+  ############
+  
   my $out  = qq{<html>};
-  $out    .= qq{<b>Plant Configuration check Info</b> <br><br>};
+  $out    .= qq{<b>}.$hqtxt{plntck}{$lang}.qq{</b> <br><br>};
+  
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
-  $out    .= qq{<tr><td> <b>Object</b> </td><td> <b>Result</b> </td><td> <b>State</b> </td><td> <b>Note</b> </td></tr>};
-  $out    .= qq{<tr><td>               </td><td>               </td><td>              </td><td>             </td></tr>};
+  $out    .= qq{<tr style="text-decoration:underline; font-weight:bold;"><td> Object </td><td> State </td><td> Result </td><td> Note </td></tr>};
+  $out    .= qq{<tr></tr>};
 
   for my $key (sort keys %{$result}) {
+      $cf   = $result->{$key}{fault} if($result->{$key}{fault});
+      $wn   = $result->{$key}{warn}  if($result->{$key}{warn});
       $out .= qq{<tr>};
-      $out .= qq{<td> $result->{stringconfig} </td>};
-      $out .= qq{<td> $result->{result}       </td>};
-      $out .= qq{<td style="text-align: center"> $result->{state}  </td>};
-      $out .= qq{<td style="text-align: center"> $result->{note}   </td>};
+      $out .= qq{<td> <b>$key</b>                                        </td>};
+      $out .= qq{<td style="text-align: center"> $result->{$key}{state}  </td>};
+      $out .= qq{<td> $result->{$key}{result}                            </td>};
+      $out .= qq{<td style="text-align: left"> $result->{$key}{note}     </td>};
       $out .= qq{</tr>};
+      
+      $out .= qq{<tr></tr>};
   }
 
   $out .= qq{</table>};
   $out .= qq{</html>};
+  
+  $out .= "<br><br>"; 
+  
+  if($cf) {                             
+      $out .= encode ("utf8", $hqtxt{strnok}{$lang});
+  }
+  elsif ($wn) {
+      $out .= encode ("utf8", $hqtxt{strwn}{$lang});
+  }
+  else {
+      $out .= encode ("utf8", $hqtxt{strok}{$lang});
+  }
       
-return $sc;
+return $out;
 }
 
 ################################################################
