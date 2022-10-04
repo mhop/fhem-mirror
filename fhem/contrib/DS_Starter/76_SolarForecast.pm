@@ -8409,13 +8409,23 @@ sub checkPlantConfig {
     
   for my $sn (sort keys %{$stch}) {
       my $sp = $sn." => ".$sub->($sn)."<br>";
-      $result->{'String Configuration'}{result} .= $sn." => ".$sub->($sn)."<br>";
+      $result->{'String Configuration'}{note} .= $sn." => ".$sub->($sn)."<br>";
       
       if (!isSolCastUsed ($hash)) {                                                             # Strahlungsdevice DWD
-          $result->{'String Configuration'}{fault} = 1 if($sp !~ /dir.*?peak.*?tilt/x);         # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+          if ($sp !~ /dir.*?peak.*?tilt/x) {
+              $result->{'String Configuration'}{fault} = 1;                                     # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
+          }
+          else {
+              $result->{'String Configuration'}{result} = 'fullfilled';
+          }
       }
       else {                                                                                    # Strahlungsdevice SolCast-API
-          $result->{'String Configuration'}{fault} = 1 if($sp !~ /peak.*?pk/x);                 # Test Vollständigkeit
+          if($sp !~ /peak.*?pk/x) {
+              $result->{'String Configuration'}{fault} = 1;                                     # Test Vollständigkeit
+          }
+          else {
+              $result->{'String Configuration'}{result} = 'fullfilled';
+          }
       }
   }
   
