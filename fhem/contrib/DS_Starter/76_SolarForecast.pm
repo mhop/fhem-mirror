@@ -1987,13 +1987,13 @@ sub __solCast_ApiResponse {
           my $lowdm  = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate}   - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10}) / 4;
           my $highdm = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate})   / 4;
           
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate20} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 3);
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate30} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 2);          
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate40} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 1);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate20} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 3));
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate30} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 2));          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate40} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 1));
           
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate60} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 1);          
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate70} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 2);
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate80} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 3);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate60} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 1));          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate70} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 2));
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate80} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 3));
           
           $k += 1;          
       }
@@ -8565,7 +8565,8 @@ sub checkPlantConfig {
       if(!$result->{'Common Settings'}{warn}) {
           $result->{'Common Settings'}{result}  = 'fullfilled';
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
-          $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping rainFactorDamping optimizeSolCastAPIreqInterval pvCorrectionFactor_Auto <br>};
+          $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping, rainFactorDamping, optimizeSolCastAPIreqInterval <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
       }
   }
   
