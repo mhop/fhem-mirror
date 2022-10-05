@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.6 "=> "05.10.2022  new attribute solCastPercentile ",                                 
   "0.68.5 "=> "03.10.2022  extent plant configuration check ",
   "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
                            "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ".
@@ -739,6 +740,7 @@ sub Initialize {
                                 "showLink:1,0 ".
                                 "showNight:1,0 ".
                                 "showWeather:1,0 ".
+                                "solCastPercentile:slider,10,10,90 ".
                                 "spaceSize ".
                                 "Wh_kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".
@@ -1980,6 +1982,19 @@ sub __solCast_ApiResponse {
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} += sprintf "%.0f", ($pvest10 * ($period/60) * 1000);
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} += sprintf "%.0f", ($pvest90 * ($period/60) * 1000);
 
+          ## erstellen Zusatzpercentile
+          ###############################
+          my $lowdm  = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate}   - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10}) / 4;
+          my $highdm = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate})   / 4;
+          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate20} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 3);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate30} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 2);          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate40} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} - ($lowdm * 1);
+          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate60} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 1);          
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate70} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 2);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate80} = $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate} + ($highdm * 3);
+          
           $k += 1;          
       }
   }
@@ -2675,12 +2690,12 @@ sub centralTask {
   
   #deleteReadingspec ($hash, "CurrentHourPVforecast");
   #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast"); 
-  deleteReadingspec ($hash, "nextPolltime"); 
-  delete $data{$type}{$name}{solcastapi}{'All'};
-  delete $data{$type}{$name}{solcastapi}{'#All'};
-  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
-  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIInterval};
-  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
+  #deleteReadingspec ($hash, "nextPolltime"); 
+  #delete $data{$type}{$name}{solcastapi}{'All'};
+  #delete $data{$type}{$name}{solcastapi}{'#All'};
+  #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
+  #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIInterval};
+  #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
   
   ###############################################################
 
@@ -2744,10 +2759,10 @@ sub centralTask {
       
       if (isSolCastUsed ($hash)) {
           _getRoofTopData                 ($centpars);                                    # SolCast API Strahlungswerte abrufen          
-          _transferSolCastRadiationValues ($centpars);                                    # SolCast API Strahlungswerte übertragen 
+          _transferSolCastRadiationValues ($centpars);                                    # SolCast API Strahlungswerte übertragen und Forecast erstellen 
       }
       else {
-          _transferDWDRadiationValues ($centpars);                                        # DWD Strahlungswerte übertragen    
+          _transferDWDRadiationValues ($centpars);                                        # DWD Strahlungswerte übertragen und Forecast erstellen 
       }
       
       _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
@@ -3470,7 +3485,11 @@ sub __calcSolCastEstimates {
       
       $peak *= 1000;
       
-      my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate', 0);
+      my $perc = AttrVal ($name, 'solCastPercentile', 50);                                            # Percentile Auswahl
+      $perc    = q{}   if($perc == 50);
+      
+      my $est = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate',          0);                 # Estimate mittleres Percentile
+      $est    = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $est);
       my $pv  = sprintf "%.1f", ($est * $ccf * $rcf);
 
       $lh = {                                                                                         # Log-Hash zur Ausgabe
@@ -10306,7 +10325,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-cloudFactorDamping"></a>
        <li><b>cloudFactorDamping </b><br>
-         Prozentuale Mehrgewichtung der Berücksichtigung des Bewölkungsfaktors bei der solaren Vorhersage. <br>
+         Prozentuale Mehrgewichtung des Bewölkungsfaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
          Prognose durch den Bewölkungsfaktor).<br>
          (default: 35)         
@@ -10726,7 +10745,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-rainFactorDamping"></a>
        <li><b>rainFactorDamping </b><br>
-         Prozentuale Mehrgewichtung der Berücksichtigung des Regenprognosefaktors bei der solaren Vorhersage. <br>
+         Prozentuale Mehrgewichtung des Regenprognosefaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
          Prognose durch den Regenfaktor).<br>
          (default: 10)         
@@ -10775,7 +10794,25 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Wettericons anzeigen. <br>
          (default: 1)
        </li>
-       <br> 
+       <br>
+  
+       <a id="SolarForecast-attr-solCastPercentile"></a>
+       <li><b>solCastPercentile </b><br>
+         (nur bei Verwendung der SolCast API) <br><br>
+       
+         Auswahl des Vorhersageszenarios. <br>
+         SolCast liefert neben der deterministischen Vorhersage (die nur einen einzigen Wert ergibt) 
+         ebenfalls probabilistische Vorhersagedaten in Form von Konfidenzintervallen, die eine 
+         10 %- und 90 %-Wahrscheinlichkeitsgrenze um einen mittleren Prognosewert darstellen. <br>
+         Die '10'-Szenarien stellen die untere Grenze dessen dar, was in der Vorhersage erwartet wird.  
+         Die '90'-Szenarien stellen die Obergrenze dessen dar, was in den Prognosedaten erwartet wird. <br>
+         Weitere Informationen zur SolCast Vorhersageerstellung findet man auf dieser
+         <a href="https://articles.solcast.com.au/en/articles/2963469-solcast-probabilistic-forecasting-fields-what-are-they-how-do-we-create-them">SolCast-Seite</a>. 
+         <br>
+         
+         (default: 50 = mittlerer Prognosewert)
+       </li>
+       <br>
        
        <a id="SolarForecast-attr-spaceSize"></a>
        <li><b>spaceSize &lt;value&gt; </b><br>
