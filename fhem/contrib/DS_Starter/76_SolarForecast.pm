@@ -420,7 +420,7 @@ my %hqtxt = (                                                                   
   strok  => { EN => qq{Congratulations &#128522;, your system configuration has been checked and is error-free !},
               DE => qq{Herzlichen Glückwunsch &#128522;, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei !}           },
   strwn  => { EN => qq{Looks quite good &#128528;, the check of the plant configuration showed only warnings !},
-              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab nur Warnungen !}                 },  
+              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab lediglich Warnungen !}           },  
   strnok => { EN => qq{Oh no &#128577;, your string configuration is inconsistent.\nPlease check the settings !},
               DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !} },
 );
