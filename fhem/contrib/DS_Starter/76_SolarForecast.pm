@@ -4004,7 +4004,7 @@ sub _manageConsumerData {
       }
 
       ## Verbrauch auslesen + speichern
-      ##################################
+      ###################################
       my $ethreshold = 0;
       my $etotread   = ConsumerVal ($hash, $c, "retotal", ""); 
       my $u          = ConsumerVal ($hash, $c, "uetotal", ""); 
@@ -4015,8 +4015,8 @@ sub _manageConsumerData {
           my $ehist   = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
           $ethreshold = ConsumerVal ($hash, $c, "energythreshold", 0);                             # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird               
           
-          ## aktuelle Leitung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
-          ################################################################################
+          ## aktuelle Leistung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
+          ##################################################################################
           if(!$paread){
               my $timespan = $t    - ConsumerVal ($hash, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($hash, $c, "old_etotal", $etot);
@@ -4535,17 +4535,6 @@ sub ___setConsumerPlanningState {
       (undef,undef,undef,$stoptime)                     = timestampToTimestring ($stopts);
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts; 
   }
-  
-  #my $pstate = simplifyCstate ($ps);
-  #my $swtime = "";
-  #if ($pstate eq "started") {
-  #    ($swtime, $startts) = lastConsumerSwitchtime ($hash, $c);
-  #    Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, startts: $startts");
-  #}
-  #elsif ($pstate eq "finished") {
-  #    ($swtime, $stopts)  = lastConsumerSwitchtime ($hash, $c);
-  #   Log3 ($hash->{NAME}, 1, "$hash->{NAME} - $c, swtime: $swtime, stopts:$stopts ");
-  #}
   
   $ps .= " "              if ($starttime || $stoptime);
   $ps .= $starttime       if ($starttime);
@@ -8378,10 +8367,10 @@ sub checkPlantConfig {
   my $nok  = FW_makeImage('10px-kreis-rot.png',   '');
   my $warn = FW_makeImage('10px-kreis-gelb.png',  '');
   
-  my $result = {                                                                                    # Ergebnishash
-      'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
-      'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
-      'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'fault' => 0 },
+  my $result = {                                                                                                 # Ergebnishash
+      'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
+      'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
+      'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
   };
   
   my $sub = sub { 
@@ -8411,23 +8400,28 @@ sub checkPlantConfig {
       my $sp = $sn." => ".$sub->($sn)."<br>";
       $result->{'String Configuration'}{note} .= $sn." => ".$sub->($sn)."<br>";
       
+      if ($stch->{$sn}{peak} >= 500) {
+          $result->{'String Configuration'}{result} .= qq{The peak value of string "$sn" is very high. };
+          $result->{'String Configuration'}{result} .= qq{It seems to be given in Wp instead of kWp. <br>};
+          $result->{'String Configuration'}{state}   = $warn;
+          $result->{'String Configuration'}{warn}    = 1;
+      }
+      
       if (!isSolCastUsed ($hash)) {                                                             # Strahlungsdevice DWD
           if ($sp !~ /dir.*?peak.*?tilt/x) {
-              $result->{'String Configuration'}{fault} = 1;                                     # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
-          }
-          else {
-              $result->{'String Configuration'}{result} = 'fullfilled';
+              $result->{'String Configuration'}{state}  = $nok;
+              $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
           }
       }
       else {                                                                                    # Strahlungsdevice SolCast-API
           if($sp !~ /peak.*?pk/x) {
-              $result->{'String Configuration'}{fault} = 1;                                     # Test Vollständigkeit
-          }
-          else {
-              $result->{'String Configuration'}{result} = 'fullfilled';
+              $result->{'String Configuration'}{state}  = $nok;
+              $result->{'String Configuration'}{fault}  = 1;                                    # Test Vollständigkeit
           }
       }
   }
+  
+  $result->{'String Configuration'}{result} = 'fullfilled' if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
   
   ## Check Attribute DWD Wetterdevice
   #####################################
@@ -8516,35 +8510,43 @@ sub checkPlantConfig {
   ## Settings bei Nutzung SolCast
   #################################
   if (isSolCastUsed ($hash)) {
-      my $cfd = AttrVal     ($name, 'cloudFactorDamping',      ''); 
-      my $rfd = AttrVal     ($name, 'rainFactorDamping',       ''); 
-      my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto', '');
+      my $cfd = AttrVal     ($name, 'cloudFactorDamping',            ''); 
+      my $rfd = AttrVal     ($name, 'rainFactorDamping',             ''); 
+      my $osi = AttrVal     ($name, 'optimizeSolCastAPIreqInterval',  0);
+      my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto',       '');
       
       if ($cfd eq '' || $cfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{It is recommended to set cloudFactorDamping explicitly to "0" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set cloudFactorDamping explicitly to "0" is recommended<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if ($rfd eq '' || $rfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute rainFactorDamping is set to "$rfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{It is recommended to set rainFactorDamping explicitly to "0" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set rainFactorDamping explicitly to "0" is recommended<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if (!$pcf || $pcf ne 'off') {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{It is recommended to set pvCorrectionFactor_Auto to "off" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "off" is recommended<br>};
+          $result->{'Common Settings'}{warn}    = 1;
+      }
+      
+      if (!$osi) {
+          $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{Attribute optimizeSolCastAPIreqInterval is set to "$osi" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set optimizeSolCastAPIreqInterval to "1" is recommended<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if(!$result->{'Common Settings'}{warn}) {
           $result->{'Common Settings'}{result}  = 'fullfilled';
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
-          $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping rainFactorDamping pvCorrectionFactor_Auto <br>};
+          $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping rainFactorDamping optimizeSolCastAPIreqInterval pvCorrectionFactor_Auto <br>};
       }
   }
   
@@ -8556,7 +8558,7 @@ sub checkPlantConfig {
        if (!$pcf || $pcf ne 'on') {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{It is recommended to set pvCorrectionFactor_Auto to "on" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on" is recommended<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
