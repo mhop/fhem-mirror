@@ -397,6 +397,8 @@ my %hqtxt = (                                                                   
               DE => qq{Auto}                                                                                                },
   lupt   => { EN => qq{last&nbsp;update:},
               DE => qq{Stand:}                                                                                              },
+  wfmdcf => { EN => qq{Wait for more days with a consumption figure},
+              DE => qq{Warte auf weitere Tage mit einer Verbrauchszahl}                                                     },
   autoct => { EN => qq{automatic&nbsp;correction:},
               DE => qq{automatische&nbsp;Korrektur:}                                                                        },
   plntck => { EN => qq{Plant Configurationcheck Information},
@@ -451,7 +453,7 @@ my %htitles = (                                                                 
   conrec   => { EN => qq{Current time is within the consumption planning},
                 DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
   connorec => { EN => qq{Consumption planning is outside current time\n(Click for immediate planning)},
-                DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Click f&#252;r sofortige Einplanung)} },
+                DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Klick f&#252;r sofortige Einplanung)} },
   pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\n\nOn:&nbsp;<start>\nOff:&nbsp;<stop>},
                 DE => qq{Planungsstatus:&nbsp;<pstate>\n\nEin:&nbsp;<start>\nAus:&nbsp;<stop>}                     },
   akorron  => { EN => qq{Enable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on},
@@ -5222,7 +5224,7 @@ sub _estConsumptionForecast {
       my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
       next if(!$dcon);
 
-      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                        # Verbrauch aller registrierten Verbraucher aufaddieren
+      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                        # historischen Verbrauch aller registrierten Verbraucher aufaddieren
           $consumerco += HistoryVal ($hash, $n, 99, "csme${c}", 0);
       }
       
@@ -5243,7 +5245,8 @@ sub _estConsumptionForecast {
        Log3 ($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
   }
   else {
-      $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
+      my $lang = AttrVal ("global", 'language', 'EN');
+      $data{$type}{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
   }
   
   ## Verbrauchsvorhersage für die nächsten Stunden
@@ -5839,8 +5842,8 @@ sub entryGraphic {
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
       offset         => AttrNum ($name,    'historyHour',            $histhourdef),
       hourstyle      => AttrVal ($name,    'hourStyle',                        ''),
-      colorfc        => AttrVal ($name,    'beam1Color',                $b1coldef),
-      colorc         => AttrVal ($name,    'beam2Color',                $b2coldef),
+      colorb1        => AttrVal ($name,    'beam1Color',                $b1coldef),
+      colorb2        => AttrVal ($name,    'beam2Color',                $b2coldef),
       fcolor1        => AttrVal ($name,    'beam1FontColor',        $b1fontcoldef),
       fcolor2        => AttrVal ($name,    'beam2FontColor',        $b2fontcoldef),  
       beam1cont      => AttrVal ($name,    'beam1Content',               'pvReal'),
@@ -6723,8 +6726,8 @@ sub _beamGraphic {
   my $height     = $paref->{height};
   my $fsize      = $paref->{fsize};
   my $kw         = $paref->{kw};
-  my $colorfc    = $paref->{colorfc};
-  my $colorc     = $paref->{colorc};
+  my $colorb1    = $paref->{colorb1};
+  my $colorb2    = $paref->{colorb2};
   my $fcolor1    = $paref->{fcolor1};
   my $fcolor2    = $paref->{fcolor2}; 
   my $offset     = $paref->{offset};
@@ -6893,7 +6896,7 @@ sub _beamGraphic {
 
           if ($hfcg->{$i}{beam1} || $show_night) {                                                               # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
-              $style   .= defined $colorfc ? " background-color:#$colorfc\"" : '"';                              # Syntaxhilight 
+              $style   .= defined $colorb1 ? " background-color:#$colorb1\"" : '"';                              # Syntaxhilight 
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
               $ret .= "<td align='center' class='solarfc' ".$style.">";
@@ -6919,23 +6922,23 @@ sub _beamGraphic {
 
           if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
-              $color1  = $colorfc;
+              $color1  = $colorb1;
               $style1  = $style." background-color:#$color1; color:#$fcolor1;'";
 
               if($z3) {                                                                                          # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
                   $v       = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
-                  $color2  = $colorc;
+                  $color2  = $colorb2;
                   $style2  = $style." background-color:#$color2; color:#$fcolor2;'";
               }
           }
           else {
               $val     = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
-              $color1  = $colorc;
+              $color1  = $colorb2;
               $style1  = $style." background-color:#$color1; color:#$fcolor2;'";
        
               if($z3) {
                   $v       = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
-                  $color2  = $colorfc;
+                  $color2  = $colorb1;
                   $style2  = $style." background-color:#$color2; color:#$fcolor1;'";
               }
           }
@@ -6967,8 +6970,8 @@ sub _beamGraphic {
               $ret .= "<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val."</td></tr>";
           }
 
-          if ($hfcg->{$i}{diff} >= 0) {                                                                          # mit Farbe 1 colorfc füllen
-              $style .= " background-color:#$colorfc'";
+          if ($hfcg->{$i}{diff} >= 0) {                                                                          # mit Farbe 1 colorb1 füllen
+              $style .= " background-color:#$colorb1'";
               $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                           # Sonderfall , 1px dünnen Strich ausgeben
               $ret   .= "<tr class='odd' style='height:".$z2."px'>";
               $ret   .= "<td align='center' class='solarfc' ".$style.">";
@@ -6983,7 +6986,7 @@ sub _beamGraphic {
           }
         
           if ($hfcg->{$i}{diff} < 0) {                                                                           # Negativ Balken anzeigen ?
-              $style .= " background-color:#$colorc'";                                                           # mit Farbe 2 colorc füllen
+              $style .= " background-color:#$colorb2'";                                                          # mit Farbe 2 colorb2 füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
               $ret   .= "<td align='center' class='solarfc' ".$style."></td></tr>";
           }
@@ -10406,7 +10409,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird           </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.       </td></tr>
             <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                  </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten, mind. 60 (optional)             </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit des Verbrauchers nach dem initialen Einschalten in Minuten  (optional)                             </td></tr>
+            <tr><td>                       </td><td>Die Standard mintime richtet sich nach dem Verbrauchertyp, ist aber mindestens 60 Minuten.                                                </td></tr>
             <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                  </td></tr>
             <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                  </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                               </td></tr>
@@ -10683,7 +10687,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        Layout der integrierten Grafik. <br>
        Der darzustellende Inhalt der Balken wird durch die Attribute <b>beam1Content</b> bzw. <b>beam2Content</b> 
        bestimmt. <br>
-       (default: single)  
+       (default: double)  
        <br><br>
        
        <ul>   
