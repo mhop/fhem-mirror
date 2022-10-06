@@ -1,14 +1,13 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.9"
+SCRIPTVERSION="3.10"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.9.2"	#Default for systems that don't hava Java17
-ALTVERSION="0.10.9"		#Default for systems with Java17
+SIGNALVERSION="0.11.2"
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
@@ -33,21 +32,14 @@ if [ -e "/opt/java" ]; then
 fi
 JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
 if [ "$J17" != "" ] || [ "$JVER" = "17.0" ]; then
-  SIGNALVERSION=$ALTVERSION
   VEXT="-Linux"
   JAVA_VERSION=17.0
   NATIVE_JAVA17=yes
 else 
-  JAVA_VERSION=11.0
+  echo "Warning: No Java17 found - will try experimental download of a Java 17 package"
+  JAVA_VERSION=17.0
   NATIVE_JAVA17=no
   VEXT=
-fi
-
-if [ "$OPERATION" = "experimental" ]; then
-  SIGNALVERSION=$ALTVERSION
-  VEXT="-Linux"
-  JAVA_VERSION=17.0
-  OPERATION=
 fi
 
 #Get OS data
@@ -179,7 +171,7 @@ fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
 IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
-KNOWN=("amd64-glibc2.27-0.9.2" "amd64-glibc2.28-0.9.2" "amd64-glibc2.31-0.9.2" "armhf-glibc2.28-0.9.2" "armhf-glibc2.31-0.9.2" "amd64-glibc2.28-0.10.9" "amd64-glibc2.31-0.10.9" "armhf-glibc2.28-0.10.9" "armhf-glibc2.31-0.10.9")
+KNOWN=("amd64-glibc2.28-0.11.2" "amd64-glibc2.31-0.11.2" "armhf-glibc2.28-0.11.2" "armhf-glibc2.31-0.11.2")
 
 GETLIBS=1
 if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
@@ -379,18 +371,10 @@ if [ $NEEDINSTALL = 1 ]; then
 			echo -n "Downloading native libraries..."
 			cd /tmp
 			rm -rf libsignal_jni.so libzkgroup.so
-			if [ $JAVA_VERSION = "11.0" ]; then
-				wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libzkgroup.so
-			fi
 			wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/$IDENTSTR/libsignal_jni.so
 			echo "done"
 			echo "Updating native libs for $IDENTSTR"
-			if [ $JAVA_VERSION = "11.0" ]; then
-				zip -u $SIGNALPATH/signal/lib/zkgroup-java-*.jar libzkgroup.so
-				zip -u $SIGNALPATH/signal/lib/signal-client-java-*.jar libsignal_jni.so
-			else
-				zip -u $SIGNALPATH/signal/lib/libsignal-client-*.jar libsignal_jni.so
-			fi
+			zip -u $SIGNALPATH/signal/lib/libsignal-client-*.jar libsignal_jni.so
 
 			#Use updated libs in jar instead of /usr/lib
 			#mv libsignal_jni.so libzkgroup.so $LIBPATH

@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.10";
+my $Signalbot_VERSION="3.11";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -33,6 +33,7 @@ use FHEM::Text::Unicode qw(:ALL);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_RET);
+use vars qw($FW_wname);
 
 #maybe really get introspective here instead of handwritten list
  my %signatures = (
@@ -1832,7 +1833,8 @@ sub Signalbot_createRegfiles($) {
 	if (! -d "www/signal") {
 		mkdir("www/signal");
 	}
-		
+	my $http="http";
+	$http="https" if (AttrVal($FW_wname,"HTTPS",0) eq 1);
 	my $fh;
 	#1. For Windows
 	my $tmpfilename="www/signal/signalcaptcha.reg";
@@ -1843,8 +1845,8 @@ sub Signalbot_createRegfiles($) {
 	$msg .= '[HKEY_CLASSES_ROOT\signalcaptcha\shell]'."\n";
 	$msg .= '[HKEY_CLASSES_ROOT\signalcaptcha\shell\open]'."\n";
 	$msg .= '[HKEY_CLASSES_ROOT\signalcaptcha\shell\open\command]'."\n";
-	$msg .= '@="powershell.exe Start-Process -FilePath ( $(\'http://';
-	$msg .= $ip;
+	$msg .= '@="powershell.exe Start-Process -FilePath ( $(\'';
+	$msg .= $http."://".$ip;
 	$msg .= ':8083/fhem?cmd=set%%20'.$hash->{NAME}.'%%20captcha%%20\'+($(\'%1\')';
 	#Captcha has an extra "\" at the end which makes replacing with CSRF a bit more complicated
 	if ($FW_CSRF ne "") {
@@ -1863,7 +1865,7 @@ sub Signalbot_createRegfiles($) {
 	$tmpfilename="www/signal/signalcaptcha.desktop";
 	$msg  = "[Desktop Entry]\n";
 	$msg .= "Name=Signalcaptcha\n";
-	$msg .= 'Exec=xdg-open http://'.$ip.':8083/fhem?cmd=set%%20'.$hash->{NAME}.'%%20captcha%%20%u'.$FW_CSRF."\n";
+	$msg .= 'Exec=xdg-open '.$http.'://'.$ip.':8083/fhem?cmd=set%%20'.$hash->{NAME}.'%%20captcha%%20%u'.$FW_CSRF."\n";
 	$msg .= "Type=Application\n";
 	$msg .= "Terminal=false\n";
 	$msg .= "StartupNotify=false\n";
@@ -1965,21 +1967,18 @@ sub Signalbot_Detail {
 	my $multi=$hash->{helper}{multi};
 	my $version=$hash->{helper}{version};
 	$multi=0 if !defined $multi;
-	if($version<900) {
-		$ret .= "<b>signal-cli v0.9.0+ required.</b><br>Please use installer to install or update<br>";
+	if($version<1100) {
+		$ret .= "<b>signal-cli v0.11.2+ required.</b><br>Please use installer to install or update<br>";
 		$ret .= "<b>Note:</b> The installer only supports Debian based Linux distributions like Ubuntu and Raspberry OS<br>";
 		$ret .= "      and X86 or armv7l CPUs<br>";
-	}
-	if($version==901) {
-		$ret .= "<b>Warning: signal-cli v0.9.1 has issues affecting Signalbot.</b><br>Please use installer to upgrade to 0.9.2+<br>";
 	}
 	if ($multi==0 && $version>0) {
 		$ret .= "Signal-cli is running in single-mode, please consider starting it without -u parameter (e.g. by re-running the installer)<br>";
 	}
-	if($version<900 || $multi==0) {
+	if($version<1100 || $multi==0) {
 		$ret .= '<br>You can download the installer <a href="www/signal/signal_install.sh" download>here</a> or your www/signal directory and run it with<br><b>sudo ./signal_install.sh</b><br><br>';
 	}
-	return $ret if ($hash->{helper}{version}<900);
+	return $ret if ($hash->{helper}{version}<1100);
 	
 	my $current=ReadingsVal($name,"account","none");
 	my $account=$hash->{helper}{register};
