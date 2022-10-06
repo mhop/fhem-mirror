@@ -126,7 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.68.6 "=> "05.10.2022  new attribute solCastPercentile ",                                 
+  "0.68.6 "=> "06.10.2022  new attribute solCastPercentile, change _calcMaxEstimateToday ",                                 
   "0.68.5 "=> "03.10.2022  extent plant configuration check ",
   "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
                            "add SolCast section in _graphicHeader, change default colors and settings, new reading Today_PVreal ".
@@ -3620,33 +3620,28 @@ return ($pvsum, $logao);
 
 ################################################################
 #    den Maximalwert PV Vorhersage für Heute ermitteln 
-#    und mit seinem Zeitparamter im current Hash speichern
 ################################################################
 sub _calcMaxEstimateToday {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $daref = $paref->{daref};
+  my $date  = $paref->{date};
  
   my $type  = $hash->{TYPE}; 
  
-  return if (!keys %{$data{$type}{$name}{nexthours}});
+  my $maxest = 0;
+  my $maxtim = '-';
   
-  my $maxest = ReadingsNum($name, 'Today_MaxPVforecast',       0);
-  my $maxtim = ReadingsVal($name, 'Today_MaxPVforecastTime', '-');
-  
-  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {
-      next if(!NexthoursVal ($hash, $idx, 'today', 0));
+  for my $h (1..23) {      
+      my $pvfc = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      next if($pvfc <= $maxest);
       
-      my $stt = NexthoursVal ($hash, $idx, 'starttime', '');      
-      next if (!$stt);
-      
-      my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
-      next if($pvfc < $maxest);
-      
+      $maxtim = $date.' '.sprintf("%02d",$h-1).':00:00';
       $maxest = $pvfc;
-      $maxtim = $stt;
   }
+  
+  return if(!$maxest);
   
   push @$daref, "Today_MaxPVforecast<>".     $maxest." Wh";
   push @$daref, "Today_MaxPVforecastTime<>". $maxtim;     
