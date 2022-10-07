@@ -381,7 +381,7 @@ attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:ct:color
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
-attr DEVICE sonMap color_temp:ct
+attr DEVICE jsonMap color_temp:ct
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
