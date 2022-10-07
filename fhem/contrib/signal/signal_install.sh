@@ -1,20 +1,21 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.10"
+SCRIPTVERSION="3.11"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.11.2"
+SIGNALVERSION="0.11.3"
+LIBRARYVERSION="0.11.2" #Typically = SIGNALVERSION, but can be used if libsignal did not change
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
 DBSYSTEMS=/usr/share/dbus-1/system-services
 SYSTEMD=/etc/systemd/system
 LOG=/tmp/signal_install.log
 TMPFILE=/tmp/signal$$.tmp
-DBVER=0.19
+DBVER=0.22
 OPERATION=$1
 JAVACMD=java
 
@@ -170,7 +171,7 @@ elif [ $ARCH = "x86_64" ]; then
 fi
 GLIBC=`ldd --version |  grep -m1 -o '[0-9]\.[0-9][0-9]' | head -n 1`
 
-IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
+IDENTSTR=$ARCH-glibc$GLIBC-$LIBRARYVERSION
 KNOWN=("amd64-glibc2.28-0.11.2" "amd64-glibc2.31-0.11.2" "armhf-glibc2.28-0.11.2" "armhf-glibc2.31-0.11.2")
 
 GETLIBS=1
@@ -183,7 +184,7 @@ if [[ ! " ${KNOWN[*]} " =~ " ${IDENTSTR} " ]]; then
 	   GETLIBS=0
 	fi
 fi
-IDENTSTR=$ARCH-glibc$GLIBC-$SIGNALVERSION
+IDENTSTR=$ARCH-glibc$GLIBC-$LIBRARYVERSION
 
 if [ $OSNAME != "Linux" ]; then
 	echo "Only Linux systems are supported (you: $OSNAME), quitting"
@@ -335,7 +336,7 @@ echo -n "Checking for existing signal-cli installation..."
 if [ -x "$SIGNALPATH/signal/bin/signal-cli" ]; then
 	echo "found"
 	echo -n "Checking signal-cli version..."
-	CHECKVER=`$SIGNALPATH/signal/bin/signal-cli -v`
+	CHECKVER=`$SIGNALPATH/signal/bin/signal-cli --version`
 	echo $CHECKVER
 	if [ "$CHECKVER" = "signal-cli $SIGNALVERSION" ]; then
 		echo "signal-cli matches target version...ok"
@@ -427,15 +428,15 @@ check_and_compare_file  $DBSYSTEMS/org.asamk.Signal.service $TMPFILE
 cat >$TMPFILE <<EOF
 [Unit]
 Description=Send secure messages to Signal clients
-Requires=dbus.socket
-After=dbus.socket
+Requires=dbus.socket network-online.target
+After=dbus.socket network-online.target
 Wants=network-online.target
-After=network-online.target
 	
 [Service]
 Type=dbus
 Environment="SIGNAL_CLI_OPTS=-Xms2m"
 Environment="JAVA_HOME=$JAVA_HOME"
+ExecStartPre=/bin/sleep 10
 ExecStart=$SIGNALPATH/signal/bin/signal-cli --config $SIGNALVAR daemon --system
 User=$SIGNALUSER
 BusName=org.asamk.Signal
