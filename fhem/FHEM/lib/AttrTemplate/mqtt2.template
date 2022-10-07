@@ -381,6 +381,7 @@ attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:ct:color
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
+attr DEVICE sonMap color_temp:ct
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
@@ -389,7 +390,7 @@ attr DEVICE setList \
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20220913
+setreading DEVICE attrTemplateVersion 20221007
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -612,6 +613,42 @@ attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220913
+
+#provided by laberlaib, https://forum.fhem.de/index.php/topic,94495.msg1238330.html#msg1238330
+# zigbee2mqtt 5 channel device
+name:zigbee2mqtt_5channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:For zigbee2mqtt 5 channel device like UseeLink Steckerleiste SM-0306E-2W. <br>NOTE: Four additional devices will be created for further channels.<br>NOTE: Might need a FHEM restart to work properly.
+order:L_05g
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','message_socket') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0 state_l4:0 state_l5:0
+attr DEVICE setList \
+  on:noArg $\DEVICETOPIC/set {"state_l1":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state_l1":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state_l1":"TOGGLE"}
+attr DEVICE setStateList on off toggle
+deletereading -q DEVICE (?!associatedWith|IODev).*
+set DEVICE attrTemplate set_associatedWith \CHANNELS=5 \MAKECOPIES=1
+loop:#:2:3:4:5
+defmod DEVICE_CH# MQTT2_\DEVICE
+attr DEVICE_CH# setList \
+  on:noArg $\DEVICETOPIC/set {"state_l#":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state_l#":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state_l#":"TOGGLE"}
+loop:END
+attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state_l4:0 state_l5:0 state:0
+attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state_l4:0 state_l5:0 state:0
+attr DEVICE_CH4 jsonMap state_l4:state state_l1:0 state_l2:0 state_l3:0 state_l5:0 state:0
+attr DEVICE_CH5 jsonMap state_l5:state state_l1:0 state_l2:0 state_l3:0 state_l4:0 state:0
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplate speechcontrol_type_switch
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 model zigbee2mqtt_5channel_split
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5 attrTemplateVersion 20221007
+
 
 # A blind drive motor TS0601_cover connected via zigbee2mqtt
 #contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
