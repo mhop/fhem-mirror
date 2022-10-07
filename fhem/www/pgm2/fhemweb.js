@@ -2239,6 +2239,56 @@ FW_checkNotifydev(reName)
     });
 }
 
+function
+FW_rescueClient(pid, key)
+{
+  let html='<div id="rescueDialog" style="display:none">';
+  if(!pid || pid == "0") {
+    html += '<b>Key (send it to the rescuer):</b><br>'+
+            (key ? '<code>'+key+'</code>' : 'Not found, generate one first');
+    html += '<br><br>';
+  }
+
+  let buttons = [];
+
+  if(key) {
+    if(pid && pid != "0") {
+      html += "<div>There is a connection with pid "+pid+"</div><br>";
+      buttons.push({
+        text:"Terminate connection",
+        click:function(){
+          FW_cmd(FW_root+
+            "?cmd=set "+$("body").attr("data-webname")+
+            " rescueTerminate&XHR=1");
+          setTimeout(function(){ location.reload() }, 1000);
+        }});
+
+    } else {
+      html += "Address (rescuer will tell you host and port)<br>";
+      html += "<input type='text' size='20' placeholder='host port' >";
+
+      buttons.push({
+        text:"Start connection",
+        click:function(){
+          FW_cmd(FW_root+
+            "?cmd=set "+$("body").attr("data-webname")+" rescueStart "+
+            $("#rescueDialog input").val()+"&XHR=1");
+          setTimeout(function(){ location.reload() }, 1000);
+        }});
+    }
+  }
+
+  buttons.push({ text:"Cancel", click:function(){ $(this).dialog('close')} });
+
+  $('body').append(html);
+
+  $('#rescueDialog').dialog({
+    modal:true, closeOnEscape:true, width:"auto",
+    close:function(){ $('#rescueDialog').remove(); },
+    buttons:buttons
+  });
+}
+
 /*
 =pod
 

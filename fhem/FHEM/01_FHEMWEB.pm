@@ -189,16 +189,17 @@ FHEMWEB_Initialize($)
     menuEntries
     mainInputLength
     nameDisplay
+    nrAxis
     ploteditor:always,onClick,never
     plotfork:1,0
     plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
     plotEmbed:2,1,0
     plotsize
     plotWeekStartDay:0,1,2,3,4,5,6
-    nrAxis
     redirectCmds:0,1
     redirectTo
     refresh
+    rescueDialog:1,0
     reverseLogs:0,1
     roomIcons:textField-long
     showUsedFiles:0,1
@@ -1247,7 +1248,7 @@ FW_dataAttr()
     addParam($FW_wname, "styleData", "").
     addParam("global",  "language", "EN").
     "data-availableJs='$FW_fhemwebjs' ".
-    "data-webName='$FW_wname '";
+    "data-webName='$FW_wname' ";
 }
 
 sub
@@ -1742,27 +1743,44 @@ FW_roomOverview($)
   my $sfx = AttrVal("global", "language", "EN");
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
   my @list = (
-     "Everything",    "$FW_ME?room=all",
-     "",              "",
-     "Commandref",    "$FW_ME/docs/commandref${sfx}.html",
-     "Remote doc",    "http://fhem.de/fhem.html#Documentation",
-     "Edit files",    "$FW_ME?cmd=style%20list",
-     "Select style",  "$FW_ME?cmd=style%20select",
-     "Event monitor", "$FW_ME?cmd=style%20eventMonitor",
-     "",           "");
-  my $lastname = ","; # Avoid double "".
+     'Everything',    "$FW_ME?room=all",
+     '',              '',
+     'Commandref',    "$FW_ME/docs/commandref${sfx}.html",
+     'Remote doc',    'http://fhem.de/fhem.html#Documentation',
+     'Edit files',    "$FW_ME?cmd=style%20list",
+     'Select style',  "$FW_ME?cmd=style%20select",
+     'Event monitor', "$FW_ME?cmd=style%20eventMonitor",
+     '',              '');
 
   my $lfn = "Logfile";
   if($defs{$lfn}) { # Add the current Logfile to the list if defined
     my @l = FW_fileList($defs{$lfn}{logfile},1);
     my $fn = pop @l;
-    splice @list, 4,0, ("Logfile",
+    splice @list, 4,0, ('Logfile',
                       "$FW_ME/FileLog_logWrapper?dev=$lfn&type=text&file=$fn");
+  }
+
+  if(AttrVal($FW_wname, 'rescueDialog', undef)) {
+    my $pid = $defs{$FW_wname}{rescuePID};
+    $pid = 0 if(!$pid || !kill(0,$pid));
+    my $key="";
+
+    if(!-r "certs/fhemrescue.pub") {
+      mkdir("certs");
+      `ssh-keygen -N "" -t ed25519 -f certs/fhemrescue`;
+    }
+    if(open(my $fh, "certs/fhemrescue.pub")) {
+      $key =  <$fh>;
+      close($fh);
+    }
+    splice @list, @list-2,0, ('Rescue',
+                      "javascript:FW_rescueClient(\"$pid\",\"$key\")");
   }
 
   my @me = split(",", AttrVal($FW_wname, "menuEntries", ""));
   push @list, @me, "", "" if(@me);
 
+  my $lastname = ",";
   for(my $idx = 0; $idx < @list; $idx+= 2) {
     next if($FW_hiddenroom{$list[$idx]} || $list[$idx] eq $lastname);
     push @list1, $list[$idx];
@@ -3445,12 +3463,16 @@ sub
 FW_Set($@)
 {
   my ($hash, @a) = @_;
-  my %cmd = ("rereadicons" => 1, "clearSvgCache" => 1);
+  my %cmd = ("rereadicons" => ":noArg", "clearSvgCache" => ":noArg");
+  if(AttrVal($hash->{NAME}, "rescueDialog", "")) {
+    $cmd{"rescueStart"} = "";
+    $cmd{"rescueTerminate"} = ":noArg";
+  }
 
   return "no set value specified" if(@a < 2);
   return ("Unknown argument $a[1], choose one of ".
-        join(" ", map { "$_:noArg" } sort keys %cmd))
-    if(!$cmd{$a[1]});
+        join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
+    if(!defined($cmd{$a[1]}));
 
   if($a[1] eq "rereadicons") {
     my @dirs = keys %FW_icons;
@@ -3459,6 +3481,7 @@ FW_Set($@)
       FW_readIcons($d);
     }
   }
+
   if($a[1] eq "clearSvgCache") {
     my $cDir = "$FW_dir/SVGcache";
     if(opendir(DH, $cDir)) {
@@ -3468,6 +3491,31 @@ FW_Set($@)
       return "Can't open $cDir: $!";
     }
   }
+
+  if($a[1] eq "rescueStart") {
+    return "error: rescueStart needs two arguments: host and port"
+      if(!$a[2] || !$a[3] || $a[3] !~ m/[0-9]{1,5}/ || $a[3] > 65536);
+    return "error: rescue process is running with PID $hash->{rescuePID}"
+      if($hash->{rescuePID} && kill(0, $hash->{rescuePID}));
+    return "error: certificate certs/fhemrescue is not available"
+      if(! -r "certs/fhemrescue");
+    $hash->{rescuePID} = fhemFork();
+    return "error: cannot fork rescue pid\n"
+      if($hash->{rescuePID} == -1);
+    return undef if($hash->{rescuePID}); # Parent
+    my $cmd = "exec ssh -N -R0.0.0.0:18083:localhost:$hash->{PORT} ".
+                        "-i certs/fhemrescue -p$a[3] fhemrescue\@$a[2]";
+    Log 1, "Starting $cmd";
+    exec($cmd);
+  }
+
+  if($a[1] eq "rescueTerminate") {
+    return "error: nothing to terminate"
+      if(!$hash->{rescuePID});
+    kill(15, $hash->{rescuePID});
+    delete($hash->{rescuePID});
+  }
+
   return undef;
 }
 
@@ -4204,6 +4252,48 @@ FW_log($$)
         If set, a http-equiv="refresh" entry will be genererated with the given
         argument (i.e. the browser will reload the page after the given
         seconds).
+        </li><br>
+
+    <a id="FHEMWEB-attr-rescueDialog"></a>
+    <li>rescueDialog<br>
+        If set, show a Rescue link in the menu. The goal is to be able to get
+        help from someone with more knowlege (rescuer), who is then able to
+        remote control this installation.<br>
+        After opening the dialog, a key is shown, which is to be sent to the
+        rescuer. After the rescuer installed the key (see below), the
+        connection can be established, by entering the adress of the
+        rescuers server.<br><br>
+
+        <b>TODO for the rescuer:</b>
+        <ul>
+          <li>Forward a public IP/PORT combination to your SSH server.</li>
+          <li>create a fhemrescue user on this server, and store the key from
+             the client:<br>
+            <ul><code>
+            useradd -d /tmp -s /bin/false fhemrescue<br>
+            echo "KEY_FROM_THE_CLIENT" > /etc/sshd/fhemrescue.auth<br>
+            chown fhemrescue:fhemrescue /etc/sshd/fhemrescue.auth<br>
+            chmod 600 /etc/sshd/fhemrescue.auth
+            </code></ul>
+            </li>
+          <li>Append to /etc/ssh/sshd_config:<br>
+            <ul><code>
+              Match User fhemrescue<br>
+              <ul>
+                AllowTcpForwarding remote<br>
+                PermitTTY no<br>
+                GatewayPorts yes<br>
+                ForceCommand /bin/false<br>
+                AuthorizedKeysFile /etc/ssh/fhemrescue.auth<br>
+              </ul>
+            </code></ul>
+            </li>
+          <li>Restart sshd, e.g. with systemctl restart sshd
+            </li>
+          <li>Tell the client your public IP/PORT.</li>
+          <li>After the client started the connection in the rescue dialog, you
+          can access the clients FHEM via your host, port 18083.</li>
+        </ul>
         </li><br>
 
     <a id="FHEMWEB-attr-reverseLogs"></a>
@@ -4985,6 +5075,53 @@ FW_log($$)
     <li>refresh<br>
         Damit erzeugen Sie auf den ausgegebenen Webseiten einen automatischen
         Refresh, z.B. nach 5 Sekunden.
+        </li><br>
+
+    <a id="FHEMWEB-attr-rescueDialog"></a>
+    <li>rescueDialog<br>
+        Falls gesetzt, im Menue wird ein Rescue Link angezeigt. Das Ziel ist
+        von jemanden mit mehr Wissen (Retter) Hilfe zu bekommen, indem er die
+        lokale FHEM-Installation fernsteuert.<br>
+        Nach &ouml;ffnen des Dialogs wird ein Schl&uuml;ssel angezeigt, was dem
+        Retter zu schicken ist. Nachdem er diesen Schl&uuml;ssel bei sich
+        installiert hat, muss seine Adresse (Host und Port) im Dialog
+        eingetragen werden. Danach kann er die Verbindung fernsteuern.
+        <br><br>
+
+        <b>TODO f&uuml;r den Retter:</b>
+        <ul>
+          <li>eine &ouml;ffentliche IP/PORT Kombination zum eigenen SSH Server
+              weiterleiten.</li>
+
+          <li>einen fhemrescue Benutzer auf diesem Server anlegen, und den
+              Schl&uuml;ssel vom Hilfesuchenden eintragen:<br>
+            <ul><code>
+            useradd -d /tmp -s /bin/false fhemrescue<br>
+            echo "KEY_FROM_THE_CLIENT" > /etc/sshd/fhemrescue.auth<br>
+            chown fhemrescue:fhemrescue /etc/sshd/fhemrescue.auth<br>
+            chmod 600 /etc/sshd/fhemrescue.auth
+            </code></ul>
+            </li>
+          <li>Zu /etc/ssh/sshd_config Folgendes hinzuf&uuml;gen:<br>
+            <ul><code>
+              Match User fhemrescue<br>
+              <ul>
+                AllowTcpForwarding remote<br>
+                PermitTTY no<br>
+                GatewayPorts yes<br>
+                ForceCommand /bin/false<br>
+                AuthorizedKeysFile /etc/ssh/fhemrescue.auth<br>
+              </ul>
+            </code></ul>
+            </li>
+          <li>sshd neu starten, z.Bsp. mit systemctl restart sshd
+            </li>
+          <li>Dem Hilfesuchenden die &ouml;ffentliche IP/PORT Kombination
+            mitteilen.</li>
+          <li>Nachdem der Hilfesuchende diese Daten eingegeben hat, und die
+            Verbindung gestartet hat, kann die Remote-FHEM-Installation ueber
+            den eigenen SSH-Server, Port 1803 erreicht wedern.</li>
+        </ul>
         </li><br>
 
     <a id="FHEMWEB-attr-reverseLogs"></a>
