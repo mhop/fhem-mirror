@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.24.1   extend moduleVersion by useCTZ
 # 1.24.0   new sub encodeSpecChars
 # 1.23.1   correct version format
 # 1.23.0   new sub evalDecodeJSON
@@ -45,13 +46,13 @@ eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no 
 use Data::Dumper;
 use Encode;
 
- use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                 # Error Code Modul
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version 0.77; our $VERSION = version->declare('1.23.2');
+use version 0.77; our $VERSION = version->declare('1.24.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -371,7 +372,8 @@ sub moduleVersion {
   my $notes       = $paref->{notes}     // carp "got no reference of a version hash" && return;
   my $useAPI      = $paref->{useAPI};
   my $useSMUtils  = $paref->{useSMUtils};
-  my $useErrCodes = $paref->{useErrCodes}; 
+  my $useErrCodes = $paref->{useErrCodes};
+  my $useCTZ      = $paref->{useCTZ};
 
   my $type        = $hash->{TYPE};
   my $package     = (caller)[0];                                                         # das PACKAGE des aufrufenden Moduls          
@@ -379,6 +381,7 @@ sub moduleVersion {
   $hash->{HELPER}{VERSION_API}      = $useAPI      ? FHEM::SynoModules::API->VERSION()      : "unused";
   $hash->{HELPER}{VERSION_SMUtils}  = $useSMUtils  ? FHEM::SynoModules::SMUtils->VERSION()  : "unused";
   $hash->{HELPER}{VERSION_ErrCodes} = $useErrCodes ? FHEM::SynoModules::ErrCodes->VERSION() : "unused";
+  $hash->{HELPER}{VERSION_CTZ}      = $useCTZ      ? FHEM::Utility::CTZ->VERSION()          : "unused";
 
   my $v                    = (sortVersion("desc",keys %{$notes}))[0];                    # die Modulversion aus Versionshash selektieren
   $hash->{HELPER}{VERSION} = $v;
