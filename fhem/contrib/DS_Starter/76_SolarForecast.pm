@@ -1798,20 +1798,18 @@ sub _getRoofTopData {
       }
   }
   
-  if (isSolCastUsed ($hash)) {
-      my $msg;
-      if($ctzAbsent) {
-          $msg = qq{The library FHEM::Utility::CTZ is missed. Please update FHEM completely.};
-          Log3 ($name, 2, "$name - ERROR - $msg");          
-          return $msg;
-      }
-      
-      my $rmf = reqModFail();
-      if($rmf) {
-          $msg = "You have to install the required perl module: ".$rmf;
-          Log3 ($name, 2, "$name - ERROR - $msg"); 
-          return $msg;
-      }
+  my $msg;
+  if($ctzAbsent) {
+      $msg = qq{The library FHEM::Utility::CTZ is missed. Please update FHEM completely.};
+      Log3 ($name, 2, "$name - ERROR - $msg");          
+      return $msg;
+  }
+  
+  my $rmf = reqModFail();
+  if($rmf) {
+      $msg = "You have to install the required perl module: ".$rmf;
+      Log3 ($name, 2, "$name - ERROR - $msg"); 
+      return $msg;
   }
   
   $paref->{allstrings} = ReadingsVal($name, "inverterStrings", "");
@@ -1855,6 +1853,7 @@ sub __solCast_ApiRequest {
   my $url = "https://api.solcast.com.au/rooftop_sites/".
             $roofid.
             "/forecasts?format=json".
+            "&hours=72".
             "&api_key=".
             $apikey;
 
@@ -7779,7 +7778,8 @@ sub _calcCAQwithSolCastPercentil {
       }      
       
       if ($debug) {                                                                                   # nur für Debugging
-          Log (1, qq{DEBUG> $name summary PV estimates for hour of day $h - est: $est, est10: $est10, est40: $est40, est70: $est70, est90: $est90});                                   
+          Log (1, qq{DEBUG> $name summary PV estimates for hour of day "$h":\n}.
+                  qq{est: $est, est10: $est10, est20: $est20, est30: $est30, est40: $est40, est60: $est60, est70: $est70, est80: $est80, est90: $est90});                                   
       }    
 
       my %pc = (
@@ -11022,6 +11022,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       "recommends": {
         "FHEM::Meta": 0,
         "FHEM::Utility::CTZ": 1.00,
+        "DateTime": 0,
+        "DateTime::Format::Strptime": 0,
         "Storable": 0,
         "Data::Dumper": 0
       },
