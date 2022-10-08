@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.0.0  08.10.2022 good version
 # 0.0.4  10.09.2022 add pattern parameter: https://metacpan.org/pod/DateTime::Format::Strptime#STRPTIME-PATTERN-TOKENS
 #                   add strict parameter:  https://metacpan.org/pod/DateTime::Format::Strptime#DateTime::Format::Strptime-%3Enew(%25args) 
 # 0.0.3  13.03.2022 publish func reqModFail
@@ -45,7 +46,7 @@ use GPUtils qw( GP_Import GP_Export );
 eval "use DateTime;1"                    or my $abs0 = 'DateTime';
 eval "use DateTime::Format::Strptime;1"  or my $abs1 = 'DateTime::Format::Strptime';
 
-use version 0.77; our $VERSION = version->declare('0.0.1');
+use version 0.77; our $VERSION = version->declare('1.0.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
