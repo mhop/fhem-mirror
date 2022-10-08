@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.68.7 "=> "07.10.2022  new function _calcCAQwithSolCastPercentil, check missed modules in _getRoofTopData ",
   "0.68.6 "=> "06.10.2022  new attribute solCastPercentile, change _calcMaxEstimateToday ",                                 
   "0.68.5 "=> "03.10.2022  extent plant configuration check ",
   "0.68.4 "=> "03.10.2022  do ___setLastAPIcallKeyData if response_status, generate events of Today_MaxPVforecast.* in every cycle ".
@@ -194,7 +195,7 @@ my %vNotesIntern = (
   "0.54.3" => "11.07.2021  fix _flowGraphic because of Current_AutarkyRate with powerbatout ",
   "0.54.2" => "01.07.2021  fix Current_AutarkyRate with powerbatout ",
   "0.54.1" => "23.06.2021  better log in  __weatherOnBeam ",
-  "0.54.0" => "19.06.2021  new calcVariance, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
+  "0.54.0" => "19.06.2021  new calcCorrAndQuality, new reset pvCorrection circular, behavior of attr 'numHistDays', fixes ",
   "0.53.0" => "17.06.2021  Logic for preferential charging battery, attr preferredChargeBattery ",
   "0.52.5" => "16.06.2021  sub __weatherOnBeam ",
   "0.52.4" => "15.06.2021  minor fix, possible avoid implausible inverter values ",
@@ -232,7 +233,7 @@ my %vNotesIntern = (
   "0.40.0" => "25.04.2021  change checkdwdattr, new attr follow70percentRule ",
   "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionRate, ".
                            "Current_AutarkyRate ",
-  "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality, some more fixes ",
+  "0.38.3" => "21.04.2021  minor fixes in sub calcCorrAndQuality, Traffic light indicator for prediction quality, some more fixes ",
   "0.38.2" => "20.04.2021  fix _estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
@@ -419,10 +420,10 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
-  strok  => { EN => qq{Congratulations &#128522;, your system configuration has been checked and is error-free !},
-              DE => qq{Herzlichen Glückwunsch &#128522;, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei !}           },
-  strwn  => { EN => qq{Looks quite good &#128528;, the check of the plant configuration showed only warnings !},
-              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab lediglich Warnungen !}           },  
+  strok  => { EN => qq{Congratulations &#128522;, your system configuration has been checked and is error-free.},
+              DE => qq{Herzlichen Glückwunsch &#128522;, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei.}            },
+  strwn  => { EN => qq{Looks quite good &#128528;, the check of the plant configuration showed only warnings.},
+              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab lediglich Warnungen.}            },  
   strnok => { EN => qq{Oh no &#128577;, your string configuration is inconsistent.\nPlease check the settings !},
               DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !} },
 );
@@ -779,7 +780,8 @@ sub Define {
       notes       => \%vNotesIntern,
       useAPI      => 0,
       useSMUtils  => 1,
-      useErrCodes => 0
+      useErrCodes => 0,
+      useCTZ      => 1,
   };
   use version 0.77; our $VERSION = moduleVersion ($params);                        # Versionsinformationen setzen
 
@@ -1007,7 +1009,7 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
   
-  if (isSolCastUsed ($hash)) {                                                         
+  if ($prop eq 'SolCast-API') {                                                         
       return "The library FHEM::Utility::CTZ is missed. Please update FHEM completely." if($ctzAbsent);
       
       my $rmf = reqModFail();
@@ -1792,8 +1794,23 @@ sub _getRoofTopData {
       
       if ($lrt && $t < $lrt + $apiitv) {
           my $rt = $lrt + $apiitv - $t;
-          #readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($lrt + $apiitv))[0], 1);
           return qq{The waiting time to the next SolCast API call has not expired yet. The remaining waiting time is $rt seconds};
+      }
+  }
+  
+  if (isSolCastUsed ($hash)) {
+      my $msg;
+      if($ctzAbsent) {
+          $msg = qq{The library FHEM::Utility::CTZ is missed. Please update FHEM completely.};
+          Log3 ($name, 2, "$name - ERROR - $msg");          
+          return $msg;
+      }
+      
+      my $rmf = reqModFail();
+      if($rmf) {
+          $msg = "You have to install the required perl module: ".$rmf;
+          Log3 ($name, 2, "$name - ERROR - $msg"); 
+          return $msg;
       }
   }
   
@@ -2779,9 +2796,11 @@ sub centralTask {
 
       createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
 
+      calcCorrAndQuality          ($centpars);                                            # neue Korrekturfaktor/Qualität berechnen und speichern
       
-      calcVariance           ($centpars);                                                 # Autokorrektur berechnen
-      saveEnergyConsumption  ($centpars);                                                 # Energie Hausverbrauch speichern
+      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+      
+      saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       
       readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                        # Abschluß state      
   }
@@ -2990,6 +3009,7 @@ sub _specialActivities {
               for my $n (1..24) {
                   $n = sprintf "%02d", $n;
                   deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+                  deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
               }
           }
                   
@@ -3066,9 +3086,7 @@ sub _transferDWDRadiationValues {
   my $raname = ReadingsVal($name, "currentRadiationDev", "");                                  # Radiation Forecast Device
   return if(!$raname || !$defs{$raname});
   
-  my $type = $hash->{TYPE};
-  my $uac  = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
-    
+  my $type        = $hash->{TYPE};
   my $err         = checkdwdattr ($name,$raname,\@draattrmust);
   $paref->{state} = $err if($err);
   
@@ -3099,7 +3117,6 @@ sub _transferDWDRadiationValues {
           t    => $t,
           hod  => $hod,
           num  => $num,
-          uac  => $uac,
           fh1  => $fh1,
           fd   => $fd,
           day  => $paref->{day}
@@ -3174,8 +3191,7 @@ sub __calcDWDforecast {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $rad   = $paref->{rad};               # Nominale Strahlung aus DWD Device
-  my $num   = $paref->{num};               # Nexthour 
-  my $uac   = $paref->{uac};               # Nutze Autokorrektur (on/off)
+  my $num   = $paref->{num};               # Nexthour
   my $t     = $paref->{t};                 # aktueller Unix Timestamp
   my $hod   = $paref->{hod};               # Stunde des Tages
   my $fh1   = $paref->{fh1};
@@ -3197,42 +3213,12 @@ sub __calcDWDforecast {
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
-  my $range      = calcRange ($cloudcover);                                                           # Range errechnen
-  
   my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
 
-  ## Ermitteln des relevanten Autokorrekturfaktors
-  ##################################################
-  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);             # PV Korrekturfaktor (auto oder manuell)
-  my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
-  my $hcfound    = "use manual correction factor";
-  my $hq         = "m";
-  
-  if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
-      $hcfound   = "yes";                                                                             # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
-      $hq      //= 0;
-      if (!defined $hc) {
-          $hcfound = "no";
-          $hc      = 1;                                                                               # keine Korrektur  
-          $hq      = 0;
-      }
-  }
-  
-  $hc = sprintf "%.2f", $hc;
-  
-  ######
-
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf}    = $hc."/".$hq;
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
-
-  if($fd == 0 && $fh1) {
-      $paref->{pvcorrf}  = $hc."/".$hq;
-      $paref->{nhour}    = sprintf("%02d",$fh1);
-      $paref->{histname} = "pvcorrfactor";
-      setPVhistory ($paref);
-      delete $paref->{histname};  
-  }
+  my $range               = calcRange ($cloudcover);                                                  # Range errechnen
+  $paref->{range}         = $range;
+  my ($hcfound, $hc, $hq) = ___readCorrfAndQuality ($paref);                                          # liest den anzuwendenden Korrekturfaktor
+  delete $paref->{range};
   
   my $pvsum   = 0;      
   my $peaksum = 0; 
@@ -3325,6 +3311,54 @@ sub __calcDWDforecast {
 return $pvsum;
 }
 
+######################################################################
+#  Liest den anzuwendenden Korrekturfaktor (Qualität) und 
+#  speichert die Werte im Nexthours / PVhistory Hash
+######################################################################
+sub ___readCorrfAndQuality {            
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $num   = $paref->{num};               # Nexthour 
+  my $fh1   = $paref->{fh1};
+  my $fd    = $paref->{fd};
+  my $range = $paref->{range};
+  
+  my $type  = $hash->{TYPE};
+  
+  my $uac        = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                              # Auto- oder manuelle Korrektur
+  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);             # PV Korrekturfaktor (auto oder manuell)
+  my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
+  my $hcfound    = "use manual correction factor";
+  my $hq         = "m";
+  
+  if ($uac eq 'on') {                                                                                 # Autokorrektur soll genutzt werden
+      $hcfound   = "yes";                                                                             # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
+      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), $range, undef);                  # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
+      $hq      //= 0;
+      if (!defined $hc) {
+          $hcfound = "no";
+          $hc      = 1;                                                                               # keine Korrektur  
+          $hq      = 0;
+      }
+  }
+  
+  $hc = sprintf "%.2f", $hc;
+
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf}    = $hc."/".$hq;
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudrange} = $range;
+
+  if($fd == 0 && $fh1) {
+      $paref->{pvcorrf}  = $hc."/".$hq;
+      $paref->{nhour}    = sprintf("%02d",$fh1);
+      $paref->{histname} = "pvcorrfactor";
+      setPVhistory ($paref);
+      delete $paref->{histname};  
+  }
+   
+return ($hcfound, $hc, $hq);
+}
+
 ################################################################
 #  SolCast-API Strahlungsvorhersage Werte aus solcastapi-Hash 
 #  übertragen und ggf. manipulieren
@@ -3338,8 +3372,7 @@ sub _transferSolCastRadiationValues {
   my $date  = $paref->{date};
   my $daref = $paref->{daref};
   
-  my $type = $hash->{TYPE};
-  my $uac  = ReadingsVal($name, 'pvCorrectionFactor_Auto', 'off');                             # Auto- oder manuelle Korrektur
+  my $type  = $hash->{TYPE};
   
   return if(!keys %{$data{$type}{$name}{solcastapi}});
   
@@ -3369,7 +3402,6 @@ sub _transferSolCastRadiationValues {
           hod     => $hod,
           fh1     => $fh1,
           num     => $num,
-          uac     => $uac,
           fd      => $fd,
           day     => $paref->{day}
       };
@@ -3416,7 +3448,6 @@ sub __calcSolCastEstimates {
   my $fd      = $paref->{fd};
   my $fh1     = $paref->{fh1};
   my $num     = $paref->{num};
-  my $uac     = $paref->{uac};
   
   my $type    = $hash->{TYPE};
   
@@ -3431,41 +3462,12 @@ sub __calcSolCastEstimates {
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "cloudcover", 0);          # effektive Wolkendecke nächste Stunde X
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
 
-  my $range      = calcRange ($cloudcover);                                                           # Bewölkungs-Range errechnen
   my $temp       = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "temp", $tempbasedef);       # vorhergesagte Temperatur Stunde X
   
-  ## Ermitteln des relevanten Autokorrekturfaktors
-  ##################################################
-  my $pvcorr  = ReadingsNum ($name, "pvCorrectionFactor_".sprintf ("%02d", $fh1), 1.00);              # PV Korrekturfaktor (auto oder manuell)
-  my $hc      = $pvcorr;                                                                              # Voreinstellung RAW-Korrekturfaktor 
-  my $hcfound = "use manual correction factor";
-  my $hq      = "m";
-  
-  if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
-      $hcfound   = "yes";                                                                             # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
-      ($hc, $hq) = CircularAutokorrVal ($hash, sprintf ("%02d",$fh1), $range, undef);                 # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
-      $hq      //= 0;
-      if (!defined $hc) {
-          $hcfound = "no";
-          $hc      = 1;                                                                               # keine Korrektur  
-          $hq      = 0;
-      }
-  }
-  
-  $hc = sprintf "%.2f", $hc;
-  
-  ######
-  
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf ("%02d",$num)}{pvcorrf}    = $hc."/".$hq;
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf ("%02d",$num)}{cloudrange} = $range;
-  
-  if($fd == 0 && $fh1) {
-      $paref->{pvcorrf}  = $hc."/".$hq;
-      $paref->{nhour}    = sprintf "%02d", $fh1;
-      $paref->{histname} = "pvcorrfactor";
-      setPVhistory ($paref);
-      delete $paref->{histname};  
-  }
+  #my $range               = calcRange ($cloudcover);                                                  # Range errechnen
+  #$paref->{range}         = $range;
+  #my ($hcfound, $hc, $hq) = ___readCorrfAndQuality ($paref);                                          # liest den anzuwendenden Korrekturfaktor
+  #delete $paref->{range};
   
   my ($lh,$sq);
   my $pvsum   = 0;
@@ -3501,7 +3503,7 @@ sub __calcSolCastEstimates {
           "Module Temp (calculated)"          => $modtemp." &deg;C",
           "Loss String Peak Power by Temp"    => $peakloss." kWP",
           "Cloudcover"                        => $cloudcover,
-          "CloudRange"                        => $range,
+          #"CloudRange"                        => $range,
           "CloudFactorDamping"                => $clouddamp." %",
           "Cloudfactor"                       => $ccf,
           "Rainprob"                          => $rainprob,
@@ -3524,7 +3526,7 @@ sub __calcSolCastEstimates {
   
   $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # temperaturbedingte Korrektur der installierten Peakleistung in W
     
-  $pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden  
+  #$pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden  
   $pvsum  = $peaksum if($pvsum > $peaksum);                                                          # Vorhersage nicht größer als die Summe aller PV-Strings Peak
   
   my $invcapacity = CurrentVal ($hash, "invertercapacity", 0);                                       # Max. Leistung des Invertrs
@@ -3540,9 +3542,9 @@ sub __calcSolCastEstimates {
   ($pvsum, $logao)  = ___70percentRule ($paref); 
   
   $lh = {                                                                                            # Log-Hash zur Ausgabe
-      "CloudCorrFoundInStore"  => $hcfound,
-      "PV correction factor"   => $hc,
-      "PV correction quality"  => $hq,
+      #"CloudCorrFoundInStore"  => $hcfound,
+      #"PV correction factor"   => $hc,
+      #"PV correction quality"  => $hq,
       "PV generation forecast" => $pvsum." Wh ".$logao,
   };
   
@@ -7606,17 +7608,14 @@ return ($usenhd, $nhd);
 }
 
 ################################################################
-#       Abweichung PVreal / PVforecast berechnen
-#       bei eingeschalteter automat. Korrektur
+#  Korrekturfaktoren und Qualität berechnen / speichern
 ################################################################
-sub calcVariance {               
+sub calcCorrAndQuality {               
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $t     = $paref->{t};                                                              # aktuelle Unix-Zeit
-  my $chour = $paref->{chour};
-  my $day   = $paref->{day};                                                            # aktueller Tag (01,02,03...31)
-   
+
   return if(!useAutoCorrection ($name));                                                # nur bei "on" automatische Varianzkalkulation
   
   my $idts = ReadingsTimestamp($name, "currentInverterDev", "");                        # Definitionstimestamp des Inverterdevice
@@ -7626,17 +7625,39 @@ sub calcVariance {
 
   if($t - $idts < 7200) {
       my $rmh = sprintf "%.1f", ((7200 - ($t - $idts)) / 3600);
+      
       Log3 ($name, 4, "$name - Variance calculation in standby. It starts in $rmh hours."); 
-      readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
+      
+      readingsSingleUpdate ($hash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
       return;      
   }
   else {
       readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on", 0);
   }
 
-  my $maxvar = AttrVal($name, "maxVariancePerDay", $defmaxvar);                                           # max. Korrekturvarianz
+  _calcCAQfromDWDcloudcover    ($paref);
+  _calcCAQwithSolCastPercentil ($paref);
+      
+return;
+}
 
-  my @da;
+################################################################
+#  Korrekturfaktoren und Qualität in Abhängigkeit von DWD
+#  Bewölkung errechnen:
+#  Abweichung PVreal / PVforecast bei eingeschalteter automat. 
+#  Korrektur berechnen, im Circular Hash speichern
+################################################################
+sub _calcCAQfromDWDcloudcover {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};
+  
+  return if(isSolCastUsed ($hash));
+  
+  my $maxvar = AttrVal($name, 'maxVariancePerDay', $defmaxvar);                                           # max. Korrekturvarianz
+
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
       
@@ -7647,6 +7668,7 @@ sub calcVariance {
       next if(!$pvval);
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
+      
       if($cdone eq "done") {
           Log3 ($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
           next;
@@ -7658,7 +7680,7 @@ sub calcVariance {
       my ($pvhis,$fchis,$dnum,$range) = calcAvgFromHistory ($paref);                                      # historische PV / Forecast Vergleichswerte ermitteln
       
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
-      $oldfac             = 1 if(1*$oldfac == 0);
+      $oldfac             = 1 if(1 * $oldfac == 0);
       
       my $factor;
       my ($usenhd) = useNumHistDays ($name);                                                              # ist Attr numHistDays gesetzt ?
@@ -7690,7 +7712,8 @@ sub calcVariance {
       }
       
       if(defined $range) {
-          my $type  = $hash->{TYPE};         
+          my $type = $hash->{TYPE};         
+          
           Log3 ($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
           
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Korrekturfaktor für Bewölkung Range 0..10 für die jeweilige Stunde als Datenquelle eintragen
@@ -7700,11 +7723,103 @@ sub calcVariance {
           $range = "";
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, days in range: $dnum)";
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";    
+      push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, days in range: $dnum)";
+      push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";    
   }
+      
+return;
+}
+
+################################################################
+#  PVreal mit den SolCast Percentilen vergleichen und das 
+#  beste Percentil als Auswahl speichern
+################################################################
+sub _calcCAQwithSolCastPercentil {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};                        # aktuelle Stunde
+  my $date  = $paref->{date};
+  my $daref = $paref->{daref};
   
-  createReadingsFromArray ($hash, \@da, 1);
+  return if(!isSolCastUsed ($hash));
+  
+  my $debug = AttrVal ($name, "debug", 0);
+  
+  for my $h (1..23) {
+      next if(!$chour || $h > $chour);
+ 
+      my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      next if(!$pvval);
+      
+      my $cdone = ReadingsVal ($name, "pvSolCastPercentile_".sprintf("%02d",$h)."_autocalc", "");
+      
+      if($cdone eq "done") {
+          Log3 ($name, 5, "$name - pvSolCastPercentile Hour: ".sprintf("%02d",$h)." already calculated");
+          next;
+      }
+                  
+      my ($oldperc, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);               # bisher definiertes Percentil/Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
+      $oldperc             = q{default} if(1 * $oldperc == 0);
+      
+      my @sts = split ",", ReadingsVal($name, 'inverterStrings', '');
+      
+      my ($est,$est10,$est20,$est30,$est40,$est60,$est70,$est80,$est90);
+
+      for my $s (@sts) {
+          $est   += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate',   0);
+          $est10 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate10', 0);
+          $est20 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate20', 0);
+          $est30 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate30', 0);
+          $est40 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate40', 0);
+          $est60 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate60', 0);
+          $est70 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate70', 0);
+          $est80 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate80', 0);
+          $est90 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate90', 0);
+      }      
+      
+      if ($debug) {                                                                                   # nur für Debugging
+          Log (1, qq{DEBUG> $name summary PV estimates for hour of day $h - est: $est, est10: $est10, est40: $est40, est70: $est70, est90: $est90});                                   
+      }    
+
+      my %pc = (
+        10 => $est10,
+        20 => $est20,
+        30 => $est30,
+        40 => $est40,
+        60 => $est60,
+        70 => $est70,
+        80 => $est80,
+        90 => $est90,
+      );      
+      
+      my $dnum  = 1;
+      my $perc  = q{};                                                                                       # Standardpercentil 
+      my $diff0 = abs ($est - $pvval);
+                                                                                                                                              ## no critic 'NoStrict'
+      for my $p (sort keys %pc) {        
+          my $diff1 = abs ($pc{$p} - $pvval);
+           
+          if($diff1 < $diff0) {
+              $diff0 = $diff1;
+              $perc  = $p;
+          }
+      }
+      
+      if ($debug) {                                                                                   # nur für Debugging
+          Log (1, qq{DEBUG> $name percentile -> hour: $h, number checked days: $dnum, pvreal: $pvval, diffbest: $diff0, best percentile: $perc});                                   
+      } 
+      
+      #Log3 ($name, 5, "$name - write percentile into circular Hash: $perc, Hour $h");
+      
+      #my $type = $hash->{TYPE};
+            
+      #$data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $perc;                        # bestes Percentil für die jeweilige Stunde speichern
+      #$data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $dnum;                        # Percentil Qualität
+  
+      push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."<>".$perc." (automatic - old percentile: $oldperc)";
+      push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."_autocalc<>done";    
+  }
       
 return;
 }
@@ -9514,8 +9629,8 @@ return $def;
 Das Modul SolarForecast erstellt auf Grundlage der Werte aus generischen Quellendevices eine 
 Vorhersage für den solaren Ertrag und integriert weitere Informationen als Grundlage für darauf aufbauende Steuerungen. <br>
 
-Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (DWD) oder der 
-<a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a> prognostizierten Globalstrahlung am 
+Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (Model DWD) oder der 
+<a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a> (Model SolCastAPI) prognostizierten Globalstrahlung am 
 Anlagenstandort. Die Nutzung der SolCast API beschränkt sich auf die kostenlose Version unter Verwendung von Rooftop Sites.
 In zugeordneten DWD_OpenData Device(s) ist die passende Wetterstation mit dem Attribut "forecastStation" 
 festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
@@ -9565,7 +9680,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       
     Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
     (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto on) bestimmt 
-    werden. Weiterhin kann mit den Attributen <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
+    werden. Die manuelle Anpassung ist nur für das Model DWD einsetzbar.
+    Weiterhin kann mit den Attributen <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
     <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> der Beeinflussungsgrad von Bewölkungs- und 
     Regenprognosen eingestellt werden. <br><br>
     
@@ -9860,7 +9976,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <ul>
       <a id="SolarForecast-set-moduleRoofTops"></a>
       <li><b>moduleRoofTops &lt;Stringname1&gt;=&lt;pk&gt; [&lt;Stringname2&gt;=&lt;pk&gt; &lt;Stringname3&gt;=&lt;pk&gt; ...] </b> <br>
-      (nur bei Verwendung der SolCast API) <br><br>
+      (nur bei Verwendung Model SolCastAPI) <br><br>
       
       Es erfolgt die Zuordnung des Strings "StringnameX" zu einem Schlüssel &lt;pk&gt;. Der Schlüssel &lt;pk&gt; wurde mit dem 
       Setter <a href="#SolarForecast-set-roofIdentPair">roofIdentPair</a> angelegt. Damit wird bei Abruf des Rooftops (=String) 
@@ -9936,7 +10052,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a id="SolarForecast-set-pvCorrectionFactor_Auto"></a>
       <li><b>pvCorrectionFactor_Auto on | off </b> <br><br>  
       
-      Schaltet die automatische Vorhersagekorrektur ein/aus. <br>
+      Schaltet die automatische Vorhersagekorrektur ein/aus.
+      Die Wirkungsweise unterscheidet sich zwischen dem Model DWD und dem Model SolCastAPI. <br><br>
+      
+      <b>Model SolCastAPI:</b> <br>
+      (in Entwicklung)
+      <br><br>      
+      
+      <b>Model DWD:</b> <br>
       Ist die Automatik eingeschaltet, wird für jede Stunde ein Korrekturfaktor der Solarvorhersage berechnet und intern 
       gespeichert.
       Dazu wird die tatsächliche Energieerzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde verglichen, 
@@ -10011,7 +10134,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <ul>
       <a id="SolarForecast-set-roofIdentPair"></a>
       <li><b>roofIdentPair &lt;pk&gt; rtid=&lt;Rooftop-ID&gt; apikey=&lt;SolCast API Key&gt; </b> <br>
-       (nur bei Verwendung der SolCast API) <br><br>
+       (nur bei Verwendung Model SolCastAPI) <br><br>
        
        Der Abruf jedes in <a href='https://toolkit.solcast.com.au/rooftop-sites' target='_blank'>SolCast Rooftop Sites</a> 
        angelegten Rooftops ist mit der Angabe eines Paares <b>Rooftop-ID</b> und <b>API-Key</b> zu identifizieren. <br>
@@ -10185,7 +10308,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <ul>
       <a id="SolarForecast-get-roofTopData"></a>
       <li><b>roofTopData </b> <br>
-      (nur bei Verwendung der SolCast API) <br><br>
+      (nur bei Verwendung Model SolCastAPI) <br><br>
       
       Die erwarteten solaren Strahlungsdaten der definierten RoofTops werden von der SolCast API abgerufen. 
       </li>      
@@ -10195,7 +10318,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <ul>
       <a id="SolarForecast-get-solCastData"></a>
       <li><b>solCastData </b> <br>
-      (nur bei Verwendung der SolCast API) <br><br>
+      (nur bei Verwendung Model SolCastAPI) <br><br>
       
       Listet die im Kontext der SolCast-API gespeicherten Daten auf.
       Verwaltungsdatensätze sind mit einem führenden '?' gekennzeichnet. 
@@ -10712,6 +10835,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-maxVariancePerDay"></a>
        <li><b>maxVariancePerDay &lt;Zahl&gt; </b><br>
+         (nur bei Verwendung Model DWD) <br><br>
+         
          Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
          (default: 0.5)
        </li>
@@ -10726,7 +10851,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-optimizeSolCastAPIreqInterval"></a>
        <li><b>optimizeSolCastAPIreqInterval </b><br>
-         (nur bei Verwendung der SolCast API) <br><br>
+         (nur bei Verwendung Model SolCastAPI) <br><br>
+         
          Das default Abrufintervall der SolCast API beträgt fest 1 Stunde. Ist dieses Attribut gesetzt erfolgt ein dynamische
          Anpassung des Intervalls mit dem Ziel die maximal möglichen Abrufe innerhalb von Sonnenauf- und untergang 
          auszunutzen. <br>
@@ -10798,7 +10924,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
   
        <a id="SolarForecast-attr-solCastPercentile"></a>
        <li><b>solCastPercentile </b><br>
-         (nur bei Verwendung der SolCast API) <br><br>
+         (nur bei Verwendung Model SolCastAPI) <br><br>
        
          Auswahl des Vorhersageszenarios. <br>
          SolCast liefert neben der deterministischen Vorhersage (die nur einen einzigen Wert ergibt) 
@@ -10895,7 +11021,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       },
       "recommends": {
         "FHEM::Meta": 0,
-        "FHEM::Utility::CTZ": 0,
+        "FHEM::Utility::CTZ": 1.00,
         "Storable": 0,
         "Data::Dumper": 0
       },
