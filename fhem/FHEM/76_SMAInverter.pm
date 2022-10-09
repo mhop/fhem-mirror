@@ -1358,6 +1358,7 @@ sub SMAInverter_SMAcommand($$$$$) {
          $inv_SPOT_ETOTAL = "-";
      }
 
+     $inv_SPOT_ETODAY = "-";
      if (length($data) >= 82) {
          $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
 		 
@@ -1398,6 +1399,7 @@ sub SMAInverter_SMAcommand($$$$$) {
          $inv_BAT_LOADTOTAL = "-";
      }
 
+     $inv_BAT_LOADTODAY = "-";
      if (length($data) >= 82) {
          $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
 		 
