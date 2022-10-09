@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  76_SMAInverter:fix new ETOTAL/LOADTOTAL bug
  - change:  76_SMAInverter: add new hybrid inverters, STPxx.0SE
  - change:  50_Signalbot: Mandatory signal-cli v0.11.2 update
  - change:  88_HMCCU: Fixed set pct/level bug
