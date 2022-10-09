@@ -490,6 +490,8 @@ sub Decode
 	my $buf = shift // return;
 	my $name = $hash->{NAME};
 
+	$buf =~ s/{"unknown"}/{}/g;
+
 	my $data;
 	eval { $data = decode_json($buf); };
 
