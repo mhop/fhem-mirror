@@ -330,9 +330,6 @@ sub Parse
 		Log3($ioname, 1, "UBUS - decode_json error: $@");
 		return;
 	}
-
-	my $error = $data->{result}[0];
-	my $result = $data->{result}[1];
 	my $id = $data->{id};
 
 	if($id !~ m/^(.*):call:(.*)/)
@@ -343,8 +340,6 @@ sub Parse
 	my $name = $1;
 	$id = $2;
 	my $hash = $main::defs{$name};
-
-	readingsSingleUpdate($hash, 'state', 'received', 1);
 
 	if(!defined $hash)
 	{
@@ -357,6 +352,22 @@ sub Parse
 		Log3($ioname, 1, "UBUS - received message for unexpected device type " . $hash->{TYPE});
 		return;
 	}
+
+	if(defined $data->{error})
+	{
+		readingsSingleUpdate($hash, 'state', 'Error ' . $data->{error}->{code} . ': ' . $data->{error}->{message}, 1);
+		return;
+	}
+
+	readingsSingleUpdate($hash, 'state', 'received', 1);
+
+	if(!defined $data->{result})
+	{
+		return;
+	}
+
+	my $error = $data->{result}[0];
+	my $result = $data->{result}[1];
 
 	my ($module, $function, $params);
 
