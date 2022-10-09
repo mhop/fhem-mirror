@@ -3503,10 +3503,13 @@ FW_Set($@)
     return "error: cannot fork rescue pid\n"
       if($hash->{rescuePID} == -1);
     return undef if($hash->{rescuePID}); # Parent
-    my $cmd = "exec ssh -N -R0.0.0.0:18083:localhost:$hash->{PORT} ".
-                        "-i certs/fhemrescue -p$a[3] fhemrescue\@$a[2]";
-    Log 1, "Starting $cmd";
-    exec($cmd);
+    my $cmd = "ssh ".
+              "-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null ".
+              "-N -R0.0.0.0:18083:localhost:$hash->{PORT} -i certs/fhemrescue ".
+              "-p$a[3] fhemrescue\@$a[2]";
+
+    Log3 $hash, 2, "Starting $cmd";
+    exec("exec $cmd");
   }
 
   if($a[1] eq "rescueTerminate") {
