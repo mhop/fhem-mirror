@@ -1,4 +1,4 @@
-REV 26501
+REV 26507
 DIR unused
 UPD 2022-10-07_07:45:03 383557 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -654,7 +654,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-10-08_07:45:02 393622 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-10-09_07:45:02 393720 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -750,8 +750,8 @@ UPD 2022-10-07_17:51:50 4809504 docs/commandref.html
 UPD 2022-10-07_17:51:53 2862739 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-10-08_07:45:10 291107 docs/commandref_modular.html
-UPD 2022-10-08_07:45:12 302260 docs/commandref_modular_DE.html
+UPD 2022-10-09_07:45:11 291107 docs/commandref_modular.html
+UPD 2022-10-09_07:45:12 302260 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -784,9 +784,9 @@ UPD 2022-10-08_07:45:02 40259 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2022-06-01_07:45:03 11892 lib/FHEM/Modbus/TestUtils.pm
 UPD 2022-01-25_07:45:02 9836 lib/FHEM/SynoModules/API.pm
 UPD 2022-06-24_07:45:03 15257 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2022-06-30_07:45:02 74821 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2022-10-09_07:45:02 75005 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2022-02-07_07:45:02 5876 lib/FHEM/Text/Unicode.pm
-UPD 2022-09-11_07:45:07 6041 lib/FHEM/Utility/CTZ.pm
+UPD 2022-10-09_07:45:02 6074 lib/FHEM/Utility/CTZ.pm
 UPD 2022-02-11_07:45:02 7870 lib/FHEM/Utility/MQTT2_Dispatcher.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
