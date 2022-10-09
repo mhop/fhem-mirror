@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.11"
+SCRIPTVERSION="3.12"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -18,29 +18,32 @@ TMPFILE=/tmp/signal$$.tmp
 DBVER=0.22
 OPERATION=$1
 JAVACMD=java
+JAVA_VERSION=17.0
+JDK_PACKAGE=openjdk-17-jre-headless
+JAVA_NATIVE=yes
 
 #Check if Java 17 installation is available for this system
-J17=`apt-cache search --names-only 'openjdk-17-jdk-headless'`
+JDK_VER=`apt-cache search --names-only $JDK_PACKAGE`
 if ! [ "$JAVA_HOME" = "" ]; then
 	JAVACMD=$JAVA_HOME/bin/java
+	JAVA_NATIVE=no
 fi
-if [ -e "/opt/java" ]; then
+if [ -e "/opt/java/bin/java" ]; then
     JVER=`/opt/java/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
-	if [ "$JVER" = "17.0" ]; then
+	if [ "$JVER" = "$JAVA_VERSION" ]; then
 	  JAVACMD="/opt/java/bin/java"
 	  export JAVA_HOME="/opt/java"
+	  JAVA_NATIVE=no
 	 fi
 fi
 JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
-if [ "$J17" != "" ] || [ "$JVER" = "17.0" ]; then
-  VEXT="-Linux"
-  JAVA_VERSION=17.0
-  NATIVE_JAVA17=yes
-else 
-  echo "Warning: No Java17 found - will try experimental download of a Java 17 package"
-  JAVA_VERSION=17.0
-  NATIVE_JAVA17=no
-  VEXT=
+if [ "$JDK_VER" == "" ]; then
+  JAVA_NATIVE=no
+  if [ "$JVER" != "$JAVA_VERSION" ]; then
+    JAVA_NATIVE=download
+	echo "Warning: No Java $JAVA_VERSION found - will try download of a Java $JAVA_VERSION package"
+    JAVACMD="/opt/java/bin/java"
+  fi
 fi
 
 #Get OS data
@@ -109,7 +112,6 @@ install_by_file() {
 		echo "available"
 	fi
 }
-
 
 check_and_create_path() {
 #Check if path is available and create of not
@@ -207,7 +209,8 @@ echo "Signal version:               $SIGNALVERSION"
 echo "System library path:          $LIBPATH"
 echo "System architecture:          $ARCH"
 echo "System GLIBC version:         $GLIBC"
-echo "Using Java version:           $JAVA_VERSION ($JAVACMD)"
+echo "Using Java version:           $JAVACMD"
+echo "Native Java $JAVA_VERSION              $JAVA_NATIVE (current version:$JVER)"
 fi
 
 check_and_update() {
@@ -278,49 +281,59 @@ else
     echo 'created'
 fi
 
-echo -n "Checking system Java version ... "
+if [ "$JAVA_NATIVE" = "download" ]; then
+	echo -n "Downloading Java from adoptium..."
+	cd /opt
+	JAVA_ARC=OpenJDK17U-jre_$ARCHJ\_linux_hotspot_17.0.4.1_1.tar.gz
+	wget -qN https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.4.1%2B1/$JAVA_ARC
+	
+	if [ -z $JAVA_ARC ]; then
+		echo "failed"
+		exit
+	fi
+	echo "successful"
+	echo -n "Unpacking ..."
+	tar zxf $JAVA_ARC
+	rm -rf /opt/java
+	mv jdk* java
+	rm $JAVA_ARC
+	echo "done"
+	JAVA_NATIVE=no
+	export JAVA_HOME=/opt/java
+fi
+
 JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
-echo $JVER
-if [ "$JVER" != "17.0" ] && [ $NATIVE_JAVA17 = "yes" ]; then
-	echo -n "Installing openjdk-17-jre-headless..."
-	apt-get -q -y install openjdk-17-jre-headless >>$LOG
-	JVER=`java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
-	if [ "$JVER" = "17.0" ]; then
+if [ "$JAVA_NATIVE" = "yes" ] && [ "$JVER" != "$JAVA_VERSION" ]; then
+	PKG=$(dpkg-query -W --showformat='${Status}\n' $JDK_PACKAGE | grep "install")
+	if [ -z "$PKG" ]; then	
+		echo -n "Installing $JDK_PACKAGE..."
+		apt-get -q -y install $JDK_PACKAGE >>$LOG
+	else
+		echo "$JDK_PACKAGE already installed but Java $JVER found. Please use"
+		echo "sudo update-alternatives --config java"
+		echo "to activate Java $JAVA_VERSION or set your JAVA_HOME environment variable"
+		exit
+	fi
+	JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+	if [ "$JVER" = "$JAVA_VERSION" ]; then
 		echo "done"
 	else 
 		echo "failed"
+		echo "Error: Installation of $JDK_PACKAGE not successful"
+		echo "Please try manually and restart installation once successful"
+		echo "sudo apt-get install $JDK_PACKAGE" 
 		exit
 	fi
 fi
 
-if ! [ "$JVER" = "17.0" ]; then 
-  if ! [ "$JAVA_VERSION" = "$JVER" ]; then
-	if [ -e /opt/java ]; then
-		echo -n "Checking for Java in /opt/java ... "
-		JVER=`/opt/java/bin/java --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
-		echo $JVER
-	fi
-	if ! [ "$JVER" = "$JAVA_VERSION" ]; then
-		echo "Java version mismatch - version $JAVA_VERSION required"
-		echo -n "Download from adoptium.net (this can take a while) ..."
-		cd /tmp
-		JAVA_ARC=OpenJDK17U-jdk_$ARCHJ\_linux_hotspot_17.0.1_12.tar.gz
-		wget -qN https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.1%2B12/$JAVA_ARC
-		if [ -z $JAVA_ARC ]; then
-			echo "failed"
-			exit
-		fi
-		echo "successful"
-		cd /opt
-		echo -n "Unpacking ..."
-		tar zxf /tmp/$JAVA_ARC
-		rm -rf /opt/java
-		mv jdk* java
-		rm /tmp/$JAVA_ARC
-		echo "done"
-	fi
-	export JAVA_HOME=/opt/java
-  fi
+#Final check
+JVER=`$JAVACMD --version | grep -m1 -o '[0-9][0-9]\.[0-9]'`
+if ! [ "$JVER" = "$JAVA_VERSION" ]; then
+	echo "Error: Java $JVER found, but Java $JAVA_VERSION required"
+	echo "Something went wrong that this script cannot resolved - please fix manually"
+	exit
+else
+	echo "Checking for Java $JAVA_VERSION...successful"
 fi
 }
 
@@ -357,7 +370,7 @@ if [ $NEEDINSTALL = 1 ]; then
 	stop_service
 	cd /tmp
 	echo -n "Downloading signal-cli $SIGNALVERSION..."
-	wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION$VEXT.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
+	wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION-Linux.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
 	if ! [ -e signal-cli-$SIGNALVERSION.tar.gz ]; then
 		echo "failed"
 		exit
