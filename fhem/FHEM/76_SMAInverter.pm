@@ -32,6 +32,8 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.18.1" => "03.10.2022  new SE Inverters fix BAT-Data, fix ETODAY bug",
+  "2.18.0" => "30.09.2022  new SE Inverters",
   "2.17.1" => "12.07.2021  fix ETOTAL/LOADTOTAL bug",
   "2.17.0" => "01.07.2021  fix ETOTAL/LOADTOTAL bug",
   "2.16.1" => "21.06.2021  hide unavailable data",
@@ -273,6 +275,10 @@ my %SMAInverter_devtypes = (
 9403 => "SB4.0-1AV-41 (Sunny Boy 4.0 AV-41)",
 9404 => "SB5.0-1AV-41 (Sunny Boy 5.0 AV-41)",
 9405 => "SB6.0-1AV-41 (Sunny Boy 6.0 AV-41)",
+19048 => "STP5.0SE (SUNNY TRIPOWER 8.0 SE)",
+19049 => "STP6.0SE (SUNNY TRIPOWER 8.0 SE)",
+19050 => "STP8.0SE (SUNNY TRIPOWER 8.0 SE)",
+19051 => "STP10.0SE (SUNNY TRIPOWER 8.0 SE)",
 );
 
 # Wechselrichter Class-Hash DE
@@ -281,6 +287,7 @@ my %SMAInverter_classesDE = (
 8001 => "Solar-Wechselrichter",
 8002 => "Wind-Wechselrichter",
 8007 => "Batterie-Wechselrichter",
+8009 => "Hybrid-Wechselrichter",
 8033 => "Verbraucher",
 8064 => "Sensorik allgemein",
 8065 => "Stromzähler",
@@ -293,6 +300,7 @@ my %SMAInverter_classesEN = (
 8001 => "Solar Inverters",
 8002 => "Wind Turbine Inverter",
 8007 => "Batterie Inverters",
+8009 => "Hybrid Inverters",
 8033 => "Consumer",
 8064 => "Sensor System in General",
 8065 => "Electricity meter",
@@ -649,7 +657,8 @@ sub SMAInverter_getstatusDoParse($) {
 			push(@commands, "sup_BatteryInfo_UDC");     # Check BatteryInfo Voltage
 			push(@commands, "sup_BatteryInfo_IDC");     # Check BatteryInfo current
 		 }
-		 elsif (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || ReadingsVal($name,"device_type","") =~ /SBS(1\.5|2\.0|2\.5)/xs)
+		 elsif (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || ReadingsVal($name,"device_type","") =~ /SBS(1\.5|2\.0|2\.5)/xs ||
+			    ReadingsVal($name,"INV_TYPE","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs || ReadingsVal($name,"device_type","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
 		 {
 			push(@commands, "sup_BatteryInfo_2");     # Check BatteryInfo Voltage
 		 }
@@ -664,9 +673,9 @@ sub SMAInverter_getstatusDoParse($) {
           # Detail Level 2 >> get all data
           push(@commands, "sup_SpotGridFrequency");     # Check SpotGridFrequency
           push(@commands, "sup_OperationTime");         # Check OperationTime
-          push(@commands, "sup_InverterTemperature");   # Check InverterTemperature
+          push(@commands, "sup_InverterTemperature");   # Check InverterTemperature ?
           push(@commands, "sup_MaxACPower");            # Check MaxACPower
-          push(@commands, "sup_MaxACPower2");           # Check MaxACPower2
+          push(@commands, "sup_MaxACPower2");           # Check MaxACPower2 ?
           push(@commands, "sup_GridRelayStatus");       # Check GridRelayStatus
           push(@commands, "sup_DeviceStatus");          # Check DeviceStatus
 		  
@@ -781,21 +790,24 @@ sub SMAInverter_getstatusDoParse($) {
          my $cnt15  = int(900/$interval);          # Anzahl der Zyklen innerhalb 15 Minuten = Summe aller Messzyklen
          my $cntsum = $cnt15+1;                    # Sicherheitszuschlag Summe Anzahl aller Zyklen
          my @averagebuf;
-         if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS =~ /8001|8002|8007/xs) {
+         if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS =~ /8001|8002|8007|8009/xs) {
+		     my $power = $inv_SPOT_PACTOT;
+			 $power = $inv_SPOT_PDC1 + $inv_SPOT_PDC2 if($inv_CLASS =~ /8009/xs); #DC Leistung bei Hybrid verwenden
+			 
              # only for this block because of warnings if values not set at restart
              no warnings 'uninitialized';
              if (!$hash->{HELPER}{AVERAGEBUF}) {
                  for my $count (0..$cntsum) {
                      # fill with new values
-                     $inv_SPOT_PACTOT = $inv_SPOT_PACTOT // 0;
-                     push(@averagebuf, $inv_SPOT_PACTOT);
+                     $power = $power // 0;
+                     push(@averagebuf, $power);
                  }
              } else {
                  @averagebuf = split(/,/, $hash->{HELPER}{AVERAGEBUF})
              }
 
              pop(@averagebuf);                                                     # rechtes Element aus average buffer löschen
-             unshift(@averagebuf, $inv_SPOT_PACTOT);                               # und links mit neuem Wert füllen
+             unshift(@averagebuf, $power);                               # und links mit neuem Wert füllen
              $avg = join(',', @averagebuf);
 
              # calculate average energy and write to array for generate readings
@@ -840,6 +852,10 @@ sub SMAInverter_getstatusDoParse($) {
              if($sup_SpotDCPower) {
                  push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
                  push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");
+				 if(ReadingsVal($name,"INV_TYPE","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs || ReadingsVal($name,"device_type","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
+					 {
+						push(@row_array, "strings_pdc ".($inv_SPOT_PDC1 + $inv_SPOT_PDC2)."\n");
+					 }
              }
              if($sup_SpotACPower) {
                  push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n") if ($inv_SPOT_PAC1 ne "-");
@@ -890,6 +906,10 @@ sub SMAInverter_getstatusDoParse($) {
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
                      push(@row_array, "bat_idc ".$inv_BAT_IDC."\n");
+					 if(ReadingsVal($name,"INV_TYPE","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs || ReadingsVal($name,"device_type","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
+					 {
+						push(@row_array, "bat_pdc ".($inv_BAT_UDC * $inv_BAT_IDC)."\n");
+					 }
                  }
 				 if($sup_BatteryInfo_UDC) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
@@ -965,6 +985,10 @@ sub SMAInverter_getstatusDoParse($) {
              if($sup_SpotDCPower) {
                  push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
                  push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n");
+				 if(ReadingsVal($name,"INV_TYPE","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs || ReadingsVal($name,"device_type","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
+					 {
+						push(@row_array, "SPOT_PDC ".($inv_SPOT_PDC1 + $inv_SPOT_PDC2)."\n");
+					 }
              }
              if($sup_SpotACPower) {
                  push(@row_array, "SPOT_PAC1 ".$inv_SPOT_PAC1."\n") if ($inv_SPOT_PAC1 ne "-");
@@ -1012,7 +1036,11 @@ sub SMAInverter_getstatusDoParse($) {
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");                                                     
-                     push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n");                               
+                     push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n"); 
+					 if(ReadingsVal($name,"INV_TYPE","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs || ReadingsVal($name,"device_type","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)
+					 {
+						push(@row_array, "BAT_PDC ".($inv_BAT_UDC * $inv_BAT_IDC)."\n");
+					 }					 
                  }
 				 if($sup_BatteryInfo_UDC) {
                      push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");
@@ -1331,6 +1359,8 @@ sub SMAInverter_SMAcommand($$$$$) {
 
      if (length($data) >= 82) {
          $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
+		 
+		 if(($inv_SPOT_ETODAY eq -2147483648) || ($inv_SPOT_ETODAY eq 0xFFFFFFFF) || $inv_SPOT_ETODAY <= 0) {$inv_SPOT_ETODAY = "-"; }
      } 
      elsif($inv_SPOT_ETOTAL ne "-") {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
@@ -1368,6 +1398,8 @@ sub SMAInverter_SMAcommand($$$$$) {
 
      if (length($data) >= 82) {
          $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
+		 
+		 if(($inv_BAT_LOADTODAY eq -2147483648) || ($inv_BAT_LOADTODAY eq 0xFFFFFFFF) || $inv_BAT_LOADTODAY <= 0) {$inv_BAT_LOADTODAY = "-"; }
      } 
      elsif($inv_BAT_LOADTOTAL ne "-")  {
          # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
@@ -1502,9 +1534,9 @@ sub SMAInverter_SMAcommand($$$$$) {
      return (1,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
  }
  
- if ($data_ID eq 0x495B && (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || 
-     ReadingsVal($name,"device_type","") =~ /SBS(1\.5|2\.0|2\.5)/xs)) {
-     
+  if ($data_ID eq 0x495B && 
+	(ReadingsVal($name,"INV_TYPE","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs || ReadingsVal($name,"device_type","") =~ /STP(5\.0|6\.0|8\.0|10\.0)SE/xs)) {
+
      $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
      $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
      $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
@@ -1516,7 +1548,24 @@ sub SMAInverter_SMAcommand($$$$$) {
          $inv_BAT_IDC = $inv_BAT_IDC / 1000;
      }
      
-     Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
+     Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC (STPxxSE)";
+     return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
+ }
+ elsif ($data_ID eq 0x495B && 
+	(ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || ReadingsVal($name,"device_type","") =~ /SBS(1\.5|2\.0|2\.5)/xs)) {
+
+     $inv_BAT_TEMP   = unpack("V*", substr $data, 62, 4) / 10;
+     $inv_BAT_UDC    = unpack("V*", substr $data, 90, 4) / 100;
+     $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
+     
+     if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
+         $inv_BAT_IDC = "-"; 
+     } 
+     else { 
+         $inv_BAT_IDC = $inv_BAT_IDC / 1000;
+     }
+     
+     Log3 $name, 5, "$name - Found Data and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC (SBS1.5-2.5)";
      return (1,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
  }
  elsif($data_ID eq 0x495B) {
@@ -1618,9 +1667,17 @@ sub SMAInverter_SMAcommand($$$$$) {
 
  if($data_ID eq 0x462E) {
      $inv_SPOT_OPERTM = int(unpack("V*", substr $data, 62, 4) / 36) / 100;
-     $inv_SPOT_FEEDTM = int(unpack("V*", substr $data, 78, 4) / 36) / 100;
-     Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=$inv_SPOT_FEEDTM";
-     return (1,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial);
+	 if($size > 78) {
+		$inv_SPOT_FEEDTM = int(unpack("V*", substr $data, 78, 4) / 36) / 100;
+		
+		Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=$inv_SPOT_FEEDTM";
+		return (1,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial);
+	 }
+     else
+	 {
+		Log3 $name, 5, "$name - Found Data SPOT_OPERTM=$inv_SPOT_OPERTM and SPOT_FEEDTM=--";
+		return (1,$inv_SPOT_OPERTM,0,$inv_susyid,$inv_serial);
+	 }
  }
 
  if($data_ID eq 0x4657) {
@@ -2187,6 +2244,7 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>BAT_IDC [A,B,C] / bat_idc [A,B,C]</b>        :  Battery Current [A,B,C]</li>
 <li><b>BAT_TEMP [A,B,C] / bat_temp [A,B,C]</b>      :  Battery temperature [A,B,C]</li>
 <li><b>BAT_UDC [A,B,C] / bat_udc [A,B,C]</b>        :  Battery Voltage [A,B,C]</li>
+<li><b>BAT_PDC / bat_pdc</b>       					:  Battery power (only Hybrid-Inverter)</li>
 <li><b>ChargeStatus / chargestatus</b>      		:  Battery Charge status </li>
 <li><b>BAT_LOADTODAY</b>                    		:  Battery Load Today </li>
 <li><b>BAT_LOADTOTAL</b>                    		:  Battery Load Total </li>
@@ -2214,6 +2272,7 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_PACTOT / total_pac</b>          		:  Total Power </li>
 <li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC power input 1 </li>
 <li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC power input 2 </li>
+<li><b>SPOT_PDC / strings_pds</b>    				:  DC power summary (only Hybrid-Inverter)</li>
 <li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Grid voltage phase L1 </li>
 <li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Grid voltage phase L2 </li>
 <li><b>SPOT_UAC3 / phase_3_uac</b>          		:  Grid voltage phase L3 </li>
@@ -2425,6 +2484,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>BAT_IDC [A,B,C] / bat_idc [A,B,C]</b>        :  Akku Strom [A,B,C]</li>
 <li><b>BAT_TEMP [A,B,C] / bat_temp [A,B,C]</b>      :  Akku Temperatur [A,B,C]</li>
 <li><b>BAT_UDC [A,B,C] / bat_udc [A,B,C]</b>        :  Akku Spannung [A,B,C]</li>
+<li><b>BAT_PDC / bat_pdc</b> 						:  Akku Leistung (bei Hybridwechselrichtern)</li>
 <li><b>ChargeStatus / chargestatus</b>      		:  Akku Ladestand </li>
 <li><b>BAT_LOADTODAY</b>                    		:  Battery Load Today </li>
 <li><b>BAT_LOADTOTAL</b>                    		:  Battery Load Total </li>
@@ -2451,6 +2511,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_PACTOT / total_pac</b>          		:  Gesamtleistung </li>
 <li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC Leistung Eingang 1 </li>
 <li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC Leistung Eingang 2 </li>
+<li><b>SPOT_PDC / strings_pds</b>       			:  DC Leistung gesamt (bei Hybridwechselrichtern)</li>
 <li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Netz Spannung phase L1 </li>
 <li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Netz Spannung phase L2 </li>
 <li><b>SPOT_UAC3 / phase_3_uac</b>          		:  Netz Spannung phase L3 </li>
@@ -2496,7 +2557,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.16.1",
+  "version": "v2.18.1",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
