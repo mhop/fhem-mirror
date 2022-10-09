@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.18.2" => "09.10.2022  fix new ETOTAL/LOADTOTAL bug",
   "2.18.1" => "03.10.2022  new SE Inverters fix BAT-Data, fix ETODAY bug",
   "2.18.0" => "30.09.2022  new SE Inverters",
   "2.17.1" => "12.07.2021  fix ETOTAL/LOADTOTAL bug",
@@ -1361,8 +1362,9 @@ sub SMAInverter_SMAcommand($$$$$) {
          $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
 		 
 		 if(($inv_SPOT_ETODAY eq -2147483648) || ($inv_SPOT_ETODAY eq 0xFFFFFFFF) || $inv_SPOT_ETODAY <= 0) {$inv_SPOT_ETODAY = "-"; }
-     } 
-     elsif($inv_SPOT_ETOTAL ne "-") {
+     }
+	 
+     if($inv_SPOT_ETODAY eq "-" && $inv_SPOT_ETOTAL ne "-") {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
          my $etotold = ReadingsNum($name, ".etotal_yesterday", 0);
@@ -1401,7 +1403,8 @@ sub SMAInverter_SMAcommand($$$$$) {
 		 
 		 if(($inv_BAT_LOADTODAY eq -2147483648) || ($inv_BAT_LOADTODAY eq 0xFFFFFFFF) || $inv_BAT_LOADTODAY <= 0) {$inv_BAT_LOADTODAY = "-"; }
      } 
-     elsif($inv_BAT_LOADTOTAL ne "-")  {
+	 
+     if($inv_BAT_LOADTODAY eq "-" && $inv_BAT_LOADTOTAL ne "-")  {
          # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
          my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
@@ -2557,7 +2560,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.18.1",
+  "version": "v2.18.2",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
