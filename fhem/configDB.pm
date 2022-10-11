@@ -545,6 +545,9 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 sub cfgDB_SaveState {
 	my ($out,$val,$r,$rd,$t,@rowList);
 
+    # don't write statefile in rescue mode
+    return if ($configDB{attr}{rescue} == 1);
+
     _cfgDB_deleteRF;
 
 	$t = localtime;
@@ -640,41 +643,17 @@ sub cfgDB_MigrationImport {
 		push @files, $fn;
 	}
 
-# find RSS layouts
+# find RSS and Infopanel layouts
 	@def = '';
-	@def = _cfgDB_findDef('TYPE=RSS','LAYOUTFILE');
+	@def = _cfgDB_findDef('TYPE=(RSS|InfoPanel)','LAYOUTFILE');
 	foreach my $fn (@def) {
 		next unless $fn;
 		push @files, $fn;
 	}
 
-# find InfoPanel layouts
+# find weekprofile/LightScene/RHASSPY configurations
 	@def = '';
-	@def = _cfgDB_findDef('TYPE=InfoPanel','LAYOUTFILE');
-	foreach my $fn (@def) {
-		next unless $fn;
-		push @files, $fn;
-	}
-
-# find weekprofile configurations
-	@def = '';
-	@def = _cfgDB_findDef('TYPE=weekprofile','CONFIGFILE');
-	foreach my $fn (@def) {
-		next unless $fn;
-		push @files, $fn;
-	}
-
-# find LightScene configurations
-	@def = '';
-	@def = _cfgDB_findDef('TYPE=LightScene','CONFIGFILE');
-	foreach my $fn (@def) {
-		next unless $fn;
-		push @files, $fn;
-	}
-
-# find RHASSPY configurations
-	@def = '';
-	@def = _cfgDB_findDef('TYPE=RHASSPY','CONFIGFILE');
+	@def = _cfgDB_findDef('TYPE=(weekprofile|LightScene|RHASSPY)','CONFIGFILE');
 	foreach my $fn (@def) {
 		next unless $fn;
 		push @files, $fn;
@@ -695,7 +674,6 @@ sub cfgDB_MigrationImport {
 # import uniqueID file
 	$filename = "$modpath/FHEM/FhemUtils/uniqueID";
 	push @files,$filename if (-e $filename);   
-
 
 # do the import
 	foreach my $fn (@files) {
