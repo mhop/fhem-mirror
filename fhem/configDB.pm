@@ -341,7 +341,7 @@ sub cfgDB_Init {
 #		insert default entries to get fhem running
 		$fhem_dbh->commit();
 		my $uuid = createUniqueId();
-		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
+		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid',NULL)");
 		_cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init',0);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logdir ./log',1);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logfile %L/fhem-%Y-%m-%d.log',2);
