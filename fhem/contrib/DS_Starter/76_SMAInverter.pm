@@ -1,5 +1,5 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 24664 2021-06-20 20:50:44Z DS_Starter $
+# $Id: 76_SMAInverter.pm 24737 2021-07-12 16:46:51Z MadMax $
 #################################################################################################################
 #
 #  Copyright notice
@@ -32,7 +32,12 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
-  "2.15.0" => "14.06.2021  MadMax: SBS5.0-10, SBS6.0-10 read battery data included ",
+  "2.17.1" => "12.07.2021  fix ETOTAL/LOADTOTAL bug",
+  "2.17.0" => "01.07.2021  fix ETOTAL/LOADTOTAL bug",
+  "2.16.1" => "21.06.2021  hide unavailable data",
+  "2.16.0" => "21.06.2021  AC Voltage and AC Curren read fixed, read CosPhi included ",
+  "2.15.1" => "18.06.2021  SBS1.5, SBS2.0, SBS2.5 read battery data included ",
+  "2.15.0" => "14.06.2021  SBS5.0-10, SBS6.0-10, SBS3.7-10 read battery data included ",
   "2.14.2" => "02.06.2021  new inverter type 9359=SBS6.0-10 ",
   "2.14.1" => "27.02.2021  change save .etotal_yesterday, Forum: https://forum.fhem.de/index.php/topic,56080.msg1134664.html#msg1134664 ",
   "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P, Forum: #topic,56080.msg986302.html#msg986302",
@@ -109,6 +114,9 @@ our %SMAInverter_vNotesIntern = (
 # $inv_SPOT_UAC1                  # Grid voltage phase L1
 # $inv_SPOT_UAC2                  # Grid voltage phase L2
 # $inv_SPOT_UAC3                  # Grid voltage phase L3
+# $inv_SPOT_UAC1_2                # Grid voltage phase L1 - L2
+# $inv_SPOT_UAC2_3                # Grid voltage phase L2 - L3
+# $inv_SPOT_UAC3_1                # Grid voltage phase L3 - L1
 # $inv_SPOT_IAC1                  # Grid current phase L1
 # $inv_SPOT_IAC2                  # Grid current phase L2
 # $inv_SPOT_IAC3                  # Grid current phase L3
@@ -531,6 +539,7 @@ sub SMAInverter_getstatusDoParse($) {
      $sup_ChargeStatus,
      $sup_SpotDCVoltage,
      $sup_SpotACVoltage,
+	 $sup_SpotACCurrent,
      $sup_BatteryInfo,
 	 $sup_BatteryInfo_2, 			#SBS(1.5|2.0|2.5)
 	 $sup_BatteryInfo_TEMP,
@@ -556,7 +565,9 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_SPOT_UDC1, $inv_SPOT_UDC2,
      $inv_SPOT_IDC1, $inv_SPOT_IDC2,
      $inv_SPOT_UAC1, $inv_SPOT_UAC2, $inv_SPOT_UAC3,
+	 $inv_SPOT_UAC1_2, $inv_SPOT_UAC2_3, $inv_SPOT_UAC3_1,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
+	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
@@ -631,6 +642,7 @@ sub SMAInverter_getstatusDoParse($) {
          # Detail Level 1 or 2 >> get voltage and current levels
          push(@commands, "sup_SpotDCVoltage");         # Check SpotDCVoltage
          push(@commands, "sup_SpotACVoltage");         # Check SpotACVoltage
+		 push(@commands, "sup_SpotACCurrent");         # Check SpotACCurrent
 		 
 		 if (ReadingsVal($name,"INV_TYPE","") =~ /SBS(6\.0|5\.0|3\.7)/xs || ReadingsVal($name,"device_type","") =~ /SBS(6\.0|5\.0|3\.7)/xs)
 		 {
@@ -694,7 +706,11 @@ sub SMAInverter_getstatusDoParse($) {
                  ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
              }
              elsif ($i eq "sup_SpotACVoltage") {
-                 ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
+                 ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004656FF);
+             }
+			 elsif ($i eq "sup_SpotACCurrent") {
+				 Log3 $name, 5, "$name -> sup_SpotACCurrent";
+                 ($sup_SpotACCurrent,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465300, 0x004655FF);
              }
 		     elsif ($i eq "sup_BatteryInfo_TEMP") {
 			     Log3 $name, 5, "$name -> sup_BatteryInfo_TEMP";
@@ -818,17 +834,17 @@ sub SMAInverter_getstatusDoParse($) {
 
          if ($sc) {                                                                                      # SBFSpot Kompatibilitätsmodus
              if($sup_EnergyProduction) {
-                 push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n");
-                 push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n");
+                 push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n")  if ($inv_SPOT_ETOTAL ne "-");
+                 push(@row_array, "etoday ".($inv_SPOT_ETODAY/1000)."\n") if ($inv_SPOT_ETODAY ne "-");
              }
              if($sup_SpotDCPower) {
                  push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
                  push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");
              }
              if($sup_SpotACPower) {
-                 push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n");
-                 push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n");
-                 push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n");
+                 push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n") if ($inv_SPOT_PAC1 ne "-");
+                 push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n") if ($inv_SPOT_PAC2 ne "-");
+                 push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n") if ($inv_SPOT_PAC3 ne "-");
              }
              if($sup_SpotACTotalPower) {
                  push(@row_array, "total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
@@ -858,12 +874,18 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, "string_2_idc ".sprintf("%.3f",$inv_SPOT_IDC2)."\n");
                  }
                  if($sup_SpotACVoltage) {
-                     push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n");
-                     push(@row_array, "phase_2_uac ".sprintf("%.2f",$inv_SPOT_UAC2)."\n");
-                     push(@row_array, "phase_3_uac ".sprintf("%.2f",$inv_SPOT_UAC3)."\n");
-                     push(@row_array, "phase_1_iac ".sprintf("%.3f",$inv_SPOT_IAC1)."\n");
-                     push(@row_array, "phase_2_iac ".sprintf("%.3f",$inv_SPOT_IAC2)."\n");
-                     push(@row_array, "phase_3_iac ".sprintf("%.3f",$inv_SPOT_IAC3)."\n");
+                     push(@row_array, "phase_1_uac ".sprintf("%.2f",$inv_SPOT_UAC1)."\n") if ($inv_SPOT_UAC1 ne "-");
+                     push(@row_array, "phase_2_uac ".sprintf("%.2f",$inv_SPOT_UAC2)."\n") if ($inv_SPOT_UAC2 ne "-");
+                     push(@row_array, "phase_3_uac ".sprintf("%.2f",$inv_SPOT_UAC3)."\n") if ($inv_SPOT_UAC3 ne "-");
+                     push(@row_array, "phase_1_2_uac ".sprintf("%.3f",$inv_SPOT_UAC1_2)."\n") if ($inv_SPOT_UAC1_2 ne "-");
+                     push(@row_array, "phase_2_3_uac ".sprintf("%.3f",$inv_SPOT_UAC2_3)."\n") if ($inv_SPOT_UAC2_3 ne "-");
+                     push(@row_array, "phase_3_1_uac ".sprintf("%.3f",$inv_SPOT_UAC3_1)."\n") if ($inv_SPOT_UAC3_1 ne "-");
+					 push(@row_array, "cosphi ".sprintf("%.3f",$inv_SPOT_CosPhi)."\n") if ($inv_SPOT_CosPhi ne "-");
+                 }
+				 if($sup_SpotACCurrent) {
+                     push(@row_array, "phase_1_iac ".sprintf("%.2f",$inv_SPOT_IAC1)."\n") if ($inv_SPOT_IAC1 ne "-");
+                     push(@row_array, "phase_2_iac ".sprintf("%.2f",$inv_SPOT_IAC2)."\n") if ($inv_SPOT_IAC2 ne "-");
+                     push(@row_array, "phase_3_iac ".sprintf("%.2f",$inv_SPOT_IAC3)."\n") if ($inv_SPOT_IAC3 ne "-");
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
@@ -871,19 +893,19 @@ sub SMAInverter_getstatusDoParse($) {
                  }
 				 if($sup_BatteryInfo_UDC) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
-					 push(@row_array, "bat_udc_a ".$inv_BAT_UDC_A."\n");
-					 push(@row_array, "bat_udc_b ".$inv_BAT_UDC_B."\n");
-					 push(@row_array, "bat_udc_c ".$inv_BAT_UDC_C."\n");                                                        
+					 push(@row_array, "bat_udc_a ".$inv_BAT_UDC_A."\n") if ($inv_BAT_UDC_A ne "-");
+					 push(@row_array, "bat_udc_b ".$inv_BAT_UDC_B."\n") if ($inv_BAT_UDC_B ne "-");
+					 push(@row_array, "bat_udc_c ".$inv_BAT_UDC_C."\n") if ($inv_BAT_UDC_C ne "-");                                                        
                  }
 				 if($sup_BatteryInfo_IDC) {
                      push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");                                                       
-					 push(@row_array, "bat_idc_a ".$inv_BAT_IDC_A."\n");
-					 push(@row_array, "bat_idc_b ".$inv_BAT_IDC_B."\n");
-					 push(@row_array, "bat_idc_c ".$inv_BAT_IDC_C."\n"); 
+					 push(@row_array, "bat_idc_a ".$inv_BAT_IDC_A."\n") if ($inv_BAT_IDC_A ne "-");
+					 push(@row_array, "bat_idc_b ".$inv_BAT_IDC_B."\n") if ($inv_BAT_IDC_B ne "-");
+					 push(@row_array, "bat_idc_c ".$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-"); 
                  }
                  if($sup_SpotBatteryLoad) {
-                     push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n");
-                     push(@row_array, "bat_loadtoday ".($inv_BAT_LOADTODAY/1000)."\n");
+                     push(@row_array, "bat_loadtotal ".($inv_BAT_LOADTOTAL/1000)."\n") if ($inv_BAT_LOADTOTAL ne "-");
+                     push(@row_array, "bat_loadtoday ".($inv_BAT_LOADTODAY/1000)."\n") if ($inv_BAT_LOADTODAY ne "-");
                  }
              }
 
@@ -897,9 +919,9 @@ sub SMAInverter_getstatusDoParse($) {
                  }
 				 if($sup_BatteryInfo_TEMP) {
                      push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
-					 push(@row_array, "bat_temp_a ".$inv_BAT_TEMP_A."\n");
-					 push(@row_array, "bat_temp_b ".$inv_BAT_TEMP_B."\n");
-					 push(@row_array, "bat_temp_c ".$inv_BAT_TEMP_C."\n");
+					 push(@row_array, "bat_temp_a ".$inv_BAT_TEMP_A."\n") if ($inv_BAT_TEMP_A ne "-");
+					 push(@row_array, "bat_temp_b ".$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
+					 push(@row_array, "bat_temp_c ".$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
                  }
                  if($sup_SpotGridFrequency) {
                      push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
@@ -937,17 +959,17 @@ sub SMAInverter_getstatusDoParse($) {
          } 
          else {                                                                                # kein SBFSpot Compatibility Mode
              if($sup_EnergyProduction) {
-                 push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n");
-                 push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n");
+                 push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n") if ($inv_SPOT_ETOTAL ne "-");
+                 push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n") if ($inv_SPOT_ETODAY ne "-");
              }
              if($sup_SpotDCPower) {
                  push(@row_array, "SPOT_PDC1 ".$inv_SPOT_PDC1."\n");
                  push(@row_array, "SPOT_PDC2 ".$inv_SPOT_PDC2."\n");
              }
              if($sup_SpotACPower) {
-                 push(@row_array, "SPOT_PAC1 ".$inv_SPOT_PAC1."\n");
-                 push(@row_array, "SPOT_PAC2 ".$inv_SPOT_PAC2."\n");
-                 push(@row_array, "SPOT_PAC3 ".$inv_SPOT_PAC3."\n");
+                 push(@row_array, "SPOT_PAC1 ".$inv_SPOT_PAC1."\n") if ($inv_SPOT_PAC1 ne "-");
+                 push(@row_array, "SPOT_PAC2 ".$inv_SPOT_PAC2."\n") if ($inv_SPOT_PAC2 ne "-");
+                 push(@row_array, "SPOT_PAC3 ".$inv_SPOT_PAC3."\n") if ($inv_SPOT_PAC3 ne "-");
              }
              if($sup_SpotACTotalPower) {
                  push(@row_array, "SPOT_PACTOT ".$inv_SPOT_PACTOT."\n");
@@ -975,12 +997,18 @@ sub SMAInverter_getstatusDoParse($) {
                      push(@row_array, "SPOT_IDC2 ".$inv_SPOT_IDC2."\n");
                  }
                  if($sup_SpotACVoltage) {
-                     push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n");
-                     push(@row_array, "SPOT_UAC2 ".$inv_SPOT_UAC2."\n");
-                     push(@row_array, "SPOT_UAC3 ".$inv_SPOT_UAC3."\n");
-                     push(@row_array, "SPOT_IAC1 ".$inv_SPOT_IAC1."\n");
-                     push(@row_array, "SPOT_IAC2 ".$inv_SPOT_IAC2."\n");
-                     push(@row_array, "SPOT_IAC3 ".$inv_SPOT_IAC3."\n");
+                     push(@row_array, "SPOT_UAC1 ".$inv_SPOT_UAC1."\n") if ($inv_SPOT_UAC1 ne "-");
+                     push(@row_array, "SPOT_UAC2 ".$inv_SPOT_UAC2."\n") if ($inv_SPOT_UAC2 ne "-");
+                     push(@row_array, "SPOT_UAC3 ".$inv_SPOT_UAC3."\n") if ($inv_SPOT_UAC3 ne "-");
+                     push(@row_array, "SPOT_UAC1_2 ".sprintf("%.3f",$inv_SPOT_UAC1_2)."\n") if ($inv_SPOT_UAC1_2 ne "-");
+                     push(@row_array, "SPOT_UAC2_3 ".sprintf("%.3f",$inv_SPOT_UAC2_3)."\n") if ($inv_SPOT_UAC2_3 ne "-");
+                     push(@row_array, "SPOT_UAC3_1 ".sprintf("%.3f",$inv_SPOT_UAC3_1)."\n") if ($inv_SPOT_UAC3_1 ne "-");
+					 push(@row_array, "SPOT_CosPhi ".sprintf("%.3f",$inv_SPOT_CosPhi)."\n") if ($inv_SPOT_CosPhi ne "-");
+                 }
+				 if($sup_SpotACCurrent) {
+                     push(@row_array, "SPOT_IAC1 ".sprintf("%.2f",$inv_SPOT_IAC1)."\n") if ($inv_SPOT_IAC1 ne "-");
+                     push(@row_array, "SPOT_IAC2 ".sprintf("%.2f",$inv_SPOT_IAC2)."\n") if ($inv_SPOT_IAC2 ne "-");
+                     push(@row_array, "SPOT_IAC3 ".sprintf("%.2f",$inv_SPOT_IAC3)."\n") if ($inv_SPOT_IAC3 ne "-");
                  }
                  if($sup_BatteryInfo || $sup_BatteryInfo_2) {
                      push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");                                                     
@@ -988,19 +1016,19 @@ sub SMAInverter_getstatusDoParse($) {
                  }
 				 if($sup_BatteryInfo_UDC) {
                      push(@row_array, "BAT_UDC ".  $inv_BAT_UDC."\n");
-					 push(@row_array, "BAT_UDC_A ".$inv_BAT_UDC_A."\n");
-					 push(@row_array, "BAT_UDC_B ".$inv_BAT_UDC_B."\n");
-					 push(@row_array, "BAT_UDC_C ".$inv_BAT_UDC_C."\n");                                                                                       
+					 push(@row_array, "BAT_UDC_A ".$inv_BAT_UDC_A."\n") if ($inv_BAT_UDC_A ne "-");
+					 push(@row_array, "BAT_UDC_B ".$inv_BAT_UDC_B."\n") if ($inv_BAT_UDC_B ne "-");
+					 push(@row_array, "BAT_UDC_C ".$inv_BAT_UDC_C."\n") if ($inv_BAT_UDC_C ne "-");                                                                                       
                  }
 				 if($sup_BatteryInfo_IDC) {                                                      
                      push(@row_array, "BAT_IDC ".  $inv_BAT_IDC."\n");
-					 push(@row_array, "BAT_IDC_A ".$inv_BAT_IDC_A."\n");
-					 push(@row_array, "BAT_IDC_B ".$inv_BAT_IDC_B."\n");
-					 push(@row_array, "BAT_IDC_C ".$inv_BAT_IDC_C."\n");                                
+					 push(@row_array, "BAT_IDC_A ".$inv_BAT_IDC_A."\n") if ($inv_BAT_IDC_A ne "-");
+					 push(@row_array, "BAT_IDC_B ".$inv_BAT_IDC_B."\n") if ($inv_BAT_IDC_B ne "-");
+					 push(@row_array, "BAT_IDC_C ".$inv_BAT_IDC_C."\n") if ($inv_BAT_IDC_C ne "-");                                
                  }
                  if($sup_SpotBatteryLoad) {
-                     push(@row_array, "BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL."\n");
-                     push(@row_array, "BAT_LOADTODAY ".$inv_BAT_LOADTODAY."\n");
+                     push(@row_array, "BAT_LOADTOTAL ".$inv_BAT_LOADTOTAL."\n") if ($inv_BAT_LOADTOTAL ne "-");
+                     push(@row_array, "BAT_LOADTODAY ".$inv_BAT_LOADTODAY."\n") if ($inv_BAT_LOADTODAY ne "-");
                  }
              }
 
@@ -1014,9 +1042,9 @@ sub SMAInverter_getstatusDoParse($) {
                  }
 				 if($sup_BatteryInfo_TEMP) {
                      push(@row_array, "BAT_TEMP ".  $inv_BAT_TEMP."\n");
-					 push(@row_array, "BAT_TEMP_A ".$inv_BAT_TEMP_A."\n");
-					 push(@row_array, "BAT_TEMP_B ".$inv_BAT_TEMP_B."\n");
-					 push(@row_array, "BAT_TEMP_C ".$inv_BAT_TEMP_C."\n");
+					 push(@row_array, "BAT_TEMP_A ".$inv_BAT_TEMP_A."\n") if ($inv_BAT_TEMP_A ne "-");
+					 push(@row_array, "BAT_TEMP_B ".$inv_BAT_TEMP_B."\n") if ($inv_BAT_TEMP_B ne "-");
+					 push(@row_array, "BAT_TEMP_C ".$inv_BAT_TEMP_C."\n") if ($inv_BAT_TEMP_C ne "-");
                  }
                  if($sup_SpotGridFrequency) {
                      push(@row_array, "SPOT_FREQ ".$inv_SPOT_FREQ."\n");
@@ -1179,7 +1207,9 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_UDC1, $inv_SPOT_UDC2,
      $inv_SPOT_IDC1, $inv_SPOT_IDC2,
      $inv_SPOT_UAC1, $inv_SPOT_UAC2, $inv_SPOT_UAC3,
+	 $inv_SPOT_UAC1_2, $inv_SPOT_UAC2_3, $inv_SPOT_UAC3_1,
      $inv_SPOT_IAC1, $inv_SPOT_IAC2, $inv_SPOT_IAC3,
+	 $inv_SPOT_CosPhi,
      $inv_BAT_UDC, $inv_BAT_UDC_A, $inv_BAT_UDC_B, $inv_BAT_UDC_C, 
      $inv_BAT_IDC, $inv_BAT_IDC_A, $inv_BAT_IDC_B, $inv_BAT_IDC_C,
      $inv_BAT_CYCLES, $inv_BAT_CYCLES_A, $inv_BAT_CYCLES_B, $inv_BAT_CYCLES_C,
@@ -1289,16 +1319,20 @@ sub SMAInverter_SMAcommand($$$$$) {
  if($data_ID eq 0x2601) {
      if (length($data) >= 66) {
          $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
+		 
+		 if(($inv_SPOT_ETOTAL eq -2147483648) || ($inv_SPOT_ETOTAL eq 0xFFFFFFFF) || $inv_SPOT_ETOTAL <= 0) {$inv_SPOT_ETOTAL = "-"; }
+		 
+		 
      } 
      else {
          Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
-         $inv_SPOT_ETOTAL = 0;
+         $inv_SPOT_ETOTAL = "-";
      }
 
      if (length($data) >= 82) {
          $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
      } 
-     else {
+     elsif($inv_SPOT_ETOTAL ne "-") {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
          my $etotold = ReadingsNum($name, ".etotal_yesterday", 0);
@@ -1309,9 +1343,13 @@ sub SMAInverter_SMAcommand($$$$$) {
          } 
          else {
              Log3 ($name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !");
-             $inv_SPOT_ETODAY = 0;
+             $inv_SPOT_ETODAY = "-";
          }
      }
+	 else
+	 {
+		$inv_SPOT_ETODAY = "-";
+	 }
 
      Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
      return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
@@ -1320,16 +1358,18 @@ sub SMAInverter_SMAcommand($$$$$) {
  if($data_ID eq 0x4967) {
      if (length($data) >= 66) {
          $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
+		 
+		 if(($inv_BAT_LOADTOTAL eq -2147483648) || ($inv_BAT_LOADTOTAL eq 0xFFFFFFFF) || $inv_BAT_LOADTOTAL <= 0) {$inv_BAT_LOADTOTAL = "-"; }
      } 
      else {
          Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
-         $inv_SPOT_ETOTAL = 0;
+         $inv_BAT_LOADTOTAL = "-";
      }
 
      if (length($data) >= 82) {
          $inv_BAT_LOADTODAY = unpack("V*", substr ($data, 78, 4));
      } 
-     else {
+     elsif($inv_BAT_LOADTOTAL ne "-")  {
          # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
          my $bltotold = ReadingsNum($name, ".bat_loadtotal_yesterday", 0);
@@ -1340,9 +1380,13 @@ sub SMAInverter_SMAcommand($$$$$) {
          } 
          else {
              Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYLOAD_TODAY ... set it to \"0\" !";
-             $inv_BAT_LOADTODAY = 0;
+             $inv_BAT_LOADTODAY = "-";
          }
      }
+	 else
+	 {
+		$inv_BAT_LOADTODAY = "-";
+	 }
 
      Log3 $name, 5, "$name - Data BAT_LOADTOTAL=$inv_BAT_LOADTOTAL and BAT_LOADTODAY=$inv_BAT_LOADTODAY";
      return (1,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial);
@@ -1359,11 +1403,11 @@ sub SMAInverter_SMAcommand($$$$$) {
 
  if($data_ID eq 0x4640) {
      $inv_SPOT_PAC1 = unpack("l*", substr $data, 62, 4);
-     if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = 0; }   # Catch 0x80000000 as 0 value
+     if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = "-"; }   # Catch 0x80000000 as 0 value
      $inv_SPOT_PAC2 = unpack("l*", substr $data, 90, 4);
-     if($inv_SPOT_PAC2 eq -2147483648) {$inv_SPOT_PAC2 = 0; }   # Catch 0x80000000 as 0 value
+     if($inv_SPOT_PAC2 eq -2147483648) {$inv_SPOT_PAC2 = "-"; }   # Catch 0x80000000 as 0 value
      $inv_SPOT_PAC3 = unpack("l*", substr $data, 118, 4);
-     if($inv_SPOT_PAC3 eq -2147483648) {$inv_SPOT_PAC3 = 0; }   # Catch 0x80000000 as 0 value
+     if($inv_SPOT_PAC3 eq -2147483648) {$inv_SPOT_PAC3 = "-"; }   # Catch 0x80000000 as 0 value
      Log3 $name, 5, "$name - Found Data SPOT_PAC1=$inv_SPOT_PAC1 and SPOT_PAC2=$inv_SPOT_PAC2 and SPOT_PAC3=$inv_SPOT_PAC3";
      return (1,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial);
  }
@@ -1421,18 +1465,41 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_SPOT_UAC1 = unpack("l*", substr $data, 62, 4);
      $inv_SPOT_UAC2 = unpack("l*", substr $data, 90, 4);
      $inv_SPOT_UAC3 = unpack("l*", substr $data, 118, 4);
-     $inv_SPOT_IAC1 = unpack("l*", substr $data, 146, 4);
-     $inv_SPOT_IAC2 = unpack("l*", substr $data, 174, 4);
-     $inv_SPOT_IAC3 = unpack("l*", substr $data, 202, 4);
-     if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = 0; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = 0; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = 0; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF)) {$inv_SPOT_IAC1 = 0; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF)) {$inv_SPOT_IAC2 = 0; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
-     if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF)) {$inv_SPOT_IAC3 = 0; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     $inv_SPOT_UAC1_2 = unpack("l*", substr $data, 146, 4);
+     $inv_SPOT_UAC2_3 = unpack("l*", substr $data, 174, 4);
+     $inv_SPOT_UAC3_1 = unpack("l*", substr $data, 202, 4);
+	 
+	 if($size >= 230) {
+		 $inv_SPOT_CosPhi = unpack("l*", substr $data, 230, 4);
+		 if(($inv_SPOT_CosPhi eq -2147483648) || ($inv_SPOT_CosPhi eq 0xFFFFFFFF)) {$inv_SPOT_CosPhi = "-"; } else {$inv_SPOT_CosPhi = $inv_SPOT_CosPhi / 100; }
+	 }
+	 else
+	 {
+		$inv_SPOT_CosPhi = "-";
+	 }
+	 
+     if(($inv_SPOT_UAC1 eq -2147483648) || ($inv_SPOT_UAC1 eq 0xFFFFFFFF) || $inv_SPOT_UAC1 < 0) {$inv_SPOT_UAC1 = "-"; } else {$inv_SPOT_UAC1 = $inv_SPOT_UAC1 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC2 eq -2147483648) || ($inv_SPOT_UAC2 eq 0xFFFFFFFF) || $inv_SPOT_UAC2 < 0) {$inv_SPOT_UAC2 = "-"; } else {$inv_SPOT_UAC2 = $inv_SPOT_UAC2 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC3 eq -2147483648) || ($inv_SPOT_UAC3 eq 0xFFFFFFFF) || $inv_SPOT_UAC3 < 0) {$inv_SPOT_UAC3 = "-"; } else {$inv_SPOT_UAC3 = $inv_SPOT_UAC3 / 100; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC1_2 eq -2147483648) || ($inv_SPOT_UAC1_2 eq 0xFFFFFFFF) || $inv_SPOT_UAC1_2 < 0) {$inv_SPOT_UAC1_2 = "-"; } else {$inv_SPOT_UAC1_2 = $inv_SPOT_UAC1_2 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC2_3 eq -2147483648) || ($inv_SPOT_UAC2_3 eq 0xFFFFFFFF) || $inv_SPOT_UAC2_3 < 0) {$inv_SPOT_UAC2_3 = "-"; } else {$inv_SPOT_UAC2_3 = $inv_SPOT_UAC2_3 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_UAC3_1 eq -2147483648) || ($inv_SPOT_UAC3_1 eq 0xFFFFFFFF) || $inv_SPOT_UAC3_1 < 0) {$inv_SPOT_UAC3_1 = "-"; } else {$inv_SPOT_UAC3_1 = $inv_SPOT_UAC3_1 / 100; }   # Catch 0x80000000 and 0xFFFFFFFF as 0 value
      
-     Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and SPOT_IAC1=$inv_SPOT_IAC1 and SPOT_IAC2=$inv_SPOT_IAC2 and SPOT_IAC3=$inv_SPOT_IAC3";
-     return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
+     Log3 $name, 5, "$name - Found Data SPOT_UAC1=$inv_SPOT_UAC1 and SPOT_UAC2=$inv_SPOT_UAC2 and SPOT_UAC3=$inv_SPOT_UAC3 and inv_SPOT_UAC1_2=$inv_SPOT_UAC1_2 and inv_SPOT_UAC2_3=$inv_SPOT_UAC2_3 and inv_SPOT_UAC3_1=$inv_SPOT_UAC3_1 and inv_SPOT_CosPhi=$inv_SPOT_CosPhi";
+     return (1,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_UAC1_2,$inv_SPOT_UAC2_3,$inv_SPOT_UAC3_1,$inv_SPOT_CosPhi,$inv_susyid,$inv_serial);
+ }
+ 
+  if($data_ID eq 0x4653) {
+     $inv_SPOT_IAC1 = unpack("l*", substr $data, 62, 4);
+     $inv_SPOT_IAC2 = unpack("l*", substr $data, 90, 4);
+     $inv_SPOT_IAC3 = unpack("l*", substr $data, 118, 4);
+	 
+     if(($inv_SPOT_IAC1 eq -2147483648) || ($inv_SPOT_IAC1 eq 0xFFFFFFFF) || $inv_SPOT_IAC1 < 0) {$inv_SPOT_IAC1 = "-"; } else {$inv_SPOT_IAC1 = $inv_SPOT_IAC1 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC2 eq -2147483648) || ($inv_SPOT_IAC2 eq 0xFFFFFFFF) || $inv_SPOT_IAC2 < 0) {$inv_SPOT_IAC2 = "-"; } else {$inv_SPOT_IAC2 = $inv_SPOT_IAC2 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+     if(($inv_SPOT_IAC3 eq -2147483648) || ($inv_SPOT_IAC3 eq 0xFFFFFFFF) || $inv_SPOT_IAC3 < 0) {$inv_SPOT_IAC3 = "-"; } else {$inv_SPOT_IAC3 = $inv_SPOT_IAC3 / 1000; }  # Catch 0x80000000 and 0xFFFFFFFF as 0 value
+
+     Log3 $name, 5, "$name - Found Data inv_SPOT_IAC1=$inv_SPOT_IAC1 and inv_SPOT_IAC2=$inv_SPOT_IAC2 and inv_SPOT_IAC3=$inv_SPOT_IAC3";
+     return (1,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial);
  }
  
  if ($data_ID eq 0x495B && (ReadingsVal($name,"INV_TYPE","") =~ /SBS(1\.5|2\.0|2\.5)/xs || 
@@ -1443,7 +1510,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_BAT_IDC    = unpack("l*", substr $data, 118, 4);
      
      if($inv_BAT_IDC eq -2147483648) {                                                           # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = 0; 
+         $inv_BAT_IDC = "-"; 
      } 
      else { 
          $inv_BAT_IDC = $inv_BAT_IDC / 1000;
@@ -1525,7 +1592,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 $inv_BAT_IDC = unpack("l*", substr $data, 146, 4);
 	 
      if($inv_BAT_IDC eq -2147483648) {                                                          # Catch 0x80000000 as 0 value
-         $inv_BAT_IDC = 0; 
+         $inv_BAT_IDC = "-"; 
      } 
      else { 
          $inv_BAT_IDC = $inv_BAT_IDC / 1000;
@@ -1843,12 +1910,12 @@ sub SMAInverter_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 24664 2021-06-20 20:50:44Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 24737 2021-07-12 16:46:51Z MadMax $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 24664 2021-06-20 20:50:44Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 24737 2021-07-12 16:46:51Z MadMax $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -2116,58 +2183,62 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 
 <b>Readings</b>
 <ul>
-<li><b>BAT_CYCLES / bat_cycles</b>          :  Battery recharge cycles </li>
-<li><b>BAT_IDC / bat_idc</b>                :  Battery Current </li>
-<li><b>BAT_TEMP / bat_temp</b>              :  Battery temperature </li>
-<li><b>BAT_UDC / bat_udc</b>                :  Battery Voltage </li>
-<li><b>ChargeStatus / chargestatus</b>      :  Battery Charge status </li>
-<li><b>BAT_LOADTODAY</b>                    :  Battery Load Today </li>
-<li><b>BAT_LOADTOTAL</b>                    :  Battery Load Total </li>
-<li><b>ChargeStatus / chargestatus</b>      :  Battery Charge status </li>
-<li><b>CLASS / device_class</b>             :  Inverter Class </li>
-<li><b>PACMAX1 / pac_max_phase_1</b>        :  Nominal power in Ok Mode </li>
-<li><b>PACMAX1_2 / pac_max_phase_1_2</b>    :  Maximum active power device (Some inverters like SB3300/SB1200) </li>
-<li><b>PACMAX2 / pac_max_phase_2</b>        :  Nominal power in Warning Mode </li>
-<li><b>PACMAX3 / pac_max_phase_3</b>        :  Nominal power in Fault Mode </li>
-<li><b>Serialnumber / serial_number</b>     :  Inverter Serialnumber </li>
-<li><b>SPOT_ETODAY / etoday</b>             :  Today yield </li>
-<li><b>SPOT_ETOTAL / etotal</b>             :  Total yield </li>
-<li><b>SPOT_FEEDTM / feed-in_time</b>       :  Feed-in time </li>
-<li><b>SPOT_FREQ / grid_freq </b>           :  Grid Frequency </li>
-<li><b>SPOT_IAC1 / phase_1_iac</b>          :  Grid current phase L1 </li>
-<li><b>SPOT_IAC2 / phase_2_iac</b>          :  Grid current phase L2 </li>
-<li><b>SPOT_IAC3 / phase_3_iac</b>          :  Grid current phase L3 </li>
-<li><b>SPOT_IDC1 / string_1_idc</b>         :  DC current input </li>
-<li><b>SPOT_IDC2 / string_2_idc</b>         :  DC current input </li>
-<li><b>SPOT_OPERTM / operation_time</b>     :  Operation Time </li>
-<li><b>SPOT_PAC1 / phase_1_pac</b>          :  Power L1  </li>
-<li><b>SPOT_PAC2 / phase_2_pac</b>          :  Power L2  </li>
-<li><b>SPOT_PAC3 / phase_3_pac</b>          :  Power L3  </li>
-<li><b>SPOT_PACTOT / total_pac</b>          :  Total Power </li>
-<li><b>SPOT_PDC1 / string_1_pdc</b>         :  DC power input 1 </li>
-<li><b>SPOT_PDC2 / string_2_pdc</b>         :  DC power input 2 </li>
-<li><b>SPOT_UAC1 / phase_1_uac</b>          :  Grid voltage phase L1 </li>
-<li><b>SPOT_UAC2 / phase_2_uac</b>          :  Grid voltage phase L2 </li>
-<li><b>SPOT_UAC3 / phase_3_uac</b>          :  Grid voltage phase L3 </li>
-<li><b>SPOT_UDC1 / string_1_udc</b>         :  DC voltage input </li>
-<li><b>SPOT_UDC2 / string_2_udc</b>         :  DC voltage input </li>
-<li><b>SUSyID / susyid</b>                  :  Inverter SUSyID </li>
-<li><b>INV_TEMP / device_temperature</b>    :  Inverter temperature </li>
-<li><b>INV_TYPE / device_type</b>           :  Inverter Type </li>
-<li><b>POWER_IN / power_in</b>              :  Battery Charging power </li>
-<li><b>POWER_OUT / power_out</b>            :  Battery Discharging power </li>
-<li><b>INV_GRIDRELAY / gridrelay_status</b> :  Grid Relay/Contactor Status </li>
-<li><b>INV_STATUS / device_status</b>       :  Inverter Status </li>
-<li><b>opertime_start</b>                   :  Begin of iverter operating time corresponding the calculated time of sunrise with consideration of the
-                                               attribute "offset" (if set) </li>
-<li><b>opertime_stop</b>                    :  End of iverter operating time corresponding the calculated time of sunrise with consideration of the
-                                               attribute "offset" (if set) </li>
-<li><b>modulstate</b>                       :  shows the current module state "normal" or "sleep" if the inverter won't be requested at the time. </li>
-<li><b>avg_power_lastminutes_05</b>         :  average power of the last 5 minutes. </li>
-<li><b>avg_power_lastminutes_10</b>         :  average power of the last 10 minutes. </li>
-<li><b>avg_power_lastminutes_15</b>         :  average power of the last 15 minutes. </li>
-<li><b>inverter_processing_time</b>         :  wasted time to retrieve the inverter data </li>
-<li><b>background_processing_time</b>       :  total wasted time by background process (BlockingCall) </li>
+<li><b>BAT_CYCLES / bat_cycles</b>          		:  Battery recharge cycles </li>
+<li><b>BAT_IDC [A,B,C] / bat_idc [A,B,C]</b>        :  Battery Current [A,B,C]</li>
+<li><b>BAT_TEMP [A,B,C] / bat_temp [A,B,C]</b>      :  Battery temperature [A,B,C]</li>
+<li><b>BAT_UDC [A,B,C] / bat_udc [A,B,C]</b>        :  Battery Voltage [A,B,C]</li>
+<li><b>ChargeStatus / chargestatus</b>      		:  Battery Charge status </li>
+<li><b>BAT_LOADTODAY</b>                    		:  Battery Load Today </li>
+<li><b>BAT_LOADTOTAL</b>                    		:  Battery Load Total </li>
+<li><b>ChargeStatus / chargestatus</b>     			:  Battery Charge status </li>
+<li><b>CLASS / device_class</b>             		:  Inverter Class </li>
+<li><b>PACMAX1 / pac_max_phase_1</b>        		:  Nominal power in Ok Mode </li>
+<li><b>PACMAX1_2 / pac_max_phase_1_2</b>    		:  Maximum active power device (Some inverters like SB3300/SB1200) </li>
+<li><b>PACMAX2 / pac_max_phase_2</b>        		:  Nominal power in Warning Mode </li>
+<li><b>PACMAX3 / pac_max_phase_3</b>        		:  Nominal power in Fault Mode </li>
+<li><b>Serialnumber / serial_number</b>     		:  Inverter Serialnumber </li>
+<li><b>SPOT_ETODAY / etoday</b>             		:  Today yield </li>
+<li><b>SPOT_ETOTAL / etotal</b>             		:  Total yield </li>
+<li><b>SPOT_FEEDTM / feed-in_time</b>       		:  Feed-in time </li>
+<li><b>SPOT_FREQ / grid_freq </b>           		:  Grid Frequency </li>
+<li><b>SPOT_CosPhi / coshhi </b>           			:  displacement factor </li>
+<li><b>SPOT_IAC1 / phase_1_iac</b>          		:  Grid current phase L1 </li>
+<li><b>SPOT_IAC2 / phase_2_iac</b>          		:  Grid current phase L2 </li>
+<li><b>SPOT_IAC3 / phase_3_iac</b>          		:  Grid current phase L3 </li>
+<li><b>SPOT_IDC1 / string_1_idc</b>         		:  DC current input </li>
+<li><b>SPOT_IDC2 / string_2_idc</b>         		:  DC current input </li>
+<li><b>SPOT_OPERTM / operation_time</b>     		:  Operation Time </li>
+<li><b>SPOT_PAC1 / phase_1_pac</b>          		:  Power L1  </li>
+<li><b>SPOT_PAC2 / phase_2_pac</b>          		:  Power L2  </li>
+<li><b>SPOT_PAC3 / phase_3_pac</b>          		:  Power L3  </li>
+<li><b>SPOT_PACTOT / total_pac</b>          		:  Total Power </li>
+<li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC power input 1 </li>
+<li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC power input 2 </li>
+<li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Grid voltage phase L1 </li>
+<li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Grid voltage phase L2 </li>
+<li><b>SPOT_UAC3 / phase_3_uac</b>          		:  Grid voltage phase L3 </li>
+<li><b>SPOT_UAC1_2 / phase_1_2_uac</b>      		:  Grid voltage phase L1-L2 </li>
+<li><b>SPOT_UAC2_3 / phase_2_3_uac</b>      		:  Grid voltage phase L2-L3 </li>
+<li><b>SPOT_UAC3_1 / phase_3_1_uac</b>      		:  Grid voltage phase L3-L1 </li>
+<li><b>SPOT_UDC1 / string_1_udc</b>         		:  DC voltage input </li>
+<li><b>SPOT_UDC2 / string_2_udc</b>         		:  DC voltage input </li>
+<li><b>SUSyID / susyid</b>                  		:  Inverter SUSyID </li>
+<li><b>INV_TEMP / device_temperature</b>    		:  Inverter temperature </li>
+<li><b>INV_TYPE / device_type</b>           		:  Inverter Type </li>
+<li><b>POWER_IN / power_in</b>              		:  Battery Charging power </li>
+<li><b>POWER_OUT / power_out</b>            		:  Battery Discharging power </li>
+<li><b>INV_GRIDRELAY / gridrelay_status</b> 		:  Grid Relay/Contactor Status </li>
+<li><b>INV_STATUS / device_status</b>       		:  Inverter Status </li>
+<li><b>opertime_start</b>                   		:  Begin of iverter operating time corresponding the calculated time of sunrise with consideration of the
+														attribute "offset" (if set) </li>
+<li><b>opertime_stop</b>                    		:  End of iverter operating time corresponding the calculated time of sunrise with consideration of the
+														attribute "offset" (if set) </li>
+<li><b>modulstate</b>                       		:  shows the current module state "normal" or "sleep" if the inverter won't be requested at the time. </li>
+<li><b>avg_power_lastminutes_05</b>         		:  average power of the last 5 minutes. </li>
+<li><b>avg_power_lastminutes_10</b>         		:  average power of the last 10 minutes. </li>
+<li><b>avg_power_lastminutes_15</b>         		:  average power of the last 15 minutes. </li>
+<li><b>inverter_processing_time</b>         		:  wasted time to retrieve the inverter data </li>
+<li><b>background_processing_time</b>       		:  total wasted time by background process (BlockingCall) </li>
 </ul>
 <br><br>
 
@@ -2350,57 +2421,61 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 
 <b>Readings</b>
 <ul>
-<li><b>BAT_CYCLES / bat_cycles</b>          :  Akku Ladezyklen </li>
-<li><b>BAT_IDC / bat_idc</b>                :  Akku Strom </li>
-<li><b>BAT_TEMP / bat_temp</b>              :  Akku Temperatur </li>
-<li><b>BAT_UDC / bat_udc</b>                :  Akku Spannung </li>
-<li><b>ChargeStatus / chargestatus</b>      :  Akku Ladestand </li>
-<li><b>BAT_LOADTODAY</b>                    :  Battery Load Today </li>
-<li><b>BAT_LOADTOTAL</b>                    :  Battery Load Total </li>
-<li><b>CLASS / device_class</b>             :  Wechselrichter Klasse </li>
-<li><b>PACMAX1 / pac_max_phase_1</b>        :  Nominelle Leistung in Ok Mode </li>
-<li><b>PACMAX1_2 / pac_max_phase_1_2</b>    :  Maximale Leistung (für einige Wechselrichtertypen) </li>
-<li><b>PACMAX2 / pac_max_phase_2</b>        :  Nominelle Leistung in Warning Mode </li>
-<li><b>PACMAX3 / pac_max_phase_3</b>        :  Nominelle Leistung in Fault Mode </li>
-<li><b>Serialnumber / serial_number</b>     :  Wechselrichter Seriennummer </li>
-<li><b>SPOT_ETODAY / etoday</b>             :  Energie heute</li>
-<li><b>SPOT_ETOTAL / etotal</b>             :  Energie Insgesamt </li>
-<li><b>SPOT_FEEDTM / feed-in_time</b>       :  Einspeise-Stunden </li>
-<li><b>SPOT_FREQ / grid_freq </b>           :  Netz Frequenz </li>
-<li><b>SPOT_IAC1 / phase_1_iac</b>          :  Netz Strom phase L1 </li>
-<li><b>SPOT_IAC2 / phase_2_iac</b>          :  Netz Strom phase L2 </li>
-<li><b>SPOT_IAC3 / phase_3_iac</b>          :  Netz Strom phase L3 </li>
-<li><b>SPOT_IDC1 / string_1_idc</b>         :  DC Strom Eingang 1 </li>
-<li><b>SPOT_IDC2 / string_2_idc</b>         :  DC Strom Eingang 2 </li>
-<li><b>SPOT_OPERTM / operation_time</b>     :  Betriebsstunden </li>
-<li><b>SPOT_PAC1 / phase_1_pac</b>          :  Leistung L1  </li>
-<li><b>SPOT_PAC2 / phase_2_pac</b>          :  Leistung L2  </li>
-<li><b>SPOT_PAC3 / phase_3_pac</b>          :  Leistung L3  </li>
-<li><b>SPOT_PACTOT / total_pac</b>          :  Gesamtleistung </li>
-<li><b>SPOT_PDC1 / string_1_pdc</b>         :  DC Leistung Eingang 1 </li>
-<li><b>SPOT_PDC2 / string_2_pdc</b>         :  DC Leistung Eingang 2 </li>
-<li><b>SPOT_UAC1 / phase_1_uac</b>          :  Netz Spannung phase L1 </li>
-<li><b>SPOT_UAC2 / phase_2_uac</b>          :  Netz Spannung phase L2 </li>
-<li><b>SPOT_UAC3 / phase_3_uac</b>          :  Netz Spannung phase L3 </li>
-<li><b>SPOT_UDC1 / string_1_udc</b>         :  DC Spannung Eingang 1 </li>
-<li><b>SPOT_UDC2 / string_2_udc</b>         :  DC Spannung Eingang 2 </li>
-<li><b>SUSyID / susyid</b>                  :  Wechselrichter SUSyID </li>
-<li><b>INV_TEMP / device_temperature</b>    :  Wechselrichter Temperatur </li>
-<li><b>INV_TYPE / device_type</b>           :  Wechselrichter Typ </li>
-<li><b>POWER_IN / power_in</b>              :  Akku Ladeleistung </li>
-<li><b>POWER_OUT / power_out</b>            :  Akku Entladeleistung </li>
-<li><b>INV_GRIDRELAY / gridrelay_status</b> :  Netz Relais Status </li>
-<li><b>INV_STATUS / device_status</b>       :  Wechselrichter Status </li>
-<li><b>opertime_start</b>                   :  Beginn Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenaufgangs mit Berücksichtigung des
-                                               Attributs "offset" (wenn gesetzt) </li>
-<li><b>opertime_stop</b>                    :  Ende Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenuntergangs mit Berücksichtigung des
-                                               Attributs "offset" (wenn gesetzt) </li>
-<li><b>modulstate</b>                       :  zeigt den aktuellen Modulstatus "normal" oder "sleep" falls der Wechselrichter nicht abgefragt wird. </li>
-<li><b>avg_power_lastminutes_05</b>         :  durchschnittlich erzeugte Leistung der letzten 5 Minuten. </li>
-<li><b>avg_power_lastminutes_10</b>         :  durchschnittlich erzeugte Leistung der letzten 10 Minuten. </li>
-<li><b>avg_power_lastminutes_15</b>         :  durchschnittlich erzeugte Leistung der letzten 15 Minuten. </li>
-<li><b>inverter_processing_time</b>         :  verbrauchte Zeit um den Wechelrichter abzufragen. </li>
-<li><b>background_processing_time</b>       :  gesamte durch den Hintergrundprozess (BlockingCall) verbrauchte Zeit. </li>
+<li><b>BAT_CYCLES / bat_cycles</b>          		:  Akku Ladezyklen </li>
+<li><b>BAT_IDC [A,B,C] / bat_idc [A,B,C]</b>        :  Akku Strom [A,B,C]</li>
+<li><b>BAT_TEMP [A,B,C] / bat_temp [A,B,C]</b>      :  Akku Temperatur [A,B,C]</li>
+<li><b>BAT_UDC [A,B,C] / bat_udc [A,B,C]</b>        :  Akku Spannung [A,B,C]</li>
+<li><b>ChargeStatus / chargestatus</b>      		:  Akku Ladestand </li>
+<li><b>BAT_LOADTODAY</b>                    		:  Battery Load Today </li>
+<li><b>BAT_LOADTOTAL</b>                    		:  Battery Load Total </li>
+<li><b>CLASS / device_class</b>             		:  Wechselrichter Klasse </li>
+<li><b>PACMAX1 / pac_max_phase_1</b>        		:  Nominelle Leistung in Ok Mode </li>
+<li><b>PACMAX1_2 / pac_max_phase_1_2</b>    		:  Maximale Leistung (für einige Wechselrichtertypen) </li>
+<li><b>PACMAX2 / pac_max_phase_2</b>        		:  Nominelle Leistung in Warning Mode </li>
+<li><b>PACMAX3 / pac_max_phase_3</b>        		:  Nominelle Leistung in Fault Mode </li>
+<li><b>Serialnumber / serial_number</b>     		:  Wechselrichter Seriennummer </li>
+<li><b>SPOT_ETODAY / etoday</b>             		:  Energie heute</li>
+<li><b>SPOT_ETOTAL / etotal</b>             		:  Energie Insgesamt </li>
+<li><b>SPOT_FEEDTM / feed-in_time</b>       		:  Einspeise-Stunden </li>
+<li><b>SPOT_FREQ / grid_freq </b>           		:  Netz Frequenz </li>
+<li><b>SPOT_CosPhi / coshhi </b>           			:  Verschiebungsfaktor </li>
+<li><b>SPOT_IAC1 / phase_1_iac</b>          		:  Netz Strom phase L1 </li>
+<li><b>SPOT_IAC2 / phase_2_iac</b>          		:  Netz Strom phase L2 </li>
+<li><b>SPOT_IAC3 / phase_3_iac</b>          		:  Netz Strom phase L3 </li>
+<li><b>SPOT_IDC1 / string_1_idc</b>         		:  DC Strom Eingang 1 </li>
+<li><b>SPOT_IDC2 / string_2_idc</b>         		:  DC Strom Eingang 2 </li>
+<li><b>SPOT_OPERTM / operation_time</b>     		:  Betriebsstunden </li>
+<li><b>SPOT_PAC1 / phase_1_pac</b>          		:  Leistung L1  </li>
+<li><b>SPOT_PAC2 / phase_2_pac</b>          		:  Leistung L2  </li>
+<li><b>SPOT_PAC3 / phase_3_pac</b>          		:  Leistung L3  </li>
+<li><b>SPOT_PACTOT / total_pac</b>          		:  Gesamtleistung </li>
+<li><b>SPOT_PDC1 / string_1_pdc</b>         		:  DC Leistung Eingang 1 </li>
+<li><b>SPOT_PDC2 / string_2_pdc</b>         		:  DC Leistung Eingang 2 </li>
+<li><b>SPOT_UAC1 / phase_1_uac</b>          		:  Netz Spannung phase L1 </li>
+<li><b>SPOT_UAC2 / phase_2_uac</b>          		:  Netz Spannung phase L2 </li>
+<li><b>SPOT_UAC3 / phase_3_uac</b>          		:  Netz Spannung phase L3 </li>
+<li><b>SPOT_UAC1_2 / phase_1_2_uac</b>          	:  Netz Spannung phase L1-L2 </li>
+<li><b>SPOT_UAC2_3 / phase_2_3_uac</b>          	:  Netz Spannung phase L2-L3 </li>
+<li><b>SPOT_UAC3_1 / phase_3_1_uac</b>          	:  Netz Spannung phase L3-L1 </li>
+<li><b>SPOT_UDC1 / string_1_udc</b>         		:  DC Spannung Eingang 1 </li>
+<li><b>SPOT_UDC2 / string_2_udc</b>         		:  DC Spannung Eingang 2 </li>
+<li><b>SUSyID / susyid</b>                  		:  Wechselrichter SUSyID </li>
+<li><b>INV_TEMP / device_temperature</b>    		:  Wechselrichter Temperatur </li>
+<li><b>INV_TYPE / device_type</b>           		:  Wechselrichter Typ </li>
+<li><b>POWER_IN / power_in</b>              		:  Akku Ladeleistung </li>
+<li><b>POWER_OUT / power_out</b>            		:  Akku Entladeleistung </li>
+<li><b>INV_GRIDRELAY / gridrelay_status</b> 		:  Netz Relais Status </li>
+<li><b>INV_STATUS / device_status</b>       		:  Wechselrichter Status </li>
+<li><b>opertime_start</b>                   		:  Beginn Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenaufgangs mit Berücksichtigung des
+														Attributs "offset" (wenn gesetzt) </li>
+<li><b>opertime_stop</b>                    		:  Ende Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenuntergangs mit Berücksichtigung des
+														Attributs "offset" (wenn gesetzt) </li>
+<li><b>modulstate</b>                       		:  zeigt den aktuellen Modulstatus "normal" oder "sleep" falls der Wechselrichter nicht abgefragt wird. </li>
+<li><b>avg_power_lastminutes_05</b>         		:  durchschnittlich erzeugte Leistung der letzten 5 Minuten. </li>
+<li><b>avg_power_lastminutes_10</b>         		:  durchschnittlich erzeugte Leistung der letzten 10 Minuten. </li>
+<li><b>avg_power_lastminutes_15</b>         		:  durchschnittlich erzeugte Leistung der letzten 15 Minuten. </li>
+<li><b>inverter_processing_time</b>         		:  verbrauchte Zeit um den Wechelrichter abzufragen. </li>
+<li><b>background_processing_time</b>       		:  gesamte durch den Hintergrundprozess (BlockingCall) verbrauchte Zeit. </li>
 
 </ul>
 <br><br>
@@ -2421,15 +2496,15 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v1.1.1",
+  "version": "v2.16.1",
   "release_status": "stable",
   "author": [
-    "Thomas Schoedl (sct14675)",
+    "Maximilian Paries",
     "Heiko Maaz <heiko.maaz@t-online.de>",
     null
   ],
   "x_fhem_maintainer": [
-    "sct14675",
+    "MadMax",
     "DS_Starter",
     null
   ],
