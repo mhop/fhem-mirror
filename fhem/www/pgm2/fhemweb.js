@@ -1321,7 +1321,7 @@ FW_longpoll()
   if(FW_serverGenerated)
     since = FW_serverLastMsg + (FW_serverGenerated-FW_serverFirstMsg);
 
-  let inform = encodeURIComponent("type=status;filter="+filter+
+  var inform = encodeURIComponent("type=status;filter="+filter+
                                   ";since="+since+";fmt=JSON"); // 128651
   var query = "?XHR=1"+
               "&inform="+inform+
@@ -2242,14 +2242,14 @@ FW_checkNotifydev(reName)
 function
 FW_rescueClient(pid, key)
 {
-  let html='<div id="rescueDialog" style="display:none">';
+  var html='<div id="rescueDialog" style="display:none">';
   if(!pid || pid == "0") {
     html += '<b>Key (send it to the rescuer):</b><br>'+
             (key ? '<code>'+key+'</code>' : 'Not found, generate one first');
     html += '<br><br>';
   }
 
-  let buttons = [];
+  var buttons = [];
 
   if(key) {
     if(pid && pid != "0") {
