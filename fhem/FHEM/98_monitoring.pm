@@ -53,6 +53,7 @@ BEGIN {
     InternalVal
     ReadingsVal
     ReadingsNum
+    ReadingsAge
     devspec2array
     AnalyzeCommandChain
     AnalyzeCommand
