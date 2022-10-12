@@ -8070,7 +8070,7 @@ sub __avgSolCastPercFromHistory {
 
       ($perc, $qual) = split "/", $histval;                                            # Percentil und Qualität splitten
 
-      next if($qual eq 'm');                                                           # manuell eingestellte Percentile überspringen
+      next if(!$perc || $qual eq 'm');                                                 # manuell eingestellte Percentile überspringen
       
       $perc = 50 if(!$perc || $perc < 10);
       
