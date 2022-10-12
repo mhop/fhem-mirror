@@ -10235,7 +10235,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <b>Model SolCastAPI:</b> <br>
       Eine eingeschaltete Autokorrektur ermittelt am Ende jeder relevanten Stunde durch Vergleich von PV Prognose und 
       realer Erzeugung das beste Percentil (10-90). 
-      Bevor die Autokorrektur eingeschaltet ist die Prognose zu optimieren mit folgenden Schritten: <br><br>
+      Bevor man die Autokorrektur eingeschaltet, ist die Prognose mit folgenden Schritten zu optimieren: <br><br>
       <ul>
          <li>
          definiere im RoofTop-Editor der SolCast API den 
