@@ -2732,8 +2732,11 @@ sub centralTask {
       else {
           my $new = gettimeofday()+$interval; 
           InternalTimer($new, "FHEM::SolarForecast::centralTask", $hash, 0);                       # Wiederholungsintervall
-          $hash->{MODE} = "Automatic - next Cycletime: ".FmtTime($new);
-          readingsSingleUpdate($hash, "nextCycletime", FmtTime($new), 1);
+          
+          if(!IsDisabled($name)) {
+              $hash->{MODE} = "Automatic - next Cycletime: ".FmtTime($new);
+              readingsSingleUpdate($hash, "nextCycletime", FmtTime($new), 1);
+          }
       }
       
       return if(IsDisabled($name));
