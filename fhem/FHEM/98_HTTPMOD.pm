@@ -21,6 +21,7 @@
 #   First version: 25.12.2013
 #
 #   Todo:       
+#               allow set inerval 0
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
@@ -140,7 +141,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.12 - 19.4.2022';
+my $Module_Version = '4.1.14 - 19.8.2022';
 
 my $AttrList = join (' ', 
       'reading[0-9]+(-[0-9]+)?Name', 
@@ -148,6 +149,7 @@ my $AttrList = join (' ',
       '(reading|get|set)[0-9]*(-[0-9]+)?Expr:textField-long',       # old
       '(reading|get|set)[0-9]*(-[0-9]+)?Map',                       # old
       '(reading|get|set)[0-9]*(-[0-9]+)?OExpr:textField-long',
+      '(reading|get|set)[0-9]*(-[0-9]+)?IgnoreExpr:textField-long', 
       '(reading|get|set)[0-9]*(-[0-9]+)?OMap:textField-long',
       '(get|set)[0-9]*(-[0-9]+)?IExpr:textField-long',
       '(get|set)[0-9]*(-[0-9]+)?IMap:textField-long', 
@@ -181,6 +183,7 @@ my $AttrList = join (' ',
       'timeout',
       'queueDelay',
       'queueMax',
+      'dropQueueDoubles', 
       'alignTime',
       'minSendDelay',
       'showMatched:0,1',
@@ -474,8 +477,10 @@ sub AttrFn {
         elsif ($aName =~ /Expr/) { 
             my $timeDiff = 0;       # only for expressions using it
             my @matchlist;
+            my $oldVal;
             return "Invalid Expression $aVal" 
                 if (!EvalExpr($hash, {expr => $aVal, '$timeDiff' => $timeDiff, '@matchlist' => \@matchlist,
+                            '$oldVal' => $oldVal,
                             checkOnly => 1, action => "attr $aName"} ));
             if ($aName =~ /readingsExpr.*/) {
                 LogOldAttr($hash, $aName, "reading01Expr syntax");
@@ -1463,27 +1468,29 @@ sub GetRegex {
 }
 
 
-###################################
-# format a reading value
+###############################################################
+# format a reading value using map, format, expr ... from attrs
 sub FormatReading {
-    my ($hash, $context, $num, $val, $reading) = @_;                                                
-    my $name = $hash->{NAME};
-    my ($format, $decode, $encode);
-    my $expr = "";
-    my $map  = "";
+    my $hash    = shift;            # my device hash
+    my $context = shift;            # get, set or reading 
+    my $num     = shift;            # num or num-subnum to identify format attrs
+    my $val     = shift;            # value to save in reading
+    my $reading = shift;            # name of the reading to update                                        
+    my $name    = $hash->{NAME};    # my device name
 
-    $decode  = GetFAttr($name, $context, $num, 'Decode');
-    $encode  = GetFAttr($name, $context, $num, 'Encode');
-    $map     = GetFAttr($name, $context, $num, 'Map') if ($context ne 'set');           # not for set!
-    $map     = GetFAttr($name, $context, $num, 'OMap', $map);                           # new syntax
-    $format  = GetFAttr($name, $context, $num, 'Format');
+    my $decode  = GetFAttr($name, $context, $num, 'Decode');
+    my $encode  = GetFAttr($name, $context, $num, 'Encode');
+    my $map     = GetFAttr($name, $context, $num, 'Map') if ($context ne 'set');           # not for set!
+       $map     = GetFAttr($name, $context, $num, 'OMap', $map);                           # new syntax
+    my $format  = GetFAttr($name, $context, $num, 'Format');
 
-    $expr    = AttrVal($name, 'readingsExpr'  . $num, '') if ($context eq 'reading');   # very old syntax, not for set
-    $expr    = GetFAttr($name, $context, $num, 'Expr', $expr) if ($context ne 'set');   # not for set!
-    $expr    = GetFAttr($name, $context, $num, 'OExpr', $expr);                         # new syntax
+    my $expr    = AttrVal($name, 'readingsExpr'  . $num, '') if ($context eq 'reading');   # old syntax, not set
+       $expr    = GetFAttr($name, $context, $num, 'Expr', $expr) if ($context ne 'set');   # not for set!
+       $expr    = GetFAttr($name, $context, $num, 'OExpr', $expr);                         # new syntax
     
-    # encode as utf8 by default if no encode is specified and body was decoded or no charset was seen in the header 
-    if (!$encode && (!$hash->{'.bodyCharset'} || $hash->{'.bodyCharset'} eq 'internal' )) {   # body was decoded and encode not sepcified
+    # encode as utf8 if no encode specified and body was decoded or no charset was seen in the header 
+    if (!$encode && (!$hash->{'.bodyCharset'} || $hash->{'.bodyCharset'} eq 'internal' )) {   
+        # body was decoded and encode not sepcified
         $encode = 'utf8';
         Log3 $name, 5, "$name: FormatReading is encoding the reading value as utf-8 because no encoding was specified and the response body charset was unknown or decoded";
     }
@@ -1497,34 +1504,38 @@ sub FormatReading {
         my $timeDiff = $timeStr ? ($hash->{".updateTime"} ? $hash->{".updateTime"} : gettimeofday()) - time_str2num($timeStr) : 0;
         $val = EvalExpr($hash, {expr => $expr, val => $val, '$timeDiff' => $timeDiff});
     }    
-    $val = MapConvert ($hash, {map => $map, val => $val, undefIfNoMatch => 0});            # keep $val if no map or no match
+    $val = MapConvert ($hash, {map => $map, val => $val, undefIfNoMatch => 0}); # keep $val if no map or no match
     $val = FormatVal  ($hash, {val => $val, format => $format});
     return $val;
 }
 
 
-###################################
-# extract reading for a buffer
+###################################################
+# extract readings from buffer using one definition
+# can create several subreadings.
+# called only from readCallback
 sub ExtractReading {
-    my ($hash, $buffer, $context, $num, $reqType) = @_;         
-    # can't just use $request because update might extract additional gets as update
-    # for get / set which use reading.* definitions for parsing reqType might be "get01" and context might be "reading"
-    my $name = $hash->{NAME};
-    my ($reading, $regex) = ("", "");
-    my ($json, $xpath, $xpathst, $recomb, $regopt, $sublen, $alwaysn);
+    my $hash      = shift;        # my device hash
+    my $buffer    = shift;        # the buffer to work on
+    my $context   = shift;        # reading, get, set
+    my $num       = shift;        # the number used in the attr
+    my $reqType   = shift;        # the request type like get01 used for defPtr storing
+    # can't just pass $request because update might extract additional gets as type 'update'
+    # for get / set which use reading.* definitions for parsing reqType might be 'get01' and context 'reading>
     my @subrlist  = ();
     my @matchlist = ();
-    my $try = 1;            # was there any applicable parsing definition?
-    my $regCompile = AttrVal($name, 'regexCompile', 1);
+    my $name      = $hash->{NAME};
+    my ($reading, $regex) = ('', '');
     my %namedRegexGroups;
     
-    $json    = GetFAttr($name, $context, $num, "JSON");
-    $xpath   = GetFAttr($name, $context, $num, "XPath");
-    $xpathst = GetFAttr($name, $context, $num, "XPath-Strict");
-    $regopt  = GetFAttr($name, $context, $num, "RegOpt");
-    $recomb  = GetFAttr($name, $context, $num, "RecombineExpr");
-    $sublen  = GetFAttr($name, $context, $num, "AutoNumLen", 0);
-    $alwaysn = GetFAttr($name, $context, $num, "AlwaysNum");
+    my $json    = GetFAttr($name, $context, $num, "JSON");
+    my $xpath   = GetFAttr($name, $context, $num, "XPath");
+    my $xpathst = GetFAttr($name, $context, $num, "XPath-Strict");
+    my $regopt  = GetFAttr($name, $context, $num, "RegOpt");
+    my $recomb  = GetFAttr($name, $context, $num, "RecombineExpr");
+    my $sublen  = GetFAttr($name, $context, $num, "AutoNumLen", 0);
+    my $alwaysn = GetFAttr($name, $context, $num, "AlwaysNum");
+    my $ignExpr = GetFAttr($name, $context, $num, "IgnoreExpr");
     
     # support for old syntax
     if ($context eq "reading") {        
@@ -1607,17 +1618,24 @@ sub ExtractReading {
             }        
         }
     } 
-    else {      # neither regex, xpath nor json attribute found ...
-        $try = 0;           
+    else {      # neither regex, xpath nor json attribute found ... 
         Log3 $name, 5, "$name: ExtractReading for context $context, num $num - no individual parse definition";
+        return (0, 0, $reading, ());
     }
-
     my $match = @matchlist;
     if (!$match) {
-        Log3 $name, 5, "$name: ExtractReading $reading did not match" if ($try);
-        return ($try, $match, $reading, @subrlist);
+        Log3 $name, 5, "$name: ExtractReading $reading did not match";
+        return (1, 0, $reading, ());        # try=true, match=false, reading name, no subreadings
     }
     
+    # check IgnoreExpr
+    if ($ignExpr && EvalExpr($hash,         # ignore exp results true -> don't proceed and don't set readings
+            {expr => $ignExpr, val => $matchlist[0], '@val' => \@matchlist, 
+             '$oldVal' => ReadingsVal($name, $reading, ''), 
+             nullIfNoExp => 1, action => "IgnoreExpr for $reading"} )) {
+                 return (0, 0, $reading, ());
+    }
+             
     if ($recomb) {
         Log3 $name, 5, "$name: ExtractReading is recombining $match matches with expression $recomb";
         my $val = EvalExpr($hash, {expr => $recomb, '@matchlist' => \@matchlist});
@@ -1629,7 +1647,7 @@ sub ExtractReading {
         Log3 $name, 5, "$name: experimental named regex group handling";
         foreach my $subReading (keys %namedRegexGroups) {
             my $val = $namedRegexGroups{$subReading};
-            push @subrlist, $subReading;
+            push @subrlist, $subReading;                # add every named match to list of subReadings
             # search for group in -Name attrs (-group is sub number) ...
             my $group = 0;
             foreach my $aName (sort keys %{$attr{$name}}) {
@@ -1656,12 +1674,11 @@ sub ExtractReading {
         my $group = 1;
         foreach my $val (@matchlist) {
             my ($subNum, $eNum, $subReading);
-            if ($match == 1) {
-                # only one match
+            if ($match == 1) {                  # only one match
                 $eNum = $num;
                 $subReading = ($alwaysn ? "${reading}-" . ($sublen ? sprintf ("%0${sublen}d", 1) : "1") : $reading);
-            } else {
-                # multiple matches -> check for special name of readings
+            } 
+            else {                              # multiple matches -> check for special name of readings
                 $eNum = $num ."-".$group;
                 # don't use GetFAttr here because we don't want to get the value of the generic attribute "Name"
                 # but this name with -group number added as default
@@ -1676,7 +1693,7 @@ sub ExtractReading {
                     $subNum = "-$group";
                 }
             }
-            push @subrlist, $subReading;
+            push @subrlist, $subReading;        # add every subReading name to list
             $val = FormatReading($hash, $context, $eNum, $val, $subReading);
                         
             Log3 $name, 5, "$name: ExtractReading for $context$num-$group sets $subReading to $val";
@@ -1692,7 +1709,7 @@ sub ExtractReading {
             $group++;
         }
     }
-    return ($try, $match, $reading, @subrlist);
+    return (1, $match, $reading, @subrlist);        # try=true, match=true, reading name, list of subreadings
 }
 
 
@@ -1718,14 +1735,14 @@ sub DeleteReading {
 ###################################
 # check max age of all readings
 sub DoMaxAge {
-    my $hash = shift;                   # reference to Fhem device hash
-    my $name = $hash->{NAME};           # Fhem device name
-    my ($base, $num, $sub, $max, $rep, $mode, $time, $now);
+    my $hash     = shift;                   # reference to Fhem device hash
+    my $name     = $hash->{NAME};           # Fhem device name
     my $readings = $hash->{READINGS};
     return if (!$readings); 
-    $now = gettimeofday();
+    my $now      = gettimeofday();
     UpdateRequestHash($hash) if ($hash->{".updateRequestHash"});
-
+    my ($base, $num, $sub, $max, $rep, $mode, $time);
+    
     LOOP:                               # go through alle readings of this device
     foreach my $reading (sort keys %{$readings}) {
         my $key = $reading;                                     # start by checking full reading name as key in readingBase hash
@@ -1807,8 +1824,6 @@ sub DoMaxAge {
     }
     return;
 }
-
-
 
 
 ######################################################
@@ -2400,7 +2415,7 @@ sub ReadCallback {
         push @matched,   @subrlist if ($tried && $match);
         push @unmatched, $reading  if ($tried && !$match);
         $checkAll = GetFAttr($name, $context, $num, 'CheckAllReadings', !$tried);
-        # if ExtractReading2 could not find any parsing instruction (e.g. regex) then check all Readings
+        # if ExtractReading could not find any parsing instruction (e.g. regex) then check all Readings
     }
     
     if (AttrVal($name, "extractAllJSON", "") || GetFAttr($name, $context, $num, "ExtractAllJSON")) {
@@ -2433,9 +2448,22 @@ sub ReadCallback {
         Log3 $name, 5, "$name: Read response to $type did not match " . join ' ', @unmatched if (@unmatched);
     }
     
+    #Log3 $name, 5, "$name: parseFunction2 ref is " . ref($hash->{'parseFunction2'});
     EvalFunctionCall($hash, $buffer, 'parseFunction1', $type);
+    if ($hash->{'parseFunction1'} && ref($hash->{'parseFunction1'}) eq 'CODE') {
+        my $callHash = $hash->{'parseFunction1Hash'};
+        my $cName = $callHash->{NAME};
+        Log3 $name, 5, "$name: calling parseFunction1 for device $cName";
+        &{$hash->{'parseFunction1'}}($callHash, $header, $body, $request);
+    }
     readingsEndUpdate($hash, 1);
     EvalFunctionCall($hash, $buffer, 'parseFunction2', $type);
+    if ($hash->{'parseFunction2'} && ref($hash->{'parseFunction2'}) eq 'CODE') {
+        my $callHash = $hash->{'parseFunction2Hash'};
+        my $cName = $callHash->{NAME};
+        Log3 $name, 5, "$name: calling parseFunction2 for device $cName";
+        &{$hash->{'parseFunction2'}}($callHash, $header, $body, $request);
+    }
     DoDeleteIfUnmatched($hash, $type, @matched) if ($hash->{DeleteIfUnmatched});
     HandleSendQueue("direct:".$name);  
     CleanupParsers($hash);
@@ -2650,6 +2678,15 @@ sub AddToSendQueue {
     $request->{num}             = 'unknown' if (!$request->{num});
     
     my $qlen = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
+    if ($qlen && AttrVal($name, 'dropQueueDoubles', 0)) {
+        foreach my $req (@{$hash->{QUEUE}}) {
+            if ($request->{type} eq $req->{type} && $request->{url} eq $req->{url} 
+                && $request->{header} eq $req->{header} && $request->{data} eq $req->{data}) {
+                Log3 $name, 3, "$name: AddToQueue - drop new redundant request because it is already in the queue";
+                return;
+            }
+        }
+    }
     #Log3 $name, 4, "$name: AddToQueue adds $request->{type}, initial queue len: $qlen" . ($request->{'priority'} ? ", priority" : "");
     Log3 $name, 5, "$name: AddToQueue " . ($request->{'priority'} ? "prepends " : "adds ") . 
             "type $request->{type} to " .
