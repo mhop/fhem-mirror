@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.0 "=> "13.10.2022  delete Attr solCastPercentile, new manual Setter pvSolCastPercentile_XX ",
   "0.69.0 "=> "12.10.2022  Autocorrection function for model SolCast-API, __solCast_ApiRequest: request only 48 hours ",
   "0.68.7 "=> "07.10.2022  new function _calcCAQwithSolCastPercentil, check missed modules in _getRoofTopData ",
   "0.68.6 "=> "06.10.2022  new attribute solCastPercentile, change _calcMaxEstimateToday ",                                 
@@ -321,6 +322,23 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_20     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_21     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_Auto   => { fn => \&_setpvCorrectionFactorAuto    },
+  pvSolCastPercentile_05    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_06    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_07    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_08    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_09    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_10    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_11    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_12    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_13    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_14    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_15    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_16    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_17    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_18    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_19    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_20    => { fn => \&_setpvSolCastPercentile       },
+  pvSolCastPercentile_21    => { fn => \&_setpvSolCastPercentile       },
   reset                     => { fn => \&_setreset                     },
   roofIdentPair             => { fn => \&_setroofIdentPair             },
   moduleRoofTops            => { fn => \&_setmoduleRoofTops            },
@@ -744,7 +762,6 @@ sub Initialize {
                                 "showLink:1,0 ".
                                 "showNight:1,0 ".
                                 "showWeather:1,0 ".
-                                "solCastPercentile:slider,10,10,90 ".
                                 "spaceSize ".
                                 "Wh_kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".
@@ -857,8 +874,8 @@ sub Set {
   
   return if(IsDisabled($name));
   
-  my ($setlist,@fcdevs,@cfs,@condevs);
-  my ($fcd,$ind,$med,$cf,$cons) = ("","","","","noArg");
+  my ($setlist,@fcdevs,@cfs,@scp,@condevs);
+  my ($fcd,$ind,$med,$cf,$sp,$cons) = ("","","","","","noArg");
   
   my @re = qw( ConsumerMaster
                consumerPlanning
@@ -883,9 +900,11 @@ sub Set {
   my $rdd = join ",", @fcdevs;
 
   for my $h (@chours) {
-      push @cfs, "pvCorrectionFactor_".sprintf("%02d",$h); 
+      push @cfs, 'pvCorrectionFactor_'. sprintf("%02d",$h); 
+      push @scp, 'pvSolCastPercentile_'.sprintf("%02d",$h); 
   }
-  $cf = join " ", @cfs if(@cfs);
+  $cf = join " ", @cfs;
+  $sp = join " ", @scp;
   
   my $type  = $hash->{TYPE};
   
@@ -913,7 +932,8 @@ sub Set {
              "reset:$resets ".
              "roofIdentPair ".
              "writeHistory:noArg ".
-             (!isSolCastUsed ($hash) ? $cf : q{});
+             (!isSolCastUsed ($hash) ? $cf : q{}).
+             (isSolCastUsed ($hash)  ? $sp : q{})
              ;
             
   my $params = {
@@ -1470,6 +1490,30 @@ return;
 }
 
 ################################################################
+#                      Setter pvSolCastPercentile
+################################################################
+sub _setpvSolCastPercentile {            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop} // return qq{no SolCast percentile specified};
+
+  if($prop !~ /[1-9]0/x) {
+      return qq{The correction value must be specified by numbers 10, 20, 30 ... 90};
+  }
+  
+  readingsSingleUpdate($hash, $opt, $prop." (manual)", 1);
+  
+  my $cfnum = (split "_", $opt)[1]; 
+  deleteReadingspec ($hash, "pvSolCastPercentile_${cfnum}_autocalc");
+  
+  centralTask ($hash);
+
+return;
+}
+
+################################################################
 #                 Setter pvCorrectionFactor_Auto
 ################################################################
 sub _setpvCorrectionFactorAuto {         ## no critic "not used"
@@ -1485,8 +1529,8 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
       for my $n (1..24) {
           $n     = sprintf "%02d", $n;
           my $rv = ReadingsVal ($name, "pvCorrectionFactor_${n}", "");
-          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*") if($rv !~ /manual/xs);
-          deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
+          deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*")  if($rv !~ /manual/xs);
+          deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*") if($rv !~ /manual/xs);
       }
       
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
@@ -1533,6 +1577,7 @@ sub _setreset {                          ## no critic "not used"
       for my $n (1..24) {
           $n = sprintf "%02d", $n;
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+          deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
       }
       
       my $circ  = $paref->{prop1} // 'no';                                   # alle pvKorr-Werte aus Circular-Hash löschen ?
@@ -1543,7 +1588,7 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$type}{$name}{circular}{$circh}{pvcorrf};
               delete $data{$type}{$name}{circular}{$circh}{quality}; 
 
-              Log3($name, 3, qq{$name - stored PV correction factor of hour "$circh" in pvCircular deleted});
+              Log3($name, 3, qq{$name - stored PV correction factor / SolCast percentile of hour "$circh" from pvCircular deleted});
               return;              
           }
           
@@ -1552,7 +1597,7 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$type}{$name}{circular}{$hod}{quality};
           }
           
-          Log3($name, 3, qq{$name - all stored PV correction factors in pvCircular deleted});
+          Log3($name, 3, qq{$name - all stored PV correction factors / SolCast percentile from pvCircular deleted});
       }
       return;
   }
@@ -2087,8 +2132,8 @@ sub ___setLastAPIcallKeyData {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];           # letzte Abrufzeit
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                        # letzter Abrufzeitstempel
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t))[3];       # letzte Abrufzeit
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{lastretrieval_timestamp} = $t;                                    # letzter Abrufzeitstempel
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
   
@@ -3333,7 +3378,7 @@ sub ___readCorrfAndQuality {
   
   my $type  = $hash->{TYPE};
   
-  my $uac        = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                              # Auto- oder manuelle Korrektur
+  my $uac        = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
   my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);             # PV Korrekturfaktor (auto oder manuell)
   my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
   my $hcfound    = "use manual correction factor";
@@ -3571,7 +3616,7 @@ sub ___readPercAndQuality {
   
   my $type  = $hash->{TYPE};
   
-  my $uac        = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                              # Auto- oder manuelle Korrektur
+  my $uac        = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
   my $perc       = ReadingsNum ($name, "pvSolCastPercentile_".sprintf("%02d",$fh1), 50);              # Estimate Percentil
   my $hcfound    = "use manual percentile selection";
   my $hq         = "m";
@@ -3587,9 +3632,6 @@ sub ___readPercAndQuality {
       }
       
       $perc = 50 if(!$perc);
-  }
-  else {
-      $perc = AttrVal ($name, 'solCastPercentile', $perc);                                            # Percentile manuelle Auswahl
   }
   
   $perc = sprintf "%.0f", $perc;
@@ -8678,6 +8720,7 @@ sub checkPlantConfig {
   my $ok   = FW_makeImage('10px-kreis-gruen.png', '');
   my $nok  = FW_makeImage('10px-kreis-rot.png',   '');
   my $warn = FW_makeImage('10px-kreis-gelb.png',  '');
+  my $info = FW_makeImage('message_info',         '');
   
   my $result = {                                                                                                 # Ergebnishash
       'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
@@ -8841,11 +8884,10 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{warn}    = 1;
       }
       
-      if (!$pcf || $pcf ne 'off') {
-          $result->{'Common Settings'}{state}   = $warn;
+      if (!$pcf || $pcf ne 'on') {
+          $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "off" is recommended<br>};
-          $result->{'Common Settings'}{warn}    = 1;
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on" is recommended if the SolCast efficiency factor is already adjusted<br>};
       }
       
       if (!$osi) {
@@ -10244,7 +10286,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          definiere im RoofTop-Editor der SolCast API den 
          <a href="https://articles.solcast.com.au/en/articles/2959798-what-is-the-efficiency-factor?_ga=2.119610952.1991905456.1665567573-1390691316.1665567573"><b>efficiency factor</b></a> 
          entsprechend dem Alter der Anlage. <br>
-         Bei einer 8 Jahre alten Anlage (8 x 2%) wäre er 84. <br>
+         Bei einer 8 Jahre alten Anlage wäre er 84 (100 - (8 x 2%)). <br>
          </li>
          <li>
          nach Sonnenuntergang wird das Reading Today_PVdeviation erstellt, welches die Abweichung zwischen Prognose und 
@@ -10252,7 +10294,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </li>
          </li>
          <li>
-         entsprechend der Abweichung wird der efficiency factor in Schritten angepasst bis ein Optimum, d.h. die kleinste
+         entsprechend der Abweichung passe den efficiency factor in Schritten an bis ein Optimum, d.h. die kleinste
          Tagesabweichung gefunden ist
          </li>
       </ul> 
@@ -10284,10 +10326,23 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-set-pvCorrectionFactor_" data-pattern="pvCorrectionFactor_.*"></a>
-      <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br> 
+      <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br>
+      (nur bei Verwendung Model DWD) <br><br>      
       
       Manueller Korrekturfaktor für die Stunde XX des Tages zur Anpassung der Vorhersage an die individuelle Anlage. <br>
       (default: 1.0)      
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-set-pvSolCastPercentile_" data-pattern="pvSolCastPercentile_.*"></a>
+      <li><b>pvSolCastPercentile_XX &lt;Zahl&gt; </b> <br>
+      (nur bei Verwendung Model SolCastAPI) <br><br>
+      
+      Manuelle Auswahl eines SolCast API Percentile für die Stunde XX des Tages zur Anpassung der Vorhersage an die 
+      individuelle Anlage. <br>
+      (default: 50)      
       </li>
     </ul>
     <br>
@@ -10316,7 +10371,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                           </td></tr>
             <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                            </td></tr>
             <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                      </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>löscht die aktuellen und gespeicherten PV Korrekturfaktoren                                                          </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht Readings pvSolCastPercentile* / pvCorrectionFactor* und gespeicherten                                         </td></tr>
+            <tr><td>                           </td><td>PV Korrekturfaktoren bzw. SolCast Percentile                                                                         </td></tr>
             <tr><td>                           </td><td>Um PV Korrekturfaktoren einer bestimmten Stunde aus pvCircular zu löschen:                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection circular &lt;Stunde&gt;  </ul>                                               </td></tr>    
             <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection circular 10)       </ul>                                               </td></tr>            
@@ -10725,7 +10781,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <table>  
          <colgroup> <col width=12%> <col width=88%> </colgroup>
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                        </td></tr>
-            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülamschine                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmaschine                                                                                  </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                                 </td></tr>
             <tr><td>                       </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                                 </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                                       </td></tr>
