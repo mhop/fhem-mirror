@@ -27,7 +27,7 @@ use strict;
 use warnings;
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                       # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday tv_interval);
 
 eval "use FHEM::Meta;1"                  or my $modMetaAbsent = 1;         ## no critic 'eval'
 eval "use FHEM::Utility::CTZ qw(:all);1" or my $ctzAbsent     = 1;         ## no critic 'eval'
@@ -126,6 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.1 "=> "14.10.2022  new function setTimeTracking ",
   "0.70.0 "=> "13.10.2022  delete Attr solCastPercentile, new manual Setter pvSolCastPercentile_XX ",
   "0.69.0 "=> "12.10.2022  Autocorrection function for model SolCast-API, __solCast_ApiRequest: request only 48 hours ",
   "0.68.7 "=> "07.10.2022  new function _calcCAQwithSolCastPercentil, check missed modules in _getRoofTopData ",
@@ -1861,6 +1862,9 @@ sub _getRoofTopData {
   
   $paref->{allstrings} = ReadingsVal($name, "inverterStrings", "");
   
+  my $type = $hash->{TYPE};
+  delete $data{$type}{$name}{current}{runTimeAPIResponseProc};
+  
   __solCast_ApiRequest ($paref);
   
 return;
@@ -1942,6 +1946,8 @@ sub __solCast_ApiResponse {
   my $t          = time;
   
   my ($msg,$starttmstr);
+  
+  my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
 
   if ($err ne "") {
       $msg = 'SolCast API server response: '.$err; 
@@ -1949,7 +1955,10 @@ sub __solCast_ApiResponse {
       Log3 ($name, 2, "$name - $msg");
       
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
+      
       readingsSingleUpdate($hash, "state", $msg, 1);
+      $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);           # API Laufzeit ermitteln
+      
       return;
   } 
   elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
@@ -1961,6 +1970,7 @@ sub __solCast_ApiResponse {
           Log3 ($name, 2, "$name - $msg");
           
           readingsSingleUpdate($hash, "state", $msg, 1);
+          $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);       # API Laufzeit ermitteln
           return;
       }
     
@@ -1987,16 +1997,19 @@ sub __solCast_ApiResponse {
           ___setLastAPIcallKeyData ($hash, $t);
           
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
+          
           readingsSingleUpdate($hash, "state", $msg, 1);
+          $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);     # API Laufzeit ermitteln
+          
           return;
       }
       
       my $k = 0;              
       
-      while ($jdata->{'forecasts'}[$k]) {                                       # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
-          my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
+      while ($jdata->{'forecasts'}[$k]) {                                                                # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
+          my $petstr = $jdata->{'forecasts'}[$k]{'period_end'};
           
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                 # ersten Datensatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # ersten Datensatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
               $k += 1;
               next;                           
           }
@@ -2015,7 +2028,7 @@ sub __solCast_ApiResponse {
       while ($jdata->{'forecasts'}[$k]) {
           my $petstr  = $jdata->{'forecasts'}[$k]{'period_end'};
           
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                 # ersten Datanesatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # ersten Datanesatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
               $k += 1;
               next;                           
           }
@@ -2035,7 +2048,7 @@ sub __solCast_ApiResponse {
               return;
           }
           
-          if($debug) {                                                                                         # nur für Debugging
+          if($debug) {                                                                                  # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
                   Log (1, qq{DEBUG> $name SolCast API Hash - Start Date/Time: }. $starttmstr);
                   Log (1, qq{DEBUG> $name SolCast API Hash - pv_estimate50 add: }.(sprintf "%.0f", ($pvest50 * ($period/60) * 1000)).qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
@@ -2074,6 +2087,8 @@ sub __solCast_ApiResponse {
       name       => $name,
       allstrings => $allstrings
   };
+  
+  $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);          # API Laufzeit ermitteln
   
 return &$caller($param);
 }
@@ -2740,7 +2755,9 @@ return @pvconf;
 sub centralTask {
   my $hash = shift;
   my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};  
+  my $type = $hash->{TYPE};
+  
+  my $cst = [gettimeofday];                                                                         # Zyklus-Startzeit
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
   
@@ -2858,6 +2875,8 @@ sub centralTask {
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
   }
+  
+  setTimeTracking ($hash, $cst, 'runTimeCycleSummary');                                   # Zyklus-Laufzeit ermitteln
   
 return;
 }
@@ -8056,7 +8075,7 @@ sub _calcCAQwithSolCastPercentil {
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $perc;                        # bestes Percentil für die jeweilige Stunde speichern
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $dnum;                        # Percentil Qualität
   
-      push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."<>".$perc." (automatic - old percentile: $oldperc)";
+      push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."<>".$perc." (automatic - old percentile: $oldperc, average days: $dnum)";
       push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."_autocalc<>done";    
   }
       
@@ -9175,6 +9194,22 @@ sub setModel {
       $hash->{MODEL} = 'DWD';
       deleteReadingspec ($hash, 'nextSolCastCall');
   }
+  
+return;
+}
+
+################################################################
+#  Laufzeit Ergebnis erfassen und speichern
+################################################################
+sub setTimeTracking {
+  my $hash = shift;
+  my $st   = shift;                  # Startzeitstempel
+  my $tkn  = shift;                  # Name des Zeitschlüssels
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  $data{$type}{$name}{current}{$tkn} = sprintf "%.4f", tv_interval($st);
   
 return;
 }
