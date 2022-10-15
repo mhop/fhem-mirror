@@ -126,6 +126,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.3 "=> "15.10.2022  use readingsBulkUpdateIfChanged in function createReadingsFromArray ",
+  "0.70.2 "=> "15.10.2022  average calculation in _calcCAQwithSolCastPercentil, delete reduce by temp in __calcSolCastEstimates ",
   "0.70.1 "=> "14.10.2022  new function setTimeTracking ",
   "0.70.0 "=> "13.10.2022  delete Attr solCastPercentile, new manual Setter pvSolCastPercentile_XX ",
   "0.69.0 "=> "12.10.2022  Autocorrection function for model SolCast-API, __solCast_ApiRequest: request only 48 hours ",
@@ -2332,6 +2334,10 @@ sub Attr {
       $val = ($do == 1 ? "disabled" : "initialized");
       readingsSingleUpdate($hash, "state", $val, 1);
   }
+  
+  if($aName eq "createTomorrowPVFcReadings") {
+      deleteReadingspec ($hash, "Tomorrow_Hour.*");
+  }
     
   if ($cmd eq "set") {
       if ($aName eq "interval") {
@@ -3541,18 +3547,7 @@ sub __calcSolCastEstimates {
   my $peaksum = 0;
   
   for my $string (sort keys %{$data{$type}{$name}{strings}}) {
-      my $peak                 = $data{$type}{$name}{strings}{$string}{peak};                         # String Peak (kWp)
-      
-      $paref->{peak}           = $peak;
-      $paref->{cloudcover}     = $cloudcover;
-      $paref->{temp}           = $temp;
-      
-      my ($peakloss, $modtemp) = ___calcPeaklossByTemp ($paref);                                      # Reduktion Peakleistung durch Temperaturkoeffizienten der Module (vorzeichengehaftet)
-      $peak                   += $peakloss;
-      
-      delete $paref->{peak};
-      delete $paref->{cloudcover};
-      delete $paref->{temp};
+      my $peak = $data{$type}{$name}{strings}{$string}{peak};                                         # String Peak (kWp)
       
       $peak *= 1000;
       
@@ -3565,8 +3560,6 @@ sub __calcSolCastEstimates {
           "Starttime"                         => $wantdt,
           "modulePeakString"                  => $peak." W",
           "Forecasted temperature"            => $temp." &deg;C",
-          "Module Temp (calculated)"          => $modtemp." &deg;C",
-          "Loss String Peak Power by Temp"    => $peakloss." kWP",
           "Cloudcover"                        => $cloudcover,
           "CloudFactorDamping"                => $clouddamp." %",
           "Cloudfactor"                       => $ccf,
@@ -5524,7 +5517,7 @@ sub _calcReadingsTomorrowPVFc {
   
   my $type   = $hash->{TYPE};
   
-  deleteReadingspec ($hash, "Tomorrow_Hour.*");
+  # deleteReadingspec ($hash, "Tomorrow_Hour.*");
   
   my $h    = $data{$type}{$name}{nexthours};
   my $hods = AttrVal($name, 'createTomorrowPVFcReadings', '');
@@ -8027,7 +8020,7 @@ sub _calcCAQwithSolCastPercentil {
         90 => $est90,
       );      
       
-      my $perc  = 50;                                                                                          # Standardpercentil 
+      my $perc  = 50;                                                                                         # Standardpercentil 
       my $diff0 = abs ($est50 - $pvval);
                                                                                                                                               ## no critic 'NoStrict'
       for my $p (sort keys %pc) {        
@@ -8048,14 +8041,14 @@ sub _calcCAQwithSolCastPercentil {
       my ($usenhd) = __useNumHistDays ($name);                                                               # ist Attr numHistDays gesetzt ?
  
       if($dnum) {                                                                                            # Werte in History vorhanden -> haben Prio !
-          $avgperc = $avgperc * $dnum;
+          $avgperc = $avgperc;
           $dnum++;                                                                            
-          $perc    = sprintf "%.0f", ((($avgperc + $perc) / $dnum) / 10);                                     
+          $perc    = sprintf "%.0f", ((($avgperc + $perc) / 2) / 10);                                     
       }
       elsif($oldperc && !$usenhd) {                                                                          # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr numHistDays
           $oldperc = $oldperc * $oldq;
           $dnum    = $oldq + 1;
-          $perc    = sprintf "%.0f", ((($oldperc + $perc) / $dnum) / 10);
+          $perc    = sprintf "%.0f", ((($oldperc + $perc) / 2) / 10);
       }
       else {                                                                                                 # ganz neuer Wert
           $perc   = sprintf "%.0f", ($perc / 10);
@@ -9070,7 +9063,13 @@ sub createReadingsFromArray {
   
   for my $elem (@$daref) {
       my ($rn,$rval,$ts) = split "<>", $elem, 3;
-      readingsBulkUpdate($hash, $rn, $rval, undef, $ts);      
+      
+      if ($ts) {
+          readingsBulkUpdate ($hash, $rn, $rval, undef, $ts);   
+      }
+      else {
+          readingsBulkUpdateIfChanged ($hash, $rn, $rval);
+      }      
   }
 
   readingsEndUpdate($hash, $doevt);
