@@ -126,7 +126,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.70.3 "=> "15.10.2022  use readingsBulkUpdateIfChanged in function createReadingsFromArray ",
+  "0.70.3 "=> "15.10.2022  check event-on-change-reading in plantConfiguration check ",
   "0.70.2 "=> "15.10.2022  average calculation in _calcCAQwithSolCastPercentil, delete reduce by temp in __calcSolCastEstimates ",
   "0.70.1 "=> "14.10.2022  new function setTimeTracking ",
   "0.70.0 "=> "13.10.2022  delete Attr solCastPercentile, new manual Setter pvSolCastPercentile_XX ",
@@ -8874,6 +8874,19 @@ sub checkPlantConfig {
       }  
   }
   
+  ## Allgemeine Settings 
+  ########################
+  my $eocr = AttrVal ($name, 'event-on-change-reading', '');  
+  
+  if (!$eocr) {
+      $result->{'Common Settings'}{state}   = $info;
+      $result->{'Common Settings'}{result} .= qq{Attribute 'event-on-change-reading' is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading' is recommended to improve the runtime performance.<br>};
+  }
+  
+  $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
+  $result->{'Common Settings'}{note}   .= qq{event-on-change-reading <br>};
+  
   ## Settings bei Nutzung SolCast
   #################################
   if (isSolCastUsed ($hash)) {
@@ -8885,27 +8898,27 @@ sub checkPlantConfig {
       if ($cfd eq '' || $cfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set cloudFactorDamping explicitly to "0" is recommended<br>};
+          $result->{'Common Settings'}{note}   .= qq{set cloudFactorDamping explicitly to "0" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if ($rfd eq '' || $rfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute rainFactorDamping is set to "$rfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set rainFactorDamping explicitly to "0" is recommended<br>};
+          $result->{'Common Settings'}{note}   .= qq{set rainFactorDamping explicitly to "0" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if (!$pcf || $pcf ne 'on') {
           $result->{'Common Settings'}{state}   = $info;
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on" is recommended if the SolCast efficiency factor is already adjusted<br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on" is recommended if the SolCast efficiency factor is already adjusted.<br>};
       }
       
       if (!$osi) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute optimizeSolCastAPIreqInterval is set to "$osi" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set optimizeSolCastAPIreqInterval to "1" is recommended<br>};
+          $result->{'Common Settings'}{note}   .= qq{set optimizeSolCastAPIreqInterval to "1" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
@@ -9063,13 +9076,7 @@ sub createReadingsFromArray {
   
   for my $elem (@$daref) {
       my ($rn,$rval,$ts) = split "<>", $elem, 3;
-      
-      if ($ts) {
-          readingsBulkUpdate ($hash, $rn, $rval, undef, $ts);   
-      }
-      else {
-          readingsBulkUpdateIfChanged ($hash, $rn, $rval);
-      }      
+      readingsBulkUpdate ($hash, $rn, $rval, undef, $ts);         
   }
 
   readingsEndUpdate($hash, $doevt);
