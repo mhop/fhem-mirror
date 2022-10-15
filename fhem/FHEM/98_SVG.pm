@@ -2526,7 +2526,7 @@ plotAsPng(@)
 
   # Forum #32791,#116138: some lib versions cannot parse complex CSS selectors
   $svgdata =~ s/\.SVGplot\./\./g if(AttrVal($svgName, "plotAsPngFix", 0));
-  $svgdata = Encode::decode('UTF-8', $buf)
+  $svgdata = Encode::decode("UTF-8", $svgdata) if(!$unicodeEncoding); #129693
 
   eval {
     require Image::LibRSVG;
