@@ -1994,7 +1994,7 @@ sub ESCVP21net_openDevice{
       <li><b>model</b> - defines your type of projector. It is used for loading a suitable pre-defined command set.
         <br>No parameter or <i>default</i> will provide you with a limit "set" (PWR, MUTE, LAMP, KEY, GetAll, GetStatus).
         <br>You can try <i>TW5650</i> to get a typical set of implemented commands. Providing the maintainer with a suitable set for your projector will extend the module's capabilities ;-)
-        <br>Individually supported by now: TW5650, EB2250U, TW6100, TW7400, TW9400
+        <br>Individually supported by now: TW5650, EB2250U, TW6100, TW7400, TW9400, LS12000
         <br>"Hidden Feature:" Type <i>Scotty</i> will give you everything (as he does always ;) ). Not every command will work for you. You are the Captain, so decide wisely what to choose...
       </li>
       <li>Example: <code>define EPSON ESCVP21net 10.10.0.1 3629 TW5650</code>
