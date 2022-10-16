@@ -36,7 +36,8 @@
 #    1.01.15  add debug options
 #    1.01.16  add cyclicConnect to mitigate lost TCP connection issue
 #    1.01.17  add TW9400
-#    1.01.18  added undocumented settings (IMGPROC, IRIS,LIRIS)
+#    1.01.18  added undocumented settings (IMGPROC, IRIS, LIRIS)
+#    1.01.19  added LS12000 (especially POPLP) 
 #
 ################################################################################
 #
@@ -70,7 +71,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.18";
+my $version = "1.01.19";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -250,6 +251,48 @@ my %ESCVP21net_TW9400result = (
   "LUMINANCE:02" => "medium"
 );
 
+# LS12000 sets
+my %ESCVP21net_LS12000sets = (
+  "4KENHANCE"    => ":get,off,FullHD",
+  "ASPECT"       => ":get,Auto,Normal,Full,Zoom",
+  "AUTOHOME"     => ":get,off,on",
+  "CMODE"        => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigialCinema",
+  "DYNRANGE"     => ":get,Auto,SDR,HDR10,HLG",
+  "HLENS"        => ":get",
+  "HREVERSE"     => ":get,Flip,Normal",
+  "ILLUM"        => ":get,on,off,toggle",
+  "IMGPRESET"    => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
+  "IMGPROC"      => ":get,fine,fast",
+  "IRIS"         => ":get,00,01,02",
+  "LENS"         => ":get",
+  "LIRIS"        => ":get,0,128,255",   
+  "LUMINANCE"    => ":get,normal,eco,medium",
+  "MCFI"         => ":get,off,low,normal,high",
+  "MSEL"         => ":get,black,blus,user",
+  "OVSCAN"       => ":get,off,4%,8%,auto",
+  "POPLP"        => ":01,01,03,04,05,06,07,08,09,0A",
+  "PRODUCT"      => ":get,ModelName_on,ModelName_off",
+  "SIGNAL"       => ":get,none,2D,3D",
+  "SNO"          => ":get",
+  "SOURCE"       => ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
+  "VREVERSE"     => ":get,Flip,Normal",
+  "WLPWR"        => ":get,WLAN_on,WLAN_off"
+);
+
+my %ESCVP21net_LS12000result = (
+  "CMODE:06"     => "Dynamic",
+  "CMODE:07"     => "Natural",
+  "CMODE:0C"     => "BrightCinema",
+  "CMODE:15"     => "Cinema",
+  "CMODE:17"     => "3D_Cinema",
+  "CMODE:18"     => "3D_Dynamic",
+  "CMODE:20"     => "BW_Cinema",
+  "CMODE:22"     => "DigitalCinema",
+  "LUMINANCE:00" => "normal",
+  "LUMINANCE:01" => "eco",
+  "LUMINANCE:02" => "medium"
+);
+
 # scotty sets - sort of godmode, gives you enhanced set possibilities
 my %ESCVP21net_Scottysets = (
   "4KENHANCE"    => ":get,off,FullHD",
@@ -262,16 +305,19 @@ my %ESCVP21net_Scottysets = (
   "CMODE"        => ":get,sRGB,Normal,Meeting,Presentation,Theatre,Game/LivingRoom,Natural,Dynamic/Sports,09,Custom,Living,BlackBoard,WhiteBoard,14,Photo,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigitalCinema",
   "DYNRANGE"     => ":get,Auto,SDR,HDR10,HLG",
   "FREEZE"       => ":get,on,off,toggle",
+  "HLENS"        => ":get",
   "HREVERSE"     => ":get,Flip,Normal",
   "ILLUM"        => ":get,on,off,toggle",
   "IMGPRESET"    => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
   "IMGPROC"      => ":get,fine,fast",
   "IRIS"         => ":get,00,01,02",
+  "LENS"         => ":get",
   "LIRIS"        => ":get,0,128,255",        
   "LUMINANCE"    => ":get,high,low,toggle",
   "MCFI"         => ":get,off,low,normal,high",
   "MSEL"         => ":get,black,blus,user",
   "OVSCAN"       => ":get,off,4%,8%,auto",
+  "POPLP"        => ":01,01,03,04,05,06,07,08,09,0A",
   "PRODUCT"      => ":get,ModelName_on,ModelName_off",
   "PWSTATUS"     => ":get",
   "SIGNAL"       => ":get,none,2D,3D",
@@ -1774,6 +1820,11 @@ sub ESCVP21net_setTypeCmds ($){
     %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW9400sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW9400result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW9400 sets and result";
+  }  
+  elsif ($hash->{model} eq "LS12000"){
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_LS12000sets, %VP21addattrs);
+    %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_LS12000result);
+    main::Log3 $name, 5, "[$name]: setTypeCmds: loaded LS12000 sets and result";
   }  
   elsif ($hash->{model} eq "Scotty"){
     %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Scottysets, %VP21addattrs);
