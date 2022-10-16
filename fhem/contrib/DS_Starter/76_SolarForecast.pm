@@ -2177,8 +2177,6 @@ sub ___setLastAPIcallKeyData {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
       my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
-      
-      #$data{$type}{$name}{current}{secondsUntilSunSet} = $dart;
  
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $darr) if($dart && $darr);
@@ -5517,8 +5515,6 @@ sub _calcReadingsTomorrowPVFc {
   
   my $type   = $hash->{TYPE};
   
-  # deleteReadingspec ($hash, "Tomorrow_Hour.*");
-  
   my $h    = $data{$type}{$name}{nexthours};
   my $hods = AttrVal($name, 'createTomorrowPVFcReadings', '');
   return if(!keys %{$h} || !$hods);
@@ -5532,8 +5528,7 @@ sub _calcReadingsTomorrowPVFc {
 
       next if($hods !~ /$h/xs);                                                    # diese Stunde des Tages soll nicht erzeugt werden 
       
-      my $st = NexthoursVal ($hash, $idx, 'starttime', 'XXXX-XX-XX XX:XX:XX');     # Starttime
-      
+      my $st   = NexthoursVal ($hash, $idx, 'starttime', 'XXXX-XX-XX XX:XX:XX');   # Starttime
       my $pvfc = NexthoursVal ($hash, $idx, 'pvforecast', 0);
       
       push @$daref, "Tomorrow_Hour".$h."_PVforecast<>".$pvfc." Wh";
@@ -10337,6 +10332,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <li>
          entsprechend der Abweichung passe den efficiency factor in Schritten an bis ein Optimum, d.h. die kleinste
          Tagesabweichung gefunden ist
+         </li>
+         <li>
+         ist man der Auffassung die optimale Einstellung gefunden zu haben, kann vCorrectionFactor_Auto on gesetzt werden um 
+         eine automatische Auswahl des optimalen Percentils zu aktivieren
          </li>
       </ul> 
       <br>
