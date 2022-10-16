@@ -37,7 +37,7 @@
 #    1.01.16  add cyclicConnect to mitigate lost TCP connection issue
 #    1.01.17  add TW9400
 #    1.01.18  added undocumented settings (IMGPROC, IRIS, LIRIS)
-#    1.01.19  added LS12000 (especially POPLP) 
+#    1.01.19  added LS12000 (added POPLP, LENS, HLENS) 
 #
 ################################################################################
 #
