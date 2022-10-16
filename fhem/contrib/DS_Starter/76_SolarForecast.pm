@@ -442,12 +442,12 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
-  strok  => { EN => qq{Congratulations &#128522;, your system configuration has been checked and is error-free.},
-              DE => qq{Herzlichen Glückwunsch &#128522;, ihre Anlagenkonfiguration wurde geprüft und ist fehlerfrei.}            },
+  strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please observe any notes.},
+              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise beachten. } },
   strwn  => { EN => qq{Looks quite good &#128528;, the check of the plant configuration showed only warnings.},
-              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab lediglich Warnungen.}            },  
+              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab lediglich Warnungen.}                   },  
   strnok => { EN => qq{Oh no &#128577;, your string configuration is inconsistent.\nPlease check the settings !},
-              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !} },
+              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !}        },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
