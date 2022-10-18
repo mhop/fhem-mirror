@@ -65,7 +65,7 @@ sub valetudo_c {
     my $NAME = shift;
     my ($cmd,$load) = split q{ }, shift, 2;
     my $ret = 'error';
-    my $devicetopic = InternalVal($NAME,'DEVICETOPIC',"valetudo/$NAME");
+    my $devicetopic = AttrVal($NAME,'devicetopic',"valetudo/$NAME");
 
     # x_raw_payload like
     # /MapSegmentationCapability/clean/set {"segment_ids":["6"],"iterations":1,"customOrder":true}
