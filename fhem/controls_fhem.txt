@@ -1,4 +1,4 @@
-REV 26549
+REV 26552
 DIR unused
 UPD 2022-10-17_07:45:02 383744 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -654,7 +654,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-10-10_07:45:03 393984 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-10-18_07:45:09 395844 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-09-04_07:45:03 10549 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -750,8 +750,8 @@ UPD 2022-10-17_07:45:07 4809687 docs/commandref.html
 UPD 2022-10-10_07:45:09 2862922 docs/commandref_DE.html
 UPD 2022-02-19_07:45:02 83441 docs/commandref_frame.html
 UPD 2022-02-19_07:45:02 93402 docs/commandref_frame_DE.html
-UPD 2022-10-17_07:45:10 291107 docs/commandref_modular.html
-UPD 2022-10-17_07:45:12 302260 docs/commandref_modular_DE.html
+UPD 2022-10-18_07:45:17 291107 docs/commandref_modular.html
+UPD 2022-10-18_07:45:18 302260 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2132,6 +2132,7 @@ UPD 2015-07-28_14:05:33 3730 www/images/openautomation/measure_voltage.svg
 UPD 2015-07-28_14:05:33 5367 www/images/openautomation/measure_water_meter.svg
 UPD 2015-07-28_14:05:33 1124 www/images/openautomation/message_attention.svg
 UPD 2015-07-28_14:05:33 2002 www/images/openautomation/message_garbage.svg
+UPD 2022-10-18_07:45:09 1562 www/images/openautomation/message_info.svg
 UPD 2015-07-28_14:05:33 3837 www/images/openautomation/message_light_intensity.svg
 UPD 2015-07-28_14:05:33 999 www/images/openautomation/message_mail.svg
 UPD 2015-07-28_14:05:33 1042 www/images/openautomation/message_mail_open.svg
