@@ -39,7 +39,9 @@ use HttpUtils;
 eval "use JSON;1;" or my $jsonabs = "JSON";                                ## no critic 'eval' # Debian: apt-get install libjson-perl
 
 use FHEM::SynoModules::SMUtils qw(
-                                   evaljson  
+                                   evaljson
+                                   getClHash
+                                   delClHash                                   
                                    moduleVersion
                                    trim
                                  );                                        # Hilfsroutinen Modul
@@ -54,6 +56,7 @@ BEGIN {
   GP_Import( 
       qw(
           attr
+          asyncOutput
           AnalyzePerlCommand
           AttrVal
           AttrNum
@@ -126,6 +129,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.5 "=> "18.10.2022  new hidden getter plantConfigCheck ",
+  "0.70.4 "=> "16.10.2022  change attr historyHour to positive numbers, plantconfig check changed ",
   "0.70.3 "=> "15.10.2022  check event-on-change-reading in plantConfiguration check ",
   "0.70.2 "=> "15.10.2022  average calculation in _calcCAQwithSolCastPercentil, delete reduce by temp in __calcSolCastEstimates ",
   "0.70.1 "=> "14.10.2022  new function setTimeTracking ",
@@ -351,17 +356,18 @@ my %hset = (                                                                # Ha
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
-  data              => { fn => \&_getdata,                   needcred => 0 },
-  html              => { fn => \&_gethtml,                   needcred => 0 },
-  ftui              => { fn => \&_getftui,                   needcred => 0 },
-  valCurrent        => { fn => \&_getlistCurrent,            needcred => 0 },
-  valConsumerMaster => { fn => \&_getlistvalConsumerMaster,  needcred => 0 },
-  pvHistory         => { fn => \&_getlistPVHistory,          needcred => 0 },
-  pvCircular        => { fn => \&_getlistPVCircular,         needcred => 0 },
-  forecastQualities => { fn => \&_getForecastQualities,      needcred => 0 },
-  nextHours         => { fn => \&_getlistNextHours,          needcred => 0 },
-  roofTopData       => { fn => \&_getRoofTopData,            needcred => 0 },
-  solCastData       => { fn => \&_getlistSolCastData,        needcred => 0 },
+  data               => { fn => \&_getdata,                   needcred => 0 },
+  html               => { fn => \&_gethtml,                   needcred => 0 },
+  ftui               => { fn => \&_getftui,                   needcred => 0 },
+  valCurrent         => { fn => \&_getlistCurrent,            needcred => 0 },
+  valConsumerMaster  => { fn => \&_getlistvalConsumerMaster,  needcred => 0 },
+  plantConfigCheck   => { fn => \&_setplantConfiguration,     needcred => 0 },
+  pvHistory          => { fn => \&_getlistPVHistory,          needcred => 0 },
+  pvCircular         => { fn => \&_getlistPVCircular,         needcred => 0 },
+  forecastQualities  => { fn => \&_getForecastQualities,      needcred => 0 },
+  nextHours          => { fn => \&_getlistNextHours,          needcred => 0 },
+  roofTopData        => { fn => \&_getRoofTopData,            needcred => 0 },
+  solCastData        => { fn => \&_getlistSolCastData,        needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -442,12 +448,12 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
-  strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please observe any notes.},
-              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise beachten. } },
-  strwn  => { EN => qq{Looks quite good &#128528;, the check of the plant configuration showed only warnings.},
-              DE => qq{Sieht ganz gut aus &#128528;, die Prüfung der Anlagenkonfiguration ergab lediglich Warnungen.}                   },  
+  strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please observe any notes (<I>).},
+              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten. }      },
+  strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please observe the warnings (<W>).},
+              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten sie die Warnungen (<W>).} },  
   strnok => { EN => qq{Oh no &#128577;, your string configuration is inconsistent.\nPlease check the settings !},
-              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !}        },
+              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !}                   },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -485,6 +491,8 @@ my %htitles = (                                                                 
                 DE => qq{PV-&#220;berschu&#223; ausreichend}                                                       },
   nosplus  => { EN => qq{PV surplus insufficient},
                 DE => qq{PV-&#220;berschu&#223; unzureichend}                                                      },
+  plchk    => { EN => qq{Configuration check of the plant},
+                DE => qq{Konfigurationspr&#252;fung der Anlage}                                                    },
 );
 
 my %weather_ids = (
@@ -641,7 +649,7 @@ my $defcmode     = "can";                                                       
 
 my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
 my $defflowGSize = 300;                                                           # default flowGraphicSize
-my $histhourdef  = -2;                                                            # default Anzeige vorangegangene Stunden
+my $histhourdef  = 2;                                                             # default Anzeige vorangegangene Stunden
 my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag Default Farbe
 my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht Default Farbe
 my $b1coldef     = 'FFAC63';                                                      # Default Farbe Beam 1
@@ -746,7 +754,7 @@ sub Initialize {
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast,none ".                                     
                                 "headerDetail:all,co,pv,pvco,statusLink ".
-                                "historyHour:slider,0,-1,-23 ".
+                                "historyHour:slider,0,1,23 ".
                                 "hourCount:slider,4,1,24 ".                                                                
                                 "hourStyle ".
                                 "htmlStart ".
@@ -1419,20 +1427,26 @@ sub _setplantConfiguration {             ## no critic "not used"
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
-
-  if(!$arg) {
-      return qq{The command "$opt" needs an argument !};
-  } 
   
-  if($arg eq "check") {      
-      my $ret = checkPlantConfig ($hash); 
-      return qq{<html>$ret</html>};
+  my ($err,@pvconf);
+  
+  $arg = 'check' if (!$arg);
+  
+  if($arg eq "check") {
+      $err    = getClHash($hash);
+      my $out = checkPlantConfig ($hash);
+      $out    = qq{<html>$out</html>};
+      
+      #$paref->{out} = $out;
+      #InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::__plantCfgAsynchOut", $paref, 0);
+    
+      return $out;
   }
   
   if($arg eq "save") {
-      my $error = writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
-      if($error) {
-          return $error;
+      $err = writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+      if($err) {
+          return $err;
       }
       else {
           return qq{Plant Configuration has been written to file "$plantcfg.$name"};
@@ -1440,9 +1454,9 @@ sub _setplantConfiguration {             ## no critic "not used"
   }
   
   if($arg eq "restore") {
-      my ($error, @pvconf) = FileRead ($plantcfg.$name);                                        
+      ($err, @pvconf) = FileRead ($plantcfg.$name);                                        
       
-      if(!$error) {
+      if(!$err) {
           my $rbit = 0;
           for my $elem (@pvconf) {
               my ($reading, $val) = split "<>", $elem;
@@ -1459,10 +1473,25 @@ sub _setplantConfiguration {             ## no critic "not used"
           }
       }
       else {
-          return $error;
+          return $err;
       }      
   }
   
+return;
+}
+
+################################################################
+#   asynchrone Ausgabe Ergbnis Plantconfig Check
+################################################################
+sub __plantCfgAsynchOut {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $out   = $paref->{out};
+
+  asyncOutput($hash->{HELPER}{CL}{1}, $out);
+  delClHash  ($name);
+      
 return;
 }
 
@@ -1865,7 +1894,7 @@ sub _getRoofTopData {
   $paref->{allstrings} = ReadingsVal($name, "inverterStrings", "");
   
   my $type = $hash->{TYPE};
-  delete $data{$type}{$name}{current}{runTimeAPIResponseProc};
+  undef $data{$type}{$name}{current}{runTimeAPIResponseProc};
   
   __solCast_ApiRequest ($paref);
   
@@ -2020,7 +2049,7 @@ sub __solCast_ApiResponse {
                     
           next if ($err);
           
-          delete $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
+          undef $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
 
           $k += 1;          
       } 
@@ -2894,7 +2923,7 @@ sub createStringConfig {                 ## no critic "not used"
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
+  undef $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
   my @istrings = split ",", ReadingsVal ($name, "inverterStrings", "");                           # Stringbezeichner
   $data{$type}{$name}{current}{allstringscount} = scalar @istrings;                               # Anzahl der Anlagenstrings 
   
@@ -2906,7 +2935,7 @@ sub createStringConfig {                 ## no critic "not used"
   return qq{Please complete command "set $name modulePeakString".} if(!$peak);
   
   my ($aa,$ha) = parseParams ($peak);
-  delete $data{$type}{$name}{current}{allstringspeak};
+  undef $data{$type}{$name}{current}{allstringspeak};
   
   while (my ($strg, $pp) = each %$ha) {
       if ($strg ~~ @istrings) {
@@ -3139,7 +3168,7 @@ sub __delSolCastObsoleteData {
   for my $idx (sort keys %{$data{$type}{$name}{solcastapi}}) {             # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
       for my $scd (sort keys %{$data{$type}{$name}{solcastapi}{$idx}}) {
           my $ds = timestringToTimestamp ($scd);
-          delete $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
+          undef $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
       }
   }
   
@@ -3169,7 +3198,7 @@ sub _transferDWDRadiationValues {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
       if($fd > 1) {                                                                           # überhängende Werte löschen 
-          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)};
+          undef $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)};
           next;
       }
       
@@ -3458,7 +3487,7 @@ sub _transferSolCastRadiationValues {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
       if($fd > 1) {                                                                           # überhängende Werte löschen 
-          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
+          undef $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
           next;
       }
       
@@ -4291,19 +4320,19 @@ sub __calcEnergyPieces {
       delete $paref->{etot};
   }
   else {
-      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};
-      delete $data{$type}{$name}{consumers}{$c}{epiecAVG_hours};
-      delete $data{$type}{$name}{consumers}{$c}{epiecEstart};
-      delete $data{$type}{$name}{consumers}{$c}{epiecHist};
-      delete $data{$type}{$name}{consumers}{$c}{epiecHour};
+      undef $data{$type}{$name}{consumers}{$c}{epiecAVG};
+      undef $data{$type}{$name}{consumers}{$c}{epiecAVG_hours};
+      undef $data{$type}{$name}{consumers}{$c}{epiecEstart};
+      undef $data{$type}{$name}{consumers}{$c}{epiecHist};
+      undef $data{$type}{$name}{consumers}{$c}{epiecHour};
       
       for my $h (1..$epiecHCounts) {
-          delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h};
-          delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
+          undef $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h};
+          undef $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
       }
   }  
 
-  delete $data{$type}{$name}{consumers}{$c}{epieces};
+  undef $data{$type}{$name}{consumers}{$c}{epieces};
   
   my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
@@ -4379,7 +4408,7 @@ sub ___csmSpecificEpieces {
           $data{$type}{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
             
           $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
-          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                                        # Löschen, wird neu erfasst
+          undef $data{$type}{$name}{consumers}{$c}{$epiecHist};                                        # Löschen, wird neu erfasst
       }
         
       $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Namen fürs Speichern
@@ -4409,7 +4438,7 @@ sub ___csmSpecificEpieces {
           $hours                                             = ceil ($hours / $epiecHCounts);
           $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
                
-          delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                           # Durchschnitt für epics ermitteln     
+          undef $data{$type}{$name}{consumers}{$c}{epiecAVG};                                            # Durchschnitt für epics ermitteln     
           
           for my $hour (1..$hours) {                                                                     # jede Stunde durchlaufen
               my $hoursE = 1;
@@ -5922,7 +5951,7 @@ sub pageAsHtml {
   my $ftui = shift;
   
   my $ret = "<html>";
-  $ret   .= entryGraphic ($name);
+  $ret   .= entryGraphic ($name, $ftui);
   $ret   .= "</html>";
   
 return $ret;
@@ -5961,6 +5990,8 @@ sub entryGraphic {
   my $html_end   = AttrVal ($name, 'htmlEnd',   undef);                                    # beliebige HTML Strings die nach der Grafik ausgegeben werden
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
   
+  my $offset     = -1 * AttrNum ($name, 'historyHour', $histhourdef);
+  
   my $paref = {
       hash           => $hash,
       name           => $name,
@@ -5968,7 +5999,7 @@ sub entryGraphic {
       maxhours       => $maxhours,
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
-      offset         => AttrNum ($name,    'historyHour',            $histhourdef),
+      offset         => $offset,
       hourstyle      => AttrVal ($name,    'hourStyle',                        ''),
       colorb1        => AttrVal ($name,    'beam1Color',                $b1coldef),
       colorb2        => AttrVal ($name,    'beam2Color',                $b2coldef),
@@ -6275,13 +6306,19 @@ sub _graphicHeader {
          $lup = "$day.$month.$year&nbsp;$time"; 
       }
 
-      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')"};               # Update Button generieren        
+      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')"};                        # Update Button generieren        
 
       if ($ftui eq "ftui") {
           $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
       }
+                  
+      my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren        
 
-      my $upstate = ReadingsVal($name, "state", "");
+      if ($ftui eq "ftui") {
+          $cmdplchk = qq{"ftui.setFhemStatus('get $name plantConfigCheck')"};     
+      }
+
+      my $upstate = ReadingsVal($name, 'state', '');
       
       ## SolCast Sektion
       ####################
@@ -6322,6 +6359,12 @@ sub _graphicHeader {
           
           
       }
+      
+      ## Anlagen Check-Icon
+      #######################
+      $img         = FW_makeImage('edit_settings@grey');
+      my $chkicon  = "<a onClick=$cmdplchk>$img</a>";
+      my $chktitle = $htitles{plchk}{$lang};
 
       ## Update-Icon
       ################
@@ -6377,8 +6420,17 @@ sub _graphicHeader {
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
  
-      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b> $dlink </b></td><td colspan="3" align="left" $dstyle> $lupt   &nbsp; $lup &nbsp; $upicon </td><td colspan="3" align="left" $dstyle> $api                   </td></tr>};
-      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b>        </b></td><td colspan="3" align="left" $dstyle> $autoct &nbsp;             $acicon </td><td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon </td></tr>};
+      $header  .= qq{<tr>};
+      $header  .= qq{<td colspan="2" align="left" $dstyle> <b>$dlink</b>                    </td>};   
+      $header  .= qq{<td colspan="1" align="left" title="$chktitle" $dstyle> $chkicon       </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $lupt &nbsp; $lup &nbsp; $upicon </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $api                             </td>};
+      $header  .= qq{</tr>};
+      $header  .= qq{<tr>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle>                                  </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $autoct &nbsp; $acicon           </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon           </td>};
+      $header  .= qq{</tr>};
   }
   
   # Header Information pv 
@@ -8499,7 +8551,7 @@ sub listDataPool {
       }
       for my $i (keys %{$h}) {
           if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
-              delete $data{$type}{$name}{consumers}{$i};
+              undef $data{$type}{$name}{consumers}{$i};
               Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer Hash});
           }         
       }
@@ -8724,15 +8776,15 @@ sub checkPlantConfig {
   my $cf   = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
   my $wn   = 0;                                                                                     # Warnung wenn 1
   
-  my $ok   = FW_makeImage('10px-kreis-gruen.png', '');
-  my $nok  = FW_makeImage('10px-kreis-rot.png',   '');
-  my $warn = FW_makeImage('10px-kreis-gelb.png',  '');
-  my $info = FW_makeImage('message_info',         '');
+  my $ok   = FW_makeImage('10px-kreis-gruen.png',     '');
+  my $nok  = FW_makeImage('10px-kreis-rot.png',       '');
+  my $warn = FW_makeImage('message_attention@orange', '');
+  my $info = FW_makeImage('message_info',             '');
   
-  my $result = {                                                                                                 # Ergebnishash
-      'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
-      'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
-      'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'warn' => 0, 'fault' => 0 },
+  my $result = {                                                                                    # Ergebnishash
+      'String Configuration'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'DWD Weather Attributes'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Common Settings'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
   
   my $sub = sub { 
@@ -8783,7 +8835,7 @@ sub checkPlantConfig {
       }
   }
   
-  $result->{'String Configuration'}{result} = 'fullfilled' if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
+  $result->{'String Configuration'}{result} = "fullfilled" if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
   
   ## Check Attribute DWD Wetterdevice
   #####################################
@@ -8804,7 +8856,7 @@ sub checkPlantConfig {
           $result->{'DWD Weather Attributes'}{fault}  = 1;
       }
       else {
-          $result->{'DWD Weather Attributes'}{result} = 'fullfilled';
+          $result->{'DWD Weather Attributes'}{result} = "fullfilled";
       }
   }
   
@@ -8833,7 +8885,7 @@ sub checkPlantConfig {
               $result->{'DWD Radiation Attributes'}{fault}  = 1;
           }
           else {
-              $result->{'DWD Radiation Attributes'}{result} = 'fullfilled';
+              $result->{'DWD Radiation Attributes'}{result} = "fullfilled";
           }
       }
   }
@@ -8863,7 +8915,7 @@ sub checkPlantConfig {
               $result->{'Roof Ident Pair Settings'}{fault}   = 1;
           }
           else {
-              $result->{'Roof Ident Pair Settings'}{result}  = 'fullfilled' if(!$result->{'Roof Ident Pair Settings'}{fault});
+              $result->{'Roof Ident Pair Settings'}{result}  = "fullfilled" if(!$result->{'Roof Ident Pair Settings'}{fault});
               $result->{'Roof Ident Pair Settings'}{note}   .= qq{checked "$is" Roof Ident Pair "$pk":<br>rtid=$rtid, apikey=$apikey <br>};
           }          
       }  
@@ -8877,13 +8929,11 @@ sub checkPlantConfig {
       $result->{'Common Settings'}{state}   = $info;
       $result->{'Common Settings'}{result} .= qq{Attribute 'event-on-change-reading' is not set. <br>};
       $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading' is recommended to improve the runtime performance.<br>};
+      $result->{'Common Settings'}{info}    = 1;
   }
   
-  $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
-  $result->{'Common Settings'}{note}   .= qq{event-on-change-reading <br>};
-  
-  ## Settings bei Nutzung SolCast
-  #################################
+  ## allg. Settings bei Nutzung SolCast
+  ######################################
   if (isSolCastUsed ($hash)) {
       my $cfd = AttrVal     ($name, 'cloudFactorDamping',            ''); 
       my $rfd = AttrVal     ($name, 'rainFactorDamping',             ''); 
@@ -8917,16 +8967,16 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{warn}    = 1;
       }
       
-      if(!$result->{'Common Settings'}{warn}) {
-          $result->{'Common Settings'}{result}  = 'fullfilled';
+      if(!$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+          $result->{'Common Settings'}{result}  = "fullfilled";
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
           $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping, rainFactorDamping, optimizeSolCastAPIreqInterval <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading <br>};
       }
   }
   
-  ## Settings bei Nutzung DWD Radiation
-  #######################################
+  ## allg. Settings bei Nutzung DWD Radiation
+  #############################################
   if (!isSolCastUsed ($hash)) {
       my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto', '');
       
@@ -8937,9 +8987,10 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{warn}    = 1;
       }
       
-      if(!$result->{'Common Settings'}{warn}) {
-          $result->{'Common Settings'}{result}  = 'fullfilled';
-          $result->{'Common Settings'}{note}   .= qq{checked parameter:<br>pvCorrectionFactor_Auto}; 
+      if(!$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+          $result->{'Common Settings'}{result}  = "fullfilled";
+          $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading <br>}; 
       }
   }
   
@@ -8980,6 +9031,9 @@ sub checkPlantConfig {
   else {
       $out .= encode ("utf8", $hqtxt{strok}{$lang});
   }
+  
+  $out =~ s/<I>/$info/gx;
+  $out =~ s/<W>/$warn/gx;
       
 return $out;
 }
@@ -11044,7 +11098,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <a id="SolarForecast-attr-historyHour"></a>
        <li><b>historyHour </b><br>
          Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
-         (default: -2)
+         (default: 2)
        </li>
        <br>
        
