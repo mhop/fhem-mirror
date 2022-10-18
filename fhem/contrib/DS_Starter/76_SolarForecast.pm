@@ -1172,9 +1172,18 @@ sub _setinverterStrings {                ## no critic "not used"
   if ($prop =~ /\?/xs) {
       return qq{The inverter string designation is wrong. An inverter string name must not contain a '?' character!};
   }
+  
+  my $type = $hash->{TYPE};
+  
+  my @istrings = split ",", $prop; 
 
-  readingsSingleUpdate($hash, "inverterStrings", $prop,    1);
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  for my $k (keys %{$data{$type}{$name}{solcastapi}}) {
+      next if ($k =~ /\?/xs || $k ~~ @istrings);
+      delete $data{$type}{$name}{solcastapi}{$k};   
+  }
+
+  readingsSingleUpdate ($hash, "inverterStrings", $prop,    1);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   
 return qq{NOTE: After setting or changing "inverterStrings" please check }.
        qq{/ set all module parameter (e.g. moduleTiltAngle) again ! \n}.
@@ -1894,7 +1903,7 @@ sub _getRoofTopData {
   $paref->{allstrings} = ReadingsVal($name, "inverterStrings", "");
   
   my $type = $hash->{TYPE};
-  undef $data{$type}{$name}{current}{runTimeAPIResponseProc};
+  delete $data{$type}{$name}{current}{runTimeAPIResponseProc};
   
   __solCast_ApiRequest ($paref);
   
@@ -2049,7 +2058,7 @@ sub __solCast_ApiResponse {
                     
           next if ($err);
           
-          undef $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
+          delete $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
 
           $k += 1;          
       } 
@@ -2869,7 +2878,7 @@ sub centralTask {
       Log3 ($name, 4, "$name - ###                New data collection cycle                 ###");
       Log3 ($name, 4, "$name - ################################################################");
       Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
-      
+
       collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
       _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
@@ -2923,8 +2932,8 @@ sub createStringConfig {                 ## no critic "not used"
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  undef $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
-  my @istrings = split ",", ReadingsVal ($name, "inverterStrings", "");                           # Stringbezeichner
+  delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
+  my @istrings = split ",", ReadingsVal ($name, 'inverterStrings', '');                           # Stringbezeichner
   $data{$type}{$name}{current}{allstringscount} = scalar @istrings;                               # Anzahl der Anlagenstrings 
   
   if(!@istrings) {
@@ -2935,7 +2944,7 @@ sub createStringConfig {                 ## no critic "not used"
   return qq{Please complete command "set $name modulePeakString".} if(!$peak);
   
   my ($aa,$ha) = parseParams ($peak);
-  undef $data{$type}{$name}{current}{allstringspeak};
+  delete $data{$type}{$name}{current}{allstringspeak};
   
   while (my ($strg, $pp) = each %$ha) {
       if ($strg ~~ @istrings) {
@@ -3144,7 +3153,7 @@ sub _specialActivities {
   else {
       delete $hash->{HELPER}{H00DONE};
   }  
-  
+
 return;
 }
 
@@ -3168,7 +3177,7 @@ sub __delSolCastObsoleteData {
   for my $idx (sort keys %{$data{$type}{$name}{solcastapi}}) {             # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
       for my $scd (sort keys %{$data{$type}{$name}{solcastapi}{$idx}}) {
           my $ds = timestringToTimestamp ($scd);
-          undef $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
+          delete $data{$type}{$name}{solcastapi}{$idx}{$scd} if ($ds && $ds < $refts);
       }
   }
   
@@ -3198,7 +3207,7 @@ sub _transferDWDRadiationValues {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
       if($fd > 1) {                                                                           # überhängende Werte löschen 
-          undef $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)};
+          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)};
           next;
       }
       
@@ -3487,7 +3496,7 @@ sub _transferSolCastRadiationValues {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
       if($fd > 1) {                                                                           # überhängende Werte löschen 
-          undef $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
+          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d", $num};
           next;
       }
       
@@ -4320,19 +4329,19 @@ sub __calcEnergyPieces {
       delete $paref->{etot};
   }
   else {
-      undef $data{$type}{$name}{consumers}{$c}{epiecAVG};
-      undef $data{$type}{$name}{consumers}{$c}{epiecAVG_hours};
-      undef $data{$type}{$name}{consumers}{$c}{epiecEstart};
-      undef $data{$type}{$name}{consumers}{$c}{epiecHist};
-      undef $data{$type}{$name}{consumers}{$c}{epiecHour};
+      delete $data{$type}{$name}{consumers}{$c}{epiecAVG};
+      delete $data{$type}{$name}{consumers}{$c}{epiecAVG_hours};
+      delete $data{$type}{$name}{consumers}{$c}{epiecEstart};
+      delete $data{$type}{$name}{consumers}{$c}{epiecHist};
+      delete $data{$type}{$name}{consumers}{$c}{epiecHour};
       
       for my $h (1..$epiecHCounts) {
-          undef $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h};
-          undef $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
+          delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h};
+          delete $data{$type}{$name}{consumers}{$c}{"epiecHist_".$h."_hours"};
       }
   }  
 
-  undef $data{$type}{$name}{consumers}{$c}{epieces};
+  delete $data{$type}{$name}{consumers}{$c}{epieces};
   
   my $cotype  = ConsumerVal ($hash, $c, "type",    $defctype  );
   my $mintime = ConsumerVal ($hash, $c, "mintime", $defmintime);
@@ -4408,7 +4417,7 @@ sub ___csmSpecificEpieces {
           $data{$type}{$name}{consumers}{$c}{epiecHist}      = 1 if(ConsumerVal ($hash, $c, "epiecHist", 0) > $epiecHCounts);
             
           $epiecHist = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0); 
-          undef $data{$type}{$name}{consumers}{$c}{$epiecHist};                                        # Löschen, wird neu erfasst
+          delete $data{$type}{$name}{consumers}{$c}{$epiecHist};                                        # Löschen, wird neu erfasst
       }
         
       $epiecHist       = "epiecHist_".ConsumerVal ($hash, $c, "epiecHist", 0);                          # Namen fürs Speichern
@@ -4438,7 +4447,7 @@ sub ___csmSpecificEpieces {
           $hours                                             = ceil ($hours / $epiecHCounts);
           $data{$type}{$name}{consumers}{$c}{epiecAVG_hours} = $hours;
                
-          undef $data{$type}{$name}{consumers}{$c}{epiecAVG};                                            # Durchschnitt für epics ermitteln     
+          delete $data{$type}{$name}{consumers}{$c}{epiecAVG};                                           # Durchschnitt für epics ermitteln     
           
           for my $hour (1..$hours) {                                                                     # jede Stunde durchlaufen
               my $hoursE = 1;
@@ -8551,7 +8560,7 @@ sub listDataPool {
       }
       for my $i (keys %{$h}) {
           if ($i !~ /^[0-9]{2}$/ix) {                                   # bereinigen ungültige consumer, Forum: https://forum.fhem.de/index.php/topic,117864.msg1173219.html#msg1173219
-              undef $data{$type}{$name}{consumers}{$i};
+              delete $data{$type}{$name}{consumers}{$i};
               Log3 ($name, 3, qq{$name - INFO - invalid consumer key "$i" was deleted from consumer Hash});
           }         
       }
