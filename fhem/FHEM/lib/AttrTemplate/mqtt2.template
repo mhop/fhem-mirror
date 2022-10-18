@@ -372,9 +372,14 @@ setreading DEVICE attrTemplateVersion 20220913
 name:zigbee2mqtt_light_rgbcct_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02e1
-desc: A dimmable rgb-cct light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Tested with: RGB-CCT GL-C-008
+desc: A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as HEX value<br>remove color_temp in setlist command <b>on</b> if default white is not desired<br>Tested with:<br><a href="https://www.zigbee2mqtt.io/devices/HG08008.html" target="_blank">Livarno Home LED ceiling light</a><br><a href="https://www.zigbee2mqtt.io/devices/404000_404005_404012_404019.html#m%25C3%25BCller%2520licht-404000%252F404005%252F404012%252F404019" target="_blank">Mueller Light tint RGBW bulb</a>
+farewell:specified values ​​can be adjusted at any time in the setList attribute
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:BRIGHTNESS;default brightness in <b>brightness</b>-command (numeric, 0-255, 120 might be a good value to start);undef
+par:CTVALUE;default color temp (ct) value in <b>on</b>-command (numeric, 0-370, 320?);undef
+par:CTWARMVALUE;default ct value in <b>warm</b>-command (320?);undef
+par:CTWHITEVALUE;default ct value in <b>white</b>-command (250?);undef
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal('DEVICE','icon','hue_filled_white_and_color_e27_b22') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
@@ -383,14 +388,18 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
 attr DEVICE jsonMap color_temp:ct
 attr DEVICE setList \
-  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  on:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "state":"ON", "color_temp": CTVALUE}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
-  color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  warm:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS , "color_temp": CTWARMVALUE}\
+  white:noArg $\DEVICETOPIC/set {"brightness": BRIGHTNESS, "color_temp": CTWHITEVALUE}\
+  rgb:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
+attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221007
+setreading DEVICE attrTemplateVersion 20221018
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -3337,20 +3346,21 @@ attr DEVICE icon ICON
 attr DEVICE devicetopic DEV_TPC
 attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  $\DEVICETOPIC/settings:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/settings:.* $DEVICETOPIC/settings:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); if (defined $ret->{mode}) { $ret->{mode}=$ret->{mode} eq 'true' ? 'auto' : 'manual' }; if (defined $ret->{set_boost_minutes}) { $ret->{boost}=$ret->{set_boost_minutes}?'on' : 'off' }; for (qw(accelerated_heating boost)) { next if !defined $ret->{$_}; $ret->{$_}=$ret->{$_} eq 'true' ? 'on' : 'off' }; return $ret }\
   $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   accelerated_heating:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/accelerated_heating $val)}\
-  schedule:on,off {my $val=$EVTPART1 eq 'on'?1:0; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
+  mode:auto,manual {my $val=$EVTPART1 eq 'auto'?1:0; qq($\DEVICETOPIC/thermostat/0/command/schedule $val)}\
   schedule_profile:slider,1,1,5,1 $\DEVICETOPIC/thermostat/0/command/schedule_profile $EVTPART1\
   desired-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/target_t $EVTPART1\
   external-temp:slider,4.0,0.5,31.0,1 $\DEVICETOPIC/thermostat/0/command/ext_t $EVTPART1\
   valve:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_pos $EVTPART1\
   valve_min_percent:slider,0,1,100,1 $\DEVICETOPIC/thermostat/0/command/valve_min_percent $EVTPART1\
+  boost:on,off {my $val=$EVTPART1 eq 'on'?5:0; qq($\DEVICETOPIC/thermostat/0/command/boost_minutes $val)}\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
   set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
-attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent 
+attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
@@ -3358,7 +3368,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221004
+setreading DEVICE attrTemplateVersion 20221018
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
