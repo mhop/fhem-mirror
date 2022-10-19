@@ -383,7 +383,7 @@ par:CTWHITEVALUE;default ct value in <b>white</b>-command (250?);undef
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal('DEVICE','icon','hue_filled_white_and_color_e27_b22') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
-attr DEVICE webCmd toggle:on:off:brightness:ct:color
+attr DEVICE webCmd toggle:on:off:brightness:ct:rgb
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); $ret->{state}=lc($ret->{state}) if defined $ret->{state}; return $ret }
 attr DEVICE jsonMap color_temp:ct
@@ -399,7 +399,7 @@ attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221018
+setreading DEVICE attrTemplateVersion 20221019
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -3346,7 +3346,7 @@ attr DEVICE icon ICON
 attr DEVICE devicetopic DEV_TPC
 attr DEVICE readingList $\DEVICETOPIC/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/info:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  $\DEVICETOPIC/settings:.* $DEVICETOPIC/settings:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); if (defined $ret->{mode}) { $ret->{mode}=$ret->{mode} eq 'true' ? 'auto' : 'manual' }; if (defined $ret->{set_boost_minutes}) { $ret->{boost}=$ret->{set_boost_minutes}?'on' : 'off' }; for (qw(accelerated_heating boost)) { next if !defined $ret->{$_}; $ret->{$_}=$ret->{$_} eq 'true' ? 'on' : 'off' }; return $ret }\
+  $\DEVICETOPIC/settings:.* { my $ret=json2nameValue($EVENT,'',$JSONMAP); if (defined $ret->{mode}) { $ret->{mode}=$ret->{mode} eq 'true' ? 'auto' : 'manual' }; if (defined $ret->{set_boost_minutes}) { $ret->{boost}=$ret->{set_boost_minutes}?'on' : 'off' }; for (qw(accelerated_heating boost)) { next if !defined $ret->{$_}; $ret->{$_}=$ret->{$_} eq 'true' ? 'on' : 'off' }; return $ret }\
   $\DEVICETOPIC/online:.* online\
   $\DEVICETOPIC/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
@@ -3368,7 +3368,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221018
+setreading DEVICE attrTemplateVersion 20221019
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
