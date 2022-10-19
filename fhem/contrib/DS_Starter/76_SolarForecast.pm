@@ -129,6 +129,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.6 "=> "19.10.2022  fix  ___setLastAPIcallKeyData ",
   "0.70.5 "=> "18.10.2022  new hidden getter plantConfigCheck ",
   "0.70.4 "=> "16.10.2022  change attr historyHour to positive numbers, plantconfig check changed ",
   "0.70.3 "=> "15.10.2022  check event-on-change-reading in plantConfiguration check ",
@@ -2192,24 +2193,29 @@ sub ___setLastAPIcallKeyData {
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests} += 1;
   
-  ## Berechnung des optimalen Request Intervalls
-  ################################################  
-  my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
-  my $madr = $apimaxreqs / $asc;                                                                                    # vorläufige max. tägliche Anzahl API Requests
-  
   my %seen;
   my @as     = map { $data{$type}{$name}{solcastapi}{'?IdPair'}{$_}{apikey}; } keys %{$data{$type}{$name}{solcastapi}{'?IdPair'}};
   my @unique = grep { !$seen{$_}++ } @as;                                                             
-  my $upc    = scalar @unique;
-  $madr     *= $upc;                                                                                                # max. tägliche Anzahl API Requests                                                                    
-
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier} = ($asc * $upc);
+  my $upc    = scalar @unique;                                                                                      # Anzahl eingesetzte API Keys
   
-  my $darr = $madr - (SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / ($asc * $upc));            # verbleibende SolCast API Calls am aktuellen Tag
-  $darr    = 0 if($darr < 0);
+  my $asc  = CurrentVal ($hash, 'allstringscount', 1);                                                              # Anzahl der Strings
+  my $madr = sprintf "%.0f", (($apimaxreqs / $asc) * $upc);                                                         # max. tägliche Anzahl API Calls
+  my $mpk  = sprintf "%.4f", ($apimaxreqs / $madr);                                                                 # Requestmultiplikator             
+                                       
+  my $drr  = $apimaxreqs - SolCastAPIVal($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+  $drr     = 0 if($drr < 0);
   
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls} = $darr;
+  my $ddc  = SolCastAPIVal($hash, '?All', '?All', 'todayDoneAPIrequests', 0) / $mpk;                                # ausgeführte API Calls  
+  my $drc  = $madr - $ddc;                                                                                          # verbleibende SolCast API Calls am aktuellen Tag
+  $drc     = 0 if($drc < 0);
   
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{solCastAPIcallMultiplier}  = $mpk;  
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls}      = $drc;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}         = $ddc;
+  
+  ## Berechnung des optimalen Request Intervalls
+  ################################################     
   if (AttrVal($name, 'optimizeSolCastAPIreqInterval', 0)) {      
       my $date   = strftime "%Y-%m-%d", localtime($t);  
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
@@ -2217,9 +2223,9 @@ sub ___setLastAPIcallKeyData {
       $dart      = 0 if($dart < 0);
  
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
-      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $darr) if($dart && $darr);
+      $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
       
-      # Log3 ($name, 1, qq{$name - madr: $madr, darr: $darr, dart: $dart, interval: }. SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', ""));
+      # Log3 ($name, 1, qq{$name - madr: $madr, drc: $drc, dart: $dart, interval: }. SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', ""));
   }
   else {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
@@ -6361,8 +6367,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;(';
           $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls', $apimaxreqs) * 
-                  SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier', 1);
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', 0);
           $api .= ')';
           
           
@@ -9901,7 +9906,9 @@ return $def;
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time',      $def) - letzte Abfrage Zeitstring
 # SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp', $def) - letzte Abfrage Unix Timestamp
 # SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
-# SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Aufrufe (ungl. Requests !)
+# SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
+# SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
+# SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Calls (ungl. Requests !)
 # SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier',$def) - APIcalls = APIRequests * solCastAPIcallMultiplier
 # SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall                             
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
@@ -10694,13 +10701,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <ul>
          <table>  
          <colgroup> <col width=40%> <col width=60%> </colgroup>
-            <tr><td> <b>currentAPIinterval</b>      </td><td>das aktuell verwendete API Abrufintervall                </td></tr> 
-            <tr><td> <b>lastretrieval_time</b>      </td><td>Zeit des letzten SolCast API Abrufs                      </td></tr>
-            <tr><td> <b>lastretrieval_timestamp</b> </td><td>Unix Timestamp des letzten SolCast API Abrufs            </td></tr>
-            <tr><td> <b>pv_estimate</b>             </td><td>erwartete PV Erzeugung von SolCast API (Wh)              </td></tr>
-            <tr><td> <b>todayDoneAPIrequests</b>    </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
-            <tr><td> <b>todayRemaingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Abrufe am aktuellen Tag    </td></tr>           
-            <tr><td> <b>                            </td><td>(ein Abruf kann mehrere API Requests ausführen)          </td></tr>                   
+            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuell verwendete API Abrufintervall                </td></tr> 
+            <tr><td> <b>lastretrieval_time</b>        </td><td>Zeit des letzten SolCast API Abrufs                      </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>Unix Timestamp des letzten SolCast API Abrufs            </td></tr>
+            <tr><td> <b>pv_estimate</b>               </td><td>erwartete PV Erzeugung von SolCast API (Wh)              </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden API Requests am aktuellen Tag   </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag      </td></tr>
+            <tr><td> <b>todayRemaingAPIcalls</b>      </td><td>Anzahl der noch möglichen API Abrufe am aktuellen Tag    </td></tr>    
+            <tr><td> <b>                              </td><td>(ein Abruf kann mehrere API Requests ausführen)          </td></tr>                   
          </table> 
       </ul>
       </li>      
