@@ -3135,6 +3135,9 @@ sub _specialActivities {
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
           
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
