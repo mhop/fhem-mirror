@@ -57,7 +57,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '5.0 222751518';
+my $HMCCU_VERSION = '5.0 222930908';
 
 # Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -650,27 +650,29 @@ sub HMCCU_Attr ($@)
 		elsif ($attrname eq 'ccuflags') {
 			my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 			if ($attrval =~ /(intrpc|extrpc)/) {
-				HMCCU_Log ($hash, 1, "HMCCU: [$name] RPC server mode $1 no longer supported. Using procrpc instead");
+				HMCCU_Log ($hash, 1, "RPC server mode $1 no longer supported. Using procrpc instead");
 				$attrval =~ s/(extrpc|intrpc)/procrpc/;
 				$_[3] = $attrval;
 			}
 		}
 		elsif ($attrname eq 'ccuGetVars') {
 			my ($interval, $pattern) = split /:/, $attrval;
-			$pattern = '.*' if (!defined ($pattern));
+			$interval = 60 if (!defined($interval) || $interval eq '');
+			$pattern = '.*' if (!defined($pattern) || $pattern eq '');
+			return "HMCCU: [$name] Interval is not numeric for attribute ccuGetVars" if (!HMCCU_IsIntNum($interval));
 			$hash->{hmccu}{ccuvarspat} = $pattern;
 			$hash->{hmccu}{ccuvarsint} = $interval;
-			RemoveInternalTimer ($hash, "HMCCU_UpdateVariables");
+			RemoveInternalTimer ($hash, 'HMCCU_UpdateVariables');
 			if ($interval > 0) {
-				HMCCU_Log ($hash, 2, "HMCCU: [$name] Updating CCU system variables every $interval seconds");
-				InternalTimer (gettimeofday()+$interval, "HMCCU_UpdateVariables", $hash);
+				HMCCU_Log ($hash, 2, "Updating CCU system variables matching $pattern every $interval seconds");
+				InternalTimer (gettimeofday()+$interval, 'HMCCU_UpdateVariables', $hash);
 			}
 		}
 		elsif ($attrname eq 'eventMap') {
 			my @av = map { $_ =~ /^rpcserver (on|off):(on|off)$/ || $_ eq '' ? () : $_ } split (/\//, $attrval);
 			if (scalar(@av) > 0) {
 				$_[3] = '/'.join('/',@av).'/';
-				HMCCU_Log ($hash, 2, "HMCCU: [$name] Removed rpcserver entries from attribute eventMap");
+				HMCCU_Log ($hash, 2, "Removed rpcserver entries from attribute eventMap");
 			}
 			else {
 				# Workaround because FHEM is ignoring error values for attribute eventMap
@@ -7813,8 +7815,8 @@ sub HMCCU_ExecuteGetDeviceInfoCommand ($@)
 				"<br/>Unique control roles: $detect->{uniqueControlRoleCount}<br/>";		
 		}
 	}
-	$devInfo .= "<br/>Current state datapoint = $sc.$sd<br/>";
-	$devInfo .= "<br/>Current control datapoint = $cc.$cd<br/>";
+	$devInfo .= "<br/>Current state datapoint = $sc.$sd<br/>" if ($sc ne '' && $sd ne '');
+	$devInfo .= "<br/>Current control datapoint = $cc.$cd<br/>" if ($cc ne '' && $cd ne '');
 	$devInfo .= '<br/><b>Device description</b><br/><br/><pre>';
 	$result = HMCCU_DeviceDescToStr ($ioHash, $clHash->{TYPE} eq 'HMCCU' ? $address : $clHash);
 	$devInfo .= '</pre>';
@@ -8224,6 +8226,7 @@ sub HMCCU_GetSCDatapoints ($)
 	my ($clHash) = @_;
 
 	my $type = $clHash->{TYPE};
+	return ('', '', '', '', 0, 0) if ($type ne 'HMCCUDEV' && $type ne 'HMCCUCHN');
 
 	my ($sc, $sd) = HMCCU_StateDatapoint ($clHash);
 	my ($cc, $cd) = HMCCU_ControlDatapoint ($clHash);
@@ -8232,10 +8235,6 @@ sub HMCCU_GetSCDatapoints ($)
 	my $rcdCnt = $cc ne '' && $cd ne '' ? 1 : 0;
 
 	return ($sc, $sd, $cc, $cd, $rsdCnt, $rcdCnt) if ($rsdCnt > 0 || $rcdCnt > 0);
-
-	# Detect by attributes
-	# ($sc, $sd, $cc, $cd, $rsdCnt, $rcdCnt) = HMCCU_DetectSCAttr ($clHash, $sc, $sd, $cc, $cd);
-	# return ($sc, $sd, $cc, $cd, $rsdCnt, $rcdCnt) if ($rsdCnt);
 
 	my $ioHash = HMCCU_GetHash ($clHash);
 	return HMCCU_SetDefaultSCDatapoints ($ioHash, $clHash);
@@ -10973,7 +10972,8 @@ sub HMCCU_MaxHashEntries ($$)
       </li><br/>
       <li><b>ccuGetVars &lt;interval&gt;:[&lt;pattern&gt;]</b><br/>
       	Read CCU system variables periodically and update readings. If pattern is specified
-      	only variables matching this expression are stored as readings.
+      	only variables matching this expression are stored as readings. Delete attribute or set
+		<i>interval</i> to 0 to deactivate the polling of system variables.
       </li><br/>
       <li><b>ccuReqTimeout &lt;Seconds&gt;</b><br/>
       	Set timeout for CCU request. Default is 4 seconds. This timeout affects several

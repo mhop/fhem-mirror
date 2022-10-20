@@ -140,7 +140,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 		F => 3, S => 'LUX', C => '', V => '', P => 2
 	},
 	'MOTION_DETECTOR' => {
-		F => 3, S => 'MOTION', C => '', V => '', P => 1
+		F => 3, S => 'MOTION', C => '', V => '', P => 2
 	},
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		F => 3, S => 'MOTION', C => 'MOTION_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
@@ -237,7 +237,7 @@ $HMCCU_CONFIG_VERSION = '5.0';
 
 %HMCCU_READINGS = (
 	'ACCELERATION_TRANSCEIVER' =>
-		'^(C#\.)?MOTION:motion',
+		'^(C#\.)?MOTION:+motion',
 	'ARMING' =>
 		'^(C#\.)?ARMSTATE$:+armState',
 	'BLIND' =>
@@ -283,9 +283,9 @@ $HMCCU_CONFIG_VERSION = '5.0';
 	'MOTION_DETECTOR' =>
 		'^(C#\.)?BRIGHTNESS$:brightness;(C#\.)?MOTION:motion',
 	'MOTIONDETECTOR_TRANSCEIVER' =>
-		'^(C#\.)?ILLUMINATION$:brightness;^(C#\.)?MOTION$:motion;(C#\.)?MOTION_DETECTION_ACTIVE$:detection',
+		'^(C#\.)?ILLUMINATION$:+brightness;^(C#\.)?MOTION$:+motion;(C#\.)?MOTION_DETECTION_ACTIVE$:+detection',
 	'PRESENCEDETECTOR_TRANSCEIVER' =>
-		'^(C#\.)?ILLUMINATION$:brightness;(C#\.)?PRESENCE_DETECTION_STATE:presence;(C#\.)?PRESENCE_DETECTION_ACTIVE:detection',
+		'^(C#\.)?ILLUMINATION$:+brightness;(C#\.)?PRESENCE_DETECTION_STATE:+presence;(C#\.)?PRESENCE_DETECTION_ACTIVE:+detection',
 	'SHUTTER_TRANSMITTER' =>
 		'^(C#\.)?LEVEL$:+pct,+level',
 	'SHUTTER_VIRTUAL_RECEIVER' =>
