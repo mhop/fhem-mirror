@@ -37,7 +37,8 @@
 #    1.01.16  add cyclicConnect to mitigate lost TCP connection issue
 #    1.01.17  add TW9400
 #    1.01.18  added undocumented settings (IMGPROC, IRIS, LIRIS)
-#    1.01.19  added LS12000 (added POPLP, LENS, HLENS) 
+#    1.01.19  added LS12000 (added POPLP, LENS, HLENS)
+#    1.01.20  added more LS12000 options, enable 2-value commands 
 #
 ################################################################################
 #
@@ -71,7 +72,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.19";
+my $version = "1.01.20";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -102,6 +103,27 @@ my %ESCVP21net_defaultsets = (
   "PWR"       => ":get,on,off,toggle"
 );
 
+my %ESCVP21net_Entrysets = (  
+  "BRIGHT"       => ":get",
+  "BRIGHTset"    => ":slider,0,1,255",
+  "CONTRAST"      => ":get",
+  "CONTRASTset"   => ":slider,0,1,255",
+  "DENSITY"      => ":get",
+  "DENSITYset"   => ":slider,0,1,255",
+  "TINT"         => ":get",
+  "TINTset"      => ":slider,0,1,255",
+  "SHARP"        => ":get",
+  "SHARPset"     => ":slider,0,1,255"
+);
+
+my %ESCVP21net_HomeBasicsets = (  
+  "GAMMA"        => ":get,-2,-1,0,1,2,custom"
+);
+
+my %ESCVP21net_HomeEntertainmentsets = (  
+  #
+);
+
 my %ESCVP21net_Miscsets = (
   "KEY"     => ":03,05,3C,3D"
 );
@@ -113,6 +135,7 @@ my %ESCVP21net_TW5650sets = (
   "AUTOKEYSTONE" => ":get,on,off",
   "BTAUDIO"      => ":get,on,off,toggle",
   "CMODE"        => ":get,Dynamic,Natural,Living,Cinema,3D_Cinema,3D_Dynamic",
+  "ERASEMEM"     => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
   "HREVERSE"     => ":get,Flip,Normal",
   "ILLUM"        => ":get,on,off,toggle",
   "IMGPROC"      => ":get,fine,fast",
@@ -121,6 +144,8 @@ my %ESCVP21net_TW5650sets = (
   "MCFI"         => ":get,off,low,normal,high",
   "MSEL"         => ":get,black,blue,user",
   "OVSCAN"       => ":get,off,4%,8%,auto",
+  "POPMEM"       => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "PUSHMEM"      => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",  
   "SIGNAL"       => ":get,none,2D,3D",
   "SNO"          => ":get",
   "SOURCE"       => ":get,HDMI1,HDMI2,ScreenMirror,Input1,USB,LAN",
@@ -253,44 +278,47 @@ my %ESCVP21net_TW9400result = (
 
 # LS12000 sets
 my %ESCVP21net_LS12000sets = (
-  "4KENHANCE"    => ":get,off,FullHD",
-  "ASPECT"       => ":get,Auto,Normal,Full,Zoom",
-  "AUTOHOME"     => ":get,off,on",
-  "CMODE"        => ":get,Dynamic,Natural,BrightCinema,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigialCinema",
+  "ASPECT"       => ":get,Auto,Full,Zoom,Anamorphic,HorizSqueeze",
+  "CMODE"        => ":get,Dynamic,Natural,BrightCinema,Cinema,BW_Cinema,Vivid",
   "DYNRANGE"     => ":get,Auto,SDR,HDR10,HLG",
+  "ERASEMEM"     => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
   "HLENS"        => ":get",
   "HREVERSE"     => ":get,Flip,Normal",
   "ILLUM"        => ":get,on,off,toggle",
   "IMGPRESET"    => ":get,Setting1,Setting2,Setting3,Setting4,Setting5",
-  "IMGPROC"      => ":get,fine,fast",
-  "IRIS"         => ":get,00,01,02",
   "LENS"         => ":get",
-  "LIRIS"        => ":get,0,128,255",   
-  "LUMINANCE"    => ":get,normal,eco,medium",
+  "LUMINANCE"    => ":get,min,middle,max",
   "MCFI"         => ":get,off,low,normal,high",
-  "MSEL"         => ":get,black,blus,user",
   "OVSCAN"       => ":get,off,4%,8%,auto",
-  "POPLP"        => ":01,01,03,04,05,06,07,08,09,0A",
-  "PRODUCT"      => ":get,ModelName_on,ModelName_off",
-  "SIGNAL"       => ":get,none,2D,3D",
+  "POPLA"        => ":Memory01,Memory02,Memory03",  
+  "POPLP"        => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "POPMEM"       => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "PUSHLA"       => ":Memory01,Memory02,Memory03",  
+  "PUSHLP"       => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "PUSHMEM"      => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",  
+  "SIGNAL"       => ":get",
   "SNO"          => ":get",
-  "SOURCE"       => ":get,HDMI1,HDMI2,Input1,Input2,ScreenMirror,PC1,PC2,USB,LAN,Video,Video(RCA),WirelessHD",
-  "VREVERSE"     => ":get,Flip,Normal",
-  "WLPWR"        => ":get,WLAN_on,WLAN_off"
+  "SOURCE"       => ":get,HDMI1,HDMI2",
+  "VREVERSE"     => ":get,Flip,Normal"
 );
 
 my %ESCVP21net_LS12000result = (
-  "CMODE:06"     => "Dynamic",
-  "CMODE:07"     => "Natural",
-  "CMODE:0C"     => "BrightCinema",
-  "CMODE:15"     => "Cinema",
-  "CMODE:17"     => "3D_Cinema",
-  "CMODE:18"     => "3D_Dynamic",
-  "CMODE:20"     => "BW_Cinema",
-  "CMODE:22"     => "DigitalCinema",
-  "LUMINANCE:00" => "normal",
-  "LUMINANCE:01" => "eco",
-  "LUMINANCE:02" => "medium"
+  "ASPECT:30"     => "Auto",
+  "ASPECT:40"     => "Full",
+  "ASPECT:50"     => "Zoom",
+  "ASPECT:80"     => "Anamorphic",
+  "ASPECT:90"     => "HorizSqueeze",
+  "CMODE:06"      => "Dynamic",
+  "CMODE:07"      => "Natural",
+  "CMODE:0C"      => "BrightCinema",
+  "CMODE:15"      => "Cinema",
+  "CMODE:20"      => "BW_Cinema",
+  "CMODE:23"      => "Vivid",
+  "LUMINANCE:00"  => "min",
+  "LUMINANCE:127" => "middle",
+  "LUMINANCE:255" => "max",
+  "SIGNAL:00"     => "no_signal",
+  "SIGNAL:01"     => "signal_detected"
 );
 
 # scotty sets - sort of godmode, gives you enhanced set possibilities
@@ -302,8 +330,9 @@ my %ESCVP21net_Scottysets = (
   "AUDIO"        => ":get,Audio1,Audio2,USB",
   "AVOUT"        => ":get,projection,constantly",
   "BTAUDIO"      => ":get,on,off,toggle",
-  "CMODE"        => ":get,sRGB,Normal,Meeting,Presentation,Theatre,Game/LivingRoom,Natural,Dynamic/Sports,09,Custom,Living,BlackBoard,WhiteBoard,14,Photo,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigitalCinema",
+  "CMODE"        => ":get,sRGB,Normal,Meeting,Presentation,Theatre,Game/LivingRoom,Natural,Dynamic/Sports,09,Custom,Living,BlackBoard,WhiteBoard,14,Photo,Cinema,3D_Cinema,3D_Dynamic,BW_Cinema,DigitalCinema,Vivid",
   "DYNRANGE"     => ":get,Auto,SDR,HDR10,HLG",
+  "ERASEMEM"     => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
   "FREEZE"       => ":get,on,off,toggle",
   "HLENS"        => ":get",
   "HREVERSE"     => ":get,Flip,Normal",
@@ -317,7 +346,12 @@ my %ESCVP21net_Scottysets = (
   "MCFI"         => ":get,off,low,normal,high",
   "MSEL"         => ":get,black,blus,user",
   "OVSCAN"       => ":get,off,4%,8%,auto",
-  "POPLP"        => ":01,01,03,04,05,06,07,08,09,0A",
+  "POPLA"        => ":Memory01,Memory02,Memory03",  
+  "POPLP"        => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "POPMEM"       => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "PUSHLA"       => ":Memory01,Memory02,Memory03",  
+  "PUSHLP"       => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",
+  "PUSHMEM"      => ":Memory01,Memory02,Memory03,Memory04,Memory05,Memory06,Memory07,Memory08,Memory09,Memory10",  
   "PRODUCT"      => ":get,ModelName_on,ModelName_off",
   "PWSTATUS"     => ":get",
   "SIGNAL"       => ":get,none,2D,3D",
@@ -349,7 +383,8 @@ my %ESCVP21net_Scottyresult = (
   "CMODE:17"     => "3D_Cinema",
   "CMODE:18"     => "3D_Dynamic",
   "CMODE:20"     => "BW_Cinema",  
-  "CMODE:22"     => "DigitalCinema",  
+  "CMODE:22"     => "DigitalCinema",
+  "CMODE:Vivid"  => "23",  
   "LUMINANCE:00" => "normal",
   "LUMINANCE:01" => "eco",
   "LUMINANCE:02" => "medium"
@@ -364,6 +399,8 @@ my %ESCVP21net_data = (
   "ASPECT:Auto"           => "30",
   "ASPECT:Full"           => "40",
   "ASPECT:Zoom"           => "50",
+  "ASPECT:Anamorphic"     => "80",
+  "ASPECT:HorizSqueeze"   => "90",
   "AUDIO:Audio1"          => "01",
   "AUDIO:Audio2"          => "02",
   "AUDIO:USB"             => "03",
@@ -396,12 +433,29 @@ my %ESCVP21net_data = (
   "CMODE:3D_Cinema"       => "17",
   "CMODE:3D_Dynamic"      => "18",
   "CMODE:DigitalCinema"   => "22",
+  "CMODE:Vivid"           => "23",
   "DYNRANGE:Auto"         => "00",
   "DYNRANGE:SDR"          => "01",
   "DYNRANGE:HDR10"        => "20",
   "DYNRANGE:HLG"          => "30",              
+  "ERASEMEM:Memory01"     => "02 01",
+  "ERASEMEM:Memory02"     => "02 02",
+  "ERASEMEM:Memory03"     => "02 03",
+  "ERASEMEM:Memory04"     => "02 04",
+  "ERASEMEM:Memory05"     => "02 05",
+  "ERASEMEM:Memory06"     => "02 06",
+  "ERASEMEM:Memory07"     => "02 07",
+  "ERASEMEM:Memory08"     => "02 08",
+  "ERASEMEM:Memory09"     => "02 09",
+  "ERASEMEM:Memory10"     => "02 0A",
   "FREEZE:on"             => "ON",
   "FREEZE:off"            => "OFF",
+  "GAMMA:-2"              => "24",
+  "GAMMA:-1"              => "23",
+  "GAMMA:0"               => "22",
+  "GAMMA:1"               => "21",
+  "GAMMA:2"               => "20",
+  "GAMMA:custom"          => "F0",
   "HREVERSE:Flip"         => "ON",
   "HREVERSE:Normal"       => "OFF",
   "ILLUM:on"              => "01",
@@ -418,6 +472,9 @@ my %ESCVP21net_data = (
   "LUMINANCE:normal"      => "00",
   "LUMINANCE:eco"         => "01",
   "LUMINANCE:medium"      => "02",
+  "LUMINANCE:min"         => "00",
+  "LUMINANCE:middle"      => "127",
+  "LUMINANCE:max"         => "255",
   "MCFI:off"              => "00",
   "MCFI:low"              => "01",
   "MCFI:normal"           => "02",
@@ -431,27 +488,73 @@ my %ESCVP21net_data = (
   "OVSCAN:4%"             => "02",
   "OVSCAN:8%"             => "04",
   "OVSCAN:auto"           => "A0",
+  "POPLA:Memory01"        => "01",
+  "POPLA:Memory02"        => "02",
+  "POPLA:Memory03"        => "03",
+  "POPLP:Memory01"        => "01",
+  "POPLP:Memory02"        => "02",
+  "POPLP:Memory03"        => "03",
+  "POPLP:Memory04"        => "04",
+  "POPLP:Memory05"        => "05",
+  "POPLP:Memory06"        => "06",
+  "POPLP:Memory07"        => "07",
+  "POPLP:Memory08"        => "08",
+  "POPLP:Memory09"        => "09",
+  "POPLP:Memory10"        => "0A",
+  "PUSHLA:Memory01"       => "01",
+  "PUSHLA:Memory02"       => "02",
+  "PUSHLA:Memory03"       => "03",
+  "PUSHLP:Memory01"       => "01",
+  "PUSHLP:Memory02"       => "02",
+  "PUSHLP:Memory03"       => "03",
+  "PUSHLP:Memory04"       => "04",
+  "PUSHLP:Memory05"       => "05",
+  "PUSHLP:Memory06"       => "06",
+  "PUSHLP:Memory07"       => "07",
+  "PUSHLP:Memory08"       => "08",
+  "PUSHLP:Memory09"       => "09",
+  "PUSHLP:Memory10"       => "0A",  
   "PRODUCT:ModelName_off" => "00",
   "PRODUCT:ModelName_on"  => "01",
+  "PUSHMEM:Memory01"      => "02 01",
+  "PUSHMEM:Memory02"      => "02 02",
+  "PUSHMEM:Memory03"      => "02 03",
+  "PUSHMEM:Memory04"      => "02 04",
+  "PUSHMEM:Memory05"      => "02 05",
+  "PUSHMEM:Memory06"      => "02 06",
+  "PUSHMEM:Memory07"      => "02 07",
+  "PUSHMEM:Memory08"      => "02 08",
+  "PUSHMEM:Memory09"      => "02 09",
+  "PUSHMEM:Memory10"      => "02 0A",
+  "POPMEM:Memory01"       => "02 01",
+  "POPMEM:Memory02"       => "02 02",
+  "POPMEM:Memory03"       => "02 03",
+  "POPMEM:Memory04"       => "02 04",
+  "POPMEM:Memory05"       => "02 05",
+  "POPMEM:Memory06"       => "02 06",
+  "POPMEM:Memory07"       => "02 07",
+  "POPMEM:Memory08"       => "02 08",
+  "POPMEM:Memory09"       => "02 09",
+  "POPMEM:Memory10"       => "02 0A",
   "PWR:on"                => "ON",
   "PWR:off"               => "OFF",
   "SIGNAL:none"           => "00",
   "SIGNAL:2D"             => "01",
   "SIGNAL:3D"             => "02",
   "SIGNAL:not_supported"  => "03",
-  "SOURCE:HDMI1"          => "30",
-  "SOURCE:HDMI2"          => "A0",
-  "SOURCE:ScreenMirror"   => "56",
-  "SOURCE:PC"             => "10",
-  "SOURCE:Input1"         => "10",  
+  "SOURCE:Input1"         => "10",
+  "SOURCE:PC"             => "10",  
+  "SOURCE:PC1"            => "1F",
   "SOURCE:Input2"         => "20",  
+  "SOURCE:Dsub"           => "20",
+  "SOURCE:PC2"            => "2F",
+  "SOURCE:HDMI1"          => "30",
   "SOURCE:Video"          => "40",  
   "SOURCE:Video(RCA)"     => "41",  
-  "SOURCE:PC1"            => "1F",
-  "SOURCE:PC2"            => "2F",
   "SOURCE:USB"            => "52",
   "SOURCE:LAN"            => "53",
-  "SOURCE:Dsub"           => "20",
+  "SOURCE:ScreenMirror"   => "56",
+  "SOURCE:HDMI2"          => "A0",
   "SOURCE:WirelessHD"     => "D0",  
   "VREVERSE:Flip"         => "ON",
   "VREVERSE:Normal"       => "OFF",
@@ -488,6 +591,12 @@ my %ESCVP21net_defaultresults = (
   "DYNRANGE:30"      => "HLG",  
   "FREEZE:ON"        => "on",
   "FREEZE:OFF"       => "off",
+  "GAMMA:24"         => "-2",
+  "GAMMA:23"         => "-1",
+  "GAMMA:22"         => "0",
+  "GAMMA:21"         => "1",
+  "GAMMA:20"         => "2",
+  "GAMMA:F0"         => "custom",
   "HREVERSE:ON"      => "Flip",
   "HREVERSE:OFF"     => "Normal",
   "ILLUM:01"         => "on", 
@@ -1053,13 +1162,15 @@ sub ESCVP21net_Set {
   my $name = shift @param;
   my $opt = shift @param;
   if (int(@param) > 0){
-    $value = join("", @param);
+    # changed for multi parameter by adding joining params by space
+    #$value = join("", @param);
+    $value = join(" ", @param);
     #my $value = shift @param;    
   }
   else{
     $value = "none";
   }
-  # add LF to log for better overview...
+  # add LF to log for better overview in Logfile...
   if ($opt ne "?"){
     main::Log3 $name, 5, "\n";
     main::Log3 $name, 5, "[$name]: Set: called with $name $opt $value";
@@ -1175,7 +1286,7 @@ sub ESCVP21net_Set {
   }
 ##### end of debug options
   
-  # everything fine so far, so contruct $arg to pass by blockingFn  
+  # everything fine so far, so construct $arg to pass by blockingFn  
   my $arg = $name."|".$opt."|".$value;
   # store latest command to helper
   $hash->{helper}{lastCommand} = $opt;  
@@ -1200,7 +1311,7 @@ sub ESCVP21net_setValue($){
   # subroutine should be called unblocking e.g. via ESCVP21net_Set
   my ($string) = @_;
   my ( $name, $cmd, $val ) = split( "\\|", $string );
-  my $result = "none";
+  my $result = "none"; # set as default for initialization
   my $returnval = "$name|$cmd|error"; # just for initialization
   my @resultarr;
   my $data = "";
@@ -1234,11 +1345,30 @@ sub ESCVP21net_setValue($){
     if (exists($ESCVP21net_data{$datakey})){
       $val = $ESCVP21net_data{$datakey};
     }
-    # VOLset needs special treatment, since Epson does some funny by-12 calculation
-    if ($cmd eq "VOLset"){
-      $val = $val*$volfactor;
-	    $cmd = "VOL";      
+    # handle commands with integers to set, named XXXXset
+    # test if cmd ends with set, then strip set and set cmd to string without set
+    # e.g. VOLset becomes VOL
+    # BRIGHTset: not all values might be accepted, projector switches to next possible lower value    
+    if ($cmd =~ /set$/){
+      my $cmdraw = $cmd;
+      
+      # VOLset needs special treatment, since Epson does some funny by-12 calculation
+      if ($cmd eq "VOLset"){
+        $val = $val*$volfactor;
+	      #$cmd = "VOL";      
+        }
+      
+      $cmd =~ s/set//;
+      main::Log3 $name, 5, "[$name]: setValue: $cmdraw contains set, cmd changed to $cmd";
     }
+
+    # BRIGHTset
+    # not all values might be accepted, projector switches to nex possible lower value
+    #if ($cmd eq "BRIGHTset"){
+    #  #$val = $val*$factor;
+	  #  $cmd = "BRIGHT";      
+    #}
+
     # set end encode data to be sent, Epson wants \r\n and utf8
     $data = "$cmd $val\r\n";
     $encdata = encode("utf8",$data);  
@@ -1481,9 +1611,12 @@ sub ESCVP21net_setValueDone {
     }
     else{
       $rv = readingsBulkUpdate($hash, $cmd, $result, 1);
-      # if VOL, we also have to set VOLset!
-      $rv = readingsBulkUpdate($hash, "VOLset", "set to $result", 1)
-        if ($cmd eq "VOL");
+      # if cmd was originally XXXset, we also have to set XXXset
+      if ($hash->{helper}{lastCommand} =~ /set$/){
+        $rv = readingsBulkUpdate($hash, $hash->{helper}{lastCommand}, "set to $result", 1);
+      }
+      #if ($cmd eq "VOL") {$rv = readingsBulkUpdate($hash, "VOLset", "set to $result", 1);}
+      #if ($cmd eq "BRIGHT") {$rv = readingsBulkUpdate($hash, "BRIGHTset", "set to $result", 1);}  
       $getcmds .= $cmd.",";     
     }
     main::Log3 $name, 5, "[$name]: setValueDone: resultarray loop end: $cmd set to $rv";
@@ -1515,12 +1648,32 @@ sub ESCVP21net_setValueError {
 
 sub ESCVP21net_calcResult {
   my ($hash, $result, $cmd, $datakey, $volfactor) = @_;
+  my $name = $hash->{NAME};
+  my $setval;
+  if ($datakey =~ /:/){
+    $setval = (split ":", $datakey, 2)[1];
+  }
+  else {
+    $setval = $datakey;
+  }
+  
   # result is of the form "LAMP=1234 :"
   # or something like IMEVENT=0001 03 00000002 00000000 T1 F1 : (happens sometimes at PWR off, 03 is the relevant value then)
+  main::Log3 $name, 5, "[$name]: calcResult got Result: $result, Command: $cmd, Datakey: $datakey, SetVal: $setval";
   if (!$result){
     $result = "none";
     return $result;
   }
+  elsif ($result =~ "ERR"){
+    # Projector rturned an error - happens when no "get" is implemented by Epson
+    # I decided to not output just "Error", but take the value which was originally set
+    # and write it to result
+    # Not 100% clean, since one might set an value outside fhem, and the module has no chance to read that
+    # but why, WTF, should someone use anything but fhem to set something ;-)
+    #$result = "projector does not provide return value";
+    #return $result;
+    $result = $setval;
+  }  
   elsif ($result =~ "IMEVENT"){
     $result = (split / /, $result, 3)[1];
   }
@@ -1797,7 +1950,7 @@ sub ESCVP21net_setTypeCmds ($){
   my %ESCVP21net_typeresults;
   
   if ($hash->{model} eq "TW5650"){
-    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW5650sets, %VP21addattrs);
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_TW5650sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW5650result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW5650 sets and result";
   }
@@ -1807,27 +1960,27 @@ sub ESCVP21net_setTypeCmds ($){
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded EB2250 sets and result";
   }
   elsif ($hash->{model} eq "TW6100"){
-    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW6100sets, %VP21addattrs);
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_TW6100sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW6100result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW6100 sets and result";
   } 
   elsif ($hash->{model} eq "TW7400"){
-    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW7400sets, %VP21addattrs);
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_TW7400sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW7400result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW7400 sets and result";
   }
   elsif ($hash->{model} eq "TW9400"){
-    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_TW9400sets, %VP21addattrs);
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_TW9400sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW9400result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW9400 sets and result";
   }  
   elsif ($hash->{model} eq "LS12000"){
-    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_LS12000sets, %VP21addattrs);
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_LS12000sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_LS12000result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded LS12000 sets and result";
   }  
   elsif ($hash->{model} eq "Scotty"){
-    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Scottysets, %VP21addattrs);
+    %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_Scottysets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_Scottyresult);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded Scotty sets and result";
   }  
