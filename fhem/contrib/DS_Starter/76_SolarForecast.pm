@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-19 20:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-22 20:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -129,6 +129,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.7 "=> "22.10.2022  minor changes (Display is/whereabouts Solacast Requests, SolCast Forecast Quality, setup procedure) ",
   "0.70.6 "=> "19.10.2022  fix  ___setLastAPIcallKeyData ",
   "0.70.5 "=> "18.10.2022  new hidden getter plantConfigCheck ",
   "0.70.4 "=> "16.10.2022  change attr historyHour to positive numbers, plantconfig check changed ",
@@ -417,8 +418,6 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben Sie mindestens eine Kombination Rooftop-ID/SolCast-API mit "set LINK roofIdentPair" an}  },  
   mrt    => { EN => qq{Please set the assignment String / Rooftop identification with "set LINK moduleRoofTops"},
               DE => qq{Bitte setzen Sie die Zuordnung String / Rooftop Identifikation mit "set LINK moduleRoofTops"}        },  
-  awd    => { EN => qq{LINK is waiting for solar forecast data ...},
-              DE => qq{LINK wartet auf Solarvorhersagedaten ...}                                                            },
   cnsm   => { EN => qq{Consumer},
               DE => qq{Verbraucher}                                                                                         },
   eiau   => { EN => qq{Off/On},
@@ -449,12 +448,14 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
+  awd    => { EN => qq{LINK is waiting for solar forecast data ... <br><br>(The configuration can be checked with "set LINK plantConfiguration check".) },
+              DE => qq{LINK wartet auf Solarvorhersagedaten ... <br><br>(Die Konfiguration kann mit "set LINK plantConfiguration check" gepr&uuml;ft werden.)} },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please observe any notes (<I>).},
-              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten. }      },
+              DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten. }                  },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please observe the warnings (<W>).},
-              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten sie die Warnungen (<W>).} },  
+              DE => qq{Sieht ganz gut aus &#128528;, die Anlagenkonfiguration ist prinzipiell in Ordnung. Bitte beachten sie die Warnungen (<W>).}             },  
   strnok => { EN => qq{Oh no &#128577;, your string configuration is inconsistent.\nPlease check the settings !},
-              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !}                   },
+              DE => qq{Oh nein &#128577;, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen !}                               },
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
@@ -1087,9 +1088,10 @@ sub _setroofIdentPair {                 ## no critic "not used"
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
   
-  writeDataToFile     ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
+  writeDataToFile ($hash, "solcastapi", $scpicache.$name);                             # Cache File SolCast API Werte schreiben
   
-  my $msg = qq{The roofident pair "$pk" has been saved. You can check it by the "get $name solCastData" command.};
+  my $msg = qq{The Roof identification pair "$pk" has been saved. }.
+            qq{Repeat the command if you want to save more Roof identification pairs.};
   
 return $msg;
 }
@@ -1119,13 +1121,14 @@ sub _setmoduleRoofTops {                ## no critic "not used"
       }     
   }
 
-  readingsSingleUpdate($hash, "moduleRoofTops", $arg, 1);
+  readingsSingleUpdate ($hash, "moduleRoofTops", $arg, 1);  
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
   
+  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
   
-  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
-
 return;
 }
 
@@ -1184,11 +1187,15 @@ sub _setinverterStrings {                ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "inverterStrings", $prop,    1);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
   
-return qq{NOTE: After setting or changing "inverterStrings" please check }.
-       qq{/ set all module parameter (e.g. moduleTiltAngle) again ! \n}.
-       qq{Use "set $name plantConfiguration check" to validate your Setup.};
+  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+  
+  my $ret = qq{NOTE: After setting or changing "inverterStrings" please check }.
+            qq{/ set all module parameter (e.g. moduleTiltAngle) again ! \n}.
+            qq{Use "set $name plantConfiguration check" to validate your Setup.};
+            
+return $ret;
 }
 
 ################################################################
@@ -1352,12 +1359,13 @@ sub _setmodulePeakString {               ## no critic "not used"
       }     
   }
   
-  readingsSingleUpdate($hash, "modulePeakString", $arg, 1);
+  readingsSingleUpdate ($hash, "modulePeakString", $arg, 1);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  
+  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
   
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
-  
-  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1385,12 +1393,13 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
       }     
   }
     
-  readingsSingleUpdate($hash, "moduleTiltAngle", $arg, 1);
+  readingsSingleUpdate  ($hash, "moduleTiltAngle", $arg, 1);
+  writeDataToFile       ($hash, "plantconfig", $plantcfg.$name);                  # Anlagenkonfiguration File schreiben  
+  
+  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
     
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
-
-  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben  
 
 return;
 }
@@ -1418,12 +1427,13 @@ sub _setmoduleDirection {                ## no critic "not used"
       }     
   }
 
-  readingsSingleUpdate($hash, "moduleDirection", $arg, 1);
+  readingsSingleUpdate ($hash, "moduleDirection", $arg, 1);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
   
+  return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
+
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
-  
-  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1442,11 +1452,13 @@ sub _setplantConfiguration {             ## no critic "not used"
   
   $arg = 'check' if (!$arg);
   
-  if($arg eq "check") {
-      $err    = getClHash($hash);
+  if($arg eq "check") {      
       my $out = checkPlantConfig ($hash);
       $out    = qq{<html>$out</html>};
       
+      ## asynchrone Ausgabe
+      #######################
+      #$err          = getClHash($hash);
       #$paref->{out} = $out;
       #InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::__plantCfgAsynchOut", $paref, 0);
     
@@ -2939,6 +2951,7 @@ sub createStringConfig {                 ## no critic "not used"
   my $type = $hash->{TYPE};
   
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
+  
   my @istrings = split ",", ReadingsVal ($name, 'inverterStrings', '');                           # Stringbezeichner
   $data{$type}{$name}{current}{allstringscount} = scalar @istrings;                               # Anzahl der Anlagenstrings 
   
@@ -2946,7 +2959,7 @@ sub createStringConfig {                 ## no critic "not used"
       return qq{Define all used strings with command "set $name inverterStrings" first.};
   }
   
-  my $peak = ReadingsVal ($name, "modulePeakString", "");                                         # kWp für jeden Stringbezeichner
+  my $peak = ReadingsVal ($name, 'modulePeakString', '');                                         # kWp für jeden Stringbezeichner
   return qq{Please complete command "set $name modulePeakString".} if(!$peak);
   
   my ($aa,$ha) = parseParams ($peak);
@@ -2963,7 +2976,7 @@ sub createStringConfig {                 ## no critic "not used"
   }
   
   if (!isSolCastUsed ($hash)) {                                                                   # DWD Strahlungsquelle
-      my $tilt = ReadingsVal ($name, "moduleTiltAngle", "");                                      # Modul Neigungswinkel für jeden Stringbezeichner
+      my $tilt = ReadingsVal ($name, 'moduleTiltAngle', '');                                      # Modul Neigungswinkel für jeden Stringbezeichner
       return qq{Please complete command "set $name moduleTiltAngle".} if(!$tilt);
       
       my ($at,$ht) = parseParams ($tilt);
@@ -2977,7 +2990,7 @@ sub createStringConfig {                 ## no critic "not used"
           }
       }
       
-      my $dir = ReadingsVal ($name, "moduleDirection", "");                                      # Modul Ausrichtung für jeden Stringbezeichner
+      my $dir = ReadingsVal ($name, 'moduleDirection', '');                                      # Modul Ausrichtung für jeden Stringbezeichner
       return qq{Please complete command "set $name moduleDirection".} if(!$dir);
       
       my ($ad,$hd) = parseParams ($dir);
@@ -2992,7 +3005,7 @@ sub createStringConfig {                 ## no critic "not used"
       }
   }
   else {                                                                                         # SolCast-API Strahlungsquelle
-      my $mrt = ReadingsVal ($name, "moduleRoofTops", "");                                       # RoofTop Konfiguration -> Zuordnung <pk>
+      my $mrt = ReadingsVal ($name, 'moduleRoofTops', '');                                       # RoofTop Konfiguration -> Zuordnung <pk>
       return qq{Please complete command "set $name moduleRoofTops".} if(!$mrt);
       
       my ($ad,$hd) = parseParams ($mrt);
@@ -5986,7 +5999,7 @@ sub entryGraphic {
   
   # Setup Vollständigkeit/disabled prüfen
   #########################################
-  my $incomplete = _checkSetupComplete ($hash);
+  my $incomplete = _checkSetupNotComplete ($hash);
   return $incomplete if($incomplete);
   
   # Kontext des SolarForecast-Devices speichern für Refresh
@@ -6156,7 +6169,7 @@ return $ret;
 ################################################################
 #       Vollständigkeit Setup prüfen
 ################################################################
-sub _checkSetupComplete {                                
+sub _checkSetupNotComplete {                                
   my $hash  = shift;
   my $ret   = q{};
   
@@ -6215,7 +6228,7 @@ sub _checkSetupComplete {
       elsif(!$is) {
           $ret .= $hqtxt{ist}{$lang}; 
       }
-      elsif(!$peaks) {                                           
+      elsif(!$peaks) {         
           $ret .= $hqtxt{mps}{$lang};  
       }
       elsif(!$rip && isSolCastUsed ($hash)) {                                             # Verwendung SolCast API
@@ -6231,13 +6244,14 @@ sub _checkSetupComplete {
           $ret .= $hqtxt{mta}{$lang};  
       }
       elsif(!defined $pv0) {
-          $ret .= $hqtxt{awd}{$lang};   
+          $ret .= $hqtxt{awd}{$lang};          
       }
       
       $ret   .= "</td>";
       $ret   .= "</tr>";
       $ret   .= "</table>";
       $ret    =~ s/LINK/$link/gxs;
+      
       return $ret;
   }
   
@@ -6370,11 +6384,8 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;(';
           $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', 0);
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', 50);
           $api .= ')';
-          
-          
-          
       }
       
       ## Anlagen Check-Icon
@@ -6426,9 +6437,16 @@ sub _graphicHeader {
       ######################
       my $pcqicon;
       
+      if (isSolCastUsed ($hash)) {
+      $pcqicon = $pcq < 10 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
+                 $pcq < 20 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
+                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);
+      }
+      else {
       $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
                  $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
-                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);
+                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);          
+      }
       
       $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
 
@@ -8788,8 +8806,7 @@ sub checkPlantConfig {
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $lang = AttrVal ("global", 'language', 'EN');  
-  my $stch = $data{$type}{$name}{strings};
+  my $lang = AttrVal ("global", 'language', 'EN');
   my $cf   = 0;                                                                                     # config fault: 1 -> Konfig fehlerhaft, 0 -> Konfig ok
   my $wn   = 0;                                                                                     # Warnung wenn 1
   
@@ -8808,9 +8825,9 @@ sub checkPlantConfig {
       my $string = shift;
       my $ret;
       
-      for my $key (sort keys %{$stch->{$string}}) {
+      for my $key (sort keys %{$data{$type}{$name}{strings}{$string}}) {
           $ret    .= ", " if($ret);
-          $ret    .= $key.": ".$stch->{$string}{$key};
+          $ret    .= $key.": ".$data{$type}{$name}{strings}{$string}{$key};
       }
       
       return $ret;
@@ -8827,11 +8844,11 @@ sub checkPlantConfig {
       $result->{'String Configuration'}{fault}  = 1;
   }
     
-  for my $sn (sort keys %{$stch}) {
+  for my $sn (sort keys %{$data{$type}{$name}{strings}}) {
       my $sp = $sn." => ".$sub->($sn)."<br>";
       $result->{'String Configuration'}{note} .= $sn." => ".$sub->($sn)."<br>";
       
-      if ($stch->{$sn}{peak} >= 500) {
+      if ($data{$type}{$name}{strings}{$sn}{peak} >= 500) {
           $result->{'String Configuration'}{result} .= qq{The peak value of string "$sn" is very high. };
           $result->{'String Configuration'}{result} .= qq{It seems to be given in Wp instead of kWp. <br>};
           $result->{'String Configuration'}{state}   = $warn;
@@ -8957,6 +8974,14 @@ sub checkPlantConfig {
       my $osi = AttrVal     ($name, 'optimizeSolCastAPIreqInterval',  0);
       my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto',       '');
       
+      my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
+      
+      if (!$pcf || $pcf ne 'on') {
+          $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on" is recommended if the SolCast efficiency factor is already adjusted.<br>};
+      }
+      
       if ($cfd eq '' || $cfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd" <br>};
@@ -8971,12 +8996,6 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{warn}    = 1;
       }
       
-      if (!$pcf || $pcf ne 'on') {
-          $result->{'Common Settings'}{state}   = $info;
-          $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on" is recommended if the SolCast efficiency factor is already adjusted.<br>};
-      }
-      
       if (!$osi) {
           $result->{'Common Settings'}{state}   = $warn;
           $result->{'Common Settings'}{result} .= qq{Attribute optimizeSolCastAPIreqInterval is set to "$osi" <br>};
@@ -8984,7 +9003,14 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{warn}    = 1;
       }
       
-      if(!$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
+      if($lam ne 'success' ) {
+          $result->{'Common Settings'}{state}   = $nok;
+          $result->{'Common Settings'}{result} .= qq{The last message from SolCast API is "$lam". <br>};
+          $result->{'Common Settings'}{note}   .= qq{Check the validity of your API key and Rooftop indentificators.<br>};  
+          $result->{'Common Settings'}{fault}   = 1;          
+      }
+      
+      if(!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = "fullfilled";
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
           $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping, rainFactorDamping, optimizeSolCastAPIreqInterval <br>};
@@ -9913,7 +9939,8 @@ return $def;
 # SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
 # SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Calls (ungl. Requests !)
 # SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier',$def) - APIcalls = APIRequests * solCastAPIcallMultiplier
-# SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall                             
+# SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall 
+# SolCastAPIVal ($hash, '?All', '?All', 'response_message',        $def) - letzte SolCast API Antwort
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'rtid',                $def) - RoofTop-ID, <pk> = Paarschlüssel 
 # SolCastAPIVal ($hash, '?IdPair', '?<pk>', 'apikey',              $def) - API-Key, <pk> = Paarschlüssel
 #
@@ -10515,7 +10542,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        Der Abruf jedes in <a href='https://toolkit.solcast.com.au/rooftop-sites' target='_blank'>SolCast Rooftop Sites</a> 
        angelegten Rooftops ist mit der Angabe eines Paares <b>Rooftop-ID</b> und <b>API-Key</b> zu identifizieren. <br>
        Der Schlüssel &lt;pk&gt; kennzeichnet eindeutig ein verbundenes Paar Rooftop-ID / API-Key. Es können beliebig viele 
-       Paare nacheinander angelegt werden. In dem Fall ist jeweils ein neuer Name für "&lt;pk&gt;" zu verwenden.
+       Paare <b>nacheinander</b> angelegt werden. In dem Fall ist jeweils ein neuer Name für "&lt;pk&gt;" zu verwenden.
        <br><br>
        
        Der Schlüssel &lt;pk&gt; wird im Setter <a href="#SolarForecast-set-moduleRoofTops">moduleRoofTops</a> der abzurufenden 
