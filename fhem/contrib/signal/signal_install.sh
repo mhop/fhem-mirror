@@ -1,13 +1,13 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.13"
+SCRIPTVERSION="3.14"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.11.3"
+SIGNALVERSION="0.11.4"
 LIBRARYVERSION="0.11.2" #Typically = SIGNALVERSION, but can be used if libsignal did not change
 SIGNALVAR=/var/lib/$SIGNALUSER
 DBSYSTEMD=/etc/dbus-1/system.d
