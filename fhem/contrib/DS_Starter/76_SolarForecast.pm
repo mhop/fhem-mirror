@@ -129,7 +129,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.70.9 "=> "23.10.2022  create additional percentile only for pvCorrectionFactor_Auto on ",
+  "0.70.9 "=> "23.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
+                           "changed _calcCAQwithSolCastPercentil ",
   "0.70.8 "=> "23.10.2022  change average calculation in _calcCAQwithSolCastPercentil, unuse Notify/createNotifyDev ".
                            "extend Delete func, extend plantconfig check, revise commandref, change set reset pvCorrection ".
                            "rename runTimeCycleSummary to runTimeCentralTask ",
@@ -2141,24 +2142,24 @@ sub __solCast_ApiResponse {
               }
           }
           
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} += sprintf "%.0f", ($pvest50 * ($period/60) * 1000);
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} += sprintf "%.0f", ($pvest10 * ($period/60) * 1000);
+          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} += sprintf "%.0f", ($pvest50 * ($period/60) * 1000);
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} += sprintf "%.0f", ($pvest90 * ($period/60) * 1000);
 
           ## erstellen Zusatzpercentile
           ###############################
-          if ($uac eq 'on') {
-              my $lowdm  = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10}) / 4;
-              my $highdm = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50}) / 4;
+          #if ($uac eq 'on') {
+          #    my $lowdm  = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10}) / 4;
+          #    my $highdm = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50}) / 4;
               
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate20} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 3));
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate30} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 2));          
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate40} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 1));
+          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate20} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 3));
+          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate30} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 2));          
+          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate40} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 1));
               
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate60} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 1));          
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate70} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 2));
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate80} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 3));
-          }
+          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate60} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 1));          
+          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate70} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 2));
+          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate80} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 3));
+          #}
           
           $k += 1;          
       }
@@ -8114,26 +8115,34 @@ sub _calcCAQwithSolCastPercentil {
       my ($oldperc, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);                 # bisher definiertes Percentil/Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
       $oldperc             = 50 if(1 * $oldperc == 0);
       
-      my @sts = split ",", ReadingsVal($name, 'inverterStrings', '');
+      my @sts   = split ",", ReadingsVal($name, 'inverterStrings', '');
+      my $tmstr = $date.' '.sprintf("%02d",$h-1).':00:00';
       
       my ($est10,$est20,$est30,$est40,$est50,$est60,$est70,$est80,$est90);
 
       for my $s (@sts) {     
-          $est10 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate10', 0);
-          $est20 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate20', 0);
-          $est30 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate30', 0);
-          $est40 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate40', 0);
-          $est50 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate50', 0);    # Standardpercentil
-          $est60 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate60', 0);
-          $est70 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate70', 0);
-          $est80 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate80', 0);
-          $est90 += SolCastAPIVal ($hash, $s, $date.' '.sprintf("%02d",$h-1).':00:00', 'pv_estimate90', 0);
+          $est10 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate10', 0);
+          $est50 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate50', 0);                                     # Standardpercentil
+          $est90 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate90', 0);
       } 
       
       if(!$est50) {                                                                                            # kein Standardpercentile vorhanden
           Log (1, qq{DEBUG> $name percentile -> hour: $h, the best percentile can't be identified because of the default percentile has no value yet}) if($debug);                                   
           next;                                                                                              
       }
+      
+      ## Zusatzpercentile berechnen
+      ###############################
+      my $lowdm  = ($est50 - $est10) / 4;
+      my $highdm = ($est90 - $est50) / 4;
+      
+      $est20 = sprintf "%.0f", ($est50 - ($lowdm * 3));
+      $est30 = sprintf "%.0f", ($est50 - ($lowdm * 2));          
+      $est40 = sprintf "%.0f", ($est50 - ($lowdm * 1));
+      
+      $est60 = sprintf "%.0f", ($est50 + ($highdm * 1));          
+      $est70 = sprintf "%.0f", ($est50 + ($highdm * 2));
+      $est80 = sprintf "%.0f", ($est50 + ($highdm * 3));
       
       my %pc = (
         10 => $est10,
@@ -8169,23 +8178,31 @@ sub _calcCAQwithSolCastPercentil {
       if($dnum) {                                                                                            # Werte in History vorhanden -> haben Prio !
           $avgperc = $avgperc * $dnum;
           $dnum++;                                                                            
-          $perc    = sprintf "%.0f", ((($avgperc + $perc) / $dnum) / 10);                                     
+          $perc    = sprintf "%.0f", ((($avgperc + $perc) / $dnum) / 10);
+          
+          if ($debug) {
+              Log (1, qq{DEBUG> $name percentile -> old avg percentile: }.($avgperc/($dnum-1)).qq{, new avg percentile: }.$perc * 10);                                   
+          }          
       }
       elsif($oldperc && !$usenhd) {                                                                          # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr numHistDays
           $oldperc = $oldperc * $oldq;
           $dnum    = $oldq + 1;
           $perc    = sprintf "%.0f", ((($oldperc + $perc) / $dnum) / 10);
+          
+          if ($debug) {
+              Log (1, qq{DEBUG> $name percentile -> old circular percentile: }.($oldperc/$oldq).qq{, new percentile: }.$perc * 10); 
+          }
       }
       else {                                                                                                 # ganz neuer Wert
           $perc   = sprintf "%.0f", ($perc / 10);
-          $dnum   = 1;          
+          $dnum   = 1;
+
+          if ($debug) {
+              Log (1, qq{DEBUG> $name percentile -> new percentile: }.$perc * 10); 
+          }          
       }
       
       $perc = $perc * 10;
-      
-      if ($debug) {                                                                                           # nur für Debugging
-          Log (1, qq{DEBUG> $name percentile -> old avg percentile: }.($avgperc ? $avgperc : '-').qq{, new avg percentile: $perc});                                   
-      }
             
       Log3 ($name, 5, "$name - write percentile into circular Hash: $perc, Hour $h");
       
