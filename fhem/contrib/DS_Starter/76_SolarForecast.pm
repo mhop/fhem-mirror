@@ -3651,8 +3651,27 @@ sub __calcSolCastEstimates {
       $peak *= 1000;
       
       # my $edef = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate',           0);             # Back-Kompatibilität
-      my $ed50 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate50',         0); 
-      my $est  = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $ed50);
+      my $est50 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate50',         0); 
+      
+      if ($perc != 50) {
+          my $est10 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate10',         0);
+          my $est90 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate90',         0);
+          
+          ## Zusatzpercentile berechnen
+          ###############################
+          my $lowdm  = ($est50 - $est10) / 4;
+          my $highdm = ($est90 - $est50) / 4;
+          
+          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate20} = sprintf "%.0f", ($est50 - ($lowdm * 3));
+          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate30} = sprintf "%.0f", ($est50 - ($lowdm * 2));          
+          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate40} = sprintf "%.0f", ($est50 - ($lowdm * 1));
+          
+          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate60} = sprintf "%.0f", ($est50 + ($highdm * 1));          
+          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate70} = sprintf "%.0f", ($est50 + ($highdm * 2));
+          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate80} = sprintf "%.0f", ($est50 + ($highdm * 3));
+      }
+      
+      my $est  = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $est50);
       my $pv   = sprintf "%.1f", ($est * $ccf * $rcf);
 
       if(AttrVal ($name, 'verbose', 3) == 4) {
