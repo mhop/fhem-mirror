@@ -3463,7 +3463,10 @@ sub
 FW_Set($@)
 {
   my ($hash, @a) = @_;
-  my %cmd = ("rereadicons" => ":noArg", "clearSvgCache" => ":noArg");
+  my %cmd = ("clearSvgCache" => ":noArg",
+             "reopen" => ":noArg",
+             "rereadicons" => ":noArg");
+
   if(AttrVal($hash->{NAME}, "rescueDialog", "")) {
     $cmd{"rescueStart"} = "";
     $cmd{"rescueTerminate"} = ":noArg";
@@ -3490,6 +3493,16 @@ FW_Set($@)
     } else {
       return "Can't open $cDir: $!";
     }
+  }
+
+  if($a[1] eq "reopen") {
+    TcpServer_Close($hash);
+    delete($hash->{stacktrace});
+    my ($port, $global) = split("[ \t]+", $hash->{DEF});
+    my $ret = TcpServer_Open($hash, $port, $global);
+    return $ret if($ret);
+    TcpServer_SetSSL($hash) if(AttrVal($hash->{NAME}, "SSL", 0));
+    return undef;
   }
 
   if($a[1] eq "rescueStart") {
@@ -3705,13 +3718,20 @@ FW_log($$)
   <a id="FHEMWEB-set"></a>
   <b>Set</b>
   <ul>
+    <a id="FHEMWEB-set-rereadicons"></a>
     <li>rereadicons<br>
       reads the names of the icons from the icon path.  Use after adding or
       deleting icons.
       </li>
+    <a id="FHEMWEB-set-clearSvgCache"></a>
     <li>clearSvgCache<br>
       delete all files found in the www/SVGcache directory, which is used to
       cache SVG data, if the SVGcache attribute is set.
+      </li>
+    <a id="FHEMWEB-set-reopen"></a>
+    <li>reopen<br>
+      reopen the server port. This is an alternative to restart FHEM when
+      the SSL certificate is replaced.
       </li>
   </ul>
   <br>
@@ -4514,14 +4534,21 @@ FW_log($$)
   <a id="FHEMWEB-set"></a>
   <b>Set</b>
   <ul>
+    <a id="FHEMWEB-set-rereadicons"></a>
     <li>rereadicons<br>
       Damit wird die Liste der Icons neu eingelesen, f&uuml;r den Fall, dass
       Sie Icons l&ouml;schen oder hinzuf&uuml;gen.
       </li>
+    <a id="FHEMWEB-set-clearSvgCache"></a>
     <li>clearSvgCache<br>
       Im Verzeichnis www/SVGcache werden SVG Daten zwischengespeichert, wenn
       das Attribut SVGcache gesetzt ist.  Mit diesem Befehl leeren Sie diesen
       Zwischenspeicher.
+      </li>
+    <a id="FHEMWEB-set-reopen"></a>
+    <li>reopen<br>
+      Schlie&szlig;t und &ouml;ffnet der Serverport. Das kann eine Alternative
+      zu FHEM-Neustart sein, wenn das SSL-Zertifikat sich ge&auml;ndert hat.
       </li>
   </ul>
   <br>

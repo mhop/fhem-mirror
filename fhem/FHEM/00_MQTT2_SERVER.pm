@@ -213,6 +213,7 @@ MQTT2_SERVER_Set($@)
 {
   my ($hash, @a) = @_;
   my %sets = ( publish=>":textField,[-r]&nbsp;topic&nbsp;message",
+               reopen=>":noArg",
                clearRetain=>":noArg" );
   shift(@a);
 
@@ -238,7 +239,18 @@ MQTT2_SERVER_Set($@)
     delete($hash->{READINGS}{$rname});
     delete($hash->{retain});
     return undef;
+  
+  } elsif($a[0] eq "reopen") {
+    TcpServer_Close($hash);
+    delete($hash->{stacktrace});
+    my ($port, $global) = split("[ \t]+", $hash->{DEF});
+    my $ret = TcpServer_Open($hash, $port, $global);
+    return $ret if($ret);
+    TcpServer_SetSSL($hash) if(AttrVal($hash->{NAME}, "SSL", 0));
+    return undef;
+
   }
+
 }
 
 sub
@@ -785,6 +797,11 @@ MQTT2_SERVER_ReadDebug($$)
     <a id="MQTT2_SERVER-set-clearRetain"></a>
     <li>clearRetain<br>
       delete all the retained topics.
+      </li>
+    <a id="MQTT2_SERVER-set-reopen"></a>
+    <li>reopen<br>
+      reopen the server port. This is an alternative to restart FHEM when
+      the SSL certificate is replaced.
       </li>
   </ul>
   <br>
