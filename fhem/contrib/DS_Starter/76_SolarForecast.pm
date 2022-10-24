@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-23 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-24 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -129,7 +129,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.70.9 "=> "23.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
+  "0.70.9 "=> "24.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
                            "changed _calcCAQwithSolCastPercentil ",
   "0.70.8 "=> "23.10.2022  change average calculation in _calcCAQwithSolCastPercentil, unuse Notify/createNotifyDev ".
                            "extend Delete func, extend plantconfig check, revise commandref, change set reset pvCorrection ".
@@ -304,7 +304,78 @@ my %vNotesIntern = (
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
-# Voreinstellungen
+## Konstanten
+###############
+my @chours       = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten                              
+my $kJtokWh      = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
+my $defmaxvar    = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
+my $definterval  = 70;                                                            # Standard Abfrageintervall
+my $defslidenum  = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+
+my $pvhcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
+my $pvccache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
+my $plantcfg     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
+my $csmcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
+my $scpicache    = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
+
+my $calcmaxd     = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
+my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
+my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
+my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
+
+my $apirepetdef  = 3600;                                                          # default Abrufintervall SolCast API 
+my $apimaxreqs   = 50;                                                            # max. täglich mögliche Requests SolCast API  
+
+my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
+my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+my $tempmodinc   = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+my $tempbasedef  = 25;                                                            # Temperatur Module bei Nominalleistung
+my $cldampdef    = 35;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cloud_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
+
+my $rdampdef     = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rain_base    = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
+
+my $maxconsumer  = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
+my $epiecHCounts = 10;                                                            # Anzahl Werte für verbraucherspezifische Energiestück Ermittlung
+my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
+my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
+my $defctype     = "other";                                                       # default Verbrauchertyp
+my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
+
+my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
+my $defflowGSize = 300;                                                           # default flowGraphicSize
+my $histhourdef  = 2;                                                             # default Anzeige vorangegangene Stunden
+my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag Default Farbe
+my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht Default Farbe
+my $b1coldef     = 'FFAC63';                                                      # Default Farbe Beam 1
+my $b1fontcoldef = '0D0D0D';                                                      # Default Schriftfarbe Beam 1
+my $b2coldef     = 'C4C4A7';                                                      # Default Farbe Beam 2
+my $b2fontcoldef = '000000';                                                      # Default Schriftfarbe Beam 2
+  
+my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+my $defhyst      = 0;                                                             # default Hysterese
+
+                                                                                  # Default CSS-Style
+my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
+                   qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                \n}.
+                   qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                    \n}.
+                   qq{.flowg.bat25          { stroke: red; fill: red; }                                                      \n}.
+                   qq{.flowg.bat50          { stroke: yellow; fill: yellow; }                                                \n}.
+                   qq{.flowg.bat75          { stroke: green; fill: green; }                                                  \n}.
+                   qq{.flowg.grid_color1    { fill: green; }                                                                 \n}.
+                   qq{.flowg.grid_color2    { fill: red; }                                                                   \n}.
+                   qq{.flowg.grid_color3    { fill: gray; }                                                                  \n}.
+                   qq{.flowg.inactive_in    { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
+                   qq{.flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
+                   qq{.flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
+                   ;
+
+# Steuerhashes
+###############
 
 my %hset = (                                                                # Hash der Set-Funktion
   consumerImmediatePlanning => { fn => \&_setconsumerImmediatePlanning },
@@ -617,74 +688,6 @@ my %weather_ids = (
   '100' => { s => '0', icon => 'weather_night',            txtd => 'sternenklarer Himmel',                                                     txte => 'starry sky'                                                                 },
 );
 
-my @chours       = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten                              
-my $kJtokWh      = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
-my $defmaxvar    = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
-my $definterval  = 70;                                                            # Standard Abfrageintervall
-my $defslidenum  = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
-
-my $pvhcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
-my $pvccache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
-my $plantcfg     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
-my $csmcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCsm_SolarForecast_"; # Filename-Fragment für Consumer Status (wird mit Devicename ergänzt)
-my $scpicache    = $attr{global}{modpath}."/FHEM/FhemUtils/ScApi_SolarForecast_"; # Filename-Fragment für Werte aus SolCast API (wird mit Devicename ergänzt)
-
-my $calcmaxd     = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
-my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
-my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
-
-my $apirepetdef  = 3600;                                                          # default Abrufintervall SolCast API 
-my $apimaxreqs   = 50;                                                            # max. täglich mögliche Requests SolCast API  
-
-my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
-my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
-my $tempmodinc   = 25;                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
-my $tempbasedef  = 25;                                                            # Temperatur Module bei Nominalleistung
-my $cldampdef    = 35;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
-my $cloud_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
-
-my $rdampdef     = 10;                                                            # Gewichtung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
-my $rain_base    = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
-
-my $maxconsumer  = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
-my $epiecHCounts = 10;                                                            # Anzahl Werte für verbraucherspezifische Energiestück Ermittlung
-my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
-my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
-my $defctype     = "other";                                                       # default Verbrauchertyp
-my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
-
-my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
-my $defflowGSize = 300;                                                           # default flowGraphicSize
-my $histhourdef  = 2;                                                             # default Anzeige vorangegangene Stunden
-my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag Default Farbe
-my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht Default Farbe
-my $b1coldef     = 'FFAC63';                                                      # Default Farbe Beam 1
-my $b1fontcoldef = '0D0D0D';                                                      # Default Schriftfarbe Beam 1
-my $b2coldef     = 'C4C4A7';                                                      # Default Farbe Beam 2
-my $b2fontcoldef = '000000';                                                      # Default Schriftfarbe Beam 2
-  
-my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
-my $defhyst      = 0;                                                             # default Hysterese
-
-                                                                                  # Default CSS-Style
-my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
-                   qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                \n}.
-                   qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                    \n}.
-                   qq{.flowg.bat25          { stroke: red; fill: red; }                                                      \n}.
-                   qq{.flowg.bat50          { stroke: yellow; fill: yellow; }                                                \n}.
-                   qq{.flowg.bat75          { stroke: green; fill: green; }                                                  \n}.
-                   qq{.flowg.grid_color1    { fill: green; }                                                                 \n}.
-                   qq{.flowg.grid_color2    { fill: red; }                                                                   \n}.
-                   qq{.flowg.grid_color3    { fill: gray; }                                                                  \n}.
-                   qq{.flowg.inactive_in    { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
-                   qq{.flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
-                   qq{.flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
-                   ;
-
 my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
   "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },     
   "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => $defmintime },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
@@ -692,7 +695,16 @@ my %hef = (                                                                     
   "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
   "washingmachine" => { f => 0.30, m => 0.40, l => 0.30, mt => 120         },    
-);                                                                               
+);     
+
+my %hpctpl = (                                                                   # Percentile Template
+  20 => { mp => 3 },
+  30 => { mp => 2 }, 
+  40 => { mp => 1 }, 
+  60 => { mp => 1 }, 
+  70 => { mp => 2 }, 
+  80 => { mp => 3 }, 
+);
 
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{circular}                                                  # Ringspeicher
@@ -1948,9 +1960,7 @@ sub _getRoofTopData {
   ##
   
   $paref->{allstrings} = ReadingsVal($name, 'inverterStrings', '');
- 
-  delete $data{$type}{$name}{current}{runTimeAPIResponseProc};
-  
+   
   __solCast_ApiRequest ($paref);
   
 return;
@@ -2003,6 +2013,7 @@ sub __solCast_ApiRequest {
       timeout    => 30,
       hash       => $hash,
       caller     => \&$caller,
+      stc        => [gettimeofday],
       allstrings => $allstrings,
       string     => $string,
       method     => "GET",
@@ -2027,6 +2038,7 @@ sub __solCast_ApiResponse {
   my $caller     = $paref->{caller};
   my $string     = $paref->{string};
   my $allstrings = $paref->{allstrings};
+  my $stc        = $paref->{stc};                                                                          # Startzeit API Abruf
   
   my $type       = $hash->{TYPE};
   my $t          = time;
@@ -2043,7 +2055,8 @@ sub __solCast_ApiResponse {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
       
       readingsSingleUpdate($hash, "state", $msg, 1);
-      $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);           # API Laufzeit ermitteln
+      $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+      $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
       
       return;
   } 
@@ -2056,7 +2069,9 @@ sub __solCast_ApiResponse {
           Log3 ($name, 2, "$name - $msg");
           
           readingsSingleUpdate($hash, "state", $msg, 1);
-          $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);       # API Laufzeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+
           return;
       }
     
@@ -2085,8 +2100,9 @@ sub __solCast_ApiResponse {
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
           
           readingsSingleUpdate($hash, "state", $msg, 1);
-          $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);     # API Laufzeit ermitteln
-          
+          $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+          $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+        
           return;
       }
       
@@ -2177,7 +2193,8 @@ sub __solCast_ApiResponse {
       allstrings => $allstrings
   };
   
-  $data{$type}{$name}{current}{runTimeAPIResponseProc} += sprintf "%.4f", tv_interval($sta);          # API Laufzeit ermitteln
+  $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
+  $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
   
 return &$caller($param);
 }
@@ -3650,29 +3667,34 @@ sub __calcSolCastEstimates {
       
       $peak *= 1000;
       
-      # my $edef = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate',           0);             # Back-Kompatibilität
-      my $est50 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate50',         0); 
+      my $est50 = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0); 
       
       if ($perc != 50) {
-          my $est10 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate10',         0);
-          my $est90 = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate90',         0);
-          
-          ## Zusatzpercentile berechnen
-          ###############################
-          my $lowdm  = ($est50 - $est10) / 4;
-          my $highdm = ($est90 - $est50) / 4;
-          
-          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate20} = sprintf "%.0f", ($est50 - ($lowdm * 3));
-          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate30} = sprintf "%.0f", ($est50 - ($lowdm * 2));          
-          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate40} = sprintf "%.0f", ($est50 - ($lowdm * 1));
-          
-          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate60} = sprintf "%.0f", ($est50 + ($highdm * 1));          
-          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate70} = sprintf "%.0f", ($est50 + ($highdm * 2));
-          $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate80} = sprintf "%.0f", ($est50 + ($highdm * 3));
+          ## Zusatzpercentile berechnen - Muster:
+          ## 
+          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate20} = sprintf "%.0f", ($est50 - ($lowdm * 3));
+          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate30} = sprintf "%.0f", ($est50 - ($lowdm * 2));          
+          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate40} = sprintf "%.0f", ($est50 - ($lowdm * 1));
+          ##
+          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate60} = sprintf "%.0f", ($est50 + ($highdm * 1));          
+          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate70} = sprintf "%.0f", ($est50 + ($highdm * 2));
+          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate80} = sprintf "%.0f", ($est50 + ($highdm * 3));
+          #################################################################################################################
+
+          if ($perc < 50) {
+              my $est10 = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate10', $est50);
+              my $lowdm = ($est50 - $est10) / 4;
+              $data{$type}{$name}{solcastapi}{$string}{$wantdt}{'pv_estimate'.$perc} = sprintf "%.0f", ($est50 - ($lowdm * $hpctpl{$perc}{mp}));
+          }
+          else {
+              my $est90  = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate90', $est50);
+              my $highdm = ($est90 - $est50) / 4;
+              $data{$type}{$name}{solcastapi}{$string}{$wantdt}{'pv_estimate'.$perc} = sprintf "%.0f", ($est50 + ($highdm * $hpctpl{$perc}{mp}));
+          }          
       }
       
-      my $est  = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $est50);
-      my $pv   = sprintf "%.1f", ($est * $ccf * $rcf);
+      my $est = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $est50);
+      my $pv  = sprintf "%.1f", ($est * $ccf * $rcf);
 
       if(AttrVal ($name, 'verbose', 3) == 4) {
           $lh = {                                                                                     # Log-Hash zur Ausgabe
