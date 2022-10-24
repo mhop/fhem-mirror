@@ -129,6 +129,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.70.10"=> "24.10.2022  write best percentil in pvHistory (_calcCAQwithSolCastPercentil instead of ___readPercAndQuality) ",
   "0.70.9 "=> "24.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
                            "changed _calcCAQwithSolCastPercentil ",
   "0.70.8 "=> "23.10.2022  change average calculation in _calcCAQwithSolCastPercentil, unuse Notify/createNotifyDev ".
@@ -3794,13 +3795,13 @@ sub ___readPercAndQuality {
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $perc."/".$hq;
 
-  if($fd == 0 && $fh1) {
-      $paref->{pvcorrf}  = $perc."/".$hq;
-      $paref->{nhour}    = sprintf("%02d",$fh1);
-      $paref->{histname} = "pvcorrfactor";
-      setPVhistory ($paref);
-      delete $paref->{histname};  
-  }
+  #if($fd == 0 && $fh1) {
+  #    $paref->{pvcorrf}  = $perc."/".$hq;
+  #    $paref->{nhour}    = sprintf("%02d",$fh1);
+  #    $paref->{histname} = "pvcorrfactor";
+  #    setPVhistory ($paref);
+  #    delete $paref->{histname};  
+  #}
    
 return ($hcfound, $perc, $hq);
 }
@@ -8208,7 +8209,13 @@ sub _calcCAQwithSolCastPercentil {
           }
       }
       
-      if ($debug) {                                                                                           # nur für Debugging
+      $paref->{pvcorrf}  = $perc.'/1';                                                                       # bestes Percentil in History speichern
+      $paref->{nhour}    = sprintf("%02d",$h);
+      $paref->{histname} = "pvcorrfactor";
+      setPVhistory ($paref);
+      delete $paref->{histname}; 
+      
+      if ($debug) {                                                                                          # nur für Debugging
           Log (1, qq{DEBUG> $name summary PV estimates for hour of day "$h":\n}.
                   qq{est10: $est10, est20: $est20, est30: $est30, est40: $est40, est50 (default): $est50, est60: $est60, est70: $est70, est80: $est80, est90: $est90});                                   
           Log (1, qq{DEBUG> $name percentile -> hour: $h, number checked days: $dnum, pvreal: $pvval, diffbest: $diff0, best percentile: $perc});                                   
@@ -8275,7 +8282,7 @@ sub __avgSolCastPercFromHistory {
   my $type  = $hash->{TYPE};  
   my $pvhh  = $data{$type}{$name}{pvhist};
   
-  my ($usenhd, $calcd) = __useNumHistDays ($name);                                          # ist Attr numHistDays gesetzt ? und welcher Wert
+  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr numHistDays gesetzt ? und welcher Wert
 
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
