@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-24 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-25 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -129,7 +129,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.70.10"=> "24.10.2022  write best percentil in pvHistory (_calcCAQwithSolCastPercentil instead of ___readPercAndQuality) ",
+  "0.71.0" => "25.10.2022  new attribute createStatisticReadings, changed some default settings and commandref ",
+  "0.70.10"=> "24.10.2022  write best percentil in pvHistory (_calcCAQwithSolCastPercentil instead of ___readPercAndQuality) ".
+                           "add global dnsServer to checkPlantConfig ",
   "0.70.9 "=> "24.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
                            "changed _calcCAQwithSolCastPercentil ",
   "0.70.8 "=> "23.10.2022  change average calculation in _calcCAQwithSolCastPercentil, unuse Notify/createNotifyDev ".
@@ -374,6 +376,21 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
                    qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
                    qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
                    ;
+                                                                                  # Liste optionaler Statistikreadings
+my @csr         = qw( currentAPIinterval
+                      lastretrieval_time
+                      lastretrieval_timestamp
+                      response_message
+                      runTimeCentralTask
+                      runTimeLastAPIAnswer
+                      runTimeLastAPIProc
+                      todayMaxAPIcalls
+                      todayDoneAPIcalls
+                      todayDoneAPIrequests
+                      todayRemaingAPIcalls
+                      todayRemainingAPIrequests
+                    );
+
 
 # Steuerhashes
 ###############
@@ -450,8 +467,9 @@ my %hget = (                                                                # Ha
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
-  consumer                      => { fn => \&_attrconsumer          },
-  createConsumptionRecReadings  => { fn => \&_attrcreateConsRecRdgs },
+  consumer                      => { fn => \&_attrconsumer            },
+  createConsumptionRecReadings  => { fn => \&_attrcreateConsRecRdgs   },
+  createStatisticReadings       => { fn => \&_attrcreateStatisticRdgs },
 );
 
 my %htr = (                                                                  # Hash even/odd für <tr>
@@ -707,6 +725,21 @@ my %hpctpl = (                                                                  
   80 => { mp => 3 }, 
 );
 
+my %hcsr = (                                                                                  # Funktiontemplate zur Erstellung optionaler Statistikreadings
+  currentAPIinterval         => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
+  lastretrieval_time         => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
+  lastretrieval_timestamp    => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
+  response_message           => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
+  todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
+  todayDoneAPIcalls          => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
+  todayDoneAPIrequests       => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
+  todayRemaingAPIcalls       => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
+  todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs }, 
+  runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    def => '-'         }, 
+  runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
+  runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    def => '-'         }, 
+);
+
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{circular}                                                  # Ringspeicher
 # $data{$type}{$name}{current}                                                   # current values
@@ -723,7 +756,8 @@ sub Initialize {
   my $hash = shift;
 
   my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my $hod = join ",", map { sprintf "%02d", $_} (01..24);        
+  my $hod = join ",", map { sprintf "%02d", $_} (01..24); 
+  my $srd = join ",", @csr;  
   
   my ($consumer,@allc);
   for my $c (1..$maxconsumer) {
@@ -758,8 +792,9 @@ sub Initialize {
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
-                                "createTomorrowPVFcReadings:multiple-strict,$hod ".
                                 "createConsumptionRecReadings:multiple-strict,$allcs ".
+                                "createTomorrowPVFcReadings:multiple-strict,$hod ".
+                                "createStatisticReadings:multiple-strict,$srd ".
                                 "Css:textField-long ".
                                 "debug:1,0 ".
                                 "disable:1,0 ".
@@ -2288,10 +2323,12 @@ sub ___setLastAPIcallKeyData {
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
   }
   
+  ####
+  
   my $lang   = AttrVal ('global', 'language', 'EN');
   my $apiitv = SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval', $apirepetdef);
   
-  readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv))[0], 1);
+  readingsSingleUpdate ($hash, 'nextSolCastCall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv))[0], 1);
   
 return;
 }
@@ -2589,6 +2626,19 @@ sub _attrcreateConsRecRdgs {             ## no critic "not used"
   if ($aName eq 'createConsumptionRecReadings') {
       deleteReadingspec ($hash, "consumer.*_ConsumptionRecommended");
   }
+
+return;
+}
+
+################################################################
+#               Attr createStatisticReadings
+################################################################
+sub _attrcreateStatisticRdgs {           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aName = $paref->{aName};
+  
+  deleteReadingspec ($hash, "statistic_.*");
 
 return;
 }
@@ -2985,13 +3035,16 @@ sub centralTask {
       
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate($hash, "state", $centpars->{state}, 1);                        # Abschluß state      
+      readingsSingleUpdate ($hash, "state", $centpars->{state}, 1);                       # Abschluß state 
+      setTimeTracking      ($hash, $cst, 'runTimeCentralTask');                           # Zyklus-Laufzeit ermitteln 
+
+      genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen      
+  
+      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
   }
-  
-  setTimeTracking ($hash, $cst, 'runTimeCentralTask');                                    # Zyklus-Laufzeit ermitteln
   
 return;
 }
@@ -5839,9 +5892,10 @@ sub _calcTodayPVdeviation {
   
   my $diff = $pvfc - $pvre;
   
-  my $dp   = sprintf("%.2f" , 100 * $diff / $pvre) if($pvre);
-  
-  push @$daref, "Today_PVdeviation<>". $dp." %";
+  if($pvre) {
+      my $dp = sprintf "%.2f" , (100 * $diff / $pvre);   
+      push @$daref, "Today_PVdeviation<>". $dp." %";
+  }
     
 return;
 }
@@ -5907,6 +5961,32 @@ sub saveEnergyConsumption {
   setPVhistory ($paref);              
   delete $paref->{histname};
    
+return;
+}
+
+################################################################
+#    optionale Statistikreadings erstellen 
+################################################################
+sub genStatisticReadings {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $daref = $paref->{daref};
+ 
+  my @csr = split ',', AttrVal($name, 'createStatisticReadings', '');
+  
+  return if(!@csr);
+  
+  for my $kpi (@csr) {
+      if ($hcsr{$kpi}{fnr} == 1) {
+          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, '?All', '?All', $kpi, $hcsr{$kpi}{def});
+      }
+ 
+      if ($hcsr{$kpi}{fnr} == 2) {
+          push @$daref, 'statistic_'.$kpi.'<>'. &{$hcsr{$kpi}{fn}} ($hash, $kpi, $hcsr{$kpi}{def});
+      } 
+  }
+  
 return;
 }
 
@@ -6148,7 +6228,7 @@ sub entryGraphic {
       flowgconX      => AttrVal ($name,    'flowGraphicShowConsumerDummy',      1),            # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
       flowgconsPower => AttrVal ($name,    'flowGraphicShowConsumerPower'     , 1),            # Verbraucher Leistung in der Energieflußgrafik anzeigen
       flowgconsTime  => AttrVal ($name,    'flowGraphicShowConsumerRemainTime', 1),            # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen                                                                                                                                                         
-      flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance',      80),            # Abstand Verbrauchericons zueinander
+      flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance',     140),            # Abstand Verbrauchericons zueinander
       css            => AttrVal ($name,    'Css',                         $cssdef),            # Css Styles
   };
   
@@ -8212,8 +8292,12 @@ sub _calcCAQwithSolCastPercentil {
       $paref->{pvcorrf}  = $perc.'/1';                                                                       # bestes Percentil in History speichern
       $paref->{nhour}    = sprintf("%02d",$h);
       $paref->{histname} = "pvcorrfactor";
+      
       setPVhistory ($paref);
-      delete $paref->{histname}; 
+      
+      delete $paref->{histname};
+      delete $paref->{nhour}; 
+      delete $paref->{pvcorrf};       
       
       if ($debug) {                                                                                          # nur für Debugging
           Log (1, qq{DEBUG> $name summary PV estimates for hour of day "$h":\n}.
@@ -9098,12 +9182,13 @@ sub checkPlantConfig {
   }
   
   ## allg. Settings bei Nutzung SolCast
-  ######################################
+  #######################################
   if (isSolCastUsed ($hash)) {
-      my $cfd = AttrVal     ($name, 'cloudFactorDamping',            ''); 
-      my $rfd = AttrVal     ($name, 'rainFactorDamping',             ''); 
-      my $osi = AttrVal     ($name, 'optimizeSolCastAPIreqInterval',  0);
-      my $pcf = ReadingsVal ($name, 'pvCorrectionFactor_Auto',       '');
+      my $gdn = AttrVal     ('global', 'dnsServer',                     '');
+      my $cfd = AttrVal     ($name,    'cloudFactorDamping',            ''); 
+      my $rfd = AttrVal     ($name,    'rainFactorDamping',             ''); 
+      my $osi = AttrVal     ($name,    'optimizeSolCastAPIreqInterval',  0);
+      my $pcf = ReadingsVal ($name,    'pvCorrectionFactor_Auto',       '');
       
       my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
       
@@ -9139,6 +9224,13 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{result} .= qq{The last message from SolCast API is "$lam". <br>};
           $result->{'Common Settings'}{note}   .= qq{Check the validity of your API key and Rooftop indentificators.<br>};  
           $result->{'Common Settings'}{fault}   = 1;          
+      }
+      
+      if (!$gdn) {
+          $result->{'Common Settings'}{state}   = $nok;
+          $result->{'Common Settings'}{result} .= qq{Attribute dnsServer in global device is not set. <br>};
+          $result->{'Common Settings'}{note}   .= qq{set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
+          $result->{'Common Settings'}{fault}   = 1;
       }
       
       if(!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
@@ -10123,9 +10215,10 @@ Vorhersage für den solaren Ertrag und integriert weitere Informationen als Grun
 
 Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (Model DWD) oder der 
 <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a> (Model SolCastAPI) prognostizierten Globalstrahlung am 
-Anlagenstandort. Die Nutzung der SolCast API beschränkt sich auf die kostenlose Version unter Verwendung von Rooftop Sites.
+Anlagenstandort. Die Nutzung der SolCast API beschränkt sich auf die kostenlose Version unter Verwendung von Rooftop Sites. <br>
 In zugeordneten DWD_OpenData Device(s) ist die passende Wetterstation mit dem Attribut "forecastStation" 
-festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
+festzulegen um meteorologische Daten (Bewölkung, Sonnenaufgang, u.a.) bzw. eine Strahlungsprognose (Model DWD) für diesen 
+Standort zu erhalten. <br>
 Abhängig von den Strahlungs- und Wetterdaten sowie der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.)
 wird auf eine wahrscheinliche PV Erzeugung der kommenden Stunden ermittelt. <br>
 Darüber hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine Verbrauchsprognose verwendet. <br>
@@ -10154,18 +10247,18 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
 
       <ul>
          <table>
-         <colgroup> <col width=35%> <col width=65%> </colgroup>
-            <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches Wetterdaten liefert                      </td></tr>
-            <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device welches Strahlungsdaten liefert bzw. SolCast-API </td></tr>
-            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                             </td></tr>
-            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                </td></tr>
-            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)    </td></tr>
-            <tr><td> <b>inverterStrings</b>      </td><td>Bezeichner der vohandenen Anlagenstrings                             </td></tr>
-            <tr><td> <b>moduleDirection</b>      </td><td>Ausrichtung (Azimuth) der Anlagenstrings                             </td></tr>                        
-            <tr><td> <b>modulePeakString</b>     </td><td>die DC-Peakleistung der Anlagenstrings                               </td></tr> 
-            <tr><td> <b>roofIdentPair</b>        </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)               </td></tr>
-            <tr><td> <b>moduleRoofTops</b>       </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                  </td></tr>
-            <tr><td> <b>moduleTiltAngle</b>      </td><td>die Neigungswinkel der der Anlagenmodule                             </td></tr>            
+         <colgroup> <col width=25%> <col width=75%> </colgroup>
+            <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches meteorologische Daten (z.B. Bewölkung) liefert     </td></tr>
+            <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device bzw. SolCast-API zur Lieferung von Strahlungsdaten         </td></tr>
+            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert                                       </td></tr>
+            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert                                          </td></tr>
+            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert (sofern vorhanden)              </td></tr>
+            <tr><td> <b>inverterStrings</b>      </td><td>Bezeichner der vohandenen Anlagenstrings                                       </td></tr>
+            <tr><td> <b>moduleDirection</b>      </td><td>Ausrichtung (Azimuth) der Anlagenstrings                                       </td></tr>                        
+            <tr><td> <b>modulePeakString</b>     </td><td>die DC-Peakleistung der Anlagenstrings                                         </td></tr> 
+            <tr><td> <b>roofIdentPair</b>        </td><td>die Identifikationsdaten (bei Nutzung der SolCast API)                         </td></tr>
+            <tr><td> <b>moduleRoofTops</b>       </td><td>die Rooftop Parameter (bei Nutzung der SolCast API)                            </td></tr>
+            <tr><td> <b>moduleTiltAngle</b>      </td><td>die Neigungswinkel der der Anlagenmodule                                       </td></tr>            
          </table>
       </ul>
       <br>
@@ -10932,6 +11025,13 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
+       <a id="SolarForecast-attr-beam1FontColor"></a>
+       <li><b>beam1FontColor </b><br>
+         Auswahl der Schriftfarbe des primären Balken. <br>
+         (default: 0D0D0D)
+       </li>
+       <br>      
+       
        <a id="SolarForecast-attr-beam1Content"></a>
        <li><b>beam1Content </b><br>
          Legt den darzustellenden Inhalt der primären Balken fest.
@@ -10939,8 +11039,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <ul>   
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default)           </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung           </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
          </table>
@@ -10952,7 +11052,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>beam2Color </b><br>
          Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
        </li>
-       <br>  
+       <br>
+
+       <a id="SolarForecast-attr-beam2FontColor"></a>
+       <li><b>beam2FontColor </b><br>
+         Auswahl der Schriftfarbe des sekundären Balken. <br>
+         (default: 000000)
+       </li>
+       <br>       
        
        <a id="SolarForecast-attr-beam2Content"></a>
        <li><b>beam2Content </b><br>
@@ -11012,7 +11119,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
 
        <a id="SolarForecast-attr-consumerLegend"></a>
        <li><b>consumerLegend </b><br>
-         Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher SolarForecast Device 
+         Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher im SolarForecast Device 
          registriert sind. <br>
          (default: icon_top)
        </li>
@@ -11125,9 +11232,35 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          PV-Erzeugung bzw. des aktuellen Energieüberschusses empfohlen ist. Der Wert des erstellten Readings korreliert 
          mit den berechneten Planungsdaten das Consumers, kann aber von dem Planungszeitraum abweichen. <br>
        <br>       
-         
        </li>
-       <br>  
+       <br>
+
+       <a id="SolarForecast-attr-createStatisticReadings"></a>
+       <li><b>createStatisticReadings </b><br>
+         Für die ausgewählten Kennzahlen und Indikatoren werden Readings erstellt. <br><br>
+         
+         <ul>   
+         <table>  
+         <colgroup> <col width=25%> <col width=75%> </colgroup>
+            <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                     </td></tr>
+            <tr><td> <b>lastretrieval_time</b>        </td><td>der letze Abrufzeitpunkt der SolCast API (nur Model SolCastAPI)                                    </td></tr>
+            <tr><td> <b>lastretrieval_timestamp</b>   </td><td>der letze Abrufzeitpunkt der SolCast API (nur Model SolCastAPI) als Timestamp                      </td></tr>
+            <tr><td> <b>response_message</b>          </td><td>die letzte Statusmeldung der SolCast API (nur Model SolCastAPI)                                    </td></tr>
+            <tr><td> <b>runTimeCentralTask</b>        </td><td>die Laufzeit des letzten SolarForecast Intervalls (Gesamtprozess) in Sekunden                      </td></tr>
+            <tr><td> <b>runTimeLastAPIAnswer</b>      </td><td>die letzte Antwortzeit der SolCast API (nur Model SolCastAPI) auf einen Request in Sekunden        </td></tr>
+            <tr><td> <b>runTimeLastAPIProc</b>        </td><td>die letzte Prozesszeit zur Verarbeitung der empfangenen SolCast API Daten (nur Model SolCastAPI)   </td></tr>
+            <tr><td> <b>todayMaxAPIcalls</b>          </td><td>die maximal mögliche Anzahl SolCast API Calls (nur Model SolCastAPI).                              </td></tr>
+            <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
+            <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Calls (nur Model SolCastAPI)              </td></tr>
+            <tr><td> <b>todayDoneAPIrequests</b>      </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Requests (nur Model SolCastAPI)           </td></tr>
+            <tr><td> <b>todayRemaingAPIcalls</b>      </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)            </td></tr>
+            <tr><td> <b>todayRemainingAPIrequests</b> </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)         </td></tr>
+         </table>
+         </ul>          
+       <br>       
+       </li>
+       <br>
+
        
        <a id="SolarForecast-attr-createTomorrowPVFcReadings"></a>
        <li><b>createTomorrowPVFcReadings &lt;01,02,..,24&gt; </b><br>
@@ -11195,7 +11328,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>flowGraphicConsumerDistance </b><br>
          Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik sofern angezeigt. 
          Siehe auch Attribut <a href="#SolarForecast-attr-flowGraphicShowConsumer">flowGraphicShowConsumer</a>. <br>
-         (default: 80)
+         (default: 140)
        </li>
        <br>
        
@@ -11209,7 +11342,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <a id="SolarForecast-attr-flowGraphicShowConsumerDummy"></a>
        <li><b>flowGraphicShowConsumerDummy </b><br>
          Zeigt bzw. unterdrückt den Dummy-Verbraucher in der Energieflußgrafik. <br> 
-         Dem Dummy-Verbraucher stellt den Energieverbrauch dar der anderen Verbrauchern nicht zugeordnet werden konnte. <br>
+         Dem Dummy-Verbraucher wird der Energieverbrauch zugewiesen der anderen Verbrauchern nicht zugeordnet werden konnte. <br>
          (default: 1)
        </li>
        <br>    
