@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-25 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-26 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -129,6 +129,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
+                           "changed some graphic default settings, typo todayRemaingAPIcalls, input check currentBatteryDev ".
+                           "change attr Css to flowGraphicCss ",
   "0.71.0" => "25.10.2022  new attribute createStatisticReadings, changed some default settings and commandref ",
   "0.70.10"=> "24.10.2022  write best percentil in pvHistory (_calcCAQwithSolCastPercentil instead of ___readPercAndQuality) ".
                            "add global dnsServer to checkPlantConfig ",
@@ -347,35 +350,37 @@ my $defctype     = "other";                                                     
 my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
 
 my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
-my $defflowGSize = 300;                                                           # default flowGraphicSize
+my $flowGSizedef = 400;                                                           # default flowGraphicSize
 my $histhourdef  = 2;                                                             # default Anzeige vorangegangene Stunden
-my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag Default Farbe
-my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht Default Farbe
-my $b1coldef     = 'FFAC63';                                                      # Default Farbe Beam 1
-my $b1fontcoldef = '0D0D0D';                                                      # Default Schriftfarbe Beam 1
-my $b2coldef     = 'C4C4A7';                                                      # Default Farbe Beam 2
-my $b2fontcoldef = '000000';                                                      # Default Schriftfarbe Beam 2
+my $wthcolddef   = 'C7C979';                                                      # Wetter Icon Tag default Farbe
+my $wthcolndef   = 'C7C7C7';                                                      # Wetter Icon Nacht default Farbe
+my $b1coldef     = 'FFAC63';                                                      # default Farbe Beam 1
+my $b1fontcoldef = '0D0D0D';                                                      # default Schriftfarbe Beam 1
+my $b2coldef     = 'C4C4A7';                                                      # default Farbe Beam 2
+my $b2fontcoldef = '000000';                                                      # default Schriftfarbe Beam 2
+my $fgCDdef      = 130;                                                           # Abstand Verbrauchericons zueinander
   
 my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
 my $defhyst      = 0;                                                             # default Hysterese
 
-                                                                                  # Default CSS-Style
-my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 32px;}                                    \n}.
-                   qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                \n}.
-                   qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                    \n}.
-                   qq{.flowg.bat25          { stroke: red; fill: red; }                                                      \n}.
-                   qq{.flowg.bat50          { stroke: yellow; fill: yellow; }                                                \n}.
-                   qq{.flowg.bat75          { stroke: green; fill: green; }                                                  \n}.
-                   qq{.flowg.grid_color1    { fill: green; }                                                                 \n}.
-                   qq{.flowg.grid_color2    { fill: red; }                                                                   \n}.
-                   qq{.flowg.grid_color3    { fill: gray; }                                                                  \n}.
-                   qq{.flowg.inactive_in    { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
-                   qq{.flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }   \n}.
-                   qq{.flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
-                   qq{.flowg.active_bat_out { stroke: green;  stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
+                                                                                  # default CSS-Style
+my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
+                   qq{.flowg.sun_active     { stroke: orange; fill: orange; }                                                  \n}.
+                   qq{.flowg.sun_inactive   { stroke: gray; fill: gray; }                                                      \n}.
+                   qq{.flowg.bat25          { stroke: red; fill: red; }                                                        \n}.
+                   qq{.flowg.bat50          { stroke: darkorange; fill: darkorange; }                                          \n}.
+                   qq{.flowg.bat75          { stroke: green; fill: green; }                                                    \n}.
+                   qq{.flowg.grid_color1    { fill: green; }                                                                   \n}.
+                   qq{.flowg.grid_color2    { fill: red; }                                                                     \n}.
+                   qq{.flowg.grid_color3    { fill: gray; }                                                                    \n}.
+                   qq{.flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } \n}.
+                   qq{.flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; } \n}.
+                   qq{.flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
+                   qq{.flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
                    ;
+                              
                                                                                   # Liste optionaler Statistikreadings
 my @csr         = qw( currentAPIinterval
                       lastretrieval_time
@@ -387,7 +392,7 @@ my @csr         = qw( currentAPIinterval
                       todayMaxAPIcalls
                       todayDoneAPIcalls
                       todayDoneAPIrequests
-                      todayRemaingAPIcalls
+                      todayRemainingAPIcalls
                       todayRemainingAPIrequests
                     );
 
@@ -543,6 +548,8 @@ my %hqtxt = (                                                                   
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop>}                              },
+  fullfd => { EN => qq{fullfilled},
+              DE => qq{erf&uuml;llt}                                                                                        },
   awd    => { EN => qq{LINK is waiting for solar forecast data ... <br><br>(The configuration can be checked with "set LINK plantConfiguration check".) },
               DE => qq{LINK wartet auf Solarvorhersagedaten ... <br><br>(Die Konfiguration kann mit "set LINK plantConfiguration check" gepr&uuml;ft werden.)} },
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please observe any notes (<I>).},
@@ -733,7 +740,7 @@ my %hcsr = (                                                                    
   todayMaxAPIcalls           => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
   todayDoneAPIcalls          => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
   todayDoneAPIrequests       => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
-  todayRemaingAPIcalls       => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
+  todayRemainingAPIcalls     => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs },
   todayRemainingAPIrequests  => { fnr => 1, fn => \&SolCastAPIVal, def => $apimaxreqs }, 
   runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    def => '-'         }, 
   runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
@@ -755,9 +762,9 @@ my %hcsr = (                                                                    
 sub Initialize {
   my $hash = shift;
 
-  my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my $hod = join ",", map { sprintf "%02d", $_} (01..24); 
-  my $srd = join ",", @csr;  
+  my $fwd   = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+  my $hod   = join ",", map { sprintf "%02d", $_} (01..24); 
+  my $srd   = join ",", @csr;
   
   my ($consumer,@allc);
   for my $c (1..$maxconsumer) {
@@ -795,7 +802,6 @@ sub Initialize {
                                 "createConsumptionRecReadings:multiple-strict,$allcs ".
                                 "createTomorrowPVFcReadings:multiple-strict,$hod ".
                                 "createStatisticReadings:multiple-strict,$srd ".
-                                "Css:textField-long ".
                                 "debug:1,0 ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
@@ -804,7 +810,8 @@ sub Initialize {
                                 "flowGraphicShowConsumer:1,0 ".
                                 "flowGraphicShowConsumerDummy:1,0 ".      
                                 "flowGraphicShowConsumerPower:0,1 ". 
-                                "flowGraphicShowConsumerRemainTime:0,1 ".                                                                                 
+                                "flowGraphicShowConsumerRemainTime:0,1 ".
+                                "flowGraphicCss:textField-long ".                             
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast,none ".                                     
@@ -1309,7 +1316,12 @@ sub _setbatteryDevice {                  ## no critic "not used"
   }
   
   if(!$h->{pin} || !$h->{pout}) {
-      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+      return qq{The keys "pin" and/or "pout" are not set. Please note the command reference.};
+  }
+  
+  if(($h->{pin}  !~ /-/xs && $h->{pin} !~ /:/xs)   || 
+     ($h->{pout} !~ /-/xs && $h->{pout} !~ /:/xs)) {
+      return qq{The keys "pin" and/or "pout" are not set correctly. Please note the command reference.};
   }
 
   if($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
@@ -2167,7 +2179,12 @@ sub __solCast_ApiResponse {
       while ($jdata->{'forecasts'}[$k]) {
           my $petstr  = $jdata->{'forecasts'}[$k]{'period_end'};
           
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # ersten Datanesatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # ersten Datensatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
+              $k += 1;
+              next;                           
+          }
+          
+          if(!$jdata->{'forecasts'}[$k]{'pv_estimate'}) {                                                # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
               $k += 1;
               next;                           
           }
@@ -2303,7 +2320,7 @@ sub ___setLastAPIcallKeyData {
   $drc     = 0 if($drc < 0);
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr; 
-  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls}      = $drc;
+  $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls}    = $drc;
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls}         = $ddc;
   
   ## Berechnung des optimalen Request Intervalls
@@ -2944,6 +2961,7 @@ sub centralTask {
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todaySolCastAPIcalls};
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIInterval};
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
+  delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
   
   ###############################################################
 
@@ -3258,7 +3276,7 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
-          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
+          delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
           
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
@@ -3723,18 +3741,17 @@ sub __calcSolCastEstimates {
       
       my $est50 = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0); 
       
+      ## Zusatzpercentile berechnen - Muster:
+      ## 
+      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate20} = sprintf "%.0f", ($est50 - ($lowdm * 3));
+      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate30} = sprintf "%.0f", ($est50 - ($lowdm * 2));          
+      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate40} = sprintf "%.0f", ($est50 - ($lowdm * 1));
+      ##
+      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate60} = sprintf "%.0f", ($est50 + ($highdm * 1));          
+      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate70} = sprintf "%.0f", ($est50 + ($highdm * 2));
+      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate80} = sprintf "%.0f", ($est50 + ($highdm * 3));
+      #################################################################################################################
       if ($perc != 50) {
-          ## Zusatzpercentile berechnen - Muster:
-          ## 
-          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate20} = sprintf "%.0f", ($est50 - ($lowdm * 3));
-          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate30} = sprintf "%.0f", ($est50 - ($lowdm * 2));          
-          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate40} = sprintf "%.0f", ($est50 - ($lowdm * 1));
-          ##
-          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate60} = sprintf "%.0f", ($est50 + ($highdm * 1));          
-          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate70} = sprintf "%.0f", ($est50 + ($highdm * 2));
-          ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate80} = sprintf "%.0f", ($est50 + ($highdm * 3));
-          #################################################################################################################
-
           if ($perc < 50) {
               my $est10 = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate10', $est50);
               my $lowdm = ($est50 - $est10) / 4;
@@ -3746,6 +3763,8 @@ sub __calcSolCastEstimates {
               $data{$type}{$name}{solcastapi}{$string}{$wantdt}{'pv_estimate'.$perc} = sprintf "%.0f", ($est50 + ($highdm * $hpctpl{$perc}{mp}));
           }          
       }
+      
+      ####
       
       my $est = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $est50);
       my $pv  = sprintf "%.1f", ($est * $ccf * $rcf);
@@ -6198,38 +6217,38 @@ sub entryGraphic {
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
       offset         => $offset,
-      hourstyle      => AttrVal ($name,    'hourStyle',                        ''),
-      colorb1        => AttrVal ($name,    'beam1Color',                $b1coldef),
-      colorb2        => AttrVal ($name,    'beam2Color',                $b2coldef),
-      fcolor1        => AttrVal ($name,    'beam1FontColor',        $b1fontcoldef),
-      fcolor2        => AttrVal ($name,    'beam2FontColor',        $b2fontcoldef),  
-      beam1cont      => AttrVal ($name,    'beam1Content',               'pvReal'),
-      beam2cont      => AttrVal ($name,    'beam2Content',           'pvForecast'), 
-      caicon         => AttrVal ($name,    'consumerAdviceIcon',       $caicondef),            # Consumer AdviceIcon
-      clegend        => AttrVal ($name,    'consumerLegend',           'icon_top'),            # Lage und Art Cunsumer Legende
-      lotype         => AttrVal ($name,    'layoutType',                 'double'),
-      kw             => AttrVal ($name,    'Wh_kWh',                         'Wh'),
-      height         => AttrNum ($name,    'beamHeight',                      200),
+      hourstyle      => AttrVal ($name,    'hourStyle',                         ''),
+      colorb1        => AttrVal ($name,    'beam1Color',                 $b1coldef),
+      colorb2        => AttrVal ($name,    'beam2Color',                 $b2coldef),
+      fcolor1        => AttrVal ($name,    'beam1FontColor',         $b1fontcoldef),
+      fcolor2        => AttrVal ($name,    'beam2FontColor',         $b2fontcoldef),  
+      beam1cont      => AttrVal ($name,    'beam1Content',                'pvReal'),
+      beam2cont      => AttrVal ($name,    'beam2Content',            'pvForecast'), 
+      caicon         => AttrVal ($name,    'consumerAdviceIcon',        $caicondef),            # Consumer AdviceIcon
+      clegend        => AttrVal ($name,    'consumerLegend',            'icon_top'),            # Lage und Art Cunsumer Legende
+      lotype         => AttrVal ($name,    'layoutType',                  'double'),
+      kw             => AttrVal ($name,    'Wh_kWh',                          'Wh'),
+      height         => AttrNum ($name,    'beamHeight',                       200),
       width          => $width,
-      fsize          => AttrNum ($name,    'spaceSize',                        24),
-      maxVal         => AttrNum ($name,    'maxValBeam',                        0),            # dyn. Anpassung der Balkenhöhe oder statisch ?
-      show_night     => AttrNum ($name,    'showNight',                         0),            # alle Balken (Spalten) anzeigen ?
-      show_diff      => AttrVal ($name,    'showDiff',                       'no'),            # zusätzliche Anzeige $di{} in allen Typen
-      weather        => AttrNum ($name,    'showWeather',                       1),
-      colorw         => AttrVal ($name,    'weatherColor',            $wthcolddef),            # Wetter Icon Farbe Tag
-      colorwn        => AttrVal ($name,    'weatherColorNight',       $wthcolndef),            # Wetter Icon Farbe Nacht
-      wlalias        => AttrVal ($name,    'alias',                         $name),
-      header         => AttrNum ($name,    'showHeader',                        1), 
-      hdrDetail      => AttrVal ($name,    'headerDetail',                  'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-      lang           => AttrVal ("global", 'language',                       'EN'),
-      flowgh         => AttrVal ($name,    'flowGraphicSize',       $defflowGSize),            # Größe Energieflußgrafik
-      flowgani       => AttrVal ($name,    'flowGraphicAnimate',                0),            # Animation Energieflußgrafik
-      flowgcons      => AttrVal ($name,    'flowGraphicShowConsumer',           1),            # Verbraucher in der Energieflußgrafik anzeigen
-      flowgconX      => AttrVal ($name,    'flowGraphicShowConsumerDummy',      1),            # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
-      flowgconsPower => AttrVal ($name,    'flowGraphicShowConsumerPower'     , 1),            # Verbraucher Leistung in der Energieflußgrafik anzeigen
-      flowgconsTime  => AttrVal ($name,    'flowGraphicShowConsumerRemainTime', 1),            # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen                                                                                                                                                         
-      flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance',     140),            # Abstand Verbrauchericons zueinander
-      css            => AttrVal ($name,    'Css',                         $cssdef),            # Css Styles
+      fsize          => AttrNum ($name,    'spaceSize',                         24),
+      maxVal         => AttrNum ($name,    'maxValBeam',                         0),            # dyn. Anpassung der Balkenhöhe oder statisch ?
+      show_night     => AttrNum ($name,    'showNight',                          0),            # alle Balken (Spalten) anzeigen ?
+      show_diff      => AttrVal ($name,    'showDiff',                        'no'),            # zusätzliche Anzeige $di{} in allen Typen
+      weather        => AttrNum ($name,    'showWeather',                        1),
+      colorw         => AttrVal ($name,    'weatherColor',             $wthcolddef),            # Wetter Icon Farbe Tag
+      colorwn        => AttrVal ($name,    'weatherColorNight',        $wthcolndef),            # Wetter Icon Farbe Nacht
+      wlalias        => AttrVal ($name,    'alias',                          $name),
+      header         => AttrNum ($name,    'showHeader',                         1), 
+      hdrDetail      => AttrVal ($name,    'headerDetail',                   'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      lang           => AttrVal ("global", 'language',                        'EN'),
+      flowgsize      => AttrVal ($name,    'flowGraphicSize',        $flowGSizedef),            # Größe Energieflußgrafik
+      flowgani       => AttrVal ($name,    'flowGraphicAnimate',                 0),            # Animation Energieflußgrafik
+      flowgcons      => AttrVal ($name,    'flowGraphicShowConsumer',            1),            # Verbraucher in der Energieflußgrafik anzeigen
+      flowgconX      => AttrVal ($name,    'flowGraphicShowConsumerDummy',       1),            # Dummyverbraucher in der Energieflußgrafik anzeigen                                                                                                                                         
+      flowgconsPower => AttrVal ($name,    'flowGraphicShowConsumerPower'     ,  1),            # Verbraucher Leistung in der Energieflußgrafik anzeigen
+      flowgconsTime  => AttrVal ($name,    'flowGraphicShowConsumerRemainTime',  1),            # Verbraucher Restlaufeit in der Energieflußgrafik anzeigen                                                                                                                                                         
+      flowgconsDist  => AttrVal ($name,    'flowGraphicConsumerDistance', $fgCDdef),            # Abstand Verbrauchericons zueinander
+      css            => AttrVal ($name,    'flowGraphicCss',               $cssdef),            # flowGraphicCss Styles
   };
   
   my $ret = q{};
@@ -7490,7 +7509,7 @@ sub _flowGraphic {
   my $paref         = shift;
   my $hash          = $paref->{hash};
   my $name          = $paref->{name};
-  my $flowgh        = $paref->{flowgh};
+  my $flowgsize     = $paref->{flowgsize};
   my $flowgani      = $paref->{flowgani};
   my $flowgcons     = $paref->{flowgcons};
   my $flowgconX     = $paref->{flowgconX};
@@ -7499,7 +7518,7 @@ sub _flowGraphic {
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
   
-  my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
+  my $style      = 'width:'.$flowgsize.'px; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
   my $cpv        = ReadingsNum($name, 'Current_PV',              0);
   my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
@@ -7681,9 +7700,9 @@ END3
   
    if ($flowgconX) {                                                                              # Dummy Consumer 
       my $consumer_style = 'flowg inactive_out';
-      $consumer_style    = 'flowg active_out' if($cc_dummy > 1);
+      $consumer_style    = 'flowg active_in' if($cc_dummy > 1);
           
-      my $chain_color = "";                                                                       # Farbe der Laufkette Donsumer-Dummy
+      my $chain_color = "";                                                                       # Farbe der Laufkette Consumer-Dummy
       if($cc_dummy > 0.5) {
           $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,500,1000,$cc_dummy,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
           #$chain_color  = 'style="stroke: #DF0101;"';
@@ -9062,7 +9081,7 @@ sub checkPlantConfig {
       }
   }
   
-  $result->{'String Configuration'}{result} = "fullfilled" if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
+  $result->{'String Configuration'}{result} = $hqtxt{fullfd}{$lang} if(!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn});
   
   ## Check Attribute DWD Wetterdevice
   #####################################
@@ -9083,7 +9102,7 @@ sub checkPlantConfig {
           $result->{'DWD Weather Attributes'}{fault}  = 1;
       }
       else {
-          $result->{'DWD Weather Attributes'}{result} = "fullfilled";
+          $result->{'DWD Weather Attributes'}{result} = $hqtxt{fullfd}{$lang};
       }
   }
   
@@ -9112,7 +9131,7 @@ sub checkPlantConfig {
               $result->{'DWD Radiation Attributes'}{fault}  = 1;
           }
           else {
-              $result->{'DWD Radiation Attributes'}{result} = "fullfilled";
+              $result->{'DWD Radiation Attributes'}{result} = $hqtxt{fullfd}{$lang};
           }
       }
   }
@@ -9144,7 +9163,7 @@ sub checkPlantConfig {
           $result->{'Roof Ident Pair Settings'}{fault}   = 1;
       }
       else {
-          $result->{'Rooftop Settings'}{result} .= "fullfilled";
+          $result->{'Rooftop Settings'}{result} .= $hqtxt{fullfd}{$lang};
           $result->{'Rooftop Settings'}{note}   .= qq{Rooftops defined: }.$rft.qq{<br>};         
       }      
       
@@ -9164,7 +9183,7 @@ sub checkPlantConfig {
               $result->{'Roof Ident Pair Settings'}{fault}   = 1;
           }
           else {
-              $result->{'Roof Ident Pair Settings'}{result}  = "fullfilled" if(!$result->{'Roof Ident Pair Settings'}{fault});
+              $result->{'Roof Ident Pair Settings'}{result}  = $hqtxt{fullfd}{$lang} if(!$result->{'Roof Ident Pair Settings'}{fault});
               $result->{'Roof Ident Pair Settings'}{note}   .= qq{checked "$is" Roof Ident Pair "$pk":<br>rtid=$rtid, apikey=$apikey <br>};
           }          
       }  
@@ -9234,7 +9253,7 @@ sub checkPlantConfig {
       }
       
       if(!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
-          $result->{'Common Settings'}{result}  = "fullfilled";
+          $result->{'Common Settings'}{result}  = $hqtxt{fullfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
           $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping, rainFactorDamping, optimizeSolCastAPIreqInterval <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading <br>};
@@ -9254,7 +9273,7 @@ sub checkPlantConfig {
       }
       
       if(!$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
-          $result->{'Common Settings'}{result}  = "fullfilled";
+          $result->{'Common Settings'}{result}  = $hqtxt{fullfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading <br>}; 
       }
@@ -10163,7 +10182,7 @@ return $def;
 # SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests',    $def) - heute ausgeführte API Requests
 # SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests $def) - heute verbleibende API Requests
 # SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls',       $def) - heute ausgeführte API Calls (hat u.U. mehrere Requests)
-# SolCastAPIVal ($hash, '?All', '?All', 'todayRemaingAPIcalls',    $def) - heute noch mögliche API Calls (ungl. Requests !)
+# SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIcalls',  $def) - heute noch mögliche API Calls (ungl. Requests !)
 # SolCastAPIVal ($hash, '?All', '?All', 'solCastAPIcallMultiplier',$def) - APIcalls = APIRequests * solCastAPIcallMultiplier
 # SolCastAPIVal ($hash, '?All', '?All', 'currentAPIinterval',      $def) - aktuelles API Request Intervall 
 # SolCastAPIVal ($hash, '?All', '?All', 'response_message',        $def) - letzte SolCast API Antwort
@@ -10965,7 +10984,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>Anzahl der ausgeführten API Requests am aktuellen Tag    </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden API Requests am aktuellen Tag   </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag      </td></tr>
-            <tr><td> <b>todayRemaingAPIcalls</b>      </td><td>Anzahl der noch möglichen API Abrufe am aktuellen Tag    </td></tr>    
+            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Abrufe am aktuellen Tag    </td></tr>    
             <tr><td> <b>                              </td><td>(ein Abruf kann mehrere API Requests ausführen)          </td></tr>                   
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen API Abrufe pro Tag          </td></tr>
          </table> 
@@ -11253,7 +11272,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td>                                  </td><td>Ein Call kann mehrere API Requests enthalten.                                                      </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Calls (nur Model SolCastAPI)              </td></tr>
             <tr><td> <b>todayDoneAPIrequests</b>      </td><td>die Anzahl der am aktuellen Tag ausgeführten SolCast API Requests (nur Model SolCastAPI)           </td></tr>
-            <tr><td> <b>todayRemaingAPIcalls</b>      </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)            </td></tr>
+            <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Calls (nur Model SolCastAPI)            </td></tr>
             <tr><td> <b>todayRemainingAPIrequests</b> </td><td>die Anzahl der am aktuellen Tag noch möglichen SolCast API Requests (nur Model SolCastAPI)         </td></tr>
          </table>
          </ul>          
@@ -11278,27 +11297,27 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br> 
        
-       <a id="SolarForecast-attr-Css"></a>
-       <li><b>Css </b><br>
+       <a id="SolarForecast-attr-flowGraphicCss"></a>
+       <li><b>flowGraphicCss </b><br>
          Definiert den Style für die Energieflußgrafik. Das Attribut wird automatisch vorbelegt. 
-         Zum Ändern des Css-Attributes bitte den Default übernehmen und anpassen: <br><br>
+         Zum Ändern des flowGraphicCss-Attributes bitte den Default übernehmen und anpassen: <br><br>
          
          <ul>   
-           .flowg.text           { stroke: none; fill: gray; font-size: 32px; } <br>    
+           .flowg.text           { stroke: none; fill: gray; font-size: 60px; } <br>    
            .flowg.sun_active     { stroke: orange; fill: orange; }              <br>                                          
            .flowg.sun_inactive   { stroke: gray; fill: gray; }                  <br>                                         
            .flowg.bat25          { stroke: red; fill: red; }                    <br>                                        
-           .flowg.bat50          { stroke: yellow; fill: yellow; }              <br>                                       
+           .flowg.bat50          { stroke: darkorange; fill: darkorange; }      <br>                                       
            .flowg.bat75          { stroke: green; fill: green; }                <br>                                    
            .flowg.grid_color1    { fill: green; }                               <br>           
            .flowg.grid_color2    { fill: red; }                                 <br>                                    
            .flowg.grid_color3    { fill: gray; }                                <br>                                    
-           .flowg.inactive_in    { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
-           .flowg.inactive_out   { stroke: gray;   stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }    <br>
-           .flowg.active_in      { stroke: red;    stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_out     { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
-           .flowg.active_bat_in  { stroke: yellow; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>
-           .flowg.active_bat_out { stroke: green; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }  <br>                                                                                                                                                                                                                             
+           .flowg.inactive_in    { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }                                                                     <br>
+           .flowg.inactive_out   { stroke: gray;       stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2; }                                                                     <br>
+           .flowg.active_in      { stroke: red;        stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
+           .flowg.active_out     { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
+           .flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>
+           .flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; }   <br>                                                                                                                                                                                                                             
          </ul>   
          
        </li>
@@ -11328,7 +11347,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>flowGraphicConsumerDistance </b><br>
          Steuert den Abstand zwischen den Consumer-Icons in der Energieflußgrafik sofern angezeigt. 
          Siehe auch Attribut <a href="#SolarForecast-attr-flowGraphicShowConsumer">flowGraphicShowConsumer</a>. <br>
-         (default: 140)
+         (default: 130)
        </li>
        <br>
        
@@ -11365,7 +11384,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>flowGraphicSize &lt;Pixel&gt; </b><br>
          Größe der Energieflußgrafik sofern angezeigt. 
          Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
-         (default: 300)
+         (default: 400)
        </li>
        <br>
        
@@ -11395,16 +11414,16 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
-         Wählt die anzuzeigende interne Grafik des Moduls aus. <br>
-         Zur Anpassung der Energieflußgrafik steht das Attribut <a href="#SolarForecast-attr-Css">Css</a> zur 
-         Verfügung. <br><br>
+         Wählt die anzuzeigende Grafik des Moduls aus. <br>
+         Zur Anpassung der Energieflußgrafik steht neben den flowGraphic.*-Attributen auch 
+         das Attribut <a href="#SolarForecast-attr-flowGraphicCss">flowGraphicCss</a> zur Verfügung. <br><br>
          
          <ul>   
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Vorhersagegrafik an (default)    </td></tr>
             <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
             <tr><td> <b>forecast</b>   </td><td>zeigt die Vorhersagegrafik an                           </td></tr>
-            <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Vorhersagegrafik an (default)    </td></tr>
             <tr><td> <b>none</b>       </td><td>es wird keine Grafik angezeigt                          </td></tr>
          </table>
          </ul> 
@@ -11480,17 +11499,16 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-layoutType"></a>
        <li><b>layoutType &lt;single | double | diff&gt; </b><br>
-       Layout der integrierten Grafik. <br>
+       Layout der Modulgrafik. <br>
        Der darzustellende Inhalt der Balken wird durch die Attribute <b>beam1Content</b> bzw. <b>beam2Content</b> 
-       bestimmt. <br>
-       (default: double)  
+       bestimmt.         
        <br><br>
        
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an (default)                                               </td></tr>
           <tr><td> <b>single</b>  </td><td>- zeigt nur den primären Balken an                                                                               </td></tr>
-          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an                                                         </td></tr>
           <tr><td> <b>diff</b>    </td><td>- Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
        </table>
        </ul>
