@@ -1878,20 +1878,21 @@ sub _setclientAction {                 ## no critic "not used"
   
   my @args = @{$argsref};
   
+  my $ftui   = shift @args;                                                 # Auslöser ist FTUI ?
   my $action = shift @args;                                                 # z.B. set, setreading
   my $cname  = shift @args;                                                 # Consumername
   my $tail   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente 
   
-  Log3($name, 4, qq{$name - Consumer Action received / execute: "$action $cname $tail"});
+  Log3($name, 4, qq{$name - Client Action received / execute: "$action $cname $tail"});
   
   if($action eq "set") {
       CommandSet (undef, "$cname $tail");
-      $noUpdState = 1;
+      $noUpdState = 1 if(!$ftui);
   }
   
   if($action eq "get") {
       if($tail eq 'data') {
-          $noUpdState = 1;
+          $noUpdState = 1 if(!$ftui);
           centralTask ($hash, $noUpdState);
           return;
       }
@@ -6530,10 +6531,10 @@ sub _graphicHeader {
          $lup = "$day.$month.$year&nbsp;$time"; 
       }
 
-      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction get $name data')"};  # Update Button generieren        
+      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 get $name data')"};  # Update Button generieren        
 
       if ($ftui eq "ftui") {
-          $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction get $name data')"};     
+          $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
       }   
                   
       my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren        
@@ -6824,18 +6825,18 @@ sub _graphicConsumerLegend {
       my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
       my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
       
-      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction set $cname $oncom')"};
-      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction set $cname $offcom')"};
-      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction setreading $cname $autord 1')"};
-      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction setreading $cname $autord 0')"};
-      my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction consumerImmediatePlanning $c')"};
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 set $cname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 set $cname $offcom')"};
+      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 setreading $cname $autord 1')"};
+      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 setreading $cname $autord 0')"};
+      my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 consumerImmediatePlanning $c')"};
       
       if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction set $cname $offcom')"};
-          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction set $cname setreading $cname $autord 1')"};  
-          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction set $cname setreading $cname $autord 0')"}; 
-          $implan     = qq{"ftui.setFhemStatus('set $name clientAction consumerImmediatePlanning $c')"};          
+          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction 1 set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction 1 set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction 1 setreading $cname $autord 1')"};  
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction 1 setreading $cname $autord 0')"}; 
+          $implan     = qq{"ftui.setFhemStatus('set $name clientAction 1 consumerImmediatePlanning $c')"};          
       }
       
       $cmdon      = q{} if(!$oncom);
