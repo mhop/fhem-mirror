@@ -1536,7 +1536,7 @@ sub _setplantConfiguration {             ## no critic "not used"
           return $err;
       }
       else {
-          return qq{Plant Configuration has been written to file "$plantcfg.$name"};
+          return qq{Plant Configuration has been written to file "}.$plantcfg.$name.qq{"};
       }
   }
   
@@ -1553,7 +1553,7 @@ sub _setplantConfiguration {             ## no critic "not used"
           }          
           
           if($rbit) {
-              return qq{Plant Configuration restored from file "$plantcfg.$name"};
+              return qq{Plant Configuration restored from file "}.$plantcfg.$name.qq{"};
           }
           else {
               return qq{The Plant Configuration file "$plantcfg.$name" was empty, nothing restored};
@@ -3866,14 +3866,6 @@ sub ___readPercAndQuality {
   $perc = sprintf "%.0f", $perc;
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $perc."/".$hq;
-
-  #if($fd == 0 && $fh1) {
-  #    $paref->{pvcorrf}  = $perc."/".$hq;
-  #    $paref->{nhour}    = sprintf("%02d",$fh1);
-  #    $paref->{histname} = "pvcorrfactor";
-  #    setPVhistory ($paref);
-  #    delete $paref->{histname};  
-  #}
    
 return ($hcfound, $perc, $hq);
 }
