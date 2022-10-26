@@ -1900,6 +1900,7 @@ sub _setclientAction {                 ## no critic "not used"
   
   if($action eq "setreading") {
       CommandSetReading (undef, "$cname $tail");
+      $noUpdState = 1 if(!$ftui);
   }
   
   if($action eq "consumerImmediatePlanning") {
