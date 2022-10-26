@@ -1220,7 +1220,8 @@ FW_doUpdate(evt)
       try {
         eval(d[1]);
       } catch(e) {
-        FW_okDialog("#FHEMWEB notification:<br>"+d[1]+"<br>"+e);
+        if($("body").attr("data-confirmJSError") != 0)
+          FW_okDialog("#FHEMWEB notification:<br>"+d[1]+"<br>"+e);
       }
 
     } else {
