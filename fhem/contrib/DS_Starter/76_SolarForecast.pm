@@ -3002,7 +3002,7 @@ sub centralTask {
       
       return if(IsDisabled($name));
       
-      readingsSingleUpdate($hash, "state", "running", 1) if(!$noUpdState);
+      #readingsSingleUpdate($hash, "state", "running", 1) if(!$noUpdState);
       
       my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
       if ($ret) { 
