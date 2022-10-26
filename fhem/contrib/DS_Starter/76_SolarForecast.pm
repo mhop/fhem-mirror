@@ -61,6 +61,7 @@ BEGIN {
           AttrVal
           AttrNum
           CommandAttr
+          CommandGet
           CommandSet
           CommandSetReading
           data
@@ -129,6 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.71.2" => "26.10.2022  fix 'connection refused ...' ",
   "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
                            "changed some graphic default settings, typo todayRemaingAPIcalls, input check currentBatteryDev ".
                            "change attr Css to flowGraphicCss ",
@@ -406,7 +408,7 @@ my %hset = (                                                                # Ha
   currentRadiationDev       => { fn => \&_setcurrentRadiationDev       },
   modulePeakString          => { fn => \&_setmodulePeakString          },
   inverterStrings           => { fn => \&_setinverterStrings           },
-  consumerAction            => { fn => \&_setconsumerAction            },
+  clientAction              => { fn => \&_setclientAction              },
   currentInverterDev        => { fn => \&_setinverterDevice            },
   currentMeterDev           => { fn => \&_setmeterDevice               },
   currentBatteryDev         => { fn => \&_setbatteryDevice             },
@@ -1857,16 +1859,18 @@ return $ret;
 }
 
 ################################################################
-#              Setter consumerAction
+#              Setter clientAction
 #      ohne Menüeintrag ! für Aktivität aus Grafik
 ################################################################
-sub _setconsumerAction {                 ## no critic "not used"
+sub _setclientAction {                 ## no critic "not used"
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $opt     = $paref->{opt};
   my $arg     = $paref->{arg};
   my $argsref = $paref->{argsref};
+  
+  my $noUpdState = 0;                                                        # state nicht updaten = 0 -> state updaten !          
 
   if(!$arg) {
       return qq{The command "$opt" needs an argument !};
@@ -1878,8 +1882,19 @@ sub _setconsumerAction {                 ## no critic "not used"
   my $cname  = shift @args;                                                 # Consumername
   my $tail   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente 
   
+  Log3($name, 4, qq{$name - Consumer Action received / execute: "$action $cname $tail"});
+  
   if($action eq "set") {
       CommandSet (undef, "$cname $tail");
+      $noUpdState = 1;
+  }
+  
+  if($action eq "get") {
+      if($tail eq 'data') {
+          $noUpdState = 1;
+          centralTask ($hash, $noUpdState);
+          return;
+      }
   }
   
   if($action eq "setreading") {
@@ -1890,9 +1905,7 @@ sub _setconsumerAction {                 ## no critic "not used"
       CommandSet (undef, "$name $action $cname noTaskcall");
   }
   
-  Log3($name, 4, qq{$name - Consumer Action received / executed: "$action $cname $tail"});
-  
-  centralTask ($hash);
+  centralTask ($hash, $noUpdState);
 
 return;
 }
@@ -2935,12 +2948,13 @@ return @pvconf;
 #                       Zentraler Datenabruf
 ################################################################
 sub centralTask {
-  my $hash = shift;
+  my $hash       = shift;
+  my $noUpdState = shift // 0;                                        # state updaten 0, nicht updaten 1
+  
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  
-  my $cst = [gettimeofday];                                                                         # Zyklus-Startzeit
-  
+  my $cst  = [gettimeofday];                                          # Zyklus-Startzeit
+
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
   
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
@@ -2986,7 +3000,7 @@ sub centralTask {
       
       return if(IsDisabled($name));
       
-      readingsSingleUpdate($hash, "state", "running", 1);
+      readingsSingleUpdate($hash, "state", "running", 1) if(!$noUpdState);
       
       my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
       if ($ret) { 
@@ -3053,7 +3067,7 @@ sub centralTask {
       
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate ($hash, "state", $centpars->{state}, 1);                       # Abschluß state 
+      readingsSingleUpdate ($hash, "state", $centpars->{state}, 1) if(!$noUpdState);      # Abschluß state 
       setTimeTracking      ($hash, $cst, 'runTimeCentralTask');                           # Zyklus-Laufzeit ermitteln 
 
       genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen      
@@ -6230,7 +6244,7 @@ sub entryGraphic {
       colorw         => AttrVal ($name,    'weatherColor',             $wthcolddef),            # Wetter Icon Farbe Tag
       colorwn        => AttrVal ($name,    'weatherColorNight',        $wthcolndef),            # Wetter Icon Farbe Nacht
       wlalias        => AttrVal ($name,    'alias',                          $name),
-      header         => AttrNum ($name,    'showHeader',                         1), 
+      sheader        => AttrNum ($name,    'showHeader',                         1), 
       hdrDetail      => AttrVal ($name,    'headerDetail',                   'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       lang           => AttrVal ("global", 'language',                        'EN'),
       flowgsize      => AttrVal ($name,    'flowGraphicSize',        $flowGSizedef),            # Größe Energieflußgrafik
@@ -6256,12 +6270,12 @@ sub entryGraphic {
   # Headerzeile generieren 
   ##########################  
   my $header       = _graphicHeader ($paref);
-  $paref->{header} = $header;
+  #$paref->{header} = $header;
   
   # Verbraucherlegende und Steuerung
   ###################################           
   my $legendtxt       = _graphicConsumerLegend ($paref);
-  $paref->{legendtxt} = $legendtxt;
+  #$paref->{legendtxt} = $legendtxt;
   
   $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
   my $m = $paref->{modulo} % 2;
@@ -6440,10 +6454,10 @@ return;
 #         forecastGraphic Headerzeile generieren 
 ################################################################
 sub _graphicHeader {                                
-  my $paref  = shift;
-  my $header = $paref->{header};
+  my $paref   = shift;
+  my $sheader = $paref->{sheader};
   
-  return if(!$header);
+  return if(!$sheader);
   
   my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
   my $ftui      = $paref->{ftui};
@@ -6502,7 +6516,7 @@ sub _graphicHeader {
   
   ## Header Start
   #################
-  $header = qq{<table width='100%'>}; 
+  my $header = qq{<table width='100%'>}; 
 
   # Header Link + Status + Update Button     
   #########################################      
@@ -6516,11 +6530,11 @@ sub _graphicHeader {
          $lup = "$day.$month.$year&nbsp;$time"; 
       }
 
-      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')"};                        # Update Button generieren        
+      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction get $name data')"};  # Update Button generieren        
 
       if ($ftui eq "ftui") {
-          $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
-      }
+          $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction get $name data')"};     
+      }   
                   
       my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren        
 
@@ -6810,18 +6824,18 @@ sub _graphicConsumerLegend {
       my $autord     = ConsumerVal ($hash, $c, "autoreading",             "");                      # Readingname f. Automatiksteuerung
       my $auto       = ConsumerVal ($hash, $c, "auto",                     1);                      # Automatic Mode
       
-      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
-      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
-      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 1')"};
-      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 0')"};
-      my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction consumerImmediatePlanning $c')"};
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction set $cname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction set $cname $offcom')"};
+      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction setreading $cname $autord 1')"};
+      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction setreading $cname $autord 0')"};
+      my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction consumerImmediatePlanning $c')"};
       
       if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $offcom')"};
-          $cmdautoon  = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 1')"};  
-          $cmdautooff = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 0')"}; 
-          $implan     = qq{"ftui.setFhemStatus('set $name consumerAction consumerImmediatePlanning $c')"};          
+          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction set $cname setreading $cname $autord 1')"};  
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction set $cname setreading $cname $autord 0')"}; 
+          $implan     = qq{"ftui.setFhemStatus('set $name clientAction consumerImmediatePlanning $c')"};          
       }
       
       $cmdon      = q{} if(!$oncom);
