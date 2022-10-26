@@ -1172,7 +1172,13 @@ sub weekprofile_Set($$@)
     my $prfDest = undef;
     foreach my $prf (@{$hash->{PROFILES}}){
       $prfSrc = $prf if ( ($prf->{NAME} eq $srcName) && ($prf->{TOPIC} eq $srcTopic) );
+      my ($prf2,undef) = weekprofile_findPRF($hash,$srcName,$srcTopic,0);
+      if ( $prf2 && defined $prf2->{REF} ) {
+          ($srcTopic, $srcName) = weekprofile_splitName($me, $prf2->{REF});
+          $prfSrc = $prf2;
+      }
       $prfDest = $prf if ( ($prf->{NAME} eq $destName) && ($prf->{TOPIC} eq $destTopic) );
+      last if defined $prfSrc && defined $prfDest;
     }
     return "Error unknown profile $srcName" unless($prfSrc);
     Log3($me, 4, "$me(Set): override profile $destName") if ($prfDest);

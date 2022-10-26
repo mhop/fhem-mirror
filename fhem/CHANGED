@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_weekprofile:create reference profile
+                           from an other referenced profile
  - feature: 70_ESCVP21net: added 2-value commands
  - change:  88_HMCCU: Minor improvements
  - feature: 70_ESCVP21net: added LS12000 (with POPLP, LENS, HLENS)
