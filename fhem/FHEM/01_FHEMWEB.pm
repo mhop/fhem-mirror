@@ -1608,18 +1608,26 @@ FW_doDetail($)
 
   my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
 
-  FW_pH "cmd=style iconFor $d", "Select icon",         undef, "detLink iconFor";
-  FW_pH "cmd=style showDSI $d", "Extend devStateIcon", undef, "detLink showDSI";
-  FW_pH "cmd=rawDef $d", "Raw definition", undef, "detLink rawDef";
-  FW_pH "cmd=delete $d", "Delete this device ($d)",    undef, "detLink delDev"
-         if($d ne "global");
+  FW_pO "<div id='detLink'>";
   my $sfx = AttrVal("global", "language", "EN");
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
-  FW_pH "$FW_ME/docs/commandref${sfx}.html#${t}", "Device specific help",
+  FW_pH "$FW_ME/docs/commandref${sfx}.html#$t", "Help for $t",
          undef, "detLink devSpecHelp";
+  FW_pH "cmd=rawDef $d", "Raw definition", undef, "detLink rawDef";
+  FW_pO "<div class='detLink'>";
+  FW_pO   "<select id='moreCmds'>";
+  FW_pO     "<option >More...</option>";
+  FW_pO     "<option data-cmd='forumCopy $d'>Copy for forum.fhem.de</option>";
+  FW_pO     "<option data-cmd='style iconFor $d'>Select icon</option>";
+  FW_pO     "<option data-cmd='style showDSI $d'>Extend devStateIcon</option>";
+  if($d ne "global") {
+  FW_pO     "<option data-cmd='delete $d'>Delete $d</option>";
+  FW_pO     "<option data-cmd='rename $d'>Rename $d</option>";
+  }
+  FW_pO   "</select>";
+  FW_pO "</div>";
   FW_pO "<br><br>";
   FW_pO "</div>";
-
 }
 
 ##############################
