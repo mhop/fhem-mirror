@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-26 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-27 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,7 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.71.2" => "26.10.2022  fix 'connection refused ...' ",
+  "0.71.2" => "27.10.2022  fix 'connection refused ...' ",
   "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
                            "changed some graphic default settings, typo todayRemaingAPIcalls, input check currentBatteryDev ".
                            "change attr Css to flowGraphicCss ",
@@ -1041,9 +1041,8 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $name    = $paref->{name};
   my $type    = $paref->{type};
   my $opt     = $paref->{opt};
-  my $arg     = $paref->{arg};
-  
-  my ($c,$noTaskcall) = split " ", $arg;
+  my $c       = $paref->{prop};
+  my $evt     = $paref->{prop1} // 1;
   
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));  
@@ -1067,7 +1066,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
-  centralTask ($hash) if(!$noTaskcall);
+  centralTask ($hash, $evt);
   
 return;
 }
@@ -1868,9 +1867,7 @@ sub _setclientAction {                 ## no critic "not used"
   my $name    = $paref->{name};
   my $opt     = $paref->{opt};
   my $arg     = $paref->{arg};
-  my $argsref = $paref->{argsref};
-  
-  my $noUpdState = 0;                                                        # state nicht updaten = 0 -> state updaten !          
+  my $argsref = $paref->{argsref};                                                          
 
   if(!$arg) {
       return qq{The command "$opt" needs an argument !};
@@ -1878,36 +1875,34 @@ sub _setclientAction {                 ## no critic "not used"
   
   my @args = @{$argsref};
   
-  my $ftui   = shift @args;                                                 # Auslöser ist FTUI ?
-  my $action = shift @args;                                                 # z.B. set, setreading
-  my $cname  = shift @args;                                                 # Consumername
-  my $tail   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente 
+  my $evt      = shift @args;                                                 # Readings Event (state nicht gesteuert)
+  my $action   = shift @args;                                                 # z.B. set, setreading
+  my $cname    = shift @args;                                                 # Consumername
+  my $tail     = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     ## no critic 'Map blocks' # restliche Befehlsargumente 
   
   Log3($name, 4, qq{$name - Client Action received / execute: "$action $cname $tail"});
   
   if($action eq "set") {
       CommandSet (undef, "$cname $tail");
-      $noUpdState = 1 if(!$ftui);
   }
   
   if($action eq "get") {
       if($tail eq 'data') {
-          $noUpdState = 1 if(!$ftui);
-          centralTask ($hash, $noUpdState);
+          centralTask ($hash, $evt);
           return;
       }
   }
   
   if($action eq "setreading") {
       CommandSetReading (undef, "$cname $tail");
-      $noUpdState = 1 if(!$ftui);
   }
   
   if($action eq "consumerImmediatePlanning") {
-      CommandSet (undef, "$name $action $cname noTaskcall");
+      CommandSet (undef, "$name $action $cname $evt");
+      return;
   }
   
-  centralTask ($hash, $noUpdState);
+  centralTask ($hash, $evt);
 
 return;
 }
@@ -2682,6 +2677,10 @@ return;
 sub Notify {
   # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
   # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben. 
+  
+  return;         # nicht genutzt zur Zeit
+  
+  
   my $myHash   = shift;
   my $dev_hash = shift;
   my $myName   = $myHash->{NAME};                                                         # Name des eigenen Devices
@@ -2950,8 +2949,8 @@ return @pvconf;
 #                       Zentraler Datenabruf
 ################################################################
 sub centralTask {
-  my $hash       = shift;
-  my $noUpdState = shift // 0;                                        # state updaten 0, nicht updaten 1
+  my $hash = shift;
+  my $evt  = shift // 1;                                              # Readings Event (state nicht gesteuert)
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
@@ -2962,7 +2961,7 @@ sub centralTask {
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
   #for my $i (keys %{$data{$type}{$name}{pvhist}}) {
   #    delete $data{$type}{$name}{pvhist}{$i}{"00"};
-  #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
+  #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);                # evtl. vorhandene leere Schlüssel entfernen
   #}
   
   #for my $c (keys %{$data{$type}{$name}{consumers}}) {
@@ -3002,13 +3001,13 @@ sub centralTask {
       
       return if(IsDisabled($name));
       
-      #readingsSingleUpdate($hash, "state", "running", 1) if(!$noUpdState);
+      readingsSingleUpdate($hash, 'state', 'running', 0);
       
       my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
       if ($ret) { 
-          readingsSingleUpdate($hash, "state", $ret, 1);
+          readingsSingleUpdate($hash, 'state', $ret, 1);
           return;
-      }     
+      }
       
       my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
@@ -3040,7 +3039,7 @@ sub centralTask {
       _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
       
-      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
       
       if (isSolCastUsed ($hash)) {
           _getRoofTopData                 ($centpars);                                    # SolCast API Strahlungswerte abrufen          
@@ -3061,20 +3060,20 @@ sub centralTask {
       _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
       _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
       
-      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
 
       calcCorrAndQuality          ($centpars);                                            # neue Korrekturfaktor/Qualität berechnen und speichern
       
-      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
       
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate ($hash, "state", $centpars->{state}, 1) if(!$noUpdState);      # Abschluß state 
+      readingsSingleUpdate ($hash, 'state', $centpars->{state}, 1);                       # Abschluß state 
       setTimeTracking      ($hash, $cst, 'runTimeCentralTask');                           # Zyklus-Laufzeit ermitteln 
 
       genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen      
   
-      createReadingsFromArray ($hash, \@da, 1);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -6535,7 +6534,7 @@ sub _graphicHeader {
       my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 get $name data')"};  # Update Button generieren        
 
       if ($ftui eq "ftui") {
-          $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
+          $cmdupdate = qq{"ftui.setFhemStatus('set $name clientAction 0 get $name data')"};     
       }   
                   
       my $cmdplchk = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name plantConfigCheck', function(data){FW_okDialog(data)})"};          # Plant Check Button generieren        
@@ -6833,11 +6832,11 @@ sub _graphicConsumerLegend {
       my $implan     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name clientAction 0 consumerImmediatePlanning $c')"};
       
       if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction 1 set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction 1 set $cname $offcom')"};
-          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction 1 setreading $cname $autord 1')"};  
-          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction 1 setreading $cname $autord 0')"}; 
-          $implan     = qq{"ftui.setFhemStatus('set $name clientAction 1 consumerImmediatePlanning $c')"};          
+          $cmdon      = qq{"ftui.setFhemStatus('set $name clientAction 0 set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name clientAction 0 set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name clientAction 0 setreading $cname $autord 1')"};  
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name clientAction 0 setreading $cname $autord 0')"}; 
+          $implan     = qq{"ftui.setFhemStatus('set $name clientAction 0 consumerImmediatePlanning $c')"};          
       }
       
       $cmdon      = q{} if(!$oncom);
