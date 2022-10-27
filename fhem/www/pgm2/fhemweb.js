@@ -132,7 +132,6 @@ FW_jqueryReadyFn()
     FW_root = r;
 
   FW_replaceWidgets($("html"));
-  FW_confirmDelete();
 
   // Fix the td count by setting colspan on the last column
   $("table.block.wide").each(function(){        // table
@@ -233,26 +232,6 @@ FW_jqueryReadyFn()
     });
   });
 
-  $("div.devSpecHelp a").each(function(){       // Help on detail window
-    var dev = FW_getLink(this).split("#").pop();
-    $(this).unbind("click");
-    $(this).attr("href", "#"); // Desktop: show underlined Text
-    $(this).removeAttr("onclick");
-
-    $(this).click(function(evt){
-      if($("#devSpecHelp").length) {
-        $("#devSpecHelp").remove();
-        return;
-      }
-      FW_getHelp(dev, function(data){
-        $("#content").append('<div id="devSpecHelp"></div>');
-        $("#devSpecHelp").html(data);
-        var off = $("#devSpecHelp").position().top-20;
-        $('body, html').animate({scrollTop:off}, 500);
-      });
-    });
-  });
-
   $("table.attributes tr div.dname")    // Click on attribute fills input value
     .each(function(){
       $(this)
@@ -315,7 +294,7 @@ FW_jqueryReadyFn()
 
   FW_smallScreenCommands();
   FW_inlineModify();
-  FW_rawDef();
+  FW_detLink();
   FW_treeMenu();
 
   $("body").attr("data-os", FW_os);
@@ -464,48 +443,68 @@ FW_filterIcons()
   }
 }
 
+
 function
-FW_confirmDelete()
+FW_deleteDevice(dev)
 {
-  var b = $("body");
-  var cd = $(b).attr("data-confirmDelete");
-  if(!cd || cd == 0)
+  var cmd = addcsrf(FW_root+"?cmd=delete "+dev);
+
+  var cd = $("body").attr("data-confirmDelete");
+  if(!cd || cd == 0) {
+    location.href = cmd;
     return;
-  var wn = $(b).attr("data-webName");
-  $("div#content").find("a").each(function(){
-    var href = $(this).attr("href");
-    if(!href)
-      return;
-    var ma = $(this).attr("href").match(/.*cmd[^=]*=(delete[^&]*).*$/);
-    if(!ma || ma.length != 2)
-      return;
-    $(this).attr("href", "#");
-    $(this).unbind("click");
-    $(this).click(function(e){
-      e.preventDefault();
+  }
 
-      var div = $("<div id='FW_okDialog'>");
-      $(div).html("Do you really want to "+ma[1]+"?<br><br>"+
-        "<input type='checkbox' name='noconf'> Skip this dialog in the future");
-      $("body").append(div);
+  var div = $("<div>");
+  $(div).html("Do you really want to delete "+dev+"?<br><br>"+
+    "<input type='checkbox' name='noconf'> Skip this dialog in the future");
+  $("body").append(div);
 
-      function
-      doClose()
-      {
-          if($(div).find("input:checked").length)
-            FW_cmd(FW_root+"?cmd=attr "+wn+" confirmDelete 0&XHR=1");
-          $(this).dialog("close"); $(div).remove();
-      }
-
-      $(div).dialog({
-        dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
-        maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
-        buttons: [
-          {text:"Yes", click:function(){ location.href = ma[0]; doClose(); }},
-          {text:"No",  click:function(){ doClose(); }}]
-      });
-    });
+  $(div).dialog({
+    dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
+    maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+    buttons: [
+      {text:"Yes", click:function(){ doClose(); location.href = cmd; }},
+      {text:"No",  click:doClose} ],
+    close: doClose
   });
+
+  function
+  doClose()
+  {
+    var wn = $("body").attr("data-webName");
+    if($(div).find("input:checked").length)
+      FW_cmd(FW_root+"?cmd=attr "+wn+" confirmDelete 0&XHR=1");
+    $(this).dialog("close"); $(div).remove();
+  }
+}
+
+function
+FW_renameDevice(dev)
+{
+  var div = $("<div>");
+  $(div).html('Rename '+dev+' to:<br><br><input type="text" size="30">');
+  $("body").append(div);
+
+  $(div).dialog({
+    dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
+    maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+    buttons: [
+      {text:"Rename", click:function(){ 
+        var nn = $(div).find("input").val();
+        if(!nn.match(/^[a-z0-9._]*$/i))
+          return FW_okDialog("Illegal characters in the new name");
+        location.href = addcsrf(FW_root+"?cmd=rename "+dev+" "+nn);
+      }},
+      {text:"Cancel", click:doClose} ],
+    close: doClose
+  });
+
+  function
+  doClose()
+  {
+    $(this).dialog("close"); $(div).remove();
+  }
 }
 
 // Show the webCmd list in a dialog if: smallScreen & hiddenroom=detail & room
@@ -902,8 +901,9 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
   });
 }
 
+// Fill the "detLink" line with life
 function
-FW_rawDef()
+FW_detLink()
 {
   $("div.rawDef a").each(function(){       // Help on detail window
     var dev = FW_getLink(this).split(" ").pop().split("&")[0];
@@ -975,6 +975,58 @@ FW_rawDef()
       });
     });
 
+  });
+
+  $("#detLink .devSpecHelp a").each(function(){       // Help on detail window
+    var dev = FW_getLink(this).split("#").pop();
+    $(this).unbind("click");
+    $(this).attr("href", "#"); // Desktop: show underlined Text
+    $(this).removeAttr("onclick");
+
+    $(this).click(function(evt){
+      if($("#devSpecHelp").length) {
+        $("#devSpecHelp").remove();
+        return;
+      }
+      FW_getHelp(dev, function(data){
+        $("#content").append('<div id="devSpecHelp"></div>');
+        $("#devSpecHelp").html(data);
+        var off = $("#devSpecHelp").position().top-20;
+        $('body, html').animate({scrollTop:off}, 500);
+      });
+    });
+  });
+
+
+  $("#detLink select#moreCmds").change(function(){
+    var cmd = $(this).find("option:selected").attr("data-cmd");
+    if(!cmd)
+      return;
+    var m = cmd.match(/^([^ ]+) (.*)$/);
+    if(!m)
+      return;
+
+    if(m[1] == "forumCopy") {
+      if(!navigator.clipboard)
+        return FW_okDialog("Sorry, not supported by this browser");
+      FW_cmd(FW_root+"?cmd=list -r -i "+m[2]+"&XHR=1", function(data) {
+        navigator.clipboard.writeText('[code]'+data+'[/code]').then(
+          function(){
+            FW_okDialog('"forum ready" definition copied to the clipboard.') },
+          function(err) { FW_okDialog('Could not copy text: ', err)}
+       )
+      })
+
+    } else if(m[1] == "rename") {
+      FW_renameDevice(m[2]);
+
+    } else if(m[1] == "delete") {
+      FW_deleteDevice(m[2]);
+
+    } else {
+      location.href = addcsrf(FW_root+"?cmd="+cmd);
+
+    }
   });
 }
 

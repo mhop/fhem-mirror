@@ -88,7 +88,7 @@ sub OldReadingsNum($$$;$);
 sub OldReadingsTimestamp($$$);
 sub OldReadingsVal($$$);
 sub OpenLogfile($);
-sub PrintHash($$);
+sub PrintHash($$;$);
 sub ReadingsAge($$$);
 sub ReadingsNum($$$;$);
 sub ReadingsTimestamp($$$);
@@ -2564,37 +2564,40 @@ CommandSetReading($$)
 
 #############
 sub
-PrintHash($$)
+PrintHash($$;$)
 {
-  my ($h, $lev) = @_;
+  my ($h, $lev, $prefix) = @_;
   my $si = AttrVal("global", "showInternalValues", 0);
   return "" if($h->{".visited"});
   $h->{".visited"} = 1;
 
+  $prefix="" if(!$prefix);
   my ($str,$sstr) = ("","");
   foreach my $c (sort keys %{$h}) {
     next if(!$si && $c =~ m/^\./ || $c eq ".visited");
     if(ref($h->{$c})) {
       if(ref($h->{$c}) eq "HASH") {
         if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
-          $str .= sprintf("%*s %-19s   %-15s %s\n",
+          $str .= sprintf("$prefix%*s %-19s   %-15s %s\n",
                           $lev," ", $h->{$c}{TIME},$c,$h->{$c}{VAL});
         } elsif($c eq "IODev" || $c eq "HASH") {
-          $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
+          $str .= sprintf("$prefix%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
 
         } else {
-          $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
-          $sstr .= PrintHash($h->{$c}, $lev+2);
+          $sstr .= sprintf("$prefix%*s %s:\n", $lev, " ", $c);
+          $sstr .= PrintHash($h->{$c}, $lev+2, $prefix);
         }
       } elsif(ref($h->{$c}) eq "ARRAY") {
-         $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
+         $sstr .= sprintf("$prefix%*s %s:\n", $lev, " ", $c);
          foreach my $v (@{$h->{$c}}) {
-           $sstr .= sprintf("%*s %s\n", $lev+2, " ", defined($v) ? $v:"undef");
+           $sstr .= sprintf("$prefix%*s %s\n",
+                        $lev+2, " ", defined($v) ? $v:"undef");
          }
       }
     } else {
       my $v = $h->{$c};
-      $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, defined($v) ? $v : "");
+      $str .= sprintf("$prefix%*s %-10s %s\n",
+                        $lev," ",$c, defined($v) ? $v : "");
     }
   }
   delete $h->{".visited"};
@@ -2607,22 +2610,25 @@ CommandList($$)
 {
   my ($cl, $param) = @_;
   my $str = "";
+  my %opt;
+  my $optRegexp = '-r|-R|-i';
+  $param = cmd_parseOpts($param, $optRegexp, \%opt);
 
-  if($param =~ m/^-r *(.*)$/i) {
+  if($opt{r} || $opt{R}) {
     my @list;
-    my $arg = $1;
-    if($param =~ m/^-R/) {
-      return "-R needs a valid device as argument" if(!$arg);
-      push @list, $arg;
-      push @list, getPawList($arg);
+    if($opt{R}) {
+      return "-R needs a valid device as argument" if(!$param);
+      push @list, $param;
+      push @list, getPawList($param);
     } else {
-      @list = devspec2array($arg ? $arg : ".*", $cl);
+      @list = devspec2array($param ? $param : ".*", $cl);
     }
     foreach my $d (@list) {
       return "No device named $d found" if(!defined($defs{$d}));
       $str .= "\n" if($str);
       my @a = GetDefAndAttr($d);
       $str .= join("\n", @a)."\n" if(@a);
+      $str .= PrintHash($defs{$d}, 2, "#") if($opt{i});
     }
     foreach my $d (sort @list) {
       $str .= "\n" if($str);
