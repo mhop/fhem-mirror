@@ -453,6 +453,7 @@ my %EnO_eepConfig = (
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
   "I5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "Eltako_FRM60", sensorMode => 'pushbutton', teachMethod => "confirm", webCmd => "opens:stop:closes:position"}},
+  "J5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "002"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_TF", teachMethod => "confirm", webCmd => "on:off"}},
   "O5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "Eltako_FSR14", teachMethod => "confirm", webCmd => "on:off"}},
@@ -4900,6 +4901,73 @@ sub EnOcean_Set($@) {
         }
         Log3 $name, 3, "EnOcean set $name $cmd";
       }
+      } elsif ($manufID eq "002") {
+        # [Thermokon SR65 3AI, untested]
+        # $db[3] is the input 3 where 0x00 = 0 V ... 0xFF = 10 V
+        # $db[2] is the input 2 where 0x00 = 0 V ... 0xFF = 10 V
+        # $db[1] is the input 1 where 0x00 = 0 V ... 0xFF = 10 V
+        $rorg = "A5";
+        if($cmd eq "teach") {
+          # teach-in EEP A5-3F-7F, Manufacturer "Thermokon"
+          $data = "FFF80280";
+          $attr{$name}{eep} = "A5-3F-7F";
+          CommandDeleteReading(undef, "$name .*");
+          readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
+          $updateState = 0;
+        } elsif ($cmd =~ m/^input([123])$/) {
+          my $channel = $1;
+          return "Usage: numeric argument missing" if (!defined($a[1]));
+          return "Usage: $a[1] is not numeric or out of range" if ($a[1] !~ m/^\d+(\.\d+)?$/ || $a[1] > 10);
+          my @input;
+          for (my $i = 1; $i < 4; $i ++) {
+            $input[$i] = $channel == $i ? $a[1] : ReadingsVal($name, "input" . $i, 0);
+          }
+          $data = sprintf "%02X%02X%02X08", int($input[3] / 10 * 255), int($input[2] / 10 * 255), int($input[1] / 10 * 255);
+          readingsBeginUpdate($hash);
+          readingsBulkUpdateIfChanged($hash, $cmd, $a[1]);
+          my $setpointScaled = EnOcean_ReadingScaled($hash, $a[1], 0, 10);
+          readingsBulkUpdateIfChanged($hash, $cmd . "Scaled", $setpointScaled) if (defined $setpointScaled);
+          readingsBulkUpdateIfChanged($hash, 'state', "I1: $input[1] I2: $input[2] I3: $input[3]");
+          readingsEndUpdate($hash, 1);
+          shift @a;
+          $updateState = 0;
+        } elsif ($cmd =~ m/^input([123])Scaled$/) {
+          my $channel = $1;
+          return "Usage: numeric argument missing" if (!defined($a[1]));
+          my $scaleMin = AttrVal($name, "scaleMin", undef);
+          my $scaleMax = AttrVal($name, "scaleMax", undef);
+          my ($rangeMin, $rangeMax);
+          if (defined $scaleMax && defined $scaleMin &&
+              $scaleMax =~ m/^[+-]?\d+(\.\d+)?$/ && $scaleMin =~ m/^[+-]?\d+(\.\d+)?$/) {
+            if ($scaleMin > $scaleMax) {
+              ($rangeMin, $rangeMax) = ($scaleMax, $scaleMin);
+            } else {
+              ($rangeMin, $rangeMax) = ($scaleMin, $scaleMax);
+            }
+          } else {
+            return "Usage: Attributes scaleMin and/or scaleMax not defined or not numeric.";
+          }
+          my @input;
+          if ($a[1] =~ m/^[+-]?\d+(\.\d+)?$/ && $a[1] >= $rangeMin && $a[1] <= $rangeMax) {
+            $input[$channel] = 10 * $scaleMin / ($scaleMin - $scaleMax) - 10 / ($scaleMin - $scaleMax) * $a[1];
+            for (my $i = 1; $i < 4; $i ++) {
+              $input[$i] = $channel == $i ? $input[$i] : ReadingsVal($name, "input" . $i, 0);
+            }
+            $data = sprintf "%02X%02X%02X08", int($input[3] / 10 * 255), int($input[2] / 10 * 255), int($input[1] / 10 * 255);
+            readingsBeginUpdate($hash);
+            readingsBulkUpdateIfChanged($hash, "input" . $channel, $input[$channel]);
+            readingsBulkUpdateIfChanged($hash, $cmd, $a[1]);
+            readingsBulkUpdateIfChanged($hash, 'state', "I1: $input[1] I2: $input[2] I3: $input[3]");
+            readingsEndUpdate($hash, 1);
+            shift @a;
+            $updateState = 0;
+          } else {
+            return "Usage: $a[1] is not numeric or out of range";
+          }
+        } else {
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "input1:slider,0,0.5,10 input1Scaled input2:slider,0,0.5,10 input2Scaled input3:slider,0,0.5,10 input3Scaled teach:noArg"
+        }
+        Log3 $name, 3, "EnOcean set $name $cmd";
       }
 
     } elsif ($st eq "actuator.01") {
@@ -19075,6 +19143,7 @@ sub EnOcean_Delete($$) {
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
      <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
      <li>I5-3F-7F Shutter [Eltako FRM60] - MSC teach-in supported<br></li>
+     <li>J5-3F-7F Wireless Analog Input Module [Thermokon SR65 3AI]<br></li>
      <li>G6-02-01 Pushbutton with controllable LEDs [Eltako F4CT55] - MSC teach-in supported<br></li>
      <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
      <li>G5-ZZ-ZZ Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
@@ -20229,7 +20298,7 @@ sub EnOcean_Delete($$) {
         drive blinds to position with rotation speed and lock key option</li>
       <li>stop<br>
         issue stop command</li>
-     <li>teach<br>
+      <li>teach<br>
         initiate teach-in</li>
     </ul><br>
       [position] = 0 % ... 100 %<br>
@@ -20240,6 +20309,37 @@ sub EnOcean_Delete($$) {
       of the <a href="#EnOcean-Inofficial-EEP">Inofficial EEP</a> I5-3F-7F and then taught in the actuator.
       To control the device, it must be bidirectional paired, see <a href="#EnOcean-teach-in">Bidirectional Teach-In / Teach-Out</a>.
     <br>
+    </li>
+    <br><br>
+
+    <li>Manufacturer Specific Applications (EEP A5-3F-7F)<br><br>
+       Wireless Analog Input Module<br>
+       [Thermokon SR65 3AI, untested]<br>
+    <ul>
+      <code>set &lt;name&gt; &lt;value&gt;</code>
+      <br><br>
+      where <code>value</code> is
+      <li>input1 U/V<br>
+        set input1 (Range: U = 0 V ... 10 V)</li>
+      <li>input1Scaled [&lt;floating-point number&gt;]<br>
+        set input1Scaled</li>
+      <li>input2 U/V<br>
+        set input2 (Range: U = 0 V ... 10 V)</li>
+      <li>input2Scaled [&lt;floating-point number&gt;]<br>
+        set input2Scaled</li>
+      <li>input3 U/V<br>
+        set input3 (Range: U = 0 V ... 10 V)</li>
+      <li>input3Scaled [&lt;floating-point number&gt;]<br>
+        set input3Scaled</li>
+      <li>teach<br>
+        initiate teach-in</li>
+     </ul><br>
+       The input value can be scaled device-specifically. Set the attributes
+       <a href="#EnOcean-attr-scaleMax">scaleMax</a>, <a href="#EnOcean-attr-scaleMin">scaleMin</a> and
+       <a href="#EnOcean-attr-scaleDecimals">scaleDecimals</a> for the additional scaled setting
+       input&lt;channel&gt;Scaled.<br>
+       The attr subType must be manufProfile and attr manufID must be 002
+       for Thermokon Devices. This is done manually via the Inofficial EEP J5-3F-7F.
     </li>
     <br><br>
 
