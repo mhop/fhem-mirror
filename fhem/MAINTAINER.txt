@@ -380,7 +380,7 @@ FHEM/71_DENON_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_ONKYO_AVR_ZONE.pm    delmar               Multimedia
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             Multimedia
 FHEM/71_PIONEERAVRZONE.pm    50watt               Multimedia
-FHEM/71_YAMAHA_AVR.pm        markusbloch/orphan   Multimedia
+FHEM/71_YAMAHA_AVR.pm        orphan/Beta-User     Multimedia
 FHEM/71_YAMAHA_BD.pm         markusbloch/orphan   Multimedia
 FHEM/71_YAMAHA_MC.pm         Leugi                Multimedia
 FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia

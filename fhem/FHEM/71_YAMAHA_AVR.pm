@@ -8,7 +8,6 @@
 #     with any receiver which has an ethernet or wlan connection.
 #
 #     Copyright by Markus Bloch
-#     e-mail: Notausstieg0309@googlemail.com
 #
 #     This file is part of fhem.
 #
@@ -2605,17 +2604,21 @@ sub YAMAHA_AVR_isModel_DSP($)
 
 1;
 
+__END__
+
 =pod
+
+=encoding utf8
 =item device
 =item summary    controls Yamaha AV receivers via LAN connection
 =item summary_DE steuert Yamaha AV-Receiver &uuml;ber die LAN-Verbindung
 =begin html
 
-<a name="YAMAHA_AVR"></a>
+<a id="YAMAHA_AVR"></a>
 <h3>YAMAHA_AVR</h3>
 <ul>
-  <a name="YAMAHA_AVR_define"></a>
-  <b>Define</b>
+  <a id="YAMAHA_AVR-define"></a>
+  <h4>Define</h4>
   <ul>
     <code>
     define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;status_interval&gt;]
@@ -2681,8 +2684,8 @@ sub YAMAHA_AVR_isModel_DSP($)
      <br><br>
   </ul>
   
-  <a name="YAMAHA_AVR_set"></a>
-  <b>Set </b>
+  <a id="YAMAHA_AVR-set"></a>
+  <h4>Set</h4>
   <ul>
     <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
     <br><br>
@@ -2690,44 +2693,78 @@ sub YAMAHA_AVR_isModel_DSP($)
     The module only offers the real available inputs and scenes. The following input commands are just an example and can differ.
 <br><br>
 <ul>
+<a id="YAMAHA_AVR-set-on"></a>
 <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device</li>
+<a id="YAMAHA_AVR-set-off"></a>
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; shuts down the device </li>
+<a id="YAMAHA_AVR-set-input"></a>
 <li><b>input</b> hdm1,hdmX,... &nbsp;&nbsp;-&nbsp;&nbsp; selects the input channel (only the real available inputs were given)</li>
+<a id="YAMAHA_AVR-set-scene"></a>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; select the scene</li>
+<a id="YAMAHA_AVR-set-volume"></a>
 <li><b>volume</b> 0...100 [direct] &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage. If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
+<a id="YAMAHA_AVR-set-volumeStraight"></a>
 <li><b>volumeStraight</b> -80...15 [direct] &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in decibel. If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
-<li><b>volumeUp</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 5% or the value of attribute <a href="#YAMAHA_AVR_volumeSteps">volumeSteps</a> (optional the increasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
-<li><b>volumeDown</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 5% or the value of attribute <a href="#YAMAHA_AVR_volumeSteps">volumeSteps</a> (optional the decreasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
+<a id="YAMAHA_AVR-set-volupdown" data-pattern="volumeUp|volumeDown"></a>
+<li><b>volumeUp</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 5% or the value of attribute <a href="#YAMAHA_AVR-attr-volumeSteps">volumeSteps</a> (optional the increasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
+<li><b>volumeDown</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 5% or the value of attribute <a href="#YAMAHA_AVR-attr-volumeSteps">volumeSteps</a> (optional the decreasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
+<a id="YAMAHA_AVR-set-hdmiOut" data-pattern="hdmiOut."></a>
 <li><b>hdmiOut1</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the HDMI output 1</li>
 <li><b>hdmiOut2</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the HDMI output 2</li>
+<a id="YAMAHA_AVR-set-mute"></a>
 <li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
+<a id="YAMAHA_AVR-set-basstreble" data-pattern="bass|treble"></a>
 <li><b>bass</b> [-6...6] step 0.5 (main zone), [-10...10] step 2 (other zones), [-10...10] step 1 (other zones, DSP models) &nbsp;&nbsp;-&nbsp;&nbsp; set bass tone level in decibel</li>
 <li><b>treble</b> [-6...6] step 0.5 (main zone), [-10...10] step 2 (other zones), [-10...10] step 1 (other zones, DSP models) &nbsp;&nbsp;-&nbsp;&nbsp; set treble tone level in decibel</li>
+<a id="YAMAHA_AVR-set-dsp"></a>
 <li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; sets the DSP mode to the given preset</li>
+<a id="YAMAHA_AVR-set-enhancer"></a>
 <li><b>enhancer</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the internal sound enhancer</li>
+<a id="YAMAHA_AVR-set-3dCinemaDsp"></a>
 <li><b>3dCinemaDsp</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the CINEMA DSP 3D mode</li>
+<a id="YAMAHA_AVR-set-adaptiveDrc"></a>
 <li><b>adaptiveDrc</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the Adaptive DRC</li>
+<a id="YAMAHA_AVR-set-partyMode"></a>
 <li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;controls the party mode. In Main Zone the whole party mode is enabled/disabled system wide. In each zone executed, it enables/disables the current zone from party mode.</li>
-<li><b>navigateListMenu</b> &lt;item1&gt;/&lt;item2&gt;/.../&lt;itemN&gt; &nbsp;&nbsp;-&nbsp;&nbsp; select a specific item within a menu structure. for menu-based inputs (e.g. Net Radio, USB, Server, ...) only. See chapter <a href="#YAMAHA_AVR_MenuNavigation">Automatic Menu Navigation</a> for further details and examples.</li>
+<a id="YAMAHA_AVR-set-navigateListMenu"></a>
+<li><b>navigateListMenu</b> &lt;item1&gt;/&lt;item2&gt;/.../&lt;itemN&gt; &nbsp;&nbsp;-&nbsp;&nbsp; select a specific item within a menu structure. for menu-based inputs (e.g. Net Radio, USB, Server, ...) only. See chapter <a href="#YAMAHA_AVR-MenuNavigation">Automatic Menu Navigation</a> for further details and examples.</li>
+<a id="YAMAHA_AVR-set-tunerFrequency"></a>
 <li><b>tunerFrequency</b> &lt;frequency&gt; [AM|FM] &nbsp;&nbsp;-&nbsp;&nbsp; sets the tuner frequency. The first argument is the frequency, second parameter is optional to set the tuner band (AM or FM, default: FM). Depending which tuner band you select, the frequency is given in kHz (AM band) or MHz (FM band). If the second parameter is not set, the FM band will be used. This command can be used even the current input is not "tuner", the new frequency is set and will be played, when the tuner gets active next time.</li>
+<a id="YAMAHA_AVR-set-tunerFrequencyBand"></a>
 <li><b>tunerFrequencyBand</b> FM|DAB &nbsp;&nbsp;-&nbsp;&nbsp; controls the used tuner frequency band ("FM" for analog frequency modulation or "DAB" for digital audio broadcasting. Only available if device supports DAB. On devices using an analog tuner, the frequency band (AM/FM) can be changed via set command "tunerFrequency".</li>
+<a id="YAMAHA_AVR-set-preset">data-pattern="preset.*"></a>
 <li><b>preset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; selects a saved preset of the currently selected input.</li>
 <li><b>presetUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; selects the next preset of the currently selected input.</li>
 <li><b>presetDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; selects the previous preset of the currently selected input.</li>
+<a id="YAMAHA_AVR-set-straight"></a>
 <li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses the internal codec converter and plays the original sound codec</li>
-<li><b>direct</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all internal sound enhancement features and plays the sound straight directly</li> 
+<a id="YAMAHA_AVR-set-direct"></a>
+<li><b>direct</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all internal sound enhancement features and plays the sound straight directly</li>
+<a id="YAMAHA_AVR-set-sleep"></a>
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; activates the internal sleep timer</li>
+<a id="YAMAHA_AVR-set-shuffle"></a>
 <li><b>shuffle</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; activates the shuffle mode on the current input</li>
+<a id="YAMAHA_AVR-set-surroundDecoder"></a>
 <li><b>surroundDecoder</b> dolbypl,... &nbsp;&nbsp;-&nbsp;&nbsp; set the surround decoder. Only the available decoders were given if the device supports the configuration of the surround decoder.</li>
+<a id="YAMAHA_AVR-set-extraBass"></a>
 <li><b>extraBass</b> off,auto &nbsp;&nbsp;-&nbsp;&nbsp; controls the extra bass. Only available if supported by the device.</li>
+<a id="YAMAHA_AVR-set-ypaoVolume"></a>
 <li><b>ypaoVolume</b> off,auto &nbsp;&nbsp;-&nbsp;&nbsp; controls the YPAO volume. Only available if supported by the device.</li>
+<a id="YAMAHA_AVR-set-displayBrightness"></a>
 <li><b>displayBrightness</b> -4...0 &nbsp;&nbsp;-&nbsp;&nbsp; controls brightness reduction of the front display. Only available if supported by the device.</li>
+<a id="YAMAHA_AVR-set-repeat"></a>
 <li><b>repeat</b> one,all,off &nbsp;&nbsp;-&nbsp;&nbsp; activates the repeat mode on the current input for one or all titles</li>
+<a id="YAMAHA_AVR-set-pause"></a>
 <li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp; pause playback on current input</li>
+<a id="YAMAHA_AVR-set-play"></a>
 <li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp; start playback on current input</li>
+<a id="YAMAHA_AVR-set-stop"></a>
 <li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp; stop playback on current input</li>
+<a id="YAMAHA_AVR-set-skip"></a>
 <li><b>skip</b> reverse,forward &nbsp;&nbsp;-&nbsp;&nbsp; skip track on current input</li>
+<a id="YAMAHA_AVR-set-statusRequest"></a>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
+<a id="YAMAHA_AVR-set-remoteControl"></a>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
 
 </ul>
@@ -2760,7 +2797,7 @@ sub YAMAHA_AVR_isModel_DSP($)
     The button names are the same as on your remote control.
   </ul>
   <br>
-<a name="YAMAHA_AVR_MenuNavigation"></a>
+<a id="YAMAHA_AVR-MenuNavigation"></a>
 <u>Automatic Menu Navigation (only for menu based inputs like Net Radio, Server, USB, ...)</u><br><br>
 <ul>
 For menu based inputs you have to select a specific item out of a complex menu structure to start playing music.
@@ -2814,49 +2851,49 @@ So here are some examples:
     
 <br><br>
 </ul>
-  <a name="YAMAHA_AVR_get"></a>
-  <b>Get</b>
+  <a id="YAMAHA_AVR-get"></a>
+  <h4>Get</h4>
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code>
     <br><br>
     Currently, the get command only returns the reading values. For a specific list of possible values, see section "Generated Readings/Events".
     <br><br>
   </ul>
-  <a name="YAMAHA_AVR_attr"></a>
+  <a id="YAMAHA_AVR-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="YAMAHA_AVR_requestTimeout">requestTimeout</a></li>
+    <a id="YAMAHA_AVR-attr-requestTimeout"></a><li>requestTimeout<br>
     Optional attribute change the response timeout in seconds for all queries to the receiver.
     <br><br>
-    Possible values: 1-5 seconds. Default value is 4 seconds.
+    Possible values: 1-5 seconds. Default value is 4 seconds.</li>
     <br><br>
-    <li><a name="YAMAHA_AVR_disable">disable</a></li>
+    <a id="YAMAHA_AVR-attr-disable"></a><li>disable
     Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
     <br><br>
-    Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.
+    Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.</li>
     <br><br>
-    <li><a name="YAMAHA_AVR_volumeSmoothChange">volumeSmoothChange</a></li>
+    <a id="YAMAHA_AVR-attr-volumeSmoothChange"></a><li>volumeSmoothChange<br>
     Optional attribute to activate a smooth volume change.
     <br><br>
-    Possible values: 0 => off , 1 => on
+    Possible values: 0 => off , 1 => on</li>
     <br><br>
-    <li><a name="YAMAHA_AVR_volumeSmoothSteps">volumeSmoothSteps</a></li>
-    Optional attribute to define the number of volume changes between the
-    current and the desired volume. Default value is 5 steps
+    <a id="YAMAHA_AVR-attr-volumeSmoothSteps"></a><li>volumeSmoothSteps<br>
+    Optional attribute to define the number of volume changes between the current and the desired volume. Default value is 5 steps</li>
     <br><br>
-    <li><a name="YAMAHA_AVR_volumeSteps">volumeSteps</a></li>
-    Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%
+    <a id="YAMAHA_AVR-attr-volumeSteps"></a><li>volumeSteps<br>
+    Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%</li>
     <br><br>
-    <li><a name="YAMAHA_AVR_volumeMax">volumeMax</a></li>
+    <a id="YAMAHA_AVR-attr-volumeMax"></a><li>volumeMax<br>
     Optional attribute to set an upper limit in percentage for volume changes.
     If the user tries to change the volume to a higher level than configured with this attribute, the volume will not exceed this limit.
     <br><br>
-    Possible values: 0-100%. Default value is 100% (no limitation)<br><br>
+    Possible values: 0-100%. Default value is 100% (no limitation)</li><br><br>
   </ul>
-  <b>Generated Readings/Events:</b><br>
+  <a id="YAMAHA_AVR-readings"></a>
+  <h4>Generated Readings/Events:</h4>
   <ul>
   <li><b>3dCinemaDsp</b> - The status of the CINEMA DSP 3D mode (can be "auto" or "off")</li>
   <li><b>adaptiveDrc</b> - The status of the Adaptive DRC (can be "auto" or "off")</li>
@@ -2908,12 +2945,12 @@ So here are some examples:
 =end html
 =begin html_DE
 
-<a name="YAMAHA_AVR"></a>
+<a id="YAMAHA_AVR"></a>
 <h3>YAMAHA_AVR</h3>
 <ul>
 
-  <a name="YAMAHA_AVR_define"></a>
-  <b>Definition</b>
+  <a id="YAMAHA_AVR-define"></a>
+  <h4>Definition</h4>
   <ul>
     <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]
     <br><br>
@@ -2974,8 +3011,8 @@ So here are some examples:
      <br><br>
   </ul>
   
-  <a name="YAMAHA_AVR_set"></a>
-  <b>Set-Kommandos </b>
+  <a id="YAMAHA_AVR-set"></a>
+  <h4>Set-Kommandos</h4>
   <ul>
     <code>set &lt;Name&gt; &lt;Kommando&gt; [&lt;Parameter&gt;]</code>
     <br><br>
@@ -2984,45 +3021,76 @@ So here are some examples:
     Aktuell stehen folgende Kommandos zur Verf&uuml;gung.
 <br><br>
 <ul>
+<a id="YAMAHA_AVR-set-on"></a>
 <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver ein</li>
+<a id="YAMAHA_AVR-set-off"></a>
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver aus</li>
+<a id="YAMAHA_AVR-set-dsp"></a>
 <li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert das entsprechende DSP Preset</li>
+<a id="YAMAHA_AVR-set-enhancer"></a>
 <li><b>enhancer</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den Sound Enhancer f&uuml;r einen verbesserten Raumklang</li>
+<a id="YAMAHA_AVR-set-3dCinemaDsp"></a>
 <li><b>3dCinemaDsp</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den CINEMA DSP 3D Modus</li>
+<a id="YAMAHA_AVR-set-adaptiveDrc"></a>
 <li><b>adaptiveDrc</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert Adaptive DRC</li>
+<a id="YAMAHA_AVR-set-extraBass"></a>
 <li><b>extraBass</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den Extra Bass</li>
+<a id="YAMAHA_AVR-set-ypaoVolume"></a>
 <li><b>ypaoVolume</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert YPAO Lautst&auml;rke</li>
+<a id="YAMAHA_AVR-set-displayBrightness"></a>
 <li><b>displayBrightness</b> -4...0 &nbsp;&nbsp;-&nbsp;&nbsp; Steuert die Helligkeitsreduzierung des Front-Displays</li>
+<a id="YAMAHA_AVR-set-partyMode"></a>
 <li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;Aktiviert den Party Modus. In der Main Zone wird hierbei der Party Modus ger&auml;teweit aktiviert oder deaktiviert. In den anderen Zonen kann man damit die entsprechende Zone dem Party Modus zuschalten oder entziehen.</li>
-<li><b>navigateListMenu</b> [Element 1]/[Element 2]/.../[Element N] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt ein spezifisches Element aus einer Men&uuml;struktur aus. Nur verwendbar bei Men&uuml;-basierenden Eing&auml;ngen (z.B. Net Radio, USB, Server, etc.). Siehe nachfolgendes Kapitel "<a href="#YAMAHA_AVR_MenuNavigation">Automatische Men&uuml; Navigation</a>" f&uuml;r weitere Details und Beispiele.</li>
+<a id="YAMAHA_AVR-set-navigateListMenu"></a>
+<li><b>navigateListMenu</b> [Element 1]/[Element 2]/.../[Element N] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt ein spezifisches Element aus einer Men&uuml;struktur aus. Nur verwendbar bei Men&uuml;-basierenden Eing&auml;ngen (z.B. Net Radio, USB, Server, etc.). Siehe nachfolgendes Kapitel "<a href="#YAMAHA_AVR-MenuNavigation">Automatische Men&uuml; Navigation</a>" f&uuml;r weitere Details und Beispiele.</li>
+<a id="YAMAHA_AVR-set-tunerFrequency"></a>
 <li><b>tunerFrequency</b> [Frequenz] [AM|FM] &nbsp;&nbsp;-&nbsp;&nbsp; setzt die Radio-Frequenz. Das erste Argument ist die Frequenz, der zweite dient optional zu Angabe des Bandes (AM oder FM, standardm&auml;&szlig;ig FM). Abh&auml;ngig davon, welches Band man benutzt, wird die Frequenz in kHz (AM-Band) oder MHz (FM-Band) angegeben. Wenn im zweiten Argument kein Band angegeben ist, wird standardm&auml;&szlig;ig das FM-Band benutzt. Dieser Befehl kann auch benutzt werden, wenn der aktuelle Eingang nicht "tuner" ist. Die neue Frequenz wird dennoch gesetzt und bei der n&auml;chsten Benutzung abgespielt.</li>
+<a id="YAMAHA_AVR-set-tunerFrequencyBand"></a>
 <li><b>tunerFrequencyBand</b> FM|DAB &nbsp;&nbsp;-&nbsp;&nbsp; setzt das zu nutzende Frequenzband bzw. Empfangstechnologie für den Radioempfang ("FM" f&uumLr analoge Frequenzmodulation oder "DAB" f&uuml;r digitalen Radioempfang). Nur verf&uuml;gbar wenn DAB unterst&uuml;zt wird.</li>
+<a id="YAMAHA_AVR-set-preset" data-pattern="preset.*"></a>
 <li><b>preset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt ein gespeichertes Preset f&uuml;r den aktuellen Eingang aus.</li>
 <li><b>presetUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt das n&auml;chste Preset f&uuml;r den aktuellen Eingang aus.</li>
 <li><b>presetDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt das vorherige Preset f&uuml;r den aktuellen Eingang aus.</li>
+<a id="YAMAHA_AVR-set-direct"></a>
 <li><b>direct</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht alle internen soundverbessernden Ma&szlig;nahmen (Equalizer, Enhancer, Adaptive DRC,...) und gibt das Signal unverf&auml;lscht wieder</li>
+<a id="YAMAHA_AVR-set-input"></a>
 <li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
+<a id="YAMAHA_AVR-set-hdmiOut" data-pattern="hdmiOut."></a>
 <li><b>hdmiOut1</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Ausgabe via HDMI Ausgang 1</li>
 <li><b>hdmiOut2</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Ausgabe via HDMI Ausgang 2</li>
+<a id="YAMAHA_AVR-set-scene"></a>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
+<a id="YAMAHA_AVR-set-surroundDecoder"></a>
 <li><b>surroundDecoder</b> dolbypl,... &nbsp;&nbsp;-&nbsp;&nbsp; Setzt den Surround Decoder, welcher genutzt werden soll sofern der DSP Modus "Surround Decoder" aktiv ist.</li>
+<a id="YAMAHA_AVR-set-volume" data-pattern="volume.*"></a>
 <li><b>volume</b> 0...100  [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Prozent (0 bis 100%). Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
 <li><b>volumeStraight</b> -87...15 [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke in Dezibel (-80.5 bis 15.5 dB) so wie sie am Receiver auch verwendet wird. Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
 <li><b>volumeUp</b> [0...100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut <a href="#YAMAHA_AVR_volumeSteps">volumeSteps</a> (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang). Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
 <li><b>volumeDown</b> [0...100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut <a href="#YAMAHA_AVR_volumeSteps">volumeSteps</a> (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang). Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
+<a id="YAMAHA_AVR-set-mute"></a>
 <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
+<a id="YAMAHA_AVR-set-basstreble" data-pattern="bass|treble"></a>
 <li><b>bass</b> [-6...6] Schrittweite 0.5 (main zone), [-10...10] Schrittweite 2 (andere Zonen), [-10...10] Schrittweite 1 (andere Zonen, DSP Modelle) &nbsp;&nbsp;-&nbsp;&nbsp; Stellt die Tiefen in decibel ein</li>
 <li><b>treble</b> [-6...6] Schrittweite 0.5 (main zone), [-10...10] Schrittweite 2 (andere Zonen), [-10...10] Schrittweite 1 (andere Zonen, DSP Modelle) &nbsp;&nbsp;-&nbsp;&nbsp; Stellt die H&ouml;hen in decibel ein</li>
+<a id="YAMAHA_AVR-set-straight"></a>
 <li><b>straight</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht die interne Codec-Umwandlung und gibt den Original-Codec wieder.</li>
+<a id="YAMAHA_AVR-set-sleep"></a>
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den internen Sleep-Timer zum automatischen Abschalten</li>
+<a id="YAMAHA_AVR-set-shuffle"></a>
 <li><b>shuffle</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Zufallswiedergabe des aktuellen Eingangs (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<a id="YAMAHA_AVR-set-repeat"></a>
 <li><b>repeat</b> one,all,off &nbsp;&nbsp;-&nbsp;&nbsp; Wiederholt den aktuellen (one) oder alle (all) Titel des aktuellen Eingangs (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<a id="YAMAHA_AVR-set-pause"></a>
 <li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wiedergabe pausieren (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<a id="YAMAHA_AVR-set-play"></a>
 <li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wiedergabe starten (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<a id="YAMAHA_AVR-set-stop"></a>
 <li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wiedergabe stoppen (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<a id="YAMAHA_AVR-set-skip"></a>
 <li><b>skip</b> reverse,forward &nbsp;&nbsp;-&nbsp;&nbsp; Aktuellen Titel &uuml;berspringen (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<a id="YAMAHA_AVR-set-statusRequest"></a>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
-
+<a id="YAMAHA_AVR-set-remoteControl"></a>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
 </ul>
 <br><br>
@@ -3055,7 +3123,7 @@ So here are some examples:
     remoteControl tunerPresetDown<br>
     </code></ul><br>
   </ul>
-<a name="YAMAHA_AVR_MenuNavigation"></a>
+<a id="YAMAHA_AVR-MenuNavigation"></a>
 <u>Automatische Men&uuml; Navigation (nur f&uuml;r Men&uuml;-basierte Eing&auml;nge wie z.B. Net Radio, Server, USB, ...)</u><br><br>
 <ul>
 F&uuml;r Men&uuml;-basierte Eing&auml;nge muss man einen bestimmten Eintrag aus einer komplexen Struktur ausw&auml;hlen um die Wiedergabe zu starten.
@@ -3111,47 +3179,50 @@ Ein paar Beispiele:
     Das erste Element aus einer Listenebene (von oben nach unten), was auf eine Pfadangabe passt, wird ausgew&auml;hlt.
 <br><br>
 </ul>
-  <a name="YAMAHA_AVR_get"></a>
-  <b>Get-Kommandos</b>
+  <a id="YAMAHA_AVR-get"></a>
+  <h4>Get-Kommandos</h4>
   <ul>
     <code>get &lt;Name&gt; &lt;Readingname&gt;</code>
     <br><br>
     Aktuell stehen via GET lediglich die Werte der Readings zur Verf&uuml;gung. Eine genaue Auflistung aller m&ouml;glichen Readings folgen unter "Generierte Readings/Events".
   </ul>
   <br><br>
-  <a name="YAMAHA_AVR_attr"></a>
-  <b>Attribute</b>
+  <a id="YAMAHA_AVR-attr"></a>
+  <h4>Attribute</h4>
   <ul>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="YAMAHA_AVR_requestTimeout">requestTimeout</a></li>
+    <a id="YAMAHA_AVR-attr-requestTimeout"></a><li>requestTimeout<br>
     Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
     <br><br>
-    M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden<br><br>
-    <li><a name="YAMAHA_AVR_disable">disable</a></li>
+    M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden</li><br><br>
+    <a id="YAMAHA_AVR-attr-disable"></a><li>disable<br>
     Optionales Attribut zur Deaktivierung des zyklischen Status-Updates. Ein manuelles Update via statusRequest-Befehl ist dennoch m&ouml;glich.
     <br><br>
-    M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.<br><br>
-    <li><a name="YAMAHA_AVR_volumeSmoothChange">volumeSmoothChange</a></li>
-    Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
+    M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.</li><br><br>
+    <a id="YAMAHA_AVR-attr-volumeSmoothChange"></a><li>volumeSmoothChange<br>
+    Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert
     <br><br>
-    M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
-    <li><a name="YAMAHA_AVR_volumeSmoothSteps">volumeSmoothSteps</a></li>
+    M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert</li><br><br>
+    <a id="YAMAHA_AVR-attr-volumeSmoothSteps"></a><li>volumeSmoothSteps<br>
     Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
-    durchgef&uuml;hrt werden sollen. Standardwert ist 5 Anpassungschritte<br><br>
-    <li><a name="YAMAHA_AVR_volumeSteps">volumeSteps</a></li>
-    Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%
+    durchgef&uuml;hrt werden sollen. Standardwert ist 5 Anpassungschritte</li><br><br>
+    <a id="YAMAHA_AVR-attr-volumeSteps"></a><li>volumeSteps<br>
+    Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%</li>
     <br><br>
-    <li><a name="YAMAHA_AVR_volumeMax">volumeMax</a></li>
+    <a id="YAMAHA_AVR-attr-volumeMax"></a><li>
+    volumeMax <br>
     Optionales Attribut, welches eine maximale Obergrenze in Prozent für die Lautst&auml;rke festlegt.
     Wird versucht die Lautst&auml;rke auf einen h&ouml;heren Wert zu setzen, so wird die Lautst&auml;rke dennoch die konfigurierte Obergrenze nicht &uuml;berschreiten.
     <br><br>
-    M&ouml;gliche Werte: 0-100%. Standardwert ist 100% (keine Begrenzung)
+    M&ouml;gliche Werte: 0-100%. Standardwert ist 100% (keine Begrenzung)</li>
     <br><br>
   </ul>
-  <b>Generierte Readings/Events:</b><br>
+
+  <a id="YAMAHA_AVR-readings"></a>
+  <h4>Generierte Readings/Events:</h4>
   <ul>
   <li><b>3dCinemaDsp</b> - Der Status des CINEMA DSP 3D-Modus ("auto" =&gt; an, "off" =&gt; aus)</li>
   <li><b>adaptiveDrc</b> - Der Status des Adaptive DRC ("auto" =&gt; an, "off" =&gt; aus)</li>

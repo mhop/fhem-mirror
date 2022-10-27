@@ -376,10 +376,10 @@ desc: A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as
 farewell:specified values ​​can be adjusted at any time in the setList attribute
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:BRIGHTNESS;default brightness in <b>brightness</b>-command (numeric, 0-255, 120 might be a good value to start);undef
-par:CTVALUE;default color temp (ct) value in <b>on</b>-command (numeric, 0-370, 320?);undef
-par:CTWARMVALUE;default ct value in <b>warm</b>-command (320?);undef
-par:CTWHITEVALUE;default ct value in <b>white</b>-command (250?);undef
+par:BRIGHTNESS;default brightness in <b>brightness</b>-command (numeric, 0-255, e.g. 120);undef
+par:CTVALUE;default color temp (ct) value in <b>on</b>-command (numeric, 0-370, e.g. 320);undef
+par:CTWARMVALUE;default ct value in <b>warm</b>-command (e.g. 320);undef
+par:CTWHITEVALUE;default ct value in <b>white</b>-command (e.g. 250);undef
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal('DEVICE','icon','hue_filled_white_and_color_e27_b22') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
