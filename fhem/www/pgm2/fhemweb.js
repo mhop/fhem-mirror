@@ -1007,15 +1007,36 @@ FW_detLink()
       return;
 
     if(m[1] == "forumCopy") {
-      if(!navigator.clipboard)
-        return FW_okDialog("Sorry, not supported by this browser");
       FW_cmd(FW_root+"?cmd=list -r -i "+m[2]+"&XHR=1", function(data) {
-        navigator.clipboard.writeText('[code]'+data+'[/code]').then(
-          function(){
-            FW_okDialog('"forum ready" definition copied to the clipboard.') },
-          function(err) { FW_okDialog('Could not copy text: ', err)}
-       )
-      })
+        data = '[code]'+data+'[/code]';
+        var okTxt = '"forum ready" definition copied to the clipboard.';
+        var errTxt = 'Could not copy the text: ';
+        var ok;
+        if(navigator.clipboard) {
+          navigator.clipboard.writeText(data).then(
+            function(){ FW_okDialog(okTxt) },
+            function(err){ FW_okDialog(errTxt+err) });
+
+        } else {
+          var ta = document.createElement("textarea");
+          ta.value = data;
+          ta.style.top = ta.style.left = "0";
+          ta.style.position = "fixed";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          try {
+            if(document.execCommand('copy'))
+              FW_okDialog(okTxt);
+             else
+              FW_okDialog(errTxt);
+          } catch (err) {
+            log('Copy:'+err);
+            FW_okDialog(errTxt+err);
+          }
+          document.body.removeChild(ta);
+        }
+      });
 
     } else if(m[1] == "rename") {
       FW_renameDevice(m[2]);
