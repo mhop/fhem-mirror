@@ -130,7 +130,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.71.2" => "27.10.2022  fix 'connection lost ...' ",
+  "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
+  "0.71.2" => "27.10.2022  fix 'connection lost ...' issue ",
   "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
                            "changed some graphic default settings, typo todayRemaingAPIcalls, input check currentBatteryDev ".
                            "change attr Css to flowGraphicCss ",
@@ -546,6 +547,12 @@ my %hqtxt = (                                                                   
               DE => qq{aktuell:}                                                                                            },
   bnsas  => { EN => qq{from the upcoming sunrise},
               DE => qq{ab dem kommenden Sonnenaufgang}                                                                      },
+  dvtn   => { EN => qq{Deviation&nbsp;(%):},
+              DE => qq{Abweichung&nbsp;(%):}                                                                                },
+  tday   => { EN => qq{today},
+              DE => qq{heute}                                                                                               },
+  yday   => { EN => qq{yesterday},
+              DE => qq{gestern}                                                                                             },
   after  => { EN => qq{after},
               DE => qq{nach}                                                                                                },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>On:&nbsp;<start><br>Off:&nbsp;<stop>},
@@ -3286,6 +3293,9 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
           
+          $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
+          delete $data{$type}{$name}{circular}{99}{tdayDvtn};
+          
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag aus History löschen
           Log3 ($name, 3, qq{$name - history day "$day" deleted});
           
@@ -5903,6 +5913,7 @@ sub _calcTodayPVdeviation {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
   my $daref = $paref->{daref};
@@ -5917,7 +5928,9 @@ sub _calcTodayPVdeviation {
   my $diff = $pvfc - $pvre;
   
   if($pvre) {
-      my $dp = sprintf "%.2f" , (100 * $diff / $pvre);   
+      my $dp                                      = sprintf "%.2f" , (100 * $diff / $pvre); 
+      $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;      
+      
       push @$daref, "Today_PVdeviation<>". $dp." %";
   }
     
@@ -6640,7 +6653,17 @@ sub _graphicHeader {
       }
       
       $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
-
+      
+      ## Abweichung PV Prognose/Erzeugung
+      #####################################
+      my $tdayDvtn = CircularVal ($hash, 99, 'tdayDvtn', '-');
+      my $ydayDvtn = CircularVal ($hash, 99, 'ydayDvtn', '-');
+      $tdayDvtn    = sprintf "%.0f", $tdayDvtn if(isNumeric($tdayDvtn));
+      $ydayDvtn    = sprintf "%.0f", $ydayDvtn if(isNumeric($ydayDvtn));
+      my $dvtntxt  = $hqtxt{dvtn}{$lang}.'&nbsp;';
+      my $tdaytxt  = $hqtxt{tday}{$lang}.'&nbsp;'.$tdayDvtn;
+      my $ydaytxt  = $hqtxt{yday}{$lang}.'&nbsp;'.$ydayDvtn;
+      
       ## erste Header-Zeilen
       #######################
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
@@ -6653,9 +6676,9 @@ sub _graphicHeader {
       $header  .= qq{<td colspan="3" align="left" $dstyle> $api                             </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle>                                                      </td>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle> $autoct &nbsp; $acicon &nbsp; $lbpcq &nbsp; $pcqicon </td>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle>                                                      </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle>                                                                   </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $autoct&nbsp;&nbsp;$acicon&nbsp;&nbsp;$lbpcq&nbsp;&nbsp;$pcqicon  </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $dvtntxt&nbsp;$tdaytxt,&nbsp;$ydaytxt                             </td>};
       $header  .= qq{</tr>};
   }
   
@@ -8834,24 +8857,26 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc    = CircularVal ($hash, $idx, "pvfc",       "-");
-          my $pvrl    = CircularVal ($hash, $idx, "pvrl",       "-");
-          my $confc   = CircularVal ($hash, $idx, "confc",      "-");
-          my $gcons   = CircularVal ($hash, $idx, "gcons",      "-");
-          my $gfeedin = CircularVal ($hash, $idx, "gfeedin",    "-");
-          my $wid     = CircularVal ($hash, $idx, "weatherid",  "-");
-          my $wtxt    = CircularVal ($hash, $idx, "weathertxt", "-");
-          my $wccv    = CircularVal ($hash, $idx, "wcc",        "-");
-          my $wrprb   = CircularVal ($hash, $idx, "wrp",        "-");
-          my $temp    = CircularVal ($hash, $idx, "temp",       "-");
-          my $pvcorrf = CircularVal ($hash, $idx, "pvcorrf",    "-");
-          my $quality = CircularVal ($hash, $idx, "quality",    "-");
-          my $batin   = CircularVal ($hash, $idx, "batin",      "-");
-          my $batout  = CircularVal ($hash, $idx, "batout",     "-");
+          my $pvfc     = CircularVal ($hash, $idx, "pvfc",       "-");
+          my $pvrl     = CircularVal ($hash, $idx, "pvrl",       "-");
+          my $confc    = CircularVal ($hash, $idx, "confc",      "-");
+          my $gcons    = CircularVal ($hash, $idx, "gcons",      "-");
+          my $gfeedin  = CircularVal ($hash, $idx, "gfeedin",    "-");
+          my $wid      = CircularVal ($hash, $idx, "weatherid",  "-");
+          my $wtxt     = CircularVal ($hash, $idx, "weathertxt", "-");
+          my $wccv     = CircularVal ($hash, $idx, "wcc",        "-");
+          my $wrprb    = CircularVal ($hash, $idx, "wrp",        "-");
+          my $temp     = CircularVal ($hash, $idx, "temp",       "-");
+          my $pvcorrf  = CircularVal ($hash, $idx, "pvcorrf",    "-");
+          my $quality  = CircularVal ($hash, $idx, "quality",    "-");
+          my $batin    = CircularVal ($hash, $idx, "batin",      "-");
+          my $batout   = CircularVal ($hash, $idx, "batout",     "-");
+          my $tdayDvtn = CircularVal ($hash, $idx, "tdayDvtn",   "-");
+          my $ydayDvtn = CircularVal ($hash, $idx, "ydayDvtn",   "-");
           
           my $pvcf = qq{};
           if(ref $pvcorrf eq "HASH") {
-              for my $f (sort {$a<=>$b} keys %{$h->{$idx}{pvcorrf}}) {
+              for my $f (sort keys %{$h->{$idx}{pvcorrf}}) {
                   $pvcf .= " " if($pvcf);
                   $pvcf .= "$f=".$h->{$idx}{pvcorrf}{$f};
                   my $ct = ($pvcf =~ tr/=// // 0) / 10;
@@ -8876,11 +8901,17 @@ sub listDataPool {
           }
           
           $sq .= "\n" if($sq);
-          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, batin: $batin, batout: $batout\n";
-          $sq .= "      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
-          $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
-          $sq .= "      corr: $pvcf\n";
-          $sq .= "      quality: $cfq";
+          
+          if($idx != 99) {
+              $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, batin: $batin, batout: $batout\n";
+              $sq .= "      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
+              $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
+              $sq .= "      corr: $pvcf\n";
+              $sq .= "      quality: $cfq";
+          }
+          else {
+              $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn";
+          }
       }
   }
   
@@ -9951,7 +9982,7 @@ sub HistoryVal {
 return $def;
 }
 
-################################################################
+#############################################################################
 #    Wert des circular-Hash zurückliefern
 #    Achtung: die Werte im circular-Hash haben nicht
 #             zwingend eine Beziehung zueinander !!
@@ -9973,9 +10004,11 @@ return $def;
 #             wrp        - DWD Regenwahrscheinlichkeit
 #             temp       - Außentemperatur
 #             pvcorrf    - PV Autokorrekturfaktoren (HASH)
+#             tdayDvtn   - heutige Abweichung PV Prognose/Erzeugung in %
+#             ydayDvtn   - gestrige Abweichung PV Prognose/Erzeugung in %
 #    $def: Defaultwert
 #
-################################################################
+#############################################################################
 sub CircularVal {
   my $hash = shift;
   my $hod  = shift;
@@ -10932,7 +10965,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a id="SolarForecast-get-pvCircular"></a>
       <li><b>pvCircular </b> <br><br>
       Listet die vorhandenen Werte im Ringspeicher auf.  
-      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.      
+      Die Stundenangaben 00 - 24 beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 
+      08 - 09 Uhr. <br>
+      Die Stunde 99 hat eine Sonderfunktion. <br>      
       Erläuterung der Werte: <br><br>
       
       <ul>
@@ -10952,6 +10987,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>wtxt</b>     </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
             <tr><td> <b>corr</b>     </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
             <tr><td> <b>quality</b>  </td><td>Qualität der Autokorrekturfaktoren (max. 30), höhere Werte = höhere Qualität                                       </td></tr>
+            <tr><td> <b>tdayDvtn</b> </td><td>heutige Abweichung PV Prognose/Erzeugung in %                                                                      </td></tr>
+            <tr><td> <b>ydayDvtn</b> </td><td>gestrige Abweichung PV Prognose/Erzeugung in %                                                                     </td></tr>
          </table>
       </ul>
       
