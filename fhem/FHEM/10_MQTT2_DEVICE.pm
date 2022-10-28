@@ -857,7 +857,7 @@ MQTT2_DEVICE_addPos($@)
 sub
 zigbee2mqtt_RGB2JSON($;$)
 {
-  my ($rgb,$trans) = shift(@_);
+  my ($rgb,$trans) = (@_);
   $rgb =~ m/^(..)(..)(..)/;
   return toJSON({'transition'=>defined($trans) ? $trans : 1,
                  'color'=>{r=>hex($1),g=>hex($2),b=>hex($3)}});
