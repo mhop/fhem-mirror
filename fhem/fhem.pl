@@ -88,7 +88,7 @@ sub OldReadingsNum($$$;$);
 sub OldReadingsTimestamp($$$);
 sub OldReadingsVal($$$);
 sub OpenLogfile($);
-sub PrintHash($$;$);
+sub PrintHash($$);
 sub ReadingsAge($$$);
 sub ReadingsNum($$$;$);
 sub ReadingsTimestamp($$$);
@@ -2564,39 +2564,38 @@ CommandSetReading($$)
 
 #############
 sub
-PrintHash($$;$)
+PrintHash($$)
 {
-  my ($h, $lev, $prefix) = @_;
+  my ($h, $lev) = @_;
   my $si = AttrVal("global", "showInternalValues", 0);
   return "" if($h->{".visited"});
   $h->{".visited"} = 1;
 
-  $prefix="" if(!$prefix);
   my ($str,$sstr) = ("","");
   foreach my $c (sort keys %{$h}) {
     next if(!$si && $c =~ m/^\./ || $c eq ".visited");
     if(ref($h->{$c})) {
       if(ref($h->{$c}) eq "HASH") {
         if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
-          $str .= sprintf("$prefix%*s %-19s   %-15s %s\n",
+          $str .= sprintf("%*s %-19s   %-15s %s\n",
                           $lev," ", $h->{$c}{TIME},$c,$h->{$c}{VAL});
         } elsif($c eq "IODev" || $c eq "HASH") {
-          $str .= sprintf("$prefix%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
+          $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
 
         } else {
-          $sstr .= sprintf("$prefix%*s %s:\n", $lev, " ", $c);
-          $sstr .= PrintHash($h->{$c}, $lev+2, $prefix);
+          $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
+          $sstr .= PrintHash($h->{$c}, $lev+2);
         }
       } elsif(ref($h->{$c}) eq "ARRAY") {
-         $sstr .= sprintf("$prefix%*s %s:\n", $lev, " ", $c);
+         $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
          foreach my $v (@{$h->{$c}}) {
-           $sstr .= sprintf("$prefix%*s %s\n",
+           $sstr .= sprintf("%*s %s\n",
                         $lev+2, " ", defined($v) ? $v:"undef");
          }
       }
     } else {
       my $v = $h->{$c};
-      $str .= sprintf("$prefix%*s %-10s %s\n",
+      $str .= sprintf("%*s %-10s %s\n",
                         $lev," ",$c, defined($v) ? $v : "");
     }
   }
@@ -2628,7 +2627,11 @@ CommandList($$)
       $str .= "\n" if($str);
       my @a = GetDefAndAttr($d);
       $str .= join("\n", @a)."\n" if(@a);
-      $str .= PrintHash($defs{$d}, 2, "#") if($opt{i});
+      if($opt{i}) {
+        my $intHash = PrintHash($defs{$d}, 2);
+        $intHash =~ s/\n/\n#/g;
+        $str .= "#".$intHash;
+      }
     }
     foreach my $d (sort @list) {
       $str .= "\n" if($str);

@@ -132,6 +132,7 @@ FW_jqueryReadyFn()
     FW_root = r;
 
   FW_replaceWidgets($("html"));
+  FW_confirmDelete();
 
   // Fix the td count by setting colspan on the last column
   $("table.block.wide").each(function(){        // table
@@ -445,18 +446,22 @@ FW_filterIcons()
 
 
 function
-FW_deleteDevice(dev)
+FW_delete(cmd, fCmd)
 {
-  var cmd = addcsrf(FW_root+"?cmd=delete "+dev);
+  if($("body").attr("data-hiddenroom").match(/\binput\b/))
+    return FW_okDialog("Disabled");
+
+  if(!fCmd)
+    fCmd = addcsrf(FW_root+"?cmd="+cmd);
 
   var cd = $("body").attr("data-confirmDelete");
   if(!cd || cd == 0) {
-    location.href = cmd;
+    location.href = fCmd;
     return;
   }
 
   var div = $("<div>");
-  $(div).html("Do you really want to delete "+dev+"?<br><br>"+
+  $(div).html("Do you really want to "+cmd+"?<br><br>"+
     "<input type='checkbox' name='noconf'> Skip this dialog in the future");
   $("body").append(div);
 
@@ -464,7 +469,7 @@ FW_deleteDevice(dev)
     dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
     maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
     buttons: [
-      {text:"Yes", click:function(){ doClose(); location.href = cmd; }},
+      {text:"Yes", click:function(){ doClose(); location.href = fCmd; }},
       {text:"No",  click:doClose} ],
     close: doClose
   });
@@ -477,6 +482,27 @@ FW_deleteDevice(dev)
       FW_cmd(FW_root+"?cmd=attr "+wn+" confirmDelete 0&XHR=1");
     $(this).dialog("close"); $(div).remove();
   }
+}
+
+// For all the links starting with delete (deleteattr, etc)
+function
+FW_confirmDelete()
+{
+  var b = $("body");
+  var cd = $(b).attr("data-confirmDelete");
+  if(!cd || cd == 0)
+    return;
+  var wn = $(b).attr("data-webName");
+  $("div#content").find("a").each(function(){
+    var href = $(this).attr("href");
+    if(!href)
+      return;
+    var ma = $(this).attr("href").match(/.*cmd[^=]*=(delete[^&]*).*$/);
+    if(!ma || ma.length != 2)
+      return;
+    FW_removeLink(this);
+    $(this).click(function(e){ FW_delete(ma[1], ma[0]) });
+  });
 }
 
 function
@@ -843,6 +869,17 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       AddCodeMirror(s[0], function(pcm) {cm = pcm;});
     }
     });
+
+  if(!$("body").attr("data-hiddenroom").match(/\binput\b/)) {
+    $("table.internals div.dname").each(function(){
+      if($(this).text() == "NAME") {
+        var dev = $(this).attr("data-name");
+        var a=$("<a style='cursor:pointer'>NAME</a>");
+        $(this).html(a);
+        a.click(function(){ FW_renameDevice(dev) });
+      }
+    });
+  }
     
   // Set and attr 
   $("div input.psc[type=submit]:not(.get)").click(function(e){
@@ -901,28 +938,99 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
   });
 }
 
+
+function
+FW_removeLink(el)
+{
+  $(el).unbind("click");
+  $(el).attr("href", "#"); // Desktop: show underlined Text
+  $(el).removeAttr("onclick"); // smallscreen style
+}
+
 // Fill the "detLink" line with life
 function
 FW_detLink()
 {
-  $("div.rawDef a").each(function(){       // Help on detail window
-    var dev = FW_getLink(this).split(" ").pop().split("&")[0];
-    $(this).unbind("click");
-    $(this).attr("href", "#"); // Desktop: show underlined Text
-    $(this).removeAttr("onclick");
+  $("div.forumCopy a").each(function(){
+    if(FW_isiOS) {      // Copy does not work :(
+      $(this).parent().remove();
+      return;
+    }
+    var dev = FW_getLink(this).match(/cmd=forumCopy ([^&]*)/)[1];
+    FW_removeLink(this);
 
     $(this).click(function(evt){
+      FW_cmd(FW_root+"?cmd=list -r -i "+dev+"&XHR=1", function(data) {
+        data = '[code]'+data+'[/code]';
+        var okTxt = '"forum ready" definition copied to the clipboard.';
+        var errTxt = 'Could not copy the text: ';
+        var ok;
+        if(navigator.clipboard) {
+          navigator.clipboard.writeText(data).then(
+            function(){ FW_okDialog(okTxt) },
+            function(err){ FW_okDialog(errTxt+err) });
+
+        } else {
+          var ta = document.createElement("textarea");
+          ta.value = data;
+          document.body.appendChild(ta);
+          ta.select();
+          if(document.execCommand('copy'))
+            FW_okDialog(okTxt);
+           else
+            FW_okDialog(errTxt+"reason unknown");
+          document.body.removeChild(ta);
+        }
+      });
+      return false;
+    });
+  });
+
+  $("#detLink .devSpecHelp a").each(function(){       // Help on detail window
+    var dev = FW_getLink(this).split("#").pop();
+    FW_removeLink(this);
+
+    $(this).click(function(evt){
+      if($("#devSpecHelp").length) {
+        $("#devSpecHelp").remove();
+        return;
+      }
+      FW_getHelp(dev, function(data){
+        $("#content").append('<div id="devSpecHelp"></div>');
+        $("#devSpecHelp").html(data);
+        var off = $("#devSpecHelp").position().top-20;
+        $('body, html').animate({scrollTop:off}, 500);
+      });
+    });
+  });
+
+
+  $("#detLink select#moreCmds").click(function(){
+    var cmd = $(this).find("option:selected").attr("data-cmd");
+    if(!cmd)
+      return;
+    var m = cmd.match(/^([^ ]+) (.*)$/);
+    if(!m)
+      return;
+
+    if(m[1] == "delete") {
+      FW_delete("delete "+m[2]);
+
+    } else if(m[1] == "rawDef") {
+      var dev = m[2];
       if($("#rawDef").length) {
         $("#rawDef").remove();
         return;
       }
-      var textAreaStyle = typeof AddCodeMirror == 'function'?'opacity:0':'';
 
+      var textAreaStyle = typeof AddCodeMirror == 'function'?'opacity:0':'';
       $("#content").append('<div id="rawDef">'+
           '<textarea id="td_rawDef" rows="25" cols="60" style="width:99%; '+
                 textAreaStyle+'"/>'+
           '<button>Execute commands</button>'+
-          ' Dump "Probably associated with" too <input type="checkbox">'+
+          ' Dump "Probably associated with" too '+
+                '<input class="paw" type="checkbox">'+
+          ' With internals <input class="int" type="checkbox">'+
         '<br><br></div>');
 
       var cmVar;
@@ -943,7 +1051,8 @@ FW_detLink()
 
           var propertychange = function() {
             var nData = $("#rawDef textarea").val();
-            if(nData != data)
+            if(nData != data &&
+               !$("body").attr("data-hiddenroom").match(/\binput\b/))
               $("#rawDef button").show();
             else
               $("#rawDef button").hide();
@@ -967,82 +1076,14 @@ FW_detLink()
         });
       }
       fillData("-r");
-
-      $("#rawDef input").click(function(){fillData(this.checked ?"-R":"-r")});
-
+      $("#rawDef input").click(function(){
+        fillData(
+          ($("input.paw").is(":checked") ? "-R" : "-r")+
+          ($("input.int").is(":checked") ? " -i" : ""));
+      });
       $("#rawDef button").click(function(){
         FW_execRawDef($("#rawDef textarea").val());
       });
-    });
-
-  });
-
-  $("#detLink .devSpecHelp a").each(function(){       // Help on detail window
-    var dev = FW_getLink(this).split("#").pop();
-    $(this).unbind("click");
-    $(this).attr("href", "#"); // Desktop: show underlined Text
-    $(this).removeAttr("onclick");
-
-    $(this).click(function(evt){
-      if($("#devSpecHelp").length) {
-        $("#devSpecHelp").remove();
-        return;
-      }
-      FW_getHelp(dev, function(data){
-        $("#content").append('<div id="devSpecHelp"></div>');
-        $("#devSpecHelp").html(data);
-        var off = $("#devSpecHelp").position().top-20;
-        $('body, html').animate({scrollTop:off}, 500);
-      });
-    });
-  });
-
-
-  $("#detLink select#moreCmds").change(function(){
-    var cmd = $(this).find("option:selected").attr("data-cmd");
-    if(!cmd)
-      return;
-    var m = cmd.match(/^([^ ]+) (.*)$/);
-    if(!m)
-      return;
-
-    if(m[1] == "forumCopy") {
-      FW_cmd(FW_root+"?cmd=list -r -i "+m[2]+"&XHR=1", function(data) {
-        data = '[code]'+data+'[/code]';
-        var okTxt = '"forum ready" definition copied to the clipboard.';
-        var errTxt = 'Could not copy the text: ';
-        var ok;
-        if(navigator.clipboard) {
-          navigator.clipboard.writeText(data).then(
-            function(){ FW_okDialog(okTxt) },
-            function(err){ FW_okDialog(errTxt+err) });
-
-        } else {
-          var ta = document.createElement("textarea");
-          ta.value = data;
-          ta.style.top = ta.style.left = "0";
-          ta.style.position = "fixed";
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          try {
-            if(document.execCommand('copy'))
-              FW_okDialog(okTxt);
-             else
-              FW_okDialog(errTxt);
-          } catch (err) {
-            log('Copy:'+err);
-            FW_okDialog(errTxt+err);
-          }
-          document.body.removeChild(ta);
-        }
-      });
-
-    } else if(m[1] == "rename") {
-      FW_renameDevice(m[2]);
-
-    } else if(m[1] == "delete") {
-      FW_deleteDevice(m[2]);
 
     } else {
       location.href = addcsrf(FW_root+"?cmd="+cmd);

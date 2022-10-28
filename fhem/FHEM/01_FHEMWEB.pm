@@ -1246,6 +1246,7 @@ FW_dataAttr()
     addParam($FW_wname, "confirmJSError", 1).
     addParam($FW_wname, "addHtmlTitle", 1).
     addParam($FW_wname, "styleData", "").
+    addParam($FW_wname, "hiddenroom", "").
     addParam("global",  "language", "EN").
     "data-availableJs='$FW_fhemwebjs' ".
     "data-webName='$FW_wname' ";
@@ -1613,16 +1614,15 @@ FW_doDetail($)
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
   FW_pH "$FW_ME/docs/commandref${sfx}.html#$t", "Help for $t",
          undef, "detLink devSpecHelp";
-  FW_pH "cmd=rawDef $d", "Raw definition", undef, "detLink rawDef";
+  FW_pH "cmd=forumCopy $d", "Copy for forum.fhem.de", undef,"detLink forumCopy";
   FW_pO "<div class='detLink'>";
   FW_pO   "<select id='moreCmds'>";
-  FW_pO     "<option >More...</option>";
-  FW_pO     "<option data-cmd='forumCopy $d'>Copy for forum.fhem.de</option>";
+  FW_pO     "<option >...</option>";
+  FW_pO     "<option data-cmd='rawDef $d'>Raw definition</option>";
   FW_pO     "<option data-cmd='style iconFor $d'>Select icon</option>";
   FW_pO     "<option data-cmd='style showDSI $d'>Extend devStateIcon</option>";
   if($d ne "global") {
   FW_pO     "<option data-cmd='delete $d'>Delete $d</option>";
-  FW_pO     "<option data-cmd='rename $d'>Rename $d</option>";
   }
   FW_pO   "</select>";
   FW_pO "</div>";
