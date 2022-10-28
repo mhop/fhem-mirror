@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-27 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-28 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,7 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.71.2" => "27.10.2022  fix 'connection refused ...' ",
+  "0.71.2" => "27.10.2022  fix 'connection lost ...' ",
   "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
                            "changed some graphic default settings, typo todayRemaingAPIcalls, input check currentBatteryDev ".
                            "change attr Css to flowGraphicCss ",
@@ -575,8 +575,8 @@ my %htitles = (                                                                 
                 DE => qq{Ein -> Verbraucher ausschalten}                                                           },
   iens     => { EN => qq{On -> no off-command defined!},
                 DE => qq{Ein -> kein off-Kommando definiert!}                                                      },  
-  upd      => { EN => qq{Update},
-                DE => qq{Update}                                                                                   },
+  upd      => { EN => qq{Click for update},
+                DE => qq{Klick f&#252;r Update}                                                                    },
   on       => { EN => qq{switched on},
                 DE => qq{eingeschaltet}                                                                            },
   off      => { EN => qq{switched off},
@@ -1935,6 +1935,7 @@ sub Get {
   my $params = {
       hash  => $hash,
       name  => $name,
+      type  => $hash->{TYPE},
       opt   => $opt,
       arg   => $arg
   };
@@ -2527,6 +2528,7 @@ sub Attr {
   my $params = {
       hash  => $hash,
       name  => $name,
+      type  => $hash->{TYPE},
       cmd   => $cmd,
       aName => $aName,
       aVal  => $aVal
@@ -3001,7 +3003,7 @@ sub centralTask {
       
       return if(IsDisabled($name));
       
-      readingsSingleUpdate($hash, 'state', 'running', 0);
+      readingsSingleUpdate($hash, 'state', 'running', 0);                                          # vermeidet 'connection lost ...'
       
       my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
       if ($ret) { 
@@ -3020,6 +3022,7 @@ sub centralTask {
       my $centpars = {
           hash    => $hash,
           name    => $name,
+          type    => $type,
           t       => $t,
           date    => $date,
           minute  => $minute,
@@ -3039,7 +3042,7 @@ sub centralTask {
       _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
       
-      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
       
       if (isSolCastUsed ($hash)) {
           _getRoofTopData                 ($centpars);                                    # SolCast API Strahlungswerte abrufen          
@@ -3060,11 +3063,11 @@ sub centralTask {
       _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
       _calcTodayPVdeviation       ($centpars);                                            # Vorhersageabweichung erstellen (nach Sonnenuntergang)
       
-      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
 
       calcCorrAndQuality          ($centpars);                                            # neue Korrekturfaktor/Qualität berechnen und speichern
       
-      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
       
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       
@@ -3073,7 +3076,7 @@ sub centralTask {
 
       genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen      
   
-      createReadingsFromArray ($hash, \@da, $evt);                                           # Readings erzeugen
+      createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -3201,13 +3204,12 @@ sub _specialActivities {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $date  = $paref->{date};                                              # aktuelles Datum
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
   my $t     = $paref->{t};                                                 # aktuelle Zeit
   my $day   = $paref->{day};
-  
-  my $type  = $hash->{TYPE};
   
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
   
@@ -3239,17 +3241,6 @@ sub _specialActivities {
           $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
       }
   }
-  
-  ## zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
-  #############################################################################
-  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {                                 
-      my $nhts = NexthoursVal ($hash, $idx, "starttime",  undef);
-      my $nhfc = NexthoursVal ($hash, $idx, "pvforecast", undef);
-      next if(!defined $nhts || !defined $nhfc);
-      
-      my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
-      push @$daref, "AllPVforecastsToEvent<>".$nhfc." Wh<>".$dt." ".$h.":59:59";
-  }
 
   ## bestimmte einmalige Aktionen
   ##################################
@@ -3257,7 +3248,7 @@ sub _specialActivities {
   my $tlim = "00";                                                                                              
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
-          $date = strftime "%Y-%m-%d", localtime($t-7200);                                    # Vortag (2 h Differenz reichen aus)
+          $date = strftime "%Y-%m-%d", localtime($t-7200);                                   # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
           
           $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", 0);  
@@ -3307,7 +3298,8 @@ sub _specialActivities {
           } 
 
           writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben
-
+          
+          __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
           __delSolCastObsoleteData ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash          
           
           $hash->{HELPER}{H00DONE} = 1;
@@ -3321,15 +3313,36 @@ return;
 }
 
 #############################################################################
+# zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
+#############################################################################
+sub __createAdditionalEvents  {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
+  my $daref = $paref->{daref};
+  
+  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {                                 
+      my $nhts = NexthoursVal ($hash, $idx, "starttime",  undef);
+      my $nhfc = NexthoursVal ($hash, $idx, "pvforecast", undef);
+      next if(!defined $nhts || !defined $nhfc);
+ 
+      my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+      push @$daref, "AllPVforecastsToEvent<>".$nhfc." Wh<>".$dt." ".$h.":59:59";
+  }
+  
+return;
+}
+
+#############################################################################
 #            solcastapi Hash veraltete Daten löschen
 #############################################################################
 sub __delSolCastObsoleteData {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $date  = $paref->{date};                                              # aktuelles Datum
-  
-  my $type  = $hash->{TYPE};
   
   if (!keys %{$data{$type}{$name}{solcastapi}}) {
       return;
@@ -3362,7 +3375,7 @@ sub _transferDWDRadiationValues {
   my $raname = ReadingsVal($name, "currentRadiationDev", "");                                  # Radiation Forecast Device
   return if(!$raname || !$defs{$raname});
   
-  my $type        = $hash->{TYPE};
+  my $type        = $paref->{type};
   my $err         = checkdwdattr ($name,$raname,\@draattrmust);
   $paref->{state} = $err if($err);
   
@@ -3389,6 +3402,7 @@ sub _transferDWDRadiationValues {
       my $params = {
           hash => $hash,
           name => $name,
+          type => $type,
           rad  => $rad,
           t    => $t,
           hod  => $hod,
@@ -3466,14 +3480,13 @@ sub __calcDWDforecast {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $rad   = $paref->{rad};               # Nominale Strahlung aus DWD Device
   my $num   = $paref->{num};               # Nexthour
   my $t     = $paref->{t};                 # aktueller Unix Timestamp
   my $hod   = $paref->{hod};               # Stunde des Tages
   my $fh1   = $paref->{fh1};
   my $fd    = $paref->{fd};
-  
-  my $type  = $hash->{TYPE};
   
   my $stch  = $data{$type}{$name}{strings};                                                           # String Configuration Hash
   
@@ -3599,12 +3612,11 @@ sub ___readCorrfAndQuality {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $num   = $paref->{num};               # Nexthour 
   my $fh1   = $paref->{fh1};
   my $fd    = $paref->{fd};
   my $range = $paref->{range};
-  
-  my $type  = $hash->{TYPE};
   
   my $uac        = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
   my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.00);             # PV Korrekturfaktor (auto oder manuell)
@@ -3647,12 +3659,11 @@ sub _transferSolCastRadiationValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
   my $date  = $paref->{date};
   my $daref = $paref->{daref};
-  
-  my $type  = $hash->{TYPE};
   
   return if(!keys %{$data{$type}{$name}{solcastapi}});
   
@@ -3678,6 +3689,7 @@ sub _transferSolCastRadiationValues {
       my $params = {
           hash    => $hash,
           name    => $name,
+          type    => $type,
           wantdt  => $wantdt,
           hod     => $hod,
           fh1     => $fh1,
@@ -3723,12 +3735,11 @@ sub __calcSolCastEstimates {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
+  my $type    = $paref->{type};
   my $wantdt  = $paref->{wantdt};
   my $hod     = $paref->{hod};
   my $fd      = $paref->{fd};
   my $num     = $paref->{num};
-  
-  my $type    = $hash->{TYPE};
   
   my $reld    = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
@@ -3854,11 +3865,10 @@ sub ___readPercAndQuality {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $num   = $paref->{num};               # Nexthour 
   my $fh1   = $paref->{fh1};
   my $fd    = $paref->{fd};
-  
-  my $type  = $hash->{TYPE};
   
   my $uac        = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
   my $perc       = ReadingsNum ($name, "pvSolCastPercentile_".sprintf("%02d",$fh1), 50);              # Estimate Percentil
@@ -3956,10 +3966,9 @@ sub _calcMaxEstimateToday {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $daref = $paref->{daref};
   my $date  = $paref->{date};
- 
-  my $type  = $hash->{TYPE}; 
  
   my $maxest = 0;
   my $maxtim = '-';
@@ -3997,7 +4006,7 @@ sub _transferInverterValues {
   $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
              
-  my $type = $hash->{TYPE};
+  my $type  = $paref->{type};
   
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total (PV Erzeugung)
@@ -4075,7 +4084,7 @@ sub _transferWeatherValues {
   my $err         = checkdwdattr ($name,$fcname,\@dweattrmust);
   $paref->{state} = $err if($err);
   
-  my $type = $hash->{TYPE};
+  my $type = $paref->{type};
   my ($time_str);
   
   my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute    
@@ -4176,7 +4185,7 @@ sub _transferMeterValues {
   $medev     = $a->[0] // "";
   return if(!$medev || !$defs{$medev});
   
-  my $type = $hash->{TYPE}; 
+  my $type = $paref->{type};
   
   my ($gc,$gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
   my ($gf,$gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
@@ -4320,13 +4329,12 @@ sub _manageConsumerData {
   my $paref   = shift;
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
+  my $type    = $paref->{type};
   my $t       = $paref->{t};                                                 # aktuelle Zeit
   my $date    = $paref->{date};                                              # aktuelles Datum
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
-  my $daref   = $paref->{daref};  
-    
-  my $type    = $hash->{TYPE};   
+  my $daref   = $paref->{daref};
 
   my $nhour       = $chour+1;
   $paref->{nhour} = sprintf("%02d",$nhour); 
@@ -4505,9 +4513,8 @@ sub __calcEnergyPieces {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $c     = $paref->{consumer}; 
-  
-  my $type  = $hash->{TYPE};
+  my $type  = $paref->{type};
+  my $c     = $paref->{consumer};
   
   my $etot = HistoryVal ($hash, $paref->{day}, sprintf("%02d",$paref->{nhour}), "csmt${c}", 0);
   
@@ -4581,11 +4588,10 @@ sub ___csmSpecificEpieces {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer}; 
   my $etot  = $paref->{etot};
-  my $t     = $paref->{t}; 
-  
-  my $type  = $hash->{TYPE};
+  my $t     = $paref->{t};
    
   if(ConsumerVal ($hash, $c, "onoff", "off") eq "on") {                                                 # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
       $data{$type}{$name}{consumers}{$c}{lastOnTime} = $t;
@@ -4677,7 +4683,7 @@ sub __planSwitchTimes {
   
   return if(ConsumerVal ($hash, $c, "planstate", undef));                                  # Verbraucher ist schon geplant/gestartet/fertig
   
-  my $type   = $hash->{TYPE};
+  my $type   = $paref->{type};
   my $debug  = AttrVal ($name, "debug", 0);
   
   my $nh     = $data{$type}{$name}{nexthours};
@@ -4821,13 +4827,12 @@ sub ___planMust {
   my $paref    = shift;
   my $hash     = $paref->{hash};
   my $name     = $paref->{name};
+  my $type     = $paref->{type};
   my $c        = $paref->{consumer};
   my $maxref   = $paref->{maxref};
   my $elem     = $paref->{elem};
   my $mintime  = $paref->{mintime};
   my $stopdiff = $paref->{stopdiff};
-
-  my $type     = $hash->{TYPE};
 
   my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
   my $half                          = ceil ($mintime / 2 / 60);                                      # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
@@ -4861,13 +4866,12 @@ return;
 sub ___setConsumerPlanningState {     
   my $paref   = shift;
   my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $type    = $paref->{type};
   my $c       = $paref->{consumer};
   my $ps      = $paref->{ps};                                                # Planstatus
   my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on 
   my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
-  
-  my $type    = $hash->{TYPE};
-  my $name    = $hash->{NAME};
   
   my ($starttime,$stoptime);
   
@@ -4937,9 +4941,8 @@ sub ___setPlanningDeleteMeth {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
-  
-  my $type  = $hash->{TYPE};
 
   my $sonkey  = ConsumerVal ($hash, $c, "planswitchon",  "");
   my $soffkey = ConsumerVal ($hash, $c, "planswitchoff", "");
@@ -4966,10 +4969,9 @@ sub __setTimeframeState {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                            # aktueller Unixtimestamp
-  
-  my $type  = $hash->{TYPE};
 
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                      # geplante Unix Startzeit
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                      # geplante Unix Stopzeit  
@@ -4991,10 +4993,9 @@ sub __setConsRcmdState {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer};                                                         # aktueller Unixtimestamp
   my $daref = $paref->{daref};
-  
-  my $type  = $hash->{TYPE};
 
   my $surplus  = CurrentVal  ($hash, "surplus",     0);                                   # aktueller Energieüberschuß
   my $nompower = ConsumerVal ($hash, $c, "power",   0);                                   # Consumer nominale Leistungsaufnahme (W)
@@ -5022,11 +5023,10 @@ sub __switchConsumer {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                           # aktueller Unixtimestamp
   my $state = $paref->{state};
-  
-  my $type  = $hash->{TYPE};
   
   $state    = ___switchConsumerOn          ($paref);                                 # Verbraucher Einschaltbedingung prüfen + auslösen 
   $state    = ___switchConsumerOff         ($paref);                                 # Verbraucher Ausschaltbedingung prüfen + auslösen
@@ -5217,12 +5217,11 @@ return $state;
 sub ___setConsumerSwitchingState {     
   my $paref = shift;
   my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
-  
-  my $type  = $hash->{TYPE};
-  my $name  = $hash->{NAME};
   
   my $pstate = simplifyCstate (ConsumerVal ($hash, $c, "planstate", ""));
   my $calias = ConsumerVal    ($hash, $c, "alias", "");                                      # Consumer Device Alias
@@ -5299,10 +5298,9 @@ sub __remainConsumerTime {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};                                                                   # aktueller Unixtimestamp
-  
-  my $type  = $hash->{TYPE};
   
   my ($planstate,$startstr,$stoptstr) = __getPlanningStateAndTimes ($paref);
   my $stopts                          = ConsumerVal ($hash, $c, "planswitchoff", undef);     # geplante Unix Stopzeit  
@@ -5376,7 +5374,7 @@ sub _transferBatteryValues {
   my ($badev,$a,$h) = useBattery ($name);
   return if(!$badev);
   
-  my $type = $hash->{TYPE}; 
+  my $type = $paref->{type};
   
   my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
   my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
@@ -5529,8 +5527,7 @@ sub _estConsumptionForecast {
   $medev       = $am->[0] // "";
   return if(!$medev || !$defs{$medev});
   
-  my $type  = $hash->{TYPE};
-  
+  my $type  = $paref->{type};
   my $acref = $data{$type}{$name}{consumers};
  
   ## Verbrauchsvorhersage für den nächsten Tag
@@ -5737,9 +5734,8 @@ sub _calcReadingsTomorrowPVFc {
   my $paref  = shift;
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $type   = $paref->{type};
   my $daref  = $paref->{daref};
-  
-  my $type   = $hash->{TYPE};
   
   my $h    = $data{$type}{$name}{nexthours};
   my $hods = AttrVal($name, 'createTomorrowPVFcReadings', '');
@@ -5770,11 +5766,11 @@ sub _createSummaries {
   my $paref  = shift;
   my $hash   = $paref->{hash};
   my $name   = $paref->{name};
+  my $type   = $paref->{type};
   my $daref  = $paref->{daref};
   my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
   
-  my $type   = $hash->{TYPE};
   $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
   
   ## Initialisierung
@@ -6022,9 +6018,8 @@ return;
 sub collectAllRegConsumers {
   my $paref = shift;
   my $hash  = $paref->{hash};
-  my $name  = $paref->{name}; 
-  
-  my $type  = $hash->{TYPE};
+  my $name  = $paref->{name};
+  my $type  = $paref->{type};
               
   delete $data{$type}{$name}{current}{consumerdevs};
   
@@ -6219,6 +6214,7 @@ sub entryGraphic {
   my $paref = {
       hash           => $hash,
       name           => $name,
+      type           => $hash->{TYPE},
       ftui           => $ftui,
       maxhours       => $maxhours,
       modulo         => 1,
@@ -6699,9 +6695,8 @@ sub _showConsumerInGraphicBeam {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $type  = $paref->{type};
   my $hfcg  = $paref->{hfcg};
-  
-  my $type  = $hash->{TYPE};
   
   # get consumer list and display it in Graphics
   ################################################ 
@@ -6768,7 +6763,7 @@ sub _graphicConsumerLegend {
   my $name                     = $paref->{name};                                                    # Consumer AdviceIcon
   my ($clegendstyle, $clegend) = split('_', $paref->{clegend});
   
-  my $type                     = $hash->{TYPE};
+  my $type                     = $paref->{type};
   my @consumers                = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
   
   $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
@@ -7643,7 +7638,7 @@ END0
   my @consumers;
   
   if ($flowgcons) {
-      my $type       = $hash->{TYPE};
+      my $type       = $paref->{type};
       @consumers     = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                        # definierte Verbraucher ermitteln
       $consumercount = scalar @consumers; 
 
@@ -8099,7 +8094,7 @@ sub _calcCAQfromDWDcloudcover {
       }
       
       if(defined $range) {
-          my $type = $hash->{TYPE};         
+          my $type = $paref->{type};         
           
           Log3 ($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
           
@@ -8123,17 +8118,16 @@ return;
 ################################################################
 sub __avgCloudcoverCorrFromHistory {               
   my $paref = shift;
-  my $hash  = $paref->{hash};         
+  my $hash  = $paref->{hash}; 
+  my $name  = $paref->{name}; 
+  my $type  = $paref->{type};  
   my $hour  = $paref->{hour};                                                             # Stunde des Tages für die der Durchschnitt bestimmt werden soll
   my $day   = $paref->{day};                                                              # aktueller Tag
   
   $hour     = sprintf("%02d",$hour);
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};  
   my $pvhh  = $data{$type}{$name}{pvhist};
   
-  my ($usenhd, $calcd) = __useNumHistDays ($name);                                          # ist Attr numHistDays gesetzt ? und welcher Wert
+  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr numHistDays gesetzt ? und welcher Wert
 
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
@@ -8367,7 +8361,7 @@ sub _calcCAQwithSolCastPercentil {
             
       Log3 ($name, 5, "$name - write percentile into circular Hash: $perc, Hour $h");
       
-      my $type = $hash->{TYPE};
+      my $type = $paref->{type}; 
             
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $perc;                        # bestes Percentil für die jeweilige Stunde speichern
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $dnum;                        # Percentil Qualität
@@ -8385,14 +8379,13 @@ return;
 ################################################################
 sub __avgSolCastPercFromHistory {               
   my $paref = shift;
-  my $hash  = $paref->{hash};         
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name}; 
+  my $type  = $paref->{type};   
   my $hour  = $paref->{hour};                                                             # Stunde des Tages für die der Durchschnitt bestimmt werden soll
   my $day   = $paref->{day};                                                              # aktueller Tag
   
-  $hour     = sprintf("%02d",$hour);
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};  
+  $hour     = sprintf("%02d",$hour);  
   my $pvhh  = $data{$type}{$name}{pvhist};
   
   my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr numHistDays gesetzt ? und welcher Wert
