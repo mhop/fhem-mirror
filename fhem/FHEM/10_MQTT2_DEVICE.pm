@@ -855,11 +855,12 @@ MQTT2_DEVICE_addPos($@)
 #####################################
 # Utility functions for the AttrTemplates
 sub
-zigbee2mqtt_RGB2JSON($)
+zigbee2mqtt_RGB2JSON($;$)
 {
-  my $rgb = shift(@_);
+  my ($rgb,$trans) = shift(@_);
   $rgb =~ m/^(..)(..)(..)/;
-  return toJSON({'transition'=>1, 'color'=>{r=>hex($1),g=>hex($2),b=>hex($3)}});
+  return toJSON({'transition'=>defined($trans) ? $trans : 1,
+                 'color'=>{r=>hex($1),g=>hex($2),b=>hex($3)}});
 }
 
 sub
