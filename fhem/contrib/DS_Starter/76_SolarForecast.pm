@@ -530,14 +530,14 @@ my %hqtxt = (                                                                   
               DE => qq{Stand:}                                                                                              },
   wfmdcf => { EN => qq{Wait for more days with a consumption figure},
               DE => qq{Warte auf weitere Tage mit einer Verbrauchszahl}                                                     },
-  autoct => { EN => qq{automatic&nbsp;correction:},
-              DE => qq{automatische&nbsp;Korrektur:}                                                                        },
+  autoct => { EN => qq{Autocorrection:},
+              DE => qq{Autokorrektur:}                                                                                      },
   plntck => { EN => qq{Plant Configurationcheck Information},
               DE => qq{Informationen zur Anlagenkonfigurationspr&uuml;fung}                                                 },
-  lbpcq  => { EN => qq{correction&nbsp;quality&nbsp;current&nbsp;hour:},
-              DE => qq{Korrekturqualität&nbsp;akt.&nbsp;Stunde:}                                                            },
+  lbpcq  => { EN => qq{Quality:},
+              DE => qq{Qualit&auml;t:}                                                                                      },
   lblPvh => { EN => qq{next&nbsp;4h:},
-              DE => qq{nächste&nbsp;4h:}                                                                                    },
+              DE => qq{n&auml;chste&nbsp;4h:}                                                                               },
   lblPRe => { EN => qq{remain&nbsp;today:},
               DE => qq{Rest&nbsp;heute:}                                                                                    },
   lblPTo => { EN => qq{tomorrow:},
@@ -575,6 +575,8 @@ my %htitles = (                                                                 
                 DE => qq{Ein -> Verbraucher ausschalten}                                                           },
   iens     => { EN => qq{On -> no off-command defined!},
                 DE => qq{Ein -> kein off-Kommando definiert!}                                                      },  
+  natc     => { EN => qq{automatic cycle:},
+                DE => qq{automatischer Zyklus:}                                                                    },
   upd      => { EN => qq{Click for update},
                 DE => qq{Klick f&#252;r Update}                                                                    },
   on       => { EN => qq{switched on},
@@ -2989,7 +2991,7 @@ sub centralTask {
   if($init_done == 1) {
       if(!$interval) {
           $hash->{MODE} = "Manual";
-          readingsSingleUpdate($hash, "nextCycletime", "Manual", 1);
+          readingsSingleUpdate($hash, 'nextCycletime', 'Manual', 1);
       } 
       else {
           my $new = gettimeofday()+$interval; 
@@ -2997,7 +2999,7 @@ sub centralTask {
           
           if(!IsDisabled($name)) {
               $hash->{MODE} = "Automatic - next Cycletime: ".FmtTime($new);
-              readingsSingleUpdate($hash, "nextCycletime", FmtTime($new), 1);
+              readingsSingleUpdate($hash, 'nextCycletime', FmtTime($new), 1);
           }
       }
       
@@ -6505,8 +6507,8 @@ sub _graphicHeader {
   
   my $lupt    = $hqtxt{lupt}{$lang};
   my $autoct  = $hqtxt{autoct}{$lang};
-  my $lbpcq   = encode("utf8", $hqtxt{lbpcq}{$lang});     
-  my $lblPv4h = encode("utf8", $hqtxt{lblPvh}{$lang}); 
+  my $lbpcq   = $hqtxt{lbpcq}{$lang};     
+  my $lblPv4h = $hqtxt{lblPvh}{$lang}; 
   my $lblPvRe = $hqtxt{lblPRe}{$lang};
   my $lblPvTo = $hqtxt{lblPTo}{$lang};
   my $lblPvCu = $hqtxt{lblPCu}{$lang};
@@ -6585,8 +6587,9 @@ sub _graphicHeader {
 
       ## Update-Icon
       ################
+      my $naup = ReadingsVal ($name, 'nextCycletime', '');
       if ($upstate =~ /updated|successfully|switched/ix) {
-          $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang});
+          $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang}.' ('.$htitles{natc}{$lang}.' '.$naup.')');
           $upicon = "<a onClick=$cmdupdate>$img</a>";
       } 
       elsif ($upstate =~ /running/ix) {
@@ -6598,7 +6601,7 @@ sub _graphicHeader {
           $upicon = "<a>$img</a>";
       } 
       else {
-          $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang});
+          $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang}.' ('.$htitles{natc}{$lang}.' '.$naup.')');
           $upicon = "<a onClick=$cmdupdate>$img</a>";
       }
 
@@ -6609,8 +6612,7 @@ sub _graphicHeader {
           $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang});
       } 
       elsif ($pcfa eq "off") {
-          $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;
-          #$acicon = "<a title='$htitles{akorron}{$lang}'</a>-";  
+          $htitles{akorron}{$lang} =~ s/<NAME>/$name/xs;  
           $acicon = FW_makeImage('-', $htitles{akorron}{$lang});
       } 
       elsif ($pcfa =~ /standby/ix) {
@@ -6651,9 +6653,9 @@ sub _graphicHeader {
       $header  .= qq{<td colspan="3" align="left" $dstyle> $api                             </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle>                                  </td>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle> $autoct &nbsp; $acicon           </td>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon           </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle>                                                      </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle> $autoct &nbsp; $acicon &nbsp; $lbpcq &nbsp; $pcqicon </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle>                                                      </td>};
       $header  .= qq{</tr>};
   }
   
@@ -9199,7 +9201,7 @@ sub checkPlantConfig {
   if (!$eocr) {
       $result->{'Common Settings'}{state}   = $info;
       $result->{'Common Settings'}{result} .= qq{Attribute 'event-on-change-reading' is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading' is recommended to improve the runtime performance.<br>};
+      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading = .*' is recommended to improve the runtime performance and avoid the 'connection lost' message.<br>};
       $result->{'Common Settings'}{info}    = 1;
   }
   
