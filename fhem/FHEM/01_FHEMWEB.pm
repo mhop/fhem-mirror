@@ -1622,14 +1622,16 @@ FW_doDetail($)
   my $lNum = AttrVal($FW_wname, "detailLinks", 2);
   my $li = 0;
   while($li < $lNum && $li < @detCmd / 2) {
-    FW_pH "cmd=$detCmd[2*$li] $d", $detCmd[2*$li+1], undef, "detLink";
+    FW_pH "cmd=$detCmd[2*$li] $d", $detCmd[2*$li+1], undef, "detLink"
+      if(!$FW_hiddenroom{$detCmd[2*$li]});
     $li++;
   }
   if($li < @detCmd/2) {
     FW_pO   "<select id='moreCmds'>";
     FW_pO     "<option >...</option>";
     while($li < @detCmd / 2) {
-      FW_pO "<option data-cmd='$detCmd[2*$li] $d'>$detCmd[2*$li+1]</option>";
+      FW_pO "<option data-cmd='$detCmd[2*$li] $d'>$detCmd[2*$li+1]</option>"
+        if(!$FW_hiddenroom{$detCmd[2*$li]});
       $li++;
     }
     FW_pO   "</select>"
@@ -4065,7 +4067,8 @@ FW_log($$)
         to the detailed views or save button are hidden (although each aspect
         still can be addressed through URL manipulation).<br>
         The list can also contain values from the additional "Howto/Wiki/FAQ"
-        block.
+        block, and from the bottom of the detail page: devSpecHelp, forumCopy,
+        rawDef, style iconFor, style showDSI, delete.
         </li>
         <br>
 
@@ -4900,7 +4903,9 @@ FW_log($$)
        Fall werden diverse Eingabefelder ausgeblendent. Durch direktes Aufrufen
        der URL sind diese R&auml;ume weiterhin erreichbar!<br>
        Ebenso k&ouml;nnen Eintr&auml;ge in den Logfile/Commandref/etc Block
-       versteckt werden.  </li><br>
+       versteckt werden, oder die Links unten auf der Detailseite: devSpecHelp,
+       forumCopy, rawDef, style iconFor, style showDSI, delete.
+       </li><br>
 
     <a id="FHEMWEB-attr-hiddenroomRegexp"></a>
     <li>hiddenroomRegexp<br>
