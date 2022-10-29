@@ -7676,10 +7676,10 @@ END0
           $consumer_start = 350 - ($consDist  * (($consumercount -1) / 2)); 
       } 
       else {
-          $consumer_start = 350 - ((($consDist ) / 2) * ($consumercount-1));
+          $consumer_start = 350 - (($consDist / 2) * ($consumercount-1));
       }
       
-      $consumer_start = 0 if $consumer_start < 0;
+      #$consumer_start = 0 if $consumer_start < 0;
       $pos_left       = $consumer_start + 15;
       
       for my $c0 (@consumers) {
