@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-28 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-29 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,6 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
   "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
   "0.71.2" => "27.10.2022  fix 'connection lost ...' issue ",
   "0.71.1" => "26.10.2022  save no datasets with pv_estimate = 0 (__solCast_ApiResponse) to save time/space ".
@@ -6281,13 +6282,11 @@ sub entryGraphic {
   
   # Headerzeile generieren 
   ##########################  
-  my $header       = _graphicHeader ($paref);
-  #$paref->{header} = $header;
+  my $header = _graphicHeader ($paref);
   
   # Verbraucherlegende und Steuerung
   ###################################           
-  my $legendtxt       = _graphicConsumerLegend ($paref);
-  #$paref->{legendtxt} = $legendtxt;
+  my $legendtxt = _graphicConsumerLegend ($paref);
   
   $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
   my $m = $paref->{modulo} % 2;
@@ -6305,7 +6304,9 @@ sub entryGraphic {
   
   if ($legendtxt && ($clegend eq 'top')) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td>";
+      #$ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
+      $ret .= "$legendtxt</td>";
       $ret .= "</tr>";
       
       $paref->{modulo}++;
@@ -6344,7 +6345,8 @@ sub entryGraphic {
   if($gsel eq "both" || $gsel eq "flow") {
       $ret  .= "<tr class='$htr{$m}{cl}'>";
       my $fg = _flowGraphic ($paref);
-      $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$fg</td>";
+      $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret  .= "$fg</td>";
       $ret  .= "</tr>";
       
       $paref->{modulo}++;
@@ -6356,8 +6358,10 @@ sub entryGraphic {
   #################
   if ($legendtxt && ($clegend eq 'bottom')) {
       $ret .= "<tr class='$htr{$m}{cl}'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-      $ret .= "$legendtxt</td></tr>";
+      #$ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='padding-left: 10px; padding-top: 5px; padding-bottom: 5px; word-break: normal'>";
+      $ret .= "$legendtxt</td>";
+      $ret .= "</tr>";
   }
   
   $ret .= "</table>";
@@ -7545,7 +7549,8 @@ sub _flowGraphic {
   my $consDist      = $paref->{flowgconsDist};
   my $css           = $paref->{css};
   
-  my $style      = 'width:'.$flowgsize.'px; height:'.$flowgsize.'px;';
+  #my $style      = 'width:'.$flowgsize.'px; height:'.$flowgsize.'px;';
+  my $style      = 'width:98%; height:'.$flowgsize.'px;';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
   my $cpv        = ReadingsNum($name, 'Current_PV',              0);
   my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
@@ -7615,7 +7620,7 @@ sub _flowGraphic {
       $animation
       </style>
      
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 780 780" style="$style" id="SVGPLOT">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 -25 800 680" style="$style" id="SVGPLOT">
       
       <g transform="translate(400,50)">
         <g>
@@ -7738,8 +7743,8 @@ END3
       $ret .= qq{<path id="home-consumer_X" class="$consumer_style" $chain_color d="M780,620 L930,620" />};  
    }
   
-  ## get consumer list and display it in Graphics
-  ################################################
+  ## Consumer Laufketten
+  ########################
   if ($flowgcons) {
       $pos_left          = $consumer_start * 2;
       my $pos_left_start = 0;
@@ -7766,14 +7771,14 @@ END3
              
           my $consumer_style = 'flowg inactive_out';
           $consumer_style    = 'flowg active_out' if($p > $defpopercent);
-         
-          my $chain_color = "";                                                                     # Farbe der Laufkette des Consumers
+          my $chain_color    = "";                                                                 # Farbe der Laufkette des Consumers
+          
           if($p > 0.5) {
               $chain_color  = 'style="stroke: #'.substr(Color::pahColor(0,50,100,$p,[0,255,0, 127,255,0, 255,255,0, 255,127,0, 255,0,0]),0,6).';"';
               #$chain_color  = 'style="stroke: #DF0101;"';
           }
          
-          $ret            .= qq{<path id="home-consumer_$c1" class="$consumer_style" $chain_color d="M$pos_left_start,700 L$pos_left,850" />};
+          $ret            .= qq{<path id="home-consumer_$c1" class="$consumer_style" $chain_color d="M$pos_left_start,700 L$pos_left,850" />};   # Design Consumer Laufkette
          
           $pos_left       += ($consDist * 2);
           $pos_left_start += $distance;
@@ -7782,26 +7787,27 @@ END3
   
   ## Angaben Dummy-Verbraucher 
   #############################
-  
   $cc_dummy = sprintf("%.0f",$cc_dummy);
   
   ## Textangaben an Grafikelementen 
   ###################################
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="15"  style="text-anchor: start;">$cpv</text>}        if ($cpv);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1020" y="380" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);
+  #$ret .= qq{<text class="flowg text" id="bat-txt"       x="1020" y="380" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1170" y="295" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);
   $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="300" style="text-anchor: start;">$csc</text>}        if ($csc && $cpv);
   $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="200" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="525"  y="420" style="text-anchor: end;">$cgc</text>}          if ($cgc);
   $ret .= qq{<text class="flowg text" id="batout-txt"    x="865"  y="420" style="text-anchor: start;">$batout</text>}     if ($batout && $hasbat);
   $ret .= qq{<text class="flowg text" id="batin-txt"     x="865"  y="200" style="text-anchor: start;">$batin</text>}      if ($batin && $hasbat);
-  $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="620" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
-  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1070" y="620" style="text-anchor: start;">$cc_dummy</text>}  if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="flowg text" id="home-txt"      x="600"  y="640" style="text-anchor: end;">$cc</text>};                                               # Current_Consumption Anlage
+  #$ret .= qq{<text class="flowg text" id="dummy-txt"     x="1070" y="620" style="text-anchor: start;">$cc_dummy</text>}  if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
+  $ret .= qq{<text class="flowg text" id="dummy-txt"     x="1085" y="640" style="text-anchor: start;">$cc_dummy</text>}   if ($flowgconX && $flowgconPower);   # Current_Consumption Dummy
   
-  ## Anzeigedetails auswählen
-  ############################
+  ## Consumer Anzeige
+  #####################
   if ($flowgcons) {
-      $pos_left = ($consumer_start * 2) - 50;
+      $pos_left = ($consumer_start * 2) - 50;                                                         # -XX -> Start Lage Consumer Beschriftung
       
       for my $c2 (@consumers) {      
           $currentPower    = sprintf("%.1f", ReadingsNum($name, "consumer${c2}_currentPower", 0));
@@ -7812,8 +7818,8 @@ END3
               $currentPower = isConsumerPhysOn($hash, $c2) ? 'on' : 'off';
           }
           
-          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"     x="$pos_left" y="1090" style="text-anchor: start;">$currentPower</text>}      if ($flowgconPower);    # Current_Consumption Consumer
-          $ret       .= qq{<text class="flowg text" id="consumer-txt_time_$c2"     x="$pos_left" y="1150" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Consumer Restlaufzeit                                                                                                                                                                                                    
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"      x="$pos_left" y="1060" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption 
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_time_$c2" x="$pos_left" y="1120" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit                                                                                                                                                                                                    
           $pos_left  += ($consDist * 2);
       }
   }
