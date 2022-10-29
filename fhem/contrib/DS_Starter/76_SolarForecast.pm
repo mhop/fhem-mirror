@@ -11547,7 +11547,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        
        <a id="SolarForecast-attr-layoutType"></a>
        <li><b>layoutType &lt;single | double | diff&gt; </b><br>
-       Layout der Modulgrafik. <br>
+       Layout der Balkengrafik. <br>
        Der darzustellende Inhalt der Balken wird durch die Attribute <b>beam1Content</b> bzw. <b>beam2Content</b> 
        bestimmt.         
        <br><br>
