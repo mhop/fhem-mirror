@@ -951,46 +951,34 @@ FW_removeLink(el)
 function
 FW_detLink()
 {
-  $("div.forumCopy a").each(function(){
-    if(FW_isiOS) {      // Copy does not work :(
-      $(this).parent().remove();
+  if(FW_isiOS || FW_os == "osx") {      // our copy fails here
+    $("#detLink a[href*=forumCopy]").parent().remove();
+    $("#detLink option[data-cmd^=forumCopy]").remove();
+  }
+
+  $("#detLink a").each(function(){
+    var m = FW_getLink(this).match(/cmd=([^&]*)/);
+    if(!m)      // delete is already processed
       return;
-    }
-    var dev = FW_getLink(this).match(/cmd=forumCopy ([^&]*)/)[1];
     FW_removeLink(this);
-
-    $(this).click(function(evt){
-      FW_cmd(FW_root+"?cmd=list -r -i "+dev+"&XHR=1", function(data) {
-        data = '[code]'+data+'[/code]';
-        var okTxt = '"forum ready" definition copied to the clipboard.';
-        var errTxt = 'Could not copy the text: ';
-        var ok;
-        if(navigator.clipboard) {
-          navigator.clipboard.writeText(data).then(
-            function(){ FW_okDialog(okTxt) },
-            function(err){ FW_okDialog(errTxt+err) });
-
-        } else {
-          var ta = document.createElement("textarea");
-          ta.value = data;
-          document.body.appendChild(ta);
-          ta.select();
-          if(document.execCommand('copy'))
-            FW_okDialog(okTxt);
-           else
-            FW_okDialog(errTxt+"reason unknown");
-          document.body.removeChild(ta);
-        }
-      });
-      return false;
-    });
+    $(this).click(function(){doDetCmd(m[1])});
+  });
+  $("#detLink select#moreCmds").change(function(){
+    doDetCmd($(this).find("option:selected").attr("data-cmd"));
   });
 
-  $("#detLink .devSpecHelp a").each(function(){       // Help on detail window
-    var dev = FW_getLink(this).split("#").pop();
-    FW_removeLink(this);
+  function
+  doDetCmd(fCmd)
+  {
+    if(!fCmd)
+      return;
+    var m = fCmd.match(/^([^ ]+) (.*)$/);
+    if(!m)
+      return;
 
-    $(this).click(function(evt){
+    var cmd=m[1], dev=m[2];
+
+    if(cmd == "devSpecHelp") {
       if($("#devSpecHelp").length) {
         $("#devSpecHelp").remove();
         return;
@@ -1001,23 +989,24 @@ FW_detLink()
         var off = $("#devSpecHelp").position().top-20;
         $('body, html').animate({scrollTop:off}, 500);
       });
-    });
-  });
 
+    } else if(cmd == "forumCopy") {
+      FW_cmd(FW_root+"?cmd=list -r -i "+dev+"&XHR=1", function(data) {
+        var ta = document.createElement("textarea");
+        ta.value = '[code]'+data+'[/code]';
+        document.body.appendChild(ta);
+        ta.select();
+        if(document.execCommand('copy'))
+          FW_okDialog('"forum ready" definition copied to the clipboard.');
+         else
+          FW_okDialog('Could not copy');
+        document.body.removeChild(ta);
+      });
 
-  $("#detLink select#moreCmds").click(function(){
-    var cmd = $(this).find("option:selected").attr("data-cmd");
-    if(!cmd)
-      return;
-    var m = cmd.match(/^([^ ]+) (.*)$/);
-    if(!m)
-      return;
+    } else if(cmd == "delete") {
+      FW_delete("delete "+dev);
 
-    if(m[1] == "delete") {
-      FW_delete("delete "+m[2]);
-
-    } else if(m[1] == "rawDef") {
-      var dev = m[2];
+    } else if(cmd == "rawDef") {
       if($("#rawDef").length) {
         $("#rawDef").remove();
         return;
@@ -1086,10 +1075,10 @@ FW_detLink()
       });
 
     } else {
-      location.href = addcsrf(FW_root+"?cmd="+cmd);
+      location.href = addcsrf(FW_root+"?cmd="+cmd+" "+dev);
 
     }
-  });
+  }
 }
 
 function

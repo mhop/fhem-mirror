@@ -166,6 +166,7 @@ FHEMWEB_Initialize($)
     confirmDelete:0,1
     confirmJSError:0,1
     defaultRoom
+    detailLinks
     deviceOverview:always,iconOnly,onClick,never
     editConfig:1,0
     editFileList:textField-long
@@ -1610,22 +1611,29 @@ FW_doDetail($)
   my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
 
   FW_pO "<div id='detLink'>";
-  my $sfx = AttrVal("global", "language", "EN");
-  $sfx = ($sfx eq "EN" ? "" : "_$sfx");
-  FW_pH "$FW_ME/docs/commandref${sfx}.html#$t", "Help for $t",
-         undef, "detLink devSpecHelp";
-  FW_pH "cmd=forumCopy $d", "Copy for forum.fhem.de", undef,"detLink forumCopy";
-  FW_pO "<div class='detLink'>";
-  FW_pO   "<select id='moreCmds'>";
-  FW_pO     "<option >...</option>";
-  FW_pO     "<option data-cmd='rawDef $d'>Raw definition</option>";
-  FW_pO     "<option data-cmd='style iconFor $d'>Select icon</option>";
-  FW_pO     "<option data-cmd='style showDSI $d'>Extend devStateIcon</option>";
-  if($d ne "global") {
-  FW_pO     "<option data-cmd='delete $d'>Delete $d</option>";
+  my @detCmd = (
+    'devSpecHelp',   "Help for $t",
+    'forumCopy',     'Copy for forum.fhem.de',
+    'rawDef',        'Raw definition',
+    'style iconFor', 'Select icon',
+    'style showDSI', 'Extend devStateIcon',
+    'delete',        "Delete $d"
+  );
+  my $lNum = AttrVal($FW_wname, "detailLinks", 2);
+  my $li = 0;
+  while($li < $lNum && $li < @detCmd / 2) {
+    FW_pH "cmd=$detCmd[2*$li] $d", $detCmd[2*$li+1], undef, "detLink";
+    $li++;
   }
-  FW_pO   "</select>";
-  FW_pO "</div>";
+  if($li < @detCmd/2) {
+    FW_pO   "<select id='moreCmds'>";
+    FW_pO     "<option >...</option>";
+    while($li < @detCmd / 2) {
+      FW_pO "<option data-cmd='$detCmd[2*$li] $d'>$detCmd[2*$li+1]</option>";
+      $li++;
+    }
+    FW_pO   "</select>"
+  }
   FW_pO "<br><br>";
   FW_pO "</div>";
 }
@@ -3896,6 +3904,13 @@ FW_log($$)
         </li>
         <br>
 
+    <a id="FHEMWEB-attr-detailLinks"></a>
+    <li>detailLinks<br>
+        number of links to show on the bottom of the device detail page.
+        The rest of the commands is shown in a dropdown menu. Default is 2.
+        </li>
+        <br>
+
     <a id="FHEMWEB-attr-devStateIcon"></a>
     <li>devStateIcon<br>
         First form:<br>
@@ -4720,6 +4735,14 @@ FW_log($$)
         Beispiel:<br>
         attr WEB defaultRoom Zentrale
         </li><br>
+
+    <a id="FHEMWEB-attr-detailLinks"></a>
+    <li>detailLinks<br>
+        Anzahl der Links, die auf der Detailseite unten angezeigt werden. Die
+        weiteren Befehle werden in einem Auswahlmen&%uuml; angezeigt.
+        Voreinstellung ist 2.
+        </li>
+        <br>
 
     <a id="FHEMWEB-attr-devStateIcon"></a>
     <li>devStateIcon<br>
