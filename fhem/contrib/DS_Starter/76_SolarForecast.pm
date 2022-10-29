@@ -7818,8 +7818,8 @@ END3
               $currentPower = isConsumerPhysOn($hash, $c2) ? 'on' : 'off';
           }
           
-          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"      x="$pos_left" y="1060" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption 
-          $ret       .= qq{<text class="flowg text" id="consumer-txt_time_$c2" x="$pos_left" y="1120" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit                                                                                                                                                                                                    
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_$c2"      x="$pos_left" y="1110" style="text-anchor: start;">$currentPower</text>} if ($flowgconPower);    # Lage Consumer Consumption 
+          $ret       .= qq{<text class="flowg text" id="consumer-txt_time_$c2" x="$pos_left" y="1170" style="text-anchor: start;">$consumerTime</text>} if ($flowgconTime);     # Lage Consumer Restlaufzeit                                                                                                                                                                                                    
           $pos_left  += ($consDist * 2);
       }
   }
