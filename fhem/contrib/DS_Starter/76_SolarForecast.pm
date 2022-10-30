@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-29 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-30 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,6 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.72.0" => "30.10.2022  rename some graphic attributes ",
   "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
   "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
   "0.71.2" => "27.10.2022  fix 'connection lost ...' issue ",
@@ -800,14 +801,6 @@ sub Initialize {
   # $hash->{NotifyFn}           = \&Notify;                                              # wird zur Zeit nicht genutzt/verwendet
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
-                                "beam1Color:colorpicker,RGB ".
-                                "beam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
-                                "beam1FontColor:colorpicker,RGB ".
-                                "beam2Color:colorpicker,RGB ".
-                                "beam2Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
-                                "beam2FontColor:colorpicker,RGB ".
-                                "beamHeight ".
-                                "beamWidth ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
@@ -825,32 +818,39 @@ sub Initialize {
                                 "flowGraphicShowConsumerRemainTime:0,1 ".
                                 "flowGraphicCss:textField-long ".                             
                                 "follow70percentRule:1,dynamic,0 ".
-                                "forcePageRefresh:1,0 ".
-                                "graphicSelect:both,flow,forecast,none ".                                     
+                                "graphicBeamHeight ".
+                                "graphicBeamWidth:slider,40,10,100 ".
+                                "graphicBeam1Color:colorpicker,RGB ".
+                                "graphicBeam2Color:colorpicker,RGB ".
+                                "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
+                                "graphicBeam2Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
+                                "graphicBeam1FontColor:colorpicker,RGB ".
+                                "graphicBeam2FontColor:colorpicker,RGB ".
+                                "graphicBeam1MaxVal ".
+                                "graphicHistoryHour:slider,0,1,23 ".
+                                "graphicHourCount:slider,4,1,24 ".
+                                "graphicHourStyle ".
+                                "graphicLayoutType:single,double,diff ".
+                                "graphicSelect:both,flow,forecast,none ".
+                                "graphicShowDiff:no,top,bottom ".
+                                "graphicShowNight:1,0 ".
+                                "graphicShowWeather:1,0 ".
+                                "graphicSpaceSize ".
+                                "graphicStartHtml ".
+                                "graphicEndHtml ".
+                                "graphicWeatherColor:colorpicker,RGB ".
+                                "graphicWeatherColorNight:colorpicker,RGB ".
                                 "headerDetail:all,co,pv,pvco,statusLink ".
-                                "historyHour:slider,0,1,23 ".
-                                "hourCount:slider,4,1,24 ".                                                                
-                                "hourStyle ".
-                                "htmlStart ".
-                                "htmlEnd ".
+                                "headerShow:1,0 ".
                                 "interval ".
-                                "layoutType:single,double,diff ".
                                 "maxVariancePerDay ".
-                                "maxValBeam ".
                                 "numHistDays:slider,1,1,30 ".
                                 "optimizeSolCastAPIreqInterval:1,0 ".
                                 "preferredChargeBattery:slider,0,1,100 ".
                                 "rainFactorDamping:slider,0,1,100 ".
                                 "sameWeekdaysForConsfc:1,0 ".
-                                "showDiff:no,top,bottom ".
-                                "showHeader:1,0 ".
                                 "showLink:1,0 ".
-                                "showNight:1,0 ".
-                                "showWeather:1,0 ".
-                                "spaceSize ".
                                 "Wh_kWh:Wh,kWh ".
-                                "weatherColor:colorpicker,RGB ".
-                                "weatherColorNight:colorpicker,RGB ".
                                 $consumer.                                
                                 $readingFnAttributes;
 
@@ -858,6 +858,30 @@ sub Initialize {
 
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
+  
+ $hash->{AttrRenameMap} = { "beam1Color"         => "graphicBeam1Color",
+                            "beam1Content"       => "graphicBeam1Content",
+                            "beam1FontColor"     => "graphicBeam1FontColor",
+                            "beam2Color"         => "graphicBeam2Color",
+                            "beam2Content"       => "graphicBeam2Content",
+                            "beam2FontColor"     => "graphicBeam2FontColor",
+                            "beamHeight"         => "graphicBeamHeight",
+                            "beamWidth"          => "graphicBeamWidth",
+                            "historyHour"        => "graphicHistoryHour",
+                            "hourCount"          => "graphicHourCount",
+                            "hourStyle"          => "graphicHourStyle",
+                            "layoutType"         => "graphicLayoutType",
+                            "maxValBeam"         => "graphicBeam1MaxVal",
+                            "showDiff"           => "graphicShowDiff",
+                            "showNight"          => "graphicShowNight",
+                            "showWeather"        => "graphicShowWeather",
+                            "spaceSize"          => "graphicSpaceSize",
+                            "weatherColor"       => "graphicWeatherColor",
+                            "weatherColorNight"  => "graphicWeatherColorNight",
+                            "htmlStart"          => "graphicStartHtml",
+                            "htmlEnd"            => "graphicEndHtml",
+                            "showHeader"         => "headerShow",
+                          };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
  
@@ -6214,18 +6238,16 @@ sub entryGraphic {
 
   # Parameter f. Anzeige extrahieren
   ###################################   
-  my $width      = AttrNum ($name, 'beamWidth',           6);                              # zu klein ist nicht problematisch  
-  my $maxhours   = AttrNum ($name, 'hourCount',          24);
-  
-  my $alias      = AttrVal ($name, "alias", $name);                                        # Linktext als Aliasname oder Devicename setzen
-  my $gsel       = AttrVal ($name, 'graphicSelect', 'both');                               # Auswahl der anzuzeigenden Grafiken
-  my $dlink      = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
-
-  my $html_start = AttrVal ($name, 'htmlStart', undef);                                    # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  my $html_end   = AttrVal ($name, 'htmlEnd',   undef);                                    # beliebige HTML Strings die nach der Grafik ausgegeben werden
+  my $width      = AttrNum ($name, 'graphicBeamWidth',    20);                             # zu klein ist nicht problematisch  
+  my $maxhours   = AttrNum ($name, 'graphicHourCount',    24);
+  my $alias      = AttrVal ($name, 'alias',            $name);                             # Linktext als Aliasname oder Devicename setzen
+  my $gsel       = AttrVal ($name, 'graphicSelect',   'both');                             # Auswahl der anzuzeigenden Grafiken 
+  my $html_start = AttrVal ($name, 'graphicStartHtml', undef);                             # beliebige HTML Strings die vor der Grafik ausgegeben werden
+  my $html_end   = AttrVal ($name, 'graphicEndHtml',   undef);                             # beliebige HTML Strings die nach der Grafik ausgegeben werden
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
+  my $offset     = -1 * AttrNum ($name, 'graphicHistoryHour', $histhourdef);
   
-  my $offset     = -1 * AttrNum ($name, 'historyHour', $histhourdef);
+  my $dlink      = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>};
   
   my $paref = {
       hash           => $hash,
@@ -6236,28 +6258,28 @@ sub entryGraphic {
       modulo         => 1,
       dstyle         => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
       offset         => $offset,
-      hourstyle      => AttrVal ($name,    'hourStyle',                         ''),
-      colorb1        => AttrVal ($name,    'beam1Color',                 $b1coldef),
-      colorb2        => AttrVal ($name,    'beam2Color',                 $b2coldef),
-      fcolor1        => AttrVal ($name,    'beam1FontColor',         $b1fontcoldef),
-      fcolor2        => AttrVal ($name,    'beam2FontColor',         $b2fontcoldef),  
-      beam1cont      => AttrVal ($name,    'beam1Content',                'pvReal'),
-      beam2cont      => AttrVal ($name,    'beam2Content',            'pvForecast'), 
+      hourstyle      => AttrVal ($name,    'graphicHourStyle',                  ''),
+      colorb1        => AttrVal ($name,    'graphicBeam1Color',          $b1coldef),
+      colorb2        => AttrVal ($name,    'graphicBeam2Color',          $b2coldef),
+      fcolor1        => AttrVal ($name,    'graphicBeam1FontColor',  $b1fontcoldef),
+      fcolor2        => AttrVal ($name,    'graphicBeam2FontColor',  $b2fontcoldef),  
+      beam1cont      => AttrVal ($name,    'graphicBeam1Content',         'pvReal'),
+      beam2cont      => AttrVal ($name,    'graphicBeam2Content',     'pvForecast'), 
       caicon         => AttrVal ($name,    'consumerAdviceIcon',        $caicondef),            # Consumer AdviceIcon
       clegend        => AttrVal ($name,    'consumerLegend',            'icon_top'),            # Lage und Art Cunsumer Legende
-      lotype         => AttrVal ($name,    'layoutType',                  'double'),
+      lotype         => AttrVal ($name,    'graphicLayoutType',           'double'),
       kw             => AttrVal ($name,    'Wh_kWh',                          'Wh'),
-      height         => AttrNum ($name,    'beamHeight',                       200),
+      height         => AttrNum ($name,    'graphicBeamHeight',                200),
       width          => $width,
-      fsize          => AttrNum ($name,    'spaceSize',                         24),
-      maxVal         => AttrNum ($name,    'maxValBeam',                         0),            # dyn. Anpassung der Balkenhöhe oder statisch ?
-      show_night     => AttrNum ($name,    'showNight',                          0),            # alle Balken (Spalten) anzeigen ?
-      show_diff      => AttrVal ($name,    'showDiff',                        'no'),            # zusätzliche Anzeige $di{} in allen Typen
-      weather        => AttrNum ($name,    'showWeather',                        1),
-      colorw         => AttrVal ($name,    'weatherColor',             $wthcolddef),            # Wetter Icon Farbe Tag
-      colorwn        => AttrVal ($name,    'weatherColorNight',        $wthcolndef),            # Wetter Icon Farbe Nacht
+      fsize          => AttrNum ($name,    'graphicSpaceSize',                  24),
+      maxVal         => AttrNum ($name,    'graphicBeam1MaxVal',                 0),            # dyn. Anpassung der Balkenhöhe oder statisch ?
+      show_night     => AttrNum ($name,    'graphicShowNight',                   0),            # alle Balken (Spalten) anzeigen ?
+      show_diff      => AttrVal ($name,    'graphicShowDiff',                 'no'),            # zusätzliche Anzeige $di{} in allen Typen
+      weather        => AttrNum ($name,    'graphicShowWeather',                 1),
+      colorw         => AttrVal ($name,    'graphicWeatherColor',      $wthcolddef),            # Wetter Icon Farbe Tag
+      colorwn        => AttrVal ($name,    'graphicWeatherColorNight', $wthcolndef),            # Wetter Icon Farbe Nacht
       wlalias        => AttrVal ($name,    'alias',                          $name),
-      sheader        => AttrNum ($name,    'showHeader',                         1), 
+      sheader        => AttrNum ($name,    'headerShow',                         1), 
       hdrDetail      => AttrVal ($name,    'headerDetail',                   'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       lang           => AttrVal ("global", 'language',                        'EN'),
       flowgsize      => AttrVal ($name,    'flowGraphicSize',        $flowGSizedef),            # Größe Energieflußgrafik
@@ -6399,8 +6421,8 @@ sub _checkSetupNotComplete {
   my $pv0   = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);                    # der erste PV ForeCast Wert
   
   my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
-  my $height = AttrNum ($name,    'beamHeight',  200);
-  my $lang   = AttrVal ("global", "language",   "EN");
+  my $height = AttrNum ($name,    'graphicBeamHeight', 200);
+  my $lang   = AttrVal ("global", 'language',         'EN');
   
   if(IsDisabled($name)) {   
       $ret .= "<table class='roomoverview'>";
@@ -7198,10 +7220,8 @@ sub _beamGraphic {
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
           
           if ($val ne '&nbsp;') {                                                                                # Forum: https://forum.fhem.de/index.php/topic,117864.msg1166215.html#msg1166215
-          $val  = $hfcg->{$i}{diff} < 0 ? 
-                  '<b>'.$val.'<b/>'     : 
-                  $val > 0              ? 
-                  '+'.$val              : 
+          $val  = $hfcg->{$i}{diff} < 0 ? '<b>'.$val.'<b/>' : 
+                  $val > 0              ? '+'.$val          : 
                   $val;                                                                                          # negative Zahlen in Fettschrift, 0 aber ohne +
           }
           
@@ -7271,7 +7291,7 @@ sub _beamGraphic {
           # z4 - Zahl negativer Wert + fsize
 
           my ($px_pos,$px_neg);
-          my $maxValBeam = 0;                                                                                    # ToDo:  maxValBeam noch aus Attribut maxValBeam ableiten
+          my $maxValBeam = 0;                                                                                    # ToDo:  maxValBeam noch aus Attribut graphicBeam1MaxVal ableiten
 
           if ($maxValBeam) {                                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
               $px_pos = int($height/2);
@@ -7441,7 +7461,7 @@ sub _beamGraphic {
       }
 
       $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
-      $ret .= $hfcg->{$i}{time} == $thishour ?                                                                                           # wenn Hervorhebung nur bei gestztem Attr 'historyHour' ? dann hinzufügen: "&& $offset < 0"
+      $ret .= $hfcg->{$i}{time} == $thishour ?                                                                                           # wenn Hervorhebung nur bei gestztem Attr 'graphicHistoryHour' ? dann hinzufügen: "&& $offset < 0"
                                    '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : 
                                    $hfcg->{$i}{time_str};
       
@@ -7711,9 +7731,10 @@ END1
   }
   
   if ($flowgconX) {                                                                                # Dummy Consumer
-      $ret .= '<g id="consumer_X" fill="grey" transform="translate(520,330),scale(0.1)">';
-      $ret .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100', '');
-      $ret .= '</g> ';
+      my $dumcol = $cc_dummy <= 0 ? '@grey' : q{};                                                 # Einfärbung Consumer Dummy
+      $ret      .= '<g id="consumer_X" fill="grey" transform="translate(520,330),scale(0.1)">';
+      $ret      .= "<title>consumer_X</title>".FW_makeImage('light_light_dim_100'.$dumcol, '');
+      $ret      .= '</g> ';
    }
    
     $ret .= << "END2";
@@ -11086,21 +11107,21 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
     
-       <a id="SolarForecast-attr-beam1Color"></a>
-       <li><b>beam1Color </b><br>
+       <a id="SolarForecast-attr-graphicBeam1Color"></a>
+       <li><b>graphicBeam1Color </b><br>
          Farbauswahl der primären Balken.  
        </li>
        <br>
        
-       <a id="SolarForecast-attr-beam1FontColor"></a>
-       <li><b>beam1FontColor </b><br>
+       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
+       <li><b>graphicBeam1FontColor </b><br>
          Auswahl der Schriftfarbe des primären Balken. <br>
          (default: 0D0D0D)
        </li>
        <br>      
        
-       <a id="SolarForecast-attr-beam1Content"></a>
-       <li><b>beam1Content </b><br>
+       <a id="SolarForecast-attr-graphicBeam1Content"></a>
+       <li><b>graphicBeam1Content </b><br>
          Legt den darzustellenden Inhalt der primären Balken fest.
        
          <ul>   
@@ -11115,21 +11136,21 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br> 
        
-       <a id="SolarForecast-attr-beam2Color"></a>
-       <li><b>beam2Color </b><br>
+       <a id="SolarForecast-attr-graphicBeam2Color"></a>
+       <li><b>graphicBeam2Color </b><br>
          Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
        </li>
        <br>
 
-       <a id="SolarForecast-attr-beam2FontColor"></a>
-       <li><b>beam2FontColor </b><br>
+       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
+       <li><b>graphicBeam2FontColor </b><br>
          Auswahl der Schriftfarbe des sekundären Balken. <br>
          (default: 000000)
        </li>
        <br>       
        
-       <a id="SolarForecast-attr-beam2Content"></a>
-       <li><b>beam2Content </b><br>
+       <a id="SolarForecast-attr-graphicBeam2Content"></a>
+       <li><b>graphicBeam2Content </b><br>
          Legt den darzustellenden Inhalt der sekundären Balken fest. 
 
          <ul>   
@@ -11144,18 +11165,18 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-beamHeight"></a>
-       <li><b>beamHeight &lt;value&gt; </b><br>
+       <a id="SolarForecast-attr-graphicBeamHeight"></a>
+       <li><b>graphicBeamHeight &lt;value&gt; </b><br>
          Höhe der Balken in px und damit Bestimmung der gesammten Höhe.
-         In Verbindung mit "hourCount" lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
+         In Verbindung mit "graphicHourCount" lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
          (default: 200)
        </li>
        <br>
        
-       <a id="SolarForecast-attr-beamWidth"></a>
-       <li><b>beamWidth &lt;value&gt; </b><br>
-         Breite der Balken in px. <br>
-         (default: 6 (auto))
+       <a id="SolarForecast-attr-graphicBeamWidth"></a>
+       <li><b>graphicBeamWidth &lt;value&gt; </b><br>
+         Breite der Balken der Balkengrafik in px. Ohne gesetzen Attribut wird die Balkenbreite durch das Modul 
+         automatisch bestimmt. <br>
        </li>
        <br>  
        
@@ -11451,14 +11472,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </ul> 
        </li>
        <br>
-     
-       <a id="SolarForecast-attr-forcePageRefresh"></a>
-       <li><b>forcePageRefresh</b><br>
-         Das Attribut wird durch das SMAPortal-Device ausgewertet. <br>
-         Wenn gesetzt, wird ein Reload aller Browserseiten mit aktiven FHEMWEB-Verbindungen nach dem Update des 
-         Eltern-SMAPortal-Devices erzwungen.    
-       </li>
-       <br>
        
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
@@ -11469,50 +11482,50 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <ul>   
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Vorhersagegrafik an (default)    </td></tr>
+            <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Balkengrafik an (default)        </td></tr>
             <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
-            <tr><td> <b>forecast</b>   </td><td>zeigt die Vorhersagegrafik an                           </td></tr>
+            <tr><td> <b>forecast</b>   </td><td>zeigt die Balkengrafik an                               </td></tr>
             <tr><td> <b>none</b>       </td><td>es wird keine Grafik angezeigt                          </td></tr>
          </table>
          </ul> 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-historyHour"></a>
-       <li><b>historyHour </b><br>
+       <a id="SolarForecast-attr-graphicHistoryHour"></a>
+       <li><b>graphicHistoryHour </b><br>
          Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
          (default: 2)
        </li>
        <br>
        
-       <a id="SolarForecast-attr-hourCount"></a>
-       <li><b>hourCount &lt;4...24&gt; </b><br>
-         Anzahl der Balken/Stunden. <br>
+       <a id="SolarForecast-attr-graphicHourCount"></a>
+       <li><b>graphicHourCount &lt;4...24&gt; </b><br>
+         Anzahl der Balken/Stunden in der Balkengrafk. <br>
          (default: 24)
        </li>
        <br>
        
        <a id="SolarForecast-attr-headerDetail"></a>
        <li><b>headerDetail </b><br>
-         Detailiierungsgrad der Kopfzeilen. <br>
+         Detaillierungsgrad des Kopfbereiches. <br>
          (default: all)
          
          <ul>   
          <table>  
-         <colgroup> <col width=10%> <col width=90%> </colgroup>
-            <tr><td> <b>all</b>        </td><td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zur Device Detailanzeige + Aktualisierungszeit (default) </td></tr>
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>all</b>        </td><td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zur Detailanzeige + Aktualisierungszeit (default)        </td></tr>
             <tr><td> <b>co</b>         </td><td>nur Verbrauch (CO)                                                                                    </td></tr>
             <tr><td> <b>pv</b>         </td><td>nur Erzeugung (PV)                                                                                    </td></tr>
             <tr><td> <b>pvco</b>       </td><td>Erzeugung (PV) und Verbrauch (CO)                                                                     </td></tr>         
-            <tr><td> <b>statusLink</b> </td><td>Link zur Device Detailanzeige + Aktualisierungszeit                                                   </td></tr>
+            <tr><td> <b>statusLink</b> </td><td>Link zur Detailanzeige + Statusinformationen                                                          </td></tr>
          </table>
          </ul>       
        </li>
        <br>                                      
        
-       <a id="SolarForecast-attr-hourStyle"></a>
-       <li><b>hourStyle </b><br>
-         Format der Zeitangabe. <br><br>
+       <a id="SolarForecast-attr-graphicHourStyle"></a>
+       <li><b>graphicHourStyle </b><br>
+         Format der Zeitangabe in der Balkengrafik. <br><br>
        
        <ul>   
          <table>  
@@ -11525,14 +11538,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-htmlStart"></a>
-       <li><b>htmlStart &lt;HTML-String&gt; </b><br>
+       <a id="SolarForecast-attr-graphicStartHtml"></a>
+       <li><b>graphicStartHtml &lt;HTML-String&gt; </b><br>
          Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird. 
        </li>
        <br>
 
-       <a id="SolarForecast-attr-htmlEnd"></a>
-       <li><b>htmlEnd &lt;HTML-String&gt; </b><br>
+       <a id="SolarForecast-attr-graphicEndHtml"></a>
+       <li><b>graphicEndHtml &lt;HTML-String&gt; </b><br>
          Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird. 
        </li>
        <br> 
@@ -11545,11 +11558,11 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          (default: 70)
        </li><br>
        
-       <a id="SolarForecast-attr-layoutType"></a>
-       <li><b>layoutType &lt;single | double | diff&gt; </b><br>
+       <a id="SolarForecast-attr-graphicLayoutType"></a>
+       <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
        Layout der Balkengrafik. <br>
-       Der darzustellende Inhalt der Balken wird durch die Attribute <b>beam1Content</b> bzw. <b>beam2Content</b> 
-       bestimmt.         
+       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeam1Content</b> bzw. 
+       <b>graphicBeam2Content</b> bestimmt.         
        <br><br>
        
        <ul>   
@@ -11563,11 +11576,11 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br> 
  
-       <a id="SolarForecast-attr-maxValBeam"></a>
-       <li><b>maxValBeam &lt;0...val&gt; </b><br>
+       <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
+       <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
          Festlegung des maximalen Betrags des primären Balkens (Stundenwert) zur Berechnung der maximalen Balkenhöhe. 
          Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
-         Wenn nicht gesetzt oder 0, erfolgt eine dynamische Anpassung. <br>
+         Mit dem Wert "0" erfolgt eine dynamische Anpassung. <br>
          (default: 0)
        </li>
        <br>
@@ -11626,16 +11639,17 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>
        
    
-       <a id="SolarForecast-attr-showDiff"></a>
-       <li><b>showDiff &lt;no | top | bottom&gt; </b><br>
-         Zusätzliche Darstellung der Differenz "beam1Content - beam2Content" im Kopf- oder Fußbereich der Anzeige. <br>
+       <a id="SolarForecast-attr-graphicShowDiff"></a>
+       <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
+         Zusätzliche Anzeige der Differenz "graphicBeam1Content - graphicBeam2Content" im Kopf- oder Fußbereich der 
+         Balkengrafik. <br>
          (default: no)
        </li>
        <br>
        
-       <a id="SolarForecast-attr-showHeader"></a>
-       <li><b>showHeader </b><br>
-         Anzeige der Kopfzeile mit Prognosedaten, Rest des aktuellen Tages und des nächsten Tages <br>
+       <a id="SolarForecast-attr-headerShow"></a>
+       <li><b>headerShow </b><br>
+         Anzeigen/Verbergen des Tabellenkopfes mit Prognosedaten sowie bestimmten aktuellen und statistischen Werten. <br>
          (default: 1)
        </li>
        <br>
@@ -11647,16 +11661,16 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-showNight"></a>
-       <li><b>showNight </b><br>
-         Die Nachtstunden (ohne Ertragsprognose) werden mit angezeigt. <br>
+       <a id="SolarForecast-attr-graphicShowNight"></a>
+       <li><b>graphicShowNight </b><br>
+         Anzeigen/Verbergen der Nachtstunden (ohne Ertragsprognose) in der Balkengrafik. <br>
          (default: 0)
        </li>
        <br>
 
-       <a id="SolarForecast-attr-showWeather"></a>
-       <li><b>showWeather </b><br>
-         Wettericons anzeigen. <br>
+       <a id="SolarForecast-attr-graphicShowWeather"></a>
+       <li><b>graphicShowWeather </b><br>
+         Wettericons in der Balkengrafik anzeigen/verbergen. <br>
          (default: 1)
        </li>
        <br>
@@ -11679,8 +11693,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-spaceSize"></a>
-       <li><b>spaceSize &lt;value&gt; </b><br>
+       <a id="SolarForecast-attr-graphicSpaceSize"></a>
+       <li><b>graphicSpaceSize &lt;value&gt; </b><br>
          Legt fest wieviel Platz in px über oder unter den Balken (bei Anzeigetyp Differential (diff)) zur Anzeige der 
          Werte freigehalten wird. Bei Styles mit große Fonts kann der default-Wert zu klein sein bzw. rutscht ein 
          Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. <br>
@@ -11695,14 +11709,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>   
 
-       <a id="SolarForecast-attr-weatherColor"></a>
-       <li><b>weatherColor </b><br>
-         Farbe der Wetter-Icons.
+       <a id="SolarForecast-attr-graphicWeatherColor"></a>
+       <li><b>graphicWeatherColor </b><br>
+         Farbe der Wetter-Icons in der Balkengrafik für die Tagesstunden.
        </li>
        <br> 
 
-       <a id="SolarForecast-attr-weatherColorNight"></a>
-       <li><b>weatherColorNight </b><br>
+       <a id="SolarForecast-attr-graphicWeatherColorNight"></a>
+       <li><b>graphicWeatherColorNight </b><br>
          Farbe der Wetter-Icons für die Nachtstunden.
        </li>
        <br>        
