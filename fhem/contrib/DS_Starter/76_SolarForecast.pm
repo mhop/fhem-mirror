@@ -130,7 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.72.1" => "30.10.2022  fix 'connection lost ...' issue again ",
+  "0.72.1" => "30.10.2022  fix 'connection lost ...' issue again, global language check in checkPlantConfig ",
   "0.72.0" => "30.10.2022  rename some graphic attributes ",
   "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
   "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
@@ -9281,8 +9281,15 @@ sub checkPlantConfig {
   if (!$eocr) {
       $result->{'Common Settings'}{state}   = $info;
       $result->{'Common Settings'}{result} .= qq{Attribute 'event-on-change-reading' is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading = .*' is recommended to improve the runtime performance and avoid the 'connection lost' message.<br>};
+      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading = .*' is recommended to improve the runtime performance.<br>};
       $result->{'Common Settings'}{info}    = 1;
+  }
+  
+  if ($lang ne 'DE') {
+      $result->{'Common Settings'}{state}   = $info;
+      $result->{'Common Settings'}{result} .= qq{The global attribute 'language' is set to '$lang'. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'language = DE' is recommended. When set like this, most of the outputs are in German.<br>};
+      $result->{'Common Settings'}{info}    = 1;      
   }
   
   ## allg. Settings bei Nutzung SolCast
@@ -9341,7 +9348,7 @@ sub checkPlantConfig {
           $result->{'Common Settings'}{result}  = $hqtxt{fullfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
           $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping, rainFactorDamping, optimizeSolCastAPIreqInterval <br>};
-          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading <br>};
+          $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, global language <br>};
       }
   }
   
