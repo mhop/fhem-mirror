@@ -11106,79 +11106,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          regelmäßig neu geladen werden sollen.
        </li>
        <br>
-    
-       <a id="SolarForecast-attr-graphicBeam1Color"></a>
-       <li><b>graphicBeam1Color </b><br>
-         Farbauswahl der primären Balken.  
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
-       <li><b>graphicBeam1FontColor </b><br>
-         Auswahl der Schriftfarbe des primären Balken. <br>
-         (default: 0D0D0D)
-       </li>
-       <br>      
-       
-       <a id="SolarForecast-attr-graphicBeam1Content"></a>
-       <li><b>graphicBeam1Content </b><br>
-         Legt den darzustellenden Inhalt der primären Balken fest.
-       
-         <ul>   
-         <table>  
-         <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default)           </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung           </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
-         </table>
-         </ul>       
-       </li>
-       <br> 
-       
-       <a id="SolarForecast-attr-graphicBeam2Color"></a>
-       <li><b>graphicBeam2Color </b><br>
-         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
-       <li><b>graphicBeam2FontColor </b><br>
-         Auswahl der Schriftfarbe des sekundären Balken. <br>
-         (default: 000000)
-       </li>
-       <br>       
-       
-       <a id="SolarForecast-attr-graphicBeam2Content"></a>
-       <li><b>graphicBeam2Content </b><br>
-         Legt den darzustellenden Inhalt der sekundären Balken fest. 
-
-         <ul>   
-         <table>  
-         <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
-            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
-            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
-         </table>
-         </ul>        
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-graphicBeamHeight"></a>
-       <li><b>graphicBeamHeight &lt;value&gt; </b><br>
-         Höhe der Balken in px und damit Bestimmung der gesammten Höhe.
-         In Verbindung mit "graphicHourCount" lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
-         (default: 200)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-graphicBeamWidth"></a>
-       <li><b>graphicBeamWidth &lt;value&gt; </b><br>
-         Breite der Balken der Balkengrafik in px. Ohne gesetzen Attribut wird die Balkenbreite durch das Modul 
-         automatisch bestimmt. <br>
-       </li>
-       <br>  
        
        <a id="SolarForecast-attr-cloudFactorDamping"></a>
        <li><b>cloudFactorDamping </b><br>
@@ -11211,7 +11138,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          registriert sind. <br>
          (default: icon_top)
        </li>
-       <br>       
+       <br>
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] <br>
@@ -11322,6 +11249,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>       
        </li>
        <br>
+       
 
        <a id="SolarForecast-attr-createStatisticReadings"></a>
        <li><b>createStatisticReadings </b><br>
@@ -11364,7 +11292,19 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </ul>         
          
        </li>
-       <br> 
+       <br>
+       
+       <a id="SolarForecast-attr-debug"></a>
+       <li><b>debug</b><br>
+         Aktiviert/deaktiviert Debug-Meldungen im Modul.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-disable"></a>
+       <li><b>disable</b><br>
+         Aktiviert/deaktiviert das Device.
+       </li>
+       <br>
        
        <a id="SolarForecast-attr-flowGraphicCss"></a>
        <li><b>flowGraphicCss </b><br>
@@ -11391,18 +11331,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          
        </li>
        <br> 
-  
-       <a id="SolarForecast-attr-debug"></a>
-       <li><b>debug</b><br>
-         Aktiviert/deaktiviert Debug-Meldungen im Modul.
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-disable"></a>
-       <li><b>disable</b><br>
-         Aktiviert/deaktiviert das Device.
-       </li>
-       <br>
        
        <a id="SolarForecast-attr-flowGraphicAnimate"></a>
        <li><b>flowGraphicAnimate </b><br>
@@ -11472,6 +11400,135 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </ul> 
        </li>
        <br>
+    
+       <a id="SolarForecast-attr-graphicBeam1Color"></a>
+       <li><b>graphicBeam1Color </b><br>
+         Farbauswahl der primären Balken.  
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam1FontColor"></a>
+       <li><b>graphicBeam1FontColor </b><br>
+         Auswahl der Schriftfarbe des primären Balken. <br>
+         (default: 0D0D0D)
+       </li>
+       <br>      
+       
+       <a id="SolarForecast-attr-graphicBeam1Content"></a>
+       <li><b>graphicBeam1Content </b><br>
+         Legt den darzustellenden Inhalt der primären Balken fest.
+       
+         <ul>   
+         <table>  
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default)           </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung           </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
+         </table>
+         </ul>       
+       </li>
+       <br> 
+       
+       <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
+       <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
+         Festlegung des maximalen Betrags des primären Balkens (Stundenwert) zur Berechnung der maximalen Balkenhöhe. 
+         Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
+         Mit dem Wert "0" erfolgt eine dynamische Anpassung. <br>
+         (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeam2Color"></a>
+       <li><b>graphicBeam2Color </b><br>
+         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
+       </li>
+       <br>
+
+       <a id="SolarForecast-attr-graphicBeam2FontColor"></a>
+       <li><b>graphicBeam2FontColor </b><br>
+         Auswahl der Schriftfarbe des sekundären Balken. <br>
+         (default: 000000)
+       </li>
+       <br>       
+       
+       <a id="SolarForecast-attr-graphicBeam2Content"></a>
+       <li><b>graphicBeam2Content </b><br>
+         Legt den darzustellenden Inhalt der sekundären Balken fest. 
+
+         <ul>   
+         <table>  
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
+            <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
+            <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
+         </table>
+         </ul>        
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeamHeight"></a>
+       <li><b>graphicBeamHeight &lt;value&gt; </b><br>
+         Höhe der Balken in px und damit Bestimmung der gesammten Höhe.
+         In Verbindung mit "graphicHourCount" lassen sich damit auch recht kleine Grafikausgaben erzeugen. <br>
+         (default: 200)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicBeamWidth"></a>
+       <li><b>graphicBeamWidth &lt;value&gt; </b><br>
+         Breite der Balken der Balkengrafik in px. Ohne gesetzen Attribut wird die Balkenbreite durch das Modul 
+         automatisch bestimmt. <br>
+       </li>
+       <br> 
+
+       <a id="SolarForecast-attr-graphicHistoryHour"></a>
+       <li><b>graphicHistoryHour </b><br>
+         Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
+         (default: 2)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicHourCount"></a>
+       <li><b>graphicHourCount &lt;4...24&gt; </b><br>
+         Anzahl der Balken/Stunden in der Balkengrafk. <br>
+         (default: 24)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicHourStyle"></a>
+       <li><b>graphicHourStyle </b><br>
+         Format der Zeitangabe in der Balkengrafik. <br><br>
+       
+       <ul>   
+         <table>  
+           <colgroup> <col width=30%> <col width=70%> </colgroup>
+           <tr><td> <b>nicht gesetzt</b>  </td><td>nur Stundenangabe ohne Minuten (default)                </td></tr>
+           <tr><td> <b>:00</b>            </td><td>Stunden sowie Minuten zweistellig, z.B. 10:00           </td></tr>
+           <tr><td> <b>:0</b>             </td><td>Stunden sowie Minuten einstellig, z.B. 8:0              </td></tr>
+         </table>
+       </ul>       
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicLayoutType"></a>
+       <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
+       Layout der Balkengrafik. <br>
+       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeam1Content</b> bzw. 
+       <b>graphicBeam2Content</b> bestimmt.         
+       <br><br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an (default)                                               </td></tr>
+          <tr><td> <b>single</b>  </td><td>- zeigt nur den primären Balken an                                                                               </td></tr>
+          <tr><td> <b>diff</b>    </td><td>- Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
+       </table>
+       </ul>
+       </li>
+       <br> 
        
        <a id="SolarForecast-attr-graphicSelect"></a>
        <li><b>graphicSelect </b><br>
@@ -11491,19 +11548,60 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-graphicHistoryHour"></a>
-       <li><b>graphicHistoryHour </b><br>
-         Anzahl der vorangegangenen Stunden die in der Balkengrafik dargestellt werden. <br>
-         (default: 2)
+       <a id="SolarForecast-attr-graphicShowDiff"></a>
+       <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
+         Zusätzliche Anzeige der Differenz "graphicBeam1Content - graphicBeam2Content" im Kopf- oder Fußbereich der 
+         Balkengrafik. <br>
+         (default: no)
        </li>
        <br>
        
-       <a id="SolarForecast-attr-graphicHourCount"></a>
-       <li><b>graphicHourCount &lt;4...24&gt; </b><br>
-         Anzahl der Balken/Stunden in der Balkengrafk. <br>
+       <a id="SolarForecast-attr-graphicShowNight"></a>
+       <li><b>graphicShowNight </b><br>
+         Anzeigen/Verbergen der Nachtstunden (ohne Ertragsprognose) in der Balkengrafik. <br>
+         (default: 0)
+       </li>
+       <br>
+
+       <a id="SolarForecast-attr-graphicShowWeather"></a>
+       <li><b>graphicShowWeather </b><br>
+         Wettericons in der Balkengrafik anzeigen/verbergen. <br>
+         (default: 1)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicStartHtml"></a>
+       <li><b>graphicStartHtml &lt;HTML-String&gt; </b><br>
+         Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird. 
+       </li>
+       <br>
+
+       <a id="SolarForecast-attr-graphicEndHtml"></a>
+       <li><b>graphicEndHtml &lt;HTML-String&gt; </b><br>
+         Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird. 
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicSpaceSize"></a>
+       <li><b>graphicSpaceSize &lt;value&gt; </b><br>
+         Legt fest wieviel Platz in px über oder unter den Balken (bei Anzeigetyp Differential (diff)) zur Anzeige der 
+         Werte freigehalten wird. Bei Styles mit große Fonts kann der default-Wert zu klein sein bzw. rutscht ein 
+         Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. <br>
          (default: 24)
        </li>
        <br>
+       
+       <a id="SolarForecast-attr-graphicWeatherColor"></a>
+       <li><b>graphicWeatherColor </b><br>
+         Farbe der Wetter-Icons in der Balkengrafik für die Tagesstunden.
+       </li>
+       <br> 
+
+       <a id="SolarForecast-attr-graphicWeatherColorNight"></a>
+       <li><b>graphicWeatherColorNight </b><br>
+         Farbe der Wetter-Icons für die Nachtstunden.
+       </li>
+       <br>  
        
        <a id="SolarForecast-attr-headerDetail"></a>
        <li><b>headerDetail </b><br>
@@ -11521,34 +11619,14 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </table>
          </ul>       
        </li>
-       <br>                                      
-       
-       <a id="SolarForecast-attr-graphicHourStyle"></a>
-       <li><b>graphicHourStyle </b><br>
-         Format der Zeitangabe in der Balkengrafik. <br><br>
-       
-       <ul>   
-         <table>  
-           <colgroup> <col width=30%> <col width=70%> </colgroup>
-           <tr><td> <b>nicht gesetzt</b>  </td><td>nur Stundenangabe ohne Minuten (default)                </td></tr>
-           <tr><td> <b>:00</b>            </td><td>Stunden sowie Minuten zweistellig, z.B. 10:00           </td></tr>
-           <tr><td> <b>:0</b>             </td><td>Stunden sowie Minuten einstellig, z.B. 8:0              </td></tr>
-         </table>
-       </ul>       
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-graphicStartHtml"></a>
-       <li><b>graphicStartHtml &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird. 
-       </li>
-       <br>
+       <br>   
 
-       <a id="SolarForecast-attr-graphicEndHtml"></a>
-       <li><b>graphicEndHtml &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird. 
+       <a id="SolarForecast-attr-headerShow"></a>
+       <li><b>headerShow </b><br>
+         Anzeigen/Verbergen des Tabellenkopfes mit Prognosedaten sowie bestimmten aktuellen und statistischen Werten. <br>
+         (default: 1)
        </li>
-       <br> 
+       <br>       
        
        <a id="SolarForecast-attr-interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
@@ -11557,33 +11635,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          manuell erfolgen. <br>
          (default: 70)
        </li><br>
-       
-       <a id="SolarForecast-attr-graphicLayoutType"></a>
-       <li><b>graphicLayoutType &lt;single | double | diff&gt; </b><br>
-       Layout der Balkengrafik. <br>
-       Der darzustellende Inhalt der Balken wird durch die Attribute <b>graphicBeam1Content</b> bzw. 
-       <b>graphicBeam2Content</b> bestimmt.         
-       <br><br>
-       
-       <ul>   
-       <table>  
-       <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an (default)                                               </td></tr>
-          <tr><td> <b>single</b>  </td><td>- zeigt nur den primären Balken an                                                                               </td></tr>
-          <tr><td> <b>diff</b>    </td><td>- Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
-       </table>
-       </ul>
-       </li>
-       <br> 
- 
-       <a id="SolarForecast-attr-graphicBeam1MaxVal"></a>
-       <li><b>graphicBeam1MaxVal &lt;0...val&gt; </b><br>
-         Festlegung des maximalen Betrags des primären Balkens (Stundenwert) zur Berechnung der maximalen Balkenhöhe. 
-         Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
-         Mit dem Wert "0" erfolgt eine dynamische Anpassung. <br>
-         (default: 0)
-       </li>
-       <br>
        
        <a id="SolarForecast-attr-maxVariancePerDay"></a>
        <li><b>maxVariancePerDay &lt;Zahl&gt; </b><br>
@@ -11638,39 +11689,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-   
-       <a id="SolarForecast-attr-graphicShowDiff"></a>
-       <li><b>graphicShowDiff &lt;no | top | bottom&gt; </b><br>
-         Zusätzliche Anzeige der Differenz "graphicBeam1Content - graphicBeam2Content" im Kopf- oder Fußbereich der 
-         Balkengrafik. <br>
-         (default: no)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-headerShow"></a>
-       <li><b>headerShow </b><br>
-         Anzeigen/Verbergen des Tabellenkopfes mit Prognosedaten sowie bestimmten aktuellen und statistischen Werten. <br>
-         (default: 1)
-       </li>
-       <br>
-       
        <a id="SolarForecast-attr-showLink"></a>
        <li><b>showLink </b><br>
          Anzeige des Detail-Links über dem Grafik-Device <br>
-         (default: 1)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-graphicShowNight"></a>
-       <li><b>graphicShowNight </b><br>
-         Anzeigen/Verbergen der Nachtstunden (ohne Ertragsprognose) in der Balkengrafik. <br>
-         (default: 0)
-       </li>
-       <br>
-
-       <a id="SolarForecast-attr-graphicShowWeather"></a>
-       <li><b>graphicShowWeather </b><br>
-         Wettericons in der Balkengrafik anzeigen/verbergen. <br>
          (default: 1)
        </li>
        <br>
@@ -11693,33 +11714,12 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-graphicSpaceSize"></a>
-       <li><b>graphicSpaceSize &lt;value&gt; </b><br>
-         Legt fest wieviel Platz in px über oder unter den Balken (bei Anzeigetyp Differential (diff)) zur Anzeige der 
-         Werte freigehalten wird. Bei Styles mit große Fonts kann der default-Wert zu klein sein bzw. rutscht ein 
-         Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. <br>
-         (default: 24)
-       </li>
-       <br>
-       
        <a id="SolarForecast-attr-Wh_kWh"></a>
        <li><b>Wh_kWh &lt;Wh | kWh&gt; </b><br>
          Definiert die Anzeigeeinheit in Wh oder in kWh auf eine Nachkommastelle gerundet. <br>
          (default: Wh)
        </li>
-       <br>   
-
-       <a id="SolarForecast-attr-graphicWeatherColor"></a>
-       <li><b>graphicWeatherColor </b><br>
-         Farbe der Wetter-Icons in der Balkengrafik für die Tagesstunden.
-       </li>
-       <br> 
-
-       <a id="SolarForecast-attr-graphicWeatherColorNight"></a>
-       <li><b>graphicWeatherColorNight </b><br>
-         Farbe der Wetter-Icons für die Nachtstunden.
-       </li>
-       <br>        
+       <br>      
 
      </ul>
   </ul>
