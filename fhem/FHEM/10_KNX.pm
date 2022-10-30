@@ -90,9 +90,16 @@
 #              .... both will be completly removed with next version
 #              new: Internal "RAWMSG" shows msg from Bus while device is disabled (debugging)
 #              bugfix: allowed group-format corrected: was 0-31/0-15/0-255 -> now: 0-31/0-7/0-255 lt.KNX-spec
+# MH 202210xx  changed package name FHEM::KNX -> KNX
+#              changed svnid format 
+#              fix dpt4,dpt16 encode/decode (ascii vs. ISO-8859-1)
+#              fix dpt14.057 unit 'dpt14.057' { cos&phi; vs. cosφ ) =>need UTF8 in DbLog spec !
+#              new dpt217 - for EBUSD KNX implementation
+#              no default slider in FHEMWEB-set/get for dpt7,8,9,12,13 - use widgetoverride slider !
+#              cmdref formatting
 
 
-package FHEM::KNX; ## no critic 'package'
+package KNX; ## no critic 'package'
 
 use strict;
 use warnings;
@@ -115,7 +122,8 @@ use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 BEGIN {
     # Import from main context
     GP_Import(
-        qw(readingsSingleUpdate readingsBulkUpdate readingsBulkUpdateIfChanged readingsBeginUpdate readingsEndUpdate
+        qw(readingsSingleUpdate readingsBulkUpdate readingsBulkUpdateIfChanged
+          readingsBeginUpdate readingsEndUpdate
           Log3
           AttrVal InternalVal ReadingsVal ReadingsNum
           addToDevAttrList
@@ -323,7 +331,8 @@ my %dpttypes = (
 	'dpt14.056'     => {CODE=>'dpt14', UNIT=>q{W},  FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 	'dpt14.068'     => {CODE=>'dpt14', UNIT=>q{°C}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 	'dpt14.076'     => {CODE=>'dpt14', UNIT=>q{m³}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
-	'dpt14.057'     => {CODE=>'dpt14', UNIT=>q{cos&phi;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+	'dpt14.057'     => {CODE=>'dpt14', UNIT=>q{cosφ}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
+#	'dpt14.057'     => {CODE=>'dpt14', UNIT=>q{cos&phi;}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/[-+]?(?:\d*[\.\,])?\d+/ix, MIN=>undef, MAX=>undef},
 
 	# Access data - receive only
 	'dpt15'         => {CODE=>'dpt15', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/noset/ix, MIN=>undef, MAX=>undef,
@@ -361,6 +370,11 @@ my %dpttypes = (
 	'dpt22'         => {CODE=>'dpt22', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/noset/ix, MIN=>undef, MAX=>undef,
                             DEC=>\&dec_dpt22,},
 	'dpt22.101'     => {CODE=>'dpt22', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/noset/ix, MIN=>undef, MAX=>undef},
+
+	# Version Info - receive only!!! for EBUSD KNX implementation
+	'dpt217'        => {CODE=>'dpt217', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/\d+\.\d+/ix, MIN=>0, MAX=>255.255,
+                            DEC=>\&dec_dpt217,},
+	'dpt217.001'    => {CODE=>'dpt217', UNIT=>q{}, FACTOR=>1, OFFSET=>0, PATTERN=>qr/\d+\.\d+/ix, MIN=>0, MAX=>255.255},
 
 	# Color-Code
 	'dpt232'        => {CODE=>'dpt232', UNIT=>q{}, FACTOR=>undef, OFFSET=>undef, PATTERN=>qr/[0-9a-f]{6}/ix, MIN=>undef, MAX=>undef, SETLIST=>'colorpicker',
@@ -411,7 +425,7 @@ sub KNX_Define {
 	my $name = $a[0];
 	$hash->{NAME} = $name;
 
-	$svnid =~ s/.*\.pm\s(.+)Z.*/$1 UTC/ix;
+	$svnid =~ s/.*\.pm\s(.+)Z.*/$1/ix;
 	$hash->{SVN} = $svnid; # store svn info in dev hash
 
 	my $logtxt = qq{KNX_define ($name): }; # leading txt
@@ -419,14 +433,17 @@ sub KNX_Define {
 	Log3 ($name, 5, $logtxt . join (q{ }, @a));
 
 	#too less arguments or no valid 1st gad
-	return ($logtxt . q{wrong syntax or wrong group-format (0-31/0-7/0-255)} . qq{\n} .q{  "define <name> KNX <group:model[:GAD-name][:set|get|listenonly]> } .
+	return ($logtxt . q{wrong syntax or wrong group-format (0-31/0-7/0-255)} . 
+               qq{\n} . q{  "define <name> KNX <group:model[:GAD-name][:set|get|listenonly]> } .
                q{[<group:model[:GAD-name][:set|get|listenonly]>]"}) if (int(@a) < 3 || $a[2] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ix);
 
 	# check if the last arg matches any IO-Device - and assign it - else use the automatic mechanism
 	if ( $a[int(@a) - 1] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ix ) {
 		my $iodevCandidate = pop(@a); 
-		Log3 ($name, 2, $logtxt . qq{specifying IODev $iodevCandidate is deprecated in define - use "attr $name IODev $iodevCandidate"});
-		return ($logtxt . qq{specifying IODev $iodevCandidate is deprecated in define - use "attr $name IODev $iodevCandidate"}) if ($init_done); # allow durin start
+		Log3 ($name, 2, qq{$logtxt specifying IODev $iodevCandidate is deprecated in define } . 
+                                qq{- use "attr $name IODev $iodevCandidate"});
+		return qq{$logtxt specifying IODev $iodevCandidate is deprecated in define } .
+                       qq{- use "attr $name IODev $iodevCandidate"} if ($init_done); # allow durin start
 
 		my $ret = KNX_chkIODev($hash,$iodevCandidate); # returns undef on success!
 		if (! defined($ret)) {
@@ -473,7 +490,7 @@ sub KNX_Define {
 		}
 		elsif (!defined($dpttypes{$gadModel})) { #check model-type
 			return $logtxt . qq{invalid model: $gadModel for group-number $gadNo} . 
-                               '. Please consult commanref - avaliable DPT for correct model definition.';
+                               '. Please consult commandref - avaliable DPT for correct model definition.';
 		}
 		elsif ($gadNo == 1) { # gadModel ok
 			$hash->{model} = lc($gadModel) =~ s/^(dpt[\d]+)\..*/$1/rx; # use first gad as mdl reference for fheminfo
@@ -505,7 +522,7 @@ sub KNX_Define {
 		#if not defined yet, define a new hash
 		if (not(defined($tableHashRef))) {
 			$tableHashRef={};
-			$hash->{GADTABLE}=$tableHashRef;
+			$hash->{GADTABLE} = $tableHashRef;
 		}
 
 		return ($logtxt . qq{GAD $gad may be supplied only once per device.}) if (defined($hash->{GADTABLE}->{$gadCode}));
@@ -536,12 +553,14 @@ sub KNX_Define {
 		if (defined ($dptDetails->{SETLIST})) { # list is given, pass it through
 			$setlist = q{:} . $dptDetails->{SETLIST};
 		}
-		elsif (defined ($dptDetails->{MIN}) and ($dptDetails->{MIN} =~ m/0|[+-]?\d*[(.|,)\d*]/x)) { #number? - place slider
+		elsif (defined ($dptDetails->{MIN}) and looks_like_number($dptDetails->{MIN})) { #number? - place slider
+#		elsif (defined ($dptDetails->{MIN}) and ($dptDetails->{MIN} =~ m/0|[+-]?\d*[(.|,)\d*]/x)) { #number? - place slider
 			my $min = $dptDetails->{MIN};
 			my $max = $dptDetails->{MAX};
 			my $interval = int(($max-$min)/100);
 			$interval = 1 if ($interval == 0);
-			$setlist = ':slider,' . $min . q{,} . $interval . q{,} . $max;
+			$setlist = ':slider,' . $min . q{,} . $interval . q{,} . $max if ($interval < 50); # nonsense for dpt7,8,9,12,13
+#			$setlist = ':slider,' . $min . q{,} . $interval . q{,} . $max;
 		}
 		elsif (defined ($dptDetails->{MIN})) { #on/off/...
 			my $min = $dptDetails->{MIN};
@@ -979,19 +998,20 @@ sub KNX_DbLog_split {
 sub KNX_Parse {
 	my $iohash = shift; # this is IO-Device hash !
 	my $msg = shift;
-	my $ioName = $iohash->{NAME};
 
+	my $ioName = $iohash->{NAME};
 	return q{} if ((IsDisabled($ioName) == 1) || IsDummy($ioName)); # IO - device is disabled or dummy
 
 	#Msg format: C<src>[wrp]<group><value> i.e. Cw00000101
 	my ($src,$cmd,$gadCode,$val) = $msg =~ m/^$TULid([0-9a-f]{5})([prw])([0-9a-f]{5})(.*)$/ix; 
 	my @foundMsgs;
 
-	Log3 ($ioName, 4, qq{KNX_Parse -enter: IO-name= $ioName DEST= $gadCode MSG= $msg});
+	Log3 ($ioName, 4, qq{KNX_Parse -enter: IO-name= $ioName dest= $gadCode msg= $msg});
 
 	#gad not defined yet, give feedback for autocreate
 	if (not (exists $modules{KNX}->{defptr}->{$gadCode})) {
-		#format gad
+		return KNX_autoCreate($iohash,$gadCode);
+=pod		#format gad
 		my $gad = KNX_hexToName($gadCode);
 		#create name
 		my $newDevName = sprintf('KNX_%.2d%.2d%.3d',split (/\//x, $gad));
@@ -1002,6 +1022,7 @@ sub KNX_Parse {
 			return q{} if($newDevName =~ /$igntypes/x);
 		}
 		return qq{UNDEFINED $newDevName KNX $gad} . q{:} . $MODELERR;
+=cut
 	}
 
 	#get list from device-hashes using given gadCode (==destination)
@@ -1021,8 +1042,8 @@ sub KNX_Parse {
 			next;
 		}
 
-		Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): -process IO-name= $ioName  GADNAME= $gadName } . 
-                                      qq{GADCODE= $gadCode CMD= $cmd});
+		Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): -process IO-name= $ioName gadName= $gadName } . 
+                                      qq{gadCode= $gadCode cmd= $cmd});
 
 		#handle write and reply messages
 		if ($cmd =~ /[w|p]/ix) {
@@ -1031,11 +1052,11 @@ sub KNX_Parse {
 			my $transval = KNX_decodeByDpt ($deviceHash, $val, $gadName);
 			#message invalid
 			if (not defined($transval) or ($transval eq q{})) {
-				Log3 ($deviceName, 2, qq{KNX_Parse ($deviceName): [wp] READINGNAME= $getName MESSAGE= $msg} . 
+				Log3 ($deviceName, 2, qq{KNX_Parse ($deviceName): [wp] readingName= $getName message= $msg} . 
                                                       ' could not be decoded');
 				next;
 			}
-			Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): [wp] READINGNAME= $getName VALUE= $transval SENDER= $src});
+			Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): [wp] readingName= $getName value= $transval sender= $src});
 
 			#apply post processing for state and set all readings
 			KNX_SetReadings($deviceHash, $gadName, $transval, $getName, $src);
@@ -1050,7 +1071,7 @@ sub KNX_Parse {
 			my $value = undef;
 			if (AttrVal($deviceName, 'answerReading', 0) != 0) {
 				my $putVal = ReadingsVal($deviceName, $putName, undef);
-				if ((defined($putVal)) && ($putVal ne q{})) {
+				if (defined($putVal) && ($putVal ne q{})) {
 					$value = $putVal; #medium priority, overwrite $value
 				}
 				else {
@@ -1061,14 +1082,14 @@ sub KNX_Parse {
 			#high priority - eval
 			my $cmdAttr = AttrVal($deviceName, 'putCmd', undef);
 			if ((defined($cmdAttr)) && ($cmdAttr ne q{})) {
-				$value = ReadingsVal($deviceName, 'state', undef); # get default value from state
+#				$value = ReadingsVal($deviceName, 'state', undef); # get default value from state
 				$value = KNX_eval ($deviceHash, $gadName, $value, $cmdAttr);
 				if (defined($value) && ($value ne q{}) && ($value ne 'ERROR')) { # answer only, if eval was successful
 					Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] replaced by Attr putCmd= $cmdAttr - VALUE= $value});
 					readingsSingleUpdate($deviceHash, $putName, $value,1);
 				}
 				else {
-					Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] GADNAME= $gadName - no reply sent!});
+					Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] gadName= $gadName - no reply sent!});
 					$value = undef; # dont send !
 				} 
 			}
@@ -1076,7 +1097,7 @@ sub KNX_Parse {
 			#send transval
 			if (defined($value)) {
 				my $transval = KNX_encodeByDpt($deviceHash, $value, $gadName);
-				Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): [r] send answer: READING= $gadName VALUE= $transval});
+				Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): [r] send answer: reading= $gadName value= $transval});
 				IOWrite ($deviceHash, $TULid, 'p' . $gadCode . $transval);
 			}
 		}
@@ -1086,6 +1107,26 @@ sub KNX_Parse {
 }
 
 ########## begin of private functions ##########
+
+# KNX_autoCreate 
+# check wether we must do autocreate...
+# on entry: $iohash, $gadcode
+# on exit: return string for autocreate
+sub KNX_autoCreate {
+	my $iohash  = shift;
+	my $gadCode = shift;
+
+	my $gad = KNX_hexToName($gadCode); #format gad
+	my $newDevName = sprintf('KNX_%.2d%.2d%.3d',split (/\//x, $gad)); #create name
+
+	# check if any autocreate device has ignoretype "KNX..." set
+	my @acList = devspec2array('TYPE=autocreate');
+	foreach my $acdev (@acList) {
+		my $igntypes = AttrVal($acdev,'ignoreTypes',q{});
+		return q{} if($newDevName =~ /$igntypes/x);
+	}
+	return qq{UNDEFINED $newDevName KNX $gad} . q{:} . $MODELERR;
+} 
 
 # KNX_SetReadings is called from KNX_Set and KNX_Parse
 # calling param: $hash, $gadName, $transval, $rdName, caller (set/parse)
@@ -1378,16 +1419,16 @@ sub KNX_encodeByDpt {
 
 	my $ivalue = $value; # save for compare
 	$value = KNX_limit ($hash, $value, $model, 'ENCODE');
-	Log3 ($name, 4, qq{KNX_limit ($name): GadName= $gadName  modified... Input= $ivalue Output= $value Model= $model}) if ($ivalue ne $value);
+	Log3 ($name, 4, qq{KNX_limit ($name): gadName= $gadName modified... Input= $ivalue Output= $value Model= $model}) if ($ivalue ne $value);
 
 	if (ref($dpttypes{$code}->{ENC}) eq 'CODE') {
 		$hexval = $dpttypes{$code}->{ENC}->($value, $model);
-		Log3 ($name, 5, qq{KNX_encodeByDpt ($name): GadName= $gadName model= $model code= $code } . 
+		Log3 ($name, 5, qq{KNX_encodeByDpt ($name): gadName= $gadName model= $model code= $code } . 
                                 qq{in-Value= $ivalue out-value= $value out-hexval= $hexval});
 		return $hexval;
 	}
 	else {
-		Log3 ($name, 2, qq{KNX_encodeByDpt ($name): GadName= $gadName model= $model not valid});
+		Log3 ($name, 2, qq{KNX_encodeByDpt ($name): gadName= $gadName model= $model not valid});
 	}
 	return;
 }
@@ -1409,11 +1450,12 @@ sub KNX_decodeByDpt {
 
 	if (ref($dpttypes{$code}->{DEC}) eq 'CODE') {
 		$state = $dpttypes{$code}->{DEC}->($value, $model, $hash);
-		Log3 ($name, 5, qq{KNX_decodeByDpt ($name): model= $model code= $code value= $value length-value=: } . length($value) . qq{ state= $state});
+		Log3 ($name, 5, qq{KNX_decodeByDpt ($name): gadName= $gadName model= $model code= $code value= $value length-value= } . 
+                                length($value) . qq{ state= $state});
 		return $state;
 	}
 	else {
-		Log3 ($name, 2, qq{KNX_decodeByDpt ($name): model= $model no valid model defined});
+		Log3 ($name, 2, qq{KNX_decodeByDpt ($name): gadName= $gadName model= $model not valid});
 	}
 	return;
 }
@@ -1451,18 +1493,22 @@ sub enc_dpt3 { #Step value (four-bit)
 	return sprintf('%.2x',$numval);
 }
 
-sub enc_dpt4 { #single char ascii / iso-8859-1 String
-        my $value = shift;
-        my $model = shift;
-        my $numval = q{};
+sub enc_dpt4 { #single ascii or iso-8859-1 char
+	my $value = shift;
+	my $model = shift;
+	my $numval = encode('iso-8859-1', decode('utf8', $value)); #always convert to latin-1
+	$numval =~ s/[\x80-\xff]/?/gx if ($model eq 'dpt4.001'); #replace values >= 0x80 if ascii
+=pod
+	my $numval = q{};
         if ($model eq 'dpt4.002' ) {
                 $numval = encode('iso-8859-1', decode('utf8', $value)); #convert to latin-1
         } else {
                 $numval = encode('ascii', decode('utf8', $value)); # plain ascii
         }
-        #convert to hex-string
-        my $dat = unpack('H*', $numval);
-        return sprintf('00%s',$dat);
+=cut
+	#convert to hex-string
+	my $dat = unpack('H*', $numval);
+	return sprintf('00%s',$dat);
 }
 
 sub enc_dpt5 { #1-Octet unsigned value
@@ -1558,12 +1604,16 @@ sub enc_dpt14 { #4-Octet single precision float
 sub enc_dpt16 { #14-Octet String
 	my $value = shift;
 	my $model = shift;
+	my $numval = encode('iso-8859-1', decode('utf8', $value)); #always convert to latin-1
+	$numval =~ s/[\x80-\xff]/?/gx if ($model =~ /dpt16\.000/ix); #replace values >= 0x80 if ascii 
+=pod
 	my $numval = q{};
 	if ($model eq 'dpt16.001' ) {
 		$numval = encode('iso-8859-1', decode('utf8', $value)); #convert to latin-1
 	} else {
 		$numval = encode('ascii', decode('utf8', $value)); # plain ascii
 	}
+=cut
 	#convert to hex-string
 	my $dat = unpack('H*', $numval);
 	$dat = '00' if ($value =~ /^$PAT_DPT16_CLR/ix); # send all zero string if "clear line string"
@@ -1754,7 +1804,9 @@ sub dec_dpt16 { #14-Octet String or dpt4: single Char string
 	$value =~ s/\s*$//gx; # strip trailing blanks
 	my $state = pack('H*',$value);
 	#convert from latin-1
-	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model =~ m/(16.001|4.002)/x);
+	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model !~ m/^dpt(?:16.000|4.001)$/x);
+##	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model =~ m/^dpt(16.001|4.002|16|4)$/x);
+#	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model =~ m/(16.001|4.002)/x);
 	$state = q{} if ($state =~ m/^[\x00]/ix); # case all zeros received
 	$state =~ s/[\x00-\x1F]+//gx; # remove non printable chars
 	return $state;
@@ -1793,6 +1845,13 @@ sub dec_dpt22 { #HVAC dpt22.101 only
 	return $state;
 }
 
+sub dec_dpt217 { #version
+	my $numval = hex (shift);
+	my $maj = $numval >> 8;
+	my $min = $numval & 0x00FF;
+	return sprintf('%d.%d',$maj,$min);
+}
+
 sub dec_dpt232 { #RGB-Code
 	my $numval = hex (shift);
 	return sprintf ('%.6x',$numval);
@@ -1824,14 +1883,12 @@ sub main::KNX_scan {
 	foreach my $knxdef (@devlist) {
 		my $devhash = $defs{$knxdef};
 		next if ((! defined($devhash)) || ($devhash->{TYPE} ne 'KNX') || $devhash->{DEF} =~ /$MODELERR/ix);
-#		next if ((! defined($devhash)) || ($devhash->{TYPE} ne 'KNX') || $devhash->{DEF} =~ /MODEL_NOT_DEFINED/ix);
 
 		#check if IO-device is ready
 		my $iodev = $devhash->{IODev}->{NAME};
-#		my $iodev = ReadingsVal($knxdef,'IODev',undef);
 		next if (! defined($iodev));
-		my $iostate = InternalVal($iodev,'STATE',q{});
-#		my $iostate = ReadingsVal($iodev,'state',q{});
+#		my $iostate = InternalVal($iodev,'STATE',q{});
+		my $iostate = ReadingsVal($iodev,'state',q{});
 		next if ($iostate ne 'connected');
  
 		$i++;
@@ -1903,6 +1960,52 @@ sub doKNX_scan {
   .pad20l {padding-left: 20px;}
   .pad30l {padding-left: 30px;}
   .pad40l {padding-left: 40px;}
+
+  #KNX-dpt_ul {
+    list-style-type: none;
+    padding-left: 30px;
+    width:95%;
+    column-count:2;
+    column-gap:10px;
+    -moz-column-count:2;
+    -moz-column-gap:20px;
+    -webkit-column-count:2;
+    -webkit-column-gap:20px;
+    float: left;
+  }
+  #KNX-dpt_ul li {
+    padding-left: 1em; white-space: pre; overflow: clip;
+  }
+  #KNX-dpt_ul li b { 
+    display: inline-block;
+    width: 6em;
+    overflow: clip;
+  }
+  /* For mobile phones: */
+  @media only screen and (max-width: 1050px) {
+    #KNX-dpt_ul {column-count:1; -moz-column-count:1; -webkit-column-count:1;}
+  }
+  #KNX-attr_ul {
+    list-style-type: none;
+    padding-left: 30px;
+    width:95%;
+    column-count:2;
+    column-gap:10px;
+    -moz-column-count:2;
+    -moz-column-gap:20px;
+    -webkit-column-count:2;
+    -webkit-column-gap:20px;
+    float: left;
+    margin: 3px;
+    padding: 3px;
+  }
+  #KNX-attr_ul a {
+    padding-left: 1em; width: 100%;
+  }
+  /* For mobile phones: */
+  @media only screen and (max-width: 1050px) {
+    #KNX-attr_ul {column-count:1; -moz-column-count:1; -webkit-column-count:1;}
+  }
 </style>
 <a id="KNX"></a>
 <h3>KNX</h3>
@@ -1999,7 +2102,8 @@ The answer from the bus-device updates reading and state.</p>
 
 <a id="KNX-attr"></a>
 <p><strong>Common attributes</strong></p>
-<ul>
+<!-- <ul> -->
+<ol id="KNX-attr_ul">
 <a href="#DbLogattr">DbLogInclude</a><br /> 
 <a href="#DbLogattr">DbLogExclude</a><br />
 <a href="#DbLogattr">DbLogValueFn</a><br />
@@ -2027,8 +2131,9 @@ The answer from the bus-device updates reading and state.</p>
 <a href="#webCmd">webCmd</a><br /> 
 <a href="#webCmdLabel">webCmdLabel</a><br /> 
 <a href="#widgetOverride">widgetOverride</a>
-</ul>
-
+<!-- </ul> -->
+</ol>
+<br/>&nbsp;<br/>&nbsp;
 <p><strong>Special attributes</strong></p>
 <ul>
 <a id="KNX-attr-answerReading"></a><li>answerReading<br/>
@@ -2079,14 +2184,15 @@ The answer from the bus-device updates reading and state.</p>
 <br/>
 <a id="KNX-attr-listenonly"></a><li>listenonly - This attr is deprecated - use "listenonly" option in device definition</li> 
 <a id="KNX-attr-readonly"></a><li>readonly - This attr is deprecated - use "get" option in device definition</li>
-<a id="KNX-attr-slider"></a><li>slider - This attr is deprecated - use attribute widgetOverride &lt;readingname&gt;:slider,<start->,<step->,<end-range> instead</li>
+<a id="KNX-attr-slider"></a><li>slider - This attr is deprecated - use attribute widgetOverride &lt;gadName&gt;:slider,&lt;start-&gt;,&lt;step-&gt;,&lt;end-range&gt; instead</li>
 </ul>
 
 <a id="KNX-dpt"></a>
 <p><strong>DPT - data-point-types</strong></p>
 <p>The following dpt are implemented and have to be assigned within the device definition. 
    The values right to the dpt define the valid range of Set-command values and Get-command return values and units.</p>
-<ul>
+<!-- <ul> -->
+<ol id="KNX-dpt_ul">
 <li><b>dpt1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>off, on, toggle</li>
 <li><b>dpt1.000 </b>  0, 1</li>
 <li><b>dpt1.001 </b>  off, on, toggle</li>
@@ -2117,8 +2223,8 @@ The answer from the bus-device updates reading and state.</p>
 <li><b>dpt3.007 </b>  -100..+100 %</li>
 <li><b>dpt3.008 </b>  -100..+100 %</li>
 <li><b>dpt4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>single char</li>
-<li><b>dpt4.001 </b>  ascii</li>
-<li><b>dpt4.002 </b>  iso-8859-1</li>
+<li><b>dpt4.001 </b>  ascii char</li>
+<li><b>dpt4.002 </b>  ISO-8859-1 char</li>
 <li><b>dpt5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>0..255</li>
 <li><b>dpt5.001 </b>  0..100 %</li>
 <li><b>dpt5.003 </b>  0..360 &deg;</li>
@@ -2180,22 +2286,24 @@ The answer from the bus-device updates reading and state.</p>
 <li><b>dpt14.033</b>  -Inf.0..+Inf.0 Hz</li>
 <li><b>dpt14.039</b>  -Inf.0..+Inf.0 m</li>
 <li><b>dpt14.056</b>  -Inf.0..+Inf.0 W</li>
-<li><b>dpt14.057</b>  -Inf.0..+Inf.0 cos&Phi;</li>
+<li><b>dpt14.057</b>  -Inf.0..+Inf.0 cos&phi;</li>
 <li><b>dpt14.068</b>  -Inf.0..+Inf.0 &deg;C</li>
 <li><b>dpt14.076</b>  -Inf.0..+Inf.0 m&sup3;</li>
 <li><b>dpt15.000</b>  Access-code - receive only!</li>
 <li><b>dpt16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>14 char string</li>
-<li><b>dpt16.000</b>  ASCII-String</li>
-<li><b>dpt16.001</b>  ISO-8859-1-String (Latin1)</li>
+<li><b>dpt16.000</b>  ASCII string</li>
+<li><b>dpt16.001</b>  ISO-8859-1 string (Latin1)</li>
 <li><b>dpt17.001</b>  Scene Nr: 0..63</li>
 <li><b>dpt18.001</b>  Scene Nr: 1..64. - only "activation" works..</li>
 <li><b>dpt19&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>01.12.2020_01:02:03 (Date&amp;Time)</li>
 <li><b>dpt19.001</b>  01.12.2020_01:02:03</li>
 <li><b>dpt20.102</b>  HVAC mode</li>
-<li><b>dpt22.101</b>  HVAC RHCC Status</li>
+<li><b>dpt22.101</b>  HVAC RHCC Status (readonly)</li>
+<li><b>dpt217.001</b> dpt version (readonly)</li>
 <li><b>dpt232&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>RGB-Value RRGGBB</li>
-</ul>
-
+<!-- </ul> -->
+</ol>
+<br/>&nbsp;<br/>&nbsp;
 <a id="KNX-utilities"></a>
 <p><strong>KNX Utility Functions</strong></p>
 <ul>
@@ -2212,7 +2320,7 @@ Returns number of "get's" issued.<br/>
 <code>KNX_scan('room=Kueche')       - scan all KNX-devices in room Kueche</code><br/>
 <code>{KNX_scan('device')}          - syntax when used from FHEM-cmdline</code><br/>
 <code>knxscan device                - syntax when used from FHEM-cmdline via cmd-alias definition, see below</code><br/>
-<br/>When using KNX_scan() or any 'set|get <device> ...' in a global:INITIALIZED notify, pls. ensure to have some delay in processing the cmd's by using <b>fhem sleep</b>.
+<br/>When using KNX_scan() or any 'set|get &lt;device&gt; ...' in a global:INITIALIZED notify, pls. ensure to have some delay in processing the cmd's by using <b>fhem sleep</b>.
 <br/>Example: <code>defmod initialized_nf notify global:INITIALIZED sleep 10 quiet;; set KNX_date now;; set KNX_time now;; {KNX_scan();;}</code>
 <br/>This avoids sending requests while the KNX-Gateway has not finished its initial handshake-procedure with FHEM (the KNX-IO-device).  
 <br/><br/>If you want to use this function as a FHEM cmd, define a cmdalias-device, e.g:<br/>
