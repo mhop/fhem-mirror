@@ -130,6 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.72.1" => "30.10.2022  fix 'connection lost ...' issue again ",
   "0.72.0" => "30.10.2022  rename some graphic attributes ",
   "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
   "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
@@ -2993,6 +2994,7 @@ sub centralTask {
   my $cst  = [gettimeofday];                                          # Zyklus-Startzeit
 
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
+  RemoveInternalTimer($hash, "FHEM::SolarForecast::_writeState");
   
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
   #for my $i (keys %{$data{$type}{$name}{pvhist}}) {
@@ -3021,9 +3023,11 @@ sub centralTask {
   setModel ($hash);                                                                                # Model setzen  
   
   if($init_done == 1) {
+      my @da;
+      
       if(!$interval) {
           $hash->{MODE} = "Manual";
-          readingsSingleUpdate($hash, 'nextCycletime', 'Manual', 1);
+          push @da, "nextCycletime<>Manual";
       } 
       else {
           my $new = gettimeofday()+$interval; 
@@ -3031,7 +3035,7 @@ sub centralTask {
           
           if(!IsDisabled($name)) {
               $hash->{MODE} = "Automatic - next Cycletime: ".FmtTime($new);
-              readingsSingleUpdate($hash, 'nextCycletime', FmtTime($new), 1);
+              push @da, "nextCycletime<>".FmtTime($new);
           }
       }
       
@@ -3045,7 +3049,6 @@ sub centralTask {
           return;
       }
       
-      my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
       my $date    = strftime "%Y-%m-%d", localtime($t);                                            # aktuelles Datum
       my $chour   = strftime "%H",       localtime($t);                                            # aktuelle Stunde 
@@ -3105,16 +3108,34 @@ sub centralTask {
       
       saveEnergyConsumption       ($centpars);                                            # Energie Hausverbrauch speichern
       
-      readingsSingleUpdate ($hash, 'state', $centpars->{state}, 1);                       # Abschluß state 
       setTimeTracking      ($hash, $cst, 'runTimeCentralTask');                           # Zyklus-Laufzeit ermitteln 
 
       genStatisticReadings        ($centpars);                                            # optionale Statistikreadings erstellen      
   
       createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
+
+      if ($evt) {                                                                      
+          InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::_writeState", $centpars, 0);
+      }
+      else {
+          _writeState ($centpars);
+      }
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
   }
+  
+return;
+}
+
+################################################################
+#        "state" updaten
+################################################################
+sub _writeState {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  readingsSingleUpdate ($hash, 'state', $paref->{state}, 1);                              # Abschluß state 
   
 return;
 }
@@ -6168,7 +6189,9 @@ sub FwFn {
   RemoveInternalTimer($hash, \&pageRefresh);
   $hash->{HELPER}{FW} = $FW_wname;
   
-  my $ret = entryGraphic ($name);
+  my $ret = "<html>";
+  $ret   .= entryGraphic ($name);
+  $ret   .= "</html>";
   
   # Autorefresh nur des aufrufenden FHEMWEB-Devices
   my $al = AttrVal($name, "autoRefresh", 0);
@@ -6296,7 +6319,6 @@ sub entryGraphic {
   
   $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
   
-  $ret .= "<html>";
   $ret .= $html_start if (defined($html_start));
   $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
@@ -6391,7 +6413,6 @@ sub entryGraphic {
   $ret .= "</td></tr>";
   $ret .= "</table>";
   $ret .= $html_end if (defined($html_end));
-  $ret .= "</html>";
  
 return $ret;
 }
@@ -6629,6 +6650,7 @@ sub _graphicHeader {
       my $naup = ReadingsVal ($name, 'nextCycletime', '');
       if ($upstate =~ /updated|successfully|switched/ix) {
           $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang}.' ('.$htitles{natc}{$lang}.' '.$naup.')');
+          #$img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang});
           $upicon = "<a onClick=$cmdupdate>$img</a>";
       } 
       elsif ($upstate =~ /running/ix) {
