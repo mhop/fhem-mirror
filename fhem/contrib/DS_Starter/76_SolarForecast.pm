@@ -10771,8 +10771,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> nur noch eine untergeordnete Bedeutung. <br>
       <b>Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
-      (default: off)      
-      </li>
+      (default: off)
     </ul>
     <br>
     
@@ -10808,7 +10807,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
 
       <ul>
          <table>  
-         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                                              </td></tr>         
+         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                                                      
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                             </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                          </td></tr>
@@ -11054,7 +11053,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>todayRemainingAPIrequests</b> </td><td>Anzahl der verbleibenden API Requests am aktuellen Tag   </td></tr>
             <tr><td> <b>todayDoneAPIcalls</b>         </td><td>Anzahl der ausgeführten API Abrufe am aktuellen Tag      </td></tr>
             <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen API Abrufe am aktuellen Tag    </td></tr>    
-            <tr><td> <b>                              </td><td>(ein Abruf kann mehrere API Requests ausführen)          </td></tr>                   
+            <tr><td>                                  </td><td>(ein Abruf kann mehrere API Requests ausführen)          </td></tr>                   
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen API Abrufe pro Tag          </td></tr>
          </table> 
       </ul>
