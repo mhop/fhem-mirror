@@ -8170,7 +8170,7 @@ sub EnOcean_Parse($$) {
         if (!($db[0] & 8)) {
           # teach-in
           $attr{$name}{eep} = "D5-00-01";
-          $attr{$name}{manufID} = "7FF";
+          $attr{$name}{manufID} = "7FF" if (!exists($attr{$name}{manufID}));
           $attr{$name}{subType} = "contact";
           push @event, "3:teach:1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID";
           Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
