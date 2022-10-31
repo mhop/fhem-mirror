@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-30 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-10-31 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,7 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.72.1" => "30.10.2022  fix 'connection lost ...' issue again, global language check in checkPlantConfig ",
+  "0.72.1" => "31.10.2022  fix 'connection lost ...' issue again, global language check in checkPlantConfig ",
   "0.72.0" => "30.10.2022  rename some graphic attributes ",
   "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
   "0.71.3" => "28.10.2022  new circular keys tdayDvtn, ydayDvtn for calculation PV forecast/generation in header ",
@@ -931,7 +931,7 @@ sub Define {
   $params->{cachename}  = "solcastapi";
   _readCacheFile ($params);
     
-  readingsSingleUpdate($hash, "state", "initialized", 1);
+  singleUpdateState ( {hash => $hash, state => 'initialized', evt => 1} );
 
   centralTask   ($hash);                                                                                 # Einstieg in Abfrage 
   InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0); # Einstieg periodisches Schreiben historische Daten
@@ -1639,7 +1639,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   my $cfnum = (split "_", $opt)[1]; 
   deleteReadingspec ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
   
-  centralTask ($hash);
+  centralTask ($hash, 0);
 
 return;
 }
@@ -1663,7 +1663,7 @@ sub _setpvSolCastPercentile {            ## no critic "not used"
   my $cfnum = (split "_", $opt)[1]; 
   deleteReadingspec ($hash, "pvSolCastPercentile_${cfnum}_autocalc");
   
-  centralTask ($hash);
+  centralTask ($hash, 0);
 
 return;
 }
@@ -2087,7 +2087,7 @@ sub __solCast_ApiRequest {
   
   if(!$roofid || !$apikey) {
       my $err = qq{The roofIdentPair "$pk" of String "$string" has no Rooftop-ID and/or SolCast-API key assigned !};
-      readingsSingleUpdate($hash, "state", $err, 1);
+      singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
   }
   
@@ -2148,7 +2148,7 @@ sub __solCast_ApiResponse {
       
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $err;
       
-      readingsSingleUpdate($hash, "state", $msg, 1);
+      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
       $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
       
@@ -2162,7 +2162,7 @@ sub __solCast_ApiResponse {
           
           Log3 ($name, 2, "$name - $msg");
           
-          readingsSingleUpdate($hash, "state", $msg, 1);
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
@@ -2193,7 +2193,7 @@ sub __solCast_ApiResponse {
           
           $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{response_message} = $jdata->{'response_status'}{'message'};
           
-          readingsSingleUpdate($hash, "state", $msg, 1);
+          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
           $data{$type}{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
           $data{$type}{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
         
@@ -2240,7 +2240,7 @@ sub __solCast_ApiResponse {
           if ($err) {              
               Log3 ($name, 2, "$name - $err");
               
-              readingsSingleUpdate($hash, "state", $err, 1);
+              singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
               return;
           }
           
@@ -2531,7 +2531,7 @@ sub Attr {
       }
       $do  = 0 if($cmd eq "del");
       $val = ($do == 1 ? "disabled" : "initialized");
-      readingsSingleUpdate($hash, "state", $val, 1);
+      singleUpdateState ( {hash => $hash, state => $val, evt => 1} );
   }
   
   if($aName eq "createTomorrowPVFcReadings") {
@@ -2936,13 +2936,13 @@ sub writeDataToFile {
   if ($error) {
       my $err = qq{ERROR writing cache file "$file": $error};
       Log3 ($name, 1, "$name - $err");
-      readingsSingleUpdate($hash, "state", "ERROR writing cache file $file - $error", 1);
+      singleUpdateState ( {hash => $hash, state => "ERROR writing cache file $file - $error", evt => 1} );
       return $err;          
   }
   else {
       my $lw = gettimeofday(); 
       $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
-      readingsSingleUpdate($hash, "state", "wrote cachefile $cachename successfully", 1);
+      singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
   }
    
 return; 
@@ -2987,14 +2987,14 @@ return @pvconf;
 ################################################################
 sub centralTask {
   my $hash = shift;
-  my $evt  = shift // 1;                                              # Readings Event (state nicht gesteuert)
+  my $evt  = shift // 1;                                              # Readings Event generieren
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $cst  = [gettimeofday];                                          # Zyklus-Startzeit
 
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::_writeState");
+  RemoveInternalTimer($hash, "FHEM::SolarForecast::singleUpdateState");
   
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
   #for my $i (keys %{$data{$type}{$name}{pvhist}}) {
@@ -3039,13 +3039,11 @@ sub centralTask {
           }
       }
       
-      return if(IsDisabled($name));
-      
-      readingsSingleUpdate($hash, 'state', 'running', 0);                                          # vermeidet 'connection lost ...'
+      return if(IsDisabled($name));                                          
       
       my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
-      if ($ret) { 
-          readingsSingleUpdate($hash, 'state', $ret, 1);
+      if ($ret) {
+          singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );
           return;
       }
       
@@ -3066,7 +3064,8 @@ sub centralTask {
           chour   => $chour,
           day     => $day,
           dayname => $dayname,
-          state   => "updated",
+          state   => 'running',
+          evt     => 0,
           daref   => \@da
       };
       
@@ -3074,6 +3073,9 @@ sub centralTask {
       Log3 ($name, 4, "$name - ###                New data collection cycle                 ###");
       Log3 ($name, 4, "$name - ################################################################");
       Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
+      
+      singleUpdateState           ($centpars);
+      $centpars->{state} = 'updated';
 
       collectAllRegConsumers      ($centpars);                                            # alle Verbraucher Infos laden
       _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
@@ -3114,28 +3116,18 @@ sub centralTask {
   
       createReadingsFromArray ($hash, \@da, $evt);                                        # Readings erzeugen
 
-      if ($evt) {                                                                      
-          InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::_writeState", $centpars, 0);
+      if ($evt) {
+          $centpars->{evt} = $evt;          
+          InternalTimer(gettimeofday()+1, "FHEM::SolarForecast::singleUpdateState", $centpars, 0);
       }
       else {
-          _writeState ($centpars);
+          $centpars->{evt} = 1;
+          singleUpdateState ($centpars);
       }
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
   }
-  
-return;
-}
-
-################################################################
-#        "state" updaten
-################################################################
-sub _writeState {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  
-  readingsSingleUpdate ($hash, 'state', $paref->{state}, 1);                              # Abschluß state 
   
 return;
 }
@@ -9508,6 +9500,21 @@ sub createReadingsFromArray {
   readingsEndUpdate($hash, $doevt);
   
   undef @$daref;
+  
+return;
+}
+
+################################################################
+#        "state" updaten
+################################################################
+sub singleUpdateState {
+  my $paref = shift;
+  
+  my $hash  = $paref->{hash};
+  my $val   = $paref->{state} // 'unknown';
+  my $evt   = $paref->{evt}   // 0;
+  
+  readingsSingleUpdate ($hash, 'state', $val, $evt);
   
 return;
 }
