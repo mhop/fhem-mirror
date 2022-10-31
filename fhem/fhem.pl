@@ -2808,6 +2808,8 @@ CommandRename($$)
   return "Invalid characters in name (not A-Za-z0-9._): $new"
                         if(!goodDeviceName($new));
   return "Cannot rename global" if($old eq "global");
+  return "Cannot rename $old from itself"
+        if($cl && $cl->{SNAME} && $cl->{SNAME} eq $old);
 
   %ntfyHash = ();
   $defs{$new} = $defs{$old};

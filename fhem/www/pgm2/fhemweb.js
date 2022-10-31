@@ -501,7 +501,7 @@ FW_confirmDelete()
     if(!ma || ma.length != 2)
       return;
     FW_removeLink(this);
-    $(this).click(function(e){ FW_delete(ma[1], ma[0]) });
+    $(this).click(function(e){ FW_delete(ma[1], ma[0]); return false; });
   });
 }
 
@@ -520,7 +520,7 @@ FW_renameDevice(dev)
         var nn = $(div).find("input").val();
         if(!nn.match(/^[a-z0-9._]*$/i))
           return FW_okDialog("Illegal characters in the new name");
-        location.href = addcsrf(FW_root+"?cmd=rename "+dev+" "+nn);
+        location.href=addcsrf(FW_root+"?cmd=rename "+dev+" "+nn+"&detail="+nn);
       }},
       {text:"Cancel", click:doClose} ],
     close: doClose

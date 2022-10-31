@@ -4742,7 +4742,7 @@ FW_log($$)
     <a id="FHEMWEB-attr-detailLinks"></a>
     <li>detailLinks<br>
         Anzahl der Links, die auf der Detailseite unten angezeigt werden. Die
-        weiteren Befehle werden in einem Auswahlmen&%uuml; angezeigt.
+        weiteren Befehle werden in einem Auswahlmen&uuml; angezeigt.
         Voreinstellung ist 2.
         </li>
         <br>
