@@ -870,7 +870,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     }
     });
 
-  if(!$("body").attr("data-hiddenroom").match(/\binput\b/)) {
+  var hr = $("body").attr("data-hiddenroom");
+  if(!hr || !hr.match(/\binput\b/)) {
     $("table.internals div.dname").each(function(){
       if($(this).text() == "NAME") {
         var dev = $(this).attr("data-name");
