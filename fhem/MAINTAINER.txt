@@ -385,8 +385,8 @@ FHEM/71_YAMAHA_BD.pm         markusbloch/orphan   Multimedia
 FHEM/71_YAMAHA_MC.pm         Leugi                Multimedia
 FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia
 FHEM/71_ZM_Monitor.pm        delmar               Sonstige Systeme
-FHEM/72_FB_CALLLIST.pm       markusbloch/orphan   Frontends
-FHEM/72_FB_CALLMONITOR.pm    markusbloch/orphan   Unterstützende Dienste
+FHEM/72_FB_CALLLIST.pm       JoWiemann            Frontends
+FHEM/72_FB_CALLMONITOR.pm    JoWiemann            Unterstützende Dienste
 FHEM/72_FRITZBOX.pm          tupol                FRITZ!Box (link als PM an tupol)
 FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
 FHEM/72_UBUS_CALL.pm         xenos1984            Sonstige Systeme
@@ -401,7 +401,7 @@ FHEM/73_GasCalculator        Sailor               Unterstützende Dienste https:
 FHEM/73_km200.pm             Sailor               Heizungssteuerung/Raumklima https://forum.fhem.de/index.php/topic,25540.0.html
 FHEM/73_MPD.pm               Wzut                 Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
-FHEM/73_PRESENCE.pm          markusbloch/orphan   Unterstützende Dienste
+FHEM/73_PRESENCE.pm          JoWiemann            Unterstützende Dienste
 FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_GardenaSmartDevice.pm CoolTux             Sonstige Systeme
@@ -429,7 +429,7 @@ FHEM/77_UWZ.pm               CoolTux              Unterstützende Dienste/Wetter
 FHEM/79_BDKM.pm              arnoaugustin         Heizungssteuerung/Raumklima (bitte auch PM)
 FHEM/80_M232.pm              neubert              Sonstige Systeme
 FHEM/81_M232Counter.pm       neubert              Sonstige Systeme
-FHEM/82_LGTV_IP12.pm         markusbloch/orphan   Multimedia
+FHEM/82_LGTV_IP12.pm         JoWiemann            Multimedia
 FHEM/82_LGTV_WebOS.pm        CoolTux              Multimedia
 FHEM/82_M232Voltage.pm       neubert              Sonstige Systeme
 FHEM/83_IOhomecontrol.pm     neubert              Sonstige Systeme
