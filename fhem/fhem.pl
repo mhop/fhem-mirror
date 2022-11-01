@@ -2743,7 +2743,7 @@ CommandReload($$;$)
       $cfgDB = 'X';
     } else {
       # configDB not used and file not found: it's a real error!
-      return "Can't read $file: $!";
+      return "Can't read $file";
     }
   }
 
