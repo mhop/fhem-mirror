@@ -4885,12 +4885,14 @@ setreading DEVICE attrTemplateVersion 20210510
 # new valetudo Template contributed by Otto123, should replace the old valetudo/rockrobo Template
 name:valetudo
 filter:TYPE=MQTT2_DEVICE
-desc:use this to control a rooted vacuum with valetudo V2. For further details visit <a href="https://github.com/Hypfer/Valetudo">Hypfer/Valetudo</a><br><br>NOTE: tested with Dreame L10pro, Xiaomi Vacuum Gen1, details: <a href="https://forum.fhem.de/index.php/topic,121017.0.html">Forum Thread</a>
+desc:use this to control a rooted vacuum with valetudo V2. For further details visit <a href="https://github.com/Hypfer/Valetudo">Hypfer/Valetudo</a><br>NOTE: tested with Dreame L10pro, Xiaomi Vacuum Gen1, details: <a href="https://forum.fhem.de/index.php/topic,121017.0.html">Forum Thread</a>
 order:X_03b
 par:BASE_TOPIC;BASE_TOPIC typically is valetudo;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,([^\/:]+)[\/].*, ? $1 : undef }
 par:DEV_ID;DEV_ID is random by Firmware;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^\/]+\/([^\/:]+).*, ? $1 : undef }
+par:IP4;Device IP Adress;{(split q{,}, ReadingsVal("DEVICE",'ips',undef))[0] || (split q{_}, InternalVal("DEVICE",ReadingsVal("DEVICE",'IODev',undef).'_CONN',undef))[1] || undef }
 { $data{f}='99_valetudoUtils.pm';\
-$data{u}="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/AttrTemplate/$data{f}?format=txt";\
+# Svn_GetFile() works asynch #{ Svn_GetFile("contrib/AttrTemplate/$data{f}", $data{f}, sub(){CommandReload(undef, $data{f})}) }\
+{$data{u}="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/AttrTemplate/$data{f}?format=txt"}\
 qx(wget -qO FHEM/$data{f} $data{u}); CommandReload(undef, $data{f});\
 delete $data{f};delete $data{u};''}
 attr DEVICE alias DEV_ID
@@ -4898,42 +4900,33 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE icon vacuum_top
 attr DEVICE readingList \
   $\DEVICETOPIC/\x24state:.* _state\
-  $\DEVICETOPIC/(Att.*|Basic.*|Consum.*|Curr.*|Loc.*|Wifi.*)/[a-zA-Z\-_]+:.* { $TOPIC =~ m,$\DEVICETOPIC\/.*\/([a-zA-Z\-_]+),; $1 eq 'ips'? {"ip4"=> (split ',',$EVENT)[0]}:{"$1"=>$EVENT} }\
-  $\DEVICETOPIC/BatteryStateAttribute/level:.* batteryPercent\
-  $\DEVICETOPIC/BatteryStateAttribute/status:.* batteryState\
-  $\DEVICETOPIC/FanSpeedControlCapability/preset:.* fanSpeed\
-  $\DEVICETOPIC/GoToLocationCapability/presets:.* .locationsPresets\
-  $\DEVICETOPIC/GoToLocationCapability/go:.* {}\
-  $\DEVICETOPIC/MapData/map-data:.* {}\
-  $\DEVICETOPIC/MapData/segments:.* .segments\
-  $\DEVICETOPIC/StatusStateAttribute/status:.* { {"state"=>$EVENT,"cleanerState"=>$EVENT} }\
-  $\DEVICETOPIC/StatusStateAttribute/detail:.* stateDetail\
-  $\DEVICETOPIC/StatusStateAttribute/error:.* stateError\
-  $\DEVICETOPIC/WaterUsageControlCapability/preset:.* waterUsage\
-  $\DEVICETOPIC/ZoneCleaningCapability/presets:.* .zonesPresets\
-  $\DEVICETOPIC/ZoneCleaningCapability/start:.* {}
+  $\DEVICETOPIC/.*/[a-zA-Z\-_]+:.* { $TOPIC =~ m,$\DEVICETOPIC\/(.*)\/([a-zA-Z\-_]+),; valetudo_r($NAME,$1,$2,$EVENT) }
 attr DEVICE setList \
   pause:noArg $\DEVICETOPIC/BasicControlCapability/operation/set PAUSE\
   start:noArg $\DEVICETOPIC/BasicControlCapability/operation/set START\
   stop:noArg $\DEVICETOPIC/BasicControlCapability/operation/set STOP\
   charge:noArg $\DEVICETOPIC/BasicControlCapability/operation/set HOME\
   clean_zone:{valetudo_w($name,'zones')} { valetudo_c($NAME,$EVENT) }\
-  fanSpeed:off,min,low,medium,high,turbo,max $\DEVICETOPIC/FanSpeedControlCapability/preset/set $EVTPART1\
-  waterUsage:off,min,low,medium,high,turbo,max $\DEVICETOPIC/WaterUsageControlCapability/preset/set $EVTPART1\
+  fanSpeed:min,low,medium,high,max $\DEVICETOPIC/FanSpeedControlCapability/preset/set $EVTPART1\
   locate:PERFORM   $\DEVICETOPIC/LocateCapability/locate/set $EVTPART1\
-  x_raw_payload:textField { valetudo_c($NAME,$EVENT) }
+  x_raw_payload:textField { valetudo_c($NAME,$EVENT) }\
+  delete:zones,locations {fhem("deletereading $NAME .$EVTPART1");;return undef}\
+  zoneNew:textField { valetudo_z($NAME,$EVENT) }\
+  zoneRename:textField { valetudo_z($NAME,$EVENT) }\
+  get:segments,release,ip { valetudo_g($NAME,$EVENT) }
 attr DEVICE event-on-change-reading .*
 attr DEVICE timestamp-on-change-reading .*
 attr DEVICE setStateList operation clean_segment clean_zone goto fanSpeed waterUsage locate x_raw_payload
 attr DEVICE model valetudoV2
-attr DEVICE stateFormat <a href="http://ip4" target="_blank">state</a>
-setreading DEVICE attrTemplateVersion 20220121
-option:{valetudo_f('DEVICE','MapSegmentation')}
-{ CommandAttr_multiline( 'DEVICE','setList',q(  clean_segment:{'multiple-strict,'.valetudo_w($name,'segments')} { valetudo_c($NAME,$EVENT) }) ) }
-option:{valetudo_f('DEVICE','GoToLocation')}
-{ CommandAttr_multiline( 'DEVICE','setList',q(  goto:{valetudo_w($name,'locations')} { valetudo_c($NAME,$EVENT) }) ) }
+attr DEVICE devStateIcon docked:rc_PLAY:start (moving|cleaning):rc_PLAY@blue:pause (idle|paused):rc_PAUSE@red:start returning:refresh:pause 
+attr DEVICE stateFormat cleanerState\
+<a href="http://ip4" target="_blank">cleanerState</a>
+setreading DEVICE attrTemplateVersion 20221101
 option:{1}
-deletereading -q DEVICE (?!associatedWith|IODev).*
+deletereading -q DEVICE \.{0,1}segments|map-data.*|.*_.*_.*|_.*
+{valetudo_s('DEVICE')}
+set DEVICE get ip IP4
+set DEVICE get release
 
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
@@ -4952,7 +4945,7 @@ attr DEVICE event-on-change-reading .*
 attr DEVICE readingList $\DEVICETOPIC/commandOut:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:SerialNumber\
 dat_le:mowerErrorIndex dat_ls:mowerStatusIndex\
-cfg_rd:mowerRainDelay cfg_sc_m:mowerActiveIndex cfg_sc_p:mowerTimeCorrection\
+cfg_rd:mowerRainDelay cfg_sc_m:mowerActiveIndex cfg_sc_p:mowerTimeCorrection cfg_tq:torqueSetting\
 dat_bt_t:batteryTemperature dat_bt_v:batteryVoltage dat_bt_p:batteryPercent dat_bt_nr:batteryChargeCycle dat_bt_c:batteryCharging\
 dat_st_b:totalBladeTime dat_st_d:totalDistance dat_st_wt:totalTime dat_st_bl:borderLength\
 dat_dmp_1:directionPitch dat_dmp_2:directionRoll dat_dmp_3:directionYaw
@@ -4963,6 +4956,7 @@ attr DEVICE setList mowerRainDelay:slider,0,30,1440 $\DEVICETOPIC/commandIn {"rd
   startMower:noArg $\DEVICETOPIC/commandIn {"cmd":1}\
   pauseMower:noArg $\DEVICETOPIC/commandIn {"cmd":2}\
   stopMower:noArg $\DEVICETOPIC/commandIn {"cmd":3}\
+  torqueSetting:slider,-50,1,50 $\DEVICETOPIC/commandIn {"tq":$EVTPART1}\
   PartyTime:slider,0,10,2880 $\DEVICETOPIC/commandIn {"sc":{"distm":$EVTPART1}}\
   PartyMode:on,off { my %hash = ( 'on' => 2, 'off' => 1);qq($\DEVICETOPIC/commandIn {"sc":{"m":$hash{$EVTPART1}}})}\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq($\DEVICETOPIC/commandIn $payload)}
@@ -5013,7 +5007,7 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  17 => "Battery temp out of range"\
 ); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
 attr DEVICE model worx_landroid_mower
-setreading DEVICE attrTemplateVersion 20210602
+setreading DEVICE attrTemplateVersion 20221101
 
 
 ###########################################
