@@ -4889,7 +4889,7 @@ desc:use this to control a rooted vacuum with valetudo V2. For further details v
 order:X_03b
 par:BASE_TOPIC;BASE_TOPIC typically is valetudo;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,([^\/:]+)[\/].*, ? $1 : undef }
 par:DEV_ID;DEV_ID is random by Firmware;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^\/]+\/([^\/:]+).*, ? $1 : undef }
-par:IP4;Device IP Adress;{(split q{,}, ReadingsVal("DEVICE",'ips',undef))[0] || (split q{_}, InternalVal("DEVICE",ReadingsVal("DEVICE",'IODev',undef).'_CONN',undef))[1] || undef }
+par:IP4;Device IP Adress;{(split q{,}, ReadingsVal("DEVICE",'ips',undef))[0] || (split q{_}, InternalVal("DEVICE",ReadingsVal("DEVICE",'IODev',undef).'_CONN',undef))[-2] || undef }
 { $data{f}='99_valetudoUtils.pm';\
 # Svn_GetFile() works asynch #{ Svn_GetFile("contrib/AttrTemplate/$data{f}", $data{f}, sub(){CommandReload(undef, $data{f})}) }\
 {$data{u}="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/AttrTemplate/$data{f}?format=txt"}\
