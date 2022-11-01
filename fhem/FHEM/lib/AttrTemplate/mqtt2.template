@@ -695,7 +695,7 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC/availability:.* availability\
-  $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP)) }
+  $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE event-on-change-reading .*
 attr DEVICE setList open:noArg $\DEVICETOPIC/set {"state": "OPEN"}\
   close:noArg $\DEVICETOPIC/set {"state": "CLOSE"}\
@@ -707,7 +707,7 @@ attr DEVICE devStateIcon 0:fts_shutter_100 (\d|1\d):fts_shutter_90 2\d:fts_shutt
 attr DEVICE webCmd open:close:stop:pct
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_curtain_driver
-setreading DEVICE attrTemplateVersion 20221028
+setreading DEVICE attrTemplateVersion 20221101
 
 
 name:zigbee2mqtt_ContactSensor
