@@ -21,7 +21,7 @@
 #################################################################################################################
 #
 #  	Date			Version		Description
-#	31.10.2022		0.0.93		Parameter AC-Strom_Begrenzung_AcALim hinzugefügt; User & Passwort encrypted und Funktion get_Account hinzugefügt
+#	31.10.2022		0.0.93		Parameter AC-Strom_Begrenzung, Param_Manuelle_Ladefreigabe; Param_Ladefreigabe_ueber_App hinzugefügt; User & Passwort encrypted und Funktion get_Account hinzugefügt
 #	22.01.2022		0.0.92		Bugfixes: insert 'use JSON'
 #	12.12.2021		0.0.91		Bugfixes: check for undefined parameter in SMAEVCharger_getReadableCode($)
 #	14.11.2021		0.0.9		Bugfixes: when setting an incorrect value, the set command was executed anyway. No there is no setting, if value are incorrect
@@ -70,6 +70,8 @@ my %update_readings = (
 	"Param_Minimaler_Ladestrom" 					=> {values => ":slider,6,1,32", 												level => 0},
 	"Param_Dauer_Ladevorgang" 						=> {values => ":time", 															level => 0},
 	"Param_Energiemenge_Ladevorgang" 				=> {values => ":slider,1,1,100", 												level => 0},
+	"Param_Manuelle_Ladefreigabe" 					=> {values => ":Ladesperre,Ladefreigabe", 										level => 0},
+	"Param_Ladefreigabe_ueber_App" 					=> {values => ":ja,nein", 														level => 0},
 	#"Param_Ende_Ladevorgang" => {values => "",  will be calculated with Param_Dauer_Ladevorgang but could also be set an Param_Dauer_Ladevorgang will be calculated
 	
 	#advanced
@@ -83,6 +85,7 @@ my %update_readings = (
 	"Param_Maximale_Schieflast" 					=> {values => ":slider,0,230,10000", 											level => 1},
 	"Param_Fallback_Wirkleistungsbegrenzung" 		=> {values => ":slider,0,230,22000", 											level => 1},
 	"Param_AC_Strom_Begrenzung_AcALim" 				=> {values => ":slider,6,1,32", 												level => 1},
+
 	
 	#expert
 	"Param_Timeout_nach_Kommunikationsverlust" 		=> {values => ":slider,200,100,60000",											level => 2},
@@ -119,7 +122,9 @@ my %reading_codes = (
 	"WPA" => "3323",
 	"WPA2" => "3324",
 	"WPA2-MIXED" => "3398",
-	"intelligente Ladung" => "4950"
+	"intelligente Ladung" => "4950",
+	"Ladesperre" => "5171",
+	"Ladefreigabe" => "5172"
 	);
 
 ###############################################################
@@ -784,7 +789,9 @@ sub SMAEVCharger_handledata($$$)
 		$params->{"Parameter.GridGuard.Cntry.VRtg"} = "Param_Netz_Nennspannung";
 		$params->{"Parameter.PCC.ARtg"} = "Param_Nennstrom_Netzanschluss";
 		$params->{"Parameter.PCC.FlbInv.WMax"} = "Param_Fallback_Wirkleistungsbegrenzung";
-		
+		$params->{"Parameter.Chrg.ChrgApv"} = "Param_Manuelle_Ladefreigabe";
+		$params->{"Parameter.Chrg.ChrgLok"} = "Param_Ladefreigabe_ueber_App";
+		$params->{"Parameter.Inverter.AcALim"} = "Param_AC_Strom_Begrenzung";
 		
 
 		
@@ -796,7 +803,6 @@ sub SMAEVCharger_handledata($$$)
 		$params->{"Parameter.Inverter.WMax"} = "Param_Nennwirkleistung_WMaxOut";
 		$params->{"Parameter.Inverter.WMaxIn"} = "Param_Nennwirkleistung_WMaxIn";
 		$params->{"Parameter.Inverter.WMaxInRtg"} = "Param_Bemessungswirkleistung_WMaxInRtg";
-		$params->{"Parameter.Inverter.AcALim"} = "Param_AC_Strom_Begrenzung_AcALim";
 		$params->{"Parameter.Nameplate.ARtg"} = "Param_Nennstrom_alle_Phasen";
 		$params->{"Parameter.Nameplate.Location"} = "Param_Geraetename";
 		$params->{"Parameter.PCC.WMaxAsym"} = "Param_Maximale_Schieflast";
@@ -1059,6 +1065,8 @@ sub SMAEVCharger_SMAcmd($$$) {
 		$params->{"Param_Minimaler_Ladestrom"} = "Parameter.Chrg.AMinCha";
 		$params->{"Param_Dauer_Ladevorgang"} = "Parameter.Chrg.Plan.DurTmm";
 		$params->{"Param_Energiemenge_Ladevorgang"} = "Parameter.Chrg.Plan.En";
+		$params->{"Param_Manuelle_Ladefreigabe"} = "Parameter.Chrg.ChrgApv";
+		$params->{"Param_Ladefreigabe_ueber_App"} = "Parameter.Chrg.ChrgLok";
 		
 			
 	# advanced params
@@ -1071,7 +1079,7 @@ sub SMAEVCharger_SMAcmd($$$) {
 		$params->{"Param_Nennstrom_Netzanschluss"} = "Parameter.PCC.ARtg";
 		$params->{"Param_Nennwirkleistung_WMaxOut"} = "Parameter.Inverter.WMax";
 		$params->{"Param_Nennwirkleistung_WMaxIn"} = "Parameter.Inverter.WMaxIn";
-		$params->{"Param_AC_Strom_Begrenzung_AcALim"} = "Parameter.Inverter.AcALim";
+		$params->{"Param_AC_Strom_Begrenzung"} = "Parameter.Inverter.AcALim";
 		$params->{"Param_Maximale_Schieflast"} = "Parameter.PCC.WMaxAsym";
 		$params->{"Param_Fallback_Wirkleistungsbegrenzung"} = "Parameter.PCC.FlbInv.WMax";
 	}
@@ -1550,6 +1558,8 @@ To start charging there are different options:
 					<li>Parameter.Chrg.Plan.StopTm :<b> Param_Ende_Ladevorgang</b>: (detail-level: 0) </li>
 					<li>Parameter.Chrg.StpWhenFl :<b> Param_Trennung_nach_Vollladung</b>: (detail-level: 0 / setting-level: 1)</li>
 					<li>Parameter.Chrg.StpWhenFlTm :<b> Param_Ladebereitschaft_bis_Trennung</b>: (detail-level: 0 / setting-level: 1) </li>
+					<li>Parameter.Chrg.ChrgApv :<b> Param_Manuelle_Ladefreigabe</b>: (detail-level: 0 / setting-level: 0) </li>
+					<li>Parameter.Chrg.ChrgLok :<b> Param_Ladefreigabe_ueber_App</b>: (detail-level: 0 / setting-level: 0) </li>
 					<li>Parameter.GridGuard.Cntry.VRtg :<b> Param_Netz_Nennspannung</b>: (detail-level: 0) </li>
 					<li>Parameter.PCC.ARtg :<b> Param_Nennstrom_Netzanschluss</b>: (detail-level: 0 / setting-level: 1) </li>
 					<li>Parameter.PCC.FlbInv.WMax :<b> Param_Fallback_Wirkleistungsbegrenzung</b>: (detail-level: 0 / setting-level: 1) </li>
@@ -1558,7 +1568,7 @@ To start charging there are different options:
 					<li>Parameter.Inverter.WMax :<b> Param_Nennwirkleistung_WMaxOut</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxIn :<b> Param_Nennwirkleistung_WMaxIn</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxInRtg :<b> Param_Bemessungswirkleistung_WMaxInRtg</b>: (detail-level: 1)</li>
-					<li>Parameter.Inverter.AcALim :<b> Param_AC_Strom_Begrenzung_AcALim</b>: (detail-level: 1 / setting-level: 1)</li>
+					<li>Parameter.Inverter.AcALim :<b> Param_AC_Strom_Begrenzung</b>: (detail-level: 0 / setting-level: 1)</li>
 					<li>Parameter.Nameplate.ARtg :<b> Param_Nennstrom_alle_Phasen</b>: (detail-level: 1)</li>
 					<li>Parameter.Nameplate.Location : <b> Param_Geraetename </b> : (detail-level: 1)</li>
 					<li>Parameter.PCC.WMaxAsym :<b> Param_Maximale_Schieflast</b>: (detail-level: 1 / setting-level: 1)</li>
@@ -1795,6 +1805,8 @@ Nachfolgend sind alle Readings aufgelistet:
 					<li>Parameter.Chrg.Plan.StopTm :<b> Param_Ende_Ladevorgang</b>: (detail-level: 0) </li>
 					<li>Parameter.Chrg.StpWhenFl :<b> Param_Trennung_nach_Vollladung</b>: (detail-level: 0 / setting-level: 1)</li>
 					<li>Parameter.Chrg.StpWhenFlTm :<b> Param_Ladebereitschaft_bis_Trennung</b>: (detail-level: 0 / setting-level: 1) </li>
+					<li>Parameter.Chrg.ChrgApv :<b> Param_Manuelle_Ladefreigabe</b>: (detail-level: 0 / setting-level: 0) </li>
+					<li>Parameter.Chrg.ChrgLok :<b> Param_Ladefreigabe_ueber_App</b>: (detail-level: 0 / setting-level: 0) </li>
 					<li>Parameter.GridGuard.Cntry.VRtg :<b> Param_Netz_Nennspannung</b>: (detail-level: 0) </li>
 					<li>Parameter.PCC.ARtg :<b> Param_Nennstrom_Netzanschluss</b>: (detail-level: 0 / setting-level: 1) </li>
 					<li>Parameter.PCC.FlbInv.WMax :<b> Param_Fallback_Wirkleistungsbegrenzung</b>: (detail-level: 0 / setting-level: 1) </li>
@@ -1803,7 +1815,7 @@ Nachfolgend sind alle Readings aufgelistet:
 					<li>Parameter.Inverter.WMax :<b> Param_Nennwirkleistung_WMaxOut</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxIn :<b> Param_Nennwirkleistung_WMaxIn</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxInRtg :<b> Param_Bemessungswirkleistung_WMaxInRtg</b>: (detail-level: 1)</li>
-					<li>Parameter.Inverter.AcALim :<b> Param_AC_Strom_Begrenzung_AcALim</b>: (detail-level: 1 / setting-level: 1)</li>
+					<li>Parameter.Inverter.AcALim :<b> Param_AC_Strom_Begrenzung</b>: (detail-level: 0 / setting-level: 1)</li>
 					<li>Parameter.Nameplate.ARtg :<b> Param_Nennstrom_alle_Phasen</b>: (detail-level: 1)</li>
 					<li>Parameter.Nameplate.Location : <b> Param_Geraetename </b> : (detail-level: 1)</li>
 					<li>Parameter.PCC.WMaxAsym :<b> Param_Maximale_Schieflast</b>: (detail-level: 1 / setting-level: 1)</li>
