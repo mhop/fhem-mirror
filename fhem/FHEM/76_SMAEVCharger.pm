@@ -369,8 +369,8 @@ sub SMAEVCharger_Define($$)
 	my $User = $a[3];
 	my $Pass = $a[4];      #todo evtl. verschlüsseln und mit set befehl änderbar machen?
 	
-	my $username = netatmo_encrypt($User);
-    my $password = netatmo_encrypt($Pass);
+	my $username = SMAEVCharger_SMAencrypt($User);
+    my $password = SMAEVCharger_SMAencrypt($Pass);
 
 	# extract IP or Hostname from $a[4]
 	if (!defined $Host) 
