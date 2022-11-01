@@ -21,6 +21,7 @@
 #################################################################################################################
 #
 #  	Date			Version		Description
+#	31.10.2022		0.0.93		Parameter AC-Strom_Begrenzung_AcALim hinzugefügt; User & Passwort encrypted und Funktion get_Account hinzugefügt
 #	22.01.2022		0.0.92		Bugfixes: insert 'use JSON'
 #	12.12.2021		0.0.91		Bugfixes: check for undefined parameter in SMAEVCharger_getReadableCode($)
 #	14.11.2021		0.0.9		Bugfixes: when setting an incorrect value, the set command was executed anyway. No there is no setting, if value are incorrect
@@ -56,6 +57,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 use JSON;
+use Encode qw(encode_utf8 decode_utf8);
 
 
 ###############################################################
@@ -76,10 +78,11 @@ my %update_readings = (
 	"Param_Ladebereitschaft_bis_Trennung" 			=> {values => "", 																level => 1},
 	"Param_Betrieb_mit_Netzanschlusspunktzaehler" 	=> {values => ":ja,nein", 														level => 1},
 	"Param_Nennstrom_Netzanschluss" 				=> {values => ":slider,0,1,100", 												level => 1},
-	"Param_Nennwirkleistung_WMaxOut" 				=> {values => ":slider,1380,230,22000", 											level => 1},
-	"Param_Nennwirkleistung_WMaxIn" 				=> {values => ":slider,1380,230,22000", 											level => 1},
+	"Param_Nennwirkleistung_WMaxOut" 				=> {values => ":slider,1380,230,22000", 										level => 1},
+	"Param_Nennwirkleistung_WMaxIn" 				=> {values => ":slider,1380,230,22000", 										level => 1},
 	"Param_Maximale_Schieflast" 					=> {values => ":slider,0,230,10000", 											level => 1},
 	"Param_Fallback_Wirkleistungsbegrenzung" 		=> {values => ":slider,0,230,22000", 											level => 1},
+	"Param_AC_Strom_Begrenzung_AcALim" 				=> {values => ":slider,6,1,32", 												level => 1},
 	
 	#expert
 	"Param_Timeout_nach_Kommunikationsverlust" 		=> {values => ":slider,200,100,60000",											level => 2},
@@ -360,6 +363,9 @@ sub SMAEVCharger_Define($$)
 	 
 	my $User = $a[3];
 	my $Pass = $a[4];      #todo evtl. verschlüsseln und mit set befehl änderbar machen?
+	
+	my $username = netatmo_encrypt($User);
+    my $password = netatmo_encrypt($Pass);
 
 	# extract IP or Hostname from $a[4]
 	if (!defined $Host) 
@@ -382,9 +388,10 @@ sub SMAEVCharger_Define($$)
 	{
 		return "Argument:{$a[2]} not accepted as Host or IP. Read device specific help file.";
 	}
-
-	$hash->{USER} = $User;
-	$hash->{PASS} = $Pass;
+	
+	$hash->{DEF} = "$Host $username $password";
+	$hash->{USER} = $username;
+	$hash->{PASS} = $password;
 	$hash->{HOST} = $Host;
 
 	InternalTimer(gettimeofday()+5, "SMAEVCharger_GetData", $hash, 0);      # Start Hauptroutine
@@ -414,14 +421,27 @@ sub SMAEVCharger_Get($$)
 	my $opt  = shift @a;
  
 	my  $getlist = "Unknown argument $opt, choose one of ".
-                "data:noArg ";
+                "data:noArg showAccount:noArg";
 
 	return "module is disabled" if(IsDisabled($name));
 
 	if ($opt eq "data") 
 	{
 		SMAEVCharger_GetData($hash);
-	} 
+	}
+	elsif( $opt eq 'showAccount' )
+    {
+      my $username = $hash->{USER};
+      my $password = $hash->{PASS};
+
+      return 'no username set' if( !$username );
+      return 'no password set' if( !$password );
+
+      $username = SMAEVCharger_SMAdecrypt( $username );
+      $password = SMAEVCharger_SMAdecrypt( $password );
+
+      return "username: $username\npassword: $password";
+    }	
 	else 
 	{
 		return "$getlist";
@@ -597,7 +617,7 @@ sub SMAEVCharger_Run($)
 	Log3 ($name, 4, "$name -> Start BlockingCall SMAEVCharger_Run");
 
 	# login to EV Charger
-	if(SMAEVCharger_SMAlogon($hash->{HOST}, $hash->{PASS},$hash->{USER}, $hash))
+	if(SMAEVCharger_SMAlogon($hash->{HOST}, SMAEVCharger_SMAdecrypt($hash->{PASS}),SMAEVCharger_SMAdecrypt($hash->{USER}), $hash))
 	{
 		Log3 $name, 4, "$name - login succes / start getting live data";
 		
@@ -776,6 +796,7 @@ sub SMAEVCharger_handledata($$$)
 		$params->{"Parameter.Inverter.WMax"} = "Param_Nennwirkleistung_WMaxOut";
 		$params->{"Parameter.Inverter.WMaxIn"} = "Param_Nennwirkleistung_WMaxIn";
 		$params->{"Parameter.Inverter.WMaxInRtg"} = "Param_Bemessungswirkleistung_WMaxInRtg";
+		$params->{"Parameter.Inverter.AcALim"} = "Param_AC_Strom_Begrenzung_AcALim";
 		$params->{"Parameter.Nameplate.ARtg"} = "Param_Nennstrom_alle_Phasen";
 		$params->{"Parameter.Nameplate.Location"} = "Param_Geraetename";
 		$params->{"Parameter.PCC.WMaxAsym"} = "Param_Maximale_Schieflast";
@@ -1050,6 +1071,7 @@ sub SMAEVCharger_SMAcmd($$$) {
 		$params->{"Param_Nennstrom_Netzanschluss"} = "Parameter.PCC.ARtg";
 		$params->{"Param_Nennwirkleistung_WMaxOut"} = "Parameter.Inverter.WMax";
 		$params->{"Param_Nennwirkleistung_WMaxIn"} = "Parameter.Inverter.WMaxIn";
+		$params->{"Param_AC_Strom_Begrenzung_AcALim"} = "Parameter.Inverter.AcALim";
 		$params->{"Param_Maximale_Schieflast"} = "Parameter.PCC.WMaxAsym";
 		$params->{"Param_Fallback_Wirkleistungsbegrenzung"} = "Parameter.PCC.FlbInv.WMax";
 	}
@@ -1073,7 +1095,7 @@ sub SMAEVCharger_SMAcmd($$$) {
 	Log3 $name, 5, "$name - PUT Parameter: ".$cmd." : ".$value;
 	
 	if (defined($params->{$cmd}) 
-		and SMAEVCharger_SMAlogon($hash->{HOST}, $hash->{PASS}, $hash->{USER}, $hash))
+		and SMAEVCharger_SMAlogon($hash->{HOST}, SMAEVCharger_SMAdecrypt($hash->{PASS}), SMAEVCharger_SMAdecrypt($hash->{USER}), $hash))
 	{	
 		my $timestamp = POSIX::strftime("%Y-%m-%dT%H:%M:%S.000Z",gmtime());
 		
@@ -1293,6 +1315,51 @@ sub SMAEVCharger_SMAlogout($$)
 	return 1;
 }
 
+##########################################################################
+#                            Encrypt Passwort/Username
+##########################################################################
+
+sub SMAEVCharger_SMAencrypt($)
+{
+  my ($decoded) = @_;
+  my $key = getUniqueId();
+  my $encoded;
+
+  return $decoded if( $decoded =~ /crypt:/ );
+
+  for my $char (split //, $decoded) {
+    my $encode = chop($key);
+    $encoded .= sprintf("%.2x",ord($char)^ord($encode));
+    $key = $encode.$key;
+  }
+
+  return 'crypt:'.$encoded;
+}
+
+##########################################################################
+#                            Decrypt Passwort/Username
+##########################################################################
+
+sub SMAEVCharger_SMAdecrypt($)
+{
+  my ($encoded) = @_;
+  my $key = getUniqueId();
+  my $decoded;
+
+  return $encoded if( $encoded !~ /crypt:/ );
+  
+  $encoded = $1 if( $encoded =~ /crypt:(.*)/ );
+
+  for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
+    my $decode = chop($key);
+    $decoded .= chr(ord($char)^ord($decode));
+    $key = $decode.$key;
+  }
+
+  return $decoded;
+}
+
+
 
 1;
 
@@ -1351,6 +1418,11 @@ All values ​​that can be changed via the web interface can also be changed w
   <li><b> get &lt;name&gt; data </b>
   <br><br>
   The request of the charger will be executed directly. Otherwise all <intervall> seconds the charge will be called automated (look at attribute interval)
+  <br>
+  </li>
+  <li><b> get &lt;name&gt; showAccount </b>
+  <br><br>
+  Shows the decrypted account infos
   <br>
   </li>
 
@@ -1486,6 +1558,7 @@ To start charging there are different options:
 					<li>Parameter.Inverter.WMax :<b> Param_Nennwirkleistung_WMaxOut</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxIn :<b> Param_Nennwirkleistung_WMaxIn</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxInRtg :<b> Param_Bemessungswirkleistung_WMaxInRtg</b>: (detail-level: 1)</li>
+					<li>Parameter.Inverter.AcALim :<b> Param_AC_Strom_Begrenzung_AcALim</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Nameplate.ARtg :<b> Param_Nennstrom_alle_Phasen</b>: (detail-level: 1)</li>
 					<li>Parameter.Nameplate.Location : <b> Param_Geraetename </b> : (detail-level: 1)</li>
 					<li>Parameter.PCC.WMaxAsym :<b> Param_Maximale_Schieflast</b>: (detail-level: 1 / setting-level: 1)</li>
@@ -1591,6 +1664,11 @@ können die anzuzeigenden Werte und die Werte, die geändert werden können, mit
   <li><b> get &lt;name&gt; data </b>
   <br><br>
   Die Daten des Chargers werden direkt abgerufen. Ansonsten findet alle <intervall> Sekunden ein automatisierter Abruf statt (siehe auch das Attribut interval)
+  <br>
+  </li>
+  <li><b> get &lt;name&gt; showAccount </b>
+  <br><br>
+  Zeigt die unverschlüsselten Anmeldedaten an
   <br>
   </li>
 
@@ -1725,6 +1803,7 @@ Nachfolgend sind alle Readings aufgelistet:
 					<li>Parameter.Inverter.WMax :<b> Param_Nennwirkleistung_WMaxOut</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxIn :<b> Param_Nennwirkleistung_WMaxIn</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Inverter.WMaxInRtg :<b> Param_Bemessungswirkleistung_WMaxInRtg</b>: (detail-level: 1)</li>
+					<li>Parameter.Inverter.AcALim :<b> Param_AC_Strom_Begrenzung_AcALim</b>: (detail-level: 1 / setting-level: 1)</li>
 					<li>Parameter.Nameplate.ARtg :<b> Param_Nennstrom_alle_Phasen</b>: (detail-level: 1)</li>
 					<li>Parameter.Nameplate.Location : <b> Param_Geraetename </b> : (detail-level: 1)</li>
 					<li>Parameter.PCC.WMaxAsym :<b> Param_Maximale_Schieflast</b>: (detail-level: 1 / setting-level: 1)</li>
