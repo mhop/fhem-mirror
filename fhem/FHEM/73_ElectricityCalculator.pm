@@ -152,7 +152,7 @@ sub ElectricityCalculator_Define($$$)
 
 	### Start timer for execution around midnight
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	my $EpochNextMidnight = Time::Local::timelocal_nocheck(1, 0, 0, $mday+1, $mon, $year+1900);
 	InternalTimer($EpochNextMidnight, "ElectricityCalculator_MidnightTimer", $hash, 0);
 
 	### For debugging purpose only
