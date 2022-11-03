@@ -4780,19 +4780,20 @@ sub plot {
     if (defined $maxValTime) {
       $footer.= sprintf('<text text-anchor="start" x="12" y="%s" style="fill:%s;font-size:8px"><tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", $unit);
       if ($hours > 168) {
-        $footer.= sprintf('<text text-anchor="start" x="40" y="%s" style="fill:%s;font-size:8px">&#x25B2<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="43" y="%s" style="fill:%s;font-size:8px">&#x25B2<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($maxValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="40" y="%s" style="fill:%s;font-size:8px">&#x25B2<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($maxValTime)));
-        $footer.= sprintf('<text text-anchor="start" x="61" y="%s" style="fill:#CCCCCC;font-size:8px">%s</text>',$footerPos,::strftime("%H:%M",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="45" y="%s" style="fill:%s;font-size:8px">&#x25B2<tspan style="fill:#CCCCCC">%s</tspan></text>',$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($maxValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="65" y="%s" style="fill:#CCCCCC;font-size:8px">%s</text>',$footerPos,::strftime("%H:%M",localtime($maxValTime)));
       }
-      $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:8px;%s">%s</text>',$bwidth/2+22.5,$footerPos,color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
+      $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:8px;%s">%s</text>',$bwidth/2+25.5,$footerPos,color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
     }
     if (defined $minValTime) {
       if ($hours > 168) {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">&#x2022<tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+23,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
+       ## $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">&#x2022<tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+25,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px"><tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+25.5,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%d.%m %H:%M",localtime($minValTime)));
       } else {
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">&#x2022<tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+23,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($minValTime)));
-        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth/2+47,$footerPos,::strftime("%H:%M",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px"><tspan style="fill:%s">&#x25BC</tspan>%s</text>',$bwidth/2+25.5,$footerPos,defined $unitColor ? $unitColor : "#CCCCCC", ::strftime("%a",localtime($minValTime)));
+        $footer.= sprintf('<text text-anchor="start" x="%s" y="%s" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth/2+46,$footerPos,::strftime("%H:%M",localtime($minValTime)));
       }
       $footer.= sprintf('<text text-anchor="end" x="%s" y="%s" style="fill:%s;font-size:8px;%s">%s</text>', $bwidth+8,$footerPos,color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
     }
@@ -4804,33 +4805,80 @@ sub plot {
 
 sub card
 {
-  my ($col,$header,$icon,$min,$max,$minColor,$maxColor,$unit_a,$func,$decfont,$prop,$model,$lightness,$collect2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$decfont2) = @_;
+  my ($col,$header,$icon,$min,$max,$minColor,$maxColor,$unit_a,$func,$decfont,$prop,$model,$lightness,$col2,$min2,$max2,$minColor2,$maxColor2,$unit_b,$func2,$decfont2) = @_;
+  
+  my @value1;
+  my @value2;
+  my @unit1;
+  my @unit2;
+  my $colcount=0;
+  my $col2count=0;
   
   if (!defined $col) {
     return("");
   }
   
-  my $collect;
   if (ref($col) eq "ARRAY") {
-    $collect=${$col}[0];
+    for (my $i=0;$i< @{$col};$i++) {
+      if (ref (${$col}[$i]) eq "HASH") {
+        $value1[$i]=${$col}[$i];
+        $colcount++;
+      } else {
+        $value1[$i]{value}=${$col}[$i];
+      }
+    }
   } else {
-    $collect=$col;
-  }
-  
-  my $unit;
+    if (ref ($col) eq "HASH") {
+      $colcount++;
+      $value1[0]=$col;
+    } else {
+      $value1[0]{value}=$col;
+    }
+  }  
+ 
   if (ref($unit_a) eq "ARRAY") {
-    $unit=${$unit_a}[0];
+    for (my $i=0;$i < @{$unit_a};$i++) {
+      $unit1[$i]=${$unit_a}[$i];
+    }
   } else {
-    $unit=$unit_a;
+    $unit1[0]=$unit_a;
+  }
+  if (defined $col2) {
+    if (ref($col2) eq "ARRAY") {
+      for (my $i=0;$i< @{$col2};$i++) {
+        if (ref (${$col2}[$i]) eq "HASH") {
+          $value2[$i]=${$col2}[$i];
+          $col2count++;
+        } else {
+          $value2[$i]{value}=${$col2}[$i];
+        }
+      }
+    } else {
+      if (ref ($col2) eq "HASH") {
+        $col2count++;
+        $value2[0]=$col2;
+      } else {
+        $value2[0]{value}=$col2;
+      }
+    }  
+  }
+  if (ref($unit_b) eq "ARRAY") {
+    for (my $i=0;$i < @{$unit_b};$i++) {
+      $unit2[$i]=${$unit_b}[$i];
+    }
+  } else {
+    $unit2[0]=$unit_b;
   }
 
-  if (!defined ${$collect}{hours}) {
+  
+
+  if (!defined $value1[0]{value}) {
     return("");
   }
 
-  my $hours = ${$collect}{hours};
-  my $time = ${$collect}{time};
-  my $dim=${$collect}{dim};
+  my $hours = $value1[0]{hours};
+  my $time = $value1[0]{time};
+  my $dim=$value1[0]{dim};
   
   my $bheight=73;
   my $htrans=0;
@@ -4854,7 +4902,7 @@ sub card
   
   my $chart_dim = $hring eq "" ? $bwidth-90: $bwidth-36 ;
   
-  $chart_dim -= defined $collect2 ? ($hring eq "1" ? 13 : 15):0;
+  $chart_dim -= $col2count ? ($hring eq "1" ? 13 : 15):0;
   
   my $x_prop=int($chart_dim/$dim*100)/100;
   
@@ -4875,20 +4923,30 @@ sub card
    
   my ($lr,$lir,$lmm,$lu,$ln,$li);
   ($lr,$lir,$lmm,$lu,$ln,$li)=split (/,/,$lightness) if (defined $lightness);
-  $unit="" if (!defined $unit);
   
-  if (defined $header or $hring) {
+  my $head;
+  if (defined $header or $hring eq "1" or (@value1+@value2)>2) {
+    $head=1;
+  }
+  
+  if (defined $head) {
     $htrans = 24;
     $bheight += 24;
   }
   
   if ($noFooter ne "1") {
-    $bheight += 15;
-    if (ref ($col) eq "ARRAY") {
-      $bheight += (@{$col}-1)*10;
-    } 
-    if (defined $collect2) {
-      $bheight += 10;
+    $bheight += 5;
+    for (my $i=0;$i<@value1;$i++) {
+      if (defined ($value1[$i]{dim})) {
+        $bheight += 10;
+      }
+    }
+    if (defined $col2) {
+      for (my $i=0;$i<@value2;$i++) {
+        if (defined ($value2[$i]{dim})) {
+          $bheight += 10;
+        }
+      }
     }  
   }
 
@@ -4911,7 +4969,7 @@ sub card
   my $svg_height=int($size/100*$bheight);
   
   my $currColor;
-  ($currColor,$minColor,$maxColor)=get_color(${$collect}{value},$min,$max,$minColor,$maxColor,$func);
+  ($currColor,$minColor,$maxColor)=get_color(${$value1[0]}{value},$min,$max,$minColor,$maxColor,$func);
   
   ##$ic="$ic\@".color($currColor,$ln) if (defined($icon) and $icon !~ /@/);
 
@@ -4921,8 +4979,8 @@ sub card
     } elsif ($ic =~ /^(.*\@)colorVal1/) {
       $ic="$1".color($currColor,$li);
     } elsif ($ic =~ /^(.*\@)colorVal2/) {
-      if (defined $collect2) {
-        my ($currColor2)=get_color(${$collect2}{value},$min2,$max2,$minColor2,$maxColor2,$func2);
+      if (defined $col2) {
+        my ($currColor2)=get_color(${$value2[0]}{value},$min2,$max2,$minColor2,$maxColor2,$func2);
         $ic="$1".color($currColor2,$li);
       }
     }
@@ -4936,43 +4994,43 @@ sub card
 
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
 
-
-  $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />' if (defined $header or $hring);
-  if (defined $header or $hring ne "") {
-    $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',($hring eq "1" and defined $ic) ? 34:14,$header_style,$header_txt) if (defined $header); 
+  $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />' if (defined $head);
+  if (defined $head) {
+    $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',defined $ic ? 34:14,$header_style,$header_txt) if (defined $header); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
       my $svg_icon=::FW_makeImage($ic);
-      if(!($svg_icon =~ s/\sheight="[^"]*"/ height="18"/)) {
+      if (!($svg_icon =~ s/\sheight="[^"]*"/ height="18"/)) {
           $svg_icon =~ s/svg/svg height="18"/ 
       }
-      if(!($svg_icon =~ s/\swidth="[^"]*"/ width="18"/)) {
+      if (!($svg_icon =~ s/\swidth="[^"]*"/ width="18"/)) {
           $svg_icon =~ s/svg/svg width="18"/ 
       }
-      $out.='<g transform="translate('.($hring eq "1" ? 14:$bwidth-11).',2) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
+      $out.='<g transform="translate(14,2) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
       $out.= $svg_icon;
       $out.='</g>';
     }
     $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />';
-    if ($hring eq "1") {
-      if (ref($col) eq "ARRAY") {
-        for (my $i=0;$i< @{$col};$i++) {
-          $out.=sprintf('<g transform="translate(%s,1)">',defined $collect2 ? $bwidth-35-(@{$col}-$i)*21.5:$bwidth+7-(@{$col}-$i)*43);
-          my $unitColor=(split(",",${$unit_a}[$i]))[1];
-          $decfont="" if (!defined $decfont);
-        ##  $out.= ui_Table::ring(${$col}[$i]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? "$decfont,,fill:".color($unitColor,$ln):$unit ,"70,1",$func,defined $unitColor ? "$decfont,,fill:".color($unitColor,$ln):$decfont,$model,$lightness,undef,undef);
-          $out.= ui_Table::ring(${$col}[$i]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[$i]))[0]:$unit ,"70,1",$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,$model,$lightness);
-          $out.='</g>';
-        }
-      } else {
-        $out.=sprintf('<g transform="translate(%s,1)">',defined $collect2 ? $bwidth-78:$bwidth-35);
-        $out.= ui_Table::ring(${$collect}{value},$min,$max,$minColor,$maxColor,$unit,"70,1",$func,$decfont,$model,$lightness);
+    if ($hring eq "1" or @value1 > 2) {
+      my $begin=0;
+      $begin= 2 if ($hring eq "" and @value1 > 2);
+      for (my $i=$begin;$i<@value1;$i++) {
+        $out.=sprintf('<g transform="translate(%s,1)">',defined $col2 ? $bwidth+7-(@value1+@value2-$i)*43 : $bwidth+7-(@value1-$i)*43);
+        my $unitColor=(split(",",$unit1[$i]))[1];
+        $decfont="" if (!defined $decfont);
+        $out.= ui_Table::ring($value1[$i]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[$i]))[0],"70,1",$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,$model,$lightness);
         $out.='</g>';
       }
-      if (defined $collect2) {
-        $out.=sprintf('<g transform="translate(%s,1)">',$bwidth-35);
-        $out.= ui_Table::ring(${$collect2}{value},$min2,$max2,$minColor2,$maxColor2,$unit2,"70,1",$func2,$decfont2,$model,$lightness);
+    }
+    if (defined $col2 and ((@value1+@value2)>2 or $hring eq "1")) {
+      my $begin=0;
+      $begin=1 if ($hring eq "" and @value1 == 1);           
+      for (my $i=$begin;$i<@value2;$i++) {
+        $out.=sprintf('<g transform="translate(%s,1)">',$bwidth+7-(@value2-$i)*43);
+        my $unitColor2=(split(",",$unit2[$i]))[1];
+        $decfont2="" if (!defined $decfont2);
+        $out.= ui_Table::ring($value2[$i]{value},$min2,$max2,$minColor2,$maxColor2,(split(",",$unit2[$i]))[0],"70,1",$func2,defined $unitColor2 ? $decfont2.",,fill:".$unitColor2:$decfont2,$model,$lightness);
+        $out.='</g>';
       }
-      $out.='</g>';
     }
   }
   
@@ -4985,7 +5043,6 @@ sub card
 
   for (my $i=1;$i<5;$i++) {
     my $y=$i*10;
-    ##$out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1"/>',$y,$chart_dim,$y);
     $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1"/>',$y,$chart_dim,$y);
   }
   
@@ -5032,18 +5089,10 @@ sub card
      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0 and $x <= $chart_dim);
     }
     
-   # for (my $i=0;$i<$description;$i++) {
-   #   my $x=int((($i)*($chart_dim/$description)+$pos)*10)/10;
-   #   $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
-   # }
-  
-    
-    
     for (my $i=0;$i<$description;$i++) {
       my $h=$beginhour+($i+1)*$scale;
       $hour=($h >= 24 ? $h % 24:$h);
       my $x=int((($i*($chart_dim/$description)+$pos))*10)/10;
-      ##$out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
       if ($hour == 0) {
         if ($hours <= 168) {
           $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,substr(::strftime("%a",localtime($timebeginn+$h*3600)),0,2));
@@ -5075,48 +5124,62 @@ sub card
   my ($outplot,$outfooter);
   my @outfooter;
   
-  if (ref($col) eq "ARRAY") {
-    my $minVal;
-    my $maxVal;
-    for (my $i=0;$i< @{$col};$i++) {
-      my $min=defined ${$col}[$i]{min_value} ? ${$col}[$i]{min_value} : ${$col}[$i]{value};
-      my $max=defined ${$col}[$i]{max_value} ? ${$col}[$i]{max_value} : ${$col}[$i]{value};
+  my $minVal;
+  my $maxVal;
+  for (my $i=0;$i< @value1;$i++) {
+    if (defined ($value1[$i]{dim})) {
+      my $min=defined $value1[$i]{min_value} ? $value1[$i]{min_value} : $value1[$i]{value};
+      my $max=defined $value1[$i]{max_value} ? $value1[$i]{max_value} : $value1[$i]{value};
       $minVal=$min if (!defined $minVal or $min < $minVal);
       $maxVal=$max if (!defined $maxVal or $max > $maxVal);
     }
-    for (my $i=0;$i<@{$col};$i++) {
-      ($outplot,$outfooter) = plot (${$col}[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $i ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$i*10,undef,-2.5,"end",(split(",",${$unit_a}[$i]))[1],(split(",",${$unit_a}[$i]))[0]);
+  }
+  my $j=0;
+  for (my $i=0;$i<@value1;$i++) {
+    if (defined ($value1[$i]{dim})) {
+      ($outplot,$outfooter) = plot ($value1[$i],[$min,$minVal],[$max,$maxVal],$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$j*10,undef,-2.5,"end",(split(",",$unit1[$i]))[1],(split(",",$unit1[$i]))[0]);
+      $j++;
       $out.=$outplot;
       push (@outfooter,$outfooter);
     }
-  } else {
-    my ($outplot,$outfooter) = plot ($collect,$min,$max,$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim,$noColor,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84,undef,-2.5,"end",undef,$unit);
-    $out.=$outplot;
-    push (@outfooter,$outfooter);
   }
-  if (defined $collect2) {
-    ($outplot,$outfooter) = plot ($collect2,$min2,$max2,$minColor2,$maxColor2,$dec2,$func2,$steps,$x_prop,$chart_dim,$noColor,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+@outfooter*10,undef,$chart_dim+3,"start",undef,$unit2);
-    $out.=$outplot;
-    push (@outfooter,$outfooter)
+  if (defined $col2) {
+    my $minVal2;
+    my $maxVal2;
+    for (my $i=0;$i< @value2;$i++) {
+      if (defined ($value2[$i]{dim})) {
+        my $min=defined $value2[$i]{min_value} ? $value2[$i]{min_value} : $value2[$i]{value};
+        my $max=defined $value2[$i]{max_value} ? $value2[$i]{max_value} : $value2[$i]{value};
+        $minVal2=$min if (!defined $minVal2 or $min < $minVal2);
+        $maxVal2=$max if (!defined $maxVal2 or $max > $maxVal2);
+      }
+    }
+    my $offset=@outfooter*10;
+    my $j=0;
+    for (my $i=0;$i<@value2;$i++) {
+      if (defined ($value2[$i]{dim})) {
+        ($outplot,$outfooter) = plot ($value2[$i],[$min2,$minVal2],[$max2,$maxVal2],$minColor2,$maxColor2,$dec2,$func2,$steps,$x_prop,$chart_dim, $j == 0 ? $noColor:-1,$lmm,$ln,$lr,$plot,$bwidth,$noFooter eq "1" ? 0:84+$offset+$j*10,undef,$chart_dim+3,"start",(split(",",$unit2[$i]))[1],(split(",",$unit2[$i]))[0]);
+        $j++;
+        $out.=$outplot;
+        push (@outfooter,$outfooter);
+      }
+    }
   }
   $out.= '</g>';
   $out.= '</svg>';
 
   if ($hring eq "") {
     $out.=sprintf('<g transform="translate(%s,6)">',$bwidth-49);
-    if (!defined $collect2) {
-      if (ref($col) eq "ARRAY" and scalar (@{$col}) >= 2 ) {
-          my $unitColor=(split(",",${$unit_a}[0]))[1];
-          my $unitColor2=(split(",",${$unit_a}[1]))[1];
-          $decfont="" if (!defined $decfont);
-          ##$decfont2="" if (!defined $decfont2);
-          $out.= ui_Table::ring2(${$col}[0]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[0]))[0]:$unit,92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
-                 ${$col}[1]{value},$min,$max,$minColor,$maxColor,ref ($unit_a) eq "ARRAY" ? (split(",",${$unit_a}[1]))[0]:$unit,$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $header or !defined $icon) ? undef: $icon,$model);
-      } else {
-        $out.= ui_Table::ring(${$collect}{value},$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,$model,$lightness,(defined $header or !defined $icon) ? undef: $icon);
-      }
-    } else {            
-      $out.= ui_Table::ring2(${$collect}{value},$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,${$collect2}{value},$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$decfont2,$lightness,((defined $header or !defined $icon) ? undef: $icon),$model);
+    if (@value1 >= 2 ) {
+      my $unitColor=(split(",",$unit1[0]))[1];
+      my $unitColor2=(split(",",$unit1[1]))[1];
+      $decfont="" if (!defined $decfont);
+      $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
+             $value1[1]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[1]))[0],$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $header or !defined $icon) ? undef: $icon,$model);
+    } elsif (@value1 == 1 and @value2 >= 1) {
+        $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$value2[0]{value},$min2,$max2,$minColor2,$maxColor2,(split(",",$unit2[0]))[0],$func2,$decfont2,$lightness,((defined $header or !defined $icon) ? undef: $icon),$model);
+    } else {
+        $out.= ui_Table::ring($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$model,$lightness,(defined $header or !defined $icon) ? undef: $icon);
     }
     $out.='</g>';
     $out.=sprintf('<text text-anchor="middle" x="%s" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth-21,::strftime("%H:%M:%S",localtime($time)));
