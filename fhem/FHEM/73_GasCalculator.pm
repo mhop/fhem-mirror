@@ -152,7 +152,10 @@ sub GasCalculator_Define($$$)
 
 	### Start timer for execution around midnight
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	my $EpochNextMidnight = Time::Local::timelocal_nocheck(1, 0, 0, $mday+1, $mon, $year+1900);
+	my $EpochThisMidnight 			= timelocal(0,0,0,$mday  ,$mon,$year);
+	my $EpochNextMidnight 			= timelocal(0,0,0,$mday+1,$mon,$year);
+	my $SecondsToday 				= $EpochNextMidnight - $EpochThisMidnight;
+	$hash->{system}{SecondsToday} 	= $SecondsToday;
 	InternalTimer($EpochNextMidnight, "GasCalculator_MidnightTimer", $hash, 0);
 
 	### For debugging purpose only
@@ -160,8 +163,8 @@ sub GasCalculator_Define($$$)
 	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - year              : " . $year;
 	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - mon               : " . $mon;
 	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - day               : " . $mday;
-	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
 	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - SecondsToday      : " . $SecondsToday;
 
 	return undef;
 }
@@ -535,8 +538,8 @@ sub GasCalculator_MidnightTimer($)
 			next;
 		}
 		
-		my $GasCounterReadingValue 				= ReadingsVal($GasCountName,                              $GasCountReadingName                              , "error");
-		my $LastUpdateTimestampUnix             = ReadingsVal($GasCalcReadingDestinationDeviceName, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
+		my $GasCounterReadingValue 					= ReadingsVal($GasCountName,                              $GasCountReadingName                              , "error");
+		my $LastUpdateTimestampUnix         	    = ReadingsVal($GasCalcReadingDestinationDeviceName, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
 	
 		### Calculate time difference since last update
 		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
@@ -554,14 +557,14 @@ sub GasCalculator_MidnightTimer($)
 		if (($GasCalcReadingPrefix ne "error") && ($GasCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
 			
 			### If there was no update in the last 24h
-			if ( $DeltaTimeSinceLastUpdate >= 86400) {
+			if ( $DeltaTimeSinceLastUpdate >= $GasCalcDev->{system}{SecondsToday}) {
 				### Create Log entries for debugging purpose
-				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : No Update in the last 24h!";
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : No Update in the last day!";
 
 			}
 			else {
 				### Create Log entries for debugging purpose
-				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : There was an Update in the last day!";
 			}
 			
 			### Create Log entries for debugging purpose	
@@ -601,14 +604,15 @@ sub GasCalculator_MidnightTimer($)
 	}
 
 	### Start timer for execution around midnight
-	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) 	= localtime(time);
+	my $EpochThisMidnight 										= timelocal(0,0,0,$mday  ,$mon,$year);
+	my $EpochNextMidnight 										= timelocal(0,0,0,$mday+1,$mon,$year);
+	my $SecondsToday 											= $EpochNextMidnight - $EpochThisMidnight;
+	$GasCalcDev->{system}{SecondsToday} 						= $SecondsToday;
 	InternalTimer($EpochNextMidnight, "GasCalculator_MidnightTimer", $GasCalcDev, 0);
 	
 	### For debugging purpose only
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer _______Looping finished___________";
-	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - time              : " . time();
-	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
 }
 ####END####### Midnight Routine ################################################################################END#####
@@ -966,11 +970,18 @@ sub GasCalculator_Notify($$)
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - LastUpdateTimestampUnix                  : " . ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadTimeRelDelta                 : " . $GasCountReadingLastChangeDelta;
 
-		if (($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour) || ($GasCountReadingLastChangeDelta > 86400))
+		if (($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour) || ($GasCountReadingLastChangeDelta > $GasCalcDev->{system}{SecondsToday}))
 		{
 			### Create Log entries for debugging
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected OR last reading is older than 24h!";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected OR last reading is older than 1 day!";
 
+			### Recalculate new dayspan in seconds
+			my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) 	= localtime(time);
+			my $EpochThisMidnight 										= timelocal(0,0,0,$mday  ,$mon,$year);
+			my $EpochNextMidnight 										= timelocal(0,0,0,$mday+1,$mon,$year);
+			my $SecondsToday 											= $EpochNextMidnight - $EpochThisMidnight;
+			$GasCalcDev->{system}{SecondsToday} 						= $SecondsToday;
+			
 			### Calculate gas energy of previous day € = (Vprevious[cubic] - V1stDay[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic] 
 			my $GasCalcEnergyDayLast      = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
 			### Calculate pure gas cost of previous day GasCalcEnergyLastDay * Price per kWh
