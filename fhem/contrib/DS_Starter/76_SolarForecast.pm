@@ -10351,14 +10351,16 @@ Das Modul SolarForecast erstellt auf Grundlage der Werte aus generischen Quellen
 Vorhersage für den solaren Ertrag und integriert weitere Informationen als Grundlage für darauf aufbauende Steuerungen. <br>
 
 Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (Model DWD) oder der 
-<a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a> (Model SolCastAPI) prognostizierten Globalstrahlung am 
-Anlagenstandort. Die Nutzung der SolCast API beschränkt sich auf die kostenlose Version unter Verwendung von Rooftop Sites. <br>
+<a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a> (Model SolCastAPI) prognostizierten 
+Globalstrahlung am Anlagenstandort. Wegen der erreichbaren Genauigkeit wird die Nutzung der SolCast API empfohlen ! <br><br>
+
+Die Nutzung der SolCast API beschränkt sich auf die kostenlose Version unter Verwendung von Rooftop Sites. <br>
 In zugeordneten DWD_OpenData Device(s) ist die passende Wetterstation mit dem Attribut "forecastStation" 
 festzulegen um meteorologische Daten (Bewölkung, Sonnenaufgang, u.a.) bzw. eine Strahlungsprognose (Model DWD) für diesen 
 Standort zu erhalten. <br>
-Abhängig von den Strahlungs- und Wetterdaten sowie der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.)
-wird auf eine wahrscheinliche PV Erzeugung der kommenden Stunden ermittelt. <br>
-Darüber hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine Verbrauchsprognose verwendet. <br>
+Über die PV Erzeugungsprognose hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine 
+Verbrauchsprognose verwendet. <br><br>
+
 Das Modul errechnet aus den Prognosewerten einen zukünftigen Energieüberschuß der zur Betriebsplanung von Verbrauchern
 genutzt wird. Weiterhin bietet das Modul eine <a href="#SolarForecast-Consumer">Consumer Integration</a> zur integrierten
 Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
