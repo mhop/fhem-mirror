@@ -32,7 +32,7 @@ use warnings;
 use JSON;
 use Data::Dumper;
 
-my $VERSION = "0.9.9";
+my $VERSION = "0.9.9.2";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -470,7 +470,7 @@ sub SMARTMON_getSmartDataReadings($$) {
   # Bekannte Werte einspielen
   # per Referenz uebergeben!
   my $done_map = SMARTMON_interpretKnownData($hash, \%{$dmap}, \%{$map});
-
+  
   my $cnt_oldage=0;
   my $cnt_prefail=0;
   my $sr = AttrVal($name, "show_raw", "0");
@@ -487,13 +487,18 @@ sub SMARTMON_getSmartDataReadings($$) {
       # oder wenn explizit erwuenscht (Attribut show_raw) 
       if(!defined($done_map->{$id}) || $sr eq "2") {
         my $m = $dmap->{$id};
-        my $rName = $m->{name};
-        #my $raw   = $dmap->{$id}->{raw};
-        $map->{sprintf("%03d_%s",$id,$rName)} = 
-           sprintf("Flag: %s Val: %s Worst: %s Thresh: %s ".
-                   "Type: %s Updated: %s When_Failed: %s Raw: %s",
-                   $m->{flag},$m->{value},$m->{worst},$m->{thresh},$m->{type},
-                   $m->{updated},$m->{failed},$m->{raw});
+        if($m->{format} eq 0) {
+          my $rName = $m->{name};
+          #my $raw   = $dmap->{$id}->{raw};
+          $map->{sprintf("%03d_%s",$id,$rName)} = 
+             sprintf("Flag: %s Val: %s Worst: %s Thresh: %s ".
+                     "Type: %s Updated: %s When_Failed: %s Raw: %s",
+                     $m->{flag},$m->{value},$m->{worst},$m->{thresh},$m->{type},
+                     $m->{updated},$m->{failed},$m->{raw});
+        } else {
+          my $rName = $m->{name};
+          $map->{$id} = $m->{text};
+        }
       }
     }
   }
@@ -520,7 +525,7 @@ sub SMARTMON_readDeviceData($%) {
       my($k,$v) = split(/:\s*/,$line);
       if(defined $v) {
 		  $v = trim($v);
-		  if($k eq "Device Model") {
+		  if(($k eq "Device Model") || ($k eq "Model Number")) {
 			$hash->{DEVICE_MODEL}=$v;
 			$map->{"deviceModel"}=$v if($sd eq '1');
 		  }
@@ -532,7 +537,7 @@ sub SMARTMON_readDeviceData($%) {
 			$hash->{DEVICE_FIRMWARE}=$v;
 			$map->{"deviceFirmware"}=$v if($sd eq '1');
 		  }
-		  if($k eq "User Capacity") {
+		  if(($k eq "User Capacity") || ($k eq "Total NVM Capacity")) {
 			$hash->{DEVICE_CAPACITY}=$v;
 			$map->{"deviceCapacity"}=$v if($sd eq '1');
 		  }
@@ -616,6 +621,166 @@ sub SMARTMON_interpretKnownData($$$) {
     $known->{"RC"}=1;
   }
   
+  
+  # > NVMe
+  # smartctl 7.2 2020-12-30 r5155 [x86_64-linux-5.18.0-0.deb11.4-amd64] (local build)
+  # Copyright (C) 2002-20, Bruce Allen, Christian Franke, www.smartmontools.org
+  #
+  # === START OF SMART DATA SECTION ===
+  # SMART/Health Information (NVMe Log 0x02)
+  # Critical Warning:                   0x00
+  # Temperature:                        38 Celsius
+  # Available Spare:                    100%
+  # Available Spare Threshold:          1%
+  # Percentage Used:                    1%
+  # Data Units Read:                    88.487 [45,3 GB]
+  # Data Units Written:                 253.077 [129 GB]
+  # Host Read Commands:                 1.006.924
+  # Host Write Commands:                19.046.809
+  # Controller Busy Time:               6
+  # Power Cycles:                       45
+  # Power On Hours:                     789
+  # Unsafe Shutdowns:                   39
+  # Media and Data Integrity Errors:    0
+  # Error Information Log Entries:      67
+  # Warning  Comp. Temperature Time:    0
+  # Critical Comp. Temperature Time:    0
+  # Temperature Sensor 1:               50 Celsius
+  # Temperature Sensor 2:               51 Celsius
+  # Temperature Sensor 3:               52 Celsius
+  # Temperature Sensor 4:               53 Celsius
+  # Temperature Sensor 5:               54 Celsius
+  # Temperature Sensor 6:               55 Celsius
+  # Temperature Sensor 7:               56 Celsius
+  # Temperature Sensor 8:               57 Celsius
+  
+  if($dmap->{"Power On Hours"}) {
+    my $poh = $dmap->{"Power On Hours"}->{text};
+    $map->{power_on_hours} = $poh;
+    my $poht = $poh =~ s/\.//r;
+    $map->{power_on_text} = SMARTMON_hour2Dauer($poht);
+    $known->{"Power On Hours"}=1;
+  }
+  
+  if($dmap->{"Power Cycles"}) {
+    $map->{power_cycle_count} = $dmap->{"Power Cycles"}->{text};
+    $known->{"Power Cycles"}=1;
+  }
+  
+  if($dmap->{"Temperature"}) {
+	my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature"}->{text}));
+    $map->{temperature} = $tv;
+    $known->{"Temperature"}=1;
+  }
+  
+  if($dmap->{"Temperature Sensor 1"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 1"}->{text}));
+    $map->{temperature1} = $tv;
+    $known->{"Temperature Sensor 1"}=1;
+  }
+  if($dmap->{"Temperature Sensor 2"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 2"}->{text}));
+    $map->{temperature2} = $tv;
+    $known->{"Temperature Sensor 2"}=1;
+  }
+  if($dmap->{"Temperature Sensor 3"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 3"}->{text}));
+    $map->{temperature3} = $tv;
+    $known->{"Temperature Sensor 3"}=1;
+  }
+  if($dmap->{"Temperature Sensor 4"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 4"}->{text}));
+    $map->{temperature4} = $tv;
+    $known->{"Temperature Sensor 4"}=1;
+  }
+  if($dmap->{"Temperature Sensor 5"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 5"}->{text}));
+    $map->{temperature5} = $tv;
+    $known->{"Temperature Sensor 5"}=1;
+  }
+  if($dmap->{"Temperature Sensor 6"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 6"}->{text}));
+    $map->{temperature6} = $tv;
+    $known->{"Temperature Sensor 6"}=1;
+  }
+  if($dmap->{"Temperature Sensor 7"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 7"}->{text}));
+    $map->{temperature7} = $tv;
+    $known->{"Temperature Sensor 7"}=1;
+  }
+  if($dmap->{"Temperature Sensor 8"}) {
+    my($tv, $tu) = split(/\s+/, trim($dmap->{"Temperature Sensor 8"}->{text}));
+    $map->{temperature8} = $tv;
+    $known->{"Temperature Sensor 8"}=1;
+  }
+  
+  if($dmap->{"Critical Warning"}) {
+    $map->{critical_warning} = $dmap->{"Critical Warning"}->{text};
+    $known->{"Critical Warning"}=1;
+  }
+  
+   if($dmap->{"Available Spare"}) {
+    $map->{available_spare} = $dmap->{"Available Spare"}->{text};
+    $known->{"Available Spare"}=1;
+  }
+  if($dmap->{"Available Spare Threshold"}) {
+    $map->{available_spare_threshold} = $dmap->{"Available Spare Threshold"}->{text};
+    $known->{"Available Spare Threshold"}=1;
+  }
+  
+  if($dmap->{"Percentage Used"}) {
+    $map->{percentage_used} = $dmap->{"Percentage Used"}->{text};
+    $known->{"Percentage Used"}=1;
+  }
+  
+  if($dmap->{"Data Units Read"}) {
+    $map->{data_units_read} = $dmap->{"Data Units Read"}->{text};
+    $known->{"Data Units Read"}=1;
+  }
+  if($dmap->{"Data Units Written"}) {
+    $map->{data_units_written} = $dmap->{"Data Units Written"}->{text};
+    $known->{"Data Units Written"}=1;
+  }
+  
+  if($dmap->{"Host Read Commands"}) {
+    $map->{host_read_commands} = $dmap->{"Host Read Commands"}->{text};
+    $known->{"Host Read Commands"}=1;
+  }
+  if($dmap->{"Host Write Commands"}) {
+    $map->{host_write_commands} = $dmap->{"Host Write Commands"}->{text};
+    $known->{"Host Write Commands"}=1;
+  }
+  
+  if($dmap->{"Controller Busy Time"}) {
+    $map->{controller_busy_time} = $dmap->{"Controller Busy Time"}->{text};
+    $known->{"Controller Busy Time"}=1;
+  }
+  
+  if($dmap->{"Unsafe Shutdowns"}) {
+    $map->{unsafe_shutdowns} = $dmap->{"Unsafe Shutdowns"}->{text};
+    $known->{"Unsafe Shutdowns"}=1;
+  }
+  
+  if($dmap->{"Media and Data Integrity Errors"}) {
+    $map->{media_and_data_integrity_errors} = $dmap->{"Media and Data Integrity Errors"}->{text};
+    $known->{"Media and Data Integrity Errors"}=1;
+  }
+  
+  if($dmap->{"Error Information Log Entries"}) {
+    $map->{error_information_log_entries} = $dmap->{"Error Information Log Entries"}->{text};
+    $known->{"Error Information Log Entries"}=1;
+  }
+  
+  if($dmap->{"Warning  Comp. Temperature Time"}) {
+    $map->{warning_comp_temperature_time} = $dmap->{"Warning  Comp. Temperature Time"}->{text};
+    $known->{"Warning  Comp. Temperature Time"}=1;
+  }
+
+  if($dmap->{"Critical Comp. Temperature Time"}) {
+    $map->{critical_comp_temperature_time} = $dmap->{"Critical Comp. Temperature Time"}->{text};
+    $known->{"Critical Comp. Temperature Time"}=1;
+  }  
+  
   return $known;
 }
 
@@ -657,6 +822,45 @@ sub SMARTMON_readSmartData($;$) {
   my $param="";
   if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
   my ($r, @dev_data) = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$hash->{DEVICE});
+  
+  ### TEST
+  #SMARTMON_Log($hash, 1, "TEST device SMART data !!!");
+  #my $r = "TEST";
+  #my @dev_data = (
+  #"smartctl 7.2 2020-12-30 r5155 [x86_64-linux-5.18.0-0.deb11.4-amd64] (local build)",
+  #"Copyright (C) 2002-20, Bruce Allen, Christian Franke, www.smartmontools.org",
+  #"",
+  #"=== START OF SMART DATA SECTION ===",
+  #"SMART/Health Information (NVMe Log 0x02)",
+  #"Critical Warning:                   0x00",
+  #"Temperature:                        38 Celsius",
+  #"Available Spare:                    100%",
+  #"Available Spare Threshold:          1%",
+  #"Percentage Used:                    1%",
+  #"Data Units Read:                    88.487 [45,3 GB]",
+  #"Data Units Written:                 253.077 [129 GB]",
+  #"Host Read Commands:                 1.006.924",
+  #"Host Write Commands:                19.046.809",
+  #"Controller Busy Time:               6",
+  #"Power Cycles:                       45",
+  #"Power On Hours:                     91.999.999",
+  #"Unsafe Shutdowns:                   39",
+  #"Media and Data Integrity Errors:    0",
+  #"Error Information Log Entries:      67",
+  #"Warning  Comp. Temperature Time:    0",
+  #"Critical Comp. Temperature Time:    0",
+  #"Temperature Sensor 1:               50 Celsius",
+  #"Temperature Sensor 2:               51 Celsius",
+  #"Temperature Sensor 3:               52 Celsius",
+  #"Temperature Sensor 4:               53 Celsius",
+  #"Temperature Sensor 5:               54 Celsius",
+  #"Temperature Sensor 6:               55 Celsius",
+  #"Temperature Sensor 7:               56 Celsius",
+  #"Temperature Sensor 8:               57 Celsius",
+  #"Testwert:                           38 Papageien"
+  #);
+  ### TEST
+    
   SMARTMON_Log($hash, 5, "device SMART data: ".Dumper(@dev_data));
   if(defined($r)) {$map->{"RC"}->{raw} = $r;}
   if(defined($dev_data[0])) {
@@ -682,6 +886,23 @@ sub SMARTMON_readSmartData($;$) {
               $map->{$d_id}->{updated} = $d_updated;
               $map->{$d_id}->{failed}  = $d_when_failed;
               $map->{$d_id}->{raw}     = $d_raw_value;
+              $map->{$d_id}->{format}  = 0;
+            }
+          }
+        }
+      } elsif (scalar(@dev_data)>0 && $dev_data[0]=~m/NVMe/) {
+        shift @dev_data;
+        while(scalar(@dev_data)>0) {
+          my ($d_attr_name, $d_value) = split(/:/, trim($dev_data[0]));
+          shift @dev_data;
+          $d_attr_name = trim($d_attr_name);
+          $d_value = trim($d_value);
+          
+          if(!defined($include) || defined($include->{$d_attr_name})) {
+            if(defined($d_attr_name)) {
+              $map->{$d_attr_name}->{name}    = $d_attr_name;
+              $map->{$d_attr_name}->{text}    = $d_value;
+              $map->{$d_attr_name}->{format}  = 1;
             }
           }
         }
