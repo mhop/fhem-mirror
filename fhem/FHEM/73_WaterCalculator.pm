@@ -152,7 +152,10 @@ sub WaterCalculator_Define($$$)
 
 	### Start timer for execution around midnight
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	my $EpochNextMidnight = Time::Local::timelocal_nocheck(1, 0, 0, $mday+1, $mon, $year+1900);
+	my $EpochThisMidnight 			= timelocal(0,0,0,$mday  ,$mon,$year);
+	my $EpochNextMidnight 			= timelocal(0,0,0,$mday+1,$mon,$year);
+	my $SecondsToday 				= $EpochNextMidnight - $EpochThisMidnight;
+	$hash->{system}{SecondsToday} 	= $SecondsToday;
 	InternalTimer($EpochNextMidnight, "WaterCalculator_MidnightTimer", $hash, 0);
 
 	### For debugging purpose only
@@ -160,8 +163,8 @@ sub WaterCalculator_Define($$$)
 	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - year              : " . $year;
 	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - mon               : " . $mon;
 	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - day               : " . $mday;
-	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
 	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - SecondsToday      : " . $SecondsToday;
 
 	return undef;
 }
@@ -536,7 +539,7 @@ sub WaterCalculator_MidnightTimer($)
 		}
 		
 		my $WaterCounterReadingValue 				= ReadingsVal($WaterCountName,                              $WaterCountReadingName                              , "error");
-		my $LastUpdateTimestampUnix                     = ReadingsVal($WaterCalcReadingDestinationDeviceName, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );	
+		my $LastUpdateTimestampUnix                 = ReadingsVal($WaterCalcReadingDestinationDeviceName, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );	
 
 		### Calculate time difference since last update
 		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
@@ -554,14 +557,14 @@ sub WaterCalculator_MidnightTimer($)
 		if (($WaterCalcReadingPrefix ne "error") && ($WaterCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
 
 			### If there was no update in the last 24h
-			if ( $DeltaTimeSinceLastUpdate >= 86400) {
+			if ( $DeltaTimeSinceLastUpdate >= $WaterCalcDev->{system}{SecondsToday}) {
 				### Create Log entries for debugging purpose
-				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : No Update in the last 24h!";
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : No Update in the last day!";
 
 			}
 			else {
 				### Create Log entries for debugging purpose
-				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : There was an Update in the last day!";
 			}
 			
 			### Create Log entries for debugging purpose	
@@ -601,14 +604,15 @@ sub WaterCalculator_MidnightTimer($)
 	}
 
 	### Start timer for execution around midnight
-	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) 	= localtime(time);
+	my $EpochThisMidnight 										= timelocal(0,0,0,$mday  ,$mon,$year);
+	my $EpochNextMidnight 										= timelocal(0,0,0,$mday+1,$mon,$year);
+	my $SecondsToday 											= $EpochNextMidnight - $EpochThisMidnight;
+	$WaterCalcDev->{system}{SecondsToday} 						= $SecondsToday;
 	InternalTimer($EpochNextMidnight, "WaterCalculator_MidnightTimer", $WaterCalcDev, 0);
 	
 	### For debugging purpose only
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer _______Looping finished___________";
-	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - time              : " . time();
-	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
 }
 ####END####### Midnight Routine ################################################################################END#####
@@ -889,7 +893,7 @@ sub WaterCalculator_Notify($$)
 
 			### Create Log entries for debugging
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous value NOT found. Skipping Loop";
-###		
+
 			### Jump out of loop since there is nothing to do anymore than to wait for the next value
 			next;
 		}
@@ -963,13 +967,20 @@ sub WaterCalculator_Notify($$)
 		### Check whether the current value is the first one after change of day = First one after midnight or if last update is older than 1 day
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimeCurHour                        : " . $WaterCountReadingTimestampCurrentHour;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimePrevHour                       : " . $WaterCountReadingTimestampPreviousHour;
-		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - LastUpdateTimestampUnix                  : " . ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - LastUpdateTimestampUnix                          : " . ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimeRelDelta                       : " . $WaterCountReadingLastChangeDelta;
 
-		if (($WaterCountReadingTimestampCurrentHour < $WaterCountReadingTimestampPreviousHour) || ($WaterCountReadingLastChangeDelta > 86400))
+		if (($WaterCountReadingTimestampCurrentHour < $WaterCountReadingTimestampPreviousHour) || ($WaterCountReadingLastChangeDelta > $WaterCalcDev->{system}{SecondsToday}))
 		{
 			### Create Log entries for debugging
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - First reading of day detected OR last reading is older than 24h!";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - First reading of day detected OR last reading is older than 1 day!";
+
+			### Recalculate new dayspan in seconds
+			my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) 	= localtime(time);
+			my $EpochThisMidnight 										= timelocal(0,0,0,$mday  ,$mon,$year);
+			my $EpochNextMidnight 										= timelocal(0,0,0,$mday+1,$mon,$year);
+			my $SecondsToday 											= $EpochNextMidnight - $EpochThisMidnight;
+			$WaterCalcDev->{system}{SecondsToday} 	= $SecondsToday;
 
 			### Calculate Water Consumption of previous day ? = (Wprevious[qm] - WcurrentDay[qm]) 
 			my $WaterCalcConsumptionDayLast      = ($WaterCountReadingValuePrevious - ReadingsVal($WaterCalcReadingDestinationDeviceName, $WaterCalcReadingPrefix . "_CounterDay1st", "0"));
