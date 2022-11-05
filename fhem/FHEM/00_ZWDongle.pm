@@ -1057,7 +1057,7 @@ ZWDongle_Ready($)
 =item summary_DE Anbindung von standard ZWave Controller
 =begin html
 
-<a name="ZWDongle"></a>
+<a id="ZWDongle"></a>
 <h3>ZWDongle</h3>
 <ul>
   This module serves a ZWave dongle, which is attached via USB or TCP/IP, and
@@ -1066,7 +1066,7 @@ ZWDongle_Ready($)
   standardized, it should work with other devices too. A notable exception is
   the USB device from Merten.
   <br><br>
-  <a name="ZWDongledefine"></a>
+  <a id="ZWDongle-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; ZWDongle &lt;device&gt;</code>
@@ -1074,7 +1074,7 @@ ZWDongle_Ready($)
   <br>
   Upon initial connection the module will get the homeId of the attached
   device. Since the DevIo module is used to open the device, you can also use
-  devices connected via  TCP/IP. See <a href="#CULdefine">this</a> paragraph on
+  devices connected via  TCP/IP. See <a href="#CUL-define">this</a> paragraph on
   device naming details.
   <br>
   Example:
@@ -1084,7 +1084,7 @@ ZWDongle_Ready($)
   </ul>
   <br>
 
-  <a name="ZWDongleset"></a>
+  <a id="ZWDongle-set"></a>
   <b>Set</b>
   <ul>
 
@@ -1217,7 +1217,7 @@ ZWDongle_Ready($)
   </ul>
   <br>
 
-  <a name="ZWDongleget"></a>
+  <a id="ZWDongle-get"></a>
   <b>Get</b>
   <ul>
   <li>homeId<br>
@@ -1279,29 +1279,29 @@ ZWDongle_Ready($)
   </ul>
   <br>
 
-  <a name="ZWDongleattr"></a>
+  <a id="ZWDongle-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
-    <li><a name="helpSites">helpSites</a><br>
+    <li><a id="ZWDongle-attr-helpSites">helpSites</a><br>
       Comma separated list of Help Sites to get device pictures from or to
       show a link to in the detailed window. Valid values are pepper
       and alliance.
       </li>
-    <li><a name="homeId">homeId</a><br>
+    <li><a id="ZWDongle-attr-homeId">homeId</a><br>
       Stores the homeId of the dongle. Is a workaround for some buggy dongles,
       wich sometimes report a wrong/nonexisten homeId (Forum #35126)</li>
-    <li><a name="networkKey">networkKey</a><br>
+    <li><a id="ZWDongle-attr-networkKey">networkKey</a><br>
       Needed for secure inclusion, hex string with length of 32
       </li>
-    <li><a name="neighborListPos">neighborListPos</a><br>
+    <li><a id="ZWDongle-attr-neighborListPos">neighborListPos</a><br>
       Used by the "Show neighbor map" function in the FHEMWEB ZWDongle detail
       screen to store the position of the box.
       </li>
-    <li><a name="neighborListFmt">neighborListFmt</a><br>
+    <li><a id="ZWDongle-attr-neighborListFmt">neighborListFmt</a><br>
       Used by the "Show neighbor map" function in the FHEMWEB ZWDongle detail
       screen. The value is a perl hash, specifiying the values for the keys
       txt, img and title. In the value each word is replaced by the
@@ -1311,7 +1311,7 @@ ZWDongle_Ready($)
         { txt=>"NAME", img=>"IMAGE", title=>"Time to ack: timeToAck" }
       </code></ul>
       </li>
-    <li><a name="showSetInState">showSetInState</a><br>
+    <li><a id="ZWDongle-attr-showSetInState">showSetInState</a><br>
       If the attribute is set to 1, and a user issues a set command to a ZWave
       device, then the state of the ZWave device will be changed to
       set_&lt;cmd&gt; first, and after the ACK from the device is received, to
@@ -1320,7 +1320,7 @@ ZWDongle_Ready($)
       to the CUL_HM module.  Default for this attribute is 0.
       </li>
 
-    <li><a name="ZWDonglesetReadingOnAck">setReadingOnAck</a><br>
+    <li><a id="ZWDongle-attr-ZWDonglesetReadingOnAck">setReadingOnAck</a><br>
       If the attribute is set to 1, and a set command with an argument is
       issued to a ZWave device, then a reading with the same name will be
       updated upon reception of the corresponding ZWave ACK radio telegram.
@@ -1329,7 +1329,7 @@ ZWDongle_Ready($)
   </ul>
   <br>
 
-  <a name="ZWDongleevents"></a>
+  <a id="ZWDongle-events"></a>
   <b>Generated events:</b>
   <ul>
 
