@@ -1443,7 +1443,6 @@ sub setValue_collect
          $maxVal=$value;
          $maxValTime=$time;
          $maxValSlot=$i;
-         
       }
       if (!defined $minVal or $value <= $minVal) {
          $minVal=$value;
@@ -1461,7 +1460,6 @@ sub setValue_collect
     }
   }
 
-  
   ${$collect}{max_value}=$maxVal;
   ${$collect}{max_value_time}=$maxValTime;
   ${$collect}{max_value_slot}=$maxValSlot;
@@ -4814,6 +4812,10 @@ sub card
   my $colcount=0;
   my $col2count=0;
   
+  my $hours;
+  my $time;
+  my $dim;
+  
   if (!defined $col) {
     return("");
   }
@@ -4823,6 +4825,11 @@ sub card
       if (ref (${$col}[$i]) eq "HASH") {
         $value1[$i]=${$col}[$i];
         $colcount++;
+        if (!defined $dim) {
+          $hours=$value1[$i]{hours};
+          $time=$value1[$i]{time};
+          $dim=$value1[$i]{dim};
+        }
       } else {
         $value1[$i]{value}=${$col}[$i];
       }
@@ -4831,6 +4838,11 @@ sub card
     if (ref ($col) eq "HASH") {
       $colcount++;
       $value1[0]=$col;
+      if (!defined $dim) {
+        $hours=$value1[0]{hours};
+        $time=$value1[0]{time};
+        $dim=$value1[0]{dim};
+      }
     } else {
       $value1[0]{value}=$col;
     }
@@ -4849,6 +4861,11 @@ sub card
         if (ref (${$col2}[$i]) eq "HASH") {
           $value2[$i]=${$col2}[$i];
           $col2count++;
+          if (!defined $dim) {
+            $hours=$value2[$i]{hours};
+            $time=$value2[$i]{time};
+            $dim=$value2[$i]{dim};
+          }
         } else {
           $value2[$i]{value}=${$col2}[$i];
         }
@@ -4857,6 +4874,11 @@ sub card
       if (ref ($col2) eq "HASH") {
         $col2count++;
         $value2[0]=$col2;
+        if (!defined $dim) {
+          $hours=$value2[0]{hours};
+          $time=$value2[0]{time};
+          $dim=$value2[0]{dim};
+        }  
       } else {
         $value2[0]{value}=$col2;
       }
@@ -4876,9 +4898,6 @@ sub card
     return("");
   }
 
-  my $hours = $value1[0]{hours};
-  my $time = $value1[0]{time};
-  my $dim=$value1[0]{dim};
   
   my $bheight=73;
   my $htrans=0;
@@ -4901,6 +4920,8 @@ sub card
   
   
   my $chart_dim = $hring eq "" ? $bwidth-90: $bwidth-36 ;
+  
+  $chart_dim += $colcount ? 0: 18;
   
   $chart_dim -= $col2count ? ($hring eq "1" ? 13 : 15):0;
   
@@ -4925,7 +4946,8 @@ sub card
   ($lr,$lir,$lmm,$lu,$ln,$li)=split (/,/,$lightness) if (defined $lightness);
   
   my $head;
-  if (defined $header or $hring eq "1" or (@value1+@value2)>2) {
+  #if (defined $header or $hring eq "1" or (@value1+@value2)>2) {
+  if (defined $header or $hring eq "1") {
     $head=1;
   }
   
@@ -5016,19 +5038,21 @@ sub card
       for (my $i=$begin;$i<@value1;$i++) {
         $out.=sprintf('<g transform="translate(%s,1)">',defined $col2 ? $bwidth+7-(@value1+@value2-$i)*43 : $bwidth+7-(@value1-$i)*43);
         my $unitColor=(split(",",$unit1[$i]))[1];
+        my $unit=(split(",",$unit1[$i]))[0];
         $decfont="" if (!defined $decfont);
-        $out.= ui_Table::ring($value1[$i]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[$i]))[0],"70,1",$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,$model,$lightness);
+        $out.= ui_Table::ring($value1[$i]{value},$min,$max,$minColor,$maxColor,$unit,"70,1",$func,(defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont),$model,$lightness);
         $out.='</g>';
       }
     }
-    if (defined $col2 and ((@value1+@value2)>2 or $hring eq "1")) {
+    if (defined $col2 and (((@value1+@value2)>2 or $hring eq "1"))) {
       my $begin=0;
       $begin=1 if ($hring eq "" and @value1 == 1);           
       for (my $i=$begin;$i<@value2;$i++) {
         $out.=sprintf('<g transform="translate(%s,1)">',$bwidth+7-(@value2-$i)*43);
         my $unitColor2=(split(",",$unit2[$i]))[1];
+        my $unit2=(split(",",$unit2[$i]))[0];
         $decfont2="" if (!defined $decfont2);
-        $out.= ui_Table::ring($value2[$i]{value},$min2,$max2,$minColor2,$maxColor2,(split(",",$unit2[$i]))[0],"70,1",$func2,defined $unitColor2 ? $decfont2.",,fill:".$unitColor2:$decfont2,$model,$lightness);
+        $out.= ui_Table::ring($value2[$i]{value},$min2,$max2,$minColor2,$maxColor2,$unit2,"70,1",$func2,(defined $unitColor2 ? $decfont2.",,fill:".$unitColor2:$decfont2),$model,$lightness);
         $out.='</g>';
       }
     }
@@ -5037,7 +5061,7 @@ sub card
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
   $out.='<polyline points="11,73 '.($bwidth+9).',73"  style="stroke:gray; stroke-width:0.7" />' if (!$noFooter);
   $out.= sprintf('<svg width="%s" height="72">',$chart_dim+84);
-  $out.= '<g transform="translate(35,8) scale(1) ">';
+  $out.= sprintf('<g transform="translate(%s,8) scale(1) ">',$colcount ? 35:17);
 
   $out.= '<rect x="-2" y="-3" width="'.($chart_dim+4).'" height="56" rx="1" ry="1" fill="url(#gradcardback)"/>';
 
@@ -5175,11 +5199,11 @@ sub card
       my $unitColor2=(split(",",$unit1[1]))[1];
       $decfont="" if (!defined $decfont);
       $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
-             $value1[1]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[1]))[0],$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $header or !defined $icon) ? undef: $icon,$model);
+             $value1[1]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[1]))[0],$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $head or !defined $icon) ? undef: $icon,$model);
     } elsif (@value1 == 1 and @value2 >= 1) {
-        $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$value2[0]{value},$min2,$max2,$minColor2,$maxColor2,(split(",",$unit2[0]))[0],$func2,$decfont2,$lightness,((defined $header or !defined $icon) ? undef: $icon),$model);
+        $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$value2[0]{value},$min2,$max2,$minColor2,$maxColor2,(split(",",$unit2[0]))[0],$func2,$decfont2,$lightness,((defined $head or !defined $icon) ? undef: $icon),$model);
     } else {
-        $out.= ui_Table::ring($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$model,$lightness,(defined $header or !defined $icon) ? undef: $icon);
+        $out.= ui_Table::ring($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
     }
     $out.='</g>';
     $out.=sprintf('<text text-anchor="middle" x="%s" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth-21,::strftime("%H:%M:%S",localtime($time)));
