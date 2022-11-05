@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-10-31 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-05 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,6 +130,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.72.2" => "05.11.2022  minor changes in header, rename more attributes, edit commandref, associatedWith is working again ",
   "0.72.1" => "31.10.2022  fix 'connection lost ...' issue again, global language check in checkPlantConfig ",
   "0.72.0" => "30.10.2022  rename some graphic attributes ",
   "0.71.4" => "29.10.2022  flowgraphic some changes (https://forum.fhem.de/index.php/topic,117864.msg1241836.html#msg1241836) ",
@@ -143,7 +144,7 @@ my %vNotesIntern = (
                            "add global dnsServer to checkPlantConfig ",
   "0.70.9 "=> "24.10.2022  create additional percentile only for pvCorrectionFactor_Auto on, changed __solCast_ApiResponse ".
                            "changed _calcCAQwithSolCastPercentil ",
-  "0.70.8 "=> "23.10.2022  change average calculation in _calcCAQwithSolCastPercentil, unuse Notify/createNotifyDev ".
+  "0.70.8 "=> "23.10.2022  change average calculation in _calcCAQwithSolCastPercentil, unuse Notify/createAssociatedWith ".
                            "extend Delete func, extend plantconfig check, revise commandref, change set reset pvCorrection ".
                            "rename runTimeCycleSummary to runTimeCentralTask ",
   "0.70.7 "=> "22.10.2022  minor changes (Display is/whereabouts Solacast Requests, SolCast Forecast Quality, setup procedure) ",
@@ -252,7 +253,7 @@ my %vNotesIntern = (
   "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
   "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
-                           "fix createNotifyDev for currentBatteryDev ",
+                           "fix createAssociatedWith for currentBatteryDev ",
   "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
   "0.44.0" => "10.05.2021  consumptionForecast for attr beamXContent, consumer are switched on/off ",
   "0.43.0" => "08.05.2021  plan Consumers ",
@@ -800,15 +801,24 @@ sub Initialize {
   $hash->{DbLog_splitFn}      = \&DbLogSplit;
   $hash->{AttrFn}             = \&Attr;
   # $hash->{NotifyFn}           = \&Notify;                                              # wird zur Zeit nicht genutzt/verwendet
-  $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
-                                "autoRefreshFW:$fwd ".
-                                "cloudFactorDamping:slider,0,1,100 ".
+  $hash->{AttrList}           = "affect70percentRule:1,dynamic,0 ".
+                                "affectBatteryPreferredCharge:slider,0,1,100 ".
+                                "affectCloudfactorDamping:slider,0,1,100 ".
+                                "affectConsForecastIdentWeekdays:1,0 ".
+                                "affectMaxDayVariance ".
+                                "affectNumHistDays:slider,1,1,30 ".
+                                "affectRainfactorDamping:slider,0,1,100 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
-                                "createConsumptionRecReadings:multiple-strict,$allcs ".
-                                "createTomorrowPVFcReadings:multiple-strict,$hod ".
-                                "createStatisticReadings:multiple-strict,$srd ".
-                                "debug:1,0 ".
+                                "ctrlAutoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
+                                "ctrlAutoRefreshFW:$fwd ".
+                                "ctrlConsRecommendReadings:multiple-strict,$allcs ".
+                                "ctrlDebug:1,0 ".
+                                "ctrlInterval ".
+                                "ctrlOptimizeSolCastInterval:1,0 ".
+                                "ctrlNextDayForecastReadings:multiple-strict,$hod ".
+                                "ctrlShowLink:1,0 ".
+                                "ctrlStatisticReadings:multiple-strict,$srd ".
                                 "disable:1,0 ".
                                 "flowGraphicSize ".
                                 "flowGraphicAnimate:1,0 ".
@@ -818,7 +828,6 @@ sub Initialize {
                                 "flowGraphicShowConsumerPower:0,1 ". 
                                 "flowGraphicShowConsumerRemainTime:0,1 ".
                                 "flowGraphicCss:textField-long ".                             
-                                "follow70percentRule:1,dynamic,0 ".
                                 "graphicBeamHeight ".
                                 "graphicBeamWidth:slider,40,10,100 ".
                                 "graphicBeam1Color:colorpicker,RGB ".
@@ -828,6 +837,9 @@ sub Initialize {
                                 "graphicBeam1FontColor:colorpicker,RGB ".
                                 "graphicBeam2FontColor:colorpicker,RGB ".
                                 "graphicBeam1MaxVal ".
+                                "graphicEnergyUnit:Wh,kWh ".
+                                "graphicHeaderDetail:all,co,pv,pvco,statusLink ".
+                                "graphicHeaderShow:1,0 ".
                                 "graphicHistoryHour:slider,0,1,23 ".
                                 "graphicHourCount:slider,4,1,24 ".
                                 "graphicHourStyle ".
@@ -841,17 +853,6 @@ sub Initialize {
                                 "graphicEndHtml ".
                                 "graphicWeatherColor:colorpicker,RGB ".
                                 "graphicWeatherColorNight:colorpicker,RGB ".
-                                "headerDetail:all,co,pv,pvco,statusLink ".
-                                "headerShow:1,0 ".
-                                "interval ".
-                                "maxVariancePerDay ".
-                                "numHistDays:slider,1,1,30 ".
-                                "optimizeSolCastAPIreqInterval:1,0 ".
-                                "preferredChargeBattery:slider,0,1,100 ".
-                                "rainFactorDamping:slider,0,1,100 ".
-                                "sameWeekdaysForConsfc:1,0 ".
-                                "showLink:1,0 ".
-                                "Wh_kWh:Wh,kWh ".
                                 $consumer.                                
                                 $readingFnAttributes;
 
@@ -882,6 +883,25 @@ sub Initialize {
                             "htmlStart"          => "graphicStartHtml",
                             "htmlEnd"            => "graphicEndHtml",
                             "showHeader"         => "headerShow",
+                            "headerDetail"       => "graphicHeaderDetail",
+                            "headerShow"         => "graphicHeaderShow",
+                            "cloudFactorDamping" => "affectCloudfactorDamping",
+                            "rainFactorDamping"  => "affectRainfactorDamping",
+                            "numHistDays"        => "affectNumHistDays",
+                            "maxVariancePerDay"  => "affectMaxDayVariance",
+                            "follow70percentRule"=> "affect70percentRule",
+                            "Wh_kWh"             => "graphicEnergyUnit",
+                            "autoRefreshFW"      => "ctrlAutoRefreshFW",
+                            "autoRefresh"        => "ctrlAutoRefresh",
+                            "showLink"           => "ctrlShowLink",
+                            "optimizeSolCastAPIreqInterval" => "ctrlOptimizeSolCastInterval",
+                            "interval"           => "ctrlInterval",
+                            "createStatisticReadings" => "ctrlStatisticReadings",
+                            "createConsumptionRecReadings" => "ctrlConsRecommendReadings",
+                            "createTomorrowPVFcReadings" => "ctrlNextDayForecastReadings",
+                            "preferredChargeBattery" => "affectBatteryPreferredCharge",
+                            "sameWeekdaysForConsfc"  => "affectConsForecastIdentWeekdays",
+                            "debug"           => "ctrlDebug",
                           };
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -913,7 +933,7 @@ sub Define {
   };
   use version 0.77; our $VERSION = moduleVersion ($params);                        # Versionsinformationen setzen
 
-  createNotifyDev ($hash);
+  createAssociatedWith ($hash);
   
   $params->{file}       = $pvhcache.$name;                                         # Cache File PV History lesen wenn vorhanden
   $params->{cachename}  = "pvhist";
@@ -1119,9 +1139,9 @@ sub _setcurrentForecastDev {              ## no critic "not used"
       return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
   }
 
-  readingsSingleUpdate($hash, "currentForecastDev", $prop, 1);
-  createNotifyDev     ($hash);
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, "currentForecastDev", $prop, 1);
+  createAssociatedWith ($hash);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1146,10 +1166,10 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
       return "You have to install the required perl module: ".$rmf if($rmf);
   }  
 
-  readingsSingleUpdate($hash, "currentRadiationDev", $prop, 1);
-  createNotifyDev     ($hash);
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
-  setModel            ($hash);                                             # Model setzen
+  readingsSingleUpdate ($hash, "currentRadiationDev", $prop, 1);
+  createAssociatedWith ($hash);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  setModel             ($hash);                                             # Model setzen
 
 return;
 }
@@ -1253,9 +1273,9 @@ sub _setinverterDevice {                 ## no critic "not used"
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }  
 
-  readingsSingleUpdate($hash, "currentInverterDev", $arg, 1);
-  createNotifyDev     ($hash);
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, "currentInverterDev", $arg, 1);
+  createAssociatedWith ($hash);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1323,9 +1343,9 @@ sub _setmeterDevice {                    ## no critic "not used"
       return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
   }  
 
-  readingsSingleUpdate($hash, "currentMeterDev", $arg, 1);
-  createNotifyDev     ($hash);
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, "currentMeterDev", $arg, 1);
+  createAssociatedWith ($hash);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1364,9 +1384,9 @@ sub _setbatteryDevice {                  ## no critic "not used"
       return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
   }  
 
-  readingsSingleUpdate($hash, "currentBatteryDev", $arg, 1);
-  createNotifyDev     ($hash);
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
+  createAssociatedWith ($hash);
+  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1871,7 +1891,7 @@ sub _setreset {                          ## no critic "not used"
       writeDataToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
   }   
   
-  createNotifyDev ($hash);
+  createAssociatedWith ($hash);
 
 return;
 }
@@ -2170,7 +2190,7 @@ sub __solCast_ApiResponse {
       }
     
       my $jdata = decode_json ($myjson);
-      my $debug = AttrVal     ($name, "debug", 0);
+      my $debug = AttrVal     ($name, "ctrlDebug", 0);
       
       if($debug) {                                                                                         # nur für Debugging
           Log (1, qq{DEBUG> $name SolCast API server response for string "$string":\n}. Dumper $jdata);
@@ -2371,7 +2391,7 @@ sub ___setLastAPIcallKeyData {
   
   ## Berechnung des optimalen Request Intervalls
   ################################################     
-  if (AttrVal($name, 'optimizeSolCastAPIreqInterval', 0)) {      
+  if (AttrVal($name, 'ctrlOptimizeSolCastInterval', 0)) {      
       my $date   = strftime "%Y-%m-%d", localtime($t);  
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
       my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
@@ -2534,25 +2554,25 @@ sub Attr {
       singleUpdateState ( {hash => $hash, state => $val, evt => 1} );
   }
   
-  if($aName eq "createTomorrowPVFcReadings") {
+  if($aName eq "ctrlNextDayForecastReadings") {
       deleteReadingspec ($hash, "Tomorrow_Hour.*");
   }
     
   if ($cmd eq "set") {
-      if ($aName eq "interval") {
+      if ($aName eq "ctrlInterval") {
           unless ($aVal =~ /^[0-9]+$/x) {
               return qq{The value for $aName is not valid. Use only figures 0-9 !};
           }
           InternalTimer(gettimeofday()+1.0, "FHEM::SolarForecast::centralTask", $hash, 0);
       }  
         
-      if ($aName eq "maxVariancePerDay") {
+      if ($aName eq "affectMaxDayVariance") {
           unless ($aVal =~ /^[0-9.]+$/x) {
               return qq{The value for $aName is not valid. Use only numbers with optional decimal places !};
           }
       }
       
-      if ($init_done == 1 && $aName eq "optimizeSolCastAPIreqInterval") {
+      if ($init_done == 1 && $aName eq "ctrlOptimizeSolCastInterval") {
           if (!isSolCastUsed ($hash)) {
               return qq{The attribute $aName is only valid for device model "SolCastAPI".};
           }
@@ -2674,7 +2694,7 @@ sub _attrconsumer {                      ## no critic "not used"
 
   writeDataToFile ($hash, "consumers", $csmcache.$name);                                   # Cache File Consumer schreiben
   
-  InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createNotifyDev", $hash, 0);
+  InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
 
 return;
 }
@@ -2687,7 +2707,7 @@ sub _attrcreateConsRecRdgs {             ## no critic "not used"
   my $hash  = $paref->{hash};
   my $aName = $paref->{aName};
   
-  if ($aName eq 'createConsumptionRecReadings') {
+  if ($aName eq 'ctrlConsRecommendReadings') {
       deleteReadingspec ($hash, "consumer.*_ConsumptionRecommended");
   }
 
@@ -3238,7 +3258,7 @@ return;
 sub controlParams {
   my $name = shift;
 
-  my $interval = AttrVal($name, "interval", $definterval);           # 0 wenn manuell gesteuert
+  my $interval = AttrVal($name, 'ctrlInterval', $definterval);           # 0 wenn manuell gesteuert
 
 return $interval;
 }
@@ -3542,8 +3562,8 @@ sub __calcDWDforecast {
   
   my $reld       = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
-  my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
-  my $raindamp   = AttrVal($name, "rainFactorDamping",   $rdampdef);                                  # prozentuale Berücksichtigung des Regenkorrekturfaktors
+  my $clouddamp  = AttrVal($name, "affectCloudfactorDamping", $cldampdef);                            # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $raindamp   = AttrVal($name, "affectRainfactorDamping",   $rdampdef);                            # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
@@ -3793,8 +3813,8 @@ sub __calcSolCastEstimates {
   
   my $reld    = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
-  my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
-  my $raindamp   = AttrVal($name, "rainFactorDamping",   $rdampdef);                                  # prozentuale Berücksichtigung des Regenkorrekturfaktors
+  my $clouddamp  = AttrVal($name, "affectCloudfactorDamping", $cldampdef);                            # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $raindamp   = AttrVal($name, "affectRainfactorDamping",   $rdampdef);                            # prozentuale Berücksichtigung des Regenkorrekturfaktors
 
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf ("%02d", $num), "rainprob", 0);            # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
   my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
@@ -3994,12 +4014,12 @@ sub ___70percentRule {
   my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "confc", 0);
   my $max70 = $peaksum/100 * 70;
   
-  if(AttrVal ($name, "follow70percentRule", "0") eq "1" && $pvsum > $max70) {      
+  if(AttrVal ($name, "affect70percentRule", "0") eq "1" && $pvsum > $max70) {      
       $pvsum = $max70;
       $logao = qq{(reduced by 70 percent rule)};
   }  
 
-  if(AttrVal ($name, "follow70percentRule", "0") eq "dynamic" && $pvsum > $max70 + $confc) {
+  if(AttrVal ($name, "affect70percentRule", "0") eq "dynamic" && $pvsum > $max70 + $confc) {
       $pvsum = $max70 + $confc;
       $logao = qq{(reduced by 70 percent dynamic rule)};
   }  
@@ -4734,7 +4754,7 @@ sub __planSwitchTimes {
   return if(ConsumerVal ($hash, $c, "planstate", undef));                                  # Verbraucher ist schon geplant/gestartet/fertig
   
   my $type   = $paref->{type};
-  my $debug  = AttrVal ($name, "debug", 0);
+  my $debug  = AttrVal ($name, "ctrlDebug", 0);
   
   my $nh     = $data{$type}{$name}{nexthours};
   my $maxkey = (scalar keys %{$data{$type}{$name}{nexthours}}) - 1;
@@ -5047,9 +5067,9 @@ sub __setConsRcmdState {
   my $c     = $paref->{consumer};                                                         # aktueller Unixtimestamp
   my $daref = $paref->{daref};
 
-  my $surplus  = CurrentVal  ($hash, "surplus",     0);                                   # aktueller Energieüberschuß
-  my $nompower = ConsumerVal ($hash, $c, "power",   0);                                   # Consumer nominale Leistungsaufnahme (W)
-  my $ccr      = AttrVal     ($name, 'createConsumptionRecReadings', '');                 # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
+  my $surplus  = CurrentVal  ($hash, "surplus",                    0);                    # aktueller Energieüberschuß
+  my $nompower = ConsumerVal ($hash, $c, "power",                  0);                    # Consumer nominale Leistungsaufnahme (W)
+  my $ccr      = AttrVal     ($name, 'ctrlConsRecommendReadings', '');                    # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   my $rescons  = isConsumerPhysOn($hash, $c) ? 0 : $nompower;                             # resultierender Verbauch nach Einschaltung Consumer
   
   if (!$nompower || $surplus - $rescons > 0) {
@@ -5098,7 +5118,7 @@ sub ___switchConsumerOn {
   my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
   my $state = $paref->{state};
   
-  my $debug   = AttrVal     ($name, "debug",                 0);
+  my $debug   = AttrVal     ($name, "ctrlDebug",             0);
   my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);                                  # geplante Unix Startzeit
   my $oncom   = ConsumerVal ($hash, $c, "oncom",            "");                                  # Set Command für "on"
@@ -5196,7 +5216,7 @@ sub ___switchConsumerOff {
   my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
   my $state = $paref->{state};
   
-  my $debug   = AttrVal     ($name, "debug",                 0);
+  my $debug   = AttrVal     ($name, "ctrlDebug",             0);
   my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
   my $auto    = ConsumerVal ($hash, $c, "auto",              1);
@@ -5377,7 +5397,7 @@ sub ___enableSwitchByBatPrioCharge {
   my $c     = $paref->{consumer};
   
   my $ena     = 1;
-  my $pcb     = AttrVal ($name, "preferredChargeBattery", 0);                # Vorrangladung Batterie zu X%
+  my $pcb     = AttrVal ($name, 'affectBatteryPreferredCharge', 0);          # Vorrangladung Batterie zu X%
   my ($badev) = useBattery ($name);
   
   return $ena if(!$pcb || !$badev);                                          # Freigabe Schalten Consumer wenn kein Prefered Battery/Soll-Ladung 0 oder keine Batterie installiert
@@ -5571,8 +5591,8 @@ sub _estConsumptionForecast {
   my $day     = $paref->{day};                                                      # aktuelles Tagdatum (01...31)
   my $dayname = $paref->{dayname};                                                  # aktueller Tagname
   
-  my $medev    = ReadingsVal ($name, "currentMeterDev", "");                        # aktuelles Meter device
-  my $swdfcfc  = AttrVal     ($name, "sameWeekdaysForConsfc", 0);                   # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my $medev    = ReadingsVal ($name, "currentMeterDev",                "");         # aktuelles Meter device
+  my $swdfcfc  = AttrVal     ($name, "affectConsForecastIdentWeekdays", 0);         # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
   my ($am,$hm) = parseParams ($medev);
   $medev       = $am->[0] // "";
   return if(!$medev || !$defs{$medev});
@@ -5788,7 +5808,7 @@ sub _calcReadingsTomorrowPVFc {
   my $daref  = $paref->{daref};
   
   my $h    = $data{$type}{$name}{nexthours};
-  my $hods = AttrVal($name, 'createTomorrowPVFcReadings', '');
+  my $hods = AttrVal($name, 'ctrlNextDayForecastReadings', '');
   return if(!keys %{$h} || !$hods);
   
   for my $idx (sort keys %{$h}) {
@@ -6048,7 +6068,7 @@ sub genStatisticReadings {
   my $name  = $paref->{name};
   my $daref = $paref->{daref};
  
-  my @csr = split ',', AttrVal($name, 'createStatisticReadings', '');
+  my @csr = split ',', AttrVal($name, 'ctrlStatisticReadings', '');
   
   return if(!@csr);
   
@@ -6186,7 +6206,7 @@ sub FwFn {
   $ret   .= "</html>";
   
   # Autorefresh nur des aufrufenden FHEMWEB-Devices
-  my $al = AttrVal($name, "autoRefresh", 0);
+  my $al = AttrVal($name, "ctrlAutoRefresh", 0);
   if($al) {  
       InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
       Log3 ($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
@@ -6200,11 +6220,11 @@ sub pageRefresh {
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  # Seitenrefresh festgelegt durch SolarForecast-Attribut "autoRefresh" und "autoRefreshFW"
-  my $rd = AttrVal($name, "autoRefreshFW", $hash->{HELPER}{FW});
+  # Seitenrefresh festgelegt durch SolarForecast-Attribut "ctrlAutoRefresh" und "ctrlAutoRefreshFW"
+  my $rd = AttrVal($name, "ctrlAutoRefreshFW", $hash->{HELPER}{FW});
   { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }       ## no critic 'Map blocks'
   
-  my $al = AttrVal($name, "autoRefresh", 0);
+  my $al = AttrVal($name, "ctrlAutoRefresh", 0);
   
   if($al) {      
       InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
@@ -6283,7 +6303,7 @@ sub entryGraphic {
       caicon         => AttrVal ($name,    'consumerAdviceIcon',        $caicondef),            # Consumer AdviceIcon
       clegend        => AttrVal ($name,    'consumerLegend',            'icon_top'),            # Lage und Art Cunsumer Legende
       lotype         => AttrVal ($name,    'graphicLayoutType',           'double'),
-      kw             => AttrVal ($name,    'Wh_kWh',                          'Wh'),
+      kw             => AttrVal ($name,    'graphicEnergyUnit',               'Wh'),
       height         => AttrNum ($name,    'graphicBeamHeight',                200),
       width          => $width,
       fsize          => AttrNum ($name,    'graphicSpaceSize',                  24),
@@ -6294,8 +6314,8 @@ sub entryGraphic {
       colorw         => AttrVal ($name,    'graphicWeatherColor',      $wthcolddef),            # Wetter Icon Farbe Tag
       colorwn        => AttrVal ($name,    'graphicWeatherColorNight', $wthcolndef),            # Wetter Icon Farbe Nacht
       wlalias        => AttrVal ($name,    'alias',                          $name),
-      sheader        => AttrNum ($name,    'headerShow',                         1), 
-      hdrDetail      => AttrVal ($name,    'headerDetail',                   'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+      sheader        => AttrNum ($name,    'graphicHeaderShow',                  1),            # Anzeigen des Grafik Headers
+      hdrDetail      => AttrVal ($name,    'graphicHeaderDetail',            'all'),            # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       lang           => AttrVal ("global", 'language',                        'EN'),
       flowgsize      => AttrVal ($name,    'flowGraphicSize',        $flowGSizedef),            # Größe Energieflußgrafik
       flowgani       => AttrVal ($name,    'flowGraphicAnimate',                 0),            # Animation Energieflußgrafik
@@ -6309,7 +6329,7 @@ sub entryGraphic {
   
   my $ret = q{};
   
-  $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
+  $ret .= "<span>$dlink </span><br>"  if(AttrVal($name, 'ctrlShowLink', 0));
   
   $ret .= $html_start if (defined($html_start));
   $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
@@ -6595,42 +6615,6 @@ sub _graphicHeader {
 
       my $upstate = ReadingsVal($name, 'state', '');
       
-      ## SolCast Sektion
-      ####################
-      my $api = isSolCastUsed ($hash) ? 'SolCast:' : q{};
-      
-      if($api) {
-          my $lrt = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
-          
-          if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
-              my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
-              $lrt                         = "$sly-$slmo-$sld&nbsp;$slt";
-              
-              if($lang eq "DE") {
-                 $lrt = "$sld.$slmo.$sly&nbsp;$slt"; 
-              }
-          }
-          
-          $api    .= '&nbsp;'.$lrt;
-          my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
-          
-          if ($scrm eq 'success') {
-              $img    = FW_makeImage('10px-kreis-gruen.png', $scrm);
-              $scicon = "<a>$img</a>";
-          } 
-          else {
-              $img    = FW_makeImage('10px-kreis-rot.png', $scrm);
-              $scicon = "<a>$img</a>";
-          }
-          
-          $api .= '&nbsp;&nbsp;'.$scicon;
-          $api .= '&nbsp;&nbsp;(';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
-          $api .= '/';
-          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', 50);
-          $api .= ')';
-      }
-      
       ## Anlagen Check-Icon
       #######################
       $img         = FW_makeImage('edit_settings@grey');
@@ -6677,6 +6661,43 @@ sub _graphicHeader {
           $acicon = FW_makeImage('10px-kreis-rot.png', $htitles{undef}{$lang});
       }
       
+      ## SolCast Sektion
+      ####################
+      my $api  = isSolCastUsed ($hash) ? 'SolCast:' : q{};
+      
+      if($api) {
+          my $nscc = ReadingsVal   ($name, 'nextSolCastCall', '?');
+          my $lrt  = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_time', '-');
+          
+          if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
+              my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+              $lrt                         = "$sly-$slmo-$sld&nbsp;$slt";
+              
+              if($lang eq "DE") {
+                 $lrt = "$sld.$slmo.$sly&nbsp;$slt"; 
+              }
+          }
+          
+          $api    .= '&nbsp;'.$lrt;
+          my $scrm = SolCastAPIVal ($hash, '?All', '?All', 'response_message', '-');
+          
+          if ($scrm eq 'success') {
+              $img    = FW_makeImage('10px-kreis-gruen.png', $scrm.' ('.$htitles{natc}{$lang}.' '.$nscc.')');
+              $scicon = "<a>$img</a>";
+          } 
+          else {
+              $img    = FW_makeImage('10px-kreis-rot.png', $scrm.' ('.$htitles{natc}{$lang}.' '.$nscc.')');
+              $scicon = "<a>$img</a>";
+          }
+          
+          $api .= '&nbsp;&nbsp;'.$scicon;
+          $api .= '&nbsp;&nbsp;(';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIrequests', 0);
+          $api .= '/';
+          $api .= SolCastAPIVal ($hash, '?All', '?All', 'todayRemainingAPIrequests', 50);
+          $api .= ')';
+      }
+      
       ## Qualitäts-Icon
       ######################
       my $pcqicon;
@@ -6710,10 +6731,10 @@ sub _graphicHeader {
       my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
  
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="2" align="left" $dstyle> <b>$dlink</b>                    </td>};   
-      $header  .= qq{<td colspan="1" align="left" title="$chktitle" $dstyle> $chkicon       </td>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle> $lupt &nbsp; $lup &nbsp; $upicon </td>};
-      $header  .= qq{<td colspan="3" align="left" $dstyle> $api                             </td>};
+      $header  .= qq{<td colspan="2" align="left" $dstyle>                   <b>$dlink</b>                     </td>};   
+      $header  .= qq{<td colspan="1" align="left" title="$chktitle" $dstyle> $chkicon                          </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle>                   $lupt &nbsp; $lup &nbsp; $upicon  </td>};
+      $header  .= qq{<td colspan="3" align="left" $dstyle>                   $api                              </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left" $dstyle>                                                                   </td>};
@@ -7549,7 +7570,7 @@ sub __weatherOnBeam {
 
           if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
               $val = '<b>???<b/>';
-              if(AttrVal ($name, "debug", 0)) {                                                              # nur für Debugging
+              if(AttrVal ($name, 'ctrlDebug', 0)) {                                                          # nur für Debugging
                   Log (1, qq{DEBUG> $name - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
           }
@@ -8106,7 +8127,7 @@ sub _calcCAQfromDWDcloudcover {
   
   return if(isSolCastUsed ($hash));
   
-  my $maxvar = AttrVal($name, 'maxVariancePerDay', $defmaxvar);                                           # max. Korrekturvarianz
+  my $maxvar = AttrVal($name, 'affectMaxDayVariance', $defmaxvar);                                        # max. Korrekturvarianz
 
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
@@ -8131,7 +8152,7 @@ sub _calcCAQfromDWDcloudcover {
       $oldfac             = 1 if(1 * $oldfac == 0);
       
       my $factor;
-      my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr numHistDays gesetzt ?
+      my ($usenhd) = __useNumHistDays ($name);                                                            # ist Attr affectNumHistDays gesetzt ?
     
       if($dnum) {                                                                                         # Werte in History vorhanden -> haben Prio !
           $dnum   = $dnum + 1;                                                                            
@@ -8139,7 +8160,7 @@ sub _calcCAQfromDWDcloudcover {
           $fcval  = ($fcval + $fchis) / $dnum;                                                            # Vorhersage aktuelle Stunde berücksichtigen
           $factor = sprintf "%.2f", ($pvval / $fcval);                                                    # Faktorberechnung: reale PV / Prognose
       }
-      elsif($oldfac && !$usenhd) {                                                                        # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr numHistDays
+      elsif($oldfac && !$usenhd) {                                                                        # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
           $dnum   = $oldq + 1;
           $factor = sprintf "%.2f", ($pvval / $fcval);
           $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
@@ -8193,7 +8214,7 @@ sub __avgCloudcoverCorrFromHistory {
   $hour     = sprintf("%02d",$hour);
   my $pvhh  = $data{$type}{$name}{pvhist};
   
-  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr numHistDays gesetzt ? und welcher Wert
+  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr affectNumHistDays gesetzt ? und welcher Wert
 
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
@@ -8271,7 +8292,7 @@ return;
 }
 
 ################################################################
-#       Ist Attribut 'numHistDays' gesetzt ?
+#       Ist Attribut 'affectNumHistDays' gesetzt ?
 #       $usenhd: 1 - ja, 0 - nein
 #       $nhd   : Anzahl der zu verwendenden HistDays
 ################################################################
@@ -8279,7 +8300,7 @@ sub __useNumHistDays {
   my $name = shift;
 
   my $usenhd = 0;
-  my $nhd    = AttrVal($name, 'numHistDays', $calcmaxd+1);
+  my $nhd    = AttrVal($name, 'affectNumHistDays', $calcmaxd+1);
   
   if($nhd == $calcmaxd+1) {
       $nhd = $calcmaxd;
@@ -8305,7 +8326,7 @@ sub _calcCAQwithSolCastPercentil {
   
   return if(!isSolCastUsed ($hash));
   
-  my $debug = AttrVal ($name, "debug", 0);
+  my $debug = AttrVal ($name, 'ctrlDebug', 0);
   
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
@@ -8394,7 +8415,7 @@ sub _calcCAQwithSolCastPercentil {
           Log (1, qq{DEBUG> $name percentile -> hour: $h, number checked days: $dnum, pvreal: $pvval, diffbest: $diff0, best percentile: $perc});                                   
       } 
       
-      my ($usenhd) = __useNumHistDays ($name);                                                               # ist Attr numHistDays gesetzt ?
+      my ($usenhd) = __useNumHistDays ($name);                                                               # ist Attr affectNumHistDays gesetzt ?
  
       if($dnum) {                                                                                            # Werte in History vorhanden -> haben Prio !
           $avgperc = $avgperc * $dnum;
@@ -8405,7 +8426,7 @@ sub _calcCAQwithSolCastPercentil {
               Log (1, qq{DEBUG> $name percentile -> old avg percentile: }.($avgperc/($dnum-1)).qq{, new avg percentile: }.$perc * 10);                                   
           }          
       }
-      elsif($oldperc && !$usenhd) {                                                                          # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr numHistDays
+      elsif($oldperc && !$usenhd) {                                                                          # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
           $oldperc = $oldperc * $oldq;
           $dnum    = $oldq + 1;
           $perc    = sprintf "%.0f", ((($oldperc + $perc) / $dnum) / 10);
@@ -8454,7 +8475,7 @@ sub __avgSolCastPercFromHistory {
   $hour     = sprintf("%02d",$hour);  
   my $pvhh  = $data{$type}{$name}{pvhist};
   
-  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr numHistDays gesetzt ? und welcher Wert
+  my ($usenhd, $calcd) = __useNumHistDays ($name);                                        # ist Attr affectNumHistDays gesetzt ? und welcher Wert
 
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
@@ -9287,11 +9308,11 @@ sub checkPlantConfig {
   ## allg. Settings bei Nutzung SolCast
   #######################################
   if (isSolCastUsed ($hash)) {
-      my $gdn = AttrVal     ('global', 'dnsServer',                     '');
-      my $cfd = AttrVal     ($name,    'cloudFactorDamping',            ''); 
-      my $rfd = AttrVal     ($name,    'rainFactorDamping',             ''); 
-      my $osi = AttrVal     ($name,    'optimizeSolCastAPIreqInterval',  0);
-      my $pcf = ReadingsVal ($name,    'pvCorrectionFactor_Auto',       '');
+      my $gdn = AttrVal     ('global', 'dnsServer',                   '');
+      my $cfd = AttrVal     ($name,    'affectCloudfactorDamping',    ''); 
+      my $rfd = AttrVal     ($name,    'affectRainfactorDamping',     ''); 
+      my $osi = AttrVal     ($name,    'ctrlOptimizeSolCastInterval',  0);
+      my $pcf = ReadingsVal ($name,    'pvCorrectionFactor_Auto',     '');
       
       my $lam = SolCastAPIVal ($hash, '?All', '?All', 'response_message', 'success');
       
@@ -9303,22 +9324,22 @@ sub checkPlantConfig {
       
       if ($cfd eq '' || $cfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
-          $result->{'Common Settings'}{result} .= qq{Attribute cloudFactorDamping is set to "$cfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set cloudFactorDamping explicitly to "0" is recommended.<br>};
+          $result->{'Common Settings'}{result} .= qq{Attribute affectCloudfactorDamping is set to "$cfd" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set affectCloudfactorDamping explicitly to "0" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if ($rfd eq '' || $rfd != 0) {
           $result->{'Common Settings'}{state}   = $warn;
-          $result->{'Common Settings'}{result} .= qq{Attribute rainFactorDamping is set to "$rfd" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set rainFactorDamping explicitly to "0" is recommended.<br>};
+          $result->{'Common Settings'}{result} .= qq{Attribute affectRainfactorDamping is set to "$rfd" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set affectRainfactorDamping explicitly to "0" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
       if (!$osi) {
           $result->{'Common Settings'}{state}   = $warn;
-          $result->{'Common Settings'}{result} .= qq{Attribute optimizeSolCastAPIreqInterval is set to "$osi" <br>};
-          $result->{'Common Settings'}{note}   .= qq{set optimizeSolCastAPIreqInterval to "1" is recommended.<br>};
+          $result->{'Common Settings'}{result} .= qq{Attribute ctrlOptimizeSolCastInterval is set to "$osi" <br>};
+          $result->{'Common Settings'}{note}   .= qq{set ctrlOptimizeSolCastInterval to "1" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
       }
       
@@ -9339,7 +9360,7 @@ sub checkPlantConfig {
       if(!$result->{'Common Settings'}{fault} && !$result->{'Common Settings'}{warn} && !$result->{'Common Settings'}{info}) {
           $result->{'Common Settings'}{result}  = $hqtxt{fullfd}{$lang};
           $result->{'Common Settings'}{note}   .= qq{checked parameter: <br>};
-          $result->{'Common Settings'}{note}   .= qq{cloudFactorDamping, rainFactorDamping, optimizeSolCastAPIreqInterval <br>};
+          $result->{'Common Settings'}{note}   .= qq{affectCloudfactorDamping, affectRainfactorDamping, ctrlOptimizeSolCastInterval <br>};
           $result->{'Common Settings'}{note}   .= qq{pvCorrectionFactor_Auto, event-on-change-reading, global language <br>};
       }
   }
@@ -9537,17 +9558,14 @@ return;
 }
 
 ######################################################################################
-#                   NOTIFYDEV erstellen
-#    (wird zur Zeit nicht verwendet / benötigt)
+#     NOTIFYDEV und "Probably associated with" erstellen
 ######################################################################################
-sub createNotifyDev {
+sub createAssociatedWith {
   my $hash = shift;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::createNotifyDev");
-  
-  return;
+  RemoveInternalTimer($hash, "FHEM::SolarForecast::createAssociatedWith");
   
   if($init_done == 1) {
       my @nd;
@@ -9588,12 +9606,12 @@ sub createNotifyDev {
       push @nd, $badev;
       
       if(@nd) {
-          $hash->{NOTIFYDEV} = join ",", @nd;
+          # $hash->{NOTIFYDEV} = join ",", @nd;                                   # zur Zeit nicht benutzt
           readingsSingleUpdate ($hash, ".associatedWith", join(" ",@nd), 0);
       }
   } 
   else {
-      InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::createNotifyDev", $hash, 0);
+      InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
   }
   
 return;
@@ -9888,9 +9906,8 @@ sub isInterruptable {
   
   my ($swoffcond,$info,$err) = isAddSwitchOffCond ($hash, $c, $intable, $hyst);
   Log3 ($name, 1, "$name - $err") if($err);
-  
-  my $debug = AttrVal ($name, "debug", 0);
-  if ($debug) {                                                                                   # nur für Debugging
+
+  if (AttrVal ($name, 'ctrlDebug', 0)) {                                                   # nur für Debugging
       Log (1, qq{DEBUG> $name consumer "$c" - isInterruptable Info: $info});                                   
   }
   
@@ -10343,9 +10360,8 @@ Abhängig von den Strahlungs- und Wetterdaten sowie der physikalischen Anlagenge
 wird auf eine wahrscheinliche PV Erzeugung der kommenden Stunden ermittelt. <br>
 Darüber hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine Verbrauchsprognose verwendet. <br>
 Das Modul errechnet aus den Prognosewerten einen zukünftigen Energieüberschuß der zur Betriebsplanung von Verbrauchern
-genutzt wird. Der Nutzer kann Verbraucher (z.B. Schaltsteckdosen) direkt im Modul registrieren und die Planung der 
-Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen lassen.
-
+genutzt wird. Weiterhin bietet das Modul eine <a href="#SolarForecast-Consumer">Consumer Integration</a> zur integrierten
+Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
 
 <ul>
   <a id="SolarForecast-define"></a>
@@ -10386,14 +10402,48 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
     (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto on) bestimmt 
     werden. Die manuelle Anpassung ist nur für das Model DWD einsetzbar.
-    Weiterhin kann mit den Attributen <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
-    <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> der Beeinflussungsgrad von Bewölkungs- und 
-    Regenprognosen eingestellt werden. <br><br>
+    Weiterhin kann mit den Attributen <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a> 
+    und <a href="#SolarForecast-attr-affectRainfactorDamping">affectRainfactorDamping</a> der Beeinflussungsgrad von 
+    Bewölkungs- und Regenprognosen eingestellt werden. <br><br>
     
     <b>Hinweis</b><br>
     Bei Nutzung des DWD für die solare Vorhersage wird empfohlen die automatische Vorhersagekorrektur unmittelbar 
     einzuschalten, da das SolarForecast Device eine lange Zeit benötigt um die Optimierung der Korrekturfaktoren zu erreichen.    
  
+    <br><br>
+  </ul>
+  
+  <a id="SolarForecast-Consumer"></a>
+  <b>Consumer Integration</b>
+  <br><br>
+  
+  <ul>
+    Der Nutzer kann Verbraucher (z.B. Schaltsteckdosen) direkt im Modul registrieren und die Planung der 
+    Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen lassen. Die Registrierung erfolgt mit den 
+    <a href="#SolarForecast-attr-consumer">ConsumerXX-Attributen</a>. In den Attributen werden neben dem FHEM Consumer Device eine Vielzahl von obligatorischen oder 
+    optionalen Schlüsseln angegeben die das Einplanungs- und Schaltverhalten des Consumers beeinflussen. <br>
+    Die Schlüssel sind in der ConsumerXX-Hilfe detailliiert beschreiben, erfordern unter Umständen aber eine gewisse 
+    Einarbeitung. Um sich in den Umgang mit der Consumersteuerung anzueignen, bietet es sich an zunächst einen oder 
+    mehrere Dummies anzulegen und diese Devices als Consumer zu registrieren. <br><br>
+    
+    Zu diesem Zweck eignet sich ein Dummy Device nach diesem Muster: 
+    <br><br>
+    
+    <ul>
+        define SolCastDummy dummy
+        attr SolCastDummy userattr nomPower                                                                                         <br>
+        attr SolCastDummy alias SolarForecast Consumer Dummy                                                                        <br>
+        attr SolCastDummy cmdIcon on:remotecontrol/black_btn_GREEN off:remotecontrol/black_btn_RED                                  <br>
+        attr SolCastDummy devStateIcon off:light_light_dim_100@grey on:light_light_dim_100@darkorange                               <br>
+        attr SolCastDummy group Solarprognose                                                                                       <br>
+        attr SolCastDummy icon solar_icon                                                                                           <br>
+        attr SolCastDummy nomPower 1000                                                                                             <br>
+        attr SolCastDummy readingList BatIn BatOut BatVal  BatInTot BatOutTot bezW einW Batcharge Temp automatic                    <br>
+        attr SolCastDummy room Energie,Testraum                                                                                     <br>
+        attr SolCastDummy setList BatIn BatOut BatVal BatInTot BatOutTot bezW einW Batcharge on off Temp                            <br>
+        attr SolCastDummy userReadings actpow {ReadingsVal ($name, 'state', 'off') eq 'on' ? AttrVal ($name, 'nomPower', 100) : 0}  <br>
+    </ul>
+
     <br><br>
   </ul>
 
@@ -10571,8 +10621,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       auf der <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast</a> Webseite angelegt werden.
       Ein Rooftop ist im SolarForecast-Kontext mit einem <a href="#SolarForecast-set-inverterStrings">inverterString</a> 
       gleichzusetzen. <br>
-      Es wird empfohlen bei Einsatz der SolCast API die Attribute <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
-      <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> <b>explizit auf 0</b> bzw. 
+      Es wird empfohlen bei Einsatz der SolCast API die Attribute 
+      <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a> und
+      <a href="#SolarForecast-attr-affectRainfactorDamping">affectRainfactorDamping</a> <b>explizit auf 0</b> bzw. 
       <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto</a> auf <b>"off"</b> zu setzen.
       
       <br><br>
@@ -10793,7 +10844,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       Ist die minimale Tagesabweichung gefunden, kann die Autokorrektur aktiviert werden um für jede Stunde separat das 
       beste Percentil ermitteln zu lassen. Dieser Vorgang ist dynamisch und verwendet ebenso historische Werte zur 
       Durchschnittsbildung.
-      Siehe auch Attribut <a href="#SolarForecast-attr-numHistDays">numHistDays</a>.
+      Siehe auch Attribut <a href="#SolarForecast-attr-affectNumHistDays">affectNumHistDays</a>.
       <br><br>      
       
       <b>Model DWD:</b> <br>
@@ -10803,8 +10854,10 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
       Zukünftig erwartete PV Erzeugungen werden mit den gespeicherten Korrekturfaktoren optimiert. <br> 
-      Bei aktivierter Autokorrektur haben die Attribute <a href="#SolarForecast-attr-cloudFactorDamping">cloudFactorDamping</a> und
-      <a href="#SolarForecast-attr-rainFactorDamping">rainFactorDamping</a> nur noch eine untergeordnete Bedeutung. <br>
+      Bei aktivierter Autokorrektur haben die Attribute 
+      <a href="#SolarForecast-attr-affectCloudfactorDamping">affectCloudfactorDamping</a> und
+      <a href="#SolarForecast-attr-affectRainfactorDamping">affectRainfactorDamping</a> nur noch eine untergeordnete 
+      Bedeutung. <br>
       <b>Die automatische Vorhersagekorrektur ist lernend und benötigt Zeit um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
       (default: off)
@@ -11121,35 +11174,79 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
   <br><br>
   <ul>
      <ul>
-        <a id="SolarForecast-attr-alias"></a>
-        <li><b>alias </b> <br>
-          In Verbindung mit "showLink" ein beliebiger Anzeigename.
-        </li>
-        <br>  
-       
-       <a id="SolarForecast-attr-autoRefresh"></a>
-       <li><b>autoRefresh</b> <br>
-         Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SolarForecast-Device aufgerufen hat, nach der 
-         eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Browserseiten eines bestimmten FHEMWEB-Devices neu 
-         geladen werden, kann dieses Device mit dem Attribut "autoRefreshFW" festgelegt werden.
-       </li>
-       <br>
-    
-       <a id="SolarForecast-attr-autoRefreshFW"></a>
-       <li><b>autoRefreshFW</b><br>
-         Ist "autoRefresh" aktiviert, kann mit diesem Attribut das FHEMWEB-Device bestimmt werden dessen aktive Browserseiten
-         regelmäßig neu geladen werden sollen.
+       <a id="SolarForecast-attr-affect70percentRule"></a>
+       <li><b>affect70percentRule</b><br>
+         Wenn gesetzt, wird die prognostizierte Leistung entsprechend der 70% Regel begrenzt. <br><br>
+         
+         <ul>   
+         <table>  
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>0</b>       </td><td>keine Begrenzung der prognostizierten PV-Erzeugung (default)                                 </td></tr>
+            <tr><td> <b>1</b>       </td><td>die prognostizierte PV-Erzeugung wird auf 70% der installierten Stringleistung(en) begrenzt  </td></tr>
+            <tr><td> <b>dynamic</b> </td><td>die prognostizierte PV-Erzeugung wird begrenzt wenn 70% der installierten                    </td></tr>
+            <tr><td>                </td><td>Stringleistung(en) zzgl. des prognostizierten Verbrauchs überschritten wird                  </td></tr>
+         </table>
+         </ul> 
        </li>
        <br>
        
-       <a id="SolarForecast-attr-cloudFactorDamping"></a>
-       <li><b>cloudFactorDamping </b><br>
+       <a id="SolarForecast-attr-affectBatteryPreferredCharge"></a>
+       <li><b>affectBatteryPreferredCharge </b><br>
+         Es werden Verbraucher mit dem Mode <b>can</b> erst dann eingeschaltet, wenn die angegebene Batterieladung (%)
+         erreicht ist. <br>
+         Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht. <br>
+         (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectCloudfactorDamping"></a>
+       <li><b>affectCloudfactorDamping </b><br>
          Prozentuale Mehrgewichtung des Bewölkungsfaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
          Prognose durch den Bewölkungsfaktor).<br>
          (default: 35)         
        </li>  
        <br> 
+       
+       <a id="SolarForecast-attr-affectConsForecastIdentWeekdays"></a>
+       <li><b>affectConsForecastIdentWeekdays </b><br>
+         Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
+         Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
+         (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectMaxDayVariance"></a>
+       <li><b>affectMaxDayVariance &lt;Zahl&gt; </b><br>
+         (nur bei Verwendung Model DWD) <br><br>
+         
+         Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
+         (default: 0.5)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectNumHistDays"></a>
+       <li><b>affectNumHistDays </b><br>
+         Anzahl der in den Caches verfügbaren historischen Tage, die zur Berechnung der Autokorrekturwerte der 
+         PV Vorhersage verwendet werden sollen. <br>
+         (default: alle verfügbaren Daten in pvHistory und pvCircular)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectRainfactorDamping"></a>
+       <li><b>affectRainfactorDamping </b><br>
+         Prozentuale Mehrgewichtung des Regenprognosefaktors bei der solaren Vorhersage. <br>
+         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
+         Prognose durch den Regenfaktor).<br>
+         (default: 10)         
+       </li>  
+       <br> 
+       
+        <a id="SolarForecast-attr-alias"></a>
+        <li><b>alias </b> <br>
+          In Verbindung mit "ctrlShowLink" ein beliebiger Anzeigename.
+        </li>
+        <br>
        
        <a id="SolarForecast-attr-consumerAdviceIcon"></a>
        <li><b>consumerAdviceIcon </b><br>
@@ -11214,53 +11311,53 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <ul>   
          <table>  
          <colgroup> <col width=12%> <col width=88%> </colgroup>
-            <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                        </td></tr>
-            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmaschine                                                                                  </td></tr>
-            <tr><td>                       </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, etc.)                                                            </td></tr>
-            <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                     </td></tr>          
-            <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                       </td></tr>            
-            <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                             </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                  </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                         </td></tr>
-            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers unterbleibt bei ungenügendem PV-Überschuß.                    </td></tr>
-            <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird           </td></tr>
-            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.       </td></tr>
-            <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                  </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit des Verbrauchers nach dem initialen Einschalten in Minuten  (optional)                             </td></tr>
-            <tr><td>                       </td><td>Die Standard mintime richtet sich nach dem Verbrauchertyp, ist aber mindestens 60 Minuten.                                                </td></tr>
-            <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                  </td></tr>
-            <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                  </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                               </td></tr>
-            <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                </td></tr>
-            <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                              </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Stunde (01..23) einplanen (optional)                                                     </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Stunde (01..23) einplanen (optional)                                                    </td></tr>
-            <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                     </td></tr>
-            <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                  </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                          </td></tr>
-            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                         </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                               </td></tr>
-            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.                                  </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.               </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                  </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                         </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                      </td></tr>
-            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                   </td></tr>
-            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                 </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                         </td></tr>
-            <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher (optional)                                                             </td></tr>
-            <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär unterbrochen falls der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
-            <tr><td>                       </td><td><b>1</b> - Verbraucher darf temporär unterbrochen werden falls der PV Überschuß die benötigte Energie unterschreitet                      </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysterese]</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen                            </td></tr>
-            <tr><td>                       </td><td>Device/Readings auf den Regex matched oder unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                  </td></tr>
-            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender                                 </td></tr>
-            <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                            </td></tr>
-            <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                              </td></tr>
-            <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                  </td></tr>
+            <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                             </td></tr>
+            <tr><td>                       </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmaschine                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                                      </td></tr>
+            <tr><td>                       </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                                      </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                                            </td></tr>
+            <tr><td>                       </td><td><b>charger</b>        - Verbaucher ist eine Ladeeinrichtung (Akku, Auto, etc.)                                                                 </td></tr>
+            <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                          </td></tr>          
+            <tr><td> <b>power</b>          </td><td>nominale Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                                            </td></tr>            
+            <tr><td>                       </td><td>(kann auf "0" gesetzt werden)                                                                                                                  </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                              </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß.   </td></tr>
+            <tr><td>                       </td><td><b>must</b> - der Verbaucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß.            </td></tr>
+            <tr><td> <b>icon</b>           </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                                       </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Mindestlaufzeit bzw. typische Laufzeit des Verbrauchers nach dem initialen Einschalten in Minuten  (optional)                                  </td></tr>
+            <tr><td>                       </td><td>Die Standard mintime richtet sich nach dem Verbrauchertyp, ist aber mindestens 60 Minuten.                                                     </td></tr>
+            <tr><td> <b>on</b>             </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                                       </td></tr>
+            <tr><td> <b>off</b>            </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                                       </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading welches den Schaltzustand des Consumers anzeigt (default: 'state').                                                                    </td></tr>
+            <tr><td>                       </td><td><b>on-Regex</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                     </td></tr>
+            <tr><td>                       </td><td><b>off-Regex</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                                   </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Startzeitpunkt Verbraucher nicht vor angegebener Stunde (01..23) einplanen (optional)                                                          </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Startzeitpunkt Verbraucher nicht nach angegebener Stunde (01..23) einplanen (optional)                                                         </td></tr>
+            <tr><td> <b>auto</b>           </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                                          </td></tr>
+            <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                       </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert (optional)                                                               </td></tr>
+            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (W) - aktuelle Leistung ab welcher der Verbraucher als aktiv gewertet wird.                                              </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert (optional)                                    </td></tr>
+            <tr><td>                       </td><td>:&lt;Schwellenwert&gt (Wh) - Energieverbrauch pro Stunde ab dem der Verbraucher als aktiv gewertet wird.                                       </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>zusätzliche Bedingung die erfüllt sein muß um den Verbraucher einzuschalten (optional). Der geplante Zyklus wird gestartet.                    </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der zusätzlichen Einschaltbedingung                                                                       </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der zusätzlichen Einschaltbedingung                                                                     </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Einschaltbedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                           </td></tr>
+            <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                        </td></tr>
+            <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                      </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                              </td></tr>
+            <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher (optional)                                                                  </td></tr>
+            <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär unterbrochen falls der PV Überschuß die benötigte Energie unterschreitet (default)                  </td></tr>
+            <tr><td>                       </td><td><b>1</b> - Verbraucher darf temporär unterbrochen werden falls der PV Überschuß die benötigte Energie unterschreitet                           </td></tr>
+            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysterese]</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen                                 </td></tr>
+            <tr><td>                       </td><td>Device/Readings auf den Regex matched oder unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                       </td></tr>
+            <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender                                      </td></tr>
+            <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
+            <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
+            <tr><td>                       </td><td>angehoben wird sofern der ausgewertete Readingwert ebenfalls numerisch ist. (default: 0)                                                       </td></tr>
          </table>
          </ul>
        <br>
@@ -11275,8 +11372,23 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>  
        <br>
        
-       <a id="SolarForecast-attr-createConsumptionRecReadings"></a>
-       <li><b>createConsumptionRecReadings </b><br>
+       <a id="SolarForecast-attr-ctrlAutoRefresh"></a>
+       <li><b>ctrlAutoRefresh</b> <br>
+         Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SolarForecast-Device aufgerufen hat, nach der 
+         eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Browserseiten eines bestimmten FHEMWEB-Devices neu 
+         geladen werden, kann dieses Device mit dem Attribut "ctrlAutoRefreshFW" festgelegt werden.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlAutoRefreshFW"></a>
+       <li><b>ctrlAutoRefreshFW</b><br>
+         Ist "ctrlAutoRefresh" aktiviert, kann mit diesem Attribut das FHEMWEB-Device bestimmt werden dessen aktive Browserseiten
+         regelmäßig neu geladen werden sollen.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlConsRecommendReadings"></a>
+       <li><b>ctrlConsRecommendReadings </b><br>
          Für die ausgewählten Consumer (Nummer) werden Readings der Form <b>consumerXX_ConsumptionRecommended</b> erstellt. <br>
          Diese Readings signalisieren ob das Einschalten dieses Consumers abhängig von seinen Verbrauchsdaten und der aktuellen
          PV-Erzeugung bzw. des aktuellen Energieüberschusses empfohlen ist. Der Wert des erstellten Readings korreliert 
@@ -11285,9 +11397,56 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
-
-       <a id="SolarForecast-attr-createStatisticReadings"></a>
-       <li><b>createStatisticReadings </b><br>
+       <a id="SolarForecast-attr-ctrlDebug"></a>
+       <li><b>ctrlDebug</b><br>
+         Aktiviert/deaktiviert Debug-Meldungen im Modul.
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlInterval"></a>
+       <li><b>ctrlInterval &lt;Sekunden&gt; </b><br>
+         Zeitintervall der Datensammlung. <br>
+         Ist ctrlInterval explizit auf "0" gesetzt, erfolgt keine automatische Datensammlung und muss mit "get &lt;name&gt; data" 
+         manuell erfolgen. <br>
+         (default: 70)
+       </li><br>
+       
+       <a id="SolarForecast-attr-ctrlNextDayForecastReadings"></a>
+       <li><b>ctrlNextDayForecastReadings &lt;01,02,..,24&gt; </b><br>
+         Wenn gesetzt, werden Readings der Form <b>Tomorrow_Hour&lt;hour&gt;_PVforecast</b> erstellt. <br>
+         Diese Readings enthalten die voraussichtliche PV Erzeugung des kommenden Tages. Dabei ist &lt;hour&gt; die 
+         Stunde des Tages. <br>
+       <br>
+      
+       <ul>
+         <b>Beispiel: </b> <br>
+         attr &lt;name&gt; ctrlNextDayForecastReadings 09,11 <br>
+         # erstellt Readings für die Stunde 09 (08:00-09:00) und 11 (10:00-11:00) des kommenden Tages
+       </ul>         
+         
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlOptimizeSolCastInterval"></a>
+       <li><b>ctrlOptimizeSolCastInterval </b><br>
+         (nur bei Verwendung Model SolCastAPI) <br><br>
+         
+         Das default Abrufintervall der SolCast API beträgt 1 Stunde. Ist dieses Attribut gesetzt erfolgt ein dynamische
+         Anpassung des Intervalls mit dem Ziel die maximal möglichen Abrufe innerhalb von Sonnenauf- und untergang 
+         auszunutzen. <br>
+         (default: 0)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlShowLink"></a>
+       <li><b>ctrlShowLink </b><br>
+         Anzeige des Links zur Detailansicht des Device über dem Grafikbereich <br>
+         (default: 1)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-ctrlStatisticReadings"></a>
+       <li><b>ctrlStatisticReadings </b><br>
          Für die ausgewählten Kennzahlen und Indikatoren werden Readings erstellt. <br><br>
          
          <ul>   
@@ -11309,35 +11468,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </table>
          </ul>          
        <br>       
-       </li>
-       <br>
-
-       
-       <a id="SolarForecast-attr-createTomorrowPVFcReadings"></a>
-       <li><b>createTomorrowPVFcReadings &lt;01,02,..,24&gt; </b><br>
-         Wenn gesetzt, werden Readings der Form <b>Tomorrow_Hour&lt;hour&gt;_PVforecast</b> erstellt. <br>
-         Diese Readings enthalten die voraussichtliche PV Erzeugung des kommenden Tages. Dabei ist &lt;hour&gt; die 
-         Stunde des Tages. <br>
-       <br>
-      
-       <ul>
-         <b>Beispiel: </b> <br>
-         attr &lt;name&gt; createTomorrowPVFcReadings 09,11 <br>
-         # erstellt Readings für die Stunde 09 (08:00-09:00) und 11 (10:00-11:00) des kommenden Tages
-       </ul>         
-         
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-debug"></a>
-       <li><b>debug</b><br>
-         Aktiviert/deaktiviert Debug-Meldungen im Modul.
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-disable"></a>
-       <li><b>disable</b><br>
-         Aktiviert/deaktiviert das Device.
        </li>
        <br>
        
@@ -11417,22 +11547,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Größe der Energieflußgrafik sofern angezeigt. 
          Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
          (default: 400)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-follow70percentRule"></a>
-       <li><b>follow70percentRule</b><br>
-         Wenn gesetzt, wird die prognostizierte Leistung entsprechend der 70% Regel begrenzt. <br><br>
-         
-         <ul>   
-         <table>  
-         <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>0</b>       </td><td>keine Begrenzung der prognostizierten PV-Erzeugung (default)                                 </td></tr>
-            <tr><td> <b>1</b>       </td><td>die prognostizierte PV-Erzeugung wird auf 70% der installierten Stringleistung(en) begrenzt  </td></tr>
-            <tr><td> <b>dynamic</b> </td><td>die prognostizierte PV-Erzeugung wird begrenzt wenn 70% der installierten                    </td></tr>
-            <tr><td>                </td><td>Stringleistung(en) zzgl. des prognostizierten Verbrauchs überschritten wird                  </td></tr>
-         </table>
-         </ul> 
        </li>
        <br>
     
@@ -11515,6 +11629,40 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>graphicBeamWidth &lt;value&gt; </b><br>
          Breite der Balken der Balkengrafik in px. Ohne gesetzen Attribut wird die Balkenbreite durch das Modul 
          automatisch bestimmt. <br>
+       </li>
+       <br> 
+       
+       <a id="SolarForecast-attr-graphicEnergyUnit"></a>
+       <li><b>graphicEnergyUnit &lt;Wh | kWh&gt; </b><br>
+         Definiert die Einheit zur Anzeige der elektrischen Leistung in der Grafik. Der Wert wird auf eine 
+         Nachkommastelle gerundet. <br>
+         (default: Wh)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-graphicHeaderDetail"></a>
+       <li><b>graphicHeaderDetail </b><br>
+         Detaillierungsgrad des Grafik Kopfbereiches. <br>
+         (default: all)
+         
+         <ul>   
+         <table>  
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>all</b>        </td><td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zur Detailanzeige + Aktualisierungszeit (default)        </td></tr>
+            <tr><td> <b>co</b>         </td><td>nur Verbrauch (CO)                                                                                    </td></tr>
+            <tr><td> <b>pv</b>         </td><td>nur Erzeugung (PV)                                                                                    </td></tr>
+            <tr><td> <b>pvco</b>       </td><td>Erzeugung (PV) und Verbrauch (CO)                                                                     </td></tr>         
+            <tr><td> <b>statusLink</b> </td><td>Link zur Detailanzeige + Statusinformationen                                                          </td></tr>
+         </table>
+         </ul>       
+       </li>
+       <br>   
+       
+       <a id="SolarForecast-attr-graphicHeaderShow"></a>
+       <li><b>graphicHeaderShow </b><br>
+         Anzeigen/Verbergen des Grafik Tabellenkopfes mit Prognosedaten sowie bestimmten aktuellen und 
+         statistischen Werten. <br>
+         (default: 1)
        </li>
        <br> 
 
@@ -11636,125 +11784,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>graphicWeatherColorNight </b><br>
          Farbe der Wetter-Icons für die Nachtstunden.
        </li>
-       <br>  
-       
-       <a id="SolarForecast-attr-headerDetail"></a>
-       <li><b>headerDetail </b><br>
-         Detaillierungsgrad des Kopfbereiches. <br>
-         (default: all)
-         
-         <ul>   
-         <table>  
-         <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>all</b>        </td><td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zur Detailanzeige + Aktualisierungszeit (default)        </td></tr>
-            <tr><td> <b>co</b>         </td><td>nur Verbrauch (CO)                                                                                    </td></tr>
-            <tr><td> <b>pv</b>         </td><td>nur Erzeugung (PV)                                                                                    </td></tr>
-            <tr><td> <b>pvco</b>       </td><td>Erzeugung (PV) und Verbrauch (CO)                                                                     </td></tr>         
-            <tr><td> <b>statusLink</b> </td><td>Link zur Detailanzeige + Statusinformationen                                                          </td></tr>
-         </table>
-         </ul>       
-       </li>
-       <br>   
-
-       <a id="SolarForecast-attr-headerShow"></a>
-       <li><b>headerShow </b><br>
-         Anzeigen/Verbergen des Tabellenkopfes mit Prognosedaten sowie bestimmten aktuellen und statistischen Werten. <br>
-         (default: 1)
-       </li>
-       <br>       
-       
-       <a id="SolarForecast-attr-interval"></a>
-       <li><b>interval &lt;Sekunden&gt; </b><br>
-         Zeitintervall der Datensammlung. <br>
-         Ist interval explizit auf "0" gesetzt, erfolgt keine automatische Datensammlung und muss mit "get &lt;name&gt; data" 
-         manuell erfolgen. <br>
-         (default: 70)
-       </li><br>
-       
-       <a id="SolarForecast-attr-maxVariancePerDay"></a>
-       <li><b>maxVariancePerDay &lt;Zahl&gt; </b><br>
-         (nur bei Verwendung Model DWD) <br><br>
-         
-         Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
-         (default: 0.5)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-numHistDays"></a>
-       <li><b>numHistDays </b><br>
-         Anzahl der historischen Tage aus Cache 'pvHistory' die zur Autokorrektur der PV Vorhersage verwendet werden. <br>
-         (default: alle verfügbaren Daten in pvHistory und pvCircular)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-optimizeSolCastAPIreqInterval"></a>
-       <li><b>optimizeSolCastAPIreqInterval </b><br>
-         (nur bei Verwendung Model SolCastAPI) <br><br>
-         
-         Das default Abrufintervall der SolCast API beträgt 1 Stunde. Ist dieses Attribut gesetzt erfolgt ein dynamische
-         Anpassung des Intervalls mit dem Ziel die maximal möglichen Abrufe innerhalb von Sonnenauf- und untergang 
-         auszunutzen. <br>
-         (default: 0)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-preferredChargeBattery"></a>
-       <li><b>preferredChargeBattery </b><br>
-         Es werden Verbraucher mit dem Mode <b>can</b> erst dann eingeschaltet, wenn die angegebene Batterieladung (%)
-         erreicht ist. <br>
-         Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht. <br>
-         (default: 0)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-rainFactorDamping"></a>
-       <li><b>rainFactorDamping </b><br>
-         Prozentuale Mehrgewichtung des Regenprognosefaktors bei der solaren Vorhersage. <br>
-         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV 
-         Prognose durch den Regenfaktor).<br>
-         (default: 10)         
-       </li>  
-       <br> 
-       
-       <a id="SolarForecast-attr-sameWeekdaysForConsfc"></a>
-       <li><b>sameWeekdaysForConsfc </b><br>
-         Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
-         Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
-         (default: 0)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-showLink"></a>
-       <li><b>showLink </b><br>
-         Anzeige des Detail-Links über dem Grafik-Device <br>
-         (default: 1)
-       </li>
-       <br>
-  
-       <a id="SolarForecast-attr-solCastPercentile"></a>
-       <li><b>solCastPercentile </b><br>
-         (nur bei Verwendung Model SolCastAPI) <br><br>
-       
-         Auswahl des Vorhersageszenarios. <br>
-         SolCast liefert neben der deterministischen Vorhersage (die nur einen einzigen Wert ergibt) 
-         ebenfalls probabilistische Vorhersagedaten in Form von Konfidenzintervallen, die eine 
-         10 %- und 90 %-Wahrscheinlichkeitsgrenze um einen mittleren Prognosewert darstellen. <br>
-         Die '10'-Szenarien stellen die untere Grenze dessen dar, was in der Vorhersage erwartet wird.  
-         Die '90'-Szenarien stellen die Obergrenze dessen dar, was in den Prognosedaten erwartet wird. <br>
-         Weitere Informationen zur SolCast Vorhersageerstellung findet man auf dieser
-         <a href="https://articles.solcast.com.au/en/articles/2963469-solcast-probabilistic-forecasting-fields-what-are-they-how-do-we-create-them">SolCast-Seite</a>. 
-         <br>
-         
-         (default: 50 = mittlerer Prognosewert)
-       </li>
-       <br>
-       
-       <a id="SolarForecast-attr-Wh_kWh"></a>
-       <li><b>Wh_kWh &lt;Wh | kWh&gt; </b><br>
-         Definiert die Anzeigeeinheit in Wh oder in kWh auf eine Nachkommastelle gerundet. <br>
-         (default: Wh)
-       </li>
-       <br>      
+       <br>     
 
      </ul>
   </ul>
