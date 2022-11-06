@@ -376,7 +376,7 @@ desc: <a href="https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905
 farewell:specified values ​​can be adjusted at any time in the setList attribute
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:BRIGHTNESS;default brightness in <b>on</b>-command (numeric, 0-255, e.g. 120);undef
+par:BRIGHTNESS;brightness in <b>on</b>-command (numeric, 0-255, e.g. 120);undef
 par:CTVALUE;ct (color temp) value in <b>on</b>-command (numeric, 0-370, e.g. 320);undef
 par:CTWARMVALUE;ct value in <b>warm</b>-command (e.g. 320);undef
 par:CTWHITEVALUE;ct value in <b>white</b>-command (e.g. 250);undef
@@ -399,7 +399,7 @@ attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221106_2
+setreading DEVICE attrTemplateVersion 20221106_3
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
