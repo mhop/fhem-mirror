@@ -376,7 +376,7 @@ desc: A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as
 farewell:specified values ​​can be adjusted at any time in the setList attribute
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:BRIGHTNESS;default brightness in <b>brightness</b>-command (numeric, 0-255, e.g. 120);undef
+par:BRIGHTNESS;default brightness in <b>on</b>-command (numeric, 0-255, e.g. 120);undef
 par:CTVALUE;default color temp (ct) value in <b>on</b>-command (numeric, 0-370, e.g. 320);undef
 par:CTWARMVALUE;default ct value in <b>warm</b>-command (e.g. 320);undef
 par:CTWHITEVALUE;default ct value in <b>white</b>-command (e.g. 250);undef
@@ -399,7 +399,7 @@ attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221019
+setreading DEVICE attrTemplateVersion 20221106
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -953,6 +953,27 @@ attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_AlarmSensor
 setreading DEVICE attrTemplateVersion 20200904
+
+# contributed by JJ_Pamoux, https://forum.fhem.de/index.php/topic,94495.msg1243613.html#msg1243613
+# NEO AB02B2 Alarm Sound
+name:zigbee2mqtt_alarm_sound
+desc: Alarm sound controller via zigbee2mqtt <br>Tested with: Tuya Neo NAS-AB02B2 sound device
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to audio_volume_mid;{ AttrVal('DEVICE','icon','audio_volume_mid') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Alarm: alarm  Volume: volume  Duration: duration  Melody: melody  Batterie: battpercentage %  Linkquality: linkquality
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  alarm:true,false $\DEVICETOPIC/set {"alarm": "$EVTPART1"}\
+  volume:low,medium,high $\DEVICETOPIC/set {"volume": "$EVTPART1"}\
+  duration:slider,0,1,1800 $\DEVICETOPIC/set {"duration": "$EVTPART1"}\
+  melody:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18 $\DEVICETOPIC/set {"melody": "$EVTPART1"}
+attr DEVICE model zigbee2mqtt_alarm_sound
+deletereading -q DEVICE (?!associatedWith|IODev).*
+setreading DEVICE attrTemplateVersion 20221106
 
 # SYMFONSIK sound controller
 #contributed by KurtK: https://forum.fhem.de/index.php/topic,94495.msg1056562.html#msg1056562
@@ -3384,7 +3405,7 @@ attr DEVICE setList \
   boost:on,off {my $val=$EVTPART1 eq 'on'?5:0; qq($\DEVICETOPIC/thermostat/0/command/boost_minutes $val)}\
   boost_minutes $\DEVICETOPIC/thermostat/0/command/boost_minutes $EVTPART1\
   set_boost_minutes $\DEVICETOPIC/thermostat/0/command/set_boost_minutes $EVTPART1
-attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode
+attr DEVICE jsonMap bat:0 bat_value:batteryPercent bat_voltage:batteryVoltage target_t_value:desired-temp thermostats_1_tmp_value:temperature thermostats_1_valve_min_percent:valve_min_percent thermostats_1_target_t_accelerated_heating:accelerated_heating thermostats_1_schedule:mode thermostats_1_pos:valve
 attr DEVICE stateFormat Measured: temperature Battery: batteryPercent %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
@@ -3392,7 +3413,7 @@ attr DEVICE setStateList on off
 attr DEVICE model shelly_TRV
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith|IODev).*
-setreading DEVICE attrTemplateVersion 20221019
+setreading DEVICE attrTemplateVersion 20221106
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
