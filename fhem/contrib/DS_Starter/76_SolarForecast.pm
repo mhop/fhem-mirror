@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-05 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-06 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,6 +130,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.72.4" => "06.11.2022  change __solCast_ApiResponse -> special processing first dataset of current hour ",
+  "0.72.3" => "05.11.2022  new status bit CurrentVal allStringsFullfilled ",
   "0.72.2" => "05.11.2022  minor changes in header, rename more attributes, edit commandref, associatedWith is working again ",
   "0.72.1" => "31.10.2022  fix 'connection lost ...' issue again, global language check in checkPlantConfig ",
   "0.72.0" => "30.10.2022  rename some graphic attributes ",
@@ -387,21 +389,6 @@ my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-siz
                    qq{.flowg.active_bat_in  { stroke: darkorange; stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}.
                    qq{.flowg.active_bat_out { stroke: green;      stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.8; animation: dash 0.5s linear; animation-iteration-count: infinite; } \n}
                    ;
-                              
-                                                                                  # Liste optionaler Statistikreadings
-my @csr         = qw( currentAPIinterval
-                      lastretrieval_time
-                      lastretrieval_timestamp
-                      response_message
-                      runTimeCentralTask
-                      runTimeLastAPIAnswer
-                      runTimeLastAPIProc
-                      todayMaxAPIcalls
-                      todayDoneAPIcalls
-                      todayDoneAPIrequests
-                      todayRemainingAPIcalls
-                      todayRemainingAPIrequests
-                    );
 
 
 # Steuerhashes
@@ -760,6 +747,7 @@ my %hcsr = (                                                                    
   runTimeCentralTask         => { fnr => 2, fn => \&CurrentVal,    def => '-'         }, 
   runTimeLastAPIAnswer       => { fnr => 2, fn => \&CurrentVal,    def => '-'         },
   runTimeLastAPIProc         => { fnr => 2, fn => \&CurrentVal,    def => '-'         }, 
+  allStringsFullfilled       => { fnr => 2, fn => \&CurrentVal,    def => 0           }, 
 );
 
 # Information zu verwendeten internen Datenhashes
@@ -779,7 +767,7 @@ sub Initialize {
 
   my $fwd   = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
   my $hod   = join ",", map { sprintf "%02d", $_} (01..24); 
-  my $srd   = join ",", @csr;
+  my $srd   = join ",", sort keys (%hcsr);
   
   my ($consumer,@allc);
   for my $c (1..$maxconsumer) {
@@ -2157,7 +2145,7 @@ sub __solCast_ApiResponse {
   my $type       = $hash->{TYPE};
   my $t          = time;
   
-  my ($msg,$starttmstr);
+  my $msg;
   
   my $sta = [gettimeofday];                                                                                # Start Response Verarbeitung
 
@@ -2220,43 +2208,13 @@ sub __solCast_ApiResponse {
           return;
       }
       
-      my $k = 0;              
+      my $k = 0;
+      my ($period,$starttmstr);      
       
       while ($jdata->{'forecasts'}[$k]) {                                                                # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
-          my $petstr = $jdata->{'forecasts'}[$k]{'period_end'};
-          
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # ersten Datensatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
-              $k += 1;
-              next;                           
-          }
-          
+          my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
-                    
-          next if ($err);
           
-          delete $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
-
-          $k += 1;          
-      } 
-      
-      $k      = 0;              
-      my $uac = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');                                   # Auto- oder manuelle Korrektur
-      
-      while ($jdata->{'forecasts'}[$k]) {
-          my $petstr  = $jdata->{'forecasts'}[$k]{'period_end'};
-          
-          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # ersten Datensatz überspringen wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)
-              $k += 1;
-              next;                           
-          }
-          
-          if(!$jdata->{'forecasts'}[$k]{'pv_estimate'}) {                                                # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
-              $k += 1;
-              next;                           
-          }
-                    
-          ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
-                    
           if ($err) {              
               Log3 ($name, 2, "$name - $err");
               
@@ -2264,11 +2222,46 @@ sub __solCast_ApiResponse {
               return;
           }
           
-          my $pvest50 = $jdata->{'forecasts'}[$k]{'pv_estimate'};
-          my $pvest10 = $jdata->{'forecasts'}[$k]{'pv_estimate10'};
-          my $pvest90 = $jdata->{'forecasts'}[$k]{'pv_estimate90'};
-          my $period  = $jdata->{'forecasts'}[$k]{'period'}; 
-          $period     =~ s/.*(\d\d).*/$1/;
+          if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # spezielle Behandlung ersten Datensatz wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)             
+              $period   = $jdata->{'forecasts'}[$k]{'period'};                                           # -> dann bereits beim letzten Abruf gespeicherte Daten der aktuellen Stunde durch 2 teilen damit 
+              $period   =~ s/.*(\d\d).*/$1/;                                                             # -> die neuen Daten (in dem Fall nur die einer halben Stunde) im nächsten Schritt addiert werden
+              
+              my $est10 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate10', 0) / (60/$period);
+              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} = $est10 if($est10);
+              
+              my $est50 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
+              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $est50 if($est50);
+                   
+              my $est90 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate90', 0) / (60/$period);   
+              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} = $est90 if($est90);          
+              
+              $k++;
+              next;                           
+          }
+          
+          delete $data{$type}{$name}{solcastapi}{$string}{$starttmstr};
+
+          $k++;          
+      } 
+      
+      $k      = 0;              
+      my $uac = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');                                   # Auto- oder manuelle Korrektur
+      
+      while ($jdata->{'forecasts'}[$k]) {
+          if(!$jdata->{'forecasts'}[$k]{'pv_estimate'}) {                                                # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
+              $k++;
+              next;                           
+          }
+          
+          my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
+          ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
+          
+          my $pvest50         = $jdata->{'forecasts'}[$k]{'pv_estimate'};
+          my $pvest10         = $jdata->{'forecasts'}[$k]{'pv_estimate10'};
+          my $pvest90         = $jdata->{'forecasts'}[$k]{'pv_estimate90'};
+          
+          $period             = $jdata->{'forecasts'}[$k]{'period'}; 
+          $period             =~ s/.*(\d\d).*/$1/;
           
           if($debug) {                                                                                  # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
@@ -2280,23 +2273,8 @@ sub __solCast_ApiResponse {
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} += sprintf "%.0f", ($pvest10 * ($period/60) * 1000);
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} += sprintf "%.0f", ($pvest50 * ($period/60) * 1000);
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} += sprintf "%.0f", ($pvest90 * ($period/60) * 1000);
-
-          ## erstellen Zusatzpercentile
-          ###############################
-          #if ($uac eq 'on') {
-          #    my $lowdm  = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10}) / 4;
-          #    my $highdm = ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} - $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50}) / 4;
-              
-          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate20} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 3));
-          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate30} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 2));          
-          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate40} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} - ($lowdm * 1));
-              
-          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate60} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 1));          
-          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate70} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 2));
-          #    $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate80} = sprintf "%.0f", ($data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} + ($highdm * 3));
-          #}
           
-          $k += 1;          
+          $k++;          
       }
   }
   
@@ -3061,10 +3039,12 @@ sub centralTask {
       
       return if(IsDisabled($name));                                          
       
-      my $ret = createStringConfig ($hash);                                                        # die String Konfiguration erstellen
-      if ($ret) {
-          singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );
-          return;
+      if(!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                            # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
+          my $ret = createStringConfig ($hash);                                                    
+          if ($ret) {
+              singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );
+              return;
+          }
       }
       
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
@@ -3162,6 +3142,7 @@ sub createStringConfig {                 ## no critic "not used"
   my $type = $hash->{TYPE};
   
   delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
+  $data{$type}{$name}{current}{allStringsFullfilled} = 0;
   
   my @istrings = split ",", ReadingsVal ($name, 'inverterStrings', '');                           # Stringbezeichner
   $data{$type}{$name}{current}{allstringscount} = scalar @istrings;                               # Anzahl der Anlagenstrings 
@@ -3249,6 +3230,7 @@ sub createStringConfig {                 ## no critic "not used"
       return qq{Some Strings are not used. Please delete this string names from "inverterStrings" :}.join ",",@tom;
   }
    
+  $data{$type}{$name}{current}{allStringsFullfilled} = 1;
 return;
 }
 
@@ -11454,6 +11436,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
          <ul>   
          <table>  
          <colgroup> <col width=25%> <col width=75%> </colgroup>
+            <tr><td> <b>allStringsFullfilled</b>      </td><td>Erfüllungsstatus der fehlerfreien Generierung aller Strings                                        </td></tr>
             <tr><td> <b>currentAPIinterval</b>        </td><td>das aktuelle Abrufintervall der SolCast API (nur Model SolCastAPI) in Sekunden                     </td></tr>
             <tr><td> <b>lastretrieval_time</b>        </td><td>der letze Abrufzeitpunkt der SolCast API (nur Model SolCastAPI)                                    </td></tr>
             <tr><td> <b>lastretrieval_timestamp</b>   </td><td>der letze Abrufzeitpunkt der SolCast API (nur Model SolCastAPI) als Timestamp                      </td></tr>
