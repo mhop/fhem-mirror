@@ -959,6 +959,7 @@ setreading DEVICE attrTemplateVersion 20200904
 name:zigbee2mqtt_alarm_sound
 desc: Alarm sound controller via zigbee2mqtt <br>Tested with: Tuya Neo NAS-AB02B2 sound device
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_15a
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 par:ICON;ICON as set, defaults to audio_volume_mid;{ AttrVal('DEVICE','icon','audio_volume_mid') }
