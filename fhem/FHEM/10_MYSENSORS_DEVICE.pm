@@ -1054,44 +1054,41 @@ sub onInternalMessage {
 
     if ($type == I_SIGNAL_REPORT_RESPONSE) {
         return if $msg->{ack};
-
+        my %rnames = ( 1 => 'R_RSSI_to_Parent',2 => 'R_RSSI_from_Parent',3 => 'R_SNR_to_Parent',4 => 'R_SNR_from_Parent',5 => 'R_TX_Powerlevel_Pct',6 => 'R_TX_Powerlevel_dBm',7 => 'R_Uplink_Quality');
         if ($msg->{payload} != -256) {
           my $subSet = $hash->{I_RSSI};
-          my %rnames = ( "1" => "R_RSSI_to_Parent","2" => "R_RSSI_from_Parent","3" => "R_SNR_to_Parent","4" => "R_SNR_from_Parent","5" => "R_TX_Powerlevel_Pct","6" => "R_TX_Powerlevel_dBm","7" => "R_Uplink_Quality");
-          my %payloads = ( "1" => "R!","2" => "S","3" => "S!","4" => "P","5" => "T","6" => "U");
           readingsSingleUpdate($hash, $rnames{$subSet}, $msg->{payload}, 1);
           if ($subSet < 7) {
             $hash->{I_RSSI}++;
+            my %payloads = ( 1 => 'R!',2 => 'S',3 => 'S!',4 => 'P',5 => 'T',6 => 'U');
             sendClientMessage($hash, 
                               cmd => C_INTERNAL, 
                               ack => 0, 
                               subType => I_SIGNAL_REPORT_REQUEST, 
                               payload => $payloads{$subSet}
                               );
-          } else {
-            delete $hash->{I_RSSI}; 
-            if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq "RSSI" ) {
-              RemoveInternalTimer($hash->{asyncGet});
-              my $uq = $msg->{payload};
-              my $topar = ReadingsVal($hash->{NAME},'R_RSSI_to_Parent','unknown');
-              my $frompar = ReadingsVal($hash->{NAME},'R_RSSI_from_Parent','unknown');
-              my $snr2par = ReadingsVal($hash->{NAME},'R_SNR_to_Parent','unknown');
-              my $snrfpar = ReadingsVal($hash->{NAME},'R_RSSI_from_Parent','unknown');
-              my $powpct = ReadingsVal($hash->{NAME},'R_TX_Powerlevel_Pct','unknown');
-              my $powdbm = ReadingsVal($hash->{NAME},'R_TX_Powerlevel_dBm','unknown');
-              asyncOutput($hash->{asyncGet}{CL}, "RSSI info:\n----------------------------\nto parent:     $topar\nfrom parent: $frompar\nSNR to parent:    $snr2par\nSNR from parent: $snrfpar\nPower level %:   $powpct\nPower level dBm: powdbm\nUplink Quality: $uq");
-              delete($hash->{asyncGet});
-            }
-
+            return;
           }
-          return;
-       } elsif( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq "RSSI" ) {
+        }
+        if( $hash->{asyncGet} && $hash->{asyncGet}{reading} eq 'RSSI' ) {
           RemoveInternalTimer($hash->{asyncGet});
-          asyncOutput($hash->{asyncGet}{CL}, "Your transport type seems to be RS485, so asking for RSSI values is not possible");
+          if ($msg->{payload} == -256 && (!$hash->{I_RSSI} || $hash->{I_RSSI} == 1)) {
+            asyncOutput($hash->{asyncGet}{CL}, 'Your transport type seems not to support asking RSSI values');
+          } else {
+              RemoveInternalTimer($hash->{asyncGet});
+              my $txt = 'RSSI info:\n----------------------------\n';
+              my %txts = ( 1 => 'to parent:    ',2 => '\nfrom parent:',3 => '\nSNR to parent:   ',4 => '\nSNR from parent:',5 => '\nPower level %:  ',6 => '\nPower level dBm:',7 => '\nUplink Quality:');
+              for my $i (1..$hash->{I_RSSI}) {
+                  my $rv = ReadingsVal($hash->{NAME},$rnames{$i},'unknown');
+                  next if $rv eq 'unknown';
+                  $txt .= "$txts{$i} $rv";
+              }
+              asyncOutput($hash->{asyncGet}{CL}, $txt);
+          }
           delete($hash->{asyncGet});
+          delete $hash->{I_RSSI};
        }
     }
-    
     return;
 }
 
