@@ -8357,27 +8357,27 @@ sub _calcCAQwithSolCastPercentil {
       $est60 = sprintf "%.0f", ($est50 + ($highdm * 1));          
       $est70 = sprintf "%.0f", ($est50 + ($highdm * 2));
       $est80 = sprintf "%.0f", ($est50 + ($highdm * 3));
-      
+            
       my %pc = (
-        10 => $est10,
-        20 => $est20,
-        30 => $est30,
-        40 => $est40,
-        60 => $est60,
-        70 => $est70,
-        80 => $est80,
-        90 => $est90,
+        1 => { perc => 40, est => $est40 },
+        2 => { perc => 30, est => $est30 },
+        3 => { perc => 20, est => $est20 },
+        4 => { perc => 10, est => $est10 },
+        5 => { perc => 60, est => $est60 },
+        6 => { perc => 70, est => $est70 },
+        7 => { perc => 80, est => $est80 },
+        8 => { perc => 90, est => $est90 },
       );      
       
       my $perc  = 50;                                                                                         # Standardpercentil 
       my $diff0 = abs ($est50 - $pvval);
                                                                                                                                               ## no critic 'NoStrict'
       for my $p (sort keys %pc) {        
-          my $diff1 = abs ($pc{$p} - $pvval);
+          my $diff1 = abs ($pc{$p}{est} - $pvval);
            
           if($diff1 < $diff0) {
               $diff0 = $diff1;
-              $perc  = $p;
+              $perc  = $pc{$p}{perc};
           }
       }
       
