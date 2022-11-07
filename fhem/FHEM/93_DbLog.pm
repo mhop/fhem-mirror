@@ -31,6 +31,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.13.2"  => "06.11.2022 Patch Delta calculation (delta-d,delta-h) https://forum.fhem.de/index.php/topic,129975.msg1242272.html#msg1242272 ",
+  "4.13.1"  => "16.10.2022 edit commandref ",
   "4.13.0"  => "15.04.2022 new Attr convertTimezone, minor fixes in reduceLog(NbL) ",
   "4.12.7"  => "08.03.2022 \$data{firstvalX} doesn't work, forum: https://forum.fhem.de/index.php/topic,126631.0.html ",
   "4.12.6"  => "17.01.2022 change log message deprecated to outdated, forum:#topic,41089.msg1201261.html#msg1201261 ",
@@ -1542,8 +1544,8 @@ sub DbLog_Log {
                       $DoIt = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,);                                       # Reading matcht auf Regexp, kein MinIntervall angegeben
                   
                       if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                     # Regexp matcht und MinIntervall ist angegeben
-                          my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
-                          my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
+                          my $lt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};
+                          my $lv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};
                           $lt    = 0  if(!$lt);         
                           $lv    = "" if(!defined $lv);                                                       # Forum: #100344
                           $force = ($v2[2] && $v2[2] =~ /force/i) ? 1 : 0;                                    # Forum: #97148
@@ -1566,8 +1568,8 @@ sub DbLog_Log {
                           $DoIt = 1 if($reading =~ m,^$v2[0]$,);                                                # Reading matcht auf Regexp
                   
                           if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                   # Regexp matcht und MinIntervall ist angegeben
-                              my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
-                              my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
+                              my $lt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};
+                              my $lv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};
                               $lt    = 0  if(!$lt);
                               $lv    = "" if(!defined $lv);                                                     # Forum: #100344
                               $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;                                      # Forum: #97148
@@ -1585,10 +1587,10 @@ sub DbLog_Log {
               $DoIt = DbLog_checkDefMinInt($name,$dev_name,$now,$reading,$value);
         
               if ($DoIt) {
-                  my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};                  # patch Forum:#111423
-                  my $lastv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};   
-                  $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
-                  $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
+                  my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};                          # patch Forum:#111423
+                  my $lastv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};   
+                  $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $now;
+                  $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $value;
                   
                   # Device spezifische DbLogValueFn-Funktion anwenden
                   if($DbLogValueFn ne '') {
@@ -1598,7 +1600,7 @@ sub DbLog_Log {
                       my $EVENT         = $event;
                       my $READING       = $reading;
                       my $VALUE         = $value;
-                      my $LASTVALUE     = $lastv // "";                                                        # patch Forum:#111423
+                      my $LASTVALUE     = $lastv // "";                                                                    # patch Forum:#111423
                       my $UNIT          = $unit;
                       my $IGNORE        = 0;
                       my $CN            = " ";
@@ -1607,11 +1609,11 @@ sub DbLog_Log {
                       Log3 $name, 2, "DbLog $name -> error device \"$dev_name\" specific DbLogValueFn: ".$@ if($@);
                       
                       if($IGNORE) {                                                                                        # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
-                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);             # patch Forum:#111423
-                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);  
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                     # patch Forum:#111423
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);  
                           
                           if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}) {
-                              Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit";
+                              Log3 $name, 4, "DbLog $name -> Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit";
                           }
                           
                           next;  
@@ -1650,11 +1652,11 @@ sub DbLog_Log {
                       Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
                       
                       if($IGNORE) {                                                                                     # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
-                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);          # patch Forum:#111423
-                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);                           
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                  # patch Forum:#111423
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE} = $lastv if(defined $lastv);                           
                           
                           if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}) {
-                              Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit";
+                              Log3 $name, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit";
                           }
                           
                           next;  
@@ -1681,7 +1683,7 @@ sub DbLog_Log {
                   ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$reading,$value,$unit);
   
                   my $row = ($timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit);
-                  Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
+                  Log3 $name, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
                                           if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}); 
                   
                   if($async) {                                                               # asynchoner non-blocking Mode                                                  
@@ -1698,7 +1700,7 @@ sub DbLog_Log {
                           my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
                           my $syncival = AttrVal($name, "syncInterval", 30);
                           if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
-                              Log3 $hash->{NAME}, 4, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
+                              Log3 $name, 4, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
                               DbLog_execmemcache ($hash);
                               $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
                           }
@@ -1789,7 +1791,7 @@ sub DbLog_checkDefMinInt {
                   my $lv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};
                   $lt    = 0  if(!$lt);         
                   $lv    = "" if(!defined $lv);                                        # Forum: #100344
-                  $force = ($adefelem[2] && $adefelem[2] =~ /force/i)?1:0;             # Forum: #97148
+                  $force = ($adefelem[2] && $adefelem[2] =~ /force/i) ? 1 : 0;         # Forum: #97148
                   
                   if(($now-$lt < $adefelem[1]) && ($lv eq $value || $force)) {
                       # innerhalb defaultMinInterval und LastValue=Value oder force-Option
@@ -2432,8 +2434,8 @@ sub DbLog_execmemcache {
           push (@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
       }  
       
-      delete $data{DbLog}{$name}{cache}{memcache};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
-
+      undef $data{DbLog}{$name}{cache}{memcache};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      
       my $rowlist = join('§', @row_array);
       $rowlist    = encode_base64($rowlist,"");
       
@@ -3893,22 +3895,25 @@ sub DbLog_Get {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                               } 
                               else {
-                                  $out_tstamp =~ s/\ /_/g;                               # needed by generating plots
+                                  $out_tstamp =~ s/\ /_/g;                                    # needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
                           }
                       }
                     
-                      $out_value = sprintf("%g", $maxval - $minval);
-                      $sum[$i]  += $out_value;
+                      $writeout   = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));      # geändert V4.8.0 / 14.10.2019
+                      $out_value  = ($writeout == 1) ? sprintf("%g", $maxval - $minval) : 0;  # if there was no previous reading in the selected time range, produce a null delta, %g - a floating-point number
+                      
+                      $sum[$i]   += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
-                      $writeout   = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));   # geändert V4.8.0 / 14.10.2019      
-                      $minval     = $maxval;               
+                      
+                      $minval     = $maxval if($maxval != -(~0 >> 1));                        # only use the current range's maximum as the new minimum if a proper value was found
+              
                       Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
               } 
-              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {          # Berechnung eines Tages-Deltas
+              elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {                 # Berechnung eines Tages-Deltas
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
                 
                   if($lastd[$i] eq "undef") {
@@ -3918,14 +3923,15 @@ sub DbLog_Get {
                       %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
                   }
               
-                  if("$tstamp{day}" ne "$lasttstamp{day}") {
-                      # Aenderung des Tages, berechne Delta
-                      $out_value = sprintf("%g", $maxval - $minval);                      # %g - a floating-point number
-                      $sum[$i] += $out_value;
+                  if("$tstamp{day}" ne "$lasttstamp{day}") {                                 # Aenderung des Tages, berechne Delta
+                      $writeout  = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));      # geändert V4.8.0 / 14.10.2019
+                      $out_value = ($writeout == 1) ? sprintf("%g", $maxval - $minval) : 0;  # if there was no previous reading in the selected time range, produce a null delta, %g - a floating-point number
+                      $sum[$i]  += $out_value;
                       $cnt[$i]++;
+                     
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
-                      $writeout   = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));  # geändert V4.8.0 / 14.10.2019      
-                      $minval     = $maxval;
+                      $minval     = $maxval if($maxval != -(~0 >> 1));                       # only use the current range's maximum as the new minimum if a proper value was found
+
                       Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
               } 
@@ -4024,7 +4030,9 @@ sub DbLog_Get {
           } 
           else {
               %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-              $out_value  = sprintf("%g", $maxval - $minval);
+              
+              $out_value  = ($minval != (~0 >> 1) && $maxval != -(~0 >> 1)) ? sprintf("%g", $maxval - $minval) : 0;       # if there was no previous reading in the selected time range, produce a null delta
+              
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
           }  
@@ -4038,7 +4046,7 @@ sub DbLog_Get {
               push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
           }
           else {
-             $out_tstamp =~ s/\ /_/g; #needed by generating plots
+             $out_tstamp =~ s/\ /_/g;                                                      #needed by generating plots
              $retval    .= "$out_tstamp $out_value\n";
           }
           
@@ -4061,6 +4069,9 @@ sub DbLog_Get {
 
   # Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
+      $min[$j] = 0 if ($min[$j] == (~0 >> 1));                     # if min/max values could not be calculated due to the lack of query results, set them to 0
+      $max[$j] = 0 if ($max[$j] == -(~0 >> 1));
+
       my $k = $j+1;
       $data{"min$k"}       = $min[$j];
       $data{"max$k"}       = $max[$j];

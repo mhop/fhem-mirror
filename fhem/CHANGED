@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbLog: patch delta-d,delta-h forum: #msg1242272
  - bugfix:  73_GasCalculator         : SiPowerPrefix was 1000 too small
  - bugfix:  73_ElectricityCalculator : Seconds per day considering DST
  - bugfix:  73_GasCalculator         : Seconds per day considering DST
