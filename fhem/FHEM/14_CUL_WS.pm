@@ -151,7 +151,7 @@ CUL_WS_Parse($$)
     if($std) {
       my $ot = ReadingsVal($name, 'temperature', 0);
       if($ot && abs($ot-$t) > $std) {
-        readingsBulkUpdate($def, 'strangeTemp', $t, 0);
+        readingsSingleUpdate($def, 'strangeTemp', $t, 0);
         $t = $ot;
       }
     }
