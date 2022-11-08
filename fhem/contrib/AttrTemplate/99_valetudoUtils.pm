@@ -193,20 +193,38 @@ sub valetudo_f {
 #######
 # used for readingList. return readingname -> value pairs
 # look https://valetudo.cloud/pages/integrations/mqtt.html for details mqtt implementation
+sub valetudo_dhms{
+  my $s = shift;
+
+  my $d = int($s/86400);
+  $s -= $d*86400;
+  my $h = int($s/3600);
+  $s -= $h*3600;
+  my $m = int($s/60);
+  $s -= $m*60;
+
+  return ($d,$h,$m,$s);
+}
+
 sub valetudo_r {
     my $NAME = shift;
     my $feature = shift;
     my $value = shift;
     my $EVENT = shift;
     #Log3(undef, 1, "Name $NAME, featur $feature, value $value, $EVENT");
-     
-    if ($feature =~ m,(^Att.*|^Basic.*|^Consum.*|^Loc.*),)
+    my $TMF = AttrVal($NAME,'timeformat','');
+    if ($feature =~ m,(^Att.*|^Basic.*|^Loc.*),)
        {return {"$value"=>$EVENT} }
+	if ($feature =~ m,(^Consum.*),)
+	   {return ($TMF ne '') ? {"$value"=>sprintf "%dd %02dh %02dm",valetudo_dhms($EVENT)}:
+			   {"$value"=>$EVENT} }
     if ($feature eq 'BatteryStateAttribute')
        {return $value eq 'level' ? {"batteryPercent"=>$EVENT}:
                $value eq 'status' ? {"batteryState"=>$EVENT}:{"$value"=>$EVENT} }
     if ($feature eq 'CurrentStatisticsCapability')
-       {return $value eq 'area' ? {"area"=>sprintf("%.2f",($EVENT / 10000))." m²"}:{"$value"=>$EVENT} }
+       {return $value eq 'area' ? {"$value"=>sprintf("%.2f",($EVENT / 10000))." m²"}:
+	   	       ($value eq 'time' and $TMF ne '') ? {"$value"=>sprintf "%02d:%02d:%02d",valetudo_dhms($EVENT)}:
+               {"$value"=>$EVENT} }
     if ($feature eq 'FanSpeedControlCapability')
        {return $value eq 'preset' ? {"fanSpeed"=>$EVENT}:{"$value"=>$EVENT} }
     if ($feature eq 'GoToLocationCapability' or $feature eq 'ZoneCleaningCapability' or $feature eq 'MapSegmentationCapability')
@@ -241,7 +259,7 @@ sub valetudo_g {
     my $NAME = shift;
     my ($cmd,$load) = split q{ }, shift, 2;
     #Log3(undef, 1, "Name $NAME, cmd $cmd, load $load");
-    my $ip = (split q{ },$load)[1] || ReadingsVal($NAME,'ip4',(split q{_}, InternalVal($NAME,ReadingsVal($NAME,'IODev','').'_CONN','') )[-2] || return 'error no ip');
+    my $ip = (split q{ },$load)[1] || ReadingsVal($NAME,'ip4',(split q{_}, InternalVal($NAME,ReadingsVal($NAME,'IODev','').'_CONN','') )[-2]) || return 'error no ip';
     if ($load eq 'segments'){
        my $url = '/api/v2/robot/capabilities/MapSegmentationCapability';
        my $json = GetHttpFile($ip, $url);
