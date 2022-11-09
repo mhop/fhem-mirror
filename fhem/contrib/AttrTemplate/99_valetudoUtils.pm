@@ -216,14 +216,14 @@ sub valetudo_r {
     if ($feature =~ m,(^Att.*|^Basic.*|^Loc.*),)
        {return {"$value"=>$EVENT} }
     if ($feature =~ m,(^Consum.*),)
-       {return ($TMF ne '') ? {"$value"=>sprintf "%dd %02dh %02dm",valetudo_dhms($EVENT)}:
+       {return ($TMF ne '') ? {"$value"=>sprintf '%dd %02dh %02dm',valetudo_dhms($EVENT)}:
                {"$value"=>$EVENT} }
     if ($feature eq 'BatteryStateAttribute')
        {return $value eq 'level' ? {"batteryPercent"=>$EVENT}:
                $value eq 'status' ? {"batteryState"=>$EVENT}:{"$value"=>$EVENT} }
     if ($feature eq 'CurrentStatisticsCapability')
        {return $value eq 'area' ? {"$value"=>sprintf("%.2f",($EVENT / 10000))." m²"}:
-               ($value eq 'time' and $TMF ne '') ? {"$value"=>sprintf "%02d:%02d:%02d",valetudo_dhms($EVENT)}:
+               ($value eq 'time' and $TMF ne '') ? {"$value"=>sprintf '%2$02dh %3$02dm %4$02ds',valetudo_dhms($EVENT)}:
                {"$value"=>$EVENT} }
     if ($feature eq 'FanSpeedControlCapability')
        {return $value eq 'preset' ? {"fanSpeed"=>$EVENT}:{"$value"=>$EVENT} }
