@@ -129,8 +129,8 @@ sub valetudo_c {
            for (keys %{$decoded}) { 
                if ( $_ eq $load ) {$ret = $devicetopic.'/GoToLocationCapability/go/set '.toJSON $decoded->{$_} } 
            }
-	   }
-	}
+       }
+    }
 
     # this part is for study purpose to read the full json segments with the REST API
     # this part return an array of segment id's according to selected Names from json_segments (complex json)
@@ -215,15 +215,15 @@ sub valetudo_r {
     my $TMF = AttrVal($NAME,'timeformat','');
     if ($feature =~ m,(^Att.*|^Basic.*|^Loc.*),)
        {return {"$value"=>$EVENT} }
-	if ($feature =~ m,(^Consum.*),)
-	   {return ($TMF ne '') ? {"$value"=>sprintf "%dd %02dh %02dm",valetudo_dhms($EVENT)}:
-			   {"$value"=>$EVENT} }
+    if ($feature =~ m,(^Consum.*),)
+       {return ($TMF ne '') ? {"$value"=>sprintf "%dd %02dh %02dm",valetudo_dhms($EVENT)}:
+               {"$value"=>$EVENT} }
     if ($feature eq 'BatteryStateAttribute')
        {return $value eq 'level' ? {"batteryPercent"=>$EVENT}:
                $value eq 'status' ? {"batteryState"=>$EVENT}:{"$value"=>$EVENT} }
     if ($feature eq 'CurrentStatisticsCapability')
        {return $value eq 'area' ? {"$value"=>sprintf("%.2f",($EVENT / 10000))." m²"}:
-	   	       ($value eq 'time' and $TMF ne '') ? {"$value"=>sprintf "%02d:%02d:%02d",valetudo_dhms($EVENT)}:
+               ($value eq 'time' and $TMF ne '') ? {"$value"=>sprintf "%02d:%02d:%02d",valetudo_dhms($EVENT)}:
                {"$value"=>$EVENT} }
     if ($feature eq 'FanSpeedControlCapability')
        {return $value eq 'preset' ? {"fanSpeed"=>$EVENT}:{"$value"=>$EVENT} }

@@ -4797,7 +4797,7 @@ attr DEVICE getList\
 attr DEVICE setList  action:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":$EVTPART1}\
   config:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
   waypoints:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
-  mode:Quite,Manual,Significant,Move { my %h=(Quite=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}})) }\
+  mode:Quiet,Manual,Significant,Move { my %h=(Quiet=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}})) }\
   x_raw_payload:textField { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload) }
 attr DEVICE userReadings\
   location:lat.* {ReadingsNum($name,'latitude',0).','.ReadingsNum($name,'longitude',0)},\
