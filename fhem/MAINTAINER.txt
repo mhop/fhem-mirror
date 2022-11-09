@@ -570,7 +570,7 @@ FHEM/98_update.pm            rudolfkoenig         Sonstiges
 FHEM/98_uptime.pm            betateilchen         Sonstiges
 FHEM/98_Verkehrsinfo.pm      martins              Unterstützende Dienste
 FHEM/98_version.pm           betateilchen         Sonstiges
-FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
+FHEM/98_vitoconnect.pm       mcp                  Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
 FHEM/98_WeekdayTimer.pm      Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_weekprofile.pm       risiko               Frontends
