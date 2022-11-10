@@ -7545,7 +7545,7 @@ sub _flowGraphic {
   my $cc_dummy   = $cc;
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
-  my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
+  my $soc        = sprintf "%.1f", ReadingsNum($name, 'Current_BatCharge', 100);
   
   my $bat_color  = $soc < 26 ? 'flowg bat25' : 
                    $soc < 76 ? 'flowg bat50' : 
