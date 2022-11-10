@@ -7780,7 +7780,7 @@ END3
 
   $ret .= qq{<text class="flowg text" id="pv-txt"        x="800"  y="15"  style="text-anchor: start;">$cpv</text>}        if ($cpv);
   #$ret .= qq{<text class="flowg text" id="bat-txt"       x="1020" y="380" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);
-  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1170" y="295" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);
+  $ret .= qq{<text class="flowg text" id="bat-txt"       x="1200" y="295" style="text-anchor: middle;">$soc %</text>}     if ($hasbat);                        # Lage Ladungs Text
   $ret .= qq{<text class="flowg text" id="pv_home-txt"   x="730"  y="300" style="text-anchor: start;">$csc</text>}        if ($csc && $cpv);
   $ret .= qq{<text class="flowg text" id="pv-grid-txt"   x="525"  y="200" style="text-anchor: end;">$cgfi</text>}         if ($cgfi);
   $ret .= qq{<text class="flowg text" id="grid-home-txt" x="525"  y="420" style="text-anchor: end;">$cgc</text>}          if ($cgc);
