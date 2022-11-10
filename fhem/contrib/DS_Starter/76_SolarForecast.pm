@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-06 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-08 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -130,6 +130,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.72.5" => "08.11.2022  calculate percentile correction factor instead of best percentile, exploit all available API requests ".
+                           "graphicBeamWidth more values, add moduleTiltAngle: 5,15,35,55,65,75,85 , ". 
+                           "fix _estConsumptionForecast, delete Setter pvSolCastPercentile_XX ",
   "0.72.4" => "06.11.2022  change __solCast_ApiResponse -> special processing first dataset of current hour ",
   "0.72.3" => "05.11.2022  new status bit CurrentVal allStringsFullfilled ",
   "0.72.2" => "05.11.2022  minor changes in header, rename more attributes, edit commandref, associatedWith is working again ",
@@ -352,7 +355,7 @@ my $rdampdef     = 10;                                                          
 my $rain_base    = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my $maxconsumer  = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
-my $epiecHCounts = 10;                                                            # Anzahl Werte für verbraucherspezifische Energiestück Ermittlung
+my $epiecHCounts = 10;                                                            # Anzahl Einschaltzyklen (Consumer) für verbraucherspezifische Energiestück Ermittlung
 my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);      # erlaubte Consumer Typen
 my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
@@ -425,23 +428,6 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_20     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_21     => { fn => \&_setpvCorrectionFactor        },
   pvCorrectionFactor_Auto   => { fn => \&_setpvCorrectionFactorAuto    },
-  pvSolCastPercentile_05    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_06    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_07    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_08    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_09    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_10    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_11    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_12    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_13    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_14    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_15    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_16    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_17    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_18    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_19    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_20    => { fn => \&_setpvSolCastPercentile       },
-  pvSolCastPercentile_21    => { fn => \&_setpvSolCastPercentile       },
   reset                     => { fn => \&_setreset                     },
   roofIdentPair             => { fn => \&_setroofIdentPair             },
   moduleRoofTops            => { fn => \&_setmoduleRoofTops            },
@@ -478,16 +464,23 @@ my %htr = (                                                                  # H
 
 my %hff = (                                                                                           # Flächenfaktoren 
   "0"  => { N => 100, NE => 100, E => 100, SE => 100, S => 100, SW => 100, W => 100, NW => 100 },     # http://www.ing-büro-junge.de/html/photovoltaik.html
+  "5"  => { N => 95,  NE => 96,  E => 100, SE => 103, S => 105, SW => 103, W => 100, NW => 96  },
   "10" => { N => 90,  NE => 93,  E => 100, SE => 105, S => 107, SW => 105, W => 100, NW => 93  },
+  "15" => { N => 85,  NE => 90,  E => 99,  SE => 107, S => 111, SW => 107, W => 99,  NW => 90  },
   "20" => { N => 80,  NE => 84,  E => 97,  SE => 108, S => 114, SW => 108, W => 97,  NW => 84  },
   "25" => { N => 75,  NE => 80,  E => 95,  SE => 109, S => 115, SW => 109, W => 95,  NW => 80  },
   "30" => { N => 69,  NE => 76,  E => 94,  SE => 110, S => 117, SW => 110, W => 94,  NW => 76  },
+  "35" => { N => 65,  NE => 71,  E => 92,  SE => 110, S => 118, SW => 110, W => 92,  NW => 71  },  
   "40" => { N => 59,  NE => 68,  E => 90,  SE => 109, S => 117, SW => 109, W => 90,  NW => 68  },
   "45" => { N => 55,  NE => 65,  E => 87,  SE => 108, S => 115, SW => 108, W => 87,  NW => 65  },
   "50" => { N => 49,  NE => 62,  E => 85,  SE => 107, S => 113, SW => 107, W => 85,  NW => 62  },
+  "55" => { N => 45,  NE => 58,  E => 83,  SE => 105, S => 112, SW => 105, W => 83,  NW => 58  },
   "60" => { N => 42,  NE => 55,  E => 80,  SE => 102, S => 111, SW => 102, W => 80,  NW => 55  },
+  "65" => { N => 39,  NE => 53,  E => 77,  SE => 99,  S => 108, SW => 99,  W => 77,  NW => 53  },
   "70" => { N => 37,  NE => 50,  E => 74,  SE => 95,  S => 104, SW => 95,  W => 74,  NW => 50  },
+  "75" => { N => 36,  NE => 48,  E => 70,  SE => 90,  S => 100, SW => 90,  W => 70,  NW => 48  },
   "80" => { N => 35,  NE => 46,  E => 67,  SE => 86,  S => 95,  SW => 86,  W => 67,  NW => 46  },
+  "85" => { N => 34,  NE => 44,  E => 64,  SE => 82,  S => 90,  SW => 82,  W => 64,  NW => 44  },
   "90" => { N => 33,  NE => 43,  E => 62,  SE => 78,  S => 85,  SW => 78,  W => 62,  NW => 43  },
 );                                                                                          
 
@@ -725,15 +718,6 @@ my %hef = (                                                                     
   "washingmachine" => { f => 0.30, m => 0.40, l => 0.30, mt => 120         },    
 );     
 
-my %hpctpl = (                                                                   # Percentile Template
-  20 => { mp => 3 },
-  30 => { mp => 2 }, 
-  40 => { mp => 1 }, 
-  60 => { mp => 1 }, 
-  70 => { mp => 2 }, 
-  80 => { mp => 3 }, 
-);
-
 my %hcsr = (                                                                                  # Funktiontemplate zur Erstellung optionaler Statistikreadings
   currentAPIinterval         => { fnr => 1, fn => \&SolCastAPIVal, def => 0           },
   lastretrieval_time         => { fnr => 1, fn => \&SolCastAPIVal, def => '-'         },
@@ -817,7 +801,7 @@ sub Initialize {
                                 "flowGraphicShowConsumerRemainTime:0,1 ".
                                 "flowGraphicCss:textField-long ".                             
                                 "graphicBeamHeight ".
-                                "graphicBeamWidth:slider,40,10,100 ".
+                                "graphicBeamWidth:slider,40,5,100 ".
                                 "graphicBeam1Color:colorpicker,RGB ".
                                 "graphicBeam2Color:colorpicker,RGB ".
                                 "graphicBeam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
@@ -1019,10 +1003,8 @@ sub Set {
 
   for my $h (@chours) {
       push @cfs, 'pvCorrectionFactor_'. sprintf("%02d",$h); 
-      push @scp, 'pvSolCastPercentile_'.sprintf("%02d",$h); 
   }
   $cf = join " ", @cfs;
-  $sp = join " ", @scp;
   
   my $type  = $hash->{TYPE};
   
@@ -1050,8 +1032,7 @@ sub Set {
              "reset:$resets ".
              "roofIdentPair ".
              "writeHistory:noArg ".
-             (!isSolCastUsed ($hash) ? $cf : q{}).
-             (isSolCastUsed ($hash)  ? $sp : q{})
+             $cf
              ;
             
   my $params = {
@@ -1653,30 +1634,6 @@ return;
 }
 
 ################################################################
-#                      Setter pvSolCastPercentile
-################################################################
-sub _setpvSolCastPercentile {            ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $opt   = $paref->{opt};
-  my $prop  = $paref->{prop} // return qq{no SolCast percentile specified};
-
-  if($prop !~ /[1-9]0/x) {
-      return qq{The correction value must be specified by numbers 10, 20, 30 ... 90};
-  }
-  
-  readingsSingleUpdate($hash, $opt, $prop." (manual)", 1);
-  
-  my $cfnum = (split "_", $opt)[1]; 
-  deleteReadingspec ($hash, "pvSolCastPercentile_${cfnum}_autocalc");
-  
-  centralTask ($hash, 0);
-
-return;
-}
-
-################################################################
 #                 Setter pvCorrectionFactor_Auto
 ################################################################
 sub _setpvCorrectionFactorAuto {         ## no critic "not used"
@@ -1693,7 +1650,6 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
           $n     = sprintf "%02d", $n;
           my $rv = ReadingsVal ($name, "pvCorrectionFactor_${n}", "");
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*")  if($rv !~ /manual/xs);
-          deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*") if($rv !~ /manual/xs);
       }
       
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
@@ -1740,7 +1696,6 @@ sub _setreset {                          ## no critic "not used"
       for my $n (1..24) {
           $n = sprintf "%02d", $n;
           deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
-          deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
       }
       
       my $circ  = $paref->{prop1} // 'no';                                   # alle pvKorr-Werte aus Caches löschen ?
@@ -2010,7 +1965,14 @@ sub _getRoofTopData {
   my $t     = $paref->{t}     // time;
     
   if (!$force) {                                                                              # regulärer SolCast API Abruf
-      my $lang   = AttrVal ('global', 'language', 'EN');
+      my $trr  = SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreqs);
+      my $lang = AttrVal ('global', 'language', 'EN');
+      
+      if ($trr <= 0) {                                                                             # Test
+          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{bnsas}{$lang}, 1);
+          return qq{SolCast free daily limit is used up};
+      }
+      
       my $date   = strftime "%Y-%m-%d", localtime($t);
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');  
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
@@ -2225,15 +2187,9 @@ sub __solCast_ApiResponse {
           if(!$k && $petstr =~ /T\d{2}:00/xs) {                                                          # spezielle Behandlung ersten Datensatz wenn period_end auf volle Stunde fällt (es fehlt dann der erste Teil der Stunde)             
               $period   = $jdata->{'forecasts'}[$k]{'period'};                                           # -> dann bereits beim letzten Abruf gespeicherte Daten der aktuellen Stunde durch 2 teilen damit 
               $period   =~ s/.*(\d\d).*/$1/;                                                             # -> die neuen Daten (in dem Fall nur die einer halben Stunde) im nächsten Schritt addiert werden
-              
-              my $est10 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate10', 0) / (60/$period);
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} = $est10 if($est10);
-              
+                            
               my $est50 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0) / (60/$period);
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $est50 if($est50);
-                   
-              my $est90 = SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate90', 0) / (60/$period);   
-              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} = $est90 if($est90);          
+              $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $est50 if($est50);         
               
               $k++;
               next;                           
@@ -2257,8 +2213,6 @@ sub __solCast_ApiResponse {
           ($err, $starttmstr) = ___convPendToPstart ($name, $petstr);
           
           my $pvest50         = $jdata->{'forecasts'}[$k]{'pv_estimate'};
-          my $pvest10         = $jdata->{'forecasts'}[$k]{'pv_estimate10'};
-          my $pvest90         = $jdata->{'forecasts'}[$k]{'pv_estimate90'};
           
           $period             = $jdata->{'forecasts'}[$k]{'period'}; 
           $period             =~ s/.*(\d\d).*/$1/;
@@ -2270,9 +2224,7 @@ sub __solCast_ApiResponse {
               }
           }
           
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate10} += sprintf "%.0f", ($pvest10 * ($period/60) * 1000);
           $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} += sprintf "%.0f", ($pvest50 * ($period/60) * 1000);
-          $data{$type}{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate90} += sprintf "%.0f", ($pvest90 * ($period/60) * 1000);
           
           $k++;          
       }
@@ -2360,7 +2312,7 @@ sub ___setLastAPIcallKeyData {
   
   my $ddc  = SolCastAPIVal($hash, '?All', '?All', 'todayDoneAPIrequests',     0) /                                 
              SolCastAPIVal($hash, '?All', '?All', 'solCastAPIcallMultiplier', 0);                                   # ausgeführte API Calls  
-  my $drc  = SolCastAPIVal($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreqs) - $ddc;                                                                                          # verbleibende SolCast API Calls am aktuellen Tag
+  my $drc  = SolCastAPIVal($hash, '?All', '?All', 'todayMaxAPIcalls', $apimaxreqs) - $ddc;                                                                                                     # verbleibende SolCast API Calls am aktuellen Tag
   $drc     = 0 if($drc < 0);
   
   $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests} = $drr; 
@@ -2374,7 +2326,8 @@ sub ___setLastAPIcallKeyData {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
       my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
- 
+      $drc      += 1;                                                                                               # Test
+      
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
       
@@ -3014,6 +2967,10 @@ sub centralTask {
   #delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
   delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemaingAPIcalls};
   
+  for my $n (1..24) {
+      $n = sprintf "%02d", $n;
+      deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
+  }
   ###############################################################
 
   my $interval = controlParams ($name);
@@ -3096,7 +3053,7 @@ sub centralTask {
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten    
       _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
       _manageConsumerData         ($centpars);                                            # Consumerdaten sammeln und planen  
-      _estConsumptionForecast     ($centpars);                                            # erwarteten Verbrauch berechnen
+      _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
       _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren  
       _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
       _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
@@ -3322,7 +3279,6 @@ sub _specialActivities {
               for my $n (1..24) {
                   $n = sprintf "%02d", $n;
                   deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
-                  deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
               }
           }
                   
@@ -3817,34 +3773,7 @@ sub __calcSolCastEstimates {
       
       $peak *= 1000;
       
-      my $est50 = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0); 
-      
-      ## Zusatzpercentile berechnen - Muster:
-      ## 
-      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate20} = sprintf "%.0f", ($est50 - ($lowdm * 3));
-      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate30} = sprintf "%.0f", ($est50 - ($lowdm * 2));          
-      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate40} = sprintf "%.0f", ($est50 - ($lowdm * 1));
-      ##
-      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate60} = sprintf "%.0f", ($est50 + ($highdm * 1));          
-      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate70} = sprintf "%.0f", ($est50 + ($highdm * 2));
-      ## $data{$type}{$name}{solcastapi}{$string}{$wantdt}{pv_estimate80} = sprintf "%.0f", ($est50 + ($highdm * 3));
-      #################################################################################################################
-      if ($perc != 50) {
-          if ($perc < 50) {
-              my $est10 = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate10', $est50);
-              my $lowdm = ($est50 - $est10) / 4;
-              $data{$type}{$name}{solcastapi}{$string}{$wantdt}{'pv_estimate'.$perc} = sprintf "%.0f", ($est50 - ($lowdm * $hpctpl{$perc}{mp}));
-          }
-          else {
-              my $est90  = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate90', $est50);
-              my $highdm = ($est90 - $est50) / 4;
-              $data{$type}{$name}{solcastapi}{$string}{$wantdt}{'pv_estimate'.$perc} = sprintf "%.0f", ($est50 + ($highdm * $hpctpl{$perc}{mp}));
-          }          
-      }
-      
-      ####
-      
-      my $est = SolCastAPIVal   ($hash, $string, $wantdt, 'pv_estimate'.$perc, $est50);
+      my $est = SolCastAPIVal ($hash, $string, $wantdt, 'pv_estimate50', 0) * $perc;
       my $pv  = sprintf "%.1f", ($est * $ccf * $rcf);
 
       if(AttrVal ($name, 'verbose', 3) == 4) {
@@ -3923,7 +3852,7 @@ sub ___readPercAndQuality {
   my $fd    = $paref->{fd};
   
   my $uac        = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
-  my $perc       = ReadingsNum ($name, "pvSolCastPercentile_".sprintf("%02d",$fh1), 50);              # Estimate Percentil
+  my $perc       = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh1), 1.0);              # Estimate Percentilfaktor
   my $hcfound    = "use manual percentile selection";
   my $hq         = "m";
   
@@ -3931,16 +3860,17 @@ sub ___readPercAndQuality {
       $hcfound     = "yes";                                                                           # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
       ($perc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh1), 'percentile', undef);          # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
       $hq        //= 0;
+      
       if (!$perc) {
           $hcfound = "no";
-          $perc    = 50;                                                                              # keine Korrektur  
+          $perc    = 1.0;                                                                              # keine Korrektur  
           $hq      = 0;
       }
       
-      $perc = 50 if(!$perc);
+      $perc = 1.0 if($perc >= 10);
   }
   
-  $perc = sprintf "%.0f", $perc;
+  $perc = sprintf "%.2f", $perc;
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $perc."/".$hq;
    
@@ -4623,7 +4553,7 @@ return;
 ###################################################################
 #  Verbraucherspezifische Energiestück Ermittlung
 #
-#  epiecHistCounts = x gibt an wie viele Zyklen betrachtet werden
+#  epiecHCounts = x gibt an wie viele Zyklen betrachtet werden
 #                      sollen
 #  epiecHist => x ist der Index des Speicherbereichs der aktuell 
 #               benutzt wird.
@@ -4632,7 +4562,7 @@ return;
 #  epiecHist_x_hours => x Stunden des Durchlauf bzw. wie viele 
 #                         Einträge epiecHist_x hat
 #  epiecAVG => 1=x 2=x und epiecAVG_hours => x enthalten die 
-#              durchschnittlichen Werte der in epiecHistCounts 
+#              durchschnittlichen Werte der in epiecHCounts 
 #              vorgegebenen Durchläufe.
 #
 ###################################################################
@@ -4654,8 +4584,8 @@ sub ___csmSpecificEpieces {
                 99;
 
   if($offTime < 300) {                                                                                  # erst nach 60s ist das Gerät aus
-      my $epiecHist        = "";
-      my $epiecHist_hours  = "";
+      my $epiecHist       = "";
+      my $epiecHist_hours = "";
        
       if(ConsumerVal ($hash, $c, "epiecHour", -1) < 0) {                                                # neue Aufzeichnung
           $data{$type}{$name}{consumers}{$c}{epiecStartTime} = $t;
@@ -4678,7 +4608,7 @@ sub ___csmSpecificEpieces {
       }
       
       my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
-      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = $ediff;
+      $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = sprintf '%.2f', $ediff;
       $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
       $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $ediff ? $epiecHour : $epiecHour - 1; # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
   } 
@@ -4726,6 +4656,12 @@ return;
 
 ###################################################################
 #    Consumer Schaltzeiten planen
+#
+#    ToDo:  bei mode=can ->
+#           die $epieceX aller bereits geplanten
+#           Consumer der entsprechenden Stunde XX von $surplus
+#           abziehen weil schon "verplant"
+#
 ###################################################################
 sub __planSwitchTimes {
   my $paref = shift;
@@ -4747,25 +4683,25 @@ sub __planSwitchTimes {
   #############################
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", 0 );
-      my $confc   = NexthoursVal ($hash, $idx, "confc",      0 );
-      my $surplus = $pvfc-$confc;                                                          # Energieüberschuß (kann negativ sein)
-      # next if($surplus <= 0);
+      my $confcex = NexthoursVal ($hash, $idx, "confcEx",    0 );                          # prognostizierter Verbrauch ohne registrierte Consumer
       
-      my ($hour) = $idx =~ /NextHour(\d+)/xs;
-      $max{$surplus}{starttime} = NexthoursVal ($hash, $idx, "starttime", "");
-      $max{$surplus}{today}     = NexthoursVal ($hash, $idx, "today",      0);
-      $max{$surplus}{nexthour}  = int ($hour);
+      my $spexp   = $pvfc-$confcex;                                                          # prognostizierter Energieüberschuß (kann negativ sein)
+      
+      my ($hour)              = $idx =~ /NextHour(\d+)/xs;
+      $max{$spexp}{starttime} = NexthoursVal ($hash, $idx, "starttime", "");
+      $max{$spexp}{today}     = NexthoursVal ($hash, $idx, "today",      0);
+      $max{$spexp}{nexthour}  = int ($hour);
   }
   
   my $order = 1;
   for my $k (reverse sort{$a<=>$b} keys %max) {
-      $max{$order}{surplus}   = $k;
+      $max{$order}{spexp}     = $k;
       $max{$order}{starttime} = $max{$k}{starttime};
       $max{$order}{nexthour}  = $max{$k}{nexthour};
       $max{$order}{today}     = $max{$k}{today};
       
       my $ts = timestringToTimestamp ($max{$k}{starttime});
-      $mtimes{$ts}{surplus}   = $k;
+      $mtimes{$ts}{spexp}     = $k;
       $mtimes{$ts}{starttime} = $max{$k}{starttime};
       $mtimes{$ts}{nexthour}  = $max{$k}{nexthour};
       $mtimes{$ts}{today}     = $max{$k}{today};
@@ -4802,12 +4738,12 @@ sub __planSwitchTimes {
       if($debug) {                                                                                     # nur für Debugging
           Log (1, qq{DEBUG> $name consumer "$c" - mode: $mode, relevant hash: mtimes});
           for my $m (sort{$a<=>$b} keys %mtimes) {                                                   
-              Log (1, qq{DEBUG> $name consumer "$c" - hash: mtimes, surplus: $mtimes{$m}{surplus}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}}); 
+              Log (1, qq{DEBUG> $name consumer "$c" - hash: mtimes, surplus expected: $mtimes{$m}{spexp}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}}); 
           }
       }
       
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          if($mtimes{$ts}{surplus} >= $epiece1) {                                                      # die früheste Startzeit sofern Überschuß größer als Bedarf 
+          if($mtimes{$ts}{spexp} >= $epiece1) {                                                        # die früheste Startzeit sofern Überschuß größer als Bedarf 
               my $starttime       = $mtimes{$ts}{starttime};
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
@@ -4841,7 +4777,7 @@ sub __planSwitchTimes {
       if($debug) {                                                                                     # nur für Debugging
           Log (1, qq{DEBUG> $name consumer "$c" - mode: $mode, relevant hash: max});
           for my $o (sort{$a<=>$b} keys %max) {                                                   
-              Log (1, qq{DEBUG> $name consumer "$c" - hash: max, surplus: $max{$o}{surplus}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}}); 
+              Log (1, qq{DEBUG> $name consumer "$c" - hash: max, surplus: $max{$o}{spexp}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}}); 
           }
       }
       
@@ -5588,37 +5524,38 @@ sub _estConsumptionForecast {
   my $totcon     = 0;
   my $dnum       = 0;
   my $consumerco = 0;
-  my $min        =  (~0 >> 1);
-  my $max        = -(~0 >> 1);
+  #my $min        =  (~0 >> 1);
+  #my $max        = -(~0 >> 1);
   
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
-      next if ($n eq $dayname);                                                                         # aktuellen (unvollständigen) Tag nicht berücksichtigen
+      next if ($n eq $day);                                                                             # aktuellen (unvollständigen) Tag nicht berücksichtigen
       
       if ($swdfcfc) {                                                                                   # nur gleiche Tage (Mo...So) einbeziehen
-          my $hdn = HistoryVal ($hash, $n, 99, "dayname", undef);
+          my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
           next if(!$hdn || $hdn ne $tomorrow);
       }
       
       my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
       next if(!$dcon);
 
-      for my $c (sort{$a<=>$b} keys %{$acref}) {                                                        # historischen Verbrauch aller registrierten Verbraucher aufaddieren
-          $consumerco += HistoryVal ($hash, $n, 99, "csme${c}", 0);
-      }
+      #for my $c (sort{$a<=>$b} keys %{$acref}) {                                                        # historischen Verbrauch aller registrierten Verbraucher aufaddieren
+      #    $consumerco += HistoryVal ($hash, $n, 99, "csme${c}", 0);
+      #}
       
-      $dcon -= $consumerco if($dcon >= $consumerco);                                                    # Verbrauch registrierter Verbraucher aus Verbrauch eliminieren
+      #$dcon -= $consumerco if($dcon >= $consumerco);                                                    # Verbrauch registrierter Verbraucher aus Verbrauchsvorhersage eliminieren
     
-      $min  = $dcon if($dcon < $min);
-      $max  = $dcon if($dcon > $max);
+      #$min  = $dcon if($dcon < $min);
+      #$max  = $dcon if($dcon > $max);
       
       $totcon += $dcon;
       $dnum++;      
   }
   
   if ($dnum) {
-       my $ddiff                                         = ($max - $min)/$dnum;                          # Glättungsdifferenz
-       my $tomavg                                        = int (($totcon/$dnum)-$ddiff);
-       $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # Durchschnittsverbrauch aller (gleicher) Wochentage
+       #my $ddiff                                         = ($max - $min)/$dnum;                          # Glättungsdifferenz
+       #my $tomavg                                        = int (($totcon/$dnum)-$ddiff);
+       my $tomavg                                        = int ($totcon / $dnum);
+       $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
     
        Log3 ($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
   }
@@ -5636,6 +5573,14 @@ sub _estConsumptionForecast {
                "17" => 0, "18" => 0, "19" => 0, "20" => 0,
                "21" => 0, "22" => 0, "23" => 0, "24" => 0,
              };
+             
+  my $conhex = { "01" => 0, "02" => 0, "03" => 0, "04" => 0,
+                 "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+                 "09" => 0, "10" => 0, "11" => 0, "12" => 0,
+                 "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+                 "17" => 0, "18" => 0, "19" => 0, "20" => 0,
+                 "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+               };
   
   for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
       my $nhtime = NexthoursVal ($hash, $k, "starttime", undef);                                      # Startzeit
@@ -5643,8 +5588,8 @@ sub _estConsumptionForecast {
       
       $dnum       = 0;
       $consumerco = 0;
-      $min        =  (~0 >> 1);
-      $max        = -(~0 >> 1);
+      #$min        =  (~0 >> 1);
+      #$max        = -(~0 >> 1);
       my $utime   = timestringToTimestamp ($nhtime);
       my $nhday   = strftime "%a", localtime($utime);                                               # Wochentagsname des NextHours Key
       my $nhhr    = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);                  # Stunde des Tages vom NextHours Key  (01,02,...24) 
@@ -5664,19 +5609,22 @@ sub _estConsumptionForecast {
               $consumerco += HistoryVal ($hash, $m, $nhhr, "csme${c}", 0);
           }
           
-          $hcon -= $consumerco if($hcon >= $consumerco);                                            # Verbrauch registrierter Verbraucher aus Verbrauch eliminieren
-          
-          $min = $hcon if($hcon < $min);
-          $max = $hcon if($hcon > $max);
+          #$hcon -= $consumerco if($hcon >= $consumerco);                                            # Verbrauch registrierter Verbraucher aus Verbrauch eliminieren
+          $conhex->{$nhhr} += $hcon - $consumerco if($hcon >= $consumerco);                          # prognostizierter Verbrauch Ex registrierter Verbraucher
+          #$min = $hcon if($hcon < $min);
+          #$max = $hcon if($hcon > $max);
           
           $conh->{$nhhr} += $hcon;  
           $dnum++;
       }
       
       if ($dnum) {
-           my $hdiff                                 = ($max - $min)/$dnum;                         # Glättungsdifferenz
-           my $conavg                                = int(($conh->{$nhhr}/$dnum)-$hdiff);
-           $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                                     # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+           #my $hdiff                                 = ($max - $min)/$dnum;                         # Glättungsdifferenz
+           #my $conavg                                = int(($conh->{$nhhr}/$dnum)-$hdiff);
+           $data{$type}{$name}{nexthours}{$k}{confcEx} = int ($conhex->{$nhhr} / $dnum);
+           
+           my $conavg                                  = int ($conh->{$nhhr} / $dnum);
+           $data{$type}{$name}{nexthours}{$k}{confc}   = $conavg;                                   # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
            
            if (NexthoursVal ($hash, $k, "today", 0)) {                                              # nur Werte des aktuellen Tag speichern
                $data{$type}{$name}{circular}{sprintf("%02d",$nhhr)}{confc} = $conavg; 
@@ -6534,7 +6482,7 @@ sub _graphicHeader {
   
   my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
-  my $pvcanz     = (isSolCastUsed ($hash) ? 'Percentile' : 'factor').qq{: $pcf / quality: $pcq};
+  my $pvcanz     = qq{factor: $pcf / quality: $pcq};                                               # Test
   $pcq           =~ s/m/-1/xs;
   my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
 
@@ -8295,8 +8243,8 @@ return ($usenhd, $nhd);
 }
 
 ################################################################
-#  PVreal mit den SolCast Percentilen vergleichen und das 
-#  beste Percentil als Auswahl speichern
+#  PVreal mit den SolCast Forecast vergleichen und den 
+#  Korrekturfaktor berechnen / speichern
 ################################################################
 sub _calcCAQwithSolCastPercentil {               
   my $paref = shift;
@@ -8316,72 +8264,36 @@ sub _calcCAQwithSolCastPercentil {
       my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvval);
       
-      my $cdone = ReadingsVal ($name, "pvSolCastPercentile_".sprintf("%02d",$h)."_autocalc", "");
-      
+      my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
+ 
       if($cdone eq "done") {
-          Log3 ($name, 5, "$name - pvSolCastPercentile Hour: ".sprintf("%02d",$h)." already calculated");
+          Log3 ($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
           next;
       }
       
       $paref->{hour}      = $h;
-      my ($dnum,$avgperc) = __avgSolCastPercFromHistory ($paref);                                              # historische Percentile / Qualität ermitteln
+      my ($dnum,$avgperc) = __avgSolCastPercFromHistory ($paref);                                              # historischen Percentilfaktor / Qualität ermitteln
                   
-      my ($oldperc, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 0);                 # bisher definiertes Percentil/Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
-      $oldperc             = 50 if(1 * $oldperc == 0);
+      my ($oldperc, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), 'percentile', 1.0);               # bisher definiertes Percentil/Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
+      $oldperc             = 1.0 if(1 * $oldperc == 0 || $oldperc >= 10);
       
       my @sts   = split ",", ReadingsVal($name, 'inverterStrings', '');
       my $tmstr = $date.' '.sprintf("%02d",$h-1).':00:00';
       
-      my ($est10,$est20,$est30,$est40,$est50,$est60,$est70,$est80,$est90);
+      my $est50 = 0;
 
-      for my $s (@sts) {     
-          $est10 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate10', 0);
+      for my $s (@sts) {
           $est50 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate50', 0);                                     # Standardpercentil
-          $est90 += SolCastAPIVal ($hash, $s, $tmstr, 'pv_estimate90', 0);
       } 
       
       if(!$est50) {                                                                                            # kein Standardpercentile vorhanden
-          Log (1, qq{DEBUG> $name percentile -> hour: $h, the best percentile can't be identified because of the default percentile has no value yet}) if($debug);                                   
+          Log (1, qq{DEBUG> $name percentile -> hour: $h, the percentile factor can't be calculated because of the default percentile has no value yet}) if($debug);                                   
           next;                                                                                              
       }
       
-      ## Zusatzpercentile berechnen
-      ###############################
-      my $lowdm  = ($est50 - $est10) / 4;
-      my $highdm = ($est90 - $est50) / 4;
+      my $perc = sprintf "%.2f", ($pvval / $est50);                                                                               # berechneter Faktor der Stunde -> speichern in pvHistory
       
-      $est20 = sprintf "%.0f", ($est50 - ($lowdm * 3));
-      $est30 = sprintf "%.0f", ($est50 - ($lowdm * 2));          
-      $est40 = sprintf "%.0f", ($est50 - ($lowdm * 1));
-      
-      $est60 = sprintf "%.0f", ($est50 + ($highdm * 1));          
-      $est70 = sprintf "%.0f", ($est50 + ($highdm * 2));
-      $est80 = sprintf "%.0f", ($est50 + ($highdm * 3));
-            
-      my %pc = (
-        1 => { perc => 40, est => $est40 },
-        2 => { perc => 30, est => $est30 },
-        3 => { perc => 20, est => $est20 },
-        4 => { perc => 10, est => $est10 },
-        5 => { perc => 60, est => $est60 },
-        6 => { perc => 70, est => $est70 },
-        7 => { perc => 80, est => $est80 },
-        8 => { perc => 90, est => $est90 },
-      );      
-      
-      my $perc  = 50;                                                                                         # Standardpercentil 
-      my $diff0 = abs ($est50 - $pvval);
-                                                                                                                                              ## no critic 'NoStrict'
-      for my $p (sort keys %pc) {        
-          my $diff1 = abs ($pc{$p}{est} - $pvval);
-           
-          if($diff1 < $diff0) {
-              $diff0 = $diff1;
-              $perc  = $pc{$p}{perc};
-          }
-      }
-      
-      $paref->{pvcorrf}  = $perc.'/1';                                                                       # bestes Percentil in History speichern
+      $paref->{pvcorrf}  = $perc.'/1';                                                                         # Percentilfaktor in History speichern
       $paref->{nhour}    = sprintf("%02d",$h);
       $paref->{histname} = "pvcorrfactor";
       
@@ -8392,9 +8304,8 @@ sub _calcCAQwithSolCastPercentil {
       delete $paref->{pvcorrf};       
       
       if ($debug) {                                                                                          # nur für Debugging
-          Log (1, qq{DEBUG> $name summary PV estimates for hour of day "$h":\n}.
-                  qq{est10: $est10, est20: $est20, est30: $est30, est40: $est40, est50 (default): $est50, est60: $est60, est70: $est70, est80: $est80, est90: $est90});                                   
-          Log (1, qq{DEBUG> $name percentile -> hour: $h, number checked days: $dnum, pvreal: $pvval, diffbest: $diff0, best percentile: $perc});                                   
+          Log (1, qq{DEBUG> $name PV estimates for hour of day "$h": $est50});                                 
+          Log (1, qq{DEBUG> $name percentile factor -> number checked days: $dnum, pvreal: $pvval, percentile factor: $perc});                                   
       } 
       
       my ($usenhd) = __useNumHistDays ($name);                                                               # ist Attr affectNumHistDays gesetzt ?
@@ -8402,31 +8313,28 @@ sub _calcCAQwithSolCastPercentil {
       if($dnum) {                                                                                            # Werte in History vorhanden -> haben Prio !
           $avgperc = $avgperc * $dnum;
           $dnum++;                                                                            
-          $perc    = sprintf "%.0f", ((($avgperc + $perc) / $dnum) / 10);
+          $perc    = sprintf "%.2f", (($avgperc + $perc) / $dnum);
           
           if ($debug) {
-              Log (1, qq{DEBUG> $name percentile -> old avg percentile: }.($avgperc/($dnum-1)).qq{, new avg percentile: }.$perc * 10);                                   
+              Log (1, qq{DEBUG> $name percentile -> old avg percentile: }.($avgperc/($dnum-1)).qq{, new avg percentile: }.$perc);                                   
           }          
       }
       elsif($oldperc && !$usenhd) {                                                                          # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
           $oldperc = $oldperc * $oldq;
           $dnum    = $oldq + 1;
-          $perc    = sprintf "%.0f", ((($oldperc + $perc) / $dnum) / 10);
+          $perc    = sprintf "%.0f", (($oldperc + $perc) / $dnum);
           
           if ($debug) {
               Log (1, qq{DEBUG> $name percentile -> old circular percentile: }.($oldperc/$oldq).qq{, new percentile: }.$perc * 10); 
           }
       }
       else {                                                                                                 # ganz neuer Wert
-          $perc   = sprintf "%.0f", ($perc / 10);
-          $dnum   = 1;
+          $dnum = 1;
 
           if ($debug) {
-              Log (1, qq{DEBUG> $name percentile -> new percentile: }.$perc * 10); 
+              Log (1, qq{DEBUG> $name percentile -> new percentile: }.$perc); 
           }          
       }
-      
-      $perc = $perc * 10;
             
       Log3 ($name, 5, "$name - write percentile into circular Hash: $perc, Hour $h");
       
@@ -8435,8 +8343,8 @@ sub _calcCAQwithSolCastPercentil {
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{percentile} = $perc;                        # bestes Percentil für die jeweilige Stunde speichern
       $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{percentile} = $dnum;                        # Percentil Qualität
   
-      push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."<>".$perc." (automatic - old percentile: $oldperc, average days: $dnum)";
-      push @$daref, "pvSolCastPercentile_".sprintf("%02d",$h)."_autocalc<>done";    
+      push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$perc." (automatic - old factor: $oldperc, average days: $dnum)";
+      push @$daref, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";    
   }
       
 return;
@@ -8483,21 +8391,21 @@ sub __avgSolCastPercFromHistory {
       return 0;
   }     
   
-  my ($dnum, $percsum) = (0, 0);      
-  my ($perc, $qual)    = (50,0);
+  my ($dnum, $percsum) = (0,0);      
+  my ($perc, $qual)    = (1,0);
         
   for my $dayfa (@efa) {
-      my $histval = HistoryVal ($hash, $dayfa, $hour, 'pvcorrf', undef);               # historisches Percentil/Qualität
+      my $histval = HistoryVal ($hash, $dayfa, $hour, 'pvcorrf', undef);               # historischen Percentilfaktor/Qualität
       
       next if(!defined $histval);
 
-      ($perc, $qual) = split "/", $histval;                                            # Percentil und Qualität splitten
+      ($perc, $qual) = split "/", $histval;                                            # Percentilfaktor und Qualität splitten
 
       next if(!$perc || $qual eq 'm');                                                 # manuell eingestellte Percentile überspringen
       
-      $perc = 50 if(!$perc || $perc < 10);
+      $perc = 1 if(!$perc || $perc >= 10);
       
-      Log3 ($name, 5, qq{$name - PV History -> historical Day/hour $dayfa/$hour included - percentile: $perc});
+      Log3 ($name, 5, qq{$name - PV History -> historical Day/hour $dayfa/$hour included - percentile factor: $perc});
       
       $dnum++;
       $percsum += $perc ;
@@ -8506,13 +8414,13 @@ sub __avgSolCastPercFromHistory {
   }
   
   if(!$dnum) {
-      Log3 ($name, 5, "$name - PV History -> no historical percentile selected");
+      Log3 ($name, 5, "$name - PV History -> no historical percentile factor selected");
       return 0;
   }
   
-  $perc = sprintf "%.0f", ($percsum/$dnum);
+  $perc = sprintf "%.2f", ($percsum/$dnum);
   
-  Log3 ($name, 5, "$name - PV History -> Summary - days: $dnum, average percentile: $perc");
+  Log3 ($name, 5, "$name - PV History -> Summary - days: $dnum, average percentile factor: $perc");
   
 return ($dnum,$perc);
 }
@@ -8976,12 +8884,13 @@ sub listDataPool {
           my $rad1h   = NexthoursVal ($hash, $idx, "Rad1h",      "-");
           my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-");
           my $temp    = NexthoursVal ($hash, $idx, "temp",       "-");
-          my $confc   = NexthoursVal ($hash, $idx, "confc",      "-");
+          my $confc   = NexthoursVal ($hash, $idx, "confc",      "-");  
+          my $confcex = NexthoursVal ($hash, $idx, "confcEx",    "-");  
           $sq        .= "\n" if($sq);
           $sq        .= $idx." => starttime: $nhts, hourofday: $hod, today: $today\n";
-          $sq        .= "              pvfc: $pvfc, confc: $confc, Rad1h: $rad1h\n";
+          $sq        .= "              pvfc: $pvfc, confc: $confc, confcEx: $confcex\n";
           $sq        .= "              wid: $wid, wcc: $neff, wrp: $r101, temp=$temp\n";
-          $sq        .= "              crange: $crange, correff: $pvcorrf";
+          $sq        .= "              Rad1h: $rad1h, crange: $crange, correff: $pvcorrf";
       }
   }
   
@@ -10133,7 +10042,7 @@ sub CircularAutokorrVal {
 return ($pvcorrf, $quality);
 }
 
-################################################################
+#########################################################################################
 # Wert des nexthours-Hash zurückliefern
 # Usage:
 # NexthoursVal ($hash, $hod, $key, $def)
@@ -10147,11 +10056,13 @@ return ($pvcorrf, $quality);
 #       cloudrange - berechnete Bewölkungsrange
 #       rainprob   - DWD Regenwahrscheinlichkeit
 #       Rad1h      - Globalstrahlung (kJ/m2)
-#       confc      - Vorhersage Hausverbrauch (Wh)
+#       confc      - prognostizierter Hausverbrauch (Wh)
+#       confcEx    - prognostizierter Hausverbrauch ohne registrierte Consumer (Wh)
 #       today      - 1 wenn heute
+#       correff    - verwendeter Korrekturfaktor bzw. SolCast Percentil/Qualität 
 # $def: Defaultwert
 #
-################################################################
+#########################################################################################
 sub NexthoursVal {
   my $hash = shift;
   my $hod  = shift;
@@ -10739,7 +10650,8 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
       (nur bei Verwendung des DWD_OpenData RadiationDev) <br><br>
       
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
-      Mögliche Neigungswinkel sind: 0,10,20,25,30,40,45,50,60,70,80,90 (0 = waagerecht, 90 = senkrecht). <br><br>
+      Mögliche Neigungswinkel sind: 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90 
+      (0 = waagerecht, 90 = senkrecht). <br><br>
       
       <ul>
         <b>Beispiel: </b> <br>
@@ -10850,23 +10762,10 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
     
     <ul>
       <a id="SolarForecast-set-pvCorrectionFactor_" data-pattern="pvCorrectionFactor_.*"></a>
-      <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br>
-      (nur bei Verwendung Model DWD) <br><br>      
+      <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br>     
       
       Manueller Korrekturfaktor für die Stunde XX des Tages zur Anpassung der Vorhersage an die individuelle Anlage. <br>
       (default: 1.0)      
-      </li>
-    </ul>
-    <br>
-    
-    <ul>
-      <a id="SolarForecast-set-pvSolCastPercentile_" data-pattern="pvSolCastPercentile_.*"></a>
-      <li><b>pvSolCastPercentile_XX &lt;Zahl&gt; </b> <br>
-      (nur bei Verwendung Model SolCastAPI) <br><br>
-      
-      Manuelle Auswahl eines SolCast API Percentile für die Stunde XX des Tages zur Anpassung der Vorhersage an die 
-      individuelle Anlage. <br>
-      (default: 50)      
       </li>
     </ul>
     <br>
@@ -10895,10 +10794,10 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>energyH4Trigger</b>    </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                           </td></tr>
             <tr><td> <b>inverterStrings</b>    </td><td>löscht die Stringkonfiguration der Anlage                                                                            </td></tr>
             <tr><td> <b>powerTrigger</b>       </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                      </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvSolCastPercentile* / pvCorrectionFactor*                                                       </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren / Percentile aus den Caches zu löschen:                            </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>löscht die Readings pvCorrectionFactor*                                                                              </td></tr>
+            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                         </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                 </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren / Percentile einer bestimmten Stunde aus den Caches zu löschen:                 </td></tr>
+            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                              </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                 </td></tr>    
             <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                 </td></tr>            
             <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                              </td></tr>
@@ -11006,15 +10905,16 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td> <b>starttime</b> </td><td>Startzeit des Datensatzes                                                          </td></tr>
             <tr><td> <b>hourofday</b> </td><td>laufende Stunde des Tages                                                          </td></tr>
             <tr><td> <b>pvfc</b>      </td><td>erwartete PV Erzeugung (Wh)                                                        </td></tr>
-            <tr><td> <b>today</b>     </td><td>=1 wenn Startdatum am aktuellen Tag                                                </td></tr>
-            <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch                                                        </td></tr>
+            <tr><td> <b>today</b>     </td><td>"1" wenn Startdatum am aktuellen Tag                                               </td></tr>
+            <tr><td> <b>confc</b>     </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher        </td></tr>
+            <tr><td> <b>confcEx</b>   </td><td>erwarteter Energieverbrauch ohne der Anteile registrierter Verbraucher             </td></tr>
             <tr><td> <b>wid</b>       </td><td>ID des vorhergesagten Wetters                                                      </td></tr> 
             <tr><td> <b>wcc</b>       </td><td>vorhergesagter Grad der Bewölkung                                                  </td></tr>
             <tr><td> <b>crange</b>    </td><td>berechneter Bewölkungsbereich                                                      </td></tr>
-            <tr><td> <b>correff</b>   </td><td>verwendeter Korrekturfaktor bzw. SolCast Percentil/Qualität                        </td></tr>
-            <tr><td>                  </td><td>Korrektur/m - manuell                                                              </td></tr>
-            <tr><td>                  </td><td>Korrektur/0 - Korrektur nicht in Store vorhanden (default wird verwendet)          </td></tr>
-            <tr><td>                  </td><td>Korrektur/1...X - Korrektur aus Store genutzt (höhere Zahl = bessere Qualität)     </td></tr>
+            <tr><td> <b>correff</b>   </td><td>verwendeter Korrekturfaktor/Qualität                                               </td></tr>
+            <tr><td>                  </td><td>Faktor/m - manuell                                                                 </td></tr>
+            <tr><td>                  </td><td>Faktor/0 - Korrektur nicht in Store vorhanden (default wird verwendet)             </td></tr>
+            <tr><td>                  </td><td>Faktor/1...X - Korrektur aus Store genutzt (höhere Zahl = bessere Qualität)        </td></tr>
             <tr><td> <b>wrp</b>       </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                    </td></tr>
             <tr><td> <b>Rad1h</b>     </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
             <tr><td> <b>temp</b>      </td><td>vorhergesagte Außentemperatur                                                      </td></tr>        
@@ -11333,11 +11233,11 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
             <tr><td>                       </td><td><b>Device</b> - Device zur Lieferung der vorrangigen Ausschaltbedingung                                                                        </td></tr>
             <tr><td>                       </td><td><b>Reading</b> - Reading zur Lieferung der vorrangigen Ausschaltbedingung                                                                      </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck der für die Ausschaltbedingung erfüllt sein muß                                                              </td></tr>
-            <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher (optional)                                                                  </td></tr>
-            <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär unterbrochen falls der PV Überschuß die benötigte Energie unterschreitet (default)                  </td></tr>
-            <tr><td>                       </td><td><b>1</b> - Verbraucher darf temporär unterbrochen werden falls der PV Überschuß die benötigte Energie unterschreitet                           </td></tr>
+            <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher nachdem er gestartet wurde (optional)                                       </td></tr>
+            <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)             </td></tr>
+            <tr><td>                       </td><td><b>1</b> - Verbraucher wird temporär ausgeschaltet falls der PV Überschuß die benötigte Energie unterschreitet                                 </td></tr>
             <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysterese]</b> - Verbraucher wird temporär unterbrochen wenn der Wert des angegebenen                                 </td></tr>
-            <tr><td>                       </td><td>Device/Readings auf den Regex matched oder unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                       </td></tr>
+            <tr><td>                       </td><td>Device:Readings auf den Regex matched oder unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                       </td></tr>
             <tr><td>                       </td><td>Matched der Wert nicht mehr, wird der unterbrochene Verbraucher wieder eingeschaltet sofern ausreichender                                      </td></tr>
             <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt.                                                                                                 </td></tr>
             <tr><td>                       </td><td>Die optionale Hysterese ist ein numerischer Wert um den der Ausschaltpunkt gegenüber dem Soll-Einschaltpunkt                                   </td></tr>
