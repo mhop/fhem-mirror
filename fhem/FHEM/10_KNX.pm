@@ -96,7 +96,7 @@
 #              fix dpt14.057 unit 'dpt14.057' { cos&phi; vs. cosφ ) =>need UTF8 in DbLog spec !
 #              new dpt217 - for EBUSD KNX implementation
 #              no default slider in FHEMWEB-set/get for dpt7,8,9,12,13 - use widgetoverride slider !
-#              cmdref formatting
+# MH 20221113  cleanup, cmdref formatting  
 
 
 package KNX; ## no critic 'package'
@@ -161,10 +161,8 @@ my $svnid       = '$Id$';
 
 #regex patterns
 #pattern for group-adress
-#my $PAT_GAD = '(?:3[01]|([012])?[0-9])\/(?:1[0-5]|[0-9])\/(?:2[0-4][0-9]|25[0-5]|([01])?[0-9]{1,2})'; # 0-31/0-15/0-255
 my $PAT_GAD = '(?:3[01]|([012])?[0-9])\/(?:[0-7])\/(?:2[0-4][0-9]|25[0-5]|([01])?[0-9]{1,2})'; # 0-31/0-7/0-255
 #pattern for group-adress in hex-format
-#my $PAT_GAD_HEX = '[01][0-9a-f]{4}'; # max is 1FFFF -> 31/7/255 5digits
 my $PAT_GAD_HEX = '[01][0-9a-f][0-7][0-9a-f]{2}'; # max is 1F7FF -> 31/7/255 5 digits
 #pattern for group-no
 my $PAT_GNO = '[gG][1-9][0-9]?';
@@ -554,13 +552,11 @@ sub KNX_Define {
 			$setlist = q{:} . $dptDetails->{SETLIST};
 		}
 		elsif (defined ($dptDetails->{MIN}) and looks_like_number($dptDetails->{MIN})) { #number? - place slider
-#		elsif (defined ($dptDetails->{MIN}) and ($dptDetails->{MIN} =~ m/0|[+-]?\d*[(.|,)\d*]/x)) { #number? - place slider
 			my $min = $dptDetails->{MIN};
 			my $max = $dptDetails->{MAX};
 			my $interval = int(($max-$min)/100);
 			$interval = 1 if ($interval == 0);
 			$setlist = ':slider,' . $min . q{,} . $interval . q{,} . $max if ($interval < 50); # nonsense for dpt7,8,9,12,13
-#			$setlist = ':slider,' . $min . q{,} . $interval . q{,} . $max;
 		}
 		elsif (defined ($dptDetails->{MIN})) { #on/off/...
 			my $min = $dptDetails->{MIN};
@@ -1011,18 +1007,6 @@ sub KNX_Parse {
 	#gad not defined yet, give feedback for autocreate
 	if (not (exists $modules{KNX}->{defptr}->{$gadCode})) {
 		return KNX_autoCreate($iohash,$gadCode);
-=pod		#format gad
-		my $gad = KNX_hexToName($gadCode);
-		#create name
-		my $newDevName = sprintf('KNX_%.2d%.2d%.3d',split (/\//x, $gad));
-		# check if any autocreate device has ignoretype "KNX..." set
-		my @acList = devspec2array('TYPE=autocreate');
-		foreach my $acdev (@acList) {
-			my $igntypes = AttrVal($acdev,'ignoreTypes',q{});
-			return q{} if($newDevName =~ /$igntypes/x);
-		}
-		return qq{UNDEFINED $newDevName KNX $gad} . q{:} . $MODELERR;
-=cut
 	}
 
 	#get list from device-hashes using given gadCode (==destination)
@@ -1038,7 +1022,7 @@ sub KNX_Parse {
 		push(@foundMsgs, $deviceName); # save to list even if dev is disabled
 
 		if (IsDisabled($deviceName) == 1) {
-			$deviceHash->{RAWMSG} = qq{rwp=$cmd, value=$val}; # for debugging
+			$deviceHash->{RAWMSG} = qq{gadName=$gadName cmd=$cmd, hexvalue=$val}; # for debugging
 			next;
 		}
 
@@ -1498,14 +1482,6 @@ sub enc_dpt4 { #single ascii or iso-8859-1 char
 	my $model = shift;
 	my $numval = encode('iso-8859-1', decode('utf8', $value)); #always convert to latin-1
 	$numval =~ s/[\x80-\xff]/?/gx if ($model eq 'dpt4.001'); #replace values >= 0x80 if ascii
-=pod
-	my $numval = q{};
-        if ($model eq 'dpt4.002' ) {
-                $numval = encode('iso-8859-1', decode('utf8', $value)); #convert to latin-1
-        } else {
-                $numval = encode('ascii', decode('utf8', $value)); # plain ascii
-        }
-=cut
 	#convert to hex-string
 	my $dat = unpack('H*', $numval);
 	return sprintf('00%s',$dat);
@@ -1606,14 +1582,6 @@ sub enc_dpt16 { #14-Octet String
 	my $model = shift;
 	my $numval = encode('iso-8859-1', decode('utf8', $value)); #always convert to latin-1
 	$numval =~ s/[\x80-\xff]/?/gx if ($model =~ /dpt16\.000/ix); #replace values >= 0x80 if ascii 
-=pod
-	my $numval = q{};
-	if ($model eq 'dpt16.001' ) {
-		$numval = encode('iso-8859-1', decode('utf8', $value)); #convert to latin-1
-	} else {
-		$numval = encode('ascii', decode('utf8', $value)); # plain ascii
-	}
-=cut
 	#convert to hex-string
 	my $dat = unpack('H*', $numval);
 	$dat = '00' if ($value =~ /^$PAT_DPT16_CLR/ix); # send all zero string if "clear line string"
@@ -1805,8 +1773,6 @@ sub dec_dpt16 { #14-Octet String or dpt4: single Char string
 	my $state = pack('H*',$value);
 	#convert from latin-1
 	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model !~ m/^dpt(?:16.000|4.001)$/x);
-##	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model =~ m/^dpt(16.001|4.002|16|4)$/x);
-#	$state = encode ('utf8', decode('iso-8859-1',$state)) if ($model =~ m/(16.001|4.002)/x);
 	$state = q{} if ($state =~ m/^[\x00]/ix); # case all zeros received
 	$state =~ s/[\x00-\x1F]+//gx; # remove non printable chars
 	return $state;
@@ -1887,7 +1853,6 @@ sub main::KNX_scan {
 		#check if IO-device is ready
 		my $iodev = $devhash->{IODev}->{NAME};
 		next if (! defined($iodev));
-#		my $iostate = InternalVal($iodev,'STATE',q{});
 		my $iostate = ReadingsVal($iodev,'state',q{});
 		next if ($iostate ne 'connected');
  
@@ -1931,36 +1896,6 @@ sub doKNX_scan {
 =begin html
 
 <style>
-  .wrap {
-    list-style-type: none;
-    padding-left: 30px;
-    width:100%;
-    column-count:2;
-    column-gap:20px;
-    -moz-column-count:2;
-    -moz-column-gap:20px;
-    -webkit-column-count:2;
-    -webkit-column-gap:20px;}
-  .wrap.ul {
-    float: left;
-    margin: 3px;
-    padding: 3px;
-    width: 40%; }
-  .wrap li { 
-    white-space: pre; }
-  .wrap.a {
-    float: left;
-    margin: 3px;
-    padding: 3px;
-    width: 40%; }
-  /* For mobile phones: */
-  @media only screen and (max-width: 800px) {
-    .wrap {column-count:1; background-color: lightblue;}
-  }
-  .pad20l {padding-left: 20px;}
-  .pad30l {padding-left: 30px;}
-  .pad40l {padding-left: 40px;}
-
   #KNX-dpt_ul {
     list-style-type: none;
     padding-left: 30px;
@@ -1971,7 +1906,6 @@ sub doKNX_scan {
     -moz-column-gap:20px;
     -webkit-column-count:2;
     -webkit-column-gap:20px;
-    float: left;
   }
   #KNX-dpt_ul li {
     padding-left: 1em; white-space: pre; overflow: clip;
@@ -1980,10 +1914,6 @@ sub doKNX_scan {
     display: inline-block;
     width: 6em;
     overflow: clip;
-  }
-  /* For mobile phones: */
-  @media only screen and (max-width: 1050px) {
-    #KNX-dpt_ul {column-count:1; -moz-column-count:1; -webkit-column-count:1;}
   }
   #KNX-attr_ul {
     list-style-type: none;
@@ -1995,21 +1925,18 @@ sub doKNX_scan {
     -moz-column-gap:20px;
     -webkit-column-count:2;
     -webkit-column-gap:20px;
-    float: left;
-    margin: 3px;
-    padding: 3px;
   }
   #KNX-attr_ul a {
     padding-left: 1em; width: 100%;
   }
   /* For mobile phones: */
   @media only screen and (max-width: 1050px) {
+    #KNX-dpt_ul {column-count:1; -moz-column-count:1; -webkit-column-count:1;}
     #KNX-attr_ul {column-count:1; -moz-column-count:1; -webkit-column-count:1;}
   }
 </style>
 <a id="KNX"></a>
 <h3>KNX</h3>
-<ul>
 <p>KNX is a standard for building automation / home automation. It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.</p>
 <p>For getting started, please refer to this document: <a href="https://www.knx.org/knx-en/for-your-home/">KNX for your home</a> -  knx.org web-site.</p>
 <p>While the <a href="#TUL">TUL-module</a>, <a href="#KNXTUL">KNXTUL-module</a>, or <a href="#KNXIO">KNXIO-module</a> represent the connection to the KNX network, 
@@ -2102,8 +2029,7 @@ The answer from the bus-device updates reading and state.</p>
 
 <a id="KNX-attr"></a>
 <p><strong>Common attributes</strong></p>
-<!-- <ul> -->
-<ol id="KNX-attr_ul">
+<ol id="KNX-attr_ul"> <!-- use ol as block element -->
 <a href="#DbLogattr">DbLogInclude</a><br /> 
 <a href="#DbLogattr">DbLogExclude</a><br />
 <a href="#DbLogattr">DbLogValueFn</a><br />
@@ -2131,9 +2057,8 @@ The answer from the bus-device updates reading and state.</p>
 <a href="#webCmd">webCmd</a><br /> 
 <a href="#webCmdLabel">webCmdLabel</a><br /> 
 <a href="#widgetOverride">widgetOverride</a>
-<!-- </ul> -->
 </ol>
-<br/>&nbsp;<br/>&nbsp;
+
 <p><strong>Special attributes</strong></p>
 <ul>
 <a id="KNX-attr-answerReading"></a><li>answerReading<br/>
@@ -2191,7 +2116,6 @@ The answer from the bus-device updates reading and state.</p>
 <p><strong>DPT - data-point-types</strong></p>
 <p>The following dpt are implemented and have to be assigned within the device definition. 
    The values right to the dpt define the valid range of Set-command values and Get-command return values and units.</p>
-<!-- <ul> -->
 <ol id="KNX-dpt_ul">
 <li><b>dpt1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>off, on, toggle</li>
 <li><b>dpt1.000 </b>  0, 1</li>
@@ -2301,9 +2225,8 @@ The answer from the bus-device updates reading and state.</p>
 <li><b>dpt22.101</b>  HVAC RHCC Status (readonly)</li>
 <li><b>dpt217.001</b> dpt version (readonly)</li>
 <li><b>dpt232&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>RGB-Value RRGGBB</li>
-<!-- </ul> -->
 </ol>
-<br/>&nbsp;<br/>&nbsp;
+
 <a id="KNX-utilities"></a>
 <p><strong>KNX Utility Functions</strong></p>
 <ul>
@@ -2327,8 +2250,6 @@ Returns number of "get's" issued.<br/>
 <code>defmod cmd_KNXscan cmdalias knxscan .* AS { my $res = KNX_scan($EVTPART0);; return 'Number of GAs scanned: '. $res;; }</code>
 <br/>
 </li>
-</ul>
-
 </ul>
 <br/>
 
