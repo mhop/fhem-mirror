@@ -33,18 +33,22 @@
 # 25/05/2022 first SVN version
 # 07/07/2022 cleanup, no functional changes
 # 09/07/2022 fix IOdevice ready check on set-cmd (KNXIO_write)
+# 01/09/2022 cleanup, simplify duplicate detection, perf improvements
+#            unify Log msgs
+# 13/11/2022 modify fifo logic
+#            improve cmd-ref
 
 
-package FHEM::KNXIO; ## no critic 'package'
+package KNXIO; ## no critic 'package'
 
 use strict;
 use warnings;
 use IO::Socket;
-use TcpServerUtils;
 use English qw(-no_match_vars);
 use Time::HiRes qw(gettimeofday);
 use DevIo qw(DevIo_OpenDev DevIo_SimpleWrite DevIo_SimpleRead DevIo_CloseDev DevIo_Disconnected DevIo_IsOpen);
-use English qw(-no_match_vars);
+use TcpServerUtils;
+use HttpUtils;
 use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 
 ### perlcritic parameters
@@ -81,14 +85,10 @@ BEGIN {
           AnalyzePerlCommand EvalSpecials
           TimeNow)
     );
-
-# export to main context
-GP_Export(qw(Initialize 
-             KNXIO_openDev KNXIO_init KNXIO_callback
-       )
-    );
 }
 
+# export to main context
+GP_Export(qw(Initialize ) );
 
 #####################################
 # global vars/constants
@@ -102,18 +102,12 @@ my $svnid    = '$Id$';
 sub Initialize {
 	my $hash = shift;
 	$hash->{DefFn}      = \&KNXIO_Define;
-#	$hash->{SetFn}      = "KNXIO_Set";
-#	$hash->{GetFn}      = "KNXIO_Get";
 	$hash->{AttrFn}     = \&KNXIO_Attr;
 	$hash->{ReadFn}     = \&KNXIO_Read;
 	$hash->{ReadyFn}    = \&KNXIO_Ready;
-#	$hash->{NotifyFn}   = \&KNXIO_Notify; # no need for... 
 	$hash->{WriteFn}    = \&KNXIO_Write;
 	$hash->{UndefFn}    = \&KNXIO_Undef;
 	$hash->{ShutdownFn} = \&KNXIO_Shutdown;
-#	$hash->{DeleteFn}   = "KNXIO_Delete";
-#	$hash->{DelayedShutdownFn} = "KNXIO_DelayedShutdown;
-#	$hash->{FingerprintFn}     = \&KNXIO_FingerPrint; # disabled
 
 	$hash->{AttrList}   = "disable:1 verbose:1,2,3,4,5";
 	$hash->{Clients}    = "KNX";
@@ -131,13 +125,13 @@ sub KNXIO_Define {
 	my @arg = split(/[\s\t\n]+/x,$def);
 	my $name = $arg[0] // return 'KNXIO-define: no name specified';
 	$hash->{NAME} = $name;
-	$svnid =~ s/.*\.pm\s(.+)Z.*/$1 UTC/ix;
+	$svnid =~ s/.*\.pm\s(.+)Z.*/$1/ix;
 	$hash->{SVN} = $svnid; # store svn info in dev hash
 
 	# handle mode X for FHEM2FHEM configs
 	if (scalar(@arg >=3) && $arg[2] eq 'X') {
 		$hash->{model} = $arg[2];
-		return InternalTimer(gettimeofday() + 0.5,\&KNXIO_openDev,$hash);
+		return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
 	}
 
 	return q{KNXIO-define syntax: "define <name> KNXIO <H|M|T> <ip-address|hostname>:<port> <phy-adress>" } . "\n" . 
@@ -150,7 +144,8 @@ sub KNXIO_Define {
 
 	my ($host,$port) = split(/[:]/ix,$arg[3]);
 
-	return q{KNXIO-define: invalid ip-address or port, correct syntax is: "define <name> KNXIO <H|M|T> <ip-address|name>:<port> <phy-adress>"} if ($mode =~ /[MHT]/ix && $port !~ /$PAT_PORT/ix);
+	return q{KNXIO-define: invalid ip-address or port, correct syntax is: } .
+               q{"define <name> KNXIO <H|M|T> <ip-address|name>:<port> <phy-adress>"} if ($mode =~ /[MHT]/ix && $port !~ /$PAT_PORT/ix);
 
 	if (exists($hash->{OLDDEF})) { # modify definition....
 		KNXIO_closeDev($hash);
@@ -158,7 +153,8 @@ sub KNXIO_Define {
 
 	if ($mode eq q{M}) { # multicast
 		my $host1 = (split(/\./ix,$host))[0];
-		return q{KNXIO-define: Multicast address is not in the range of 224.0.0.0 and 239.255.255.255 (default is 224.0.23.12:3671) } if ($host1 < 224 || $host1 > 239);
+		return q{KNXIO-define: Multicast address is not in the range of 224.0.0.0 and 239.255.255.255 } .
+                       q{(default is 224.0.23.12:3671) } if ($host1 < 224 || $host1 > 239);
 		$hash->{DeviceName} = $host . q{:} . $port;
 	}
 	elsif ($mode eq q{S}) {
@@ -192,7 +188,7 @@ sub KNXIO_Define {
 
 	$hash->{PARTIAL} = q{};
 	# define helpers
-	$hash->{KNXIOhelper}->{FIFO}      = q{}; # read fifo
+	$hash->{KNXIOhelper}->{FIFO}      = []; # read fifo array
 	$hash->{KNXIOhelper}->{FIFOTIMER} = 0;
 	$hash->{KNXIOhelper}->{FIFOMSG}   = q{};
 
@@ -202,7 +198,7 @@ sub KNXIO_Define {
 	delete $hash->{NEXT_OPEN};
 	RemoveInternalTimer($hash);
 
-	Log3 ($name, 3, 'KNXIO_define: opening device ' . $name . ' mode=' . $mode);
+	Log3 ($name, 3, qq{KNXIO_define ($name): opening device mode=$mode});
 
 	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
 }
@@ -258,7 +254,7 @@ sub KNXIO_Read {
 		return;
 	}
 
-	Log3 ($name, 2,'KNXIO_Read failed - invalid mode ' . $mode . ' specified');
+	Log3 ($name, 2, qq{KNXIO_Read failed - invalid mode $mode specified});
 	return;
 }
 
@@ -274,13 +270,11 @@ sub KNXIO_ReadST {
 	return if (length($hash->{PARTIAL}) < $msglen); # not enough data
 
 	# buf complete, continue
-	my @que = ();
+	my @que = [];
 	@que = @{$hash->{KNXIOhelper}->{FIFO}} if (defined($hash->{KNXIOhelper}->{FIFO}) && ($hash->{KNXIOhelper}->{FIFO} ne q{})); #get que from hash
 	while (length($hash->{PARTIAL}) >= $msglen) {
 		$buf = substr($hash->{PARTIAL},0,$msglen); # get one msg from partial
 		$hash->{PARTIAL} = substr($hash->{PARTIAL}, $msglen); # put rest to partial
-
-		Log3 ($name, 5,'KNXIO_Read Rawbuf: ' . unpack('H*',$buf));
 
 		my $outbuf = KNXIO_decodeEMI($hash,$buf);
 		if ( defined($outbuf) ) {
@@ -290,7 +284,7 @@ sub KNXIO_ReadST {
 			$msglen = unpack('n',$hash->{PARTIAL}) + 2;
 		}
 	} # /while
-	$hash->{KNXIOhelper}->{FIFO} = \@que; # push que to fifo
+	@{$hash->{KNXIOhelper}->{FIFO}} = @que; # push que to fifo
 	return KNXIO_processFIFO($hash);
 }
 
@@ -309,16 +303,17 @@ sub KNXIO_ReadM {
 	# header format: 0x06 - header size / 0x10 - KNXNET-IPVersion / 0x0530 - Routing Indicator / 0xYYYY - Header size + size of cEMIFrame
 	my ($header, $header_routing, $total_length) = unpack('nnn',$buf);
 
-	Log3 ($name, 5, 'KNXIO_Read: -header=' . sprintf('%04x',$header) . ', -routing=' . sprintf('%04x',$header_routing) . ', TotalLength=' . $total_length . '(dezimal)');
+	Log3 ($name, 5, 'KNXIO_ReadM: header=' . sprintf('%04x',$header) . ' routing=' . sprintf('%04x',$header_routing) . 
+                        qq{ TotalLength= $total_length (dezimal)});
 
 	if ($header != 0x0610 ) {
-		Log3 ($name, 1, 'KNXIO_Read: invalid header size or version');
+		Log3 ($name, 1, 'KNXIO_ReadM: invalid header size or version');
 		$hash->{PARTIAL} = undef; # delete all we have so far
 #		KNXIO_disconnect($hash); #?
 		return;
 	}
 	if (length($buf) < $total_length) {  #  6 Byte header + min 11 Byte data
-		Log3 ($name,4, 'KNXIO_Read: still waiting for complete packet (short packet length)');
+		Log3 ($name,4, 'KNXIO_ReadM: still waiting for complete packet (short packet length)');
 		$hash->{PARTIAL} = $buf; # still not enough
 		return;
 	}
@@ -327,30 +322,25 @@ sub KNXIO_ReadM {
 		$buf = substr($buf,0,$total_length);
 	}
 
-	### disabled		$buf = KNXIO_chkDupl2($hash,$buf);
-
 	##### now, the buf is complete check if routing-Frame
 	if (($header_routing == 0x0530) && ($total_length >= 17)) {  #  6 Byte header + min 11 Byte data
 		# this is the correct frame type, process it now
-		Log3 ($name, 5,'KNXIO_Read Rawbuf: ' . unpack('H*',$buf));
-
 		$buf = substr($buf,6); # strip off header
 		my $cemiRes = KNXIO_decodeCEMI($hash,$buf);
-		return if (! defined($cemiRes));
-		return KNXIO_dispatch($hash,$cemiRes);
+		return KNXIO_dispatch($hash,$cemiRes) if (defined($cemiRes));
+		return;
 	}
 	elsif ($header_routing == 0x0531) { # routing Lost Message
-		Log3 ($name, 3, 'KNXIO_Read: a routing-lost packet was received !!! - Problems with bus or KNX-router ???');
-		return;
+		Log3 ($name, 3, 'KNXIO_ReadM: a routing-lost packet was received !!! - Problems with bus or KNX-router ???');
 	}
 	elsif ($header_routing == 0x0201) { # search request
-		return; # ignore with silence
+		Log3 ($name, 4, 'KNXIO_ReadM: a search-request packet was received');
 	}
 	else {
-		Log3 ($name, 4, 'KNXIO_Read: a packet with unsupported service type ' . sprintf('%04x',$header_routing) . ' was received. - discarded');
-		return;
+		Log3 ($name, 4, q{KNXIO_ReadM: a packet with unsupported service type } .
+                                 sprintf('%04x',$header_routing) . q{ was received. - discarded});
 	}
-
+	return;
 } # /multicast
 
 #####################################
@@ -365,7 +355,7 @@ sub KNXIO_ReadH {
 	my $name = $hash->{NAME};
 
 	if ( unpack('n',$buf) != 0x0610) {
-		Log3 ($name, 3, 'KNXIO_Read: invalid Frame Header received - discarded');
+		Log3 ($name, 3, 'KNXIO_ReadH: invalid Frame Header received - discarded');
 		return;
 	}
 
@@ -382,15 +372,18 @@ sub KNXIO_ReadH {
 
 		my $discardFrame = undef;
 		if ($rxseqcntr == ($hash->{KNXIOhelper}->{SEQUENCECNTR} - 1)) {
-			Log3 ($name, 3, 'KNXIO_Read: TunnelRequest received: duplicate message received (seqcntr=' . $rxseqcntr .') - ack it');
-			$hash->{KNXIOhelper}->{SEQUENCECNTR}--; # one packet duplicate... we ack ist but do not process
+			Log3 ($name, 3, q{KNXIO_ReadH: TunnelRequest received: duplicate message received } .
+                                        qq{(seqcntr= $rxseqcntr ) - ack it});
+			$hash->{KNXIOhelper}->{SEQUENCECNTR}--; # one packet duplicate... we ack it but do not process
 			$discardFrame = 1;
 		}
 		if ($rxseqcntr != $hash->{KNXIOhelper}->{SEQUENCECNTR}) { # really out of sequence
-			Log3 ($name, 3, 'KNXIO_Read: TunnelRequest received: out of sequence, (seqcntrRx=' . $rxseqcntr . ' seqcntrTx=' . $hash->{KNXIOhelper}->{SEQUENCECNTR} . ')- no ack & discard');
+			Log3 ($name, 3, q{KNXIO_ReadH: TunnelRequest received: out of sequence, } .
+                                        qq{(seqcntrRx= $rxseqcntr seqcntrTx= $hash->{KNXIOhelper}->{SEQUENCECNTR} ) - no ack & discard});
 			return;
 		}
-		Log3 ($name, 4, 'KNXIO_Read: TunnelRequest received - send Ack and decode. seqcntrRx=' . $hash->{KNXIOhelper}->{SEQUENCECNTR} ) if (! defined($discardFrame));
+		Log3 ($name, 4, q{KNXIO_ReadH: TunnelRequest received - send Ack and decode. } .
+                                qq{seqcntrRx= $hash->{KNXIOhelper}->{SEQUENCECNTR}} ) if (! defined($discardFrame));
 		my $tacksend = pack('nnnCCCC',0x0610,0x0421,10,4,$ccid,$hash->{KNXIOhelper}->{SEQUENCECNTR},0); # send ack
 		$hash->{KNXIOhelper}->{SEQUENCECNTR}++;
 		$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0 if ($hash->{KNXIOhelper}->{SEQUENCECNTR} > 255);
@@ -398,7 +391,6 @@ sub KNXIO_ReadH {
 		return if ($discardFrame); # duplicate frame
 
 		#now decode & send to clients 
-		Log3 ($name, 5,'KNXIO_Read Rawbuf: ' . unpack('H*',$buf));
 		$buf = substr($buf,10); # strip off header (10 bytes)
 		my $cemiRes = KNXIO_decodeCEMI($hash,$buf);
 		return if (! defined($cemiRes));
@@ -407,7 +399,7 @@ sub KNXIO_ReadH {
 	elsif ( $responseID == 0x0421) { # Tunneling Ack
 		($ccid,$txseqcntr,$errcode) = unpack('x7CCC',$buf);
 		if ($errcode > 0) {
-			Log3 ($name, 3, 'KNXIO_Read: Tunneling Ack received ' . 'CCID=' . $ccid . ' txseq=' . $txseqcntr . (($errcode)?' - Status= ' . KNXIO_errCodes($errcode):q{}));
+			Log3 ($name, 3, qq{KNXIO_ReadH: Tunneling Ack received CCID= $ccid txseq= $txseqcntr Status= } . KNXIO_errCodes($errcode));
 #what next ?
 		}
 		$hash->{KNXIOhelper}->{SEQUENCECNTR_W}++;
@@ -415,23 +407,25 @@ sub KNXIO_ReadH {
 		RemoveInternalTimer($hash,\&KNXIO_TunnelRequestTO); # all ok, stop timer
 	}
 	elsif ( $responseID == 0x0202) { # Search response
-		Log3 ($name, 4, 'KNXIO_Read: SearchResponse received');
+		Log3 ($name, 4, 'KNXIO_ReadH: SearchResponse received');
 		my (@contolpointIp, $controlpointPort) = unpack('x6CCCn',$buf);
 	}
 	elsif ( $responseID == 0x0204) { # Decription response
-		Log3 ($name, 4, 'KNXIO_Read: DescriptionResponse received');
+		Log3 ($name, 4, 'KNXIO_ReadH: DescriptionResponse received');
 	}
 	elsif ( $responseID == 0x0206) { # Connection response
 		($hash->{KNXIOhelper}->{CCID},$errcode) = unpack('x6CC',$buf); # save Comm Channel ID,errcode
 		RemoveInternalTimer($hash,\&KNXIO_keepAlive);
 		if ($errcode > 0) {
-			Log3 ($name, 3, 'KNXIO_Read: ConnectionResponse received ' . 'CCID=' . $hash->{KNXIOhelper}->{CCID} . ' Status=' . KNXIO_errCodes($errcode));
+			Log3 ($name, 3, q{KNXIO_ReadH: ConnectionResponse received } .
+                                        qq{CCID= $hash->{KNXIOhelper}->{CCID} Status=} . KNXIO_errCodes($errcode));
 			KNXIO_disconnect($hash);
 			return;
 		}
 		my $phyaddr = unpack('x18n',$buf);
 		$hash->{PhyAddr} = sprintf('%05x',$phyaddr); # correct Phyaddr.
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
+		Log3 ($name, 3, qq{KNXIO ($name) connected});
 		InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
 		$hash->{KNXIOhelper}->{SEQUENCECNTR} = 0;
 	}
@@ -440,25 +434,26 @@ sub KNXIO_ReadH {
 		RemoveInternalTimer($hash,\&KNXIO_keepAlive);
 		RemoveInternalTimer($hash,\&KNXIO_keepAliveTO); # reset timeout timer
 		if ($errcode > 0) {
-			Log3 ($name, 3, 'KNXIO_Read: ConnectionStateResponse received ' . 'CCID=' . $hash->{KNXIOhelper}->{CCID}  . ' Status=' . KNXIO_errCodes($errcode));
+			Log3 ($name, 3, q{KNXIO_ReadH: ConnectionStateResponse received } .
+                                        qq{CCID= $hash->{KNXIOhelper}->{CCID} Status= } . KNXIO_errCodes($errcode));
 			KNXIO_disconnect($hash);
 			return;
 		}
 		InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash);
 	}
 	elsif ( $responseID == 0x0209) { # Disconnect request
-		Log3 ($name, 4, 'KNXIO_Read: DisconnectRequest received, restarting connenction');
+		Log3 ($name, 4, 'KNXIO_ReadH: DisconnectRequest received, restarting connenction');
 		$ccid = unpack('x6C',$buf); 
 		$msg = pack('nnnCC',(0x0610,0x020A,8,$ccid,0));
 		DevIo_SimpleWrite($hash,$msg,0); # send disco response 
 		$msg = KNXIO_prepareConnRequ($hash);
 	}
 	elsif ( $responseID == 0x020A) { # Disconnect response
-		Log3 ($name, 4, 'KNXIO_Read: DisconnectResponse received - sending connrequ');
+		Log3 ($name, 4, 'KNXIO_ReadH: DisconnectResponse received - sending connrequ');
 		$msg = KNXIO_prepareConnRequ($hash);
 	}
 	else {
-		Log3 ($name, 3, 'KNXIO_Read: invalid response received: ' . unpack('H*',$buf));
+		Log3 ($name, 3, 'KNXIO_ReadH: invalid response received: ' . unpack('H*',$buf));
 		return;
 	}
 	DevIo_SimpleWrite($hash,$msg,0) if(defined($msg)); # send msg
@@ -488,12 +483,11 @@ sub KNXIO_Write {
 	Log3 ($name, 5, 'KNXIO_write: started');
 	return if(!defined($fn) && $fn ne $TULID);
 	if (ReadingsVal($name, 'state', 'disconnected') ne 'connected') {
-#	if ($hash->{STATE} ne 'connected') {
-		Log3 ($name, 3, 'KNXIO_write called while not connected! Msg: ' . $msg . ' lost');
+		Log3 ($name, 3, qq{KNXIO_write called while not connected! Msg: $msg lost});
 		return;
 	}
 
-	Log3 ($name, 5, 'KNXIO_write: sending ' . $msg);
+	Log3 ($name, 5, qq{KNXIO_write: sending $msg});
 
 	my $acpivalues = {r => 0x00, p => 0x01, w => 0x02};
 
@@ -516,7 +510,9 @@ sub KNXIO_Write {
 			$data[0] = $acpi;
 		}
 
-		Log3 ($name, 5, q{KNXIO_Write: str/size/acpi/src/dst= } . unpack('H*',@data) . q{/} . $datasize . q{/} .  $acpi . q{/} . unpack('H*',$src) . q{/} . unpack('H*',$dst));
+		Log3 ($name, 5, q{KNXIO_Write: data=} . sprintf('%02x' x scalar(@data), @data) . 
+                                sprintf(' size=%02x acpi=%02x', $datasize, $acpi) .
+                                q{ src=} . KNXIO_addr2hex($src,0) . q{ dst=} . KNXIO_addr2hex($dst,1));
 		my $completemsg = q{};
 		my $ret = 0;
 
@@ -525,11 +521,13 @@ sub KNXIO_Write {
 		}
 		elsif ($mode eq 'M') {
 			$completemsg = pack('nnnnnnnCCC*',0x0610,0x0530,$datasize + 16,0x2900,0xBCE0,0,$dst,$datasize,0,@data);
-			$ret = TcpServer_MCastSend($hash,$completemsg); # new TcpServerUtils
+			$ret = TcpServer_MCastSend($hash,$completemsg);
 		}
 		else { # $mode eq 'H'
 			# total length= $size+20 - include 2900BCEO,src,dst,size,0
-			$completemsg = pack('nnnCCCCnnnnCCC*',0x0610,0x0420,$datasize + 20,4,$hash->{KNXIOhelper}->{CCID},$hash->{KNXIOhelper}->{SEQUENCECNTR_W},0,0x1100,0xBCE0,0,$dst,$datasize,0,@data); # send TunnelInd
+			$completemsg = pack('nnnCC',0x0610,0x0420,$datasize + 20,4,$hash->{KNXIOhelper}->{CCID}) .
+                                       pack('CCnnnnCCC*',$hash->{KNXIOhelper}->{SEQUENCECNTR_W},0,0x1100,0xBCE0,0,$dst,$datasize,0,@data); # send TunnelInd
+#			$completemsg = pack('nnnCCCCnnnnCCC*',0x0610,0x0420,$datasize + 20,4,$hash->{KNXIOhelper}->{CCID},$hash->{KNXIOhelper}->{SEQUENCECNTR_W},0,0x1100,0xBCE0,0,$dst,$datasize,0,@data); # send TunnelInd
 
 			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
 			$hash->{KNXIOhelper}->{LASTSENTMSG} = $completemsg; # save msg for resend in case of TO
@@ -537,17 +535,16 @@ sub KNXIO_Write {
 		}
 
 		$ret = DevIo_SimpleWrite($hash,$completemsg,0) if ($mode ne 'M');
-		Log3 ($name, 4, 'KNXIO_Write: Mode=' . $mode . ' buf=' . unpack('H*',$completemsg) . ' rc=' . $ret);
+		Log3 ($name, 4, qq{KNXIO_Write: Mode= $mode buf=} . unpack('H*',$completemsg) . qq{ rc= $ret});
 		return;
 	}
-	Log3 ($name, 2, 'KNXIO_write: Could not send message ' . $msg);
+	Log3 ($name, 2, qq{KNXIO_write: Could not send message $msg});
 	return;
 }
 
 #####################################
 sub KNXIO_Undef {
 	my $hash = shift;
-	my $name = shift;
 
 	return KNXIO_Shutdown($hash);
 }
@@ -556,31 +553,8 @@ sub KNXIO_Undef {
 sub KNXIO_Shutdown {
 	my $hash = shift;
 
-	my $mode = $hash->{model};
-	if ($mode eq 'M') {
-		TcpServer_Close($hash);
-	} else {
-		KNXIO_closeDev($hash);
-	}
-	RemoveInternalTimer($hash);
-	return;
+	return KNXIO_closeDev($hash);
 }
-
-###################################
-### check for duplicate msgs
-# not used !
-=pod
-sub KNXIO_FingerPrint {
-	my $ioname = shift;
-	my $buf  = shift;
-	my $mode = $defs{$ioname}->{model};
-
-	substr( $buf, 1, 5, '-----' ); # ignore src addr
-#	Log3 ($ioname, 5, 'KNXIO_Fingerprint: ' . $buf);
-#	return ( $ioname, $buf ); # ignore src addr
-	return ( q{}, $buf ); # ignore ioname & src addr
-}
-=cut
 
 ###################################
 ### functions called from DevIo ###
@@ -593,7 +567,7 @@ sub KNXIO_callback {
 
 	$hash->{nextOpenDelay} = $reconnectTO; 
 	if (defined($err)) {
-		Log3 ($hash, 2, 'KNXIO_callback: device open ' . $hash->{NAME} . ' failed with: ' . $err) if ($err);
+		Log3 ($hash, 2, qq{KNXIO_callback: device open $hash->{NAME} failed with: $err}) if ($err);
 		$hash->{NEXT_OPEN} = gettimeofday() + $hash->{nextOpenDelay};
 	}
 	return;
@@ -616,11 +590,11 @@ sub KNXIO_gethostbyname_Cb {
 	if ($error) {
 		delete $hash->{DeviceName};
 		delete $hash->{PORT};
-		Log3 ($name, 1, 'KNXIO_define: hostname could not be resolved: ' .  $error);
-		return  'KNXIO-define: hostname could not be resolved: ' . $error;
+		Log3 ($name, 1, qq{KNXIO_define ($name): hostname could not be resolved: $error});
+		return  qq{KNXIO-define: hostname could not be resolved: $error};
 	}
 	my $host = ip2str($dhost);
-	Log3 ($name, 3, 'KNXIO_define: DNS query result= ' . $host);
+	Log3 ($name, 3, qq{KNXIO_define ($name): DNS query result= $host});
 	$hash->{DeviceName} = $host . q{:} . $hash->{PORT};
 	delete $hash->{PORT};
 	return;
@@ -640,10 +614,10 @@ sub KNXIO_openDev {
 		my @f2flist = devspec2array('TYPE=FHEM2FHEM'); # get F2F devices
 		foreach my $f2fdev (@f2flist) {
 			my $rawdev = $defs{$f2fdev}->{rawDevice};
-			next if (!defined($rawdev));
-			next if ($rawdev ne $name);
+			next if (IsDevice($rawdev,'KNXIO') == 0);
+#			next if (!defined($rawdev));
+#			next if ($rawdev ne $name);
 			KNXIO_init($hash);
-#			readingsSingleUpdate($hash, 'state', 'connected', 1);
 			return;
 		}
 		readingsSingleUpdate($hash, 'state', 'disconnected', 1);
@@ -653,11 +627,11 @@ sub KNXIO_openDev {
 	if (exists $hash->{DNSWAIT}) {
 		$hash->{DNSWAIT} += 1;
 		if ($hash->{DNSWAIT} > 5) {
-			Log3 ($name, 2, 'KNXIO_openDev: ' . $name . ' - DNS failed, check ip/hostname');
+			Log3 ($name, 2, qq{KNXIO_openDev ($name): DNS failed, check ip/hostname});
 			return;
 		} 
 		InternalTimer(gettimeofday() + 1,\&KNXIO_openDev,$hash);
-		Log3 ($name, 2, 'KNXIO_openDev: waiting for DNS');
+		Log3 ($name, 2, qq{KNXIO_openDev ($name): waiting for DNS});
 		return; # waiting for DNS
 	}
 	return if (! exists($hash->{DeviceName})); # DNS failed !
@@ -672,7 +646,7 @@ sub KNXIO_openDev {
 	}
 	$host = $port if ($param =~ /UNIX:STREAM:/ix); 
 
-	Log3 ($name, 5, 'KNXIO_openDev: ' . $mode . ', ' . $host . ', ' . $port . ', reopen=' . $reopen);
+	Log3 ($name, 5, qq{KNXIO_openDev ($name): $mode , $host , $port , reopen= $reopen});
 
 	my $ret = undef; # result
 
@@ -681,11 +655,13 @@ sub KNXIO_openDev {
 		delete $hash->{TCPDev}; # devio ?
 		$ret = TcpServer_Open($hash, $port, $host, 1);
 		if (defined($ret)) { # error
-			Log3 ($name, 2, 'KNXIO_openDev: ' . $name . " can't connect: " . $ret) if(!$reopen); 
+			Log3 ($name, 2, qq{KNXIO_openDev ($name): " can't connect: "  $ret}) if(!$reopen); 
+			return;
 		} 
 		$ret = TcpServer_MCastAdd($hash,$host);
 		if (defined($ret)) { # error
-			Log3 ($name, 2, 'KNXIO_openDev: ' . $name . ' MC add failed: ' . $ret) if(!$reopen);
+			Log3 ($name, 2, qq{KNXIO_openDev ($name):  MC add failed: $ret}) if(!$reopen);
+			return;
 		}
 
 		delete $hash->{NEXT_OPEN};
@@ -696,7 +672,7 @@ sub KNXIO_openDev {
 	### socket mode
 	elsif ($mode eq 'S') {
 		if (!(-S -r -w $host) && $init_done) {
-			Log3 ($name, 2, q{KNXIO_openDev: Socket not available - (knxd running?)});
+			Log3 ($name, 2, q{KNXIO_openDev ($name): Socket not available - (knxd running?)});
 			return;
 		}
 		$ret = DevIo_OpenDev($hash,$reopen,\&KNXIO_init); # no callback
@@ -707,9 +683,9 @@ sub KNXIO_openDev {
 		my $conn = 0;
 		$conn = IO::Socket::INET->new(PeerAddr => "$host:$port", Type => SOCK_DGRAM, Proto => 'udp', Reuse => 1);
 		if (!($conn)) {
-			Log3 ($name, 2, 'KNXIO_openDev: device ' . $name  . " can't connect: " . $ERRNO) if(!$reopen); # PBP
+			Log3 ($name, 2, qq{KNXIO_openDev ($name): " can't connect: " $ERRNO}) if(!$reopen);
 			$readyfnlist{"$name.$param"} = $hash;
-			readingsSingleUpdate($hash, 'state', 'disconnected', 0);
+			readingsSingleUpdate($hash, 'state', 'disconnected', 1);
 			$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
 			return;
 		}
@@ -720,13 +696,9 @@ sub KNXIO_openDev {
 		$hash->{FD} = $conn->fileno();
 		delete $readyfnlist{"$name.$param"};
 		$selectlist{"$name.$param"} = $hash;
-#		if($reopen) {
-#			Log3 ($name, 3, "KNXIO_openDev: device $name reappeared");
-#		}
-#		else {
-#			Log3 ($name, 3, "KNXIO_openDev: device $name opened");
-#		}
-		Log3 ($name, 3, 'KNXIO_openDev: device ' . $name . ($reopen)?' reappeared':' opened');
+
+		my $retxt = ($reopen)?'reappeared':'opened';
+		Log3 ($name, 3, qq{KNXIO_openDev ($name): device $retxt});
 		$ret = KNXIO_init($hash);
 	}
 
@@ -736,7 +708,7 @@ sub KNXIO_openDev {
 	}
 
 	if(defined($ret) && $ret) {
-		Log3 ($name, 1, 'KNXIO_openDev: Cannot open KNXIO-Device ' . $name . ', ignoring it');
+		Log3 ($name, 1, qq{KNXIO_openDev ($name): Cannot open KNXIO-Device - ignoring it});
 		KNXIO_closeDev($hash);
 	}
 
@@ -764,6 +736,7 @@ sub KNXIO_init {
 
 #		DoTrigger($name, 'CONNECTED');
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
+		Log3 ($name, 3, qq{KNXIO ($name) connected});
 	}
 
 	return;
@@ -798,14 +771,15 @@ sub KNXIO_dispatch {
 	my $hash = shift;
 	my $buf = shift;
 
-	my @que = ();
+	my @que = [];
+	@que = @{$hash->{KNXIOhelper}->{FIFO}} if (defined($hash->{KNXIOhelper}->{FIFO}) && ($hash->{KNXIOhelper}->{FIFO} ne q{}));
 	push (@que,$buf);
-	$hash->{KNXIOhelper}->{FIFO} = \@que;
+	@{$hash->{KNXIOhelper}->{FIFO}} = @que;
 
 	return KNXIO_processFIFO($hash);
 }
 
-### called from FIFO TIMER or direct if FIFO disabled
+### called from FIFO TIMER
 sub KNXIO_dispatch2 { 
 #	my ($hash, $outbuf ) = ($_[0]->{h}, $_[0]->{m});
 	my $hash = shift;
@@ -814,12 +788,14 @@ sub KNXIO_dispatch2 {
 	my $name = $hash->{NAME};
 	$hash->{KNXIOhelper}->{FIFOTIMER} = 0;
 
-	$hash->{"${name}_MSGCNT"}++;
-	$hash->{"${name}_TIME"} = TimeNow();
+	$hash->{'msg_count'}++;
+	$hash->{'msg_time'} = TimeNow();
 
 	Dispatch($hash, $buf);
 
-	KNXIO_processFIFO($hash) if (defined($hash->{KNXIOhelper}->{FIFO}) && ($hash->{KNXIOhelper}->{FIFO} ne q{}));
+	RemoveInternalTimer($hash,'KNXIO::KNXIO_dispatch2');
+#	KNXIO_processFIFO($hash) if (defined($hash->{KNXIOhelper}->{FIFO}) && ($hash->{KNXIOhelper}->{FIFO} ne q{}));
+	KNXIO_processFIFO($hash);
 	return;
 }
 
@@ -828,32 +804,59 @@ sub KNXIO_processFIFO {
 	my $hash = shift;
 	my $name = $hash->{NAME};
 
+	RemoveInternalTimer($hash,'KNXIO::KNXIO_processFIFO');
+
 	if ($hash->{KNXIOhelper}->{FIFOTIMER} != 0) { # dispatch still running, do a wait loop
-		Log3 ($hash->{NAME}, 4, 'KNXIO_processFIFO: dispatch not complete, waiting');
-		InternalTimer(gettimeofday() + 0.1, \&KNXIO_processFIFO, $hash);
+		Log3 ($name, 5, qq{KNXIO_processFIFO ($name): dispatch not complete, waiting});
+		InternalTimer(gettimeofday() + 0.1, 'KNXIO::KNXIO_processFIFO', $hash);
 		return;
 	}
+
 	my @que = @{$hash->{KNXIOhelper}->{FIFO}};
+	if (scalar(@que) > 1) { # delete any duplicates
+		my $queentriesOld = scalar(@que);
+		@que = KNXIO_deldupes(@que);
+		Log3 ($name, 5, qq{KNXIO_processFIFO ($name): deleted } . ($queentriesOld - scalar(@que)) . 
+                                q{ duplicate msg from queue, } . scalar(@que) . q{ remain});
+	}
+
 	my $queentries = scalar(@que);
 	if ($queentries > 0) { # process timer is not running & fifo not empty
 		$hash->{KNXIOhelper}->{FIFOMSG} = shift (@que);
-		$hash->{KNXIOhelper}->{FIFO} = \@que;
+		@{$hash->{KNXIOhelper}->{FIFO}} = @que;
 		$hash->{KNXIOhelper}->{FIFOTIMER} = 1;
-		Log3 ($name, 4, 'KNXIO_processFIFO: ' . $hash->{KNXIOhelper}->{FIFOMSG} . ' Nr_msgs: '  . $queentries);
+		Log3 ($name, 4, qq{KNXIO_processFIFO ($name): buf= $hash->{KNXIOhelper}->{FIFOMSG} Nr_msgs= $queentries});
 #		InternalTimer(gettimeofday() + 1.0, \&KNXIO_dispatch2, $hash); # testing delay
-		InternalTimer(0, \&KNXIO_dispatch2, $hash);
+		InternalTimer(gettimeofday() + 0.05, 'KNXIO::KNXIO_dispatch2', $hash); # allow time for duplicate msgs to be read
+#		InternalTimer(0, \&KNXIO_dispatch2, $hash);
 
+=pod
 		# delete duplicates from queue
 		while ($queentries > 1) {
 			my $nextbuf = shift (@que);
 			if ($hash->{KNXIOhelper}->{FIFOMSG} eq $nextbuf) {
-				$hash->{KNXIOhelper}->{FIFO} = \@que; # discard it 
+#			my $nextbuf = substr(shift (@que),6); # ignore id/src addr
+#			if (substr($hash->{KNXIOhelper}->{FIFOMSG},6) eq $nextbuf) {
+				@{$hash->{KNXIOhelper}->{FIFO}} = @que; # discard it
 				Log3 ($name, 4, 'KNXIO_processFIFO: - deleted duplicate msg from queue');
 			}
 			$queentries--;
 		}
+=cut
+		return;
 	}
+	Log3 ($name, 5, qq{KNXIO_processFIFO ($name): finished});
 	return;
+}
+
+### delete any duplicates in an array
+### ref: https://perlmaven.com/unique-values-in-an-array-in-perl
+### input: array, return: array
+sub KNXIO_deldupes {
+	my @arr = @_;
+
+	my %seen;
+	return grep { !$seen{$_}++ } @arr;
 }
 
 ###
@@ -864,14 +867,10 @@ sub KNXIO_disconnect {
 
 	DevIo_Disconnected($hash);
 
-	Log3 ($name, 1, 'KNXIO_disconnect: device ' . $name . ' disconnected, waiting to reappear');
+	Log3 ($name, 1, qq{KNXIO_disconnect ($name): device disconnected, waiting to reappear});
 
-	$readyfnlist{"$name.$param"} = $hash;               # Start polling
+	$readyfnlist{"$name.$param"} = $hash; # Start polling
 	$hash->{NEXT_OPEN} = gettimeofday() + $reconnectTO;
-
-	# Without the following sleep the open of the device causes a SIGSEGV,
-        # and following opens block infinitely. Only a reboot helps.
-#        sleep(5);
 
 	return;
 }
@@ -891,8 +890,10 @@ sub KNXIO_closeDev {
 	}
 
 	delete $hash->{nextOpenDelay};
-	delete $hash->{"${name}_MSGCNT"};
-	delete $hash->{"${name}_TIME"};
+#	delete $hash->{"${name}_MSGCNT"};
+#	delete $hash->{"${name}_TIME"};
+	delete $hash->{'msg_cnt'};
+	delete $hash->{'msg_time'};
 
 #NO!	delete $hash->{'.CCID'};
 	delete $hash->{KNXIOhelper}->{SEQUENCECNTR};
@@ -900,7 +901,7 @@ sub KNXIO_closeDev {
 
 	RemoveInternalTimer($hash);
 
-	Log3 ($name, 5,'KNXIO_closeDev: device ' . $name . ' closed');
+	Log3 ($name, 3, qq{KNXIO_closeDev ($name): device closed}) if ($init_done);;
 
 	readingsSingleUpdate($hash, 'state', 'disconnected', 1);
 	DoTrigger($name, 'DISCONNECTED');
@@ -924,13 +925,14 @@ sub KNXIO_decodeEMI {
 
 	my ($len, $id, $src, $dst, $acpi, @data) = unpack('nnnnCC*',$buf);
 	if (($len + 2) != length($buf)) {
-		Log3 ($name, 4, 'KNXIO_decodeEMI: buffer length mismatch ' . $len . q{ } . (length($buf) - 2));
+		Log3 ($name, 4, qq{KNXIO_decodeEMI: buffer length mismatch $len } . length($buf) - 2);
 		return;
 	}
 	if ($id != 0x0027) {
 		if ($id == 0x0026) {
-			Log3 ($name, 4, 'KNXIO_decdeEMI: OpenGrpCon response received');
+			Log3 ($name, 4, 'KNXIO_decodeEMI: OpenGrpCon response received');
 			readingsSingleUpdate($hash, 'state', 'connected', 1);
+			Log3 ($name, 3, qq{KNXIO ($name) connected});
 		}
 		else {
 			Log3 ($name, 3, 'KNXIO_decodeEMI: invalid message code ' . sprintf("04x",$id));
@@ -940,7 +942,8 @@ sub KNXIO_decodeEMI {
 	$src = KNXIO_addr2hex($src,0); # always a phy-address
 	$dst = KNXIO_addr2hex($dst,1); # always a Group addr
 
-	Log3 ($name, 4, 'KNXIO_decodeEMI: src=' . $src . ' - dst=' . $dst . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
+	Log3 ($name, 4, qq{KNXIO_decodeEMI: src= $src - dst= $dst - leng= } . scalar(@data) . 
+                        q{ - data= } . sprintf('%02x' x scalar(@data),@data));
 
 	# acpi ref: KNX System Specs 03.03.07
 	$acpi = ((($acpi & 0x03) << 2) | (($data[0] & 0xC0) >> 6));
@@ -948,8 +951,8 @@ sub KNXIO_decodeEMI {
 	my $rwp = $acpicodes[$acpi];
 	if (! defined($rwp) || ($rwp eq 'invalid')) {
 		Log3 ($name, 3, 'KNXIO_decodeEMI: no valid acpi-code (read/reply/write) received, discard packet');
-#		Log3 ($name, 4, 'discarded packet: src=' . $src . ' - dst=' . $dst . ' - acpi=' . sprintf('%02x',$acpi) . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
-#		Log3 ($name, 4, "discarded packet: src=$src - dst=$dst - acpi=" . sprintf('%02x',$acpi) . " - leng=" . scalar(@data) . " - data=" . sprintf('%02x' x scalar(@data),@data));
+		Log3 ($name, 4, qq{discarded packet: src=$src dst=$dst acpi=} . sprintf('%02x',$acpi) . 
+                                ' leng=' . scalar(@data) . ' data=' . sprintf('%02x' x scalar(@data),@data));
 		return;
 	}
 
@@ -957,7 +960,7 @@ sub KNXIO_decodeEMI {
 	shift @data if (scalar(@data) > 1 ); # byte 0 is ununsed if length > 1
 	
 	my $outbuf = $TULID . $src . substr($rwp,0,1) . $dst . sprintf('%02x' x scalar(@data),@data);
-	Log3 ($name, 5, 'KNXIO_decodeEMI: ' . $outbuf);
+	Log3 ($name, 5, qq{KNXIO_decodeEMI: $outbuf});
 
 	return $outbuf;
 }
@@ -996,14 +999,16 @@ sub KNXIO_decodeCEMI {
 	$src = KNXIO_addr2hex($src,0); # always a phy-address
 	$dst = KNXIO_addr2hex($dst,$dest_addrType);
 
-	Log3 ($name, 4, 'KNXIO_decodeCEMI: src=' . $src . ' - dst=' . $dst . ' - destaddrType=' . $dest_addrType . '  - prio=' . $prio . ' - hop_count=' . $hop_count . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
+	Log3 ($name, 4, qq{KNXIO_decodeCEMI: src= $src dst= $dst destaddrType= $dest_addrType prio= $prio hop_count= $hop_count leng= } . 
+                        scalar(@data) . ' data= ' . sprintf('%02x' x scalar(@data),@data));
 
 	$acpi = ((($acpi & 0x03) << 2) | (($data[0] & 0xC0) >> 6));
 	my @acpicodes = qw(read preply write invalid);
 	my $rwp = $acpicodes[$acpi];
 	if (! defined($rwp) || ($rwp eq 'invalid')) { # not a groupvalue-read/write/reply
-		Log3 ($name, 3, 'KNXIO_decodeCEMI: no valid acpi-code (read/reply/write) received, discard packet');
-#		Log3 ($name, 4, 'discarded packet: src=' . $src . ' - dst=' . $dst . ' - destaddrType=' . $dest_addrType . ' - prio=' . $prio . ' - hop_count=' . $hop_count . ' - leng=' . scalar(@data) . ' - data=' . sprintf('%02x' x scalar(@data),@data));
+		Log3 ($name, 3, 'KNXIO_decodeCEMI: no valid acpi-code (read/reply/write) received - discard packet');
+		Log3 ($name, 4, qq{discarded packet: src=$src dst=$dst destaddrType=$dest_addrType prio=$prio hop_count=$hop_count} . 
+                                ' leng=' . scalar(@data) . ' data=' . sprintf('%02x' x scalar(@data),@data));
 		return;
 	}
 
@@ -1011,7 +1016,7 @@ sub KNXIO_decodeCEMI {
 	shift @data if (scalar(@data) > 1 ); # byte 0 is ununsed if length > 1
 
 	my $outbuf = $TULID . $src . substr($rwp,0,1) . $dst . sprintf('%02x' x scalar(@data),@data);
-	Log3 ($name, 5, 'KNXIO_decodeCEMI: ' . $outbuf);
+	Log3 ($name, 5, qq{KNXIO_decodeCEMI: $outbuf});
 
 	return $outbuf;
 }
@@ -1038,56 +1043,6 @@ sub KNXIO_hex2addr {
 	}
 	return 0;
 }
-
-### check for duplicate messages
-#   check the first msg in PARTIAL against all msgs in PARTIAL,
-#   if match, returns last matched msg (=the most recent) and delete all other msgs.
-#   if no match, return first msg from PARTIAL
-#
-#   return: buf for further processing (last matched message)
-=pod
-sub KNXIO_chkDupl2 {
-	my $hash = shift;
-	my $buf  = shift;
-	my $name = $hash->{NAME};
-	my $mode = $hash->{model};
-	my $lenpar = length($hash->{PARTIAL});
-	my $outbuf = $buf; # copy for return
-
-#	Log3 ($name, 5, 'KNXIO_chkDupl- msglen: ' .  length($buf) . ' LENPART= ' . length($hash->{PARTIAL}));
-
- 	return $buf if (length($hash->{PARTIAL}) == 0); 
-	$hash->{helper}{BUFFER} = unpack('H*',$hash->{PARTIAL}); # debugging partial
-
-	if ($mode =~ /[ST]/x) {
-		# msgformat: 0008 0027 00c8 1c0c 00 80
-		substr( $buf, 4, 2, q{..} ); # prepare reqex for duplicate test (ignore src addr)
-		my $bufrepl = substr(q{..................},0,length($buf) - 9); # ignore data-values in PARTIAL
-		substr( $buf, 9 ,(length($buf) - 9),$bufrepl);  # ignore data-values in PARTIAL
-	}
-	elsif ($mode eq 'M') {
-		# msgformat: 0610 0530 0011 2900 bcc0 00c8 1c0c 01 00 81
-		substr( $buf, 9, 3, '...' ); # prepare reqex for duplicate test (ignore hop count & src addr)
-	}
-	else {
-		return $outbuf; # unchanged
-	}
-	$buf =~ s/([)]|[(])/./gx; # mask )(
-	my $re = qr{$buf}; ## no critic 'RegularExpressions'
-
-	Log3 ($name, 1, 'KNXIO_chkDupl: regex-r= ' . unpack('H*', $buf));
-	Log3 ($name, 1, 'KNXIO_chkDupl: PARTIAL= ' . unpack('H*', $hash->{PARTIAL}));
-
-	my (@match) = ($hash->{PARTIAL} =~ m/${re}/gix);
-	my $nrmatches = scalar(@match);
-	if ($nrmatches > 0) { # we have duplicates
-		$outbuf = $match[scalar(@match)-1]; # use the last one
-		$hash->{PARTIAL} =~ s/${re}//gx; # delete duplicate packets
-	}
-	Log3 ($name, 4, 'KNXIO_chkDupl: nrDuplicates= ' . $nrmatches . ' LengthPartial= ' . length($hash->{PARTIAL}) . ' Buf-in(masked)= ' . unpack('H*', $buf) . ' Buf-out= ' . unpack('H*', $outbuf));
-	return $outbuf;
-}
-=cut
 
 ### keep alive for mode H - every minute
 # triggered on conn-response & 
@@ -1193,19 +1148,20 @@ sub KNXIO_errCodes {
 <p><code>define &lt;name&gt; KNXIO (H|M|T) &lt;(ip-address|hostname):port&gt; &lt;phy-adress&gt;</code> <br/>or<br/>
 <code>define &lt;name&gt; KNXIO S &lt;UNIX socket-path&gt; &lt;phy-adress&gt;</code></p>
 <ul>
-<b>Connection Types</b> (first parameter):
+<b>Connection Types (mode)</b> (first parameter):
 <ul>
 <li><b>H</b> Host Mode - connect to a KNX-router with UDP point-point protocol.<br/>
-  This is the mode also used by ETS when you specify KNXNET/IP as protocol. You do not need a KNXD installation. The protocol is complex and timing critical! 
+  This is the mode also used by ETS when you specify <b>KNXNET/IP</b> as protocol. You do not need a KNXD installation. The protocol is complex and timing critical! 
   If you have delays in FHEM processing close to 1 sec, the protocol may disconnect. It should recover automatically, 
-  however KNX-messages could have been lost! </li>
+  however KNX-messages could have been lost! 
+  <br>The benefit of this protocol: every sent and received msg has to be acknowledged within 1 second by the communication partner, msg delivery is verified!</li>
 <li><b>M</b> Multicast mode - connect to KNXD's or KNX-router's multicast-tree.<br/>
-  This is the mode also used by ETS when you specify KNXNET/IP Routing as protocol. 
+  This is the mode also used by ETS when you specify <b>KNXNET/IP Routing</b> as protocol. 
   If you have a KNX-router that supports multicast, you do not need a KNXD installation. Default address:port is 224.0.23.12:3671<br/>
   Pls. ensure that you have only <b>one</b> GW/KNXD in your LAN that feed the multicast tree!<br/>
   <del>This mode requires the <code>IO::Socket::Multicast</code> perl-module to be installed on yr. system. 
   On Debian systems this can be achieved by <code>apt-get install libio-socket-multicast-perl</code>.</del></li>
-<li><b>T</b> TCP Mode - uses a TCP-connection to KNXD (default port: 6720).<br/>
+<li><b>T</b> TCP mode - uses a TCP-connection to KNXD (default port: 6720).<br/>
   This mode is the successor of the TUL-modul, but does not support direct Serial/USB connection to a TPUart-USB Stick.
   If you want to use a TPUart-USB Stick or any other serial KNX-GW, use either the TUL Module, or connect the USB-Stick to KNXD and in turn use modes M,S or T to connect to KNXD.</li>
 <li><b>S</b> Socket mode - communicate via KNXD's UNIX-socket on localhost. default Socket-path: <code>/var/run/knx</code><br/> 
@@ -1228,19 +1184,20 @@ sub KNXIO_errCodes {
 
 <ul>
 Examples:<br/>
-<code>define myKNXGW KNXIO H 192.168.1.201:3671 0.0.51</code><br/>
-<code>define myKNXGW KNXIO M 224.0.23.12:3671 0.0.51</code><br/> 
-<code>define myKNXGW KNXIO S /var/run/knx 0.0.51</code><br/>
-<code>define myKNXGW KNXIO T 192.168.1.200:6720 0.0.51</code><br/>
+<code>&nbsp;&nbsp;define myKNXGW KNXIO H 192.168.1.201:3671 0.0.51</code><br/>
+<code>&nbsp;&nbsp;define myKNXGW KNXIO M 224.0.23.12:3671 0.0.51</code><br/> 
+<code>&nbsp;&nbsp;define myKNXGW KNXIO S /var/run/knx 0.0.51</code><br/>
+<code>&nbsp;&nbsp;define myKNXGW KNXIO T 192.168.1.200:6720 0.0.51</code><br/>
 </ul>
 <br/>
 <ul>
-  Suggested parameters for KNXD (with systemd, Version >= 0.14.30):
+  Suggested parameters for KNXD (Version >= 0.14.30), with systemd:
   <br/><code>
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -S -b ip:" # knxd acts as multicast client<br/>
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -b ipt:192.168.xx.yy" # connect to a knx-router with ip-addr<br/>
-    KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -single -b tpuarts:/dev/ttyxxx" # connect to a serial/USB KNX GW <br/>
+    &nbsp;&nbsp;KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -S -b ip:" # knxd acts as multicast client - do NOT use -R !<br/>
+    &nbsp;&nbsp;KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -b ipt:192.168.xx.yy" # connect to a knx-router with ip-addr<br/>
+    &nbsp;&nbsp;KNXD_OPTS="-e 0.0.50 -E 0.0.51:8 -D -T -R -S -single -b tpuarts:/dev/ttyxxx" # connect to a serial/USB KNX GW <br/>
   </code>
+  The -e and -E parameters must match the definitions in the KNX-router (set by ETS)! 
 </ul>
 
 <a id="KNXIO-set"></a>
@@ -1252,11 +1209,6 @@ Examples:<br/>
 <a id="KNXIO-attr"></a>
 <p><strong>Attributes</strong></p>
 <ul>
-<!--
-<a id="KNXIO-attr-KNX_FIFO"></a><li><b>KNX_FIFO</b> - 
-  Set this attr to 1 to enable a receive buffer for incoming messages. The KNX-messages will not processed faster, 
-  but the overall responsiveness and latency of FHEM benefit from this setting.</li>
--->
 <a id="KNXIO-attr-disable"></a><li><b>disable</b> - 
   Disable the device if set to <b>1</b>. No send/receive from bus possible. Delete this attr to enable device again.</li>
 <a id="KNXIO-attr-verbose"></a><li><b>verbose</b> - 
