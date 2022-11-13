@@ -152,8 +152,8 @@ sub WaterCalculator_Define($$$)
 
 	### Start timer for execution around midnight
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-	my $EpochThisMidnight 			= timelocal(0,0,0,$mday  ,$mon,$year);
-	my $EpochNextMidnight 			= timelocal(0,0,0,$mday+1,$mon,$year);
+	my $EpochThisMidnight 			= Time::Local::timelocal_nocheck(0,0,0,$mday  ,$mon,$year);
+	my $EpochNextMidnight 			= Time::Local::timelocal_nocheck(0,0,0,$mday+1,$mon,$year);
 	my $SecondsToday 				= $EpochNextMidnight - $EpochThisMidnight;
 	$hash->{system}{SecondsToday} 	= $SecondsToday;
 	InternalTimer($EpochNextMidnight, "WaterCalculator_MidnightTimer", $hash, 0);
@@ -605,8 +605,8 @@ sub WaterCalculator_MidnightTimer($)
 
 	### Start timer for execution around midnight
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) 	= localtime(time);
-	my $EpochThisMidnight 										= timelocal(0,0,0,$mday  ,$mon,$year);
-	my $EpochNextMidnight 										= timelocal(0,0,0,$mday+1,$mon,$year);
+	my $EpochThisMidnight 										= Time::Local::timelocal_nocheck(0,0,0,$mday  ,$mon,$year);
+	my $EpochNextMidnight 										= Time::Local::timelocal_nocheck(0,0,0,$mday+1,$mon,$year);
 	my $SecondsToday 											= $EpochNextMidnight - $EpochThisMidnight;
 	$WaterCalcDev->{system}{SecondsToday} 						= $SecondsToday;
 	InternalTimer($EpochNextMidnight, "WaterCalculator_MidnightTimer", $WaterCalcDev, 0);
@@ -977,8 +977,8 @@ sub WaterCalculator_Notify($$)
 
 			### Recalculate new dayspan in seconds
 			my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) 	= localtime(time);
-			my $EpochThisMidnight 										= timelocal(0,0,0,$mday  ,$mon,$year);
-			my $EpochNextMidnight 										= timelocal(0,0,0,$mday+1,$mon,$year);
+			my $EpochThisMidnight 										= Time::Local::timelocal_nocheck(0,0,0,$mday  ,$mon,$year);
+			my $EpochNextMidnight 										= Time::Local::timelocal_nocheck(0,0,0,$mday+1,$mon,$year);
 			my $SecondsToday 											= $EpochNextMidnight - $EpochThisMidnight;
 			$WaterCalcDev->{system}{SecondsToday} 	= $SecondsToday;
 
