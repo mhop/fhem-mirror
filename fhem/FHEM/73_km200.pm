@@ -49,30 +49,43 @@ package main;
 
 use strict;
 use warnings;
-use Blocking;
-use FHEM::Meta;
-use Time::HiRes qw(gettimeofday sleep usleep);
-use Digest::MD5 qw(md5 md5_hex md5_base64);
-use base qw( Exporter );
-use List::MoreUtils qw(first_index);
-use MIME::Base64;
-use LWP::UserAgent;
-use JSON;
-use Crypt::Rijndael;
-use HttpUtils;
-use Encode;
-use Text::Wrap;
 use constant false => 0;
 use constant true  => 1;
-
 sub km200_Define($$);
 sub km200_Undefine($$);
 sub km200_GetErrorMessage($$$$);
 
 ###START###### Initialize module ##############################################################################START####
-sub km200_Initialize($)
-{
+sub km200_Initialize($) {
     my ($hash)  = @_;
+
+	### Try to load perl libraries if installed or write log in case of unavailability. ###
+	my @UseLibraries = split(/[\n,\t]/,"
+		Blocking
+		FHEM::Meta
+		Time::HiRes qw(gettimeofday sleep usleep)
+		Digest::MD5 qw(md5 md5_hex md5_base64)
+		base qw( Exporter )
+		List::MoreUtils qw(first_index)
+		MIME::Base64
+		LWP::UserAgent
+		JSON
+		Crypt::Rijndael
+		HttpUtils
+		Encode
+		Text::Wrap
+	");
+
+	foreach my $Library (grep(/\S/, @UseLibraries)) {	
+		eval "use " . $Library;
+		if (length($@) == 0) {
+			Log3 undef, 5, "km200 - Successfully Installed Perl Module               : " . $Library
+		}
+		else {
+			Log3 undef, 2, "km200 - Cannot find " . $Library . " in \@INC. Please install the Perl library first. Initialization of 73_km200.pm aborted!";
+			return
+		}
+	}
 
     $hash->{STATE}           = "Init";
     $hash->{DefFn}           = "km200_Define";
@@ -98,8 +111,7 @@ sub km200_Initialize($)
 
 
 ###START######  Activate module after module has been used via fhem command "define" ##########################START####
-sub km200_Define($$)
-{
+sub km200_Define($$) {
 	my ($hash, $def)            = @_;
 	my @a						= split("[ \t][ \t]*", $def);
 	my $name					= $a[0];
@@ -121,6 +133,8 @@ sub km200_Define($$)
 	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
 	"/",
+	"/application",
+	"/gservice-tariff",
 	"/dhwCircuits",
 	"/gateway",
 	"/heatingCircuits",
@@ -135,16 +149,12 @@ sub km200_Define($$)
  
 	
     ###START### Check whether all variables are available #####################################################START####
-	if (int(@a) == 5) 
-	{
+	if (int(@a) == 5) {
 		###START### Check whether IPv4 address is valid
-#		if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/)
-		if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:[0-9]{1,5})?$/)
-		{
+		if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:[0-9]{1,5})?$/) {
 			Log3 $name, 4, $name. " : km200 - IPv4-address is valid                  : " . $url;
 		}
-		else
-		{
+		else {
 			return $name .": Error - IPv4 address is not valid \n Please use \"define <devicename> km200 <IPv4-address> <interval/[s]> <GatewayPassword> <PrivatePassword>\" instead";
 		}
 		####END#### Check whether IPv4 address is valid	
@@ -155,25 +165,22 @@ sub km200_Define($$)
 		my $EvalPassWord = $km200_gateway_password;
 		$EvalPassWord =~ tr/-//d;
 
-		if ( length($EvalPassWord) == 16)
-		{
+		if ( length($EvalPassWord) == 16) {
 			$km200_gateway_password = $EvalPassWord;
 			Log3 $name,4, $name. " : km200 - Provided GatewayPassword provided as bareword has the correct length at least.";		
 		}
-		else # Check whether the password is eventually base64 encoded 
-		{
+		# Check whether the password is eventually base64 encoded
+		else {
 		    # Remove additional encoding with base64
 			my $decryptData = decode_base64($km200_gateway_password);
 			$decryptData =~ tr/-//d;
 			$decryptData =~ s/\r|\n//g;
-			if ( length($decryptData) == 16)
-			{
+			if ( length($decryptData) == 16) {
 				$km200_gateway_password = $decryptData;
 				$PasswordEncrypted = true;
 				Log3 $name, 4, $name. " : km200 - Provided GatewayPassword encoded with base64 has the correct length at least.";
 			}
-			else
-			{
+			else {
 				return $name .": Error - GatewayPassword does not have the correct length.\n". 
 							  "          Please enter gateway password in the format of \"aaaabbbbccccdddd\" or \"aaaa-bbbb-cccc-dddd\"\n". 
 							  "          You may encode your password with base64 first, in order to prevent bare passwords in fhem.cfg.\n".
@@ -185,30 +192,25 @@ sub km200_Define($$)
 		####END#### Check whether gateway password has the right length and delete "-" if required
 
 		###START### Check whether private password is available and decode it with base64 if encoding is used
-		if ($PasswordEncrypted == true)
-		{
+		if ($PasswordEncrypted == true) {
 			my $decryptData = decode_base64($km200_private_password);
 			$decryptData =~ s/\r|\n//g;
-			if (length($decryptData) > 0)
-			{
+			if (length($decryptData) > 0) {
 				$km200_private_password = $decryptData;
 				Log3 $name, 4, $name. " : km200 - Provided PrivatePassword exists at least";
 			}
-			else
-			{
+			else {
 				return $name .": Error - PrivatePassword does not have the minimum length.\n".
 							  "          You may encode your password with base64 first, in order to prevent bare passwords in fhem.cfg.\n".
 							  "          If you choose to encrypt your private password with base64, you also must encrypt your gateway password the same way\n"; 
 			}
 		}
-		else # If private password is provided as bare word
-		{
-			if (length($km200_private_password) > 0)
-			{
+		# If private password is provided as bare word 
+		else {
+			if (length($km200_private_password) > 0) {
 					Log3 $name, 4, $name. " : km200 - Provided PrivatePassword exists at least";		
 			}
-			else
-			{
+			else {
 				return $name .": Error - PrivatePassword has not been provided.\n".
 							  "          You may encode your password with base64 first, in order to prevent bare passwords in fhem.cfg.\n".
 							  "          If you choose to encrypt your private password with base64, you also must encrypt your gateway password the same way\n"; 
@@ -217,8 +219,7 @@ sub km200_Define($$)
 		}
 		####END#### Check whether private password is available and decode it with base64 if encoding is used
 	}
-	else
-	{
+	else {
 	    return $name .": km200 - Error - Not enough parameter provided." . "\n" . "Gateway IPv4 address, Gateway and Private Passwords must be provided" ."\n". "Please use \"define <devicename> km200 <IPv4-address> <GatewayPassword> <PrivatePassword>\" instead";
 	}
 	####END#### Check whether all variables are available ######################################################END#####
@@ -284,11 +285,11 @@ sub km200_Define($$)
 	####END####### Reset fullResponse error message #############################################################END#####	
 	
 	###START###### For Debugging purpose only ##################################################################START####  
-	Log3 $name, 4, $name. " : km200 - Define H                               : " .$hash;
-	Log3 $name, 4, $name. " : km200 - Define D                               : " .$def;
-	Log3 $name, 4, $name. " : km200 - Define A                               : " .@a;
-	Log3 $name, 4, $name. " : km200 - Define Name                            : " .$name;
-	Log3 $name, 4, $name. " : km200 - Define Adr                             : " .$url;
+	Log3 $name, 4, $name. " : km200 - Define H                                   : " .$hash;
+	Log3 $name, 4, $name. " : km200 - Define D                                   : " .$def;
+	Log3 $name, 4, $name. " : km200 - Define A                                   : " .@a;
+	Log3 $name, 4, $name. " : km200 - Define Name                                : " .$name;
+	Log3 $name, 4, $name. " : km200 - Define Adr                                 : " .$url;
 	####END####### For Debugging purpose only ###################################################################END#####
 
 	
@@ -297,8 +298,7 @@ sub km200_Define($$)
 	$hash->{temp}{service} = "/gateway/DateTime";
 	$Km200Info = km200_GetSingleService($hash);
 	
-	if ($Km200Info eq "ERROR") 
-	{
+	if ($Km200Info eq "ERROR") {
 		$Km200Info = $hash->{temp}{TransferValue};
 		$hash->{temp}{TransferValue} = "";
 
@@ -307,12 +307,12 @@ sub km200_Define($$)
 		return ($name .": km200 - ERROR - The communication between fhem and the Buderus KM200 failed! \n". 
 		               "                  Please check physical connection, IP-address and passwords! \n");
 	} 
-	elsif ($Km200Info eq "SERVICE NOT AVAILABLE") ## Communication OK but service not available ##
-	{
+	## Communication OK but service not available ##
+	elsif ($Km200Info eq "SERVICE NOT AVAILABLE") {
 		Log3 $name, 4, $name. " : km200 -  /gateway/DateTime                     : NOT AVAILABLE";
 	} 
-	else ## Communication OK and service is available ##
-	{
+	## Communication OK and service is available ##
+	else {
 		Log3 $name, 4, $name. " : km200 - /gateway/DateTime                      : AVAILABLE";				
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
@@ -328,8 +328,7 @@ sub km200_Define($$)
 
 
 ###START###### To bind unit of value to DbLog entries #########################################################START####
-sub km200_DbLog_splitFn($$)
-{
+sub km200_DbLog_splitFn($$) {
 	my ($event, $name)	= @_;
 	my ($reading, $value, $unit);
     my $hash 			= $defs{$name};
@@ -344,8 +343,7 @@ sub km200_DbLog_splitFn($$)
 #	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[1]       : " . $argument[1];
 
 	### If the service to be changed is identical to the one where the unit received from
-	if ($argument[0] = $hash->{temp}{ServiceDbLogSplitHash}{id})
-	{
+	if ($argument[0] = $hash->{temp}{ServiceDbLogSplitHash}{id}) {
 		### Get values being changed from hash
 		$reading = $argument[0];
 		$value   = $argument[1];
@@ -362,8 +360,7 @@ sub km200_DbLog_splitFn($$)
 
 
 ###START###### Deactivate module module after "undefine" command by fhem ######################################START####
-sub km200_Undefine($$)
-{
+sub km200_Undefine($$) {
 	my ($hash, $def)  = @_;
 	my $name = $hash->{NAME};	
 	my $url  = $hash->{URL};
@@ -379,8 +376,7 @@ sub km200_Undefine($$)
 
 
 ###START###### Handle attributes after changes via fhem GUI ###################################################START####
-sub km200_Attr(@)
-{
+sub km200_Attr(@) {
 	my @a               = @_;
 	my $name            = $a[1];
 	my $hash            = $defs{$name};
@@ -391,11 +387,9 @@ sub km200_Attr(@)
 	
 	
 	### Check whether disable attribute has been provided
-	if ($a[2] eq "disable")
-	{
+	if ($a[2] eq "disable") {
 		###START### Check whether device shall be disabled
-		if ($a[3] == 1)
-		{
+		if ($a[3] == 1) {
 			### Set new status
 			$hash->{STATE} = "Disabled";
 			
@@ -411,8 +405,7 @@ sub km200_Attr(@)
 			
 			Log3 $name, 3, $name. " : km200 - Device disabled as per attribute.";
 		}
-		else
-		{
+		else {
 			### Initiate the timer for first time polling of  values from KM200 but wait 10s
 			InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 1);
 			Log3 $name, 4, $name. " : km200 - Internal timer for Initialisation of services re-started.";
@@ -425,41 +418,34 @@ sub km200_Attr(@)
 		####END#### Check whether device shall be disabled
 	}
 	### Check whether dynamic interval attribute has been provided
-	elsif ($a[2] eq "IntervalDynVal")
-	{
+	elsif ($a[2] eq "IntervalDynVal") {
 
 		$IntervalDynVal = $a[3];
 		###START### Check whether polling interval is not too short
-		if ($IntervalDynVal > 19)
-		{
+		if ($IntervalDynVal > 19) {
 			$hash->{INTERVALDYNVAL} = $IntervalDynVal;
 			Log3 $name, 4, $name. " : km200 - IntervalDynVal set to attribute value:" . $IntervalDynVal ." s";
 		}
-		else
-		{
+		else {
 			return $name .": Error - Gateway interval for IntervalDynVal too small - server response time longer than defined interval, please use something >=20, default is 90";
 		}
 		####END#### Check whether polling interval is not too short
 	}
 	### Check whether polling timeout attribute has been provided
-	elsif($a[2] eq "PollingTimeout") 
-	{
+	elsif($a[2] eq "PollingTimeout") {
 		###START### Check whether timeout is not too short
-		if ($a[3] >= 5)
-		{
+		if ($a[3] >= 5) {
 			$hash->{POLLINGTIMEOUT} = $a[3];
 			Log3 $name, 4, $name. " : km200 - Polling timeout set to attribute value:" . $a[3] ." s";
 		}
-		else
-		{
+		else {
 			Log3 $name, 4, $name. " : km200 - Error - Gateway polling timeout attribute too small: " . $a[3] ." s";
 			return $name .": Error - Gateway polling timeout attribute is too small - server response time is 5s minimum, default is 5";
 		}
 		####END#### Check whether timeout is not too short
 	}
 	### Check whether DoNotPoll attribute have been provided
-	elsif($a[2] eq "DoNotPoll") 
-	{
+	elsif($a[2] eq "DoNotPoll") {
 		my @KM200_DONOTPOLL   = ();
 		my @temp              = @a;
 
@@ -479,8 +465,7 @@ sub km200_Attr(@)
 		### Remove trailing slash of each item if available
 		
 		### For each item found in this empty parent directory
-		foreach my $item (@KM200_DONOTPOLL)
-		{
+		foreach my $item (@KM200_DONOTPOLL) {
 			### Delete trailing slash
 			$item =~ s/\/$//;
 		}
@@ -492,12 +477,10 @@ sub km200_Attr(@)
 		@{$hash->{Secret}{KM200ALLSERVICES}} = @{$hash->{Secret}{KM200ALLSERVICESBACKUP}};
 		
 		### For every blacklisted service
-		foreach my $SearchWord(@KM200_DONOTPOLL)
-		{
+		foreach my $SearchWord(@KM200_DONOTPOLL) {
 			### Filter all blocked root services out of services to be polled 
 			my $FoundPosition = first_index{ $_ eq $SearchWord }@{$hash->{Secret}{KM200ALLSERVICES}};
-			if ($FoundPosition >= 0)
-			{
+			if ($FoundPosition >= 0) {
 				splice(@{$hash->{Secret}{KM200ALLSERVICES}}, $FoundPosition, 1);
 			}
 		}
@@ -518,40 +501,33 @@ sub km200_Attr(@)
 		Log3 $name, 4, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
 	}
 	### Check whether time-out for Read-Back has been provided
-	if($a[2] eq "ReadBackDelay") 
-	{
+	if($a[2] eq "ReadBackDelay") {
 		$ReadBackDelay = $a[3];
 		###START### Check whether ReadBackDelay is valid
-		if ($ReadBackDelay >= 0)
-		{
+		if ($ReadBackDelay >= 0) {
 			$hash->{READBACKDELAY} = $ReadBackDelay;
 			Log3 $name, 4, $name. " : km200 - ReadBackDelay set to attribute value:" . $ReadBackDelay ." s";
 		}
-		else
-		{
+		else {
 			return $name .": Error - Read-Back delay time must be positive. Default is 0us";
 		}
 		####END#### Check whether ReadBackDelay is valid
 	}
 	### Check whether length for Readins has been provided
-	if($a[2] eq "ReadingTextLen") 
-	{
+	if($a[2] eq "ReadingTextLen") {
 		$ReadingTextLen = $a[3];
 		###START### Check whether ReadBackDelay is valid
-		if ($ReadingTextLen >= 0)
-		{
+		if ($ReadingTextLen >= 0) {
 			$hash->{READTEXTLEN} = $ReadingTextLen;
 			Log3 $name, 4, $name. " : km200 - ReadingTextLen set to attribute value:" . $ReadingTextLen ." s";
 		}
-		else
-		{
+		else {
 			return $name .": Error - Text Length must be positive. Default is 0";
 		}
 		####END#### Check whether ReadBackDelay is valid
 	}
 	### If no attributes of the above known ones have been selected
-	else
-	{
+	else {
 		# Do nothing
 	}
 	return undef;
@@ -560,13 +536,11 @@ sub km200_Attr(@)
 
 
 ###START###### Obtain value after "get" command by fhem #######################################################START####
-sub km200_Get($@)
-{
+sub km200_Get($@) {
 	my ( $hash, @a ) = @_;
 	
 	### If not enough arguments have been provided
-	if ( @a < 2 )
-	{
+	if ( @a < 2 ) {
 		return "\"get km200\" needs at least one argument";
 	}
 		
@@ -580,8 +554,7 @@ sub km200_Get($@)
 	### Get the list of possible services and create a hash out of it
 	my @GetServices = @{$hash->{Secret}{KM200ALLSERVICES}};
 
-	foreach my $item(@GetServices) 	
-	{
+	foreach my $item(@GetServices) {
 		$km200_gets{$item} = ("1");
 	}
 	
@@ -610,16 +583,14 @@ sub km200_Get($@)
 	}
 
 	### If service chosen in GUI does not exist
-	if(!$km200_gets{$service}) 
-	{
+	if(!$km200_gets{$service}) {
 		my @cList = keys %km200_gets;
 		push(@cList, "TestErrorMsg");
 		return "Unknown argument $service, choose one of " . join(" ", @cList);
 	}
 
 	### Check whether the initialisation process has been finished
-	if ($hash->{temp}{ServiceCounterInit} == false)
-	{
+	if ($hash->{temp}{ServiceCounterInit} == false) {
 		### Save chosen service into hash
 		$hash->{temp}{service} = $service;
 
@@ -627,28 +598,23 @@ sub km200_Get($@)
 		$ReturnValue = km200_GetSingleService($hash);
 
 		### If the "get" - option has been set to "Json" for the return of the raw Json-string
-		if ($option =~ m/json/i)
-		{
+		if ($option =~ m/json/i) {
 			$ReturnMessage = $hash->{temp}{JsonRaw};
 		}
 		### If no option has been chosen, just return the result of the value.
-		else
-		{
+		else {
 			### If type is a floatvalue then format decimals
-			if ($ReturnValue->{type} eq "floatValue")
-			{
+			if ($ReturnValue->{type} eq "floatValue") {
 				$ReturnMessage = sprintf("%.1f", $ReturnValue->{value});
 			}
 			### If type is something else just pass throught
-			else
-			{
+			else {
 				$ReturnMessage = $ReturnValue->{value};
 			}
 		}
 	}
 	### If the initialisation process has NOT been finished
-	else
-	{
+	else {
 		$ReturnMessage = "The initialisation process is still ongoing. Please wait for the STATE changing to \"Standby\"";
 	}
 		
@@ -665,13 +631,11 @@ sub km200_Get($@)
 
 
 ###START###### Manipulate service after "set" command by fhem #################################################START####
-sub km200_Set($@)
-{
+sub km200_Set($@) {
 	my ( $hash, @a ) = @_;
 	
 	### If not enough arguments have been provided
-	if ( @a < 2 )
-	{
+	if ( @a < 2 ) {
 		return "\"set km200\" needs at least one argument";
 	}
 		
@@ -686,21 +650,18 @@ sub km200_Set($@)
 
 	
 
-	foreach my $item(@WriteableServices) 	
-	{
+	foreach my $item(@WriteableServices) 	 {
 		$km200_sets{$item} = ("1");
 	}
 	
 	### If service chosen in GUI does not exist
-	if(!$km200_sets{$service}) 
-	{
+	if(!$km200_sets{$service}) {
 		my @cList = keys %km200_sets;
 		return "Unknown argument $service, choose one of " . join(" ", @cList);
 	}
 
 	### Check whether the initialisation process has been finished
-	if ($hash->{temp}{ServiceCounterInit} == false)
-	{
+	if ($hash->{temp}{ServiceCounterInit} == false) {
 		### Save chosen service into hash
 		$hash->{temp}{service}  = $service;
 		$hash->{temp}{postdata} = $value;	
@@ -709,8 +670,7 @@ sub km200_Set($@)
 		$ReturnMessage = km200_PostSingleService($hash);
 	}
 	### If the initialisation process has NOT been finished
-	else
-	{
+	else {
 		$ReturnMessage = "The initialisation process is still ongoing. Please wait for the STATE changing to \"Standby\"";
 	}
 	
@@ -724,8 +684,7 @@ sub km200_Set($@)
 
 
 ###START####### Repeats "string" for "count" times ############################################################START####
-sub str_repeat($$)
-{
+sub str_repeat($$) {
     my $string = $_[0];
     my $count  = $_[1];
     return(${string}x${count});
@@ -734,8 +693,7 @@ sub str_repeat($$)
 
 
 ###START###### Subroutine Encrypt Data ########################################################################START####
-sub km200_Encrypt($)
-{
+sub km200_Encrypt($) {
 	my ($hash, $def)            = @_;
 
 	my $km200_crypt_key_private = $hash->{Secret}{CRYPTKEYPRIVATE};
@@ -763,8 +721,7 @@ sub km200_Encrypt($)
 
 
 ###START###### Subroutine Decrypt Data ########################################################################START####
-sub km200_Decrypt($)
-{
+sub km200_Decrypt($) {
 	my ($hash, $def)            = @_;
 
 	my $km200_crypt_key_private = $hash->{Secret}{CRYPTKEYPRIVATE};
@@ -781,8 +738,7 @@ sub km200_Decrypt($)
 	#Log3 $name, 5, $name. " : km200 - decryptData2 - base64decode               : " .$decryptData;
 
 	# Check whether the length of the decryptData is NOT multiplies of 16
-	if ((length($decryptData)&0xF) != 0)
-	{
+	if ((length($decryptData)&0xF) != 0) {
 		# Return nothing which will end this subroutine
 		return "";
 	}
@@ -833,8 +789,7 @@ sub km200_Decrypt($)
 ####END####### Subroutine Decrypt Data #########################################################################END#####
 
 ###START###### Subroutine set individual data value ###########################################################START####
-sub km200_PostSingleService($)
-{
+sub km200_PostSingleService($) {
 	my ($hash, $def)                = @_;
 	my $Service                     = $hash->{temp}{service};
 	my $km200_gateway_host          = $hash->{URL} ;
@@ -853,8 +808,7 @@ sub km200_PostSingleService($)
 	$jsonRead = km200_GetSingleService($hash);	
 	
 	#### If the get-command returns an error due to an unknown Service requested
-	if ($jsonRead -> {type} eq "ERROR")
-	{
+	if ($jsonRead -> {type} eq "ERROR") {
 		### Rescue original Service request
 		my $WriteService = $Service;
 
@@ -878,8 +832,7 @@ sub km200_PostSingleService($)
 
 		### Check whether the type is an switchProgram. 
 		### If true, the requested service was a particular week of the switchProgram
-		if ($jsonRead -> {type} eq "switchProgram")
-		{
+		if ($jsonRead -> {type} eq "switchProgram") {
 			### Log file entry for debugging
 			Log3 $name, 5, $name. "km200_Set - It is a switchProgram list!";
 
@@ -937,8 +890,7 @@ sub km200_PostSingleService($)
 			
 			my @TempSetpointNames	=();
 			### For each item found in this empty parent directory
-			foreach my $item (@{ $TempSetpointsJson->{references} })
-			{
+			foreach my $item (@{ $TempSetpointsJson->{references} }) {
 				my $TempSetPoint = substr($item->{id}, (rindex($item->{id}, "/") - length($item->{id}) +1));
 				
 				### Add service, which is one of the allowed terminologies at the same time, to the list of all known services
@@ -949,20 +901,17 @@ sub km200_PostSingleService($)
 			$hash->{temp}{service}	= $Service;
 			
 			### If number of switchpoints exceeds maximum allowed
-			if (($TempReadingLength / 2) > $jsonRead -> {maxNbOfSwitchPointsPerDay})
-			{
+			if (($TempReadingLength / 2) > $jsonRead -> {maxNbOfSwitchPointsPerDay}) {
 				return ("ERROR - Too much Switchpoints for weeklist inserted. \n Do not add more than " . $jsonRead -> {maxNbOfSwitchPointsPerDay} . " SwitchPoints per day!\n");	
 			}
 			
 			### If content of array is not even
-			if (($TempReadingLength % 2)  != 0)
-			{
+			if (($TempReadingLength % 2)  != 0) {
 				return "ERROR - At least one Switchtime or Switchpoint is missing. \n Make sure you always have couples of Switchtime and Switchpoint!\n";	
 			}
 			
 			### Check whether description of setpoints is the same as referenced and the data is in the right order
-			for (my $i=0;$i<$TempReadingLength;$i+=2)
-			{ 
+			for (my $i=0;$i<$TempReadingLength;$i+=2) { 
 				### If the even element behind the uneven index [1, 3, 5, ...] is not one of the pre-defined setpoints
 				if (! grep /($TempReading[$i+1])/,@TempSetpointNames)
 				{
@@ -997,32 +946,25 @@ sub km200_PostSingleService($)
 			$hash->{temp}{postdata} = join(" ", @TempReading);
 			
 			### For the requested day to be changed, save new value
-			if    ($WriteService =~ m/1-Mo/i)
-			{
+			if    ($WriteService =~ m/1-Mo/i) {
 				@TempReadingMo   = @TempReading;
 			}
-			elsif ($WriteService =~ m/2-Tu/i)
-			{
+			elsif ($WriteService =~ m/2-Tu/i) {
 				@TempReadingTu   = @TempReading;
 			}
-			elsif ($WriteService =~ m/3-We/i)
-			{
+			elsif ($WriteService =~ m/3-We/i) {
 				@TempReadingWe   = @TempReading;
 			}	
-			elsif ($WriteService =~ m/4-Th/i)
-			{
+			elsif ($WriteService =~ m/4-Th/i) {
 				@TempReadingTh   = @TempReading;
 			}	
-			elsif ($WriteService =~ m/5-Fr/i)
-			{
+			elsif ($WriteService =~ m/5-Fr/i) {
 				@TempReadingFr   = @TempReading;
 			}	
-			elsif ($WriteService =~ m/6-Sa/i)
-			{
+			elsif ($WriteService =~ m/6-Sa/i) {
 				@TempReadingSa   = @TempReading;
 			}	
-			elsif ($WriteService =~ m/7-Su/i)
-			{
+			elsif ($WriteService =~ m/7-Su/i) {
 				@TempReadingSu   = @TempReading;
 			}	
 
@@ -1030,8 +972,7 @@ sub km200_PostSingleService($)
 			### For every weekday create setpoint hash and push it to array of hashes of switchpoints to be send
 			my @SwitchPointsSend =();
 			
-			for (my $i=0;$i<$#TempReadingMo;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingMo;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "Mo";
 				my $TempHours                = substr($TempReadingMo[$i], 0, length($TempReadingMo[$i])-2);
@@ -1041,8 +982,7 @@ sub km200_PostSingleService($)
 				push @SwitchPointsSend, $TempHashSend;
 			}
 
-			for (my $i=0;$i<$#TempReadingTu;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingTu;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "Tu";
 				my $TempHours                = substr($TempReadingTu[$i], 0, length($TempReadingTu[$i])-2);
@@ -1052,8 +992,7 @@ sub km200_PostSingleService($)
 				push @SwitchPointsSend, $TempHashSend;
 			}			
 			
-			for (my $i=0;$i<$#TempReadingWe;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingWe;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "We";
 				my $TempHours                = substr($TempReadingWe[$i], 0, length($TempReadingWe[$i])-2);
@@ -1063,8 +1002,7 @@ sub km200_PostSingleService($)
 				push @SwitchPointsSend, $TempHashSend;
 			}
 	
-			for (my $i=0;$i<$#TempReadingTh;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingTh;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "Th";
 				my $TempHours                = substr($TempReadingTh[$i], 0, length($TempReadingTh[$i])-2);
@@ -1074,8 +1012,7 @@ sub km200_PostSingleService($)
 				push @SwitchPointsSend, $TempHashSend;
 			}
 			
-			for (my $i=0;$i<$#TempReadingFr;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingFr;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "Fr";
 				my $TempHours                = substr($TempReadingFr[$i], 0, length($TempReadingFr[$i])-2);
@@ -1085,8 +1022,7 @@ sub km200_PostSingleService($)
 				push @SwitchPointsSend, $TempHashSend;
 			}
 			
-			for (my $i=0;$i<$#TempReadingSa;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingSa;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "Sa";
 				my $TempHours                = substr($TempReadingSa[$i], 0, length($TempReadingSa[$i])-2);
@@ -1096,8 +1032,7 @@ sub km200_PostSingleService($)
 				push @SwitchPointsSend, $TempHashSend;
 			}
 			
-			for (my $i=0;$i<$#TempReadingSu;$i+=2)
-			{
+			for (my $i=0;$i<$#TempReadingSu;$i+=2) {
 				my $TempHashSend;
 				$TempHashSend->{"dayOfWeek"} = "Su";
 				my $TempHours                = substr($TempReadingSu[$i], 0, length($TempReadingSu[$i])-2);
@@ -1149,8 +1084,7 @@ sub km200_PostSingleService($)
 			$hash->{status}{FlagSetRequest} = false;
 			
 			### If error message has been returned
-			if($err ne "") 
-			{
+			if($err ne "")  {
 				Log3 $name, 2, $name . " - ERROR: $err";
 				return $err;	
 			}
@@ -1168,14 +1102,12 @@ sub km200_PostSingleService($)
 		   $ReReadContent =~ s/]}/]/g;
 		   
 		### Transform back into array of hashes
-		eval 
-			{
+		eval  {
 				$ReReadContent = decode_json(encode_utf8($ReReadContent));
 				$JsonContent = decode_json(encode_utf8($JsonContent));
 				1;
 			}
-		or do 
-			{
+		or do  {
 			};
 		
 		### Set Counter for found items in SwitchPrograms
@@ -1183,14 +1115,12 @@ sub km200_PostSingleService($)
 		
 				
 		### For every item of the array of SwitchPrograms to be send
-		foreach my $ReReadItem (@{$ReReadContent})
-		{
+		foreach my $ReReadItem (@{$ReReadContent}) {
 			### Set Counter for found items of ReRead values
 			my $FoundReReadItem = 0;
 			
 			### For every item of the array of SwitchPrograms after Re-Reading 
-			foreach my $JsonItem (@{$JsonContent})
-			{
+			foreach my $JsonItem (@{$JsonContent}) {
 				### If the current Switchprogram - hash does not have the same amount of keys
 				if (%$ReReadItem ne %$JsonItem) 
 				{
@@ -1223,8 +1153,7 @@ sub km200_PostSingleService($)
 			}
 
 			### If item has been found
-			if ($FoundReReadItem == 1)
-			{ 
+			if ($FoundReReadItem == 1) { 
 				### Inkrement Counter for found identical SwitchPoints
 				$FoundJsonItem++;
 			}
@@ -1232,13 +1161,11 @@ sub km200_PostSingleService($)
 		
 		my $ReturnValue;
 		
-		if 	($FoundJsonItem == @{$ReReadContent})
-		{
+		if 	($FoundJsonItem == @{$ReReadContent}) {
 			$ReturnValue = "The service " . $Service . " has been changed succesfully!";
 			Log3 $name, 5, $name. "Writing $Service succesfully \n";
 		}	
-		else
-		{
+		else {
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
 		}
 
@@ -1248,8 +1175,7 @@ sub km200_PostSingleService($)
 	}	
 	### Check whether the type is an switchProgram. 
 	### If true, the requested service is referring to the entire week but not a particular week.
-	if ($jsonRead -> {type} eq "switchProgram")
-	{
+	if ($jsonRead -> {type} eq "switchProgram") {
 		### Create full URL of the current Service to be written
 		my $url ="http://" . $km200_gateway_host . $Service;
 
@@ -1279,8 +1205,7 @@ sub km200_PostSingleService($)
 		$hash->{status}{FlagSetRequest} = false;
 		
 		### If error message has been returned
-		if($err ne "") 
-		{
+		if($err ne "")  {
 			Log3 $name, 2, $name . " - ERROR: $err";
 			return $err;	
 		}
@@ -1297,14 +1222,12 @@ sub km200_PostSingleService($)
 		   $ReReadContent =~ s/]}/]/g;
 		   
 		### Transform back into array of hashes
-		eval 
-			{
+		eval  {
 				$ReReadContent = decode_json(encode_utf8($ReReadContent));
 				$JsonContent = decode_json(encode_utf8($JsonContent));
 				1;
 			}
-		or do 
-			{
+		or do  {
 			};
 		
 		### Set Counter for found items in SwitchPrograms
@@ -1312,14 +1235,12 @@ sub km200_PostSingleService($)
 		
 				
 		### For every item of the array of SwitchPrograms to be send
-		foreach my $ReReadItem (@{$ReReadContent})
-		{
+		foreach my $ReReadItem (@{$ReReadContent}) {
 			### Set Counter for found items of ReRead values
 			my $FoundReReadItem = 0;
 			
 			### For every item of the array of SwitchPrograms after Re-Reading 
-			foreach my $JsonItem (@{$JsonContent})
-			{
+			foreach my $JsonItem (@{$JsonContent}) {
 
 				### If the current Switchprogram - hash does not have the same amount of keys
 				if (%$ReReadItem != %$JsonItem) 
@@ -1353,8 +1274,7 @@ sub km200_PostSingleService($)
 			}
 
 			### If item has been found
-			if ($FoundReReadItem == 1)
-			{ 
+			if ($FoundReReadItem == 1) { 
 				### Inkrement Counter for found identical SwitchPoints
 				$FoundJsonItem++;
 			}
@@ -1362,13 +1282,11 @@ sub km200_PostSingleService($)
 		
 		my $ReturnValue;
 		
-		if 	($FoundJsonItem == @{$ReReadContent})
-		{
+		if 	($FoundJsonItem == @{$ReReadContent}) {
 			$ReturnValue = "The service " . $Service . " has been changed succesfully!";
 			Log3 $name, 5, $name.  "The service $Service has been changed succesfully!";
 			}	
-		else
-		{
+		else {
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
 			Log3 $name, 5, $name. "Writing $Service was NOT succesfully";
 		}
@@ -1377,8 +1295,7 @@ sub km200_PostSingleService($)
 		return $ReturnValue;
 	}	
 	## Check whether the type is a single value containing a string
-	elsif($jsonRead->{type} eq "stringValue") 
-	{	
+	elsif($jsonRead->{type} eq "stringValue") {	
 		### Save chosen value into hash to be send
 		$jsonSend->{value} = $hash->{temp}{postdata};
 
@@ -1415,8 +1332,7 @@ sub km200_PostSingleService($)
 		$hash->{status}{FlagSetRequest} = false;
 		
 		### If error message has been returned
-		if($err ne "") 
-		{
+		if($err ne "")  {
 			Log3 $name, 2, $name . " - ERROR: $err";
 			return $err;	
 		}
@@ -1429,13 +1345,11 @@ sub km200_PostSingleService($)
 		
 		### Return value
 		my $ReturnValue = "";
-		if ($ReadValue->{value} eq $hash->{temp}{postdata})
-		{	
+		if ($ReadValue->{value} eq $hash->{temp}{postdata}) {	
 			$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value};
 			Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata};
 		}
-		else
-		{
+		else {
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed.";
 			Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " was NOT successful";
 		}
@@ -1444,11 +1358,9 @@ sub km200_PostSingleService($)
 		return $ReturnValue;
 	}	
 	## Check whether the type is a single value containing a float value
-	elsif($jsonRead -> {type} eq "floatValue")
-	{
+	elsif($jsonRead -> {type} eq "floatValue") {
 		### Check whether value to be sent is numeric
-		if ($hash->{temp}{postdata} =~ /^[0-9.-]+$/) 
-		{
+		if ($hash->{temp}{postdata} =~ /^[0-9.-]+$/)  {
 			### Save chosen value into hash to be send
 			$jsonSend->{value} = ($hash->{temp}{postdata}) * 1;	
 
@@ -1485,8 +1397,7 @@ sub km200_PostSingleService($)
 			$hash->{status}{FlagSetRequest} = false;
 			
 			### If error messsage has been returned
-			if($err ne "") 
-			{
+			if($err ne "")  {
 				Log3 $name, 2, $name . " - ERROR: $err";
 				return $err;	
 			}
@@ -1500,18 +1411,15 @@ sub km200_PostSingleService($)
 
 			### Return value
 			my $ReturnValue = "";
-			if ($ReadValue->{value} eq $hash->{temp}{postdata})
-			{	
+			if ($ReadValue->{value} eq $hash->{temp}{postdata}) {	
 				$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value} . "\n";
 				Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata};
 			}
-			elsif ($jsonRead -> {value} == $ReadValue->{value})
-			{
+			elsif ($jsonRead -> {value} == $ReadValue->{value}) {
 				$ReturnValue = "ERROR - The service " . $Service . " could not changed to: " . $hash->{temp}{postdata} . "\n The value is: " . $ReadValue->{value} . "\n";
 				Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " was NOT successful";
 			}
-			else
-			{
+			else {
 				$ReturnValue = "The service " . $Service . " has been rounded to: " . $ReadValue->{value} . "\n";
 				Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " was rounded and changed successful";
 			}
@@ -1520,16 +1428,14 @@ sub km200_PostSingleService($)
 			return $ReturnValue;
 		}
 		### If the value to be sent is NOT numeric
-		else
-		{
+		else {
 			### Log file entry for debugging
 			Log3 $name, 5, $name. "km200_Set - ERROR - Float value expected!";
 			return ("km200_Set - ERROR - Float value expected!\n");
 		}
 	}
 	## If the type is unknown
-	else
-	{
+	else {
 		### Log entries for debugging purposes
 		Log3 $name, 4, $name. " : km200_SetSingleService - type unknown for : " .$Service;
 	}
@@ -1538,8 +1444,7 @@ sub km200_PostSingleService($)
 
 
 ###START###### Subroutine get individual data value ###########################################################START####
-sub km200_GetSingleService($)
-{
+sub km200_GetSingleService($) {
 	my ($hash, $def)            	= @_;
 	my $Service                 	= $hash->{temp}{service};
 	my $km200_gateway_host      	= $hash->{URL};
@@ -1581,8 +1486,7 @@ sub km200_GetSingleService($)
 	$hash->{status}{FlagGetRequest} = false;
 	
 	### If error message has been reported
-	if($err ne "") 
-	{
+	if($err ne "") {
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
 		my $ReturnMessage ="ERROR";
 		$json -> {type}   = $ReturnMessage;
@@ -1590,26 +1494,21 @@ sub km200_GetSingleService($)
 		return $json;
 	}
 	### If NO error message has been reported
-	else
-	{
+	else {
 		$hash->{temp}{decodedcontent} = $data;
 		my $decodedContent = km200_Decrypt($hash);
 
-		if ($decodedContent ne "")
-		{
-			eval 
-			{
+		if ($decodedContent ne "") {
+			eval  {
 				$json = decode_json(encode_utf8($decodedContent));
 				1;
 			}
-			or do 
-			{
+			or do  {
 			Log3 $name, 5, $name. " : km200_GetSingleService - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
 			};
 
 			### Check whether the type is a single value containing a string or float value
-			if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
-			{
+			if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue")) {
 				my $JsonId         = $json->{id};
 				my $JsonType       = $json->{type};
 				my $JsonValue      = $json->{value};
@@ -1626,8 +1525,7 @@ sub km200_GetSingleService($)
 			}	
 			
 			### Check whether the type is an switchProgram
-			elsif ($json -> {type} eq "switchProgram")
-			{
+			elsif ($json -> {type} eq "switchProgram") {
 				my $JsonId         = $json->{id};
 				my $JsonType       = $json->{type};
 
@@ -1824,8 +1722,7 @@ sub km200_GetSingleService($)
 				return $json
 			}
 			### Check whether the type is an errorlist
-			elsif ($json -> {type} eq "errorList")
-			{
+			elsif ($json -> {type} eq "errorList") {
 				my $TempErrorList    = "";
 				
 				### Sort list by timestamps descending
@@ -1858,8 +1755,7 @@ sub km200_GetSingleService($)
 				return $json;
 			}
 			### Check whether the type is an refEnum which is indicating an empty parent directory
-			elsif ($json -> {type} eq "refEnum")
-			{
+			elsif ($json -> {type} eq "refEnum") {
 				### Initialise Return Message
 				my $ReturnMessage = "";
 
@@ -1886,8 +1782,7 @@ sub km200_GetSingleService($)
 				return $json;
 			}		
 			### Check whether the type is a systeminfo
-			elsif ($json -> {type} eq "systeminfo")
-			{
+			elsif ($json -> {type} eq "systeminfo") {
 				my $JsonId         = $json->{id};
 				my $JsonType       = $json->{type};
 				my @JsonValues     = $json->{values};
@@ -1939,15 +1834,13 @@ sub km200_GetSingleService($)
 				return $json;
 			}
 			### If the type is unknown
-			else
-			{
+			else {
 				### Log entries for debugging purposes
 				Log3 $name, 4, $name. " : km200_GetSingleService - type unknown for : " .$Service;
 				### Log entries for debugging purposes
 			}
 		}
-		else 
-		{
+		else  {
 			Log3 $name, 4, $name. " : km200_GetSingleService: ". $Service . " NOT available";
 		
 			my $ReturnMessage = "ERROR";
@@ -1961,8 +1854,7 @@ sub km200_GetSingleService($)
 
 
 ###START###### Subroutine initial contact of services via HttpUtils ###########################################START####
-sub km200_GetInitService($)
-{
+sub km200_GetInitService($) {
 	my ($hash, $def)                 = @_;
 	my $km200_gateway_host           =   $hash->{URL} ;
 	my $name                         =   $hash->{NAME} ;
@@ -1976,8 +1868,7 @@ sub km200_GetInitService($)
 	RemoveInternalTimer($hash);
 
 	### If this this loop is accessed for the first time, stop the timer and set status
-	if ($ServiceCounterInit == 0)
-	{
+	if ($ServiceCounterInit == 0) {
 		### Log file entry for debugging
 		Log3 $name, 5, $name. "Sounding and importing of services started";
 		
@@ -2009,8 +1900,7 @@ sub km200_GetInitService($)
 
 ###START###### Subroutine to download complete initial data set from gateway ##################################START####
 # For all known, but not excluded services by attribute "DoNotPoll", try reading the respective values from gateway
-sub km200_ParseHttpResponseInit($)
-{
+sub km200_ParseHttpResponseInit($) {
     my ($param, $err, $data)     = @_;
     my $hash                     =   $param->{hash};
     my $name                     =   $hash ->{NAME};
@@ -2023,8 +1913,7 @@ sub km200_ParseHttpResponseInit($)
 	my $type;
     my $json ->{type} = "";
 	
-	if($err ne "") 
-	{
+	if($err ne "") {
 		### Create Log entry
 		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR                : ".$Service. ": No proper Communication with Gateway: " .$err;
 		
@@ -2044,21 +1933,17 @@ sub km200_ParseHttpResponseInit($)
 	my $decodedContent = km200_Decrypt($hash);
 	
 	### Check whether the decoded content is not empty and therefore available
-	if ($decodedContent ne "")
-	{	
-		eval 
-		{
+	if ($decodedContent ne "") {	
+		eval  {
 			$json = decode_json(encode_utf8($decodedContent));
 			1;
 		}
-		or do 
-		{
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - CANNOT be parsed    : ". $Service;
+		or do  {
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - CANNOT be parsed     : ". $Service;
 		};
 
 		### Check whether the type is a single value containing a string or float value
-		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
-		{
+		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue")) {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 			my $JsonValue      = $json->{value};
@@ -2089,13 +1974,11 @@ sub km200_ParseHttpResponseInit($)
 
 			
 			### Check whether service is writeable and write name of service in array
-			if ($json->{writeable} == 1)
-			{
+			if ($json->{writeable} == 1) {
 				$LogMessage = $LogMessage . " and is writeable";
 				push (@KM200_WriteableServices, $Service);
 			}
-			else
-			{
+			else {
 				# Do nothing
 				$LogMessage = $LogMessage . "                 ";
 			}
@@ -2105,8 +1988,7 @@ sub km200_ParseHttpResponseInit($)
 			Log3 $name, 4, $name. $LogMessage;
 		}	
 		### Check whether the type is an switchProgram
-		elsif ($json -> {type} eq "switchProgram")
-		{
+		elsif ($json -> {type} eq "switchProgram") {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 			my @JsonValues     = $json->{switchPoints};
@@ -2130,13 +2012,11 @@ sub km200_ParseHttpResponseInit($)
 			my $LogMessage = " : The following Service can be read";
 			
 			### Check whether service is writeable and write name of service in array
-			if ($json->{writeable} == 1)
-			{
+			if ($json->{writeable} == 1) {
 				$LogMessage = $LogMessage . " and is writeable";
 				push (@KM200_WriteableServices, $Service);
 			}
-			else
-			{
+			else {
 				# Do nothing
 				$LogMessage = $LogMessage . "                 ";
 			}
@@ -2153,8 +2033,7 @@ sub km200_ParseHttpResponseInit($)
 			my $TempReadingSa = "";
 			my $TempReadingSu = "";
 			
-			foreach my $item (@{ $json->{switchPoints} })
-			{
+			foreach my $item (@{ $json->{switchPoints} }) {
 				### Create string for time and switchpoint in fixed format and write part of Reading String
 				my $time         = $item->{time};
 				my $temptime     = $time / 60;
@@ -2345,8 +2224,7 @@ sub km200_ParseHttpResponseInit($)
 
 		}
 		### Check whether the type is an errorlist
-		elsif ($json -> {type} eq "errorList")
-		{
+		elsif ($json -> {type} eq "errorList") {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 
@@ -2368,13 +2246,11 @@ sub km200_ParseHttpResponseInit($)
 			my $LogMessage = " : The following Service can be read";
 			
 			### Check whether service is writeable and write name of service in array
-			if ($json->{writeable} == 1)
-			{
+			if ($json->{writeable} == 1) {
 				$LogMessage = $LogMessage . " and is writeable     ";
 				push (@KM200_WriteableServices, $Service);
 			}
-			else
-			{
+			else {
 				# Do nothing
 				$LogMessage = $LogMessage . "                 ";
 			}
@@ -2387,8 +2263,7 @@ sub km200_ParseHttpResponseInit($)
 			my @TempSortedErrorList =  sort { $b->{t} cmp $a->{t} } @{ $json->{values} };
            #my @TempSortedErrorList =  @{ $json->{values} };
 			
-			foreach my $item (@TempSortedErrorList)
-			{
+			foreach my $item (@TempSortedErrorList) {
 				### Increment Service-Index
 				$TempServiceIndex++;
 				
@@ -2414,8 +2289,7 @@ sub km200_ParseHttpResponseInit($)
 			}
 		}
 		### Check whether the type is an refEnum which is indicating an empty parent directory
-		elsif ($json -> {type} eq "refEnum")
-		{
+		elsif ($json -> {type} eq "refEnum") {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 			my @JsonReferences = $json->{references};
@@ -2424,8 +2298,7 @@ sub km200_ParseHttpResponseInit($)
 			Log3 $name, 5, $name. " : The following Service is an empty parent directory : " . $JsonId;
 			
 			### For each item found in this empty parent directory
-			foreach my $item (@{ $json->{references} })
-			{
+			foreach my $item (@{ $json->{references} }) {
 				my $SearchWord = $item->{id};
 				
 				### If the Service found is listed as blocked service
@@ -2447,8 +2320,7 @@ sub km200_ParseHttpResponseInit($)
 			@{$hash ->{Secret}{KM200ALLSERVICES}} = sort @{$hash ->{Secret}{KM200ALLSERVICES}};
 		}
 		### Check whether the type is a systeminfo
-		elsif ($json -> {type} eq "systeminfo")
-		{
+		elsif ($json -> {type} eq "systeminfo") {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 			my @JsonValues     = $json->{values};
@@ -2469,13 +2341,12 @@ sub km200_ParseHttpResponseInit($)
 			@KM200_RespondingServices = sort @KM200_RespondingServices;
 			
 			### Log file entry for debugging
-			Log3 $name, 4, $name . " : The following Service can be read                  : " .$JsonId;
+			Log3 $name, 4, $name . " : km200_ParseHttpResponseInit - Service can be read  : " .$JsonId;
 
 			### Initialise ArrayCounter 
 			my $ArrayCounter = 0;
 			
-			foreach my $ArrayItem (@{ $json->{values} })
-			{
+			foreach my $ArrayItem (@{ $json->{values} }) {
 				### Incrementation of ArrayCounter
 				$ArrayCounter++;
 
@@ -2496,21 +2367,57 @@ sub km200_ParseHttpResponseInit($)
 					my $TempJsonId = $JsonId . "/" . sprintf ('%02d', $ArrayCounter) . "/" . $SystemInfoHashKey;
 					readingsSingleUpdate( $hash, $TempJsonId, $SystemInfoHashValue, 1);
 					### Log file entry for debugging
-					Log3 $name, 5, $name . " : The following Service can be read                  : " . $TempJsonId;
+					Log3 $name, 5, $name . " : km200_ParseHttpResponseInit - Service can be read  : " . $TempJsonId;
 
 				}
 			}
 		}
-		### Check whether the type is unknown
-		else
-		{
+		### Check whether the type is a recording and is a 'power' recording
+		elsif ($json -> {type} eq "yRecording") {
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - type unknown for     : " .$Service;
+			Log3 $name, 5, $name . " : km200_ParseHttpResponseInit___________________________________________________________________________________";
+			Log3 $name, 5, $name . " : km200_ParseHttpResponseInit - value found for      : " .$Service;
+			Log3 $name, 5, $name . " : km200_ParseHttpResponseInit - id                   : " .$JsonId;
+			Log3 $name, 5, $name . " : km200_ParseHttpResponseInit - type                 : " .$JsonType;
+
+			### Add service to the list of responding services
+			push (@KM200_RespondingServices, $Service);
+
+			### Delete double entries in the list of responding services and sort in alphabetical order
+			my %FilteredKM200RespondingServices;
+			$FilteredKM200RespondingServices{$_}=0 for @KM200_RespondingServices;
+			@KM200_RespondingServices = (keys %FilteredKM200RespondingServices);
+			@KM200_RespondingServices = sort @KM200_RespondingServices;
+
+			### Log file entry for debugging
+			Log3 $name, 5, $name . " : km200_ParseHttpResponseInit - Service can be read  : " .$JsonId;
+			
+			### Log file entry for debugging
+			my $LogMessage = " : The following Service can be read";
+			
+			### Check whether service is writeable and write name of service in array
+			if ($json->{writeable} == 1) {
+				$LogMessage = $LogMessage . " and is writeable";
+				push (@KM200_WriteableServices, $Service);
+			}
+			else {
+				# Do nothing
+				$LogMessage = $LogMessage . "                 ";
+			}
+			$LogMessage = $LogMessage . " : " .$JsonId;
+			Log3 $name, 4, $name . $LogMessage;
+		}
+		## Check whether the type is unknown
+		else {
+			### Log entries for debugging purposes
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type unknown for     : " .$Service;
 		}
 	}
 	### Check whether the decoded content is empty and therefore NOT available
-	else 
-	{
+	else {
 		### Log entries for debugging purposes
 		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit -  NOT available       : ". $Service;
 	}
@@ -2523,8 +2430,7 @@ sub km200_ParseHttpResponseInit($)
 	$NumberInitServices       = @KM200_InitServices;
 	
 	### If the list of KM200ALLSERVICES has not been finished yet
-	if ($ServiceCounterInit < ($NumberInitServices-1))
-	{
+	if ($ServiceCounterInit < ($NumberInitServices-1)) {
 		++$ServiceCounterInit;
 		$hash->{temp}{ServiceCounterInit}           = $ServiceCounterInit;
 		@{$hash->{Secret}{KM200RESPONDINGSERVICES}} = @KM200_RespondingServices;
@@ -2532,8 +2438,7 @@ sub km200_ParseHttpResponseInit($)
 		km200_GetInitService($hash);
 	}
 	### If the list of KM200ALLSERVICES is finished
-	else
-	{
+	else {
 		my @KM200_DynServices = @KM200_RespondingServices;
 		
 		### Save arrays of services in hash
@@ -2564,8 +2469,7 @@ sub km200_ParseHttpResponseInit($)
 		$hash->{temp}{ServiceCounterInit} = false;
 	}
 	### If the Initialisation process has been interuppted with an error message
-	if (ReadingsVal($name,"fullResponse",0) eq "ERROR")
-	{
+	if (ReadingsVal($name,"fullResponse",0) eq "ERROR") {
 		### Reset fullResponse error message
 		readingsSingleUpdate( $hash, "fullResponse", "Restarted after ERROR", 1);
 		
@@ -2583,8 +2487,7 @@ sub km200_ParseHttpResponseInit($)
 
 
 ###START###### Subroutine obtaining dynamic services via HttpUtils ############################################START####
-sub km200_GetDynService($)
-{
+sub km200_GetDynService($) {
 	my ($hash, $def)                 = @_;
 	my $km200_gateway_host           =   $hash->{URL};
 	my $name                         =   $hash->{NAME};
@@ -2593,51 +2496,112 @@ sub km200_GetDynService($)
 	my $ServiceCounterDyn            =   $hash->{temp}{ServiceCounterDyn};
 	my $PollingTimeout               =   $hash->{POLLINGTIMEOUT};
 	
-	### Stop the current timer
-	RemoveInternalTimer($hash);
 
 	### If at least one service to be polled is available
-	if (@KM200_DynServices != 0)
-	{
-		my $Service                  =   $KM200_DynServices[$ServiceCounterDyn];
+	if (@KM200_DynServices != 0) {
+		my $Service = $KM200_DynServices[$ServiceCounterDyn];
 		
 		### Log file entry for debugging
-		if ($ServiceCounterDyn == 0)
-		{
-			Log3 $name, 5, $name. "Starting download of dynamic services";
+		if ($ServiceCounterDyn == 0) {
+			Log3 $name, 5, $name . "Starting download of dynamic services";
 		}
-		
+
 		### Log file entry for debugging
 		Log3 $name, 5, $name . " - km200_GetDynService - Polling                      : " . $Service;
-		
-		my $url = "http://" . $km200_gateway_host . $Service;
-		my $param = {
-						url        => $url,
-						timeout    => $PollingTimeout,
-						hash       => $hash,
-						method     => "GET",
-						header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
-						callback   =>  \&km200_ParseHttpResponseDyn
-					};
 
-		### Set Status Flag in order state running dynamic request
-		$hash->{status}{FlagDynRequest}           = true;
+		### Check whether Service is an parent yRecording entry
+		if (($Service =~ m/recordings/ ) and ($Service !~ m/interval=/)) {
+			my $SearchPattern = $Service . "?interval=";
 
-		### Get data
-		HttpUtils_NonblockingGet($param);
+			### Log entries for debugging purposes
+			Log3 $name, 5, $name. " : km200_GetDynService____________________________________________________________________";
+			Log3 $name, 5, $name. " : km200_GetDynService  - Service                     : " .$Service;
+			Log3 $name, 5, $name. " : km200_GetDynService  - KM200_DynServices pre       :/n" .Dumper(@KM200_DynServices);
+			Log3 $name, 5, $name. " : km200_GetDynService  - SearchPattern               : " .$SearchPattern;
+
+
+			### Search in array for old interval entries and delete them
+			for(my $i = 0; $i < @KM200_DynServices; $i++) {
+				if (index($KM200_DynServices[$i], $SearchPattern) != -1) {
+					### Log entries for debugging purposes
+					Log3 $name, 5, $name. " : km200_GetDynService  - Service purged              : " . sprintf('%03d', $i) . " - " . $KM200_DynServices[$i];
+					
+					### Delete entry in Array
+					splice(@KM200_DynServices,$i,1);
+					
+					### Correct index by due to deleted array-item
+					$i--;
+				} 
+				else
+				{
+					### Log entries for debugging purposes
+					Log3 $name, 5, $name. " : km200_GetDynService  - Service NOT purged          : " . sprintf('%03d', $i) . " - " . $KM200_DynServices[$i];
+				}
+			}
+
+			### Log entries for debugging purposes
+			Log3 $name, 5, $name. " : km200_GetDynService  - KM200_DynServices purge     :/n" .Dumper(@KM200_DynServices);
+
+			### Define interval for current timestamp
+			my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+			my @Intervals = (
+								sprintf ('%04d-%02d-%02d', $year+1900,$mon+1,$mday), 
+								sprintf ('%04d-%02d'     , $year+1900,$mon+1),
+								sprintf ('%04d'          , $year+1900)
+							);
+
+			### For all possible intervals
+			for(@Intervals) {
+				my $tmpid = $Service.'?interval='.$_;
+				### Log recording service for debugging
+				Log3 $name, 5, $name. " : km200_GetDynService  - add service                 : ". $tmpid;
+				
+				### Add service to the list of all known services
+				push (@KM200_DynServices, $tmpid);
+			}
+
+			### Log entries for debugging purposes
+			Log3 $name, 5, $name. " : km200_GetDynService  - KM200_DynServices post      :/n" .Dumper(@KM200_DynServices);
+
+			### Save Array of new DynServices into hash
+			@{$hash->{Secret}{KM200DYNSERVICES}} = @KM200_DynServices;
+			
+			### Jump to next value
+			++$ServiceCounterDyn;
+			$hash->{temp}{ServiceCounterDyn} = $ServiceCounterDyn;
+			km200_GetDynService($hash);
+		}
+		else {
+			### Log entries for debugging purposes
+			Log3 $name, 5, $name. " : km200_GetDynService  - Downloading Service         : " .$Service;
+
+			my $url = "http://" . $km200_gateway_host . $Service;
+			my $param = {
+							url        => $url,
+							timeout    => $PollingTimeout,
+							hash       => $hash,
+							method     => "GET",
+							header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
+							callback   =>  \&km200_ParseHttpResponseDyn
+						};
+
+			### Set Status Flag in order state running dynamic request
+			$hash->{status}{FlagDynRequest} = true;
+
+			### Get data
+			HttpUtils_NonblockingGet($param);
+		}
 	}
 	### If no service to be polled is available
-	else
-	{
-		Log3 $name, 5, $name . " : No dynamic values available to be read. Skipping download.";
+	else {
+		Log3 $name, 4, $name . " : km200_GetDynService  - No dynamic values available to be read. Skipping download.";
 	}
 }
 ####END####### Subroutine get dynamic data value ###############################################################END#####
 
 ###START###### Subroutine to download complete dynamic data set from gateway ##################################START####
 # For all responding dynamic services read the respective values from gateway
-sub km200_ParseHttpResponseDyn($)
-{
+sub km200_ParseHttpResponseDyn($) {
     my ($param, $err, $data)    = @_;
     my $hash                    =   $param->{hash};
     my $name                    =   $hash ->{NAME};
@@ -2645,16 +2609,17 @@ sub km200_ParseHttpResponseDyn($)
 	my @KM200_DynServices       = @{$hash ->{Secret}{KM200DYNSERVICES}};	
 	my $NumberDynServices       = @KM200_DynServices;
 	my $Service                 = $KM200_DynServices[$ServiceCounterDyn];
+	my $km200_gateway_host      =   $hash->{URL};
+	my $PollingTimeout          =   $hash->{POLLINGTIMEOUT};
+	my $json ->{type}           = "";
 	my $type;
-    my $json ->{type} = "";
-	
+
 	Log3 $name, 5, $name. " : Parsing response of dynamic service received for   : " . $Service;
 
 	### Reset Status Flag
 	$hash->{status}{FlagDynRequest}           = false;
 	
-	if($err ne "")
-	{
+	if($err ne "") {
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
         readingsSingleUpdate($hash, "fullResponse", "ERROR", 1);
 	}
@@ -2662,21 +2627,17 @@ sub km200_ParseHttpResponseDyn($)
 	$hash->{temp}{decodedcontent} = $data;
 	my $decodedContent = km200_Decrypt($hash);
 	
-	if ($decodedContent ne "")
-	{
-		eval 
-		{
+	if ($decodedContent ne "") {
+		eval  {
 			$json = decode_json(encode_utf8($decodedContent));
 			1;
 		}
-		or do 
-		{
+		or do  {
 			Log3 $name, 5, $name. " - km200_parseHttpResponseDyn : Data cannot be parsed by JSON on km200 for http://" . $param->{url};
 		};
 		
 		### Check whether the type is a single value containing a string or float value
-		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
-		{
+		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue")) {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 			my $JsonValue      = $json->{value};
@@ -2697,8 +2658,7 @@ sub km200_ParseHttpResponseDyn($)
 			### Write reading
 		}			
 		### Check whether the type is an switchProgram
-		elsif ($json -> {type} eq "switchProgram")
-		{
+		elsif ($json -> {type} eq "switchProgram") {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 
@@ -2717,8 +2677,7 @@ sub km200_ParseHttpResponseDyn($)
 			my $TempReadingSa = "";
 			my $TempReadingSu = "";
 			
-			foreach my $item (@{ $json->{switchPoints} })
-			{
+			foreach my $item (@{ $json->{switchPoints} }) {
 				### Create string for time and switchpoint in fixed format and write part of Reading String
 				my $time         = $item->{time};
 				my $temptime     = $time / 60;
@@ -2874,8 +2833,7 @@ sub km200_ParseHttpResponseDyn($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
 		}
 		### Check whether the type is an errorlist
-		elsif ($json -> {type} eq "errorList")
-		{
+		elsif ($json -> {type} eq "errorList") {
 			my $JsonId           = $json->{id};
 			my $JsonType         = $json->{type};
 			my $TempServiceIndex = 0;
@@ -2885,8 +2843,7 @@ sub km200_ParseHttpResponseDyn($)
 #			my @TempSortedErrorList =  @{ $json->{values} } ;
 			
 			### For every notification do
-			foreach my $item (@TempSortedErrorList)
-			{
+			foreach my $item (@TempSortedErrorList) {
 				### Increment Service-Index
 				$TempServiceIndex++;
 				
@@ -2938,8 +2895,7 @@ sub km200_ParseHttpResponseDyn($)
 			}
 		}
 		### Check whether the type is a systeminfo
-		elsif ($json -> {type} eq "systeminfo")
-		{
+		elsif ($json -> {type} eq "systeminfo") {
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 			my @JsonValues     = $json->{values};
@@ -2952,8 +2908,7 @@ sub km200_ParseHttpResponseDyn($)
 			### Initialise ArrayCounter 
 			my $ArrayCounter = 0;
 			
-			foreach my $ArrayItem (@{ $json->{values} })
-			{
+			foreach my $ArrayItem (@{ $json->{values} }) {
 				### Incrementation of ArrayCounter
 				$ArrayCounter++;
 
@@ -2969,15 +2924,66 @@ sub km200_ParseHttpResponseDyn($)
 				}
 			}
 		}
+
+		## Check whether the type is a recording
+		elsif (($json -> {type} eq "yRecording" ) and ($json -> {interval} ne "")) {
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+
+			## If the response contains data based on the interval
+			if ($json -> {interval} ne "") {
+				## Log entries for debugging purposes
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn________________________________________________________________________";
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn - yRec value found for : " .$Service;
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn - id                   : " .$JsonId;
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn - type                 : " .$JsonType;
+
+				my $interval = $json->{interval};
+				my $sampleRate = $json->{sampleRate};
+				
+				## Log recording values for debugging
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn                        : " . $JsonId . ' : ' . $interval . ' : ' . $sampleRate;
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn  - recording values    : " . Dumper(@{$json->{recording}});
+				
+				my $energySum = 0;
+				foreach my $item (@{ $json->{recording} })
+				{
+					if($item->{c} ne 0)
+					{
+						if($sampleRate eq "P1H")
+						{
+							$energySum = $energySum + $item->{y} / $item->{c}
+						}
+						elsif($sampleRate eq "P1D")
+						{
+							$energySum = $energySum + $item->{y} / ($item->{c} / 24)
+						}
+						elsif($sampleRate eq "P31D")
+						{
+							### don't know which values für 'c' should be used
+							$energySum = $energySum + $item->{y} / ($item->{c} / 30 / 24)
+						}
+					}
+				}
+				
+				### write reading for fhem
+				my $intervalText = $sampleRate eq "P1H" ? "_Today_kWh" : $sampleRate eq "P1D" ? "_ThisMonth_kWh" : "_ThisYear_kWh";
+				my $TempJsonId = '/recordings'.$json->{recordedResource}{id}. $intervalText;
+				$energySum = sprintf('%.02f', $energySum);
+				readingsSingleUpdate( $hash, $TempJsonId, $energySum, 1);
+
+				### Log recording values for debugging
+				Log3 $name, 5, $name. " : km200_ParseHttpRecordings energySum: ".$JsonId.':'.$energySum;
+			}
+		}		
+		
 		### Check whether the type is unknown
-		else
-		{
+		else {
 			### Log entries for debugging purposes
 			Log3 $name, 4, $name. " : km200_parseHttpResponseDyn  - type unknown for : " .$Service;
 		}
 	}
-	else 
-	{
+	else {
 		Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - Data not available on km200 for http://" . $param->{url};
 	}
 
@@ -2988,15 +2994,13 @@ sub km200_ParseHttpResponseDyn($)
 	### Clear up temporary variables
 
 	### If list is not complete yet
-	if ($ServiceCounterDyn < ($NumberDynServices-1))
-	{
+	if ($ServiceCounterDyn < ($NumberDynServices-1)) {
 		++$ServiceCounterDyn;
 		$hash->{temp}{ServiceCounterDyn} = $ServiceCounterDyn;
 		km200_GetDynService($hash);
 	}
 	### If list is complete
-	else
-	{
+	else {
 		$hash->{STATE}                   = "Standby";
 		$hash->{temp}{ServiceCounterDyn} = 0;
 		
@@ -3017,8 +3021,7 @@ sub km200_ParseHttpResponseDyn($)
 
 
 ###START###### Load database for errorcodes in hash ###########################################################START####
-sub km200_GetErrorMessage($$$$)
-{
+sub km200_GetErrorMessage($$$$) {
 	my ($ErrorCode, $SubCode, $Class, $hash) = @_;
 	my $name                         =   $hash ->{NAME};
 	my %ErrorCodeList;
@@ -4912,8 +4915,7 @@ sub km200_GetErrorMessage($$$$)
 </ul>
 =end html_DE
 
-=for :application/json;q=META.json 73_km200.pm
-{
+=for :application/json;q=META.json 73_km200.pm {
   "abstract": "Connects fhem to Buderus KM300, KM200, KM100, KM50<BR>",
   "description": "The Buderus KM200, KM100  or KM50 (hereafter described as KMxxx) is a communication device to establish a connection between the Buderus central heating control unit and the internet.<BR>It has been designed in order to allow the inhabitants accessing their heating system via his Buderus App EasyControl.<BR>Furthermore it allows the maintenance companies to access the central heating control system to read and change settings.<BR>The km200 fhem-module enables read/write access to these parameters.<BR>",
   "x_lang": {
