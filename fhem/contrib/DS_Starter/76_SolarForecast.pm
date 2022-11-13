@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-12 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-13 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,10 +134,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.0" => "13.11.2022  new attribute affectConsForecastInPlanning ",
   "0.73.0" => "12.11.2022  save Ehodpieces (___saveEhodpieces), use debug modules, revise comref,typos , maxconsumer 12 ".
                            "attr ctrlLanguage for local language support, bugfix MODE is set to Manual after restart if ".
-                           "attr ctrlInterval is not set, new attr consumerLink, graphic tooltips and formatting, ".
-                           " ",
+                           "attr ctrlInterval is not set, new attr consumerLink, graphic tooltips and formatting ",
   "0.72.5" => "08.11.2022  calculate percentile correction factor instead of best percentile, exploit all available API requests ".
                            "graphicBeamWidth more values, add moduleTiltAngle: 5,15,35,55,65,75,85 , ".
                            "fix _estConsumptionForecast, delete Setter pvSolCastPercentile_XX ",
@@ -835,6 +835,7 @@ sub Initialize {
                                 "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm ".
+                                "affectConsForecastInPlanning:1,0 ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
                                 "ctrlOptimizeSolCastInterval:1,0 ".
@@ -3014,9 +3015,11 @@ sub centralTask {
   #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);                # evtl. vorhandene leere Schlüssel entfernen
   #}
 
-  #for my $c (keys %{$data{$type}{$name}{consumers}}) {
-  #    delete $data{$type}{$name}{consumers}{$c}{OnOff};
-  #}
+  for my $c (keys %{$data{$type}{$name}{consumers}}) {
+      delete $data{$type}{$name}{consumers}{$c}{epiecEstart};      
+      delete $data{$type}{$name}{consumers}{$c}{epiecStart};   
+      delete $data{$type}{$name}{consumers}{$c}{epiecStartEnergy};
+  }
 
   #deleteReadingspec ($hash, "CurrentHourPVforecast");
   #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast");
@@ -3043,7 +3046,7 @@ sub centralTask {
           push @da, "nextCycletime<>Manual";
       }
       else {
-          my $new = gettimeofday()+$interval;
+          my $new = gettimeofday() + $interval;
           InternalTimer($new, "FHEM::SolarForecast::centralTask", $hash, 0);                       # Wiederholungsintervall
 
           if(!IsDisabled($name)) {
@@ -4609,7 +4612,7 @@ sub __calcEnergyPieces {
   else {
       delete $data{$type}{$name}{consumers}{$c}{epiecAVG};
       delete $data{$type}{$name}{consumers}{$c}{epiecAVG_hours};
-      delete $data{$type}{$name}{consumers}{$c}{epiecEstart};
+      delete $data{$type}{$name}{consumers}{$c}{epiecStartEtotal};
       delete $data{$type}{$name}{consumers}{$c}{epiecHist};
       delete $data{$type}{$name}{consumers}{$c}{epiecHour};
 
@@ -4704,11 +4707,11 @@ sub ___csmSpecificEpieces {
       if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                       # Stundenwechsel? Differenz von etot noch auf die vorherige Stunde anrechnen
           my $epiecHour_last = $epiecHour - 1;
 
-          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0) if($epiecHour > 1);
-          $data{$type}{$name}{consumers}{$c}{epiecEstart}                 = $etot;
+          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0) if($epiecHour > 1);
+          $data{$type}{$name}{consumers}{$c}{epiecStartEtotal}            = $etot;
       }
 
-      my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecEstart", 0);
+      my $ediff                                                  = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0);
       $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour} = sprintf '%.2f', $ediff;
       $data{$type}{$name}{consumers}{$c}{epiecHour}              = $epiecHour;
       $data{$type}{$name}{consumers}{$c}{$epiecHist_hours}       = $ediff ? $epiecHour : $epiecHour - 1; # wenn mehr als 1 Wh verbraucht wird die Stunde gezählt
@@ -4777,6 +4780,12 @@ sub __planSwitchTimes {
 
   my $nh     = $data{$type}{$name}{nexthours};
   my $maxkey = (scalar keys %{$data{$type}{$name}{nexthours}}) - 1;
+  my $cicfip = AttrVal ($name, 'affectConsForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+  
+  if($debug =~ /consumerPlanning/x) {
+      Log (1, qq{$name DEBUG> consumer "$c" - Consider consumption forecast in consumer planning: }.($cicfip ? 'yes' : 'no'));
+  }
+  
   my %max;
   my %mtimes;
 
@@ -4786,7 +4795,7 @@ sub __planSwitchTimes {
       my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", 0 );
       my $confcex = NexthoursVal ($hash, $idx, "confcEx",    0 );                          # prognostizierter Verbrauch ohne registrierte Consumer
 
-      my $spexp   = $pvfc-$confcex;                                                        # prognostizierter Energieüberschuß (kann negativ sein)
+      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierter Energieüberschuß (kann negativ sein)
 
       my ($hour)              = $idx =~ /NextHour(\d+)/xs;
       $max{$spexp}{starttime} = NexthoursVal ($hash, $idx, "starttime", "");
@@ -4838,8 +4847,9 @@ sub __planSwitchTimes {
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
       if($debug =~ /consumerPlanning/x) {                                                              # nur für Debugging
           Log (1, qq{$name DEBUG> consumer "$c" - mode: $mode, relevant hash: mtimes});
+          
           for my $m (sort{$a<=>$b} keys %mtimes) {
-              Log (1, qq{$name DEBUG> consumer "$c" - hash: mtimes, surplus expected: $mtimes{$m}{spexp}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}});
+              Log (1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}});
           }
       }
 
@@ -4878,8 +4888,9 @@ sub __planSwitchTimes {
   else {                                                                                               # Verbraucher _muß_ geplant werden
       if($debug) {                                                                                     # nur für Debugging
           Log (1, qq{$name DEBUG> consumer "$c" - mode: $mode, relevant hash: max});
+          
           for my $o (sort{$a<=>$b} keys %max) {
-              Log (1, qq{$name DEBUG> consumer "$c" - hash: max, surplus: $max{$o}{spexp}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}});
+              Log (1, qq{$name DEBUG> consumer "$c" - surplus: $max{$o}{spexp}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}});
           }
       }
 
@@ -11430,6 +11441,15 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV
          Prognose durch den Bewölkungsfaktor).<br>
          (default: 35)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectConsForecastInPlanning"></a>
+       <li><b>affectConsForecastInPlanning </b><br>
+         Wenn gesetzt, wird bei der Einplanung der Consumer zusätzlich zur PV Prognose ebenfalls die Prognose
+         des Verbrauchs berücksichtigt. <br>
+         Die Standardplanung der Consumer erfolgt lediglich auf Grundlage der PV Prognose. <br>
+         (default: 0)
        </li>
        <br>
 
