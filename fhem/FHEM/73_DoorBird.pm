@@ -41,29 +41,42 @@
 ########################################################################################################################
 
 package main;
-
+use constant false => 0;
+use constant true  => 1;
 use strict;
 use warnings;
 use utf8;
-use JSON;
-use HttpUtils;
-use Encode;
-use FHEM::Meta;
-use Cwd;
-use MIME::Base64;
-use Crypt::NaCl::Sodium qw( :utils );
-use Crypt::Argon2 qw/argon2i_raw/;
-use IO::Socket;
-use IO::String;			   
-use LWP::UserAgent;
-use constant false => 0;
-use constant true  => 1;
-use Data::Dumper;
-use File::Spec::Functions ':ALL';
-
 ###START###### Initialize module ##############################################################################START####
 sub DoorBird_Initialize($) {
     my ($hash)  = @_;
+
+	### Try to load perl libraries if installed or write log in case of unavailability. ###
+	my @UseLibraries = split(/[\n,\t]/,"
+		JSON
+		HttpUtils
+		Encode
+		FHEM::Meta
+		Cwd
+		MIME::Base64
+		Crypt::NaCl::Sodium qw( :utils )
+		Crypt::Argon2 qw/argon2i_raw/
+		IO::Socket
+		IO::String;			   
+		LWP::UserAgent
+		Data::Dumper
+		File::Spec::Functions ':ALL'
+	");
+
+	foreach my $Library (grep(/\S/, @UseLibraries)) {	
+		eval "use " . $Library;
+		if (length($@) == 0) {
+			Log3 undef, 5, "DoorBird - Successfully Installed Perl Module               : " . $Library
+		}
+		else {
+			Log3 undef, 2, "DoorBird - Cannot find " . $Library . " in \@INC. Please install the Perl library first. Initialization of 73_DoorBird.pm aborted!";
+			return
+		}
+	}
 
     $hash->{STATE}           = "Init";
     $hash->{DefFn}           = "DoorBird_Define";
@@ -1950,9 +1963,9 @@ sub DoorBird_RenewSessionID($) {
 
 	### Remove Newlines for better log entries
 	my $ShowData = $data;
-	$ShowData =~ s/[\t]//g;
-	$ShowData =~ s/[\r]//g;
-	$ShowData =~ s/[\n]//g;
+	$ShowData =~ s/[\t]//g if($ShowData ne "");
+	$ShowData =~ s/[\r]//g if($ShowData ne "");
+	$ShowData =~ s/[\n]//g if($ShowData ne "");
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_RenewSessionID  - err                    : " . $err      if(defined($err));
@@ -2256,9 +2269,9 @@ sub DoorBird_Info_Request($$) {
 
 	### Remove Newlines for better log entries
 	my $ShowData = $data;
-	$ShowData =~ s/[\t]//g;
-	$ShowData =~ s/[\r]//g;
-	$ShowData =~ s/[\n]//g;
+	$ShowData =~ s/[\t]//g if($ShowData ne "");
+	$ShowData =~ s/[\r]//g if($ShowData ne "");
+	$ShowData =~ s/[\n]//g if($ShowData ne "");
 
 	
 	### Log Entry for debugging purposes
