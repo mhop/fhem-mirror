@@ -3653,7 +3653,10 @@ sub __calcDWDforecast {
 
   if ($invcapacity && $pvsum > $invcapacity) {
       $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
-      Log3 ($name, 4, "$name - PV forecast limited to $pvsum Watt due to inverter capacity");
+
+      if($debug =~ /radiationProcess/x) {
+          Log (1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
+      }
   }
 
   my $logao         = qq{};
@@ -3890,7 +3893,10 @@ sub __calcSolCastEstimates {
 
   if ($invcapacity && $pvsum > $invcapacity) {
       $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
-      Log3 ($name, 4, "$name - PV forecast limited to $pvsum Watt due to inverter capacity");
+
+      if($debug =~ /radiationProcess/x) {
+          Log (1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
+      }
   }
 
   my $logao         = qq{};
@@ -5532,9 +5538,7 @@ sub _transferBatteryValues {
   $piunit   //= $pounit;
   $boutunit //= $binunit;
   $binunit  //= $boutunit;
-
-  Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit), totalin: $bin ($binunit), totalout: $bout ($boutunit), charge: $batchr");
-
+  
   my $piuf      = $piunit   =~ /^kW$/xi  ? 1000 : 1;
   my $pouf      = $pounit   =~ /^kW$/xi  ? 1000 : 1;
   my $binuf     = $binunit  =~ /^kWh$/xi ? 1000 : 1;
@@ -5544,7 +5548,13 @@ sub _transferBatteryValues {
   my $pbi       = ReadingsNum ($badev, $pin,    0) * $piuf;                                    # aktueller Batterieladung (W)
   my $btotout   = ReadingsNum ($badev, $bout,   0) * $boutuf;                                  # totale Batterieentladung (Wh)
   my $btotin    = ReadingsNum ($badev, $bin,    0) * $binuf;                                   # totale Batterieladung (Wh)
-  my $batcharge = ReadingsNum ($badev, $batchr, 0);
+  my $soc       = ReadingsNum ($badev, $batchr, 0);
+
+  my $debug = $paref->{debug};
+  if($debug =~ /collectData/x) {
+      Log (1, "$name DEBUG> collect Battery data: device=$badev =>");
+      Log (1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
+  }
 
   my $params;
 
@@ -5638,13 +5648,13 @@ sub _transferBatteryValues {
   push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatOut<>".$batoutthishour." Wh";
   push @$daref, "Current_PowerBatIn<>". (int $pbi)." W";
   push @$daref, "Current_PowerBatOut<>".(int $pbo)." W";
-  push @$daref, "Current_BatCharge<>".  $batcharge." %";
+  push @$daref, "Current_BatCharge<>".  $soc." %";
 
   $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
   $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
   $data{$type}{$name}{current}{batintotal}  = int $btotin;                                    # totale Batterieladung
   $data{$type}{$name}{current}{batouttotal} = int $btotout;                                   # totale Batterieentladung
-  $data{$type}{$name}{current}{batcharge}   = $batcharge;                                     # aktuelle Batterieladung
+  $data{$type}{$name}{current}{batcharge}   = $soc;                                           # aktuelle Batterieladung
 
 return;
 }
@@ -8643,7 +8653,9 @@ sub _calcCAQwithSolCastPercentil {
           }
       }
 
-      Log3 ($name, 5, "$name - write correction factor into circular Hash: $perc, Hour $h");
+      if($debug =~ /saveData2Cache/x) {
+          Log (1, "$name DEBUG> write correction factor into circular Hash: $perc, Hour $h");
+      }
 
       my $type = $paref->{type};
 
@@ -8734,7 +8746,9 @@ sub __avgSolCastPercFromHistory {
 
   $perc = sprintf "%.2f", ($percsum/$dnum);
 
-  Log3 ($name, 5, "$name - PV History -> Summary - days: $dnum, average percentile factor: $perc");
+  if($debug =~ /pvCorrection/x) {
+      Log (1, "$name DEBUG> PV History -> Summary - days: $dnum, average percentile factor: $perc");
+  }
 
 return ($dnum,$perc);
 }
