@@ -28,7 +28,7 @@ JsonList2_Escape($)
   $a =~ s/"/\\"/g; 
   $a =~ s/\n/\\n/g; 
   my $b = "x$a";
-  $a = "<BINARY>" if(!utf8::decode($b)); # Forum #55318
+  $a = "<BINARY>" if(!utf8::decode($b) && !$unicodeEncoding); # Forum #55318
   return $a;
 }
 
