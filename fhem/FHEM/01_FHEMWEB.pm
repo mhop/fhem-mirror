@@ -1617,6 +1617,11 @@ FW_doDetail($)
     'delete',        "Delete $d"
   );
   my $lNum = AttrVal($FW_wname, "detailLinks", 2);
+  if($lNum =~ m/^(\d),(.+)$/) {
+    $lNum = $1;
+    my %dc = @detCmd;
+    @detCmd = map { ($_, $dc{$_}) if($dc{$_}) } split(",", $2);
+  }
   my $li = 0;
   while($li < $lNum && $li < @detCmd / 2) {
     FW_pH "cmd=$detCmd[2*$li] $d", $detCmd[2*$li+1], undef, "detLink"
@@ -3893,7 +3898,11 @@ FW_log($$)
     <a id="FHEMWEB-attr-detailLinks"></a>
     <li>detailLinks<br>
         number of links to show on the bottom of the device detail page.
-        The rest of the commands is shown in a dropdown menu. Default is 2.
+        The rest of the commands is shown in a dropdown menu. Default is 2.<br>
+        This can optionally followed by a comma separated list of ids to order
+        or filter the desired links, the ids being one of devSpecHelp,
+        forumCopy, rawDef, style iconFor, style showDSI, delete. Example:<br>
+        attr WEB detailLinks 2,devSpecHelp,forumCopy
         </li>
         <br>
 
@@ -4730,7 +4739,11 @@ FW_log($$)
     <li>detailLinks<br>
         Anzahl der Links, die auf der Detailseite unten angezeigt werden. Die
         weiteren Befehle werden in einem Auswahlmen&uuml; angezeigt.
-        Voreinstellung ist 2.
+        Voreinstellung ist 2.<br>
+        Das kann optional mit der Liste der anzuzeigenden IDs erweitert werden,
+        um die Links zu sortieren oder zu filtern. Die m&ouml;glichen IDs sind
+        devSpecHelp, forumCopy, rawDef, style iconFor, style showDSI, delete.
+        Beispiel:<br> attr WEB detailLinks 2,devSpecHelp,forumCopy
         </li>
         <br>
 
