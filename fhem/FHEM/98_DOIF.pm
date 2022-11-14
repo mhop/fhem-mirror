@@ -2081,6 +2081,7 @@ DOIF_CheckTimers($$$$)
   my $intervaltimer;
     
   $timer =~ s/\s//g;
+
   ($timer,$days)=SplitDoIf('|',$timer);
   $days="" if (!defined $days);
   ($timer,$intervaltimer)=SplitDoIf(',',$timer);
@@ -2151,7 +2152,7 @@ sub DOIF_getTime {
   $hash->{timer}{$nr}=0;
   $hash->{time}{$nr}=$time;
   $hash->{timeCond}{$nr}=$condition;
-  $hash->{days}{$nr}=$days if ($days);
+  $hash->{days}{$nr}=$days if ($days ne "");
   $hash->{timers}{$condition}.=" $nr " if ($trigger);
 }
 
@@ -4897,7 +4898,9 @@ sub card
   if (!defined $value1[0]{value}) {
     return("");
   }
-
+  if (!defined $dim) {
+    return("");
+  }
   
   my $bheight=73;
   my $htrans=0;
