@@ -2092,8 +2092,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <br>
     <ul>
       <li>Value(&lt;devicename&gt;)<br>
-        liefert das Internal STATE zur&uuml;ck.
-        </li><br>
+        liefert das Internal STATE zur&uuml;ck. Achtung: STATE wird in erster
+        Linie f&uuml;r die Anzeige verwendet, und kann vom Benutzer mit dem
+        stateFormat Attribut ge&auml;ndert werden. F&uuml;r Berechnungen sollte
+        man stattdessen ReadingsVal(&lt;devicename&gt;, 'state', '') verwenden
+        (s.u.).  </li><br>
 
       <li>OldValue(&lt;devicename&gt;)</li>
       <li>OldTimestamp(&lt;devicename&gt;)<br>

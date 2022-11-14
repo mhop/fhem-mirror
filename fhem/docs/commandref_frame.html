@@ -1947,8 +1947,11 @@ The following local attributes are used by a wider range of devices:
     <br>
     <ul>
       <li>Value(&lt;devicename&gt;)<br>
-        Returns the state of the device (the string you see in parenthesis in
-        the output of the list command).
+        Returns the STATE of the device (the string you see in parenthesis in
+        the output of the list command). Note: STATE is meant for display
+        purposes, and can be customized by the user via the stateFormat
+        attribute. Use ReadingsVal(&lt;devicename&gt;, 'state', '') instead for
+        computational purposes.
         </li><br>
       <li>OldValue(&lt;devicename&gt;)
       <li>OldTimestamp(&lt;devicename&gt;)<br>
