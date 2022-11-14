@@ -2,6 +2,12 @@
 #
 ##############################################
 #
+# 2022.11.14 v0.2.17
+# - FEATURE: Unterstützung A1EIANJ7PNB0Q7 Echo Show 15
+#
+# 2022.09.12 v0.2.16
+# - BUG:     Activities Result "DISCARDED_NON_DEVICE_DIRECTED_INTENT" entfernt
+#
 # 2022.01.12 v0.2.15
 # - FEATURE: Unterstützung A2Z8O30CD35N8F Sonos Arc
 #            Unterstützung A3EVMLQTU6WL1W Fire TV Stick 4K Max
@@ -481,7 +487,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.15";
+my $ModulVersion     = "0.2.17";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -2789,7 +2795,7 @@ sub echodevice_Parse($$$) {
 						
 						#https://forum.fhem.de/index.php/topic,82631.msg906424.html#msg906424
 						next if($IgnoreVoiceCommand ne "" && $card->{description} =~ m/$IgnoreVoiceCommand/i);
-
+						next if($card->{activityStatus} eq "DISCARDED_NON_DEVICE_DIRECTED_INTENT");
 						
 						my $textjson = $card->{description};
 						$textjson =~ s/\\//g;
@@ -4359,6 +4365,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A1XWJRHALS1REP" || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5 Gen2";}
 	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")            {return "Echo Show 8";}
 	elsif($ModelNumber eq "A15996VY63BQ2D" || $ModelNumber eq "Echo Show 8")			{return "Echo Show 8 Gen2";}
+	elsif($ModelNumber eq "A1EIANJ7PNB0Q7" || $ModelNumber eq "Echo Show 15")			{return "Echo Show 15 Gen1";}
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")				{return "Echo Plus";}
 	elsif($ModelNumber eq "A1JJ0KFC4ZPNJ3" || $ModelNumber eq "Echo Input")				{return "Echo Input";}
 	elsif($ModelNumber eq "A18O6U1UQFJ0XK" || $ModelNumber eq "Echo Plus 2")			{return "Echo Plus 2";}
