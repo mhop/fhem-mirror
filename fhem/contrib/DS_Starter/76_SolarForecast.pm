@@ -6816,7 +6816,7 @@ sub _graphicHeader {
       ## Sonnenauf- und untergang
       ############################
       my $sriseimg = FW_makeImage('weather_sunrise@darkorange');
-      my $ssetimg  = FW_makeImage('weather_sunset@darkred');
+      my $ssetimg  = FW_makeImage('weather_sunset@LightCoral');
       my $srisetxt = ReadingsVal ($name, 'Today_SunRise', '-');
       my $ssettxt  = ReadingsVal ($name, 'Today_SunSet',  '-');
       
