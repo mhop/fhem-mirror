@@ -4796,9 +4796,7 @@ sub __planSwitchTimes {
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
-  
-  #return if(ConsumerVal ($hash, $c, "planstate", undef));  
-  
+    
   my $dnp = ___noPlanRelease ($paref);
   if ($dnp) {
       if($debug =~ /consumerPlanning/x) {
@@ -4978,7 +4976,9 @@ sub ___noPlanRelease {
   }
 
   if (isSolCastUsed ($hash)) {
-      if (!SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0)) {                # Planung erst nach dem ersten API Abruf freigeben
+      my $tdc = SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0);
+      
+      if ($tdc <= 2) {                                                                     # Planung erst nach dem zweiten API Abruf freigeben
            $dnp = qq{do not plan because off "todayDoneAPIcalls" not set};
       }
   }
