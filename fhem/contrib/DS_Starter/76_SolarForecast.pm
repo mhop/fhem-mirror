@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.2" => "15.11.2022  sunrise and sunset in graphic header ", 
   "0.74.1" => "15.11.2022  ___planMust -> half -> ceil to floor changed , Model SolCast: first call from 60 minutes before sunrise ".
                            "Model SolCast: release planning only after the first API retrieval ".
                            "Model DWD: release planning from one hour before sunrise ",
@@ -6811,7 +6812,14 @@ sub _graphicHeader {
           $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang}.' ('.$htitles{natc}{$lang}.' '.$naup.')');
           $upicon = "<a onClick=$cmdupdate>$img</a>";
       }
-
+      
+      ## Sonnenauf- und untergang
+      ############################
+      my $sriseimg = FW_makeImage('weather_sunrise@darkorange');
+      my $ssetimg  = FW_makeImage('weather_sunset@darkred');
+      my $srisetxt = ReadingsVal ($name, 'Today_SunRise', '-');
+      my $ssettxt  = ReadingsVal ($name, 'Today_SunSet',  '-');
+      
       ## Autokorrektur-Icon
       ######################
       my $acicon;
@@ -6934,7 +6942,7 @@ sub _graphicHeader {
       $header  .= qq{<td colspan="3" align="right" $dstyle>                   $api                       </td>};
       $header  .= qq{</tr>};
       $header  .= qq{<tr>};
-      $header  .= qq{<td colspan="3" align="left"  $dstyle>                                                                                          </td>};
+      $header  .= qq{<td colspan="3" align="left"  $dstyle> $sriseimg &nbsp; $srisetxt &nbsp;&nbsp;&nbsp; $ssetimg &nbsp; $ssettxt                   </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $autoct &nbsp;&nbsp; $acicon &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $lbpcq&nbsp; &nbsp; $pcqicon </td>};
       $header  .= qq{<td colspan="3" align="right" $dstyle> $dvtntxt};
       $header  .= qq{<span title="$text_tdayDvtn">};
