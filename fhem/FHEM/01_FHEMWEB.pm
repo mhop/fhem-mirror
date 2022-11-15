@@ -4676,7 +4676,7 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-confirmDelete"></a>
     <li>confirmDelete<br>
-        L&ouml;schaktionen weden mit einem Dialog best&auml;tigt.
+        L&ouml;schaktionen werden mit einem Dialog best&auml;tigt.
         Falls dieses Attribut auf 0 gesetzt ist, entf&auml;llt das.
         </li>
         <br>
