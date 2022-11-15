@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-13 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-15 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,6 +134,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.1" => "15.11.2022  ___planMust -> half -> ceil to floor changed , Model SolCast: first call from 60 minutes before sunrise ".
+                           "Model SolCast: release planning only after the first API retrieval ".
+                           "Model DWD: release planning from one hour before sunrise ",
   "0.74.0" => "13.11.2022  new attribute affectConsForecastInPlanning ",
   "0.73.0" => "12.11.2022  save Ehodpieces (___saveEhodpieces), use debug modules, revise comref,typos , maxconsumer 12 ".
                            "attr ctrlLanguage for local language support, bugfix MODE is set to Manual after restart if ".
@@ -350,8 +353,9 @@ my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                   
 my @draattrmust  = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat  = 900;                                                           # Wiederholungsintervall Cache File Daten schreiben
 
-my $apirepetdef  = 3600;                                                          # default Abrufintervall SolCast API
+my $apirepetdef  = 3600;                                                          # default Abrufintervall SolCast API (s)
 my $apimaxreqs   = 50;                                                            # max. täglich mögliche Requests SolCast API
+my $leadtime     = 3600;                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung                                                  
 
 my $prdef        = 0.85;                                                          # default Performance Ratio (PR)
 my $tempcoeffdef = -0.45;                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
@@ -369,6 +373,8 @@ my @ctypes       = qw(dishwasher dryer washingmachine heater charger other);    
 my $defmintime   = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype     = "other";                                                       # default Verbrauchertyp
 my $defcmode     = "can";                                                         # default Planungsmode der Verbraucher
+my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+my $defhyst      = 0;                                                             # default Hysterese
 
 my $caicondef    = 'clock@gold';                                                  # default consumerAdviceIcon
 my $flowGSizedef = 400;                                                           # default flowGraphicSize
@@ -380,9 +386,6 @@ my $b1fontcoldef = '0D0D0D';                                                    
 my $b2coldef     = 'C4C4A7';                                                      # default Farbe Beam 2
 my $b2fontcoldef = '000000';                                                      # default Schriftfarbe Beam 2
 my $fgCDdef      = 130;                                                           # Abstand Verbrauchericons zueinander
-
-my $defpopercent = 0.5;                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
-my $defhyst      = 0;                                                             # default Hysterese
 
                                                                                   # default CSS-Style
 my $cssdef       = qq{.flowg.text           { stroke: none; fill: gray; font-size: 60px; }                                     \n}.
@@ -550,8 +553,8 @@ my %hqtxt = (                                                                   
               DE => qq{morgen:}                                                                                             },
   lblPCu => { EN => qq{currently:},
               DE => qq{aktuell:}                                                                                            },
-  bnsas  => { EN => qq{from the upcoming sunrise},
-              DE => qq{ab dem kommenden Sonnenaufgang}                                                                      },
+  bnsas  => { EN => qq{from <WT> minutes before the upcoming sunrise},
+              DE => qq{ab <WT> Minuten vor dem kommenden Sonnenaufgang}                                                     },
   dvtn   => { EN => qq{Deviation},
               DE => qq{Abweichung}                                                                                          },
   tday   => { EN => qq{today},
@@ -825,6 +828,7 @@ sub Initialize {
                                 "affectBatteryPreferredCharge:slider,0,1,100 ".
                                 "affectCloudfactorDamping:slider,0,1,100 ".
                                 "affectConsForecastIdentWeekdays:1,0 ".
+                                "affectConsForecastInPlanning:1,0 ".
                                 "affectMaxDayVariance ".
                                 "affectNumHistDays:slider,1,1,30 ".
                                 "affectRainfactorDamping:slider,0,1,100 ".
@@ -835,7 +839,6 @@ sub Initialize {
                                 "ctrlAutoRefreshFW:$fwd ".
                                 "ctrlConsRecommendReadings:multiple-strict,$allcs ".
                                 "ctrlDebug:multiple-strict,$dm ".
-                                "affectConsForecastInPlanning:1,0 ".
                                 "ctrlInterval ".
                                 "ctrlLanguage:DE,EN ".
                                 "ctrlOptimizeSolCastInterval:1,0 ".
@@ -2018,11 +2021,13 @@ sub _getRoofTopData {
   
   my $lang  = AttrVal ($name, 'ctrlLanguage', AttrVal ('global', 'language', $deflang));
 
-  if (!$force) {                                                                              # regulärer SolCast API Abruf
+  if (!$force) {                                                                                   # regulärer SolCast API Abruf
       my $trr  = SolCastAPIVal($hash, '?All', '?All', 'todayRemainingAPIrequests', $apimaxreqs);
-
-      if ($trr <= 0) {                                                                             # Test
-          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{bnsas}{$lang}, 1);
+      my $etxt = $hqtxt{bnsas}{$lang};
+      $etxt    =~ s{<WT>}{($leadtime/60)}eg;
+      
+      if ($trr <= 0) {                                                                            
+          readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
           return qq{SolCast free daily limit is used up};
       }
 
@@ -2030,9 +2035,9 @@ sub _getRoofTopData {
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
-      if ($t < $srtime || $t > $sstime) {
-          readingsSingleUpdate($hash, 'nextSolCastCall', $hqtxt{bnsas}{$lang}, 1);
-          return qq{The current time is not between sunrise and sunset};
+      if ($t < $srtime - $leadtime || $t > $sstime) {
+          readingsSingleUpdate($hash, 'nextSolCastCall', $etxt, 1);
+          return "The current time is not between sunrise minus ".($leadtime/60)." minutes and sunset";
       }
 
       my $lrt    = SolCastAPIVal ($hash, '?All', '?All', 'lastretrieval_timestamp',            0);
@@ -2124,7 +2129,7 @@ sub __solCast_ApiRequest {
             $apikey;
 
   if($debug =~ /solcastProcess/x) {                                                                                         # nur für Debugging
-      Log (1, qq{$name DEBUG> Request SolCast API for string "$string": $url});
+      Log3 ($name, 1, qq{$name DEBUG> Request SolCast API for string "$string": $url});
   }
 
   my $caller = (caller(0))[3];                                          # Rücksprungmarke
@@ -2202,7 +2207,7 @@ sub __solCast_ApiResponse {
       my $debug = AttrVal     ($name, 'ctrlDebug', 'none');
 
       if($debug =~ /solcastProcess/x) {                                                                                         # nur für Debugging
-          Log (1, qq{$name DEBUG> SolCast API server response for string "$string":\n}. Dumper $jdata);
+          Log3 ($name, 1, qq{$name DEBUG> SolCast API server response for string "$string":\n}. Dumper $jdata);
       }
 
       ## bei Überschreitung Limit kommt:
@@ -2278,8 +2283,8 @@ sub __solCast_ApiResponse {
 
           if($debug =~ /solcastProcess/x) {                                                                                  # nur für Debugging
               if (exists $data{$type}{$name}{solcastapi}{$string}{$starttmstr}) {
-                  Log (1, qq{$name DEBUG> SolCast API Hash - Start Date/Time: }. $starttmstr);
-                  Log (1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.(sprintf "%.0f", ($pvest50 * ($period/60) * 1000)).qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
+                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - Start Date/Time: }. $starttmstr);
+                  Log3 ($name, 1, qq{$name DEBUG> SolCast API Hash - pv_estimate50 add: }.(sprintf "%.0f", ($pvest50 * ($period/60) * 1000)).qq{, contains already: }.SolCastAPIVal ($hash, $string, $starttmstr, 'pv_estimate50', 0));
               }
           }
 
@@ -2388,7 +2393,7 @@ sub ___setLastAPIcallKeyData {
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
       my $dart   = $sstime - $t;                                                                                    # verbleibende Sekunden bis Sonnenuntergang
       $dart      = 0 if($dart < 0);
-      $drc      += 1;                                                                                               # Test
+      $drc      += 1;                                                                                               
 
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = $apirepetdef;
       $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{currentAPIinterval} = int ($dart / $drc) if($dart && $drc);
@@ -3354,6 +3359,9 @@ sub _specialActivities {
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayDoneAPIcalls};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIrequests};
           delete $data{$type}{$name}{solcastapi}{'?All'}{'?All'}{todayRemainingAPIcalls};
+          
+          delete $data{$type}{$name}{current}{sunriseToday};
+          delete $data{$type}{$name}{current}{sunriseTodayTs};
 
           $data{$type}{$name}{circular}{99}{ydayDvtn} = CircularVal ($hash, 99, 'tdayDvtn', '-');
           delete $data{$type}{$name}{circular}{99}{tdayDvtn};
@@ -3456,7 +3464,7 @@ sub _transferDWDRadiationValues {
   $paref->{state} = $err if($err);
 
   if($debug =~ /radiationProcess/x) {
-      Log (1, qq{$name DEBUG> collect Radiation data - device: $raname =>});
+      Log3 ($name, 1, qq{$name DEBUG> collect Radiation data - device: $raname =>});
   }
       
   for my $num (0..47) {
@@ -3478,7 +3486,7 @@ sub _transferDWDRadiationValues {
       $hod         = sprintf "%02d", int ($hod)+1;                                            # Stunde des Tages
 
       if($debug =~ /radiationProcess/x) {
-          Log (1, qq{$name DEBUG> date: $wantdt, rad: fc${fd}_${fh2}_Rad1h, Rad1h: $rad});
+          Log3 ($name, 1, qq{$name DEBUG> date: $wantdt, rad: fc${fd}_${fh2}_Rad1h, Rad1h: $rad});
       }
 
       my $params = {
@@ -3636,7 +3644,7 @@ sub __calcDWDforecast {
           }
 
           if($debug =~ /radiationProcess/x) {
-              Log (1, "$name DEBUG> PV forecast calc (raw) for $reld Hour ".sprintf("%02d",$hod)." string $st ->\n$sq");
+              Log3 ($name, 1, "$name DEBUG> PV forecast calc (raw) for $reld Hour ".sprintf("%02d",$hod)." string $st ->\n$sq");
           }
       }
 
@@ -3655,7 +3663,7 @@ sub __calcDWDforecast {
       $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
 
       if($debug =~ /radiationProcess/x) {
-          Log (1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
+          Log3 ($name, 1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
       }
   }
 
@@ -3688,7 +3696,7 @@ sub __calcDWDforecast {
       }
 
       if($debug =~ /radiationProcess/x) {
-          Log (1, "$name DEBUG> PV forecast calc for $reld Hour ".sprintf("%02d",$hod)." summary: \n$sq");
+          Log3 ($name, 1, "$name DEBUG> PV forecast calc for $reld Hour ".sprintf("%02d",$hod)." summary: \n$sq");
       }
   }
 
@@ -3876,7 +3884,7 @@ sub __calcSolCastEstimates {
           }
 
           if($debug =~ /radiationProcess/x) {
-              Log (1, "$name DEBUG> PV estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
+              Log3 ($name, 1, "$name DEBUG> PV estimate for $reld Hour ".sprintf ("%02d", $hod)." string $string ->\n$sq");
           }
 
       }
@@ -3895,7 +3903,7 @@ sub __calcSolCastEstimates {
       $pvsum = $invcapacity + ($invcapacity * 0.01);                                                 # PV Vorhersage auf WR Kapazität zzgl. 1% begrenzen
 
       if($debug =~ /radiationProcess/x) {
-          Log (1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
+          Log3 ($name, 1, "$name DEBUG> PV forecast limited to $pvsum Watt due to inverter capacity");
       }
   }
 
@@ -3926,7 +3934,7 @@ sub __calcSolCastEstimates {
       }
 
       if($debug =~ /radiationProcess/x) {
-          Log (1, "$name DEBUG> PV estimate for $reld Hour ".sprintf ("%02d", $hod)." summary: \n$sq");
+          Log3 ($name, 1, "$name DEBUG> PV estimate for $reld Hour ".sprintf ("%02d", $hod)." summary: \n$sq");
       }
   }
 
@@ -4107,8 +4115,8 @@ sub _transferInverterValues {
   
   my $debug = $paref->{debug};
   if($debug =~ /collectData/x) {
-      Log (1, "$name DEBUG> collect Inverter data - device: $indev =>");
-      Log (1, "$name DEBUG> pv: $pv W, etotal: $etotal Wh");
+      Log3 ($name, 1, "$name DEBUG> collect Inverter data - device: $indev =>");
+      Log3 ($name, 1, "$name DEBUG> pv: $pv W, etotal: $etotal Wh");
   }
 
   my $nhour  = $chour+1;
@@ -4158,7 +4166,8 @@ sub _transferWeatherValues {
   my $t     = $paref->{t};                                                                      # Epoche Zeit
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
-
+  my $date  = $paref->{date};                                                                   # aktuelles Datum
+  
   my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
 
@@ -4167,12 +4176,24 @@ sub _transferWeatherValues {
 
   my $type  = $paref->{type};
   my $debug = $paref->{debug};
+  
+  if($debug =~ /collectData/x) {
+      Log3 ($name, 1, "$name DEBUG> collect Weather data - device: $fcname =>");
+  }
+  
   my ($time_str);
 
-  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute
+  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "23:59");                               # Sonnenaufgang heute
   my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute
-  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "00:00");                               # Sonnenaufgang morgen
+  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "23:59");                               # Sonnenaufgang morgen
   my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen
+  
+  $data{$type}{$name}{current}{sunriseToday}   = $date.' '.$fc0_SunRise.':00';
+  $data{$type}{$name}{current}{sunriseTodayTs} = timestringToTimestamp ($date.' '.$fc0_SunRise.':00');
+  
+  if($debug =~ /collectData/x) {
+      Log3 ($name, 1, "$name DEBUG> sunrise/sunset today: $fc0_SunRise / $fc0_SunSet, sunrise/sunset tomorrow: $fc1_SunRise / $fc1_SunSet");
+  }
 
   push @$daref, "Today_SunRise<>".   $fc0_SunRise;
   push @$daref, "Today_SunSet<>".    $fc0_SunSet;
@@ -4183,10 +4204,6 @@ sub _transferWeatherValues {
   my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
   my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
   my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
-  
-  if($debug =~ /collectData/x) {
-      Log (1, "$name DEBUG> collect Weather data - device: $fcname =>");
-  }
 
   for my $num (0..46) {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
@@ -4211,7 +4228,7 @@ sub _transferWeatherValues {
       my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
 
       if($debug =~ /collectData/x) {
-          Log (1, "$name DEBUG> wid: fc${fd}_${fh1}_ww, val: $wid, txt: $txt, cc: $neff, rp: $r101, temp: $temp");
+          Log3 ($name, 1, "$name DEBUG> wid: fc${fd}_${fh1}_ww, val: $wid, txt: $txt, cc: $neff, rp: $r101, temp: $temp");
       }
 
       $time_str                                             = "NextHour".sprintf "%02d", $num;
@@ -4329,8 +4346,8 @@ sub _transferMeterValues {
   
   my $debug = $paref->{debug};
   if($debug =~ /collectData/x) {
-      Log (1, "$name DEBUG> collect Meter data - device: $medev =>");
-      Log (1, "$name DEBUG> gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
+      Log3 ($name, 1, "$name DEBUG> collect Meter data - device: $medev =>");
+      Log3 ($name, 1, "$name DEBUG> gcon: $gco W, gfeedin: $gfin W, contotal: $gctotal Wh, feedtotal: $fitotal Wh");
   }
 
   my $gcdaypast = 0;
@@ -4713,7 +4730,7 @@ sub ___csmSpecificEpieces {
       if(ConsumerVal ($hash, $c, "epiecHour", 0) != $epiecHour) {                                       # Stundenwechsel? Differenz von etot noch auf die vorherige Stunde anrechnen
           my $epiecHour_last = $epiecHour - 1;
 
-          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = $etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0) if($epiecHour > 1);
+          $data{$type}{$name}{consumers}{$c}{$epiecHist}{$epiecHour_last} = sprintf '%.2f', ($etot - ConsumerVal ($hash, $c, "epiecStartEtotal", 0)) if($epiecHour > 1);
           $data{$type}{$name}{consumers}{$c}{epiecStartEtotal}            = $etot;
       }
 
@@ -4778,18 +4795,31 @@ sub __planSwitchTimes {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
-
-  return if(ConsumerVal ($hash, $c, "planstate", undef));                                  # Verbraucher ist schon geplant/gestartet/fertig
+  my $debug = $paref->{debug};
+  
+  #return if(ConsumerVal ($hash, $c, "planstate", undef));  
+  
+  my $dnp = ___noPlanRelease ($paref);
+  if ($dnp) {
+      if($debug =~ /consumerPlanning/x) {
+          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', ''));
+          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - $dnp});
+      }
+      return;
+  }
+  
+  if($debug =~ /consumerPlanning/x) {
+      Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', ''));
+  }
 
   my $type   = $paref->{type};
-  my $debug  = $paref->{debug};
-
+  my $lang   = $paref->{lang};
   my $nh     = $data{$type}{$name}{nexthours};
   my $maxkey = (scalar keys %{$data{$type}{$name}{nexthours}}) - 1;
   my $cicfip = AttrVal ($name, 'affectConsForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
   
   if($debug =~ /consumerPlanning/x) {
-      Log (1, qq{$name DEBUG> consumer "$c" - Consider consumption forecast in consumer planning: }.($cicfip ? 'yes' : 'no'));
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Consider consumption forecast in consumer planning: }.($cicfip ? 'yes' : 'no'));
   }
   
   my %max;
@@ -4838,7 +4868,7 @@ sub __planSwitchTimes {
   }
 
   if($debug =~ /consumerPlanning/x) {
-      Log (1, qq{$name DEBUG> consumer "$c" - epiece1: $epiece1});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - epiece1: $epiece1});
   }
 
   my $mode     = ConsumerVal ($hash, $c, "mode",          "can");
@@ -4851,11 +4881,13 @@ sub __planSwitchTimes {
   $paref->{stopdiff} = $stopdiff;
 
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
-      if($debug =~ /consumerPlanning/x) {                                                              # nur für Debugging
-          Log (1, qq{$name DEBUG> consumer "$c" - mode: $mode, relevant hash: mtimes});
+      if($debug =~ /consumerPlanning/x) {                                                            
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
           
           for my $m (sort{$a<=>$b} keys %mtimes) {
-              Log (1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, starttime: $mtimes{$m}{starttime}, nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}});
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
+                              qq{starttime: }.$mtimes{$m}{starttime}.", ".
+                              qq{nexthour: $mtimes{$m}{nexthour}, today: $mtimes{$m}{today}});
           }
       }
 
@@ -4892,11 +4924,13 @@ sub __planSwitchTimes {
       }
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
-      if($debug) {                                                                                     # nur für Debugging
-          Log (1, qq{$name DEBUG> consumer "$c" - mode: $mode, relevant hash: max});
+      if($debug) {                                                                                 
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: max});
           
           for my $o (sort{$a<=>$b} keys %max) {
-              Log (1, qq{$name DEBUG> consumer "$c" - surplus: $max{$o}{spexp}, starttime: $max{$o}{starttime}, nexthour: $max{$o}{nexthour}, today: $max{$o}{today}});
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus: $max{$o}{spexp}, }.
+                              qq{starttime: }.$max{$o}{starttime}.", ".
+                              qq{nexthour: $max{$o}{nexthour}, today: $max{$o}{today}});
           }
       }
 
@@ -4925,6 +4959,38 @@ sub __planSwitchTimes {
   ___setPlanningDeleteMeth ($paref);
 
 return;
+}
+
+###################################################################
+#    Entscheidung ob die Planung für den Consumer 
+#    vorgenommen werden soll oder nicht
+###################################################################
+sub ___noPlanRelease {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $t     = $paref->{t};                                                                 # aktuelle Zeit
+  my $c     = $paref->{consumer};
+  
+  my $dnp   = 0;                                                                           # 0 -> Planung, 1 -> keine Planung
+  
+  if(ConsumerVal ($hash, $c, "planstate", undef)) {                                        # Verbraucher ist schon geplant/gestartet/fertig
+      $dnp = qq{consumer is already planned};
+  }
+
+  if (isSolCastUsed ($hash)) {
+      if (!SolCastAPIVal ($hash, '?All', '?All', 'todayDoneAPIcalls', 0)) {                # Planung erst nach dem ersten API Abruf freigeben
+           $dnp = qq{do not plan because off "todayDoneAPIcalls" not set};
+      }
+  }
+  else {                                                                                   # Planung erst ab "$leadtime" vor Sonnenaufgang freigeben
+      my $sunrise = CurrentVal ($hash, 'sunriseTodayTs', 32529945600);
+      
+      if ($t < $sunrise - $leadtime) {
+          $dnp = "do not plan because off current time is less than sunrise minus ".($leadtime / 3600)." hour";
+      }      
+  }   
+
+return $dnp;
 }
 
 ################################################################
@@ -5018,7 +5084,7 @@ sub ___planMust {
   my $lang     = $paref->{lang};
 
   my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
-  my $half                          = ceil ($mintime / 2 / 60);                                      # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren
+  my $half                          = floor ($mintime / 2 / 60);                                     # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren
   my $startts                       = $maxts - ($half * 3600);
   my (undef,undef,undef,$starttime) = timestampToTimestring ($startts, $lang);
 
@@ -5216,12 +5282,12 @@ sub ___switchConsumerOn {
       my $nompow = ConsumerVal ($hash, $c, 'power', '-');
       my $sp     = CurrentVal  ($hash, 'surplus',  0);
 
-      Log (1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
-              qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
-              qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef")
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
+                      qq{auto mode: $auto, current Consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
+                      qq{planning state: $pstate, start timestamp: }.($startts ? $startts : "undef")
            );
-      Log (1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
-              qq{swoncond: $swoncond, on-command: $oncom }
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "on" => }.
+                      qq{swoncond: $swoncond, on-command: $oncom }
            );
   }
 
@@ -5232,7 +5298,7 @@ sub ___switchConsumerOn {
       my $enable  = ___enableSwitchByBatPrioCharge ($paref);                                      # Vorrangladung Batterie ?
 
       if($debug =~ /consumerSwitching/x) {
-          Log (1, qq{$name DEBUG> Consumer switch enabled by battery: $enable});
+          Log3 ($name, 1, qq{$name DEBUG> Consumer switch enabled by battery: $enable});
       }
 
       if ($mode eq "can" && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
@@ -5311,8 +5377,8 @@ sub ___switchConsumerOff {
   Log3 ($name, 1, "$name - $err") if($err);
 
   if($debug =~ /consumerSwitching/x) {                                                            # nur für Debugging
-      Log (1, qq{$name DEBUG> consumer "$c" - current Context is switching "off" => }.
-              qq{swoffcond: $swoffcond, off-command: $offcom }
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Context is switching "off" => }.
+                      qq{swoffcond: $swoffcond, off-command: $offcom }
            );
   }
 
@@ -5552,8 +5618,8 @@ sub _transferBatteryValues {
 
   my $debug = $paref->{debug};
   if($debug =~ /collectData/x) {
-      Log (1, "$name DEBUG> collect Battery data: device=$badev =>");
-      Log (1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
+      Log3 ($name, 1, "$name DEBUG> collect Battery data: device=$badev =>");
+      Log3 ($name, 1, "$name DEBUG> pin=$pbi W, pout=$pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
   }
 
   my $params;
@@ -5726,7 +5792,7 @@ sub _estConsumptionForecast {
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # prognostizierter Durchschnittsverbrauch aller (gleicher) Wochentage
 
        if($debug =~ /consumption/x) {
-           Log (1, "$name DEBUG> estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
+           Log3 ($name, 1, "$name DEBUG> estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
        }
   }
   else {
@@ -5807,7 +5873,7 @@ sub _estConsumptionForecast {
            }
 
            if($debug =~ /consumption/x) {
-               Log (1, "$name DEBUG> estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
+               Log3 ($name, 1, "$name DEBUG> estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
            }
       }
   }
@@ -6656,7 +6722,7 @@ sub _graphicHeader {
 
   my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
-  my $pvcanz     = qq{factor: $pcf / quality: $pcq};                                               # Test
+  my $pvcanz     = qq{factor: $pcf / quality: $pcq};                                              
   $pcq           =~ s/m/-1/xs;
   my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
 
@@ -7733,7 +7799,7 @@ sub __weatherOnBeam {
 
           if($icon_name eq 'unknown') {
               if($debug =~ /graphic/x) {
-                  Log (1, "$name DEBUG> unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
+                  Log3 ($name, 1, "$name DEBUG> unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer");
               }
           }
 
@@ -7744,7 +7810,7 @@ sub __weatherOnBeam {
               $val = '<b>???<b/>';
 
               if($debug =~ /graphic/x) {                                                                     # nur für Debugging
-                  Log (1, qq{$name DEBUG> - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+                  Log3 ($name, 1, qq{$name DEBUG> - the icon "$weather_ids{$hfcg->{$i}{weather}}{icon}" not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
           }
 
@@ -8141,7 +8207,7 @@ sub consinject {
           my ($cons,$im,$start,$end) = split (':', $_);
 
           if($debug =~ /graphic/x) {
-              Log (1, qq{$name DEBUG> Consumer to show -> $cons, relative to current time -> start: $start, end: $end}) if($i<1);
+              Log3 ($name, 1, qq{$name DEBUG> Consumer to show -> $cons, relative to current time -> start: $start, end: $end}) if($i<1);
           }
 
           if ($im && ($i >= $start) && ($i <= $end)) {
@@ -8360,7 +8426,7 @@ sub _calcCAQfromDWDcloudcover {
 
       if($cdone eq "done") {
           if($debug =~ /pvCorrection/x) {
-              Log (1, "$name DEBUG> pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
+              Log3 ($name, 1, "$name DEBUG> pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
           }
           
           next;
@@ -8392,7 +8458,7 @@ sub _calcCAQfromDWDcloudcover {
       }
 
       if($debug =~ /pvCorrection/x) {
-          Log (1, "$name DEBUG> variance -> range: $range, hour: $h, days: $dnum, real: $pvval, forecast: $fcval, factor: $factor");
+          Log3 ($name, 1, "$name DEBUG> variance -> range: $range, hour: $h, days: $dnum, real: $pvval, forecast: $fcval, factor: $factor");
       }
 
       if(abs($factor - $oldfac) > $maxvar) {
@@ -8407,7 +8473,7 @@ sub _calcCAQfromDWDcloudcover {
           my $type = $paref->{type};
 
           if($debug =~ /pvCorrection/x) {
-              Log (1, "$name DEBUG> write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
+              Log3 ($name, 1, "$name DEBUG> write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
           }
 
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Korrekturfaktor für Bewölkung Range 0..10 für die jeweilige Stunde als Datenquelle eintragen
@@ -8461,7 +8527,7 @@ sub __avgCloudcoverCorrFromHistory {
 
       if(!defined $chwcc) {
           if($debug =~ /pvCorrection/x) {
-              Log (1, "$name DEBUG> Day $day has no cloudiness value set for hour $hour, no past averages can be calculated");
+              Log3 ($name, 1, "$name DEBUG> Day $day has no cloudiness value set for hour $hour, no past averages can be calculated");
           }
           return;
       }
@@ -8470,18 +8536,18 @@ sub __avgCloudcoverCorrFromHistory {
 
       if(scalar(@efa)) {
           if($debug =~ /pvCorrection/x) {
-              Log (1, "$name DEBUG> PV History -> Raw Days ($calcmaxd) for average check: ".join " ",@efa);
+              Log3 ($name, 1, "$name DEBUG> PV History -> Raw Days ($calcmaxd) for average check: ".join " ",@efa);
           }
       }
       else {                                                                               # vermeide Fehler: Illegal division by zero
           if($debug =~ /pvCorrection/x) {
-              Log (1, "$name DEBUG> PV History -> Day $day has index $idx. Use only current day for average calc");
+              Log3 ($name, 1, "$name DEBUG> PV History -> Day $day has index $idx. Use only current day for average calc");
           }
           return (undef,undef,undef,$range);
       }
 
       if($debug =~ /pvCorrection/x) {
-          Log (1, "$name DEBUG> PV History -> cloudiness range of day/hour $day/$hour is: $range");
+          Log3 ($name, 1, "$name DEBUG> PV History -> cloudiness range of day/hour $day/$hour is: $range");
       }
 
       my $dnum         = 0;
@@ -8492,7 +8558,7 @@ sub __avgCloudcoverCorrFromHistory {
 
           if(!defined $histwcc) {
               if($debug =~ /pvCorrection/x) {
-                  Log (1, "$name DEBUG> PV History -> Day $dayfa has no cloudiness value set for hour $hour, this history dataset is ignored.");
+                  Log3 ($name, 1, "$name DEBUG> PV History -> Day $dayfa has no cloudiness value set for hour $hour, this history dataset is ignored.");
               }
               next;
           }
@@ -8505,21 +8571,21 @@ sub __avgCloudcoverCorrFromHistory {
               $dnum++;
 
               if($debug =~ /pvCorrection/x) {
-                  Log (1, "$name DEBUG> PV History -> historical Day/hour $dayfa/$hour included - cloudiness range: $range");
+                  Log3 ($name, 1, "$name DEBUG> PV History -> historical Day/hour $dayfa/$hour included - cloudiness range: $range");
               }
 
               last if( $dnum == $calcd);
           }
           else {
               if($debug =~ /pvCorrection/x) {
-                  Log (1, "$name DEBUG> PV History -> current/historical cloudiness range different: $range/$histwcc Day/hour $dayfa/$hour discarded.");
+                  Log3 ($name, 1, "$name DEBUG> PV History -> current/historical cloudiness range different: $range/$histwcc Day/hour $dayfa/$hour discarded.");
               }
           }
       }
 
       if(!$dnum) {
           if($debug =~ /pvCorrection/x) {
-              Log (1, "$name DEBUG> PV History -> all cloudiness ranges were different/not set -> no historical averages calculated");
+              Log3 ($name, 1, "$name DEBUG> PV History -> all cloudiness ranges were different/not set -> no historical averages calculated");
           }
           return (undef,undef,undef,$range);
       }
@@ -8528,7 +8594,7 @@ sub __avgCloudcoverCorrFromHistory {
       my $fchis = sprintf "%.2f", $pvfc;
 
       if($debug =~ /pvCorrection/x) {
-          Log (1, "$name DEBUG> PV History -> Summary - cloudiness range: $range, days: $dnum, pvHist:$pvhis, fcHist:$fchis");
+          Log3 ($name, 1, "$name DEBUG> PV History -> Summary - cloudiness range: $range, days: $dnum, pvHist:$pvhis, fcHist:$fchis");
       }
       return ($pvhis,$fchis,$dnum,$range);
   }
@@ -8603,7 +8669,7 @@ sub _calcCAQwithSolCastPercentil {
 
       if(!$est50) {                                                                                            # kein Standardpercentile vorhanden
           if($debug =~ /pvCorrection/x) {
-              Log (1, qq{$name DEBUG> percentile -> hour: $h, the correction factor can't be calculated because of the default percentile has no value yet});
+              Log3 ($name, 1, qq{$name DEBUG> percentile -> hour: $h, the correction factor can't be calculated because of the default percentile has no value yet});
           }
           next;
       }
@@ -8621,8 +8687,8 @@ sub _calcCAQwithSolCastPercentil {
       delete $paref->{pvcorrf};
 
       if ($debug =~ /pvCorrection/x) {                                                                                          # nur für Debugging
-          Log (1, qq{$name DEBUG> PV estimates for hour of day "$h": $est50});
-          Log (1, qq{$name DEBUG> correction factor -> number checked days: $dnum, pvreal: $pvval, correction factor: $perc});
+          Log3 ($name, 1, qq{$name DEBUG> PV estimates for hour of day "$h": $est50});
+          Log3 ($name, 1, qq{$name DEBUG> correction factor -> number checked days: $dnum, pvreal: $pvval, correction factor: $perc});
       }
 
       my ($usenhd) = __useNumHistDays ($name);                                                               # ist Attr affectNumHistDays gesetzt ?
@@ -8633,7 +8699,7 @@ sub _calcCAQwithSolCastPercentil {
           $perc    = sprintf "%.2f", (($avgperc + $perc) / $dnum);
 
           if ($debug =~ /pvCorrection/x) {
-              Log (1, qq{$name DEBUG> percentile -> old avg correction: }.($avgperc/($dnum-1)).qq{, new avg correction: }.$perc);
+              Log3 ($name, 1, qq{$name DEBUG> percentile -> old avg correction: }.($avgperc/($dnum-1)).qq{, new avg correction: }.$perc);
           }
       }
       elsif($oldperc && !$usenhd) {                                                                          # keine Werte in History vorhanden, aber in CircularVal && keine Beschränkung durch Attr affectNumHistDays
@@ -8642,19 +8708,19 @@ sub _calcCAQwithSolCastPercentil {
           $perc    = sprintf "%.0f", (($oldperc + $perc) / $dnum);
 
           if ($debug =~ /pvCorrection/x) {
-              Log (1, qq{$name DEBUG> percentile -> old circular correction: }.($oldperc/$oldq).qq{, new correction: }.$perc);
+              Log3 ($name, 1, qq{$name DEBUG> percentile -> old circular correction: }.($oldperc/$oldq).qq{, new correction: }.$perc);
           }
       }
       else {                                                                                                 # ganz neuer Wert
           $dnum = 1;
 
           if ($debug =~ /pvCorrection/x) {
-              Log (1, qq{$name DEBUG> percentile -> new correction factor: }.$perc);
+              Log3 ($name, 1, qq{$name DEBUG> percentile -> new correction factor: }.$perc);
           }
       }
 
       if($debug =~ /saveData2Cache/x) {
-          Log (1, "$name DEBUG> write correction factor into circular Hash: $perc, Hour $h");
+          Log3 ($name, 1, "$name DEBUG> write correction factor into circular Hash: $perc, Hour $h");
       }
 
       my $type = $paref->{type};
@@ -8705,12 +8771,12 @@ sub __avgSolCastPercFromHistory {
 
   if(scalar(@efa)) {
       if($debug =~ /pvCorrection/x) {
-          Log (1, "$name DEBUG> PV History -> Raw Days ($calcmaxd) for average check: ".join " ",@efa);
+          Log3 ($name, 1, "$name DEBUG> PV History -> Raw Days ($calcmaxd) for average check: ".join " ",@efa);
       }
   }
   else {                                                                               # vermeide Fehler: Illegal division by zero
       if($debug =~ /pvCorrection/x) {
-          Log (1, "$name DEBUG> PV History -> Day $day has index $idx. Use only current day for average calc");
+          Log3 ($name, 1, "$name DEBUG> PV History -> Day $day has index $idx. Use only current day for average calc");
       }
       return 0;
   }
@@ -8730,7 +8796,7 @@ sub __avgSolCastPercFromHistory {
       $perc = 1 if(!$perc || $perc >= 10);
 
       if($debug =~ /pvCorrection/x) {
-          Log (1, "$name DEBUG> PV History -> historical Day/hour $dayfa/$hour included - percentile factor: $perc");
+          Log3 ($name, 1, "$name DEBUG> PV History -> historical Day/hour $dayfa/$hour included - percentile factor: $perc");
       }
 
       $dnum++;
@@ -8747,7 +8813,7 @@ sub __avgSolCastPercFromHistory {
   $perc = sprintf "%.2f", ($percsum/$dnum);
 
   if($debug =~ /pvCorrection/x) {
-      Log (1, "$name DEBUG> PV History -> Summary - days: $dnum, average percentile factor: $perc");
+      Log3 ($name, 1, "$name DEBUG> PV History -> Summary - days: $dnum, average percentile factor: $perc");
   }
 
 return ($dnum,$perc);
@@ -8987,7 +9053,7 @@ sub setPVhistory {
 
   my $debug = $paref->{debug};
   if($debug =~ /saveData2Cache/x) {
-      Log (1, "$name DEBUG> save PV History Day: $day, Hour: $nhour, Key: $histname, Value: $val");
+      Log3 ($name, 1, "$name DEBUG> save PV History Day: $day, Hour: $nhour, Key: $histname, Value: $val");
   }
 
 return;
@@ -10164,7 +10230,7 @@ sub isInterruptable {
   Log3 ($name, 1, "$name - $err") if($err);
 
   if ($debug =~ /consumerSwitching/x) {                                                   # nur für Debugging
-      Log (1, qq{$name DEBUG> consumer "$c" - isInterruptable Info: $info});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInterruptable Info: $info});
   }
 
   if ($swoffcond) {
@@ -10466,6 +10532,9 @@ return $def;
 #       allstringspeak       - Peakleistung aller Strings nach temperaturabhängiger Korrektur
 #       allstringscount      - aktuelle Anzahl der Anlagenstrings
 #       tomorrowconsumption  - erwarteter Gesamtverbrauch am morgigen Tag
+#       sunriseToday         - Sonnenaufgang heute
+#       sunriseTodayTs       - Sonnenaufgang heute Unix Timestamp
+#
 # $def: Defaultwert
 #
 ###################################################################################################
@@ -11673,7 +11742,7 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
        <a id="SolarForecast-attr-ctrlDebug"></a>
        <li><b>ctrlDebug</b><br>
          Aktiviert/deaktiviert verschiedene Debug Module. Ist ausschließlich "none" selektiert erfolgt keine DEBUG-Ausgabe.
-         Zur Ausgabe von Debug Meldungen muß der globale verbose Level mindestens "1" sein. <br>
+         Zur Ausgabe von Debug Meldungen muß der verbose Level des Device mindestens "1" sein. <br>
          Die Debug Module können miteinander kombiniert werden: <br><br>
 
          <ul>
