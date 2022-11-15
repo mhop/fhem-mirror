@@ -4923,7 +4923,7 @@ sub __planSwitchTimes {
       }
   }
   else {                                                                                               # Verbraucher _muß_ geplant werden
-      if($debug) {                                                                                 
+      if($debug =~ /consumerPlanning/x) {                                                                                 
           Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - mode: $mode, mintime: $mintime, relevant method: max});
           
           for my $o (sort{$a<=>$b} keys %max) {
