@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-15 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-16 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.3" => "16.11.2022  writeCacheToFile 'solcastapi' after every SolCast API Call cycle is finished ", 
   "0.74.2" => "15.11.2022  sunrise and sunset in graphic header ", 
   "0.74.1" => "15.11.2022  ___planMust -> half -> ceil to floor changed , Model SolCast: first call from 60 minutes before sunrise ".
                            "Model SolCast: release planning only after the first API retrieval ".
@@ -1142,7 +1143,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
   my $calias    = ConsumerVal ($hash, $c, "alias",     "");
 
-  writeDataToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                        # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
@@ -1166,7 +1167,7 @@ sub _setcurrentForecastDev {              ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentForecastDev", $prop, 1);
   createAssociatedWith ($hash);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1193,7 +1194,7 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentRadiationDev", $prop, 1);
   createAssociatedWith ($hash);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   setModel             ($hash);                                             # Model setzen
 
 return;
@@ -1229,7 +1230,7 @@ sub _setroofIdentPair {                 ## no critic "not used"
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
   $data{$type}{$name}{solcastapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
 
-  writeDataToFile ($hash, "solcastapi", $scpicache.$name);                             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                             # Cache File SolCast API Werte schreiben
 
   my $msg = qq{The Roof identification pair "$pk" has been saved. }.
             qq{Repeat the command if you want to save more Roof identification pairs.};
@@ -1263,7 +1264,7 @@ sub _setmoduleRoofTops {                ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "moduleRoofTops", $arg, 1);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1300,7 +1301,7 @@ sub _setinverterDevice {                 ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentInverterDev", $arg, 1);
   createAssociatedWith ($hash);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1328,7 +1329,7 @@ sub _setinverterStrings {                ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "inverterStrings", $prop,    1);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1370,7 +1371,7 @@ sub _setmeterDevice {                    ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentMeterDev", $arg, 1);
   createAssociatedWith ($hash);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1411,7 +1412,7 @@ sub _setbatteryDevice {                  ## no critic "not used"
 
   readingsSingleUpdate ($hash, "currentBatteryDev", $arg, 1);
   createAssociatedWith ($hash);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1442,7 +1443,7 @@ sub _setpowerTrigger {                    ## no critic "not used"
       }
   }
 
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
   readingsSingleUpdate($hash, "powerTrigger", $arg, 1);
 
@@ -1475,7 +1476,7 @@ sub _setenergyH4Trigger {                ## no critic "not used"
       }
   }
 
-  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeCacheToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
   readingsSingleUpdate($hash, "energyH4Trigger", $arg, 1);
 
@@ -1506,7 +1507,7 @@ sub _setmodulePeakString {               ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "modulePeakString", $arg, 1);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1540,7 +1541,7 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
   }
 
   readingsSingleUpdate  ($hash, "moduleTiltAngle", $arg, 1);
-  writeDataToFile       ($hash, "plantconfig", $plantcfg.$name);                  # Anlagenkonfiguration File schreiben
+  writeCacheToFile       ($hash, "plantconfig", $plantcfg.$name);                  # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1574,7 +1575,7 @@ sub _setmoduleDirection {                ## no critic "not used"
   }
 
   readingsSingleUpdate ($hash, "moduleDirection", $arg, 1);
-  writeDataToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
+  writeCacheToFile      ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
   return if(_checkSetupNotComplete ($hash));                                      # keine Stringkonfiguration wenn Setup noch nicht komplett
 
@@ -1612,7 +1613,7 @@ sub _setplantConfiguration {             ## no critic "not used"
   }
 
   if($arg eq "save") {
-      $err = writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+      $err = writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
       if($err) {
           return $err;
       }
@@ -1711,7 +1712,7 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
 
-   writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration sichern
+   writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration sichern
 
 return;
 }
@@ -1789,19 +1790,19 @@ sub _setreset {                          ## no critic "not used"
 
   if($prop eq "powerTrigger") {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
   if($prop eq "energyH4Trigger") {
       deleteReadingspec ($hash, "energyH4Trigger.*");
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
   if($prop eq "moduleRoofTops") {
       deleteReadingspec ($hash, "moduleRoofTops");
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
+      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);              # Anlagenkonfiguration File schreiben
       return;
   }
 
@@ -1819,7 +1820,7 @@ sub _setreset {                          ## no critic "not used"
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
 
-      writeDataToFile ($hash, "solcastapi", $scpicache.$name);                # Cache File SolCast API Werte schreiben
+      writeCacheToFile ($hash, "solcastapi", $scpicache.$name);                # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -1836,7 +1837,7 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{selfconsumption};
       delete $data{$type}{$name}{current}{selfconsumptionrate};
 
-      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
+      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
   if($prop eq "currentBatteryDev") {
@@ -1847,13 +1848,13 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
 
-      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
+      writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                       # Anlagenkonfiguration File schreiben
   }
 
   if($prop eq "currentInverterDev") {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
-      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
+      writeCacheToFile   ($hash, "plantconfig", $plantcfg.$name);                     # Anlagenkonfiguration File schreiben
   }
 
   if($prop eq "consumerPlanning") {                                                  # Verbraucherplanung resetten
@@ -1868,7 +1869,7 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
   }
 
   if($prop eq "consumerMaster") {                                                    # Verbraucherhash löschen
@@ -1887,7 +1888,7 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                         # Cache File Consumer schreiben
   }
 
   createAssociatedWith ($hash);
@@ -1905,8 +1906,8 @@ sub _setwriteHistory {                   ## no critic "not used"
 
   my $ret;
 
-  $ret = writeDataToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
-  $ret = writeDataToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
+  $ret = writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  $ret = writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
 
 return $ret;
 }
@@ -2103,7 +2104,12 @@ sub __solCast_ApiRequest {
   my $paref      = shift;
   my $hash       = $paref->{hash};
   my $name       = $paref->{name};
-  my $allstrings = $paref->{allstrings} // return;                                # alle Strings
+  my $allstrings = $paref->{allstrings};                                # alle Strings
+  
+  if(!$allstrings) {                                                    # alle Strings wurden abgerufen
+      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);          # Cache File SolCast API Werte schreiben
+      return;
+  }
 
   my $string;
   ($string, $allstrings) = split ",", $allstrings, 2;
@@ -2690,7 +2696,7 @@ sub _attrconsumer {                      ## no critic "not used"
       delete $data{$type}{$name}{consumers}{$c};                                           # Consumer Hash Verbraucher löschen
   }
 
-  writeDataToFile ($hash, "consumers", $csmcache.$name);                                   # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                   # Cache File Consumer schreiben
 
   InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createAssociatedWith", $hash, 0);
 
@@ -2813,10 +2819,10 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
 
-  writeDataToFile ($hash, "pvhist",      $pvhcache.$name);             # Cache File für PV History schreiben
-  writeDataToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeDataToFile ($hash, "consumers",   $csmcache.$name);             # Cache File Consumer schreiben
-  writeDataToFile ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
+  writeCacheToFile ($hash, "pvhist",      $pvhcache.$name);             # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeCacheToFile ($hash, "consumers",   $csmcache.$name);             # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "solcastapi", $scpicache.$name);             # Cache File SolCast API Werte schreiben
 
 return;
 }
@@ -2920,8 +2926,8 @@ sub periodicWriteCachefiles {
 
   return if(IsDisabled($name));
 
-  writeDataToFile ($hash, "circular",  $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeDataToFile ($hash, "pvhist",    $pvhcache.$name);             # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "circular", $pvccache.$name);                      # Cache File PV Circular schreiben
+  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);                      # Cache File PV History schreiben
 
 return;
 }
@@ -2929,7 +2935,7 @@ return;
 ################################################################
 #             Daten in File wegschreiben
 ################################################################
-sub writeDataToFile {
+sub writeCacheToFile {
   my $hash      = shift;
   my $cachename = shift;
   my $file      = shift;
@@ -2959,7 +2965,7 @@ sub writeDataToFile {
   }
   else {
       my $lw = gettimeofday();
-      $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
+      $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
       singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
   }
 
@@ -3338,7 +3344,7 @@ sub _specialActivities {
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
           push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts;
 
-          writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                           # Anlagenkonfiguration sichern
+          writeCacheToFile ($hash, "plantconfig", $plantcfg.$name);                           # Anlagenkonfiguration sichern
 
           deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
@@ -3380,7 +3386,7 @@ sub _specialActivities {
               $data{$type}{$name}{consumers}{$c}{onoff}           = "off";
           }
 
-          writeDataToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben
+          writeCacheToFile ($hash, "consumers", $csmcache.$name);                            # Cache File Consumer schreiben
 
           __createAdditionalEvents ($paref);                                                # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
           __delSolCastObsoleteData ($paref);                                                # Bereinigung obsoleter Daten im solcastapi Hash
@@ -4953,7 +4959,7 @@ sub __planSwitchTimes {
       Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate});
   }
 
-  writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+  writeCacheToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
 
   ___setPlanningDeleteMeth ($paref);
 
@@ -5321,7 +5327,7 @@ sub ___switchConsumerOn {
 
           $state = qq{switching Consumer '$calias' to '$oncom'};
 
-          writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+          writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
 
           Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
@@ -5343,7 +5349,7 @@ sub ___switchConsumerOn {
       my $caution = isInterruptable($hash, $c) == 3 ? 'interrupt condition no longer present' : 'existing surplus';
       $state      = qq{switching Consumer '$calias' to '$oncom', caution: $caution};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                     # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -5396,7 +5402,7 @@ sub ___switchConsumerOff {
       $caution = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
       $state   = qq{switching Consumer '$calias' to '$offcom', caution: $caution};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                                     # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   }
@@ -5415,7 +5421,7 @@ sub ___switchConsumerOff {
       $caution = isInterruptable($hash, $c, $hyst) == 2 ? 'interrupt condition' : 'surplus shortage';
       $state   = qq{switching Consumer '$calias' to '$offcom', caution: $caution};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                               # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -5458,7 +5464,7 @@ sub ___setConsumerSwitchingState {
 
       $state = qq{Consumer '$calias' switched on};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                  # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -5473,7 +5479,7 @@ sub ___setConsumerSwitchingState {
 
       $state = qq{Consumer '$calias' switched off};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -5486,7 +5492,7 @@ sub ___setConsumerSwitchingState {
 
       $state = qq{Consumer '$calias' switched on (continued)};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -5499,7 +5505,7 @@ sub ___setConsumerSwitchingState {
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
 
-      writeDataToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
+      writeCacheToFile ($hash, "consumers", $csmcache.$name);                                 # Cache File Consumer schreiben
 
       Log3 ($name, 2, "$name - $state");
   }
@@ -11289,9 +11295,9 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
       <a id="SolarForecast-set-writeHistory"></a>
       <li><b>writeHistory </b> <br><br>
 
-       Die vom Device gesammelten historischen PV Daten werden in eine Datei geschrieben. Dieser Vorgang wird per default
-       regelmäßig im Hintergrund ausgeführt. Im Internal "HISTFILE" wird der Dateiname und der Zeitpunkt der letzten
-       Speicherung dokumentiert. <br>
+       Die interne Cache Datenbank wird im Filesystem gespeichert. Dieser Vorgang wird per default
+       regelmäßig im Hintergrund ausgeführt. Im Internal "LCACHEFILE" wird die letzte geschriebene Datei und der Zeitpunkt 
+       der letzten Speicherung dokumentiert. <br>
       </li>
     </ul>
     <br>
