@@ -372,11 +372,11 @@ setreading DEVICE attrTemplateVersion 20220913
 name:zigbee2mqtt_light_rgbcct_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02e1
-desc: <a href="https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935" target="_blank">Forum Thread</a><br>A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as HEX value<br>remove color_temp in setlist command <b>on</b> if default white is not desired<br>Tested with:<br><a href="https://www.zigbee2mqtt.io/devices/HG08008.html" target="_blank">Livarno Home LED ceiling light</a><br><a href="https://www.zigbee2mqtt.io/devices/404000_404005_404012_404019.html#m%25C3%25BCller%2520licht-404000%252F404005%252F404012%252F404019" target="_blank">Mueller Light tint RGBW bulb</a>
+desc: <a href="https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935" target="_blank">Forum Thread</a><br>A dimmable rgbw light connected via zigbee2mqtt<br>rgb value is encoded as HEX value<br>remove color_temp in setlist command <b>on</b> if default white is not desired<br>Tested with:<br><a href="https://www.zigbee2mqtt.io/devices/HG08008.html" target="_blank">Livarno Home LED ceiling light,&nbsp;</a><a href="https://www.zigbee2mqtt.io/devices/404000_404005_404012_404019.html#m%25C3%25BCller%2520licht-404000%252F404005%252F404012%252F404019" target="_blank">Mueller Light tint RGBW bulb,&nbsp;</a><a href="https://www.zigbee2mqtt.io/devices/HG08010.html" target="_blank">Livarno Home outdoor spotlight</a>
 farewell:specified values ​​can be adjusted at any time in the setList attribute
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:BRIGHTNESS;brightness in <b>on</b>-command (numeric, 0-255, e.g. 120);undef
+par:BRIGHTNESS;brightness in <b>all</b> specific commands (numeric, 0-255, e.g. 120);undef
 par:CTVALUE;ct (color temp) value in <b>on</b>-command (numeric, 0-370, e.g. 320);undef
 par:CTWARMVALUE;ct value in <b>warm</b>-command (e.g. 320);undef
 par:CTWHITEVALUE;ct value in <b>white</b>-command (e.g. 250);undef
@@ -399,7 +399,7 @@ attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221106_3
+setreading DEVICE attrTemplateVersion 20221116
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -3337,11 +3337,11 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellydw using original firmware. <br>Note: can be configered als two- or three-state sensor.
 order:A_16b
 par:DEVNAME;Shelly device name in the topic;{ AttrVal('DEVICE','readingList','') =~ m,shellies/([^/]*)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal("DEVICE","icon","fts_window_1w_open") }
+par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal('DEVICE','icon','fts_window_1w_open') }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon open:fts_window_1w_open@red tilted:fts_window_1w_tilt@yellow closed:fts_window_1w@green
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/sensor/state:.* doorWindow\
+  shellies/DEVNAME/sensor/state:.* { doorWindow => $EVENT eq 'close' ? 'closed' : $EVENT }\
   shellies/DEVNAME/sensor/tilt:.* tilt\
   shellies/DEVNAME/sensor/vibration:.* vibration\
   shellies/DEVNAME/sensor/lux:.* lux\
@@ -3350,9 +3350,9 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
-attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,"doorWindow","") eq "close" ? 'closed' : ReadingsNum($name,"tilt",1) > 0 ? 'tilted' :'open' }
+attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,'doorWindow','') eq 'closed' ? 'closed' : ReadingsNum($name,'tilt',1) > 0 ? 'tilted' :'open' }
 attr DEVICE model shellydw
-setreading DEVICE attrTemplateVersion 20200812
+setreading DEVICE attrTemplateVersion 20221116
 
 # shelly ix3 using original firmware
 # source info: https://forum.fhem.de/index.php/topic,114973.msg1092039.html#msg1092039
