@@ -1246,7 +1246,7 @@ ZWave_SCmd($$@)
   if($hash->{secInProgress} && !(@a < 2 || $a[1] eq "?")) {
     my %h = ( T => $type, A => \@a, CL => $hash->{CL} );
     push @{$hash->{secStack}}, \%h;
-    return ($type eq "get" ?
+    return ($type eq "get" && $hash->{CL} ?
             "Secure operation in progress, executing in background" : "");
   }
   return ZWave_Cmd($type, $hash, @a);
