@@ -1,4 +1,4 @@
-REV 26716
+REV 26719
 DIR unused
 UPD 2022-11-14_07:45:07 385078 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -72,7 +72,7 @@ UPD 2022-11-07_07:45:02 64120 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2021-09-01_07:45:03 21540 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2019-06-03_07:45:02 103261 FHEM/10_RESIDENTS.pm
-UPD 2022-09-07_07:45:09 301926 FHEM/10_RHASSPY.pm
+UPD 2022-11-19_07:45:03 301959 FHEM/10_RHASSPY.pm
 UPD 2020-07-11_07:45:03 20462 FHEM/10_SD_GT.pm
 UPD 2022-06-08_07:45:03 68136 FHEM/10_SOMFY.pm
 UPD 2020-09-20_07:45:03 8181 FHEM/10_SchellenbergHandle.pm
@@ -750,8 +750,8 @@ UPD 2022-11-15_07:45:07 4817727 docs/commandref.html
 UPD 2022-11-16_07:45:10 2866222 docs/commandref_DE.html
 UPD 2022-11-15_07:45:02 83658 docs/commandref_frame.html
 UPD 2022-11-15_07:45:02 93676 docs/commandref_frame_DE.html
-UPD 2022-11-18_07:45:11 292422 docs/commandref_modular.html
-UPD 2022-11-18_07:45:12 303632 docs/commandref_modular_DE.html
+UPD 2022-11-19_07:45:11 292422 docs/commandref_modular.html
+UPD 2022-11-19_07:45:12 303632 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1491,6 +1491,7 @@ UPD 2015-07-28_14:05:32 5946 www/images/fhemSVG/hourglass.svg
 UPD 2022-01-07_07:45:02 2266 www/images/fhemSVG/hue2019_archetypesDoubleSpot.svg
 UPD 2022-01-14_07:45:02 1255 www/images/fhemSVG/hue2019_archetypesPendantRound.svg
 UPD 2022-01-07_07:45:02 1480 www/images/fhemSVG/hue2019_archetypesSingleSpot.svg
+UPD 2022-11-19_07:45:03 1856 www/images/fhemSVG/hue2019_archetypesWallLantern.svg
 UPD 2022-01-16_07:45:06 1987 www/images/fhemSVG/hue2019_archetypesWallSpot.svg
 UPD 2019-11-26_07:45:03 849 www/images/fhemSVG/hue2019_devicesMotionSensor.svg
 UPD 2022-02-12_07:45:05 1230 www/images/fhemSVG/hue2019_roomDining.svg
