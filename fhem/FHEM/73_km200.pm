@@ -51,9 +51,6 @@ use strict;
 use warnings;
 use constant false => 0;
 use constant true  => 1;
-sub km200_Define($$);
-sub km200_Undefine($$);
-sub km200_GetErrorMessage($$$$);
 
 ###START###### Initialize module ##############################################################################START####
 sub km200_Initialize($) {
@@ -280,10 +277,6 @@ sub km200_Define($$) {
 	@{$hash->{Secret}{KM200DONOTPOLL}}  		= ();
 	####END####### Writing values to global hash ################################################################END#####
 
-	###START###### Reset fullResponse error message ############################################################START####
-	readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
-	####END####### Reset fullResponse error message #############################################################END#####	
-	
 	###START###### For Debugging purpose only ##################################################################START####  
 	Log3 $name, 4, $name. " : km200 - Define H                                   : " .$hash;
 	Log3 $name, 4, $name. " : km200 - Define D                                   : " .$def;
@@ -292,6 +285,23 @@ sub km200_Define($$) {
 	Log3 $name, 4, $name. " : km200 - Define Adr                                 : " .$url;
 	####END####### For Debugging purpose only ###################################################################END#####
 
+	### Proceed with km200 Initialization as soon fhem is initialized
+	# https://forum.fhem.de/index.php/topic,130351.msg1246281.html#msg1246281
+	# Die InternalTimer Eintraege werden erst abgearbeitet, wenn $init_done = 1 ist.
+	InternalTimer(0, \&km200_FirstInit, $hash );
+
+	return 
+}
+####END####### Activate module after module has been used via fhem command "define" ############################END#####
+
+###START###### Initialize km200 after fhem Initialization is done #############################################START####
+sub km200_FirstInit($) {
+	my $hash = @_;
+	my $name = $hash->{NAME};
+
+	###START###### Reset fullResponse error message ############################################################START####
+	readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
+	####END####### Reset fullResponse error message #############################################################END#####	
 	
 	###START###### Check whether communication to the physical unit is possible ################################START####
 	my $Km200Info ="";
@@ -324,7 +334,7 @@ sub km200_Define($$) {
 	
 	return undef;
 }
-####END####### Activate module after module has been used via fhem command "define" ############################END#####
+####END####### Initialize km200 after fhem Initialization is done ##############################################END#####
 
 
 ###START###### To bind unit of value to DbLog entries #########################################################START####
@@ -444,62 +454,62 @@ sub km200_Attr(@) {
 		}
 		####END#### Check whether timeout is not too short
 	}
-	### Check whether DoNotPoll attribute have been provided
-	elsif($a[2] eq "DoNotPoll") {
-		my @KM200_DONOTPOLL   = ();
-		my @temp              = @a;
+    elsif($a[2] eq 'DoNotPoll') {
+        #my @KM200_DONOTPOLL   = ();
+        my @temp              = @a;
 
-		### Stop the current timer
-		RemoveInternalTimer($hash);
-		Log3 $name, 4, $name. " : km200 - InternalTimer has been removed.";
-		
-		### Delete the first 3 items of the array
-		splice @temp, 0, 3;
+        ### Stop the current timer
+        RemoveInternalTimer($hash);
+        Log3 $name, 4, $name. " : km200 - InternalTimer has been removed.";
+       
+        ### Delete the first 3 items of the array
+        splice @temp, 0, 3;
 
-		### Insert empty field as minimum entry 
-		push @temp, "";
-		
-		### Transform string entries seperated by blank into array
-		@KM200_DONOTPOLL = split(/\s+/, $temp[0]);
+        ### Insert empty field as minimum entry
+        push @temp, "";
+       
+        ### Transform string entries seperated by blank into array
+        my @KM200_DONOTPOLL = split m/\s+/, $temp[0] // ();
 
-		### Remove trailing slash of each item if available
-		
-		### For each item found in this empty parent directory
-		foreach my $item (@KM200_DONOTPOLL) {
-			### Delete trailing slash
-			$item =~ s/\/$//;
-		}
-		
-		### Save list of services not to be polled into hash
-		@{$hash->{Secret}{KM200DONOTPOLL}} = @KM200_DONOTPOLL;
+        ### Remove trailing slash of each item if available
+       
+        ### For each item found in this empty parent directory
+        for my $item (@KM200_DONOTPOLL) {
+            ### Delete trailing slash
+            $item =~ s/\/$//;
+        }
+       
+        ### Save list of services not to be polled into hash
+        @{$hash->{Secret}{KM200DONOTPOLL}} = @KM200_DONOTPOLL;
 
-		### Get original list of root services back
-		@{$hash->{Secret}{KM200ALLSERVICES}} = @{$hash->{Secret}{KM200ALLSERVICESBACKUP}};
-		
-		### For every blacklisted service
-		foreach my $SearchWord(@KM200_DONOTPOLL) {
-			### Filter all blocked root services out of services to be polled 
-			my $FoundPosition = first_index{ $_ eq $SearchWord }@{$hash->{Secret}{KM200ALLSERVICES}};
-			if ($FoundPosition >= 0) {
-				splice(@{$hash->{Secret}{KM200ALLSERVICES}}, $FoundPosition, 1);
-			}
-		}
-		### Message for debugging purposes
-		Log3 $name, 5, $name. "km200 module is only polling the following services! \n @{$hash->{Secret}{KM200ALLSERVICES}}";
-		Log3 $name, 5, $name. "km200 module is NOT  polling the following services! \n @{$hash->{Secret}{KM200DONOTPOLL}}";
-		Log3 $name, 4, $name. " : km200 - The following services will not be polled: ". $a[3];
-		
-		### Interrupting all currently running Polling
-		@{$hash->{Secret}{KM200DYNSERVICES}} = "";
-		$hash->{temp}{ServiceCounterDyn} = 0;
+        ### Get original list of root services back
+        @{$hash->{Secret}{KM200ALLSERVICES}} = @{$hash->{Secret}{KM200ALLSERVICESBACKUP}};
+       
+        ### For every blacklisted service
+        for my $SearchWord(@KM200_DONOTPOLL) {
+            last if @{$hash->{Secret}{KM200ALLSERVICES}}|| ref @{$hash->{Secret}{KM200ALLSERVICES}} ne 'ARRAY';
+            ### Filter all blocked root services out of services to be polled
+            my $FoundPosition = first_index{ $_ eq $SearchWord }@{$hash->{Secret}{KM200ALLSERVICES}};
+            if ($FoundPosition >= 0) {
+                splice(@{$hash->{Secret}{KM200ALLSERVICES}}, $FoundPosition, 1);
+            }
+        }
+        ### Message for debugging purposes
+        Log3 $name, 5, $name. "km200 module is only polling the following services! \n @{$hash->{Secret}{KM200ALLSERVICES}}";
+        Log3 $name, 5, $name. "km200 module is NOT  polling the following services! \n @{$hash->{Secret}{KM200DONOTPOLL}}";
+        Log3 $name, 4, $name. " : km200 - The following services will not be polled: ". $a[3];
+       
+        ### Interrupting all currently running Polling
+        @{$hash->{Secret}{KM200DYNSERVICES}} = "";
+        $hash->{temp}{ServiceCounterDyn} = 0;
 
-		### Delete all Readings
-		fhem( "deletereading $name .*" );
+        ### Delete all Readings
+        fhem( "deletereading $name .*" );
 
-		### Re-start the sounding of  values from KM200 but wait the period of $hash->{POLLINGTIMEOUT} + 10s
-		InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+10, "km200_GetInitService", $hash, 1);
-		Log3 $name, 4, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
-	}
+        ### Re-start the sounding of  values from KM200 but wait the period of $hash->{POLLINGTIMEOUT} + 10s
+        InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+10, "km200_GetInitService", $hash, 1);
+        Log3 $name, 4, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
+    }
 	### Check whether time-out for Read-Back has been provided
 	if($a[2] eq "ReadBackDelay") {
 		$ReadBackDelay = $a[3];
@@ -2570,6 +2580,7 @@ sub km200_GetDynService($) {
 			++$ServiceCounterDyn;
 			$hash->{temp}{ServiceCounterDyn} = $ServiceCounterDyn;
 			km200_GetDynService($hash);
+#			$init_done ? km200_GetDynService($hash) : InternalTimer(gettimeofday()+30, \&km200_GetDynService, $hash, 1);
 		}
 		else {
 			### Log entries for debugging purposes
