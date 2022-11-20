@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-16 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-19 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.4" => "19.11.2022  calculate Today_PVreal from the etotal daily difference after sunset ", 
   "0.74.3" => "16.11.2022  writeCacheToFile 'solcastapi' after every SolCast API Call cycle is finished ", 
   "0.74.2" => "15.11.2022  sunrise and sunset in graphic header ", 
   "0.74.1" => "15.11.2022  ___planMust -> half -> ceil to floor changed , Model SolCast: first call from 60 minutes before sunrise ".
@@ -3129,7 +3130,7 @@ sub centralTask {
       _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
       _transferInverterValues     ($centpars);                                            # WR Werte übertragen
       _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
-      _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
+      _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln      
       _manageConsumerData         ($centpars);                                            # Consumerdaten sammeln und planen
       _estConsumptionForecast     ($centpars);                                            # Verbrauchsprognose erstellen
       _evaluateThresholds         ($centpars);                                            # Schwellenwerte bewerten und signalisieren
@@ -3352,6 +3353,7 @@ sub _specialActivities {
           deleteReadingspec ($hash, "powerTrigger_.*");
           deleteReadingspec ($hash, "Today_MaxPVforecast.*");
           deleteReadingspec ($hash, "Today_PVdeviation");
+          deleteReadingspec ($hash, "Today_PVreal");
 
           if(ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") eq "on") {
               for my $n (1..24) {
@@ -6129,7 +6131,7 @@ sub _createSummaries {
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast<>".            (int $todaySumFc->{PV}).   " Wh";
-  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh";
+  push @$daref, "Today_PVreal<>".                (int $todaySumRe->{PV}).   " Wh"  if(int $todaySumRe->{PV} > ReadingsNum($name, 'Today_PVreal', 0));
 
   push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
@@ -6139,6 +6141,7 @@ return;
 }
 
 ################################################################
+#  Kerrektur von Today_PVreal +
 #  berechnet die prozentuale Abweichung von Today_PVforecast
 #  und Today_PVreal
 ################################################################
@@ -6149,14 +6152,23 @@ sub _calcTodayPVdeviation {
   my $type  = $paref->{type};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
+  my $day   = $paref->{day};
   my $daref = $paref->{daref};
 
   my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '22:00').':00');
 
   return if($t < $sstime);
-
+  
   my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
   my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
+  
+  my $hsr  = (split ":", ReadingsVal ($name, 'Today_SunRise', '03:00'))[0];                   # die Stunde des Sonnenaufgangs
+  my $ehsr = HistoryVal ($hash, $day, $hsr, 'etotal', 0);                                     # gespeichertes etotal vor Sonnenaufgang
+  
+  if ($ehsr) {
+      my $esset = CurrentVal ($hash, 'etotal', 0);                                            # Erzeugung total (Wh) nach Sonnenuntergang
+      $pvre     = $esset - $ehsr;
+  }
 
   my $diff = $pvfc - $pvre;
 
@@ -6164,7 +6176,8 @@ sub _calcTodayPVdeviation {
       my $dp                                      = sprintf "%.2f" , (100 * $diff / $pvre);
       $data{$type}{$name}{circular}{99}{tdayDvtn} = $dp;
 
-      push @$daref, "Today_PVdeviation<>". $dp." %";
+      push @$daref, "Today_PVdeviation<>". $dp.  " %";
+      push @$daref, "Today_PVreal<>".      $pvre." Wh";
   }
 
 return;
