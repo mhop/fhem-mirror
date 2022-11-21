@@ -1834,7 +1834,7 @@ HUEDevice_Parse($$)
 
       $hash->{tholddark} = $config->{tholddark} if( defined($config->{tholddark}) );
       $hash->{sensitivity} = $config->{sensitivity} if( defined($config->{sensitivity}) );
-
+      $hash->{ledindication} = $config->{ledindication} if( defined($config->{ledindication}) );
 
       $readings{battery} = $config->{battery} if( defined($config->{battery}) );
       $readings{batteryPercent} = $config->{battery} if( defined($config->{battery}) );
