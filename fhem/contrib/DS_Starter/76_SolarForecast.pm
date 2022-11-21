@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 76_SolarForecast.pm 21735 2022-11-19 23:53:24Z DS_Starter $
+# $Id: 76_SolarForecast.pm 21735 2022-11-21 23:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.5" => "21.11.2022  new Attr affectSolCastPercentile ",
   "0.74.4" => "19.11.2022  calculate Today_PVreal from the etotal daily difference after sunset ", 
   "0.74.3" => "16.11.2022  writeCacheToFile 'solcastapi' after every SolCast API Call cycle is finished ", 
   "0.74.2" => "15.11.2022  sunrise and sunset in graphic header ", 
@@ -835,6 +836,7 @@ sub Initialize {
                                 "affectMaxDayVariance ".
                                 "affectNumHistDays:slider,1,1,30 ".
                                 "affectRainfactorDamping:slider,0,1,100 ".
+                                "affectSolCastPercentile:select,10,50,90 ".
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "consumerAdviceIcon ".
                                 "consumerLink:0,1 ".
@@ -2244,7 +2246,15 @@ sub __solCast_ApiResponse {
 
       my $k = 0;
       my ($period,$starttmstr);
+      
+      my $perc = AttrVal ($name, 'affectSolCastPercentile', 50);                                         # das gewählte zu nutzende Percentil
 
+      if($debug =~ /solcastProcess/x) {                                                                                  # nur für Debugging
+          Log3 ($name, 1, qq{$name DEBUG> SolCast API used percentile: }. $perc);
+      }
+      
+      $perc = q{} if($perc == 50);
+          
       while ($jdata->{'forecasts'}[$k]) {                                                                # vorhandene Startzeiten Schlüssel im SolCast API Hash löschen
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           ($err, $starttmstr) = ___convPendToPstart ($name, $lang, $petstr);
@@ -2276,7 +2286,7 @@ sub __solCast_ApiResponse {
       my $uac = ReadingsVal ($name, 'pvCorrectionFactor_Auto', 'off');                                   # Auto- oder manuelle Korrektur
 
       while ($jdata->{'forecasts'}[$k]) {
-          if(!$jdata->{'forecasts'}[$k]{'pv_estimate'}) {                                                # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
+          if(!$jdata->{'forecasts'}[$k]{'pv_estimate'.$perc}) {                                          # keine PV Prognose -> Datensatz überspringen -> Verarbeitungszeit sparen
               $k++;
               next;
           }
@@ -2284,7 +2294,7 @@ sub __solCast_ApiResponse {
           my $petstr          = $jdata->{'forecasts'}[$k]{'period_end'};
           ($err, $starttmstr) = ___convPendToPstart ($name, $lang, $petstr);
 
-          my $pvest50         = $jdata->{'forecasts'}[$k]{'pv_estimate'};
+          my $pvest50         = $jdata->{'forecasts'}[$k]{'pv_estimate'.$perc};
 
           $period             = $jdata->{'forecasts'}[$k]{'period'};
           $period             =~ s/.*(\d\d).*/$1/;
@@ -11594,6 +11604,16 @@ Planung und Steuerung von PV Überschuß abhängigen Verbraucherschaltungen.
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag (Dämpfung der PV
          Prognose durch den Regenfaktor).<br>
          (default: 10)
+       </li>
+       <br>
+       
+       <a id="SolarForecast-attr-affectSolCastPercentile"></a>
+       <li><b>affectSolCastPercentile &lt;10 | 50 | 90&gt; </b><br>
+         (nur bei Verwendung Model SolCastAPI) <br><br>
+
+         Auswahl des Wahrscheinlichkeitsbereiches der gelieferten SolCast-Daten.
+         SolCast liefert die 10- und 90-prozentige Wahrscheinlichkeit um den Prognosemittelwert (50) herum. <br>
+         (default: 50)
        </li>
        <br>
 
