@@ -2,6 +2,11 @@
 #
 ##############################################
 #
+# 2022.11.21 v0.2.18
+# - FEATURE: Unterstützung A2DS1Q2TPDJ48U Echo Dot Gen5 with Clock
+#            Unterstützung AQCGW9PSYWRF Polk React Soundbar
+#            Unterstützung A1VGB7MHSIEYFK Fire TV Cube Gen3
+#	
 # 2022.11.14 v0.2.17
 # - FEATURE: Unterstützung A1EIANJ7PNB0Q7 Echo Show 15
 #
@@ -487,7 +492,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.17";
+my $ModulVersion     = "0.2.18";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4357,7 +4362,8 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A3RMGO6LYLH7YN" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
 	elsif($ModelNumber eq "A2U21SRK4QGSE1" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
 	elsif($ModelNumber eq "A2H4LV5GIZ1JFT" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4 with Clock";}
-	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
+	elsif($ModelNumber eq "A2DS1Q2TPDJ48U" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen5 with Clock";}
+ 	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
 	elsif($ModelNumber eq "AWZZ5CVHX2CD"   || $ModelNumber eq "Echo Show")				{return "Echo Show Gen2";}
 	elsif($ModelNumber eq "AIPK7MM90V7TB"  || $ModelNumber eq "Echo Show")				{return "Echo Show Gen3";}
@@ -4390,6 +4396,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A2GFL5ZMWNE0PX" || $ModelNumber eq "Fire TV")				{return "Fire TV";}
 	elsif($ModelNumber eq "A12GXV8XMS007S" || $ModelNumber eq "Fire TV")				{return "Fire TV";}
 	elsif($ModelNumber eq "A3HF4YRA2L7XGC" || $ModelNumber eq "Fire TV Cube")			{return "Fire TV Cube";}
+	elsif($ModelNumber eq "A1VGB7MHSIEYFK" || $ModelNumber eq "Fire TV Cube Gen3")		{return "Fire TV Cube Gen3";}
 	elsif($ModelNumber eq "ADVBD696BHNV5"  || $ModelNumber eq "Fire TV Stick V1")		{return "Fire TV Stick V1";}
 	elsif($ModelNumber eq "A2LWARUGJLBYEW" || $ModelNumber eq "Fire TV Stick V2")		{return "Fire TV Stick V2";}
 	elsif($ModelNumber eq "AKPGW064GI9HE"  || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
@@ -4433,6 +4440,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A2WN1FJ2HG09UN" || $ModelNumber eq "Ultimate Alexa")	        {return "Ultimate Alexa";}
 	elsif($ModelNumber eq "A23FPV4BT7FH68" || $ModelNumber eq "Yamaha YAS-209 Soundbar"){return "Yamaha YAS-209 Soundbar";}
 	elsif($ModelNumber eq "A39Y3UG1XLEJLZ" || $ModelNumber eq "Fitbit Sense")			{return "Fitbit Sense";}
+	elsif($ModelNumber eq "AQCGW9PSYWRF"   || $ModelNumber eq "Polk React Soundbar")	{return "Polk React Soundbar";}
 
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
