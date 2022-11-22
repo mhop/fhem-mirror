@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.6" => "22.11.2022  bugfix consumerLegend tooltip start/end time if language is set to english ",
   "0.74.5" => "21.11.2022  new Attr affectSolCastPercentile ",
   "0.74.4" => "19.11.2022  calculate Today_PVreal from the etotal daily difference after sunset ", 
   "0.74.3" => "16.11.2022  writeCacheToFile 'solcastapi' after every SolCast API Call cycle is finished ", 
@@ -5068,12 +5069,12 @@ sub ___setConsumerPlanningState {
   my ($starttime,$stoptime);
 
   if ($startts) {
-      (undef,undef,undef,$starttime)                   = timestampToTimestring ($startts, $lang);
+      $starttime                                       = (timestampToTimestring ($startts, $lang))[3];
       $data{$type}{$name}{consumers}{$c}{planswitchon} = $startts;
   }
 
   if ($stopts) {
-      (undef,undef,undef,$stoptime)                     = timestampToTimestring ($stopts, $lang);
+      $stoptime                                         = (timestampToTimestring ($stopts, $lang))[3];
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;
   }
 
@@ -5102,17 +5103,17 @@ sub ___planMust {
   my $stopdiff = $paref->{stopdiff};
   my $lang     = $paref->{lang};
 
-  my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
-  my $half                          = floor ($mintime / 2 / 60);                                     # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren
-  my $startts                       = $maxts - ($half * 3600);
-  my (undef,undef,undef,$starttime) = timestampToTimestring ($startts, $lang);
+  my $maxts                    = timestringToTimestamp ($maxref->{$elem}{starttime});                 # Unix Timestamp des max. Überschusses heute
+  my $half                     = floor ($mintime / 2 / 60);                                           # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren
+  my $startts                  = $maxts - ($half * 3600);
+  my $starttime                = (timestampToTimestring ($startts, $lang))[3];
 
-  $paref->{starttime}               = $starttime;
-  $starttime                        = ___switchonTimelimits ($paref);
+  $paref->{starttime}          = $starttime;
+  $starttime                   = ___switchonTimelimits ($paref);
   delete $paref->{starttime};
 
-  $startts                          = timestringToTimestamp ($starttime);
-  my $stopts                        = $startts + $stopdiff;
+  $startts                     = timestringToTimestamp ($starttime);
+  my $stopts                   = $startts + $stopdiff;
 
   $paref->{ps}      = "planned:";
   $paref->{startts} = $startts;                                                                       # Unix Timestamp für geplanten Switch on
@@ -9813,27 +9814,27 @@ sub timestampToTimestring {
   my $lang  = shift;
 
   my ($lyear,$lmonth,$lday,$lhour,$lmin,$lsec) = (localtime($epoch))[5,4,3,2,1,0];
-  my $ts;
+  my $tm;
 
-  $lyear += 1900;                                                                             # year is 1900 based
-  $lmonth++;                                                                                  # month number is zero based
+  $lyear += 1900;                                                                                  # year is 1900 based
+  $lmonth++;                                                                                       # month number is zero based
 
-  my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                      # Standard f. z.B. Readingstimstamp
+  my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                           # Standard f. z.B. Readingstimstamp
   $year += 1900;
   $mon++;
 
-  my $realts = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);
-  my $tsdef  = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante für Logging-Timestamps etc. (Minute/Sekunde == 00)
-  my $tsfull = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit
+  my $realtm = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);          # engl. Variante von aktuellen timestamp
+  my $tmdef  = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante von $epoch für Logging-Timestamps etc. (Minute/Sekunde == 00)
+  my $tmfull = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit von $epoch
 
   if($lang eq "DE") {
-      $ts = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);
+      $tm = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);     # deutsche Variante Vollzeit von $epoch
   }
   else {
-      $ts = $tsdef;
+      $tm = $tmfull;
   }
 
-return ($ts, $tsdef, $realts, $tsfull);
+return ($tm, $tmdef, $realtm, $tmfull);
 }
 
 ################################################################
