@@ -2,6 +2,12 @@
 #
 ##############################################
 #
+# 2022.11.22 v0.2.20
+# - FEATURE: Unterstützung A4ZXE0RM7LQ7A Echo Dot Gen5
+#
+# 2022.11.21 v0.2.19
+# - BUG:     Auswertung FHEM Verzeichnis Attribut "fhem_home" eingeführt Standardwert = "/opt/fhem"
+#
 # 2022.11.21 v0.2.18
 # - FEATURE: Unterstützung A2DS1Q2TPDJ48U Echo Dot Gen5 with Clock
 #            Unterstützung AQCGW9PSYWRF Polk React Soundbar
@@ -492,7 +498,7 @@ use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 use MIME::Base64;
 
-my $ModulVersion     = "0.2.18";
+my $ModulVersion     = "0.2.19";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -535,6 +541,7 @@ sub echodevice_Initialize($) {
 							"npm_refresh_intervall ".
 							"npm_bin ".
 							"npm_bin_node ".
+							"fhem_home ".
 							$readingFnAttributes;
 }
 
@@ -802,6 +809,7 @@ sub echodevice_Get($@) {
 		$return .= "<tr><td>RUNLOGIN&nbsp;&nbsp;&nbsp;</td><td>Helper</td><td>"  . $hash->{helper}{RUNLOGIN} . "</td></tr>";
 		$return .= "<tr><td>RUNNING_REQUEST&nbsp;&nbsp;&nbsp;</td><td>Helper</td><td>"  . $hash->{helper}{RUNNING_REQUEST} . "</td></tr>";
 		$return .= "<tr><td>LOGINERROR&nbsp;&nbsp;&nbsp;</td><td>Helper</td><td>"  . $hash->{helper}{".LOGINERROR"} . "</td></tr>";
+		$return .= "<tr><td>FHEM_HOME&nbsp;&nbsp;&nbsp;</td><td>Attribut</td><td>"  . AttrVal($name,"fhem_home","/opt/fhem") . "</td></tr>";
 		$return .= "<tr><td>&nbsp</td><td>&nbsp</td><td> </td></tr></tbody></table>";
 		
 		$return .= "</html>";
@@ -4369,6 +4377,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "AIPK7MM90V7TB"  || $ModelNumber eq "Echo Show")				{return "Echo Show Gen3";}
 	elsif($ModelNumber eq "A4ZP7ZC4PI6TO"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5";}
 	elsif($ModelNumber eq "A1XWJRHALS1REP" || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5 Gen2";}
+	elsif($ModelNumber eq "A4ZXE0RM7LQ7A"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5 Gen5";}
 	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")            {return "Echo Show 8";}
 	elsif($ModelNumber eq "A15996VY63BQ2D" || $ModelNumber eq "Echo Show 8")			{return "Echo Show 8 Gen2";}
 	elsif($ModelNumber eq "A1EIANJ7PNB0Q7" || $ModelNumber eq "Echo Show 15")			{return "Echo Show 15 Gen1";}
@@ -4676,6 +4685,13 @@ sub echodevice_NPMInstall($){
 	
 	my $InstallResult = '<html><p><strong>Installationsergebnis</strong></p><br>';
 	my $npm_bin = AttrVal($name,"npm_bin","/usr/bin/npm");
+
+	my $npm_fhem_home = AttrVal($name,"fhem_home","/opt/fhem");
+
+	if (!(-d $npm_fhem_home)) {
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] npm_fhem_home $npm_fhem_home existiert nicht!! Bitte das Attribut fhem_home entsprechend einrichten " ;
+		return;
+	}
 	
 	# Prüfen ob npm installiert ist
 	if (!(-e $npm_bin)) {
@@ -4690,24 +4706,24 @@ sub echodevice_NPMInstall($){
 	}
 
 	# Verzeichnis anlegen
-	mkdir("cache", 0777) unless(-d "cache" );
-	mkdir("cache/alexa-cookie", 0777) unless(-d "cache/alexa-cookie" );
-	mkdir("cache/alexa-cookie/node_modules", 0777) unless(-d "cache/alexa-cookie/node_modules" );
+	mkdir($npm_fhem_home . "/cache", 0777) unless(-d "cache" );
+	mkdir($npm_fhem_home . "/cache/alexa-cookie", 0777) unless(-d $npm_fhem_home . "/cache/alexa-cookie" );
+	mkdir($npm_fhem_home . "/cache/alexa-cookie/node_modules", 0777) unless(-d $npm_fhem_home . "/cache/alexa-cookie/node_modules" );
 	
 	# Prüfen ob schon eine Installation vorhanden ist ggf. Modul löschen
-	if (-e "cache/alexa-cookie/node_modules/alexa-cookie2/alexa-cookie.js") {
+	if (-e $npm_fhem_home . "/cache/alexa-cookie/node_modules/alexa-cookie2/alexa-cookie.js") {
 		$InstallResult .= "Vorhandene Installation wird aktualisiert<br>";
 		unlink "cache/alexa-cookie/node_modules/alexa-cookie2/alexa-cookie.js";
 	}
 	else {$InstallResult .= "Installation wird angestartet<br>";}
 
-	open CMD,'-|','sudo ' . $npm_bin . ' install --prefix ./cache/alexa-cookie alexa-cookie2' or die $@;
+	open CMD,'-|','sudo ' . $npm_bin . ' install --prefix ' . $npm_fhem_home . '/cache/alexa-cookie alexa-cookie2' or die $@;
 	my $line;
 	while (defined($line=<CMD>)) {$InstallResult .= $line. "<br>";}
 	close CMD;
 	
 	# Prüfen ob das alexa-cookie Modul vorhanden ist
-	if (-e "cache/alexa-cookie/node_modules/alexa-cookie2/alexa-cookie.js") {$InstallResult .= '<p><strong><font color="green">Installation erfolgreich durchgefuehrt</font></strong></p>';}
+	if (-e $npm_fhem_home . "/cache/alexa-cookie/node_modules/alexa-cookie2/alexa-cookie.js") {$InstallResult .= '<p><strong><font color="green">Installation erfolgreich durchgefuehrt</font></strong></p>';}
 	else {$InstallResult .= '<p><strong><font color="red">!!Installation fehlgeschlagen!!</font></strong></p>';}
 	
 	# Zurückbutton
@@ -4724,6 +4740,8 @@ sub echodevice_NPMLoginNew($){
 	my $number = $hash->{NR};
 	my $InstallResult = '<html><p><strong>Login Ergebnis</strong></p><br>';
 	my $npm_bin_node  = AttrVal($name,"npm_bin_node","/usr/bin/node");
+	my $npm_fhem_home = AttrVal($name,"fhem_home","/opt/fhem");
+	
 	$NPMLoginTyp   = "NPM Login New " . localtime();
 	
 	# Prüfen ob node installiert ist
@@ -4880,14 +4898,14 @@ sub echodevice_NPMLoginNew($){
 	$SkriptContent    .= "" . "\n";
 	$SkriptContent    .= "alexaCookie.generateAlexaCookie('LoginFHEM', 'xxxx', config, (err, result) => {" . "\n";
 	$SkriptContent    .= "    console.log('RESULT: ' + err + ' / ' + JSON.stringify(result));" . "\n";
-	$SkriptContent    .= "    fs.writeFileSync('./cache/alexa-cookie/" . $number . "result.json', JSON.stringify(result) , 'utf-8'); " . "\n";
+	$SkriptContent    .= "    fs.writeFileSync('" . $npm_fhem_home . "/cache/alexa-cookie/" . $number . "result.json', JSON.stringify(result) , 'utf-8'); " . "\n";
 	$SkriptContent    .= "    if (result && result.csrf) {" . "\n";
 	$SkriptContent    .= "        alexaCookie.stopProxyServer();" . "\n";
 	$SkriptContent    .= "    }" . "\n";
 	$SkriptContent    .= "});" . "\n";
 	$SkriptContent    .= "" . "\n";
 
-	my $filename  = "cache/alexa-cookie/" . $number . "create-cookie.js";
+	my $filename  = $npm_fhem_home . "/cache/alexa-cookie/" . $number . "create-cookie.js";
 
 	# Altes Skript löschen
 	if ((-e $filename)) {unlink $filename};
@@ -4903,7 +4921,7 @@ sub echodevice_NPMLoginNew($){
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
 		$InstallResult .= "</html>";
 		$InstallResult =~ s/'/&#x0027/g;
-		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] create-cookie.js not found" ;
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] $filename not found" ;
 		return $InstallResult;
 	}
 	
@@ -4914,7 +4932,7 @@ sub echodevice_NPMLoginNew($){
 		
 	# Skript ausführen
 	close CMD;
-	open CMD,'-|', $npm_bin_node . ' ./' . $filename or die $@;
+	open CMD,'-|', $npm_bin_node . ' ' . $filename or die $@;
 	my $line;
 	my $Loop = "1";
 	my $LoopCount = 0;
@@ -4973,8 +4991,14 @@ sub echodevice_NPMLoginRefresh($){
 
 	my $InstallResult = '<html><p><strong>Login Ergebnis</strong></p><br>';
 	my $npm_bin_node  = AttrVal($name,"npm_bin_node","/usr/bin/node");
+	my $npm_fhem_home = AttrVal($name,"fhem_home","/opt/fhem");
 	
 	$NPMLoginTyp   = "NPM Login Refresh " . localtime();
+	
+	if (!(-d $npm_fhem_home)) {
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] npm_fhem_home $npm_fhem_home existiert nicht!! Bitte das Attribut fhem_home entsprechend einrichten " ;
+		return;
+	}
 	
 	# Prüfen ob npm installiert ist
 	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] check $npm_bin_node" ;
@@ -5025,11 +5049,11 @@ sub echodevice_NPMLoginRefresh($){
 	$SkriptContent    .= "" . "\n";
 	$SkriptContent    .= "alexaCookie.refreshAlexaCookie(config, (err, result) => {" . "\n";
 	$SkriptContent    .= "    console.log('RESULT: ' + err + ' / ' + JSON.stringify(result));" . "\n";
-	$SkriptContent    .= "    fs.writeFileSync('./cache/alexa-cookie/" . $number . "result.json', JSON.stringify(result) , 'utf-8'); " . "\n";
+	$SkriptContent    .= "    fs.writeFileSync('" . $npm_fhem_home . "/cache/alexa-cookie/" . $number . "result.json', JSON.stringify(result) , 'utf-8'); " . "\n";
 	$SkriptContent    .= "});" . "\n";
 	$SkriptContent    .= "" . "\n";
 	
-	my $filename  = "cache/alexa-cookie/" . $number . "refresh-cookie.js";
+	my $filename  = $npm_fhem_home . "/cache/alexa-cookie/" . $number . "refresh-cookie.js";
 	#$InstallResult .= '<form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form><br>';
 	
 	# Altes Skript löschen
@@ -5054,7 +5078,7 @@ sub echodevice_NPMLoginRefresh($){
 	# Skript ausführen
 	close CMD;
 	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] start $npm_bin_node $filename";
-	open CMD,'-|',$npm_bin_node . ' ./' . $filename . ' &';
+	open CMD,'-|',$npm_bin_node . ' ' . $filename . ' &';
 	
 	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] start InternalTimer echodevice_NPMWaitForCookie";
 	InternalTimer(gettimeofday() + 1 , "echodevice_NPMWaitForCookie" , $hash, 0);
@@ -5067,16 +5091,18 @@ sub echodevice_NPMWaitForCookie($){
 	my ($hash) = @_;
 	my $name        = $hash->{NAME};
 	my $number      = $hash->{NR};
-	my $filename    = "cache/alexa-cookie/" . $number . "result.json";
+	my $npm_fhem_home = AttrVal($name,"fhem_home","/opt/fhem");
+
+	my $filename    = $npm_fhem_home . "/cache/alexa-cookie/" . $number . "result.json";
 	my $CanDelete   = 0;
 	my $ExistSkript = "false";
 	my $CookieResult;
 	
 	if ($NPMLoginTyp =~ m/Refresh/) {
-		$ExistSkript = $number . "refresh-cookie.js = true"  if (-e "cache/alexa-cookie/" . $number . "refresh-cookie.js");
+		$ExistSkript = $number . "refresh-cookie.js = true"  if (-e $npm_fhem_home . "cache/alexa-cookie/" . $number . "refresh-cookie.js");
 	}
 	else {
-		$ExistSkript = $number . "create-cookie.js = true" if (-e "cache/alexa-cookie/" . $number . "create-cookie.js");
+		$ExistSkript = $number . "create-cookie.js = true" if (-e $npm_fhem_home . "cache/alexa-cookie/" . $number . "create-cookie.js");
 	}
 	
 	if (-e $filename) {
@@ -5099,8 +5125,8 @@ sub echodevice_NPMWaitForCookie($){
 
 				# result.json & Skripte löschen
 				if (-e $filename) {unlink $filename;}
-				if (-e "cache/alexa-cookie/" . $number . "create-cookie.js")  {unlink "cache/alexa-cookie/" . $number . "create-cookie.js";}
-				if (-e "cache/alexa-cookie/" . $number . "refresh-cookie.js") {unlink "cache/alexa-cookie/" . $number . "refresh-cookie.js";}
+				if (-e $npm_fhem_home . "cache/alexa-cookie/" . $number . "create-cookie.js")  {unlink $npm_fhem_home . "cache/alexa-cookie/" . $number . "create-cookie.js";}
+				if (-e $npm_fhem_home . "cache/alexa-cookie/" . $number . "refresh-cookie.js") {unlink $npm_fhem_home . "cache/alexa-cookie/" . $number . "refresh-cookie.js";}
 					
 				echodevice_setState($hash,"connected");				
 			}
