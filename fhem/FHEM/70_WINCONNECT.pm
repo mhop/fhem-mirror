@@ -2,6 +2,9 @@
 ############################################################################
 # 2018-03-13, v0.0.28
 #
+# v0.0.29
+# - BUFIX:      [WinWebGUI] - Fehlermeldung Kamera
+#
 # v0.0.28
 # - BUFIX:      [FEHMModul] - "printer_names"="no_printing"
 #
@@ -206,9 +209,9 @@ sub WINCONNECT_Define($$);
 sub WINCONNECT_Undefine($$);
 
 # Autoupdateinformationen
-my $DownloadGURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControl_0.0.27.exe";
-my $DownloadSURL  = "https://gitlab.com/michael.winkler/winconnect/raw/master/WinControlService_0.0.27.exe";
-my $DownloadVer   = "0.0.27";
+my $DownloadGURL  = "https://www.mwinklerblog.de/app/download/10681757570/WinControl_0.0.29.exe";
+my $DownloadSURL  = "https://www.mwinklerblog.de/app/download/10681757970/WinControlService_0.0.29.exe";
+my $DownloadVer   = "0.0.29";
 my $DownloadError = "";
 
 ###################################
