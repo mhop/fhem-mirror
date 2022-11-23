@@ -1529,6 +1529,8 @@ sub vitoconnect_getCodeCallback {
         readingsSingleUpdate( $hash, "state",
             "Login failure. Check password and apiKey", 1 );
         Log3 $name, 1, "$name - Login failure. Check password and apiKey";
+        InternalTimer( gettimeofday() + $hash->{intervall},
+            "vitoconnect_GetUpdate", $hash );	# Forum: #880
     }
     return;
 }
