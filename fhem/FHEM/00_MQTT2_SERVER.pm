@@ -539,12 +539,12 @@ MQTT2_SERVER_doPublish($$$$;$)
   my ($src, $server, $tp, $val, $retain) = @_;
   $val = "" if(!defined($val));
   $src = $server if(!defined($src));
+  my $now = gettimeofday();
 
   if($retain) {
     if(!defined($val) || $val eq "") {
       delete($server->{retain}{$tp});
     } else {
-      my $now = gettimeofday();
       my %h = ( ts=>$now, val=>$val );
       $server->{retain}{$tp} = \%h;
     }
@@ -554,7 +554,7 @@ MQTT2_SERVER_doPublish($$$$;$)
     my %nots = map { $_ => $server->{retain}{$_}{val} }
                keys %{$server->{retain}};
     my $rname = AttrVal($server->{NAME}, "hideRetain", 0) ? ".RETAIN":"RETAIN";
-    setReadingsVal($server, $rname, toJSON(\%nots),FmtDateTime(gettimeofday()));
+    setReadingsVal($server, $rname, toJSON(\%nots),FmtDateTime($now));
   }
 
   foreach my $clName (keys %{$server->{clients}}) {
@@ -583,13 +583,14 @@ MQTT2_SERVER_doPublish($$$$;$)
 
   my $fl = $server->{".feedList"};
   if($fl) {
+    my $ts = sprintf("%s.%03d", FmtTime($now), 1000*($now-int($now)));
     foreach my $fwid (keys %{$fl}) {
       my $cl = $FW_id2inform{$fwid};
       if(!$cl || !$cl->{inform}{filter} || $cl->{inform}{filter} ne '^$') {
         delete($fl->{$fwid});
         next;
       }
-      FW_AsyncOutput($cl, "", toJSON([defined($cid)?$cid:"SENT", $tp, $val]));
+      FW_AsyncOutput($cl, "", toJSON([$ts,defined($cid)?$cid:"SENT",$tp,$val]));
     }
     delete($server->{".feedList"}) if(!keys %{$fl});
   }
