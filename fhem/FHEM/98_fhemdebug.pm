@@ -15,7 +15,8 @@ sub
 fhemdebug_Initialize($){
   $cmds{"fhemdebug"}{Fn} = "fhemdebug_Fn";
   $cmds{"fhemdebug"}{Hlp} =
-      "{enable | disable | status | timerList | addTimerStacktrace | utf8check}";
+    "{enable | disable | status | timerList | ".
+    "addTimerStacktrace | utf8check | sizeInFile}";
 }
 
 sub fhemdebug_utf8check($$$$);
@@ -82,10 +83,24 @@ fhemdebug_Fn($$)
            (int(@ret) ?  "Strings with utf8-flag set:\n".join("\n", @ret) :
                          "Found no strings with utf8-flag");
 
+  } elsif($param =~ m/^sizeInFile *(\d*)$/) {
+    my $top = $1 ? $1 : 20;
+    my %s;
+    for my $d (keys %defs) {
+      next if($defs{$d}{TEMPORARY});
+      $s{$d} = length(CommandList(undef, "-r $d"));
+      $s{$d} += length($d)+length($defs{$d}{FUUID})+10 if($defs{$d}{FUUID});
+    }
+
+    my $total = 26;
+    my @out = map { $total += $s{$_}; sprintf("%6d: %s", $s{$_}, $_) }
+                    sort { $s{$b}<=>$s{$a} } keys %s;
+    return join("\n", @out[0..$top-1])."\nTotal: $total";
+
   } else {
     return "Usage: fhemdebug {enable | disable | status | ".
               "timerList | addTimerStacktrace {0|1} | forceEvents {0|1} | ".
-              " utf8check }";
+              " utf8check | sizeInFile [num] }";
   }
   return;
 }
@@ -231,6 +246,12 @@ fhemdebug_timerList($)
     <li>addTimerStacktrace {1|0}<br>
       enable or disable the registering the stacktrace of each InternalTimer
       call. This stacktrace will be shown in the timerList command.
+      </li>
+
+    <li>sizeInFile [&lt;num&gt;]<br>
+      returns the name of the devices requiring the most space in storage.
+      If [&lt;num&gt;] is omitted, the top 20 is returned.<br>
+      Note: the total wont include the comment lines.
       </li>
 
     <li>utf8check<br>
