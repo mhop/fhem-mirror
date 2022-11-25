@@ -541,6 +541,10 @@ MQTT2_SERVER_doPublish($$$$;$)
   $src = $server if(!defined($src));
   my $now = gettimeofday();
 
+  my $serverName = $server->{NAME};
+  my $ir = AttrVal($serverName, "ignoreRegexp", undef);
+  return if(defined($ir) && "$tp:$val" =~ m/$ir/);
+
   if($retain) {
     if(!defined($val) || $val eq "") {
       delete($server->{retain}{$tp});
@@ -560,10 +564,6 @@ MQTT2_SERVER_doPublish($$$$;$)
   foreach my $clName (keys %{$server->{clients}}) {
     MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val);
   }
-
-  my $serverName = $server->{NAME};
-  my $ir = AttrVal($serverName, "ignoreRegexp", undef);
-  return if(defined($ir) && "$tp:$val" =~ m/$ir/);
 
   my $cid = $src->{cid};
   $tp =~ s/:/_/g if(AttrVal($serverName, "topicConversion", 1)); # 96608
@@ -873,7 +873,10 @@ MQTT2_SERVER_ReadDebug($$)
 
     <a id="MQTT2_SERVER-attr-ignoreRegexp"></a>
     <li>ignoreRegexp<br>
-      if $topic:$message matches ignoreRegexp, then it will be silently ignored.
+      if $topic:$message matches ignoreRegexp, then it will be silently
+      ignored.  Such messages are not distributed to connected MQTT clients,
+      are not stored (if retain is set), and are not dispatched in FHEM for
+      further processing.
       </li>
 
     <a id="MQTT2_SERVER-attr-keepaliveFactor"></a>
