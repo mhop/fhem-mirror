@@ -52,3 +52,6 @@ enable the old feature.
     58_GPIO4 (=> RPI_1Wire)
     20_OWFS (=> OWServer, or OWX)
     21_OWTEMP (=> OWDevice)
+
+-  (6.2) 
+  - MQTT2_SERVER: respectRetain is 0 (i.e. false) by default from now on.
