@@ -546,7 +546,7 @@ MQTT2_SERVER_doPublish($$$$;$)
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
   return if(defined($ir) && "$tp:$val" =~ m/$ir/);
 
-  if($retain && AttrVal($serverName, "respectRetain", undef)) {
+  if($retain && AttrVal($serverName, "respectRetain", $featurelevel <= 6.1)) {
     if(!defined($val) || $val eq "") {
       delete($server->{retain}{$tp});
     } else {
@@ -909,9 +909,9 @@ MQTT2_SERVER_ReadDebug($$)
     <a id="MQTT2_SERVER-attr-respectRetain"></a>
     <li>respectRetain [1|0]<br>
       As storing messages with the retain flag can take up considerable space
-      and it has no use in a FHEM only environment, it is by default disabled.
-      Set this attribute to 1 if you have external devices relying on this
-      feature.
+      and it has no use in a FHEM only environment, it is by default disabled
+      for featurelevel > 6.1. Set this attribute to 1 if you have external
+      devices relying on this feature.
       </li>
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
