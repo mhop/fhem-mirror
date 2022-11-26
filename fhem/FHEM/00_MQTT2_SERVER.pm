@@ -47,6 +47,7 @@ MQTT2_SERVER_Initialize($)
     keepaliveFactor
     rePublish:1,0
     rawEvents
+    respectRetain:1,0
     sslVersion
     sslCertPrefix
     topicConversion:0,1
@@ -545,7 +546,7 @@ MQTT2_SERVER_doPublish($$$$;$)
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
   return if(defined($ir) && "$tp:$val" =~ m/$ir/);
 
-  if($retain) {
+  if($retain && AttrVal($serverName, "respectRetain", undef)) {
     if(!defined($val) || $val eq "") {
       delete($server->{retain}{$tp});
     } else {
@@ -904,6 +905,14 @@ MQTT2_SERVER_ReadDebug($$)
       republished. By setting this attribute the topic will also be dispatched
       to the FHEM internal clients.
       </li><br>
+
+    <a id="MQTT2_SERVER-attr-respectRetain"></a>
+    <li>respectRetain [1|0]<br>
+      As storing messages with the retain flag can take up considerable space
+      and it has no use in a FHEM only environment, it is by default disabled.
+      Set this attribute to 1 if you have external devices relying on this
+      feature.
+      </li>
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
     <li>SSL<br>
