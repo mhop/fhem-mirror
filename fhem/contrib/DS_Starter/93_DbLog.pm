@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-11-29 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-11-30 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -39,7 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.0.0"   => "29.11.2022 Test subprocess ",
+  "5.0.0"   => "30.11.2022 Test subprocess ",
   "4.13.3"  => "26.11.2022 revise commandref ",
   "4.13.2"  => "06.11.2022 Patch Delta calculation (delta-d,delta-h) https://forum.fhem.de/index.php/topic,129975.msg1242272.html#msg1242272 ",
   "4.13.1"  => "16.10.2022 edit commandref ",
@@ -378,12 +378,14 @@ sub DbLog_Define {
       Log3($name, 1, "DbLog $name - Error while reading $hash->{CONFIGURATION}: '$ret' ");
       return $ret;
   }
-
+    
   InternalTimer(gettimeofday()+2, "DbLog_setinternalcols", $hash, 0);                                         # set used COLUMNS
 
   readingsSingleUpdate ($hash, 'state', 'waiting for connection', 1);
-  _DbLog_ConnectPush   ($hash);
-  DbLog_execmemcache   ($hash);                                                                               # initial execution of DbLog_execmemcache
+  
+  DbLog_SBP_CheckAndInit ($hash);                                                                             # SubProcess starten
+  _DbLog_ConnectPush     ($hash);
+  DbLog_execmemcache     ($hash);                                                                             # initial execution of DbLog_execmemcache
 
 return;
 }
@@ -777,6 +779,7 @@ sub DbLog_Set {
     }
     elsif ($a[1] eq 'reopen') {
         return if(IsDisabled($name));
+        
         if ($dbh) {
             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
              if ($@) {
@@ -784,36 +787,45 @@ sub DbLog_Set {
              }
             $dbh->disconnect();
         }
+        
+        DbLog_SBP_CleanUp ($hash);                                              # SubProcess beenden
+        
         if (!$a[2]) {
-            Log3($name, 3, "DbLog $name: Reopen requested.");
+            Log3 ($name, 3, "DbLog $name: Reopen requested.");
             _DbLog_ConnectPush($hash);
+            
             if($hash->{HELPER}{REOPEN_RUNS}) {
                 delete $hash->{HELPER}{REOPEN_RUNS};
                 delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
                 RemoveInternalTimer($hash, "DbLog_reopen");
             }
+            
             DbLog_execmemcache($hash) if($async);
             $ret = "Reopen executed.";
         }
         else {
-            unless ($a[2] =~ /^[0-9]+$/) { return " The Value of $a[1]-time is not valid. Use only figures 0-9 !";}
-            # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
-            $hash->{HELPER}{REOPEN_RUNS} = $a[2];
+            unless ($a[2] =~ /^[0-9]+$/) { 
+                return " The Value of $a[1]-time is not valid. Use only figures 0-9 !";
+            }
+ 
+            $hash->{HELPER}{REOPEN_RUNS} = $a[2];                                            # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
 
-            # falls ein hängender Prozess vorhanden ist -> löschen
             BlockingKill($hash->{HELPER}{".RUNNING_PID"}) if($hash->{HELPER}{".RUNNING_PID"});
-            BlockingKill($hash->{HELPER}{REDUCELOG_PID}) if($hash->{HELPER}{REDUCELOG_PID});
-            BlockingKill($hash->{HELPER}{COUNT_PID}) if($hash->{HELPER}{COUNT_PID});
-            BlockingKill($hash->{HELPER}{DELDAYS_PID}) if($hash->{HELPER}{DELDAYS_PID});
+            BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
+            BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
+            BlockingKill($hash->{HELPER}{DELDAYS_PID})    if($hash->{HELPER}{DELDAYS_PID});
+            
             delete $hash->{HELPER}{".RUNNING_PID"};
             delete $hash->{HELPER}{COUNT_PID};
             delete $hash->{HELPER}{DELDAYS_PID};
             delete $hash->{HELPER}{REDUCELOG_PID};
 
             my $ts = (split(" ",FmtDateTime(gettimeofday()+$a[2])))[1];
-            Log3($name, 2, "DbLog $name: Connection closed until $ts ($a[2] seconds).");
+            Log3 ($name, 2, "DbLog $name - Connection closed until $ts ($a[2] seconds).");
+            
             readingsSingleUpdate($hash, "state", "closed until $ts ($a[2] seconds)", 1);
             InternalTimer(gettimeofday()+$a[2], "DbLog_reopen", $hash, 0);
+            
             $hash->{HELPER}{REOPEN_RUNS_UNTIL} = $ts;
         }
     }
@@ -2400,7 +2412,7 @@ return Encode::encode_utf8($error);
 }
 
 #################################################################
-# SubProcess - Hauptprozess gestartet durch DbLog_SBP_Init
+# SubProcess - Hauptprozess gestartet durch _DbLog_SBP_Init
 # liest Daten vom Parentprozess mit
 # $subprocess->readFromParent()
 #
@@ -3141,13 +3153,36 @@ return;
 }
 
 #####################################################
+#   Subprocess prüfen und ggf. neu starten
+#####################################################
+sub DbLog_SBP_CheckAndInit {          
+  my $hash = shift;
+  
+  if (!defined $hash->{SBP_PID}) {
+      _DbLog_SBP_Init ($hash);
+      return if(!defined $hash->{SBP_PID});
+  }
+  
+  my $pid = $hash->{SBP_PID};
+  
+  if (kill 0, $pid) {                                                     # SubProcess mit $pid lebt
+      $hash->{SBP_STATE} = 'running';
+  }
+  else {
+      $hash->{SBP_STATE} = "dead (".$hash->{SBP_PID}.")";
+      delete $hash->{SBP_PID};
+      _DbLog_SBP_Init ($hash);
+  }
+
+return;
+}
+
+#####################################################
 ##   Subprocess initialisieren
 #####################################################
-sub DbLog_SBP_Init {          
+sub _DbLog_SBP_Init {          
   my $hash = shift;
   my $name = $hash->{NAME};
-  
-  return if($hash->{SBP_PID});
 
   $hash->{".fhem"}{subprocess} = undef;
   
@@ -3166,13 +3201,14 @@ sub DbLog_SBP_Init {
   my $pid = $subprocess->run();
   
   if (!defined $pid) {
-      Log3 ($name, 1, "DbLog $name - Cannot create subprocess for asynchronous operation");
+      my $err = "DbLog $name - Cannot create subprocess for non-blocking operation";
+      Log3 ($name, 1, $err);
       DbLog_SBP_CleanUp     ($hash);
-      DbLog_setReadingstate ($hash, "Cannot create subprocess for asynchronous operation");
+      DbLog_setReadingstate ($hash, $err);
       return;
   }
   
-  Log3 ($name, 2, qq{DbLog $name - Subprocess "$pid" initialized ... ready for non-blocking operation});
+  Log3 ($name, 2, qq{DbLog $name - Subprocess >$pid< initialized ... ready for non-blocking operation});
 
   $hash->{".fhem"}{subprocess} = $subprocess;
   $hash->{FD}                  = fileno $subprocess->child();
@@ -3197,9 +3233,9 @@ sub DbLog_SBP_CleanUp {
   return if(!defined $subprocess);
   
   my $pid = $subprocess->pid();
-  return if(!$pid);
+  return if(!defined $pid);
   
-  Log3 ($name, 2, qq{DbLog $name - stopping Subprocess "$pid" ...});
+  Log3 ($name, 2, qq{DbLog $name - stopping Subprocess >$pid< ...});
   
   #$subprocess->terminate();
   #$subprocess->wait();
@@ -3207,9 +3243,9 @@ sub DbLog_SBP_CleanUp {
   kill 'SIGKILL', $pid;
   waitpid($pid, 0);
   
-  Log3 ($name, 2, qq{DbLog $name - Subprocess "$pid" stopped});
+  Log3 ($name, 2, qq{DbLog $name - Subprocess >$pid< stopped});
 
-  delete($selectlist{"$name.$pid"});
+  delete ($selectlist{"$name.$pid"});
   delete $hash->{FD};
   delete $hash->{SBP_PID};
 
@@ -3317,33 +3353,12 @@ sub DbLog_execmemcache {
       return;
   }
   
-  ## Subprocess initialisieren
+  ## Subprocess
   ###############################################
-  DbLog_SBP_Init ($hash);
-  
-  if ($hash->{SBP_PID}) {
-      my $pid     = $hash->{SBP_PID};
-      my $alive   = 0;
-      
-      if (kill 0, $pid) {
-          $alive = 1;
-          $hash->{SBP_STATE} = 'running';
-      }
-      else {
-          $hash->{SBP_STATE} = "dead (".$hash->{SBP_PID}.")";
-          delete $hash->{SBP_PID};
-      }
-      
-      if (!$alive) {
-          DbLog_SBP_Init ($hash);
-          return if (!$hash->{SBP_PID});
-      }
-  }
-  else {
-      return;
-  }
+  DbLog_SBP_CheckAndInit ($hash);
   
   my $subprocess = $hash->{".fhem"}{subprocess};
+  return if(!defined $subprocess);
   ################################################
 
   my $memcount = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
@@ -5166,8 +5181,8 @@ sub DbLog_checkModVer {
   my $src  = "http://fhem.de/fhemupdate/controls_fhem.txt";
 
   if($src !~ m,^(.*)/([^/]*)$,) {
-    Log3 $name, 1, "DbLog $name -> configCheck: Cannot parse $src, probably not a valid http control file";
-    return ("check of new DbLog version not possible, see logfile.");
+      Log3 ($name, 1, "DbLog $name -> configCheck: Cannot parse $src, probably not a valid http control file");
+      return ("check of new DbLog version not possible, see logfile.");
   }
 
   my $basePath     = $1;
@@ -5177,12 +5192,12 @@ sub DbLog_checkModVer {
   return ("check of new DbLog version not possible: $err") if($err);
 
   if(!$remCtrlFile) {
-      Log3 $name, 1, "DbLog $name -> configCheck: No valid remote control file";
+      Log3 ($name, 1, "DbLog $name -> configCheck: No valid remote control file");
       return ("check of new DbLog version not possible, see logfile.");
   }
 
   my @remList = split(/\R/, $remCtrlFile);
-  Log3 $name, 4, "DbLog $name -> configCheck: Got remote $ctrlFileName with ".int(@remList)." entries.";
+  Log3 ($name, 4, "DbLog $name -> configCheck: Got remote $ctrlFileName with ".int(@remList)." entries.");
 
   my $root = $attr{global}{modpath};
 
@@ -5190,10 +5205,10 @@ sub DbLog_checkModVer {
   if(open(FD, "$root/FHEM/$ctrlFileName")) {
       @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
       close(FD);
-      Log3 $name, 4, "DbLog $name -> configCheck: Got local $ctrlFileName with ".int(@locList)." entries.";
+      Log3 ($name, 4, "DbLog $name -> configCheck: Got local $ctrlFileName with ".int(@locList)." entries.");
   }
   else {
-      Log3 $name, 1, "DbLog $name -> configCheck: can't open $root/FHEM/$ctrlFileName: $!";
+      Log3 ($name, 1, "DbLog $name -> configCheck: can't open $root/FHEM/$ctrlFileName: $!");
       return ("check of new DbLog version not possible, see logfile.");
   }
 
@@ -5204,7 +5219,7 @@ sub DbLog_checkModVer {
       next if($l[0] ne "UPD" || $l[3] !~ /93_DbLog/);
       $lh{$l[3]}{TS} = $l[1];
       $lh{$l[3]}{LEN} = $l[2];
-      Log3 $name, 4, "DbLog $name -> configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN};
+      Log3 ($name, 4, "DbLog $name -> configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN});
   }
 
   my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
@@ -5216,13 +5231,13 @@ sub DbLog_checkModVer {
       my $fPath  = "$root/$fName";
       my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
       if(!$fileOk) {
-          Log3 $name, 4, "DbLog $name -> configCheck: New remote version of $fName found - creation time: ".$r[1]." - bytes: ".$r[2];
+          Log3 ($name, 4, "DbLog $name -> configCheck: New remote version of $fName found - creation time: ".$r[1]." - bytes: ".$r[2]);
           return ("",1,"A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)");
       }
       if(!$noSzCheck) {
           my $sz = -s $fPath;
-          if($fileOk && defined($sz) && $sz ne $r[2]) {
-              Log3 $name, 4, "DbLog $name -> configCheck: remote version of $fName (creation time: $r[1], bytes: $r[2]) differs from local one (bytes: $sz)";
+          if ($fileOk && defined($sz) && $sz ne $r[2]) {
+              Log3 ($name, 4, "DbLog $name -> configCheck: remote version of $fName (creation time: $r[1], bytes: $r[2]) differs from local one (bytes: $sz)");
               return ("",1,"Your local DbLog module is modified.");
           }
       }
@@ -6651,7 +6666,7 @@ return;
 sub DbLog_reopen {
   my $hash  = shift;
   my $name  = $hash->{NAME};
-  my $async = AttrVal($name, "asyncMode", undef);
+  my $async = AttrVal($name, 'asyncMode', 0);
 
   RemoveInternalTimer($hash, "DbLog_reopen");
 
@@ -6659,13 +6674,15 @@ sub DbLog_reopen {
       my $delay = delete $hash->{HELPER}{REOPEN_RUNS};                           # Statusbit "Kein Schreiben in DB erlauben" löschen
       delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
       
-      Log3 ($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
+      if($delay) {
+          Log3 ($name, 2, "DbLog $name - Database connection reopened (it was $delay seconds closed).");
+      }
 
-      DbLog_setReadingstate ($hash, "reopened");
+      DbLog_setReadingstate ($hash, 'reopened');
       DbLog_execmemcache    ($hash) if($async);
   }
   else {
-      InternalTimer(gettimeofday()+30, "DbLog_reopen", $hash, 0);
+      InternalTimer(gettimeofday()+30, 'DbLog_reopen', $hash, 0);
   }
 
 return;
