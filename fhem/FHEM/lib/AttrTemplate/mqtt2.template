@@ -223,9 +223,9 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_dimmer
-setreading DEVICE attrTemplateVersion 20220909
+setreading DEVICE attrTemplateVersion 20221201
 
 # A dimmable color light connected via zigbee2mqtt
 name:zigbee2mqtt_light_cct
@@ -246,9 +246,9 @@ attr DEVICE setList \
   ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
   ct_startup:coolest,cool,neutral,warmest,previous $\DEVICETOPIC/set {"color_temp_startup":"$EVTPART1"}
 attr DEVICE jsonMap color_temp:ct color_temp_startup:ct_startup
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_cct
-setreading DEVICE attrTemplateVersion 20221002
+setreading DEVICE attrTemplateVersion 20221201
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgb_hex
@@ -269,9 +269,9 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgb_hex
-setreading DEVICE attrTemplateVersion 20220909
+setreading DEVICE attrTemplateVersion 20221201
 
 name:zigbee2mqtt_light_rgb_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
@@ -290,9 +290,9 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgb_rgb
-setreading DEVICE attrTemplateVersion 20220909
+setreading DEVICE attrTemplateVersion 20221201
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbw_hex
@@ -317,9 +317,9 @@ attr DEVICE setList \
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 attr DEVICE jsonMap color_temp:ct
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbw_hex
-setreading DEVICE attrTemplateVersion 20220913
+setreading DEVICE attrTemplateVersion 20221201
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbw_rgb
@@ -340,9 +340,9 @@ attr DEVICE setList \
   white:noArg $\DEVICETOPIC/set {"color_temp": 154 , "color_temp": 500}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbw_rgb
-setreading DEVICE attrTemplateVersion 20220909
+setreading DEVICE attrTemplateVersion 20221201
 
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
 name:zigbee2mqtt_light_rgbcct_hex
@@ -363,10 +363,10 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   ct:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"color_temp":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE jsonMap color_temp:ct
 attr DEVICE model zigbee2mqtt_light_rgbcct_hex
-setreading DEVICE attrTemplateVersion 20220913
+setreading DEVICE attrTemplateVersion 20221201
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbcct_rgb
@@ -397,9 +397,9 @@ attr DEVICE setList \
   rgb:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 attr DEVICE userReadings rgb:color_y.* {Color::xyY2hex(ReadingsVal($name,'color_x',0),ReadingsVal($name,'color_y',0),ReadingsVal($name,'brightness',254))}
 attr DEVICE comment The specified ct and brightness values in on and warm etc. commands ​​can be adjusted at any time via the setList attribute
-set DEVICE attrTemplate speechcontrol_type_light_255
+set DEVICE attrTemplate speechcontrol_type_light_254
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
-setreading DEVICE attrTemplateVersion 20221116
+setreading DEVICE attrTemplateVersion 20221201
 
 # zigbee2mqtt 2 channel dimmer device
 name:zigbee2mqtt_2channel_dimmer_split
@@ -430,9 +430,9 @@ attr DEVICE_CH2 setList \
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith|IODev).*
 attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0 brightness_l1:0 brightness_l2:brightness
-set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_light_255
+set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_light_254
 attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_dimmer_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20220913
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20221201
 
 # zigbee2mqtt air purifier
 name:zigbee2mqtt_air_purifier
