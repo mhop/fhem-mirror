@@ -53,7 +53,7 @@ desc:template to set speech speechcontrol attributes for genericDeviceType light
 par:NOTDELAYED;Set this to 0 to not apply naming template on first round;{ 1 } 
 option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0];return 0}
 attr DEVICE genericDeviceType light
-attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39371,delay=true
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39370078740157425,delay=true
 option:{my @devices=devspec2array('TYPE=(siri|alexa|gassistant|RHASSPY)');return 1 if $devices[0] && NOTDELAYED;return 0}
 set DEVICE attrTemplate speechcontrol_general_naming_master_template
 
