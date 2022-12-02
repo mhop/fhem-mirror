@@ -278,17 +278,17 @@ sub km200_Define($$) {
 	####END####### Writing values to global hash ################################################################END#####
 
 	###START###### For Debugging purpose only ##################################################################START####  
-	Log3 $name, 4, $name. " : km200 - Define H                                   : " .$hash;
-	Log3 $name, 4, $name. " : km200 - Define D                                   : " .$def;
-	Log3 $name, 4, $name. " : km200 - Define A                                   : " .@a;
-	Log3 $name, 4, $name. " : km200 - Define Name                                : " .$name;
-	Log3 $name, 4, $name. " : km200 - Define Adr                                 : " .$url;
+	Log3 $name, 4, $name. " : km200 - Define D                                   : " . $def;
+	Log3 $name, 4, $name. " : km200 - Define A                                   : " . @a;
+	Log3 $name, 4, $name. " : km200 - Define Name                                : " . $name;
+	Log3 $name, 4, $name. " : km200 - Define Adr                                 : " . $url;
+	Log3 $name, 4, $name. " : km200 - Define H                                   : " . Dumper($hash);
 	####END####### For Debugging purpose only ###################################################################END#####
 
 	### Proceed with km200 Initialization as soon fhem is initialized
 	# https://forum.fhem.de/index.php/topic,130351.msg1246281.html#msg1246281
 	# Die InternalTimer Eintraege werden erst abgearbeitet, wenn $init_done = 1 ist.
-	InternalTimer(0, \&km200_FirstInit, $hash );
+	InternalTimer(15, \&km200_FirstInit, $hash );
 
 	return 
 }
@@ -297,7 +297,8 @@ sub km200_Define($$) {
 ###START###### Initialize km200 after fhem Initialization is done #############################################START####
 sub km200_FirstInit($) {
 	my $hash = @_;
-	my $name = $hash->{NAME};
+	my $name = "73_km200";
+	Log3 $name, 4, $name. " : km200_FirstInit -  hash                                  : " . Dumper($hash);
 
 	###START###### Reset fullResponse error message ############################################################START####
 	readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
@@ -314,22 +315,22 @@ sub km200_FirstInit($) {
 
 		## Communication with Gateway WRONG !! ##
 		$hash->{STATE}="Error - No Communication";
-		return ($name .": km200 - ERROR - The communication between fhem and the Buderus KM200 failed! \n". 
+		return ($name .": km200_FirstInit - ERROR - The communication between fhem and the Buderus KM200 failed! \n". 
 		               "                  Please check physical connection, IP-address and passwords! \n");
 	} 
 	## Communication OK but service not available ##
 	elsif ($Km200Info eq "SERVICE NOT AVAILABLE") {
-		Log3 $name, 4, $name. " : km200 -  /gateway/DateTime                     : NOT AVAILABLE";
+		Log3 $name, 4, $name. " : km200_FirstInit -  /gateway/DateTime                     : NOT AVAILABLE";
 	} 
 	## Communication OK and service is available ##
 	else {
-		Log3 $name, 4, $name. " : km200 - /gateway/DateTime                      : AVAILABLE";				
+		Log3 $name, 4, $name. " : km200_FirstInit - /gateway/DateTime                      : AVAILABLE";				
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
 
 	###START###### Initiate the timer for first time polling of  values from KM200 but wait 10s ###############START####
 	InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 1);
-	Log3 $name, 4, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
+	Log3 $name, 4, $name. " : km200_FirstInit - Internal timer for Initialisation of services started for the first time.";
 	####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
 	
 	return undef;
@@ -2579,8 +2580,8 @@ sub km200_GetDynService($) {
 			### Jump to next value
 			++$ServiceCounterDyn;
 			$hash->{temp}{ServiceCounterDyn} = $ServiceCounterDyn;
-			km200_GetDynService($hash);
-#			$init_done ? km200_GetDynService($hash) : InternalTimer(gettimeofday()+30, \&km200_GetDynService, $hash, 1);
+			InternalTimer(gettimeofday()+0, \&km200_GetDynService, $hash, 1);
+#			km200_GetDynService($hash);
 		}
 		else {
 			### Log entries for debugging purposes
