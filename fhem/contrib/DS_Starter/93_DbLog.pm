@@ -408,6 +408,8 @@ sub _DbLog_initOnStart {
   
   my $name = $hash->{NAME};
   
+  DbLog_SBP_CheckAndInit ($hash);
+  
   my $rst = DbLog_SBP_sendConnectionData ($hash);                       # Verbindungsdaten an SubProzess senden
   if (!$rst) {
       Log3 ($name, 3, "DbLog $name - DB connection parameters are initialized in the SubProcess");
@@ -543,9 +545,14 @@ sub DbLog_Attr {
       }
   }
 
-  if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {
-      InternalTimer(gettimeofday()+1.0, "DbLog_attrForSQLite", $hash, 0);
-      InternalTimer(gettimeofday()+1.5, "DbLog_attrForSQLite", $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
+  if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {      
+      if ($init_done == 1) {
+          InternalTimer(gettimeofday()+1.0, "DbLog_attrForSQLite", $hash, 0);
+          InternalTimer(gettimeofday()+1.5, "DbLog_attrForSQLite", $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
+              
+          
+          DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
+      }
   }
 
   if($aName eq "colEvent" || $aName eq "colReading" || $aName eq "colValue") {
@@ -574,7 +581,11 @@ sub DbLog_Attr {
   if($aName eq "commitMode") {
       if ($dbh) {
           $dbh->disconnect();
-        }
+      }
+      
+      if ($init_done == 1) {       
+          DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
+      }
   }
 
   if($aName eq "showproctime") {
@@ -615,8 +626,7 @@ sub DbLog_Attr {
       DbLog_setReadingstate ($hash, $val);
 
       if ($do == 0) {
-          InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0) if($async);
-          InternalTimer(gettimeofday()+2, "_DbLog_ConnectPush", $hash, 0) if(!$async);
+          InternalTimer(gettimeofday()+2, "_DbLog_initOnStart", $hash, 0);
       }
   }
 
@@ -634,6 +644,10 @@ sub DbLog_Attr {
       else {
           $hash->{HELPER}{TH} = 'history';
           $hash->{HELPER}{TC} = 'current';
+      }
+      
+      if ($init_done == 1) {       
+          DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
       }
   }
 
@@ -2561,7 +2575,7 @@ sub DbLog_SBP_onRun {
                   delete $store->{dbparams};
               }
 
-              my $msg0 = $dbdelpars ? ' and stored DB params were deleted' : '';
+              my $msg0 = $dbdelpars ? ' and stored DB params in SubProcess were deleted' : '';
               my $msg1 = 'database disconnected by request'.$msg0;
 
               Log3 ($name, 3, "DbLog $name - INFO: $msg1");
@@ -3750,8 +3764,8 @@ sub DbLog_SBP_Read {
           readingsEndUpdate   ($hash, 1);
       }
 
-      my $state = $error            ? $error     :
-                  IsDisabled($name) ? 'disabled' :
+      my $state = IsDisabled($name) ? 'disabled' :
+                  $error            ? $error     :
                   'connected';
 
       DbLog_setReadingstate ($hash, $state);
@@ -8091,10 +8105,18 @@ return;
 
     <li><b>set &lt;name&gt; rereadcfg </b> <br><br>
     <ul>
-      Perform a database disconnect and immediate reconnect to clear cache and flush journal file.<br/>
-      Probably same behavior als reopen, but rereadcfg will read the configuration data before reconnect.
-    </li>
+      The configuration file is read in again. <br>
+      After reading, an existing database connection is terminated and re-established with the configured connection data.
     </ul>
+    </li>
+    <br>
+    
+    <li><b>set &lt;name&gt; stopSubProcess </b> <br><br>
+    <ul>
+      A running SubProcess is terminated. <br>
+      As soon as a new subprocess is required by a Log operation, an automatic reinitialization of a process takes place.
+    </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; userCommand &lt;validSqlStatement&gt; </b> <br><br>
@@ -9607,7 +9629,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>set &lt;name&gt; reopen [n] </b> <br><br>
       <ul>
       Schließt die Datenbank und öffnet sie danach sofort wieder wenn keine Zeit [n] in Sekunden angegeben wurde.
-      Dabei wird die Journaldatei geleert und neu angelegt.<br/>
+      Dabei wird die Journaldatei geleert und neu angelegt. <br>
       Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme. <br>
       Wurde eine optionale Verzögerungszeit [n] in Sekunden angegeben, wird die Verbindung zur Datenbank geschlossen und erst
       nach Ablauf von [n] Sekunden wieder neu verbunden.
@@ -9618,11 +9640,21 @@ attr SMA_Energymeter DbLogValueFn
     <br>
 
     <li><b>set &lt;name&gt; rereadcfg </b> <br><br>
-      <ul>Schließt die Datenbank und öffnet sie danach sofort wieder. Dabei wird die Journaldatei geleert und neu angelegt.<br/>
-      Verbessert den Datendurchsatz und vermeidet Speicherplatzprobleme.<br/>
-      Zwischen dem Schließen der Verbindung und dem Neuverbinden werden die Konfigurationsdaten neu gelesen
-    </li>
+    <ul>
+      Die Konfigurationsdatei wird neu eingelesen. <br>
+      Nach dem Einlesen wird eine bestehende Datenbankverbindung beendet und mit den konfigurierten Verbindungsdaten
+      neu aufgebaut.
     </ul>
+    </li>
+    <br>
+    
+    <li><b>set &lt;name&gt; stopSubProcess </b> <br><br>
+    <ul>
+      Ein laufender SubProzess wird beendet. <br>
+      Sobald durch eine Log-Operation ein neuer SubProzess benötigt wird, erfolgt eine automatische Neuinitialisierung
+      eines Prozesses.
+    </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; userCommand &lt;validSqlStatement&gt; </b> <br><br>
