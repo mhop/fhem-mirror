@@ -10,6 +10,7 @@
 #    1.01.01      first released version
 #    1.01.02      bugfix for single-digit NextTimer 
 #    1.01.03      corrections for german Umlaute
+#    1.01.04      fix statusCheckIntervall
 #
 ########################################################################################
 #
@@ -41,7 +42,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.03";
+my $version = "1.01.04";
 
 my %SVDRP_gets = (
   #
@@ -141,6 +142,7 @@ sub SVDRP_Define {
   
   # clean up
   RemoveInternalTimer($hash, "SVDRP_checkConnection");
+  main::Log3 $name, 5,"[$name]: Define: status timer removed";
   DevIo_CloseDev($hash);
 
   # force immediate reconnect
@@ -152,8 +154,10 @@ sub SVDRP_Define {
 }
 
 sub SVDRP_Undef {
-  my ($hash, $arg) = @_; 
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME}; 
   RemoveInternalTimer($hash);
+  main::Log3 $name, 5,"[$name]: Undef: status timer removed";
   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
   DevIo_CloseDev($hash);
   return ;
@@ -163,6 +167,7 @@ sub SVDRP_Shutdown {
   my ($hash) = @_;
   my $name = $hash->{NAME}; 
   RemoveInternalTimer($hash);
+  main::Log3 $name, 5,"[$name]: Shutdown: status timer removed";
   DevIo_CloseDev($hash);
   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
   delete $hash->{helper}{nextConnectionCheck} if ( defined( $hash->{helper}{nextConnectionCheck} ) );
@@ -255,10 +260,12 @@ sub SVDRP_Attr {
       } 
       elsif ($attr_value eq "off"){
         RemoveInternalTimer($hash, "SVDRP_checkConnection");
+        main::Log3 $name, 5,"[$name]: Attr: status timer removed";
         $hash->{helper}{nextConnectionCheck} = "off";
       }
       else{
         RemoveInternalTimer($hash, "SVDRP_checkConnection");
+        main::Log3 $name, 5,"[$name]: Attr: status timer removed";
         $checkInterval = $attr_value;
         $next = gettimeofday() + $checkInterval;
         $hash->{helper}{nextConnectionCheck} = $next;
@@ -274,10 +281,12 @@ sub SVDRP_Attr {
       } 
       elsif ($attr_value eq "off"){
         RemoveInternalTimer($hash, "SVDRP_checkStatus");
+        main::Log3 $name, 5,"[$name]: Attr: status timer removed";
         $hash->{helper}{nextStatusCheck} = "off";
       }
       else{
         RemoveInternalTimer($hash, "SVDRP_checkStatus");
+        main::Log3 $name, 5,"[$name]: Attr: status timer removed";
         $checkInterval = $attr_value;
         $next = gettimeofday() + $checkInterval;
         $hash->{helper}{nextStatusCheck} = $next;
@@ -297,6 +306,7 @@ sub SVDRP_Attr {
     }
     elsif($attr_name eq "connectionCheck") {
       RemoveInternalTimer($hash, "SVDRP_checkConnection");
+      main::Log3 $name, 5,"[$name]: Attr: status timer removed";
       delete $hash->{helper}{nextConnectionCheck} if (defined($hash->{helper}{nextConnectionCheck}));
       # next 4 lines to set default value 600, timer running ech 600s
       #my $next = gettimeofday() + "600";
@@ -306,6 +316,7 @@ sub SVDRP_Attr {
     }
     elsif($attr_name eq "statusCheckInterval") {
       RemoveInternalTimer($hash, "SVDRP_checkStatus");
+      main::Log3 $name, 5,"[$name]: Attr: status timer removed";
       delete $hash->{helper}{nextStatusCheck} if (defined($hash->{helper}{nextStatusCheck}));
       # next 4 lines to set default value 600, timer running ech 600s
       #my $next = gettimeofday() + "600";
@@ -343,7 +354,8 @@ sub SVDRP_cleanUp {
   my $name = $hash->{NAME};
   main::Log3 $name, 5, "[$name]: cleanup: sending quit, close DevIo";
   DevIo_SimpleWrite($hash, "quit\r\n", "2");    
-  RemoveInternalTimer($hash);
+  #RemoveInternalTimer($hash);
+  #main::Log3 $name, 5,"[$name]: cleanUp: status timer removed";
   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
   delete $hash->{helper}{RUNNING_PID} if ( defined( $hash->{helper}{RUNNING_PID} ) );
   # give VDR 1 s to react before we close connection
@@ -370,12 +382,14 @@ sub SVDRP_Init($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
   main::Log3 $name, 5,"[$name]: Init: DevIo initializing";
+  #SVDRP_checkStatus($hash);
   # my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
   # #set checkInterval to 60 just for first check;
   # if ($checkInterval eq "off"){$checkInterval = 60;}
     
-  RemoveInternalTimer($hash, "SVDRP_checkConnection");
-    
+  #RemoveInternalTimer($hash, "SVDRP_checkConnection");
+  #main::Log3 $name, 5,"[$name]: Init: status timer removed";  
+  
   # my $next = gettimeofday() + $checkInterval;
   # InternalTimer($next , "SVDRP_checkConnection", $hash);
   # #SVDRP_singleWrite("VDRcontrol|STAT|disk");  
@@ -396,37 +410,48 @@ sub SVDRP_Callback($){
     my $name = $hash->{NAME};
 
     if ($error){
-      main::Log3 $name, 3, "[$name] DevIo callback error: $error";
+      main::Log3 $name, 3, "[$name]: Callback: DevIo callback error: $error";
+      SVDRP_closeDev($hash);
+      my $offlineMsg = AttrVal( $name, "statusOfflineMsg", "offline" );
+      my $rv = readingsSingleUpdate($hash, "globalError", $offlineMsg, 1);
+      main::Log3 $name, 5,"[$name]: Callback: [$name] DevIo callback: globalError set to $offlineMsg";
+
     }
     else{
-      main::Log3 $name, 3, "[$name] DevIo callback with no error";
+      main::Log3 $name, 3, "[$name]: Callback: DevIo callback with no error";
     }
     
-    #my $status = $hash->{STATE};
-    my $status = DevIo_getState($hash);
-    my $offlineMsg = AttrVal( $name, "statusOfflineMsg", "offline" );
-    if ($status eq "disconnected"){
-      # remove timers and pending setValue calls if device is disconnected
-      main::Log3 $name, 3, "[$name] DevIo callback error: STATE is $status";
-      my $rv = readingsSingleUpdate($hash, "globalError", $offlineMsg, 1);
-      RemoveInternalTimer($hash);
-      delete $hash->{helper}{nextConnectionCheck}
-      if ( defined( $hash->{helper}{nextConnectionCheck} ) );
-      delete $hash->{helper}{nextStatusCheck}
-      if ( defined( $hash->{helper}{nextStatusCheck} ) );
-      BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
+    # check for disconnected - not required, since we need to close connection after each request
+    # otherwise, no other svdr client can connect!
+    # #my $status = $hash->{STATE};
+    # #my $status = DevIo_getState($hash);
+    # my $status = ReadingsVal($name, "state", "disconnected");
+    # my $offlineMsg = AttrVal( $name, "statusOfflineMsg", "offline" );
+    # if ($status eq "disconnected"){
+    #   # remove timers and pending setValue calls if device is disconnected
+    #   main::Log3 $name, 3, "[$name]: Callback: DevIo callback error: STATE is $status";
+    #   my $rv = readingsSingleUpdate($hash, "globalError", $offlineMsg, 1);
+    #   RemoveInternalTimer($hash);
+    #   main::Log3 $name, 5,"[$name]: Callback: status timer removed";
+    #   delete $hash->{helper}{nextConnectionCheck}
+    #     if ( defined( $hash->{helper}{nextConnectionCheck} ) );
+    #   delete $hash->{helper}{nextStatusCheck}
+    #     if ( defined( $hash->{helper}{nextStatusCheck} ) );
+    #   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
 
-      # check if we should update statusCheck
-      my $checkInterval = AttrVal( $name, "statusCheckInterval", "off" );
-      my $checkcmd = AttrVal( $name, "statusCheckCmd", "DiskStatus" );
-      #my $offlineMsg = AttrVal( $name, "statusOfflineMsg", "offline" );
+    #   # check if we should update statusCheck
+    #   my $checkInterval = AttrVal( $name, "statusCheckInterval", "off" );
+    #   my $checkcmd = AttrVal( $name, "statusCheckCmd", "DiskStatus" );
+    #   #my $offlineMsg = AttrVal( $name, "statusOfflineMsg", "offline" );
   
-      if ($checkInterval ne "off"){
-        my $rv = readingsSingleUpdate($hash, $checkcmd, $offlineMsg, 1);
-        main::Log3 $name, 5,"[$name]: [$name] DevIo callback: $checkcmd set to $offlineMsg";
-        return ;
-      }      
-    }    
+    #   if ($checkInterval ne "off"){
+    #     my $rv = readingsSingleUpdate($hash, $checkcmd, $offlineMsg, 1);
+    #     main::Log3 $name, 5,"[$name]: Callback: [$name] DevIo callback: $checkcmd set to $offlineMsg";
+    #     #SVDRP_checkStatus($hash);
+    #     main::Log3 $name, 5,"[$name]: Callback: offline, but status timer set";
+    #     return ;
+    #   }      
+    # }    
     return undef; 
 }
 
@@ -437,7 +462,7 @@ sub SVDRP_Read($){
   
   # read the available data
   my $data = DevIo_SimpleRead($hash);
-  Log3 $name, 5, "[$name] Read function called";
+  Log3 $name, 5, "[$name]: Read: function called";
   # stop processing if no data is available (device disconnected)
   return if(!defined($data)); # connection lost
   
@@ -449,8 +474,8 @@ sub SVDRP_Read($){
   # concat received data to $buffer
   my $result = $data;
   $buffer .= $result;
-  Log3 $name, 5, "[$name] Read: received: $result";
-  Log3 $name, 5, "[$name] Read: buffer contains: $buffer";
+  Log3 $name, 5, "[$name]: Read: received: $result";
+  Log3 $name, 5, "[$name]: Read: buffer contains: $buffer";
 
   # as long as the buffer contains newlines (complete datagramm)
   my $msg = "none";
@@ -897,7 +922,7 @@ sub SVDRP_checkConnection ($) {
   my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash, "SVDRP_checkConnection");
-
+  main::Log3 $name, 5,"[$name]: checkConnection: status timer removed";
   my $checkInterval = AttrVal( $name, "connectionCheck", "off" );
   
   if ($checkInterval eq "off"){
@@ -940,7 +965,7 @@ sub SVDRP_checkConnection ($) {
     main::Log3 $name, 3, "[$name]: DevIo_Open has FD and NEXT_OPEN, try to reconnect periodically";
   }
   elsif ($hash->{FD} && !$hash->{NEXT_OPEN}){
-    # device is connectd, or seems to be (since broken connection is not detected by DevIo!)
+    # device is connected, or seems to be (since broken connection is not detected by DevIo!)
     # normal state when device is on and reachable
     # or when it was on, turned off, but DevIo did not recognize (TCP timeout not reached)
     # internal timer makes sense to check, if device is really reachable
@@ -956,8 +981,12 @@ sub SVDRP_checkStatus ($){
   my $name = $hash->{NAME};
   
   my $checkInterval = AttrVal( $name, "statusCheckInterval", "off" );
-  my $checkcmd = AttrVal( $name, "statusCheckCmd", "PWR" );
+  my $checkcmd = AttrVal( $name, "statusCheckCmd", "DiskStatus" );
   my $next;
+
+  # add LF for better overview
+  main::Log3 $name, 5, "\n";
+  main::Log3 $name, 5,"[$name]: checkStatus: called with $checkcmd with interval $checkInterval";
   
   if ($checkInterval eq "off"){
     RemoveInternalTimer($hash, "SVDRP_checkStatus");
