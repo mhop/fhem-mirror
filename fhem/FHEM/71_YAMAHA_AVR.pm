@@ -33,18 +33,25 @@ use warnings;
 use Time::HiRes qw(gettimeofday sleep);
 use Encode qw(decode encode);
 use HttpUtils;
+ 
+sub YAMAHA_AVR_Get($@);
+sub YAMAHA_AVR_Define($$);
+sub YAMAHA_AVR_GetStatus($;$);
+sub YAMAHA_AVR_Attr(@);
+sub YAMAHA_AVR_ResetTimer($;$);
+sub YAMAHA_AVR_Undefine($$);
 
 ###################################
 sub
-YAMAHA_AVR_Initialize
+YAMAHA_AVR_Initialize($)
 {
-    my $hash = shift;
+    my ($hash) = @_;
 
-    $hash->{GetFn}     = \&YAMAHA_AVR_Get;
-    $hash->{SetFn}     = \&YAMAHA_AVR_Set;
-    $hash->{DefFn}     = \&YAMAHA_AVR_Define;
-    $hash->{AttrFn}    = \&YAMAHA_AVR_Attr;
-    $hash->{UndefFn}   = \&YAMAHA_AVR_Undefine;
+    $hash->{GetFn}     = "YAMAHA_AVR_Get";
+    $hash->{SetFn}     = "YAMAHA_AVR_Set";
+    $hash->{DefFn}     = "YAMAHA_AVR_Define";
+    $hash->{AttrFn}    = "YAMAHA_AVR_Attr";
+    $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
     $hash->{AttrList}  = "do_not_notify:0,1 ".
                          "disable:0,1 ".
@@ -61,52 +68,50 @@ YAMAHA_AVR_Initialize
                                "volume-smooth-change" => "volumeSmoothChange",
                                "volume-smooth-steps" => "volumeSmoothSteps"
                              };                     
-    return;
 }
 
 #############################
 sub
-YAMAHA_AVR_Define
+YAMAHA_AVR_Define($$)
 {
-    my $hash = shift // return;
-    my $def  = shift // return;
-    my @arr  = split m{\s+}xms, $def;
-    my $name = shift @arr;
- 
-    if(@arr < 2)
+    my ($hash, $def) = @_;
+    my @a = split("[ \t][ \t]*", $def);
+    my $name = $hash->{NAME};
+    
+    if(!@a >= 4)
     {
-        my $msg = 'wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<ON-statusinterval>] [<OFF-statusinterval>] ';
-        Log3($name, 2, $msg);
+        my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<ON-statusinterval>] [<OFF-statusinterval>] ";
+        Log3 $name, 2, $msg;
         return $msg;
     }
 
-    my $address = $arr[1];
+    my $address = $a[2];
   
     $hash->{helper}{ADDRESS} = $address;
 
     # if a zone was given, use it, otherwise use the mainzone
-    if(defined($arr[2]))
+    if(defined($a[3]))
     {
-        $hash->{helper}{SELECTED_ZONE} = $arr[2];
+        $hash->{helper}{SELECTED_ZONE} = $a[3];
     }
     else
     {
-        $hash->{helper}{SELECTED_ZONE} = 'mainzone';
+        $hash->{helper}{SELECTED_ZONE} = "mainzone";
     }
     
     # if an update interval was given which is greater than zero, use it.
-    if ( defined $arr[3] && $arr[3] > 0 )
+    if(defined($a[4]) and $a[4] > 0)
     {
-        $hash->{helper}{OFF_INTERVAL} = $arr[3];
+        $hash->{helper}{OFF_INTERVAL} = $a[4];
     }
     else
     {
         $hash->{helper}{OFF_INTERVAL} = 30;
     }
       
-    if ( defined $arr[4] && $arr[4] > 0 )
+    if(defined($a[5]) and $a[5] > 0)
     {
-        $hash->{helper}{ON_INTERVAL} = $arr[4];
+        $hash->{helper}{ON_INTERVAL} = $a[5];
     }
     else
     {
@@ -114,12 +119,12 @@ YAMAHA_AVR_Define
     }
     
     $hash->{helper}{CMD_QUEUE} = [];
-    delete $hash->{helper}{".HTTP_CONNECTION"} if exists $hash->{helper}{".HTTP_CONNECTION"};
+    delete($hash->{helper}{".HTTP_CONNECTION"}) if(exists($hash->{helper}{".HTTP_CONNECTION"}));
     
     # In case of a redefine, check the zone parameter if the specified zone exist, otherwise use the main zone
-    if ( defined $hash->{helper}{ZONES} && length $hash->{helper}{ZONES} > 0 )
+    if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
     {
-        if ( defined YAMAHA_AVR_getParamName($hash, lc $hash->{helper}{SELECTED_ZONE}, $hash->{helper}{ZONES}) )
+        if(defined(YAMAHA_AVR_getParamName($hash, lc $hash->{helper}{SELECTED_ZONE}, $hash->{helper}{ZONES})))
         {
             $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE}; 
         }
@@ -140,60 +145,59 @@ YAMAHA_AVR_Define
     # start the status update timer
     YAMAHA_AVR_ResetTimer($hash,1);
   
-    return;
+    return undef;
 }
 
 ###################################
 sub
-YAMAHA_AVR_GetStatus #($;$)
+YAMAHA_AVR_GetStatus($;$)
 {
-    my $hash  = shift // return;
-    my $local = shift // 0;
+    my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
    
-    #$local = 0 unless(defined($local));
+    $local = 0 unless(defined($local));
 
-    return '' if !defined $hash->{helper}{ADDRESS} || !defined $hash->{helper}{OFF_INTERVAL} || !defined $hash->{helper}{ON_INTERVAL};
+    return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{OFF_INTERVAL}) or !defined($hash->{helper}{ON_INTERVAL}));
 
     my $device = $hash->{helper}{ADDRESS};
 
     # get the model informations and available zones if no informations are available
-    if ( !defined $hash->{ACTIVE_ZONE} || !defined $hash->{helper}{ZONES} || !defined$hash->{MODEL} || !defined $hash->{FIRMWARE} )
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
         YAMAHA_AVR_getModel($hash);
     }
 
     # get all available inputs and scenes if nothing is available
-    if( !defined($hash->{helper}{INPUTS}) || length $hash->{helper}{INPUTS} == 0 )
+    if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0))
     {
         YAMAHA_AVR_getInputs($hash);
     }
     
     my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
-    if ( !defined $zone )
+    if(not defined($zone))
     {
-        YAMAHA_AVR_ResetTimer($hash) if $local != 1;
-        return 'No Zone available';
+        YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
+        return "No Zone available";
     }
     
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
 
-    if ( $hash->{ACTIVE_ZONE} eq 'mainzone' && ( !exists $hash->{helper}{SUPPORT_PARTY_MODE} || $hash->{helper}{SUPPORT_PARTY_MODE} ) )
+    if($hash->{ACTIVE_ZONE} eq "mainzone" and (!exists($hash->{helper}{SUPPORT_PARTY_MODE}) or $hash->{helper}{SUPPORT_PARTY_MODE}))
     {
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Party_Mode><Mode>GetParam</Mode></Party_Mode></System></YAMAHA_AV>", "statusRequest", "partyModeStatus", {options => {can_fail => 1}});
     }
-    elsif ( $hash->{ACTIVE_ZONE} ne 'mainzone' && ( !exists $hash->{helper}{SUPPORT_PARTY_MODE} || $hash->{helper}{SUPPORT_PARTY_MODE} ) )
+    elsif($hash->{ACTIVE_ZONE} ne "mainzone" and (!exists($hash->{helper}{SUPPORT_PARTY_MODE}) or $hash->{helper}{SUPPORT_PARTY_MODE}))
     {
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Party_Mode><Target_Zone>GetParam</Target_Zone></Party_Mode></System></YAMAHA_AV>", "statusRequest", "partyModeZones", {options => {can_fail => 1}});
     }
-
-    if ( $hash->{ACTIVE_ZONE} eq 'mainzone' && ( !exists $hash->{helper}{SUPPORT_SURROUND_DECODER} || $hash->{helper}{SUPPORT_SURROUND_DECODER} ) )
+    
+    if($hash->{ACTIVE_ZONE} eq "mainzone" and (!exists($hash->{helper}{SUPPORT_SURROUND_DECODER}) or $hash->{helper}{SUPPORT_SURROUND_DECODER}))
     {
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Surround><Sound_Program_Param><SUR_DECODE>GetParam</SUR_DECODE></Sound_Program_Param></Surround></$zone></YAMAHA_AV>", "statusRequest", "surroundDecoder", {options => {can_fail => 1}});
     }
-
+   
     if($hash->{ACTIVE_ZONE} eq "mainzone" and (!exists($hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS}) or $hash->{helper}{SUPPORT_DISPLAY_BRIGHTNESS}))
     {
         if(YAMAHA_AVR_isModel_DSP($hash))
@@ -205,7 +209,7 @@ YAMAHA_AVR_GetStatus #($;$)
             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Display><FL>GetParam</FL></Display></Misc></System></YAMAHA_AV>", "statusRequest", "displayBrightness", {options => {can_fail => 1}});
         }
     }
-
+    
     if(!exists($hash->{helper}{SUPPORT_TONE_STATUS}) or (exists($hash->{helper}{SUPPORT_TONE_STATUS}) and exists($hash->{MODEL}) and $hash->{helper}{SUPPORT_TONE_STATUS}))
     {   
         if(YAMAHA_AVR_isModel_DSP($hash))
@@ -250,24 +254,26 @@ YAMAHA_AVR_GetStatus #($;$)
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
     
-    return;
+    return undef;
 }
 
 ###################################
 sub
-YAMAHA_AVR_Get #($@)
+YAMAHA_AVR_Get($@)
 {
-    my ($hash, @arr) = @_;
-
-    return 'argument is missing' if @arr != 2;
+    my ($hash, @a) = @_;
+    my $what;
+    my $return;
     
-    my $what = $arr[1];
+    return "argument is missing" if(int(@a) != 2);
     
-    return ReadingsVal($hash->{NAME}, $what, '') if defined ReadingsVal($hash->{NAME}, $what, undef);
+    $what = $a[1];
+    
+    return ReadingsVal($hash->{NAME}, $what, "") if(defined(ReadingsVal($hash->{NAME}, $what, undef)));
      
-    my $return = "unknown argument $what, choose one of";
+    $return = "unknown argument $what, choose one of";
     
-    for my $reading (keys %{$hash->{READINGS}})
+    foreach my $reading (keys %{$hash->{READINGS}})
     {
         $return .= " $reading:noArg";
     }
@@ -278,7 +284,7 @@ YAMAHA_AVR_Get #($@)
 
 ###################################
 sub
-YAMAHA_AVR_Set #($@)
+YAMAHA_AVR_Set($@)
 {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
@@ -350,12 +356,12 @@ YAMAHA_AVR_Set #($@)
                                                           "statusRequest:noArg";
                            
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
-    my $powerCmdDelay = YAMAHA_AVR_isModel_DSP($hash) ? 3 : 2;
-
+    my $powerCmdDelay = (YAMAHA_AVR_isModel_DSP($hash) ? "3" : "2"); 
+                                                          
     Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
-
+    
     if($what eq "on")
-    {
+    {        
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what, undef, {options => {wait_after_response => $powerCmdDelay}});
     }
     elsif($what eq "off")
@@ -1133,19 +1139,20 @@ YAMAHA_AVR_Set #($@)
     else
     {
         return $usage;
-    }
-    return;
+    } 
 }
 
 ##########################
 sub
-YAMAHA_AVR_Attr #(@)
+YAMAHA_AVR_Attr(@)
 {
     my ($cmd, $name, $attr, $val) = @_;
     
-    my $hash = $defs{$name} // return;
+    my $hash = $defs{$name};
 
-    if($attr eq 'disable')
+    return unless($hash);
+    
+    if($attr eq "disable")
     {
         # Start/Stop Timer according to new disabled-Value
         YAMAHA_AVR_ResetTimer($hash, 1);
@@ -1171,16 +1178,16 @@ YAMAHA_AVR_Attr #(@)
             }
         }
     }
+ 
 
-    return;
+    return undef;
 }
 
 #############################
 sub
-YAMAHA_AVR_Undefine #($$)
+YAMAHA_AVR_Undefine($$)
 {
-    my $hash = shift // return;
-    my $name = shift // return;
+    my($hash, $name) = @_;
 
     # Stop all timers and exit
     RemoveInternalTimer($hash);
@@ -1190,7 +1197,7 @@ YAMAHA_AVR_Undefine #($$)
        delete($modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{$hash->{ACTIVE_ZONE}});
     }
     
-    return;
+    return undef;
 }
 
 
@@ -1236,14 +1243,9 @@ YAMAHA_AVR_Undefine #($$)
 #############################
 # sends a command to the receiver via HTTP
 sub
-YAMAHA_AVR_SendCommand #($$$$;$)
+YAMAHA_AVR_SendCommand($$$$;$)
 {
-    #my ($hash, $data,$cmd,$arg,$additional_args) = @_;
-    my $hash = shift // return;
-    my $data = shift // return;
-    my $cmd  = shift // return;
-    my $arg  = shift // return;
-    my $additional_args = shift; #if set, this should be HASH type arg
+    my ($hash, $data,$cmd,$arg,$additional_args) = @_;
     my $name = $hash->{NAME};
     my $options;
     
@@ -1298,17 +1300,18 @@ YAMAHA_AVR_SendCommand #($$$$;$)
             push @{$device->{helper}{CMD_QUEUE}}, $param;  
         }
     }
-
+    
     YAMAHA_AVR_HandleCmdQueue($device);
-    return;
+    
+    return undef;
 }
 
 #############################
 # starts http requests from cmd queue
 sub
-YAMAHA_AVR_HandleCmdQueue #($)
+YAMAHA_AVR_HandleCmdQueue($)
 {
-    my $hash = shift // return;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     
@@ -1328,16 +1331,16 @@ YAMAHA_AVR_HandleCmdQueue #($)
    
         my $request = YAMAHA_AVR_getNextRequestHash($hash);
 
-        if ( !defined $request )
+        unless(defined($request))
         {
             # still request in queue, but not mentioned to be executed now
             Log3 $name, 5, "YAMAHA_AVR ($name) - still requests in queue, but no command shall be executed at the moment. Retry in 1 second.";
             RemoveInternalTimer($hash, "YAMAHA_AVR_HandleCmdQueue");
             InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash);
-            return;
+            return undef;
         }
         
-        $request->{options}{priority} = 3 if !exists $request->{options}{priority};
+        $request->{options}{priority} = 3 unless(exists($request->{options}{priority}));
         delete($request->{data}) if(exists($request->{data}) and !$request->{data});
         $request->{data}=~ s/\[CURRENT_INPUT_TAG\]/$hash->{helper}{CURRENT_INPUT_TAG}/g if(exists($request->{data}) and exists($hash->{helper}{CURRENT_INPUT_TAG}));
 
@@ -1364,14 +1367,14 @@ YAMAHA_AVR_HandleCmdQueue #($)
     $hash->{CMDs_pending} = @{$hash->{helper}{CMD_QUEUE}};
     delete($hash->{CMDs_pending}) unless($hash->{CMDs_pending}); 
     
-    return;
+    return undef;
 }
 
 #############################
 # selects the next command from command queue that has to be executed (undef if no command has to be executed now)
-sub YAMAHA_AVR_getNextRequestHash #($)
+sub YAMAHA_AVR_getNextRequestHash($)
 {
-    my $hash = shift // return;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
 
     if(@{$hash->{helper}{CMD_QUEUE}})
@@ -1448,19 +1451,17 @@ sub YAMAHA_AVR_getNextRequestHash #($)
         }
         
         Log3 $name, 5, "YAMAHA_AVR ($name) - no suitable command item found";
-        return;
+        return undef;
     }
 }
 
 #############################
 # parses the receiver response
 sub
-YAMAHA_AVR_ParseResponse #($$$)
+YAMAHA_AVR_ParseResponse($$$)
 {
-    my $param = shift // return;
-    my $err   = shift // q{};
-    my $data  = shift // q{};
-
+    my ( $param, $err, $data ) = @_;    
+    
     my $hash = $param->{hash};
     my $queue_hash = $param->{hash};
 
@@ -1468,6 +1469,9 @@ YAMAHA_AVR_ParseResponse #($$$)
     my $arg = $param->{arg};
     my $options = $param->{options};
 
+    $data = "" unless(defined($data));
+    $err = "" unless(defined($err));
+    
     $hash->{helper}{RUNNING_REQUEST} = 0;
     delete($hash->{helper}{".HTTP_CONNECTION"}) unless($param->{keepalive});
     
@@ -2126,7 +2130,7 @@ YAMAHA_AVR_ParseResponse #($$$)
                         Log3 $name, 4 ,"YAMAHA_AVR ($name) - menu browsing to $arg is finished. requesting basic status";
                         readingsEndUpdate($hash, 1);
                         YAMAHA_AVR_GetStatus($hash, 1);
-                        return;
+                        return undef;
                     }
                     
                     # initialization sequence
@@ -2256,67 +2260,63 @@ YAMAHA_AVR_ParseResponse #($$$)
     }
     
     YAMAHA_AVR_HandleCmdQueue($queue_hash);
-    return;
 }
 
 #############################
 # Converts all Values to FHEM usable command lists
-sub YAMAHA_AVR_Param2Fhem #($$)
+sub YAMAHA_AVR_Param2Fhem($$)
 {
-    my $param = shift // return;
-    my $replace_pipes = shift;
+    my ($param, $replace_pipes) = @_;
 
+   
     $param =~ s/\s+//g;
     $param =~ s/,//g;
     $param =~ s/_//g;
     $param =~ s/\(/_/g;
     $param =~ s/\)//g;
-    $param =~ s/\|/,/g if $replace_pipes;
+    $param =~ s/\|/,/g if($replace_pipes == 1);
 
     return lc $param;
 }
 
 #############################
 # Returns the Yamaha Parameter Name for the FHEM like aquivalents
-sub YAMAHA_AVR_getParamName #($$$)
+sub YAMAHA_AVR_getParamName($$$)
 {
-    my $hash = shift // return;
-    my $name = shift // return;
-    my $list = shift // return;
-
+    my ($hash, $name, $list) = @_;
+    my $item;
+   
+    return undef if(not defined($list));
+  
     my @commands = split("\\|",  $list);
 
-    for my $item (@commands)
+    foreach $item (@commands)
     {
         if(YAMAHA_AVR_Param2Fhem($item, 0) eq $name)
         {
             return $item;
         }
     }
-
-    return;
+    
+    return undef;
 }
 
 #############################
 # queries the receiver model, system-id, version and all available zones
-sub YAMAHA_AVR_getModel #($)
+sub YAMAHA_AVR_getModel($)
 {
-    my $hash = shift // return;
-
+    my ($hash) = @_;
+   
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig", {options => {at_first => 1, priority => 1}});
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription", {options => {at_first => 1, priority => 1}});
-
-    return;
-}
- 
+}    
+    
 #############################
 # parses the HTTP response for unit description XML file
 sub
-YAMAHA_AVR_ParseXML #($$$)
+YAMAHA_AVR_ParseXML($$$)
 {
-    my $param = shift // return;
-    my $err   = shift // return;
-    my $data  = shift // return;
+    my ($param, $err, $data) = @_;    
     
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
@@ -2326,10 +2326,10 @@ YAMAHA_AVR_ParseXML #($$$)
     $hash->{helper}{RUNNING_REQUEST} = 0;
     delete($hash->{helper}{".HTTP_CONNECTION"}) unless($param->{keepalive});
     
-    if($data eq '')
+    if($data eq "")
     {
         YAMAHA_AVR_HandleCmdQueue($hash);
-        return;
+        return undef
     }
 
     delete($hash->{helper}{ZONES}) if(exists($hash->{helper}{ZONES}));
@@ -2459,15 +2459,14 @@ YAMAHA_AVR_ParseXML #($$$)
     # create device pointer
     $modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{$hash->{ACTIVE_ZONE}} = $hash if(exists($hash->{SYSTEM_ID}) and exists($hash->{ACTIVE_ZONE}));
     
-    YAMAHA_AVR_HandleCmdQueue($hash);
-    return;
+    YAMAHA_AVR_HandleCmdQueue($hash); 
 }
 
 #############################
 # converts decibal volume in percentage volume (-80.5 .. 16.5dB => 0 .. 100%)
-sub YAMAHA_AVR_volume_rel2abs #($)
+sub YAMAHA_AVR_volume_rel2abs($)
 {
-    my $percentage = shift;
+    my ($percentage) = @_;
     
     #  0 - 100% -equals 80.5 to 16.5 dB
     return int((($percentage / 100 * 97) - 80.5) / 0.5) * 0.5;
@@ -2475,9 +2474,9 @@ sub YAMAHA_AVR_volume_rel2abs #($)
 
 #############################
 # converts percentage volume in decibel volume (0 .. 100% => -80.5 .. 16.5dB)
-sub YAMAHA_AVR_volume_abs2rel #($)
+sub YAMAHA_AVR_volume_abs2rel($)
 {
-    my $absolute = shift // return;
+    my ($absolute) = @_;
     
     # -80.5 to 16.5 dB equals 0 - 100%
     return int(($absolute + 80.5) / 97 * 100);
@@ -2485,56 +2484,56 @@ sub YAMAHA_AVR_volume_abs2rel #($)
 
 #############################
 # queries all available inputs and scenes
-sub YAMAHA_AVR_getInputs #($)
+sub YAMAHA_AVR_getInputs($)
 {
-    my $hash = shift // return;  
+    my ($hash) = @_;  
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
    
     my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
     
-    return if !defined $zone || $zone eq '';
+    return undef if(not defined($zone) or $zone eq "");
     
     # query all inputs
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs", {options => {at_first => 1, priority => 1}});
 
     # query all available scenes (only in mainzone available)
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", {options => {can_fail => 1, at_first => 1, priority => 1}}) if $hash->{ACTIVE_ZONE} eq 'mainzone';
-    return;
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", {options => {can_fail => 1, at_first => 1, priority => 1}}) if($hash->{ACTIVE_ZONE} eq "mainzone");
 }
 
 #############################
 # Restarts the internal status request timer according to the given interval or current receiver state
-sub YAMAHA_AVR_ResetTimer #($;$)
+sub YAMAHA_AVR_ResetTimer($;$)
 {
-    my $hash = shift // return;
-    my $interval = shift;
+    my ($hash, $interval) = @_;
     my $name = $hash->{NAME};
     
     RemoveInternalTimer($hash, "YAMAHA_AVR_GetStatus");
     
-    return if IsDisabled($name);
-    if ( defined $interval )
+    unless(IsDisabled($name))
     {
-        InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash);
+        if(defined($interval))
+        {
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash);
+        }
+        elsif(ReadingsVal($name, "presence", "absent") eq "present" and ReadingsVal($name, "power", "off") eq "on")
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
+        }
+        else
+        {
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
+        }
     }
-    elsif(ReadingsVal($name, "presence", "absent") eq "present" and ReadingsVal($name, "power", "off") eq "on")
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
-    }
-    else
-    {
-        InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
-    }
-
-    return;
+    
+    return undef;
 }
 
 #############################
 # convert all HTML entities into UTF-8 aquivalents
-sub YAMAHA_AVR_html2txt #($)
+sub YAMAHA_AVR_html2txt($)
 {
-    my $string = shift // return '';
+    my ($string) = @_;
 
     $string =~ s/&amp;/&/g;
     $string =~ s/&amp;/&/g;
@@ -2561,11 +2560,11 @@ sub YAMAHA_AVR_html2txt #($)
     return $string;
 }
 
-sub YAMAHA_AVR_generateSurroundDecoderList #($)
+sub YAMAHA_AVR_generateSurroundDecoderList($)
 {
-    my $hash = shift // return;
+    my ($hash) = @_;
     
-    if ( defined $hash->{MODEL} )
+    if(defined($hash->{MODEL}))
     {
         if($hash->{MODEL} =~ /^(?:RX-V[67]79|RX-A750|RX-AS710D?)$/) # RX-V679, RX-V779, RX-A750, RX-AS710, RX-AS710D (from RX-Vx79/RX-Ax50 series)
         {
@@ -2584,16 +2583,15 @@ sub YAMAHA_AVR_generateSurroundDecoderList #($)
             $hash->{helper}{SURROUND_DECODERS} = "Dolby PL|Dolby PLII Movie|Dolby PLII Music|Dolby PLII Game|Dolby PLIIx Movie|Dolby PLIIx Music|Dolby PLIIx Game|DTS NEO:6 Cinema|DTS NEO:6 Music";
         }
     }
-    return;
 }
 
 
 #############################
 # Check if amp is one of these models: DSP-Z7, DSP-Z9, DSP-Z11, RX-Z7, RX-Z9, RX-Z11, RX-V2065, RX-V3900, DSP-AX3900
 # Tested models: DSP-Z7
-sub YAMAHA_AVR_isModel_DSP #($)
+sub YAMAHA_AVR_isModel_DSP($)
 {
-    my $hash = shift // return;
+    my($hash) = @_;
     
     if(exists($hash->{MODEL}) && (($hash->{MODEL} =~ /DSP-Z/) || ($hash->{MODEL} =~ /RX-Z/) || ($hash->{MODEL} =~ /RX-V2065/) || ($hash->{MODEL} =~ /RX-V3900/) || ($hash->{MODEL} =~ /DSP-AX3900/)))
     {
