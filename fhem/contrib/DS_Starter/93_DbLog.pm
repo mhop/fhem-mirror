@@ -40,7 +40,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.0.0"   => "02.12.2022 implement SubProcess.pm for logging data, delete attr traceHandles ",
+  "5.0.0"   => "02.12.2022 implement SubProcess.pm for logging data in asyncMode, delete attr traceHandles ",
   "4.13.3"  => "26.11.2022 revise commandref ",
   "4.13.2"  => "06.11.2022 Patch Delta calculation (delta-d,delta-h) https://forum.fhem.de/index.php/topic,129975.msg1242272.html#msg1242272 ",
   "4.13.1"  => "16.10.2022 edit commandref ",
@@ -547,11 +547,13 @@ sub DbLog_Attr {
 
   if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {      
       if ($init_done == 1) {
-          InternalTimer(gettimeofday()+1.0, "DbLog_attrForSQLite", $hash, 0);
-          InternalTimer(gettimeofday()+1.5, "DbLog_attrForSQLite", $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
+          InternalTimer(gettimeofday()+1.0, 'DbLog_attrForSQLite', $hash, 0);
+          InternalTimer(gettimeofday()+1.5, 'DbLog_attrForSQLite', $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
               
           
-          DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
+          DbLog_SBP_dbDisconnect ($hash, 1);                                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+          
+          InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);      # neue Verbindungsdaten an SubProzess senden                                           
       }
   }
 
@@ -562,7 +564,7 @@ sub DbLog_Attr {
       InternalTimer(gettimeofday()+0.5, "DbLog_setinternalcols", $hash, 0);
   }
 
-  if($aName eq "asyncMode") {
+  if($aName eq 'asyncMode') {
       if ($cmd eq "set" && $aVal) {
           $hash->{MODE} = "asynchronous";
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0);
@@ -584,11 +586,9 @@ sub DbLog_Attr {
       }
       
       if ($init_done == 1) {       
-          DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
-          my $rst = DbLog_SBP_sendConnectionData ($hash);
-          if (!$rst) {
-              Log3 ($name, 3, "DbLog $name - new commitMode transmitted to SubProces");
-          }
+           DbLog_SBP_dbDisconnect ($hash, 1);                                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+          
+          InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden                                           
       }
   }
 
@@ -651,7 +651,9 @@ sub DbLog_Attr {
       }
       
       if ($init_done == 1) {       
-          DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
+           DbLog_SBP_dbDisconnect ($hash, 1);                                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+          
+          InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden                                           
       }
   }
 
