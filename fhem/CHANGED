@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  71_YAMAHA_AVR: PBP code restructured (part I)
  - change:  93_DbLog: revise commandref
  - bugfix:  98_vitoconnect: Missing update interval after login failure
  - bugfix:  73_km200                 : Forward declaration made obsolete
