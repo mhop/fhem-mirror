@@ -585,6 +585,10 @@ sub DbLog_Attr {
       
       if ($init_done == 1) {       
           DbLog_SBP_dbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
+          my $rst = DbLog_SBP_sendConnectionData ($hash);
+          if (!$rst) {
+              Log3 ($name, 3, "DbLog $name - new commitMode transmitted to SubProces");
+          }
       }
   }
 
@@ -2558,7 +2562,7 @@ sub DbLog_SBP_onRun {
           ##  Vorbereitungen
           #############################################################################
 
-          $attr{$name}{verbose} = $verbose;                                       # verbose Level übergeben
+          $attr{$name}{verbose} = $verbose if(defined $verbose);                  # verbose Level übergeben
 
           my $bst = [gettimeofday];                                               # Background-Startzeit
 
@@ -3522,7 +3526,8 @@ sub DbLog_SBP_sendConnectionData {
   $memc->{dbuser}      = $hash->{dbuser};
   $memc->{dbpassword}  = $attr{"sec$name"}{secret};
   $memc->{model}       = $hash->{MODEL};
-  $memc->{cm}          = AttrVal($name, 'commitMode', $dblog_cmdef);
+  $memc->{cm}          = AttrVal ($name, 'commitMode', $dblog_cmdef);
+  $memc->{verbose}     = AttrVal ($name, 'verbose',               3);
   $memc->{utf8}        = defined ($hash->{UTF8}) ? $hash->{UTF8} : 0;
   $memc->{history}     = $hash->{HELPER}{TH};
   $memc->{current}     = $hash->{HELPER}{TC};
