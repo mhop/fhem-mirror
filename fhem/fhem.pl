@@ -219,6 +219,7 @@ sub cfgDB_FileWrite;
 # ShutdownFn-called before shutdown, if DelayedShutdownFn is "over"
 # StateFn  - set local info for this device, do not activate anything
 # UndefFn  - clean up (delete timer, close fd), called by delete and rereadcfg
+# prioSave - save the definition at the start, for a small SubProcess
 
 #Special values in %defs:
 # TYPE    - The name of the module it belongs to
@@ -236,6 +237,7 @@ use vars qw($addTimerStacktrace);# set to 1 by fhemdebug
 use vars qw($auth_refresh);
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw($devcountPrioSave); # Maximum prioSave device number
 use vars qw($unicodeEncoding);  # internal encoding is unicode (wide character)
 use vars qw($featurelevel); 
 use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
@@ -2136,7 +2138,9 @@ CommandDefine($$)
   $hash{TYPE}  = $m;
   $hash{STATE} = "???";
   $hash{DEF}   = $a[2] if(int(@a) > 2);
-  $hash{NR}    = $devcount++;
+  #130588: start early after next save, for a small SubProcess size
+  $hash{NR}    = ($modules{$m}{prioSave} && $devcountPrioSave < 30) ? 
+                  $devcountPrioSave++ : $devcount++;
   $hash{CFGFN} = $currcfgfile
         if($currcfgfile ne AttrVal("global", "configfile", "") &&
           !configDBUsed());
@@ -4031,6 +4035,9 @@ doGlobalDef($)
   CommandAttr(undef, "global verbose 3");
   CommandAttr(undef, "global configfile $arg");
   CommandAttr(undef, "global logfile -");
+
+  $devcountPrioSave = 2;
+  $devcount = 30;
 }
 
 #####################################
