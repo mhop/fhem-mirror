@@ -268,9 +268,11 @@ my %DbLog_vNotesIntern = (
 ###############
 
 my %DbLog_hset = (                                                                # Hash der Set-Funktion
-  listCache      => { fn => \&_setlistCache     },
-  clearReadings  => { fn => \&_setclearReadings },
-  eraseReadings  => { fn => \&_seteraseReadings },
+  listCache      => { fn => \&_DbLog_setlistCache      },
+  clearReadings  => { fn => \&_DbLog_setclearReadings  },
+  eraseReadings  => { fn => \&_DbLog_seteraseReadings  },
+  stopSubProcess => { fn => \&_DbLog_setstopSubProcess },
+  purgeCache     => { fn => \&_DbLog_setpurgeCache     },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -840,11 +842,6 @@ sub DbLog_Set {
             $ret = "reduceLogNbl error, no <days> given.";
         }
     }
-    elsif ($opt eq 'stopSubProcess') {
-        DbLog_SBP_CleanUp ($hash);                                              # SubProcess beenden
-        $ret = 'SubProcess stopped and will be automatically restarted if needed';
-        DbLog_setReadingstate ($hash, $ret);
-    }
     elsif ($opt eq 'addLog') {
         unless ($prop) { return "The argument of $opt is not valid. Please check commandref.";}
         my $nce = ("\!useExcludes" ~~ @a) ? 1 : 0;
@@ -939,10 +936,6 @@ sub DbLog_Set {
         }
 
         $ret = "Rereadcfg executed.";
-    }
-    elsif ($opt eq 'purgeCache') {
-        delete $data{DbLog}{$name}{cache};
-        readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
     }
     elsif ($opt eq 'commitCache') {
         DbLog_execMemCacheAsync ($hash);
@@ -1236,7 +1229,7 @@ return $ret;
 ################################################################
 #                      Setter listCache
 ################################################################
-sub _setlistCache {                       ## no critic "not used"
+sub _DbLog_setlistCache {                ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
 
@@ -1256,7 +1249,7 @@ return $cache;
 ################################################################
 #                      Setter clearReadings
 ################################################################
-sub _setclearReadings {                  ## no critic "not used"
+sub _DbLog_setclearReadings {            ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1274,7 +1267,7 @@ return;
 ################################################################
 #                      Setter eraseReadings
 ################################################################
-sub _seteraseReadings {                  ## no critic "not used"
+sub _DbLog_seteraseReadings {            ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
 
@@ -1285,6 +1278,34 @@ sub _seteraseReadings {                  ## no critic "not used"
   }
   
 return;
+}
+
+################################################################
+#                      Setter stopSubProcess
+################################################################
+sub _DbLog_setstopSubProcess {           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  DbLog_SBP_CleanUp ($hash);                                              # SubProcess beenden
+  my $ret = 'SubProcess stopped and will be automatically restarted if needed';
+  DbLog_setReadingstate ($hash, $ret);
+  
+return $ret;
+}
+
+################################################################
+#                      Setter purgeCache
+################################################################
+sub _DbLog_setpurgeCache {               ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  delete $data{DbLog}{$name}{cache};
+  readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
+  
+return 'Memory Cache purged';
 }
 
 ##################################################################################################################
