@@ -21,9 +21,7 @@
 #
 #
 # ideas / todo:
-#   - use DoClose / SetStates -> Utils?
 #   - check integration of device none and write tests
-#
 #   - DevIo_IsOpen instead of checking fd
 #   - "static" ports that do not count but report every change or an analog value to Fhem
 #   - check reply from device after sending a command
@@ -31,6 +29,7 @@
 #   - max time for interpolation as attribute
 #   - detect level thresholds automatically for analog input, track drift
 #   - timeMissed
+#   - rename openRetries to helloRetries
 #
 
 #
@@ -110,6 +109,8 @@ BEGIN {
         DevIo_SimpleRead
         DevIo_CloseDev
         DevIo_Disconnected
+        DevIo_setStates
+        DevIo_getState
         SetExtensions
         HttpUtils_NonblockingGet
 
@@ -126,7 +127,7 @@ BEGIN {
 };
 
 
-my $Module_version = '8.00 - 21.10.2021';
+my $Module_version = '8.01 - 04.12.2022';
 
 
 my %SetHash = (  
@@ -256,13 +257,15 @@ sub DefineFn {
     return 'wrong syntax: define <name> ArduCounter devicename@speed or ipAdr:port'
       if ( @a < 3 );
 
-    DevIo_CloseDev($hash);
+    $hash->{devioNoSTATE} = 1;                          # let stateFormat do its thing, just set the reading 'state', not the Internal STATE
+    DevIo_CloseDev($hash);                              # make sure it is initially closed 
+    DevIo_setStates($hash, 'disconnected');             # initial value, no triggers
     my $name = $a[0];
     my $dev  = $a[2];
     
     if ($dev =~ m/^[Nn]one$/) {                         # none
         # for testing 
-    } elsif ($dev =~ m/^(.+):([0-9]+)$/) {                   # tcp conection with explicit port
+    } elsif ($dev =~ m/^(.+):([0-9]+)$/) {              # tcp conection with explicit port
         $hash->{TCP} = 1;                               
     } 
     elsif ($dev =~ m/^(\d+\.\d+\.\d+\.\d+)(?:\:([0-9]+))?$/) { 
@@ -279,8 +282,7 @@ sub DefineFn {
     }
     $hash->{DeviceName}    = $dev;
     $hash->{VersionModule} = $Module_version;
-    $hash->{NOTIFYDEV}     = "global";                  # NotifyFn nur aufrufen wenn global events (INITIALIZED)
-    $hash->{STATE}         = "disconnected";
+    $hash->{NOTIFYDEV}     = 'global';                  # NotifyFn nur aufrufen wenn global events (INITIALIZED)
     
     delete $hash->{Initialized};                        # device might not be initialized - wait for hello / setup before cmds
         
@@ -309,7 +311,7 @@ sub SetDisconnected {
     RemoveInternalTimer ("alive:$name");            # no timeout if waiting for keepalive response
     RemoveInternalTimer ("keepAlive:$name");        # don't send keepalive messages anymore
     RemoveInternalTimer ("sendHello:$name");
-    DevIo_Disconnected($hash);                      # close, add to readyFnList so _Ready is called to reopen
+    DevIo_Disconnected($hash);                      # close, set state and add to readyFnList so _Ready is called to reopen
     return;
 }
 
@@ -327,6 +329,7 @@ sub OpenCallback {
     delete $hash->{BUSY_OPENDEV};
     if ($hash->{FD}) {  
         Log3 $name, 5, "$name: DoOpen succeeded in callback";
+        DevIo_setStates($hash, 'opened');
         my $hdl = AttrVal($name, "helloSendDelay", 4);
         # send hello if device doesn't say "Started" withing $hdl seconds
         RemoveInternalTimer ("sendHello:$name");
@@ -382,7 +385,8 @@ sub DoOpen {
     }    
     
     if (!$reopen) {                 # not called from _Ready
-        DevIo_CloseDev($hash);
+        DevIo_CloseDev($hash);      # doesn't change state reading
+        DevIo_setStates($hash, 'disconnected');             # initial value, no triggers
         delete $hash->{NEXT_OPEN};
         delete $hash->{DevIoJustClosed};
     }
@@ -400,38 +404,13 @@ sub DoOpen {
     delete $hash->{TIMEOUT};    
     if ($hash->{FD}) {  
         Log3 $name, 5, "$name: DoOpen succeeded immediately" if (!$reopen);
+        DevIo_setStates($hash, 'opened');
     } else {
         Log3 $name, 5, "$name: DoOpen waiting for callback" if (!$reopen);
     }
     return;
 }
-
-
-
-##################################################
-# close connection 
-# $hash is physical or both (connection over TCP)
-sub DoClose {
-    my ($hash, $noState, $noDelete) = @_;
-    my $name = $hash->{NAME};
-       
-    Log3 $name, 5, "$name: Close called from " . FhemCaller() . 
-        ($noState || $noDelete ? ' with ' : '') . ($noState ? 'noState' : '') .     # set state?
-        ($noState && $noDelete ? ' and ' : '') . ($noDelete ? 'noDelete' : '');     # command delete on connection device?
-    
-    delete $hash->{LASTOPEN};                           # reset so next open will actually call OpenDev
-    if ($hash->{DeviceName} eq 'none') {
-        Log3 $name, 4, "$name: Simulate closing connection to none";
-    } 
-    else {
-        Log3 $name, 4, "$name: Close connection with DevIo_CloseDev";
-        # close even if it was not open yet but on ready list (need to remove entry from readylist)
-        DevIo_CloseDev($hash);
-    }
-    SetStates($hash, 'disconnected') if (!$noState);
-    return;
-}
-    
+  
 
 #################################################################
 # set state Reading and STATE internal 
@@ -443,7 +422,7 @@ sub SetStates {
     my $newState = $state;
 
     Log3 $name, 5, "$name: SetState called from " . FhemCaller() . " with $state sets state and STATE to $newState";
-    $hash->{STATE} = $newState;
+    #$hash->{STATE} = $newState;        # leave to be set via stateFormat when reading 'state' changes
     return if ($newState eq ReadingsVal($name, 'state', ''));
     readingsSingleUpdate($hash, 'state', $newState, 1);
     return;
@@ -456,16 +435,17 @@ sub ReadyFn {
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    if($hash->{STATE} eq "disconnected") {  
+    if(DevIo_getState($hash) eq 'disconnected') {
         RemoveInternalTimer ("alive:$name");        # no timeout if waiting for keepalive response
         RemoveInternalTimer ("keepAlive:$name");    # don't send keepalive messages anymore
         delete $hash->{Initialized};                # when reconnecting wait for setup / hello before further action
         if (IsDisabled($name)) {
             Log3 $name, 3, "$name: _Ready: $name is disabled - don't try to reconnect";
-            DevIo_CloseDev($hash);                  # close, remove from readyfnlist so _ready is not called again         
+            DevIo_CloseDev($hash);                  # close, remove from readyfnlist so _ready is not called again        
+            DevIo_setStates($hash, 'disconnected');     # no triggers
             return;
         }
-        DoOpen($hash, 1);                 # reopen, don't call DevIoClose before reopening
+        DoOpen($hash, 1);                           # reopen, don't call DevIoClose before reopening
         return;                                     # a return value triggers direct read for win
     }
     # This is relevant for windows/USB only
@@ -1148,6 +1128,7 @@ sub AttrFn {
                     Log3 $name, 3, "$name: value too big in attr $name $aName $aVal";
                     return "Value too big: $aVal";
                 }
+                # todo: set new keepalive delay and communicate to device
             } 
             else {
                 Log3 $name, 3, "$name: Invalid value in attr $name $aName $aVal";
@@ -1157,8 +1138,16 @@ sub AttrFn {
         elsif ($aName eq 'disable') {
             if ($aVal) {
                 Log3 $name, 5, "$name: disable attribute set";                
-                SetDisconnected($hash);    # set to disconnected and remove timers
-                DevIo_CloseDev($hash);              # really close and remove from readyFnList again
+                if ($hash->{DeviceName} eq 'none') {
+                    Log3 $name, 4, "$name: Simulate closing connection to none";
+                } 
+                else {
+                    DevIo_CloseDev($hash);              # really close and remove from readyFnList again
+                    DevIo_setStates($hash, 'disconnected');             # initial value, no triggers
+                    RemoveInternalTimer ("alive:$name");            # no timeout if waiting for keepalive response
+                    RemoveInternalTimer ("keepAlive:$name");        # don't send keepalive messages anymore
+                    RemoveInternalTimer ("sendHello:$name");
+                }
                 return;
             } else {
                 Log3 $name, 3, "$name: disable attribute cleared";
@@ -1240,7 +1229,7 @@ sub DoFlash {
         $ip   = $1;
         $port = $1;
     }
-    
+    return if ($hash->{DeviceName} eq 'none');
     my $hexFile  = shift @args; 
     my $netPort = 0;
     
@@ -1313,9 +1302,8 @@ sub DoFlash {
         if (-e $logFile) {
           unlink $logFile;
         }
+        DevIo_Disconnected($hash);                      # close, add to readyFnList so _Ready is called to reopen, set state
 
-        SetDisconnected($hash);
-        DevIo_CloseDev($hash);
         $log .= "$name closed\n";
 
         $flashCommand =~ s/\Q[PORT]\E/$port/g;
@@ -1439,9 +1427,15 @@ sub SetFn {
     } 
     elsif ($setName eq "reconnect") {
         Log3 $name, 4, "$name: set reconnect called";
-        DevIo_CloseDev($hash);   
-        delete $hash->{OpenRetries};
-        DoOpen($hash);
+        if ($hash->{DeviceName} eq 'none') {
+            Log3 $name, 4, "$name: Simulate closing / reopening connection to none";
+        } 
+        else {
+            DevIo_CloseDev($hash);
+            DevIo_setStates($hash, 'disconnected');             # no triggers            
+            delete $hash->{OpenRetries};
+            DoOpen($hash);
+        }
         return;
     } 
     elsif ($setName eq "clearLevels") {
@@ -1502,8 +1496,14 @@ sub SetFn {
         if (DoWrite($hash, "r")) {
             delete $hash->{Initialized};
         }
-        DevIo_CloseDev($hash); 
-        DoOpen($hash);
+        if ($hash->{DeviceName} eq 'none') {
+            Log3 $name, 4, "$name: Simulate closing and reopening connection to none";
+        } 
+        else {
+            DevIo_CloseDev($hash); 
+            DevIo_setStates($hash, 'disconnected');             # no triggers
+            DoOpen($hash);
+        }
         return "sent (r)eset command to device - waiting for its setup message";    
     } 
     elsif ($setName eq "resetWifi") {
@@ -1984,7 +1984,7 @@ sub HandleRunTime {
     #Log3 $name, 5, "$name: HandleRunTime: devices list is @devices";
     DEVICELOOP:
     foreach my $d (@devices) {
-        my $state = (ReadingsVal($d, "state", ""));
+        my $state = (ReadingsVal($d, 'state', ''));
         #Log3 $name, 5, "$name: HandleRunTime: check $d with state $state";
         if ($state =~ /1|on|open|BI/) {
             $doIgnore = 1;
@@ -2209,8 +2209,15 @@ sub Parse {
             my $now   = gettimeofday(); 
             my $delay = AttrVal($name, "nextOpenDelay", 60);  
             Log3 $name, 4, "$name: _Parse: primary tcp connection seems busy - delay next open";
-            SetDisconnected($hash);                # set to disconnected (state), remove timers
-            DevIo_CloseDev($hash);                          # close, remove from readyfnlist so _ready is not called again
+            SetDisconnected($hash);                         # set to disconnected (state), remove timers
+            if ($hash->{DeviceName} eq 'none') {
+                Log3 $name, 4, "$name: Simulate closing connection to none";
+            } 
+            else {
+                DevIo_CloseDev($hash);                          # close, remove from readyfnlist so _ready is not called again
+                DevIo_setStates($hash, 'disconnected');         # no triggers                
+            }
+            
             RemoveInternalTimer ("delayedopen:$name");
             InternalTimer($now+$delay, "ArduCounter::DelayedOpen", "delayedopen:$name", 0);
         # todo: the level reports should be recorded separately per pin
