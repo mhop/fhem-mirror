@@ -23,6 +23,9 @@
 
 #
 #   ToDo / Ideas 
+#                   Datentypen vorbelegen - gelten falls nichts anderes per attr definiert ist
+#                       reading attr could be optional -> reading name is then object name like h234
+#
 #                   LastError Reading per logical device with error code and affected reading
 #                   verify that nextOpenDelay is integer and >= 1
 #                   set active results in error when tcp is already open
@@ -234,6 +237,8 @@ BEGIN {                         # functions / variables needed from package main
         DevIo_CloseDev
         DevIo_IsOpen
         DevIo_Disconnected
+        DevIo_getState
+        DevIo_setStates
         SetExtensions
 
         TcpServer_Open
@@ -264,7 +269,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.4.11 - 5.10.2022';
+my $Module_Version = '4.4.13 - 4.12.2022';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -552,11 +557,11 @@ sub DefineFn {
         $dev .= ':502' if ($dev !~ /.*:[0-9]/);   # add default port if no port specified
         delete $ioHash->{SerialConn};
     }
-
-    $ioHash->{DeviceName} = $dev;       # needed by DevIo to get Device, Port, Speed etc.
-    $ioHash->{IODev}      = $ioHash;    # point back to self to make getIOHash easier
-    $ioHash->{NOTIFYDEV}  = 'global';   # NotifyFn nur aufrufen wenn global events (INITIALIZED)
-    DoClose($ioHash);
+    $ioHash->{devioNoSTATE} = 1;            # let stateFormat do its thing, just set the reading 'state', not the Internal STATE
+    $ioHash->{DeviceName}   = $dev;         # needed by DevIo to get Device, Port, Speed etc.
+    $ioHash->{IODev}        = $ioHash;      # point back to self to make getIOHash easier
+    $ioHash->{NOTIFYDEV}    = 'global';     # NotifyFn nur aufrufen wenn global events (INITIALIZED)
+    DoClose($ioHash);                       # make sure everything is losed initally, set state to disconnected
 
     Log3 $name, 3, "$name: defined as $dev";
     return;                             # open is done later from NOTIFY
@@ -677,7 +682,7 @@ sub DefineLDFn {
         delete $hash->{TCPServer};
         delete $hash->{TCPChild};
     }
-    SetStates($hash, 'disconnected');                   # initial state after define - might modify to disabled / inactive
+    GoToState($hash, 'disconnected');                   # initial state after define - might modify to disabled / inactive
     # connection will be opened later in NotifyFN (INITIALIZED, DEFINED, MODIFIED, ...)
     # for serial connections we use a separate physical device. This is set in Notify
     return;
@@ -750,10 +755,7 @@ sub AttrFn {
         # disable on a physical device
         if ($cmd eq "set" && $aVal) {
             Log3 $name, 3, "$name: attr disable set" . (IsOpen($hash) ? ", closing connection" : "");
-            # todo: call setstates here? would call DoClose, stop timers
-            DoClose($hash);                    # close, set Expect, clear Buffer, set state to disconnected
-            UpdateTimer($hash, \&Modbus::GetUpdate, 'stop');    # even here for physical device?
-            # other timers are stopped in DoClose
+            GoToState($hash, 'disabled');       # close, stop timers and set state
         }
         elsif ($cmd eq 'del' || ($cmd eq 'set' && !$aVal)) {
             Log3 $name, 3, "$name: attr disable removed";
@@ -886,11 +888,11 @@ sub AttrLDFn {
     
     if ($aName eq 'disable' && $init_done) {    # if not init_done, nothing to be done here (see NotifyFN)
         if ($cmd eq "set" && $aVal) {           # disable set on a logical device (not physical serial here!)
-            SetStates($hash, 'disabled');       # set state, close / stop timers 
+            GoToState($hash, 'disabled');       # set state, close / stop timers 
         } 
         elsif ($cmd eq 'del' || ($cmd eq 'set' && !$aVal)) {    # disable removed / cleared
             Log3 $name, 3, "$name: attr disable removed";
-            SetStates($hash, 'enabled');        # set state, open / start update timer
+            GoToState($hash, 'enabled');        # set state, open / start update timer
         }
     }   
     return;
@@ -1152,12 +1154,12 @@ sub ControlSet {
     } 
     if ($setName eq 'active' && AttrVal($name, 'enableSetInactive', 1) ) {
         return 'device is disabled' if (AttrVal($name, 'disable', 0));
-        SetStates($hash, 'active');         # set state, open / start update timer
+        GoToState($hash, 'active');         # set state, open / start update timer
         return '0';
     } 
     if ($setName eq 'inactive' && AttrVal($name, 'enableSetInactive', 1)) {
         return 'device is disabled' if (AttrVal($name, 'disable', 0));
-        SetStates($hash, 'inactive');       # set state, close / stop timers 
+        GoToState($hash, 'inactive');       # set state, close / stop timers 
         return '0';
     }     
     if ($setName eq 'stop') {
@@ -1548,7 +1550,7 @@ sub DoOpen {
     
     if ($hash->{DeviceName} eq 'none') {
         Log3 $name, 5, "$name: open called from $caller, device is defined with none" if ($caller ne 'ReadyFn'); 
-        SetStates($hash, 'opened');
+        OpenCB($hash);                                      # set state and start timers
     } 
     elsif (!$hash->{TCPConn} && $hash->{TYPE} ne 'Modbus') {        # only open physical devices or TCP
         Log3 $name, 3, "$name: open called from $caller for logical device - this should not happen";
@@ -1569,7 +1571,7 @@ sub DoOpen {
         if ($ret) {
             Log3 $name, 3, "$name: TcpServerOpen returned $ret";
         } else {
-            SetStates($hash, 'opened');
+            DevIo_setStates($hash, 'opened');
         }
     } 
     else {                                                  # normal case, physical device or TCP
@@ -1610,12 +1612,13 @@ sub DoOpen {
         $hash->{devioLoglevel}  = (AttrVal($name, 'silentReconnect', 0) ? 4 : 3);
         $hash->{TIMEOUT}        = $timeOt;
         if ($arg_ref->{FORCE}) {
-            DevIo_OpenDev($hash, $ready, 0);                # standard open
+            DevIo_OpenDev($hash, $ready, 0);                # standard synchronous open
             OpenCB($hash);                                  # do remaining steps (callback not specified in above call)
         } 
         else {
             $hash->{BUSY_OPENDEV} = 1;
             DevIo_OpenDev($hash, $ready, 0, \&OpenCB);      # async open
+            #DevIo_setStates($hash, 'opened');              # state will be set in callback
         }
     }
     Profiler($hash, 'Idle');                                # set category to book following time, can be Delay, Fhem, Idle, Read, Send or Wait
@@ -1639,13 +1642,13 @@ sub OpenCB {
         Log3 $name, 5, "$name: Open callback: $msg" if ($msg);
     }
     delete $hash->{BUSY_OPENDEV};
-    if (IsOpen($hash)) {
+    if (IsOpen($hash)) {                                        # also works for 'none'
         delete $hash->{TIMEOUTS} ;
-        UpdateTimer($hash, \&Modbus::GetUpdate, 'start');           # set / change timer
+        UpdateTimer($hash, \&Modbus::GetUpdate, 'start');       # set / change timer
+        DevIo_setStates($hash, 'opened');
     }
-    # stop queue-Timer while disconnected and start it again with delay 0 here
+    # stop queue-Timer while disconnected and start it again with delay 0 here. ProcessRequestQueue will call open again if not open yet.
     StartQueueTimer($hash, \&Modbus::ProcessRequestQueue, {delay => 0, silent => 0});
-    
     return;
 }
 
@@ -1658,6 +1661,7 @@ sub DoClose {
     my $arg_ref   = shift // {};
     my $noDelete  = $arg_ref->{NODELETE}  // 0;
     my $keepQueue = $arg_ref->{KEEPQUEUE} // 0;
+    my $noState   = $arg_ref->{NOSTATE}   // 0;
     my $name      = $hash->{NAME};
     
     if (!$hash->{TCPConn} && $hash->{TYPE} ne 'Modbus') {
@@ -1714,7 +1718,7 @@ sub DoClose {
         # close even if it was not open yet but on ready list (need to remove entry from readylist)
         DevIo_CloseDev($hash);
     }
-    SetStates($hash, 'disconnected');
+    GoToState($hash, 'disconnected') if (!$noState);
     ResetExpect($hash);
     DropBuffer($hash);
     Profiler($hash, 'Idle');                    # set category to book following time, can be Delay, Fhem, Idle, Read, Send or Wait
@@ -1740,7 +1744,7 @@ sub ReadyFn {
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    if($hash->{STATE} eq 'disconnected') {
+    if(DevIo_getState($hash) eq 'disconnected') {
         if (IsDisabled($name)) {
             Log3 $name, 3, "$name: ready called but $name is disabled - don't try to reconnect - call DoClose";
             DoClose($hash);             # state sollte schon disabled sein, macht aber nichts.
@@ -4234,10 +4238,11 @@ sub CountTimeouts {
 }
 
 
-#################################################################
-# set state Reading and STATE internal 
-# call instead of setting STATE directly and when inactive / disconnected
-sub SetStates {
+############################################################################
+# set state reading and take active / inactive into account
+# open / close when when switching between active and inactive/disabled
+# call instead of setting state directly 
+sub GoToState {
     my $hash     = shift;
     my $setState = shift;
     my $name     = $hash->{NAME};
@@ -4245,10 +4250,10 @@ sub SetStates {
     my $disabled = AttrVal($name, 'disable', 0);
     my $newState = $setState;
     
-    Log3 $name, 5, "$name: SetStates called from " . FhemCaller() . " with $setState";
+    Log3 $name, 5, "$name: GoToState called from " . FhemCaller() . " with $setState";
     
     if ($setState eq 'disabled') {
-
+        # nothing to be done here, newstate is already copied from setState
     }
     elsif ($setState eq 'enabled') {                    # attr disabled is not cleared yet here
         $newState = 'active';                           # enabled (disable removed) becomes active
@@ -4260,6 +4265,7 @@ sub SetStates {
         $newState = 'disabled' if ($disabled);
     }
     elsif ($setState eq 'opened') {
+        # nothing to be done, never called with open
     }
     elsif ($setState eq 'disconnected') {
         $newState = 'inactive' if ($oldState eq 'inactive');
@@ -4272,9 +4278,8 @@ sub SetStates {
     
     if ($newState =~ /inactive|disabled/) {
         if ($hash->{TCPConn}) {             # Modbus over TCP connection
-            DoClose($hash);                 # close, set Expect, clear Buffer, set state to disconnected
+            DoClose($hash, {NOSTATE => 1}); # close, set Expect, clear Buffer
             UpdateTimer($hash, \&Modbus::GetUpdate, 'stop');
-            # other timers are stopped in DoClose
         } 
         else {                              # connection via serial io device
             UnregAtIODev($hash);            # unregister at physical device because logical device is disabled
@@ -4294,10 +4299,8 @@ sub SetStates {
         }
     }
     
-    Log3 $name, 5, "$name: SetState sets state and STATE from $oldState to $newState";
-    $hash->{STATE} = $newState;
-    return if ($newState eq ReadingsVal($name, 'state', ''));
-    readingsSingleUpdate($hash, 'state', $newState, 1);
+    Log3 $name, 5, "$name: SetState sets state from $oldState to $newState";
+    DevIo_setStates($hash, $newState);
     return;
 }
 
@@ -4510,13 +4513,13 @@ sub SetIODev {
     }
     if (!$ioHash) {                                 # nothing found -> give up for now
         Log3 $name, 3, "$name: SetIODev found no usable physical modbus device";
-        SetStates($hash, 'disconnected');
+        DevIo_setStates($hash, 'disconnected');     # set state
         UnregAtIODev($hash);
         delete $hash->{IODev};
         return;
     }
     RegisterAtIODev($hash, $ioHash);		        # register, set MODE and PROTOCOL
-    SetStates($hash, 'opened');                     # set initial state for logical device connected through physical serial device like DevIo would do it after open
+    DevIo_setStates($hash, 'opened');               # set initial state for logical device connected through physical serial device like DevIo would do it after open
     return $ioHash;
 }
 
@@ -4929,9 +4932,9 @@ sub ObjAttr {
 # Get Object Info from Attributes,
 # parseInfo Hash or default from deviceInfo Hash
 sub ObjInfo {
-    my $hash        = shift;
-    my $key         = shift;
-    my $oName       = shift;
+    my $hash        = shift;        # device hash
+    my $key         = shift;        # objCombi like h123
+    my $oName       = shift;        # requested 
    
     my $defName     = $attrDefaults{$oName}{devDefault};
     
@@ -4947,8 +4950,8 @@ sub ObjInfo {
         $reading = $parseInfo->{$key}{reading};
     }
     if (!defined($reading)) {
-        #Log3 $name, 5, "$name: ObjInfo could not find a reading name";
-        return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
+        #return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
+        $reading = "unnamed-$key";          # don't return default here but use key as reading name and continue
     }
     
     #Log3 $name, 5, "$name: ObjInfo now looks at attrs for oName $oName / reading $reading / $key";
@@ -4965,7 +4968,13 @@ sub ObjInfo {
     # parseInfo for object $oName if special Fhem module using parseinfoHash
     return $parseInfo->{$key}{$oName}
         if (defined($parseInfo->{$key}) && defined($parseInfo->{$key}{$oName}));
-    
+
+    # returning unnamed here creates problems because we don't know if a reading actually has been defined e.g. for a slave
+    #if ($oName eq 'reading') {
+    #    Log3 $name, 5, "$name: ObjInfo called from " . FhemCaller() . " with $key, $oName requested, no attr reading defined, use unnamed-$key instead";
+    #    return "unnamed-$key";                  # if no attr and no parseinfo matche before
+    #}
+
     # check for type entry / attr ...
     if ($oName ne 'type') {
         #Log3 $name, 5, "$name: ObjInfo checking types";
@@ -5001,6 +5010,7 @@ sub ObjInfo {
         return $devInfo->{$type}{$defName}
             if (defined($devInfo->{$type}) && defined($devInfo->{$type}{$defName}));
     }
+
     # todo: the final return expression seems redundant
     return (exists($attrDefaults{$oName}{default}) ? $attrDefaults{$oName}{default} : '');
 }
