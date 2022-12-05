@@ -1500,8 +1500,7 @@ FW_detailSelect(@)
   $ret .= FW_hidden("detail", $d);
   $ret .= FW_hidden("dev.$cmd$d", $d.($param ? " $param":""));
   $ret .= FW_submit("cmd.$cmd$d", $cmd, $cmd.($psc?" psc":""));
-  $ret .= "<div class=\"$cmd downText\">&nbsp;$d&nbsp;".
-                ($param ? "&nbsp;$param":"")."</div>";
+  $ret .= "<div class=\"$cmd downText\"> $d ".($param ? "$param":"")."</div>";
   $ret .= FW_select("sel_$cmd$d","arg.$cmd$d",\@al,$selEl,$cmd,undef,$typeHash);
   $ret .= FW_textfield("val.$cmd$d", 30, $cmd);
   $ret .= "</form></div>";
