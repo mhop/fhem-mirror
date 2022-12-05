@@ -9115,12 +9115,13 @@ attr SMA_Energymeter DbLogValueFn
     <a id="DbLog-attr-showproctime"></a>
     <li><b>showproctime</b>
     <ul>
-      <code>attr &lt;device&gt; [1|0]
-      </code><br><br>
+      <code>attr &lt;device&gt; showproctime [1|0] </code><br><br>
 
-      If set, the reading "sql_processing_time" shows the required execution time (in seconds) for the sql-requests. This is not calculated
-      for a single sql-statement, but the summary of all sql-statements necessary for within an executed DbLog-function in background.
-      The reading "background_processing_time" shows the total time used in background.  <br>
+      If set, the reading "sql_processing_time" shows the required processing time (in seconds) for the 
+      SQL execution of the executed function. 
+      This does not consider a single SQL statement, but the sum of all executed SQL commands within the
+      respective function is considered. <br>
+      The reading "background_processing_time" shows the time used in the SubProcess.
     </ul>
     </li>
   </ul>
@@ -10694,13 +10695,13 @@ attr SMA_Energymeter DbLogValueFn
     <a id="DbLog-attr-showproctime"></a>
     <li><b>showproctime</b>
     <ul>
-      <code>attr &lt;device&gt; showproctime [1|0]
-      </code><br><br>
+      <code>attr &lt;device&gt; showproctime [1|0] </code><br><br>
 
-      Wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die SQL-Ausführung der
-      durchgeführten Funktion. Dabei wird nicht ein einzelnes SQL-Statement, sondern die Summe aller notwendigen SQL-Abfragen innerhalb der
-      jeweiligen Funktion betrachtet. Das Reading "background_processing_time" zeigt die im Kindprozess BlockingCall verbrauchte Zeit.<br>
-
+      Wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die 
+      SQL-Ausführung der durchgeführten Funktion. 
+      Dabei wird nicht ein einzelnes SQL-Statement, sondern die Summe aller ausgeführten SQL-Kommandos innerhalb der
+      jeweiligen Funktion betrachtet. <br>
+      Das Reading "background_processing_time" zeigt die im SubProcess verbrauchte Zeit.
     </ul>
     </li>
   </ul>
