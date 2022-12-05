@@ -1363,8 +1363,10 @@ sub DbLog_Log {
       }
   }
 
-  my ($event,$reading,$value,$unit,$memcount);
+  my ($event,$reading,$value,$unit);
   my $err;
+  
+  my $memcount = 0;
 
   my $re                 = $hash->{REGEXP};
   my $ts_0               = TimeNow();                                            # timestamp in SQL format YYYY-MM-DD hh:mm:ss
@@ -2052,11 +2054,9 @@ sub DbLog_addMemCacheRow {
       $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
   }
 
-  my $memcount = 0;
-  
-  if (defined $data{DbLog}{$name}{cache}{memcache}) {
-      $memcount = scalar(keys %{$data{DbLog}{$name}{cache}{memcache}});
-  }
+  my $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
+                 scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
+                 0;
 
 return $memcount;
 }
