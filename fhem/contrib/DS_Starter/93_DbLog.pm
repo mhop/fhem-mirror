@@ -1363,8 +1363,7 @@ sub DbLog_Log {
       }
   }
 
-  my ($event,$reading,$value,$unit);
-  my $err;
+  my ($event,$reading,$value,$unit,$err,$DoIt);
   
   my $memcount = 0;
 
@@ -1481,7 +1480,7 @@ sub DbLog_Log {
               # Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
               # entsprechend unterschiedlich vorbelegt sein.
               # keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
-              my $DoIt = 0;
+              $DoIt = 0;
 
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
 
@@ -1643,30 +1642,30 @@ sub DbLog_Log {
                     Log3 ($name, 4, "DbLog $name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                   }
                   
-                  $memcount = DbLog_addMemCacheRow ($name, $row);                        # Datensatz zum Memory Cache hinzufügen
+                  $memcount = DbLog_addMemCacheRow ($name, $row);                            # Datensatz zum Memory Cache hinzufügen
               }
           }
       }
   };
 
-  if($async) {                                                                           # asynchoner non-blocking Mode
-      readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0));
+  if($async) {                                                                               # asynchoner non-blocking Mode
+      if($memcount) {
+          readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0)) if($DoIt);
 
-      if($memcount >= $clim) {                                                           # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
-          my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
-          my $syncival = AttrVal($name, "syncInterval", 30);
+          if($memcount >= $clim) {                                                           # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
+              my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
+              my $syncival = AttrVal($name, "syncInterval", 30);
 
-          if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
+              if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
 
-              Log3 ($name, 4, "DbLog $name - Number of cache entries reached cachelimit $clim - start database sync.");
+                  Log3 ($name, 4, "DbLog $name - Number of cache entries reached cachelimit $clim - start database sync.");
 
-              DbLog_execMemCacheAsync ($hash);
+                  DbLog_execMemCacheAsync ($hash);
 
-              $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
+                  $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
+              }
           }
       }
-
-      $net = tv_interval($nst);                                                         # Notify-Routine Laufzeit ermitteln
   }
 
   if(!$async) {
@@ -1674,9 +1673,7 @@ sub DbLog_Log {
           return if($hash->{HELPER}{REOPEN_RUNS});                                      # return wenn "reopen" mit Ablaufzeit gestartet ist
 
           $err = DbLog_execMemCacheSync ($hash);
-          DbLog_setReadingstate ($hash, $err) if($err);
-
-          $net = tv_interval($nst);                                                     # Notify-Routine Laufzeit ermitteln
+          DbLog_setReadingstate ($hash, $err) if($err);                                                    
       }
       else {
           if($hash->{HELPER}{SHUTDOWNSEQ}) {
@@ -1685,6 +1682,8 @@ sub DbLog_Log {
           }
       }
   }
+  
+  $net = tv_interval($nst);                                                             # Notify-Routine Laufzeit ermitteln
 
   if($net && AttrVal($name, 'showNotifyTime', 0)) {
       readingsSingleUpdate($hash, 'notify_processing_time', sprintf("%.4f",$net), 1);
@@ -4006,7 +4005,9 @@ sub DbLog_SBP_Read {
 
       delete $hash->{HELPER}{'LONGRUN_PID'};
       delete $hash->{HELPER}{LASTLIMITRUNTIME} if(!$msg);
-
+      
+      my $ce = AttrVal ($name, 'cacheEvents', 0);
+      
       # Log3 ($name, 1, "DbLog $name - Read result of operation: $oper");
       # Log3 ($name, 1, "DbLog $name - DbLog_SBP_Read: name: $name, msg: $msg, ot: $ot, rowlback: ".Dumper $rowlback);
 
@@ -4026,15 +4027,17 @@ sub DbLog_SBP_Read {
                   $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
               }
           };
+          
+          readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0));
       }
 
-      if($asyncmode) {
-          $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
-                      scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
-                      0;
+      #if($asyncmode) {
+      #    $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
+      #                scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
+      #                0;
 
-          readingsSingleUpdate ($hash, 'CacheUsage', $memcount, 0);
-      }
+      #    readingsSingleUpdate ($hash, 'CacheUsage', $memcount, 0);
+      #}
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
           my ($rt,$brt) = split(",", $ot);
