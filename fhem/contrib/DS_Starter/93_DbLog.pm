@@ -1450,9 +1450,9 @@ sub DbLog_Log {
 
               Log3 ($name, 5, "DbLog $name - parsed Event: $dev_name , Event: $event") if($log4rel);
               
-              if($log4rel && $DbLogExclude) {
-                  Log3 ($name, 5, qq{DbLog $name - DbLogExclude of "$dev_name": $DbLogExclude});
-                  Log3 ($name, 5, qq{DbLog $name - DbLogInclude of "$dev_name": $DbLogInclude});
+              if($log4rel) {
+                  Log3 ($name, 5, qq{DbLog $name - DbLogExclude of "$dev_name": $DbLogExclude}) if($DbLogExclude);
+                  Log3 ($name, 5, qq{DbLog $name - DbLogInclude of "$dev_name": $DbLogInclude}) if($DbLogInclude);
               }
 
               # Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
@@ -2031,9 +2031,11 @@ sub DbLog_addMemCacheRow {
       $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
   }
 
-  my $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
-                 scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
-                 0;
+  my $memcount = 0;
+  
+  if (defined $data{DbLog}{$name}{cache}{memcache}) {
+      $memcount = scalar(keys %{$data{DbLog}{$name}{cache}{memcache}});
+  }
 
 return $memcount;
 }
