@@ -372,6 +372,14 @@ FW_displayHelp(devName, sel, selType, val, group)
         $(sel).closest("div[cmd='"+selType+"']")
            .after('<div class="makeTable" id="devSpecHelp"></div>')
         $("#devSpecHelp").html($(liTag).html());
+        $("#devSpecHelp a").each(function(){ // #130694
+          var href = $(this).attr("href");
+          if(href && href.indexOf("#") == 0) {
+            $(this).attr("target", "_blank");
+            $(this).attr("href",
+                addcsrf(FW_root+"/docs/commandref.html"+$(this).attr("href")));
+          }
+        });
       }
     }
     wb.remove();
