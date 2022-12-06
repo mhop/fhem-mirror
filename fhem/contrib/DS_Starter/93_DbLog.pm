@@ -459,7 +459,7 @@ sub DbLog_Undef {
   my $name = shift;
   my $dbh  = $hash->{DBHP};
 
-  delete $hash->{HELPER}{'LONGRUN_PID'};
+  delete $hash->{HELPER}{LONGRUN_PID};
 
   BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
   BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
@@ -1208,7 +1208,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
       BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
       BlockingKill($hash->{HELPER}{DELDAYS_PID})    if($hash->{HELPER}{DELDAYS_PID});
 
-      delete $hash->{HELPER}{'LONGRUN_PID'};
+      delete $hash->{HELPER}{LONGRUN_PID};
       delete $hash->{HELPER}{COUNT_PID};
       delete $hash->{HELPER}{DELDAYS_PID};
       delete $hash->{HELPER}{REDUCELOG_PID};
@@ -1469,9 +1469,9 @@ sub DbLog_Log {
       }
   }
   
-  my $log4rel = $vb4show && !$hash->{HELPER}{'LONGRUN_PID'} ? 1 : 0;
+  my $log4rel = $vb4show && !$hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
-  if(AttrVal ($name, 'verbose', 3) == 4) {
+  if(AttrVal ($name, 'verbose', 3) =~ /[45]/) {
       if($log4rel) {
           Log3 ($name, 4, "DbLog $name - ################################################################");
           Log3 ($name, 4, "DbLog $name - ###              start of new Logcycle                       ###");
@@ -2781,7 +2781,7 @@ sub DbLog_execMemCacheAsync {
       return;
   }
 
-  if($hash->{HELPER}{'LONGRUN_PID'}) {
+  if($hash->{HELPER}{LONGRUN_PID}) {
       $dolog = 0;
   }
 
@@ -2808,7 +2808,7 @@ sub DbLog_execMemCacheAsync {
 
   if($memcount && $dolog) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
-      Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - asynchronous        ###");
+      Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP asynchronous    ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - MemCache contains $memcount entries to process");
       Log3 ($name, 4, "DbLog $name - DbLogType is: $DbLogType");
@@ -2832,7 +2832,7 @@ sub DbLog_execMemCacheAsync {
       return if($error);
   }
   else {
-      if($hash->{HELPER}{'LONGRUN_PID'}) {
+      if($hash->{HELPER}{LONGRUN_PID}) {
           $error = 'Cache execution already running - resync at NextSync';
           DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
       }
@@ -2866,7 +2866,15 @@ sub DbLog_execMemCacheSync {
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
   
-  return if($hash->{HELPER}{'LONGRUN_PID'});
+  return if($hash->{HELPER}{LONGRUN_PID});
+  
+  my $name = $hash->{NAME};
+  
+  if(AttrVal ($name, 'verbose', 3) =~ /[45]/) {
+      Log3 ($name, 4, "DbLog $name - ################################################################");
+      Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
+      Log3 ($name, 4, "DbLog $name - ################################################################");
+  }
   
   my $name = $hash->{NAME};
   my $memc;
@@ -3102,6 +3110,18 @@ sub DbLog_SBP_onRun {
                                        bst        => $bst
                                      }
                                    );
+          }
+          
+          ##  Kommando: count
+          #########################################################          
+          if ($operation =~ /count/xs) {
+              _DbLog_SBP_onRun_Count ( { subprocess => $subprocess,
+                                         name       => $name,
+                                         memc       => $memc,
+                                         store      => $store,
+                                         bst        => $bst
+                                       }
+                                     );
           }
       }
   
@@ -3735,6 +3755,50 @@ sub _DbLog_SBP_onRun_Log {
 return;
 }
 
+#################################################################
+# SubProcess - Count-Routine
+#################################################################
+sub _DbLog_SBP_onRun_Count {
+  my $paref       = shift;
+  
+  my $subprocess  = $paref->{subprocess};
+  my $name        = $paref->{name};
+  my $memc        = $paref->{memc};
+  my $store       = $paref->{store};                                          # Datenspeicher
+  my $bst         = $paref->{bst};
+  
+  my $dbh         = $store->{dbh};  
+  my $history     = $store->{dbparams}{history};
+  my $current     = $store->{dbparams}{current};
+  
+  my $operation   = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
+  
+  my $error       = q{};
+
+  my $st          = [gettimeofday];                                           # SQL-Startzeit
+  
+  my $ch          = $dbh->selectrow_array("SELECT count(*) FROM $history");
+  my $cc          = $dbh->selectrow_array("SELECT count(*) FROM $current");
+
+  my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
+  my $ot  = $rt.",".$brt;
+
+  my $ret = {
+      name     => $name,
+      msg      => $error,
+      ot       => $ot,
+      oper     => $operation,
+      ch       => $ch,
+      cc       => $cc
+  };
+
+  my $retjson = eval { encode_json($ret) };
+  $subprocess->writeToParent ($retjson);
+
+return;
+}
+
 ####################################################################################################
 #       nur Datenbank "begin transaction"
 ####################################################################################################
@@ -3923,7 +3987,7 @@ sub DbLog_SBP_CheckAndInit {
   else {
       $hash->{SBP_STATE} = "dead (".$hash->{SBP_PID}.")";
       delete $hash->{SBP_PID};
-      delete $hash->{HELPER}{'LONGRUN_PID'};                             # Statusbit laufende Verarbeitung löschen
+      delete $hash->{HELPER}{LONGRUN_PID};                                # Statusbit laufende Verarbeitung löschen
       $err = _DbLog_SBP_Init ($hash);
   }
 
@@ -4053,19 +4117,22 @@ sub DbLog_SBP_sendLogData {
 
   $subprocess->writeToChild($json);
   
-  $hash->{HELPER}{'LONGRUN_PID'} = time();                # Statusbit laufende Verarbeitung mit Startzeitstempel;
+  $hash->{HELPER}{LONGRUN_PID} = time();                # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
 }
 
 #####################################################
 #   ein Kommando zur Ausführung an SubProcess senden
-#   z.B. count, deleteOldDays, etc.
+#   z.B. 
+#   $oper = count
+#   $oper = deleteOldDays
+#   etc.
 #####################################################
 sub DbLog_SBP_sendCommand {
   my $hash = shift;
   my $oper = shift;                                       # angeforderte Operation
-  my $cmd  = shift;
+  my $cmd  = shift // q{};
 
   my $name       = $hash->{NAME};
   my $subprocess = $hash->{".fhem"}{subprocess};
@@ -4090,7 +4157,7 @@ sub DbLog_SBP_sendCommand {
 
   $subprocess->writeToChild($json);
   
-  $hash->{HELPER}{'LONGRUN_PID'} = time();               # Statusbit laufende Verarbeitung mit Startzeitstempel;
+  $hash->{HELPER}{LONGRUN_PID} = time();               # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
 }
@@ -4166,7 +4233,7 @@ sub DbLog_SBP_CleanUp {
   delete ($selectlist{"$name.$pid"});
   delete $hash->{FD};
   delete $hash->{SBP_PID};
-  delete $hash->{HELPER}{'LONGRUN_PID'};
+  delete $hash->{HELPER}{LONGRUN_PID};
 
   $hash->{SBP_STATE} = "Stopped";
 
@@ -4195,11 +4262,10 @@ sub DbLog_SBP_Read {
       my $name     = $ret->{name};
       my $msg      = $ret->{msg};
       my $ot       = $ret->{ot};
-      my $rowlback = $ret->{rowlback};
       my $reqdbdat = $ret->{reqdbdat};                                                        # 1 = Request Übertragung DB Verbindungsparameter
       my $oper     = $ret->{oper};                                                            # aktuell ausgeführte Operation
 
-      delete $hash->{HELPER}{'LONGRUN_PID'};
+      delete $hash->{HELPER}{LONGRUN_PID};
       delete $hash->{HELPER}{LASTLIMITRUNTIME} if(!$msg);
       
       my $ce = AttrVal ($name, 'cacheEvents', 0);
@@ -4214,20 +4280,31 @@ sub DbLog_SBP_Read {
           }
       }
 
-      my $asyncmode = AttrVal($name, 'asyncMode', 0);
-      my $memcount;
-
-      if($rowlback) {                                                                         # one Transaction
-          eval {
-              for my $key (sort {$a <=>$b} keys %{$rowlback}) {
-                  $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
-                 
-                  Log3 ($name, 5, "DbLog $name - rowback to Cache: $key -> ".$rowlback->{$key});
-              }
-          };
+      ## Log - Read
+      ###############
+      if ($oper =~ /log_/xs) {
+          my $rowlback = $ret->{rowlback};
           
-          readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0));
+          if($rowlback) {                                                                         # one Transaction
+              my $memcount;
+              
+              eval {
+                  for my $key (sort {$a <=>$b} keys %{$rowlback}) {
+                      $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
+                     
+                      Log3 ($name, 5, "DbLog $name - rowback to Cache: $key -> ".$rowlback->{$key});
+                  }
+              };
+              
+              readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0));
+          }
       }
+
+      ## Count - Read
+      #################
+      if ($oper =~ /count/xs) {  
+
+      }      
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
           my ($rt,$brt) = split(",", $ot);
