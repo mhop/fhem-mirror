@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-05 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-06 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -29,7 +29,7 @@ eval "use JSON;1;"                       or my $jsonabs       = "JSON";         
 
 use Data::Dumper;
 use Blocking;
-use Time::HiRes qw(gettimeofday tv_interval);
+use Time::HiRes qw(gettimeofday tv_interval usleep);
 use Time::Local;
 use Encode qw(encode_utf8);
 use MIME::Base64;
@@ -40,6 +40,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log ",
   "5.2.0"   => "05.12.2022 LONGRUN_PID, \$hash->{prioSave}, rework SetFn ",
   "5.1.0"   => "03.12.2022 implement SubProcess for logging data in synchron Mode ",
   "5.0.0"   => "02.12.2022 implement SubProcess for logging data in asynchron Mode, delete attr traceHandles ",
@@ -261,7 +262,7 @@ my %DbLog_vNotesIntern = (
   "1.9.2"   => "17.12.2016 some improvemnts DbLog_Log, DbLog_Push ",
   "1.9.1"   => "16.12.2016 DbLog_Log no using encode_base64 ",
   "1.8.1"   => "16.12.2016 DbLog_Push changed ",
-  "1.7.1"   => "15.12.2016 attr procedure of \"disabled\" changed"
+  "1.7.1"   => "15.12.2016 initial rework "
 );
 
 # Steuerhashes
@@ -273,6 +274,14 @@ my %DbLog_hset = (                                                              
   eraseReadings  => { fn => \&_DbLog_seteraseReadings  },
   stopSubProcess => { fn => \&_DbLog_setstopSubProcess },
   purgeCache     => { fn => \&_DbLog_setpurgeCache     },
+  commitCache    => { fn => \&_DbLog_setcommitCache    },
+  configCheck    => { fn => \&_DbLog_setconfigCheck    },
+  reopen         => { fn => \&_DbLog_setreopen         },
+  rereadcfg      => { fn => \&_DbLog_setrereadcfg      },
+  addLog         => { fn => \&_DbLog_setaddLog         },
+  addCacheLine   => { fn => \&_DbLog_setaddCacheLine   },
+  count          => { fn => \&_DbLog_setcount          },
+  countNbl       => { fn => \&_DbLog_setcountNbl       },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -704,6 +713,7 @@ sub DbLog_Set {
     
     my $name  = $a[0];
     my $opt   = $a[1];
+    my @args  = @a;
     my $prop  = $a[2]; 
     my $prop1 = $a[3];  
 
@@ -769,20 +779,21 @@ sub DbLog_Set {
     my $dbh = $hash->{DBHP};
     my $db  = (split(/;|=/, $hash->{dbconn}))[1];
 
-    my $ret;
+    my ($ret,$trigger);
     
     my $params = {
         hash    => $hash,
         name    => $name,
+        argsref => \@args,
         opt     => $opt,
         prop    => $prop,
         prop1   => $prop1
     };
 
     if($DbLog_hset{$opt} && defined &{$DbLog_hset{$opt}{fn}}) {
-        $ret = q{};
-        $ret = &{$DbLog_hset{$opt}{fn}} ($params);
-        return $ret;
+        $ret            = q{};
+        ($ret,$trigger) = &{$DbLog_hset{$opt}{fn}} ($params);
+        return ($ret,$trigger);
     }
     
     
@@ -841,151 +852,6 @@ sub DbLog_Set {
             Log3($name, 1, "DbLog $name: reduceLogNbl syntax error, no <days>[:<days>] given.");
             $ret = "reduceLogNbl error, no <days> given.";
         }
-    }
-    elsif ($opt eq 'addLog') {
-        unless ($prop) { return "The argument of $opt is not valid. Please check commandref.";}
-        my $nce = ("\!useExcludes" ~~ @a) ? 1 : 0;
-        map (s/\!useExcludes//g, @a);
-        my $cn;
-
-        if(/CN=/ ~~ @a) {
-            my $t = join(" ",@a);
-            ($cn) = ($t =~ /^.*CN=(\w+).*$/);
-            map(s/CN=$cn//g, @a);
-        }
-
-        my $params = { hash      => $hash,
-                       devrdspec => $prop,
-                       value     => $prop1,
-                       nce       => $nce,
-                       cn        => $cn
-                     };
-
-        DbLog_AddLog ($params);
-
-        my $skip_trigger = 1;                                         # kein Event erzeugen falls addLog device/reading not found aber Abarbeitung erfolgreich
-
-        return undef,$skip_trigger;
-    }
-    elsif ($opt eq 'reopen') {
-        return if(IsDisabled($name));
-
-        if ($dbh) {
-            $dbh->disconnect();
-        }
-
-        DbLog_SBP_dbDisconnect ($hash);
-
-        if (!$prop) {
-            Log3 ($name, 3, "DbLog $name - Reopen requested");
-
-            _DbLog_ConnectPush ($hash);
-
-            if($hash->{HELPER}{REOPEN_RUNS}) {
-                delete $hash->{HELPER}{REOPEN_RUNS};
-                delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
-                RemoveInternalTimer($hash, "DbLog_reopen");
-            }
-
-            DbLog_execMemCacheAsync ($hash) if($async);
-            $ret = "Reopen executed.";
-        }
-        else {
-            unless ($prop =~ /^[0-9]+$/) {
-                return " The Value of $opt time is not valid. Use only figures 0-9 !";
-            }
-
-            $hash->{HELPER}{REOPEN_RUNS} = $prop;                                            # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
-
-            BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
-            BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
-            BlockingKill($hash->{HELPER}{DELDAYS_PID})    if($hash->{HELPER}{DELDAYS_PID});
-
-            delete $hash->{HELPER}{'LONGRUN_PID'};
-            delete $hash->{HELPER}{COUNT_PID};
-            delete $hash->{HELPER}{DELDAYS_PID};
-            delete $hash->{HELPER}{REDUCELOG_PID};
-
-            my $ts = (split(" ",FmtDateTime(gettimeofday()+$prop)))[1];
-            Log3 ($name, 2, "DbLog $name - Connection closed until $ts ($prop seconds).");
-
-            readingsSingleUpdate($hash, "state", "closed until $ts ($prop seconds)", 1);
-
-            InternalTimer(gettimeofday()+$prop, "DbLog_reopen", $hash, 0);
-
-            $hash->{HELPER}{REOPEN_RUNS_UNTIL} = $ts;
-        }
-    }
-    elsif ($opt eq 'rereadcfg') {
-        Log3 ($name, 3, "DbLog $name - Rereadcfg requested.");
-
-        if ($dbh) {
-            $dbh->disconnect();
-        }
-
-        $ret = DbLog_readCfg($hash);
-        return $ret if $ret;
-
-        _DbLog_ConnectPush     ($hash);
-        DbLog_SBP_dbDisconnect ($hash, 1);                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
-
-        my $rst = DbLog_SBP_sendConnectionData ($hash);                   # neue Verbindungsdaten an SubProzess senden
-        
-        if (!$rst) {
-            Log3 ($name, 3, "DbLog $name - new DB connection parameters are transmitted ...");
-        }
-
-        $ret = "Rereadcfg executed.";
-    }
-    elsif ($opt eq 'commitCache') {
-        DbLog_execMemCacheAsync ($hash);
-    }
-    elsif ($opt eq 'addCacheLine') {
-        if(!$prop) {
-            return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
-        }
-
-        my @b = @a;
-        shift @b;
-        shift @b;
-        my $aa;
-
-        for my $k (@b) {
-            $aa .= "$k ";
-        }
-
-        chop($aa); #letztes Leerzeichen entfernen
-        $aa = DbLog_charfilter($aa) if(AttrVal($name, "useCharfilter",0));
-
-        my ($i_timestamp, $i_dev, $i_type, $i_evt, $i_reading, $i_val, $i_unit) = split("\\|",$aa);
-
-        if($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
-            return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
-        }
-
-        my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-        eval { my $ts = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-
-        if ($@) {
-            my @l = split (/at/, $@);
-           return " Timestamp is out of range - $l[0]";
-        }
-
-        DbLog_addCacheLine ( { hash        => $hash,
-                               i_timestamp => $i_timestamp,
-                               i_dev       => $i_dev,
-                               i_type      => $i_type,
-                               i_evt       => $i_evt,
-                               i_reading   => $i_reading,
-                               i_val       => $i_val,
-                               i_unit      => $i_unit
-                             }
-                           );
-
-    }
-    elsif ($opt eq 'configCheck') {
-        my $check = DbLog_configcheck($hash);
-        return $check;
     }
     elsif ($opt eq 'exportCache') {
         my $cln;
@@ -1093,40 +959,6 @@ sub DbLog_Set {
         }
 
         return;
-    }
-    elsif ($opt eq 'count') {
-        Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
-        $dbh = _DbLog_ConnectNewDBH($hash);
-
-        if(!$dbh) {
-            Log3 ($name, 1, "DbLog $name: DBLog_Set - count - DB connect not possible");
-            return;
-        }
-        else {
-            Log3 ($name, 4, "DbLog $name: Records count requested.");
-
-            my $c = $dbh->selectrow_array("SELECT count(*) FROM $history");
-            readingsSingleUpdate($hash, 'countHistory', $c ,1);
-
-            $c = $dbh->selectrow_array("SELECT count(*) FROM $current");
-            readingsSingleUpdate($hash, 'countCurrent', $c ,1);
-
-            $dbh->disconnect();
-
-            InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
-        }
-    }
-    elsif ($opt eq 'countNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
-
-        if ($hash->{HELPER}{COUNT_PID} && $hash->{HELPER}{COUNT_PID}{pid} !~ m/DEAD/){
-            $ret = "DbLog count already in progress. Please wait until the running process is finished.";
-        }
-        else {
-            delete $hash->{HELPER}{COUNT_PID};
-            $hash->{HELPER}{COUNT_PID} = BlockingCall("DbLog_countNbl","$name","DbLog_countNbl_finished");
-            return;
-        }
     }
     elsif ($opt eq 'deleteOldDays') {
         Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
@@ -1306,6 +1138,291 @@ sub _DbLog_setpurgeCache {               ## no critic "not used"
   readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
   
 return 'Memory Cache purged';
+}
+
+################################################################
+#                      Setter commitCache
+################################################################
+sub _DbLog_setcommitCache {              ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  DbLog_execMemCacheAsync ($hash);
+  
+return;
+}
+
+################################################################
+#                      Setter configCheck
+################################################################
+sub _DbLog_setconfigCheck {              ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $check = DbLog_configcheck($hash);
+
+return $check;
+}
+
+################################################################
+#                      Setter reopen
+################################################################
+sub _DbLog_setreopen {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+
+  my $dbh = $hash->{DBHP};
+  my $ret;
+
+  if ($dbh) {
+      $dbh->disconnect();
+  }
+
+  DbLog_SBP_dbDisconnect ($hash);
+
+  if (!$prop) {
+      Log3 ($name, 3, "DbLog $name - Reopen requested");
+
+      _DbLog_ConnectPush ($hash);
+
+      if($hash->{HELPER}{REOPEN_RUNS}) {
+          delete $hash->{HELPER}{REOPEN_RUNS};
+          delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
+          RemoveInternalTimer($hash, "DbLog_reopen");
+      }
+
+      DbLog_execMemCacheAsync ($hash) if(AttrVal($name, 'asyncMode', 0));
+      $ret = "Reopen executed.";
+  }
+  else {
+      unless ($prop =~ /^[0-9]+$/) {
+          return " The Value of $opt time is not valid. Use only figures 0-9 !";
+      }
+
+      $hash->{HELPER}{REOPEN_RUNS} = $prop;                                              # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
+
+      BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
+      BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
+      BlockingKill($hash->{HELPER}{DELDAYS_PID})    if($hash->{HELPER}{DELDAYS_PID});
+
+      delete $hash->{HELPER}{'LONGRUN_PID'};
+      delete $hash->{HELPER}{COUNT_PID};
+      delete $hash->{HELPER}{DELDAYS_PID};
+      delete $hash->{HELPER}{REDUCELOG_PID};
+
+      my $ts = (split " ",FmtDateTime(gettimeofday()+$prop))[1];
+      Log3 ($name, 2, "DbLog $name - Connection closed until $ts ($prop seconds).");
+
+      readingsSingleUpdate($hash, "state", "closed until $ts ($prop seconds)", 1);
+
+      InternalTimer(gettimeofday()+$prop, "DbLog_reopen", $hash, 0);
+
+      $hash->{HELPER}{REOPEN_RUNS_UNTIL} = $ts;
+  }
+
+return $ret;
+}
+
+################################################################
+#                      Setter rereadcfg
+################################################################
+sub _DbLog_setrereadcfg {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+
+  my $dbh = $hash->{DBHP};
+
+  Log3 ($name, 3, "DbLog $name - Rereadcfg requested.");
+
+  if ($dbh) {
+      $dbh->disconnect();
+  }
+
+  my $ret = DbLog_readCfg($hash);
+  return $ret if $ret;
+
+  _DbLog_ConnectPush     ($hash);
+  DbLog_SBP_dbDisconnect ($hash, 1);                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+
+  my $rst = DbLog_SBP_sendConnectionData ($hash);                   # neue Verbindungsdaten an SubProzess senden
+
+  if (!$rst) {
+      Log3 ($name, 3, "DbLog $name - new DB connection parameters are transmitted ...");
+  }
+
+  $ret = "Rereadcfg executed.";
+
+return $ret;
+}
+
+################################################################
+#                      Setter addLog
+################################################################
+sub _DbLog_setaddLog {                   ## no critic "not used"
+  my $paref   = shift;
+  
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+  my $prop    = $paref->{prop};
+  my $argsref = $paref->{argsref};
+
+  unless ($prop) { 
+      return "$opt needs an argument. Please check commandref.";
+  }
+  
+  my @args = @{$argsref};
+  
+  my $nce = ("\!useExcludes" ~~ @args) ? 1 : 0;
+  
+  map (s/\!useExcludes//g, @args);
+  
+  my $cn;
+
+  if(/CN=/ ~~ @args) {
+      my $t = join(" ",@args);
+      ($cn) = ($t =~ /^.*CN=(\w+).*$/);
+      map(s/CN=$cn//g, @args);
+  }
+
+  my $params = { hash      => $hash,
+                 devrdspec => $args[2],
+                 value     => $args[3],
+                 nce       => $nce,
+                 cn        => $cn
+               };
+
+  DbLog_AddLog ($params);
+
+  my $skip_trigger = 1;                                         # kein Event erzeugen falls addLog device/reading not found aber Abarbeitung erfolgreich
+
+return undef,$skip_trigger;
+}
+
+################################################################
+#                      Setter addCacheLine
+################################################################
+sub _DbLog_setaddCacheLine {              ## no critic "not used"
+  my $paref   = shift;
+  
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+  my $prop    = $paref->{prop};
+  my $argsref = $paref->{argsref};
+
+  if(!$prop) {
+      return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
+  }
+
+  my @b = @{$argsref};
+  shift @b;
+  shift @b;
+  
+  my $aa;
+
+  for my $k (@b) {
+      $aa .= "$k ";
+  }
+
+  chop($aa);                                                                      #letztes Leerzeichen entfernen
+  $aa = DbLog_charfilter($aa) if(AttrVal($name, "useCharfilter",0));
+
+  my ($i_timestamp, $i_dev, $i_type, $i_evt, $i_reading, $i_val, $i_unit) = split "\\|", $aa;
+
+  if($i_timestamp !~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ || !$i_dev || !$i_reading) {
+      return "Syntax error in set $opt command. Use this line format: YYYY-MM-DD HH:MM:SS|<device>|<type>|<event>|<reading>|<value>|[<unit>] ";
+  }
+
+  my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+  eval { my $ts = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+
+  if ($@) {
+      my @l = split /at/, $@;
+      return "Timestamp is out of range - $l[0]";
+  }
+
+  DbLog_addCacheLine ( { hash        => $hash,
+                         i_timestamp => $i_timestamp,
+                         i_dev       => $i_dev,
+                         i_type      => $i_type,
+                         i_evt       => $i_evt,
+                         i_reading   => $i_reading,
+                         i_val       => $i_val,
+                         i_unit      => $i_unit
+                       }
+                     );
+                           
+return;
+}
+
+################################################################
+#                      Setter count
+################################################################
+sub _DbLog_setcount {              ## no critic "not used"
+  my $paref   = shift;
+  
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+
+  Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
+  
+  my $dbh = _DbLog_ConnectNewDBH($hash);
+
+  if(!$dbh) {
+      Log3 ($name, 1, "DbLog $name: DBLog_Set - count - DB connect not possible");
+      return;
+  }
+  else {
+      Log3 ($name, 4, "DbLog $name: Records count requested.");
+      
+      my $history = $hash->{HELPER}{TH};
+      my $current = $hash->{HELPER}{TC};
+      my $ch      = $dbh->selectrow_array("SELECT count(*) FROM $history");
+      my $cc      = $dbh->selectrow_array("SELECT count(*) FROM $current");
+      
+      readingsSingleUpdate($hash, 'countHistory', $ch ,1);
+      readingsSingleUpdate($hash, 'countCurrent', $cc ,1);
+      
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, 'countHistory', $ch);
+      readingsBulkUpdate  ($hash, 'countCurrent', $cc);
+      readingsEndUpdate   ($hash, 1);
+
+      $dbh->disconnect();
+  }
+                           
+return;
+}
+
+################################################################
+#                      Setter countNbl
+################################################################
+sub _DbLog_setcountNbl {                 ## no critic "not used"
+  my $paref   = shift;
+  
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+
+  Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
+  
+  my $ret;
+  
+  if ($hash->{HELPER}{COUNT_PID} && $hash->{HELPER}{COUNT_PID}{pid} !~ m/DEAD/){
+      $ret = "DbLog count already in progress. Please wait until the running process is finished.";
+  }
+  else {
+      delete $hash->{HELPER}{COUNT_PID};
+      $hash->{HELPER}{COUNT_PID} = BlockingCall("DbLog_countNbl", $name, "DbLog_countNbl_finished");
+  }
+                           
+return $ret;
 }
 
 ##################################################################################################################
@@ -2702,7 +2819,7 @@ sub DbLog_execMemCacheAsync {
       my $memc;
 
       for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-          Log3 ($name, 5, "DbLog $name - MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key});
+          Log3 ($name, 5, "DbLog $name - MemCache contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
 
           $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};        # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
       }
@@ -2711,7 +2828,7 @@ sub DbLog_execMemCacheAsync {
 
       undef $data{DbLog}{$name}{cache}{memcache};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
-      $error = DbLog_SBP_sendProcessData ($hash, 'log_asynch', $memc);                     # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
+      $error = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                         # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
       return if($error);
 
       $hash->{HELPER}{'LONGRUN_PID'} = time();                                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
@@ -2750,14 +2867,14 @@ sub DbLog_execMemCacheSync {
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
-
+  
   return if($hash->{HELPER}{'LONGRUN_PID'});
   
   my $name = $hash->{NAME};
   my $memc;
 
   for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-      Log3 ($name, 5, "DbLog $name - MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key});
+      Log3 ($name, 5, "DbLog $name - MemCache contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
 
       $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};                # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   }
@@ -2765,8 +2882,8 @@ sub DbLog_execMemCacheSync {
   $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                                     # aktuellen Index an Subprozess übergeben
 
   undef $data{DbLog}{$name}{cache}{memcache};                                                  # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
-
-  $err = DbLog_SBP_sendProcessData ($hash, 'log_synch', $memc);                                # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
+  
+  $err = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
 
   $hash->{HELPER}{'LONGRUN_PID'} = time();                                                     # Statusbit laufende Verarbeitung mit Startzeitstempel;
@@ -2797,26 +2914,14 @@ sub DbLog_SBP_onRun {
           my $dbdelpars   = $memc->{dbdelpars};                                   # 1 -> gespeicherte DB Parameter sollen gelöscht werden
           my $dbdisconn   = $memc->{dbdisconn};                                   # 1 -> die Datenbankverbindung lösen/löschen
 
-          my $DbLogType   = $memc->{DbLogType};                                   # Log-Ziele
-          my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
-          my $tl          = $memc->{tl};                                          # traceLevel
-          my $tf          = $memc->{tf};                                          # traceFlag
-          my $bi          = $memc->{bi};                                          # Bulk-Insert 0|1
           my $verbose     = $memc->{verbose};                                     # verbose Level
           my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
           my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
-          my $index       = $memc->{cdataindex};                                  # aktueller Cache-Index
 
-          my $errorh      = q{};
           my $error       = q{};
-          my $doins       = 0;                                                    # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl)
-          my $rowlback    = 0;                                                    # Eventliste für Rückgabe wenn Fehler
           my $dbh;
-
-          my @row_array;
           my $ret;
           my $retjson;
-          my $rowhref;
 
           ##  Vorbereitungen
           #############################################################################
@@ -2988,519 +3093,23 @@ sub DbLog_SBP_onRun {
           };
 
 
-          ##  Start
-          #############################################################################
-
-          if($tl) {                                                                            # Tracelevel setzen
-              $dbh->{TraceLevel} = "$tl|$tf";
+          ##  Event Logging
+          #########################################################          
+          if ($operation =~ /log_/xs) {
+              _DbLog_SBP_onRun_Log ( { subprocess => $subprocess,
+                                       name       => $name,
+                                       memc       => $memc,
+                                       store      => $store,
+                                       logstore   => $logstore,
+                                       useac      => $useac,
+                                       useta      => $useta,
+                                       bst        => $bst
+                                     }
+                                   );
           }
-
-          my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
-          my $tm = $useta             ? "ON" : "OFF";
-
-          Log3 ($name, 5, "DbLog $name - DbLogType is: $DbLogType");
-          Log3 ($name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm");
-          Log3 ($name, 4, "DbLog $name - Insert mode: ".($bi ? "Bulk" : "Array"));
-
-          my ($usepkh,$usepkc,$pkh,$pkc);
-
-          if (!$nsupk) {                                                                      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK
-              ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK ( { name     => $name,
-                                                                 dbh      => $dbh,
-                                                                 dbconn   => $dbconn,
-                                                                 history  => $history,
-                                                                 current  => $current
-                                                               }
-                                                             );
-          }
-          else {
-              Log3 ($name, 5, "DbLog $name - Primary Key usage suppressed by attribute noSupportPK");
-          }
-
-          if (defined $logstore) {                                                           # temporär gespeicherte Daten hinzufügen
-              for my $index (sort {$a<=>$b} keys %{$logstore}) {
-                  $cdata->{$index} = $logstore->{$index};
-
-                  Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
-              }
-
-              undef $logstore;
-          }
-
-          my $ceti = scalar keys %{$cdata};
-
-          my (@timestamp,@device,@type,@event,@reading,@value,@unit);
-          my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
-          my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
-          my ($tuples, $rows);
-          my @tuple_status;
-
-          no warnings 'uninitialized';
-
-          for my $key (sort {$a<=>$b} keys %{$cdata}) {
-              my $row = $cdata->{$key};
-              my @a   = split("\\|",$row);
-              s/_ESC_/\|/gxs for @a;                                               # escaped Pipe back to "|"
-
-              push @timestamp, $a[0];
-              push @device,    $a[1];
-              push @type,      $a[2];
-              push @event,     $a[3];
-              push @reading,   $a[4];
-              push @value,     $a[5];
-              push @unit,      $a[6];
-
-              Log3 ($name, 5, "DbLog $name - processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]");
-          }
-
-          use warnings;
-
-          if($bi) {
-              ## Bulk-Insert
-              #######################
-              $st = [gettimeofday];                                                # SQL-Startzeit
-
-              if (lc($DbLogType) =~ m(history)) {                                  # insert history mit/ohne primary key
-                  $sqlins = _DbLog_SBP_sqlInsHistory ($history, $model, $usepkh);
-
-                  no warnings 'uninitialized';
-
-                  for my $key (sort {$a<=>$b} keys %{$cdata}) {
-                      my $row = $cdata->{$key};
-                      my @a   = split("\\|",$row);
-                      s/_ESC_/\|/gxs for @a;                                      # escaped Pipe back to "|"
-
-                      Log3 ($name, 5, "DbLog $name - processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]");
-
-                      $a[3] =~ s/'/''/g;                                          # escape ' with ''
-                      $a[5] =~ s/'/''/g;                                          # escape ' with ''
-                      $a[6] =~ s/'/''/g;                                          # escape ' with ''
-                      $a[3] =~ s/\\/\\\\/g;                                       # escape \ with \\
-                      $a[5] =~ s/\\/\\\\/g;                                       # escape \ with \\
-                      $a[6] =~ s/\\/\\\\/g;                                       # escape \ with \\
-
-                      $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
-                  }
-
-                  use warnings;
-
-                  chop($sqlins);
-
-                  if ($usepkh && $model eq 'POSTGRESQL') {
-                      $sqlins .= " ON CONFLICT DO NOTHING";
-                  }
-
-                  $error = _DbLog_SBP_beginTransaction ($name, $dbh, $useta);
-
-                  eval { $sth_ih = $dbh->prepare($sqlins);
-                         $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);             # Tracelevel setzen
-                         $ins_hist = $sth_ih->execute();
-                         1;
-                       }
-                       or do {
-                           $errorh = $@;
-
-                           Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
-
-                           $dbh->disconnect();
-
-                           $rowlback = $cdata if($useta);                        # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-
-                           $ret = {
-                               name     => $name,
-                               msg      => $@,
-                               ot       => 0,
-                               oper     => $operation,
-                               rowlback => $rowlback
-                           };
-
-                          $retjson = eval { encode_json($ret) };
-                          $subprocess->writeToParent ($retjson);
-                          next;
-                       };
-
-                  $ins_hist = 0 if($ins_hist eq "0E0");
-                  $error    = _DbLog_SBP_commitOnly ($name, $dbh, $history);
-
-                  if($ins_hist == $ceti) {
-                      Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
-                  }
-                  else {
-                      if($usepkh) {
-                          Log3 ($name, 3, "DbLog $name - INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh");
-                      }
-                      else {
-                          Log3 ($name, 2, "DbLog $name - WARNING - only ".$ins_hist." of $ceti events inserted into table $history");
-                      }
-                  }
-              }
-
-                                                                           # insert current mit/ohne primary key
-              if (lc($DbLogType) =~ m(current)) {                          # Array-Insert wird auch bei Bulk verwendet weil im Bulk-Mode die nicht upgedateten Sätze nicht identifiziert werden können
-                  ($error, $sth_ic) = _DbLog_SBP_sthInsTable ( { table => $current,
-                                                                 dbh   => $dbh,
-                                                                 model => $model,
-                                                                 usepk => $usepkc
-                                                               }
-                                                             );
-
-                  if ($error) {
-                      Log3 ($name, 2, "DbLog $name - Error: $error");
-
-                      $dbh->disconnect();
-
-                      $ret = {
-                          name     => $name,
-                          msg      => $error,
-                          ot       => 0,
-                          oper     => $operation,
-                          rowlback => $rowlback
-                      };
-
-                      $retjson = eval { encode_json($ret) };
-                      $subprocess->writeToParent ($retjson);
-                      next;
-                  }
-
-                  ($error, $sth_uc) = _DbLog_SBP_sthUpdTable ( { table => $current,          # Statement Handle "Update" current erstellen
-                                                                 dbh   => $dbh,
-                                                                 model => $model,
-                                                                 usepk => $usepkc,
-                                                                 pk    => $pkc
-                                                               }
-                                                             );
-
-                  if($tl) {                                                                  # Tracelevel setzen
-                      $sth_uc->{TraceLevel} = "$tl|$tf";
-                      $sth_ic->{TraceLevel} = "$tl|$tf";
-                  }
-
-                  $sth_uc->bind_param_array (1, [@timestamp]);
-                  $sth_uc->bind_param_array (2, [@type]);
-                  $sth_uc->bind_param_array (3, [@event]);
-                  $sth_uc->bind_param_array (4, [@value]);
-                  $sth_uc->bind_param_array (5, [@unit]);
-                  $sth_uc->bind_param_array (6, [@device]);
-                  $sth_uc->bind_param_array (7, [@reading]);
-
-                  $error = _DbLog_SBP_beginTransaction ($name, $dbh, $useta);
-
-                  eval { ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \@tuple_status } );
-                       };
-
-                  my $nupd_cur = 0;
-
-                  for my $tuple (0..$ceti-1) {
-                      my $status = $tuple_status[$tuple];
-                      $status    = 0 if($status eq "0E0");
-
-                      next if($status);                                                     # $status ist "1" wenn update ok
-
-                      Log3 ($name, 5, "DbLog $name - Failed to update in $current - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status");
-
-                      push @timestamp_cur, $timestamp[$tuple];
-                      push @device_cur,    $device[$tuple];
-                      push @type_cur,      $type[$tuple];
-                      push @event_cur,     $event[$tuple];
-                      push @reading_cur,   $reading[$tuple];
-                      push @value_cur,     $value[$tuple];
-                      push @unit_cur,      $unit[$tuple];
-
-                      $nupd_cur++;
-                  }
-
-                  if(!$nupd_cur) {
-                      Log3 ($name, 4, "DbLog $name - $ceti of $ceti events updated in table $current".($usepkc ? " using PK on columns $pkc" : ""));
-                  }
-                  else {
-                      Log3 ($name, 4, "DbLog $name - $nupd_cur of $ceti events not updated in table $current. Try to insert ".($usepkc ? " using PK on columns $pkc " : " ")."...");
-                      $doins = 1;
-                  }
-
-                  if ($doins) {                                                             # events die nicht in Tabelle current updated wurden, werden in current neu eingefügt
-                      $sth_ic->bind_param_array (1, [@timestamp_cur]);
-                      $sth_ic->bind_param_array (2, [@device_cur]);
-                      $sth_ic->bind_param_array (3, [@type_cur]);
-                      $sth_ic->bind_param_array (4, [@event_cur]);
-                      $sth_ic->bind_param_array (5, [@reading_cur]);
-                      $sth_ic->bind_param_array (6, [@value_cur]);
-                      $sth_ic->bind_param_array (7, [@unit_cur]);
-
-                      undef @tuple_status;
-
-                      eval { ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \@tuple_status } );
-                           };
-
-                      my $nins_cur = 0;
-
-                      for my $tuple (0..$#device_cur) {
-                          my $status = $tuple_status[$tuple];
-                          $status    = 0 if($status eq "0E0");
-
-                          next if($status);                                              # $status ist "1" wenn insert ok
-
-                          Log3 ($name, 3, "DbLog $name - Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status");
-
-                          $nins_cur++;
-                      }
-                      if(!$nins_cur) {
-                          Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
-                      }
-                      else {
-                          Log3 ($name, 4, "DbLog $name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
-                      }
-                  }
-
-                  $error = _DbLog_SBP_commitOnly ($name, $dbh, $current);
-              }
-          }
-          else {
-              ## Array-Insert
-              #######################
-
-              $st = [gettimeofday];                                               # SQL-Startzeit
-
-              if (lc($DbLogType) =~ m(history)) {                                 # insert history mit/ohne primary key
-                  ($error, $sth_ih) = _DbLog_SBP_sthInsTable ( { table => $history,
-                                                                 dbh   => $dbh,
-                                                                 model => $model,
-                                                                 usepk => $usepkh
-                                                               }
-                                                             );
-
-                  if ($error) {                                                   # Eventliste zurückgeben wenn z.B. Disk I/O Error bei SQLITE
-                      Log3 ($name, 2, "DbLog $name - Error: $error");
-
-                      $dbh->disconnect();
-
-                      $ret = {
-                          name     => $name,
-                          msg      => $error,
-                          ot       => 0,
-                          oper     => $operation,
-                          rowlback => $cdata
-                      };
-
-                      $retjson = eval { encode_json($ret) };
-                      $subprocess->writeToParent ($retjson);
-                      next;
-                  }
-
-                  if($tl) {                                                            # Tracelevel setzen
-                      $sth_ih->{TraceLevel} = "$tl|$tf";
-                  }
-
-                  $sth_ih->bind_param_array (1, [@timestamp]);
-                  $sth_ih->bind_param_array (2, [@device]);
-                  $sth_ih->bind_param_array (3, [@type]);
-                  $sth_ih->bind_param_array (4, [@event]);
-                  $sth_ih->bind_param_array (5, [@reading]);
-                  $sth_ih->bind_param_array (6, [@value]);
-                  $sth_ih->bind_param_array (7, [@unit]);
-
-                  $error = _DbLog_SBP_beginTransaction ($name, $dbh, $useta);
-
-                  eval {
-                      ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
-                      my $nins_hist    = 0;
-                      my @n2hist;
-
-                      no warnings 'uninitialized';
-
-                      for my $tuple (0..$ceti-1) {
-                          my $status = $tuple_status[$tuple];
-                          $status    = 0 if($status eq "0E0");
-
-                          next if($status);                                            # $status ist "1" wenn insert ok
-
-                          Log3 ($name, 3, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
-
-                          my $nlh = ($timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple]);
-
-                          push @n2hist, $nlh;
-
-                          $nins_hist++;
-                      }
-
-                      use warnings;
-
-                      if(!$nins_hist) {
-                          Log3 ($name, 4, "DbLog $name - $ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
-                      }
-                      else {
-                          if($usepkh) {
-                              Log3 ($name, 3, "DbLog $name - INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh");
-                          }
-                          else {
-                              Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
-                          }
-
-                          my $bkey = 1;
-
-                          for my $line (@n2hist) {
-                              $line             =~ s/\|/_ESC_/gxs;                                # escape Pipe "|"
-                              $rowhref->{$bkey} = $line;
-                              $bkey++;
-                          }
-                      }
-
-                      $error = _DbLog_SBP_commitOnly ($name, $dbh, $history);
-                  };
-
-                  if ($@) {
-                      $errorh = $@;
-
-                      Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
-
-                      $error    = $errorh;
-                      $rowlback = $rowhref if($useta);                                             # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-                  }
-              }
-
-              if (lc($DbLogType) =~ m(current)) {                                                  # insert current mit/ohne primary key
-                  ($error, $sth_ic) = _DbLog_SBP_sthInsTable ( { table => $current,
-                                                                 dbh   => $dbh,
-                                                                 model => $model,
-                                                                 usepk => $usepkc
-                                                               }
-                                                             );
-
-                  if ($error) {                                                                    # Eventliste zurückgeben wenn z.B. Disk I/O error bei SQLITE
-                      Log3 ($name, 2, "DbLog $name - Error: $error");
-
-                      $dbh->disconnect();
-
-                      $ret = {
-                          name     => $name,
-                          msg      => $error,
-                          ot       => 0,
-                          oper     => $operation,
-                          rowlback => $rowlback
-                      };
-
-                      $retjson = eval { encode_json($ret) };
-                      $subprocess->writeToParent ($retjson);
-                      next;
-                  }
-
-                  ($error, $sth_uc) = _DbLog_SBP_sthUpdTable ( { table => $current,          # Statement Handle "Update" current erstellen
-                                                                 dbh   => $dbh,
-                                                                 model => $model,
-                                                                 usepk => $usepkc,
-                                                                 pk    => $pkc
-                                                               }
-                                                             );
-
-                  if($tl) {                                                                  # Tracelevel setzen
-                      $sth_uc->{TraceLevel} = "$tl|$tf";
-                      $sth_ic->{TraceLevel} = "$tl|$tf";
-                  }
-
-                  $sth_uc->bind_param_array (1, [@timestamp]);
-                  $sth_uc->bind_param_array (2, [@type]);
-                  $sth_uc->bind_param_array (3, [@event]);
-                  $sth_uc->bind_param_array (4, [@value]);
-                  $sth_uc->bind_param_array (5, [@unit]);
-                  $sth_uc->bind_param_array (6, [@device]);
-                  $sth_uc->bind_param_array (7, [@reading]);
-
-                  $error = _DbLog_SBP_beginTransaction ($name, $dbh, $useta);
-
-                  undef @tuple_status;
-
-                  eval {
-                      ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \@tuple_status } );
-                      my $nupd_cur = 0;
-
-                      no warnings 'uninitialized';
-
-                      for my $tuple (0..$ceti-1) {
-                          my $status = $tuple_status[$tuple];
-                          $status    = 0 if($status eq "0E0");
-
-                          next if($status);                                                  # $status ist "1" wenn update ok
-
-                          Log3 ($name, 5, "DbLog $name - Failed to update in $current - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status");
-
-                          push @timestamp_cur, $timestamp[$tuple];
-                          push @device_cur,    $device[$tuple];
-                          push @type_cur,      $type[$tuple];
-                          push @event_cur,     $event[$tuple];
-                          push @reading_cur,   $reading[$tuple];
-                          push @value_cur,     $value[$tuple];
-                          push @unit_cur,      $unit[$tuple];
-
-                          $nupd_cur++;
-                      }
-
-                      use warnings;
-
-                      if(!$nupd_cur) {
-                          Log3 ($name, 4, "DbLog $name - $ceti of $ceti events updated in table $current".($usepkc ? " using PK on columns $pkc" : ""));
-                      }
-                      else {
-                          Log3 ($name, 4, "DbLog $name - $nupd_cur of $ceti events not updated and try to insert into table $current".($usepkc ? " using PK on columns $pkc" : ""));
-                          $doins = 1;
-                      }
-
-                      if ($doins) {                                              # events die nicht in Tabelle current updated wurden, werden in current neu eingefügt
-                          $sth_ic->bind_param_array (1, [@timestamp_cur]);
-                          $sth_ic->bind_param_array (2, [@device_cur]);
-                          $sth_ic->bind_param_array (3, [@type_cur]);
-                          $sth_ic->bind_param_array (4, [@event_cur]);
-                          $sth_ic->bind_param_array (5, [@reading_cur]);
-                          $sth_ic->bind_param_array (6, [@value_cur]);
-                          $sth_ic->bind_param_array (7, [@unit_cur]);
-
-                          undef @tuple_status;
-
-                          ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \@tuple_status } );
-                          my $nins_cur     = 0;
-
-                          for my $tuple (0..$#device_cur) {
-                              my $status = $tuple_status[$tuple];
-                              $status    = 0 if($status eq "0E0");
-
-                              next if($status);                                 # $status ist "1" wenn insert ok
-
-                              Log3 ($name, 3, "DbLog $name - Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status");
-
-                              $nins_cur++;
-                          }
-
-                          if(!$nins_cur) {
-                              Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
-                          }
-                          else {
-                              Log3 ($name, 4, "DbLog $name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
-                          }
-                      }
-
-                      $error = _DbLog_SBP_commitOnly ($name, $dbh, $current);
-                  };
-              }
-          }
-
-          my $rt  = tv_interval($st);                                     # SQL-Laufzeit ermitteln
-          my $brt = tv_interval($bst);                                    # Background-Laufzeit ermitteln
-          my $ot  = $rt.",".$brt;
-
-          $ret = {
-              name     => $name,
-              msg      => $error,
-              ot       => $ot,
-              oper     => $operation,
-              rowlback => $rowlback
-          };
-
-          $retjson = eval { encode_json($ret) };
-          $subprocess->writeToParent ($retjson);
-
-          # hier schreiben wir etwas an den übergeordneten Prozess
-          # dies wird über die globale Select-Schleife empfangen
-          # und in der ReadFn ausgewertet.
-          # $subprocess->writeToParent($json);
       }
+  
+  usleep(300000);                                                      # reduziert CPU Last
   }
 
 return;
@@ -3578,10 +3187,555 @@ sub _DbLog_SBP_onRun_connectDB {
 return ($err, $dbh);
 }
 
+#################################################################
+# SubProcess - Log-Routine
+#################################################################
+sub _DbLog_SBP_onRun_Log {
+  my $paref       = shift;
+  
+  my $subprocess  = $paref->{subprocess};
+  my $name        = $paref->{name};
+  my $memc        = $paref->{memc};
+  my $store       = $paref->{store};                                      # Datenspeicher
+  my $logstore    = $paref->{logstore};                                   # temporärer Logdatenspeicher
+  my $useac       = $paref->{useac};
+  my $useta       = $paref->{useta};
+  my $bst         = $paref->{bst};
+  
+  my $DbLogType   = $memc->{DbLogType};                                   # Log-Ziele
+  my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
+  my $bi          = $memc->{bi};                                          # Bulk-Insert 0|1
+  my $tl          = $memc->{tl};                                          # traceLevel
+  my $tf          = $memc->{tf};                                          # traceFlag
+  my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
+  my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
+  my $index       = $memc->{cdataindex};                                  # aktueller Cache-Index
+  
+  my $dbh         = $store->{dbh};  
+  my $dbconn      = $store->{dbparams}{dbconn};
+  my $model       = $store->{dbparams}{model};
+  my $history     = $store->{dbparams}{history};
+  my $current     = $store->{dbparams}{current};
+  
+  my $errorh      = q{};
+  my $error       = q{};
+  my $doins       = 0;                                                    # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl)
+  my $rowlback    = 0;                                                    # Eventliste für Rückgabe wenn Fehler
+
+  my $ret;
+  my $retjson;
+  my $rowhref;
+  
+  if($tl) {                                                               # Tracelevel setzen
+      $dbh->{TraceLevel} = "$tl|$tf";
+  }
+
+  my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
+  my $tm = $useta             ? "ON" : "OFF";
+
+  Log3 ($name, 5, "DbLog $name - DbLogType is: $DbLogType");
+  Log3 ($name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm");
+  Log3 ($name, 4, "DbLog $name - Insert mode: ".($bi ? "Bulk" : "Array"));
+
+  my ($usepkh,$usepkc,$pkh,$pkc);
+
+  if (!$nsupk) {                                                                      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK
+      ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK ( { name     => $name,
+                                                         dbh      => $dbh,
+                                                         dbconn   => $dbconn,
+                                                         history  => $history,
+                                                         current  => $current
+                                                       }
+                                                     );
+  }
+  else {
+      Log3 ($name, 5, "DbLog $name - Primary Key usage suppressed by attribute noSupportPK");
+  }
+
+  if (defined $logstore) {                                                           # temporär gespeicherte Daten hinzufügen
+      for my $index (sort {$a<=>$b} keys %{$logstore}) {
+          $cdata->{$index} = $logstore->{$index};
+
+          Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
+      }
+
+      undef $logstore;
+  }
+
+  my $ceti = scalar keys %{$cdata};
+
+  my (@timestamp,@device,@type,@event,@reading,@value,@unit);
+  my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
+  my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
+  my ($tuples, $rows);
+  my @tuple_status;
+
+  no warnings 'uninitialized';
+
+  for my $key (sort {$a<=>$b} keys %{$cdata}) {
+      my $row = $cdata->{$key};
+      my @a   = split("\\|",$row);
+      s/_ESC_/\|/gxs for @a;                                               # escaped Pipe back to "|"
+
+      push @timestamp, $a[0];
+      push @device,    $a[1];
+      push @type,      $a[2];
+      push @event,     $a[3];
+      push @reading,   $a[4];
+      push @value,     $a[5];
+      push @unit,      $a[6];
+
+      Log3 ($name, 5, "DbLog $name - processing $key -> TS: $a[0], Dev: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Val: $a[5], Unit: $a[6]");
+  }
+
+  use warnings;
+
+  if($bi) {
+      ## Bulk-Insert
+      #######################
+      $st = [gettimeofday];                                                # SQL-Startzeit
+
+      if (lc($DbLogType) =~ m(history)) {                                  # insert history mit/ohne primary key
+          $sqlins = __DbLog_SBP_sqlInsHistory ($history, $model, $usepkh);
+
+          no warnings 'uninitialized';
+
+          for my $key (sort {$a<=>$b} keys %{$cdata}) {
+              my $row = $cdata->{$key};
+              my @a   = split("\\|",$row);
+              s/_ESC_/\|/gxs for @a;                                      # escaped Pipe back to "|"
+
+              $a[3] =~ s/'/''/g;                                          # escape ' with ''
+              $a[5] =~ s/'/''/g;                                          # escape ' with ''
+              $a[6] =~ s/'/''/g;                                          # escape ' with ''
+              $a[3] =~ s/\\/\\\\/g;                                       # escape \ with \\
+              $a[5] =~ s/\\/\\\\/g;                                       # escape \ with \\
+              $a[6] =~ s/\\/\\\\/g;                                       # escape \ with \\
+
+              $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
+          }
+
+          use warnings;
+
+          chop($sqlins);
+
+          if ($usepkh && $model eq 'POSTGRESQL') {
+              $sqlins .= " ON CONFLICT DO NOTHING";
+          }
+
+          $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+
+          eval { $sth_ih = $dbh->prepare($sqlins);
+                 $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);               # Tracelevel setzen
+                 $ins_hist = $sth_ih->execute();
+                 1;
+               }
+               or do {
+                   $errorh = $@;
+
+                   Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
+
+                   $dbh->disconnect();
+
+                   $rowlback = $cdata if($useta);                         # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+
+                   $ret = {
+                       name     => $name,
+                       msg      => $@,
+                       ot       => 0,
+                       oper     => $operation,
+                       rowlback => $rowlback
+                   };
+
+                  $retjson = eval { encode_json($ret) };
+                  $subprocess->writeToParent ($retjson);
+                  return;
+               };
+
+          $ins_hist = 0 if($ins_hist eq "0E0");
+          $error    = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+
+          if($ins_hist == $ceti) {
+              Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
+          }
+          else {
+              if($usepkh) {
+                  Log3 ($name, 3, "DbLog $name - INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh");
+              }
+              else {
+                  Log3 ($name, 2, "DbLog $name - WARNING - only ".$ins_hist." of $ceti events inserted into table $history");
+              }
+          }
+      }
+
+                                                                                   # insert current mit/ohne primary key
+      if (lc($DbLogType) =~ m(current)) {                                          # Array-Insert wird auch bei Bulk verwendet weil im Bulk-Mode die nicht upgedateten Sätze nicht identifiziert werden können
+          ($error, $sth_ic) = __DbLog_SBP_sthInsTable ( { table => $current,
+                                                          dbh   => $dbh,
+                                                          model => $model,
+                                                          usepk => $usepkc
+                                                        }
+                                                      );
+
+          if ($error) {
+              Log3 ($name, 2, "DbLog $name - Error: $error");
+
+              $dbh->disconnect();
+
+              $ret = {
+                  name     => $name,
+                  msg      => $error,
+                  ot       => 0,
+                  oper     => $operation,
+                  rowlback => $rowlback
+              };
+
+              $retjson = eval { encode_json($ret) };
+              $subprocess->writeToParent ($retjson);
+              return;
+          }
+
+          ($error, $sth_uc) = __DbLog_SBP_sthUpdTable ( { table => $current,          # Statement Handle "Update" current erstellen
+                                                          dbh   => $dbh,
+                                                          model => $model,
+                                                          usepk => $usepkc,
+                                                          pk    => $pkc
+                                                        }
+                                                      );
+
+          if($tl) {                                                                   # Tracelevel setzen
+              $sth_uc->{TraceLevel} = "$tl|$tf";
+              $sth_ic->{TraceLevel} = "$tl|$tf";
+          }
+
+          $sth_uc->bind_param_array (1, [@timestamp]);
+          $sth_uc->bind_param_array (2, [@type]);
+          $sth_uc->bind_param_array (3, [@event]);
+          $sth_uc->bind_param_array (4, [@value]);
+          $sth_uc->bind_param_array (5, [@unit]);
+          $sth_uc->bind_param_array (6, [@device]);
+          $sth_uc->bind_param_array (7, [@reading]);
+
+          $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+
+          eval { ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \@tuple_status } );
+               };
+
+          my $nupd_cur = 0;
+
+          for my $tuple (0..$ceti-1) {
+              my $status = $tuple_status[$tuple];
+              $status    = 0 if($status eq "0E0");
+
+              next if($status);                                                     # $status ist "1" wenn update ok
+
+              Log3 ($name, 5, "DbLog $name - Failed to update in $current - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status");
+
+              push @timestamp_cur, $timestamp[$tuple];
+              push @device_cur,    $device[$tuple];
+              push @type_cur,      $type[$tuple];
+              push @event_cur,     $event[$tuple];
+              push @reading_cur,   $reading[$tuple];
+              push @value_cur,     $value[$tuple];
+              push @unit_cur,      $unit[$tuple];
+
+              $nupd_cur++;
+          }
+
+          if(!$nupd_cur) {
+              Log3 ($name, 4, "DbLog $name - $ceti of $ceti events updated in table $current".($usepkc ? " using PK on columns $pkc" : ""));
+          }
+          else {
+              Log3 ($name, 4, "DbLog $name - $nupd_cur of $ceti events not updated in table $current. Try to insert ".($usepkc ? " using PK on columns $pkc " : " ")."...");
+              $doins = 1;
+          }
+
+          if ($doins) {                                                             # events die nicht in Tabelle current updated wurden, werden in current neu eingefügt
+              $sth_ic->bind_param_array (1, [@timestamp_cur]);
+              $sth_ic->bind_param_array (2, [@device_cur]);
+              $sth_ic->bind_param_array (3, [@type_cur]);
+              $sth_ic->bind_param_array (4, [@event_cur]);
+              $sth_ic->bind_param_array (5, [@reading_cur]);
+              $sth_ic->bind_param_array (6, [@value_cur]);
+              $sth_ic->bind_param_array (7, [@unit_cur]);
+
+              undef @tuple_status;
+
+              eval { ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \@tuple_status } );
+                   };
+
+              my $nins_cur = 0;
+
+              for my $tuple (0..$#device_cur) {
+                  my $status = $tuple_status[$tuple];
+                  $status    = 0 if($status eq "0E0");
+
+                  next if($status);                                              # $status ist "1" wenn insert ok
+
+                  Log3 ($name, 3, "DbLog $name - Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status");
+
+                  $nins_cur++;
+              }
+              if(!$nins_cur) {
+                  Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
+              }
+              else {
+                  Log3 ($name, 4, "DbLog $name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
+              }
+          }
+
+          $error = __DbLog_SBP_commitOnly ($name, $dbh, $current);
+      }
+  }
+  else {
+      ## Array-Insert
+      #######################
+
+      $st = [gettimeofday];                                                              # SQL-Startzeit
+
+      if (lc($DbLogType) =~ m(history)) {                                                # insert history mit/ohne primary key
+          ($error, $sth_ih) = __DbLog_SBP_sthInsTable ( { table => $history,
+                                                          dbh   => $dbh,
+                                                          model => $model,
+                                                          usepk => $usepkh
+                                                        }
+                                                      );
+
+          if ($error) {                                                                  # Eventliste zurückgeben wenn z.B. Disk I/O Error bei SQLITE
+              Log3 ($name, 2, "DbLog $name - Error: $error");
+
+              $dbh->disconnect();
+
+              $ret = {
+                  name     => $name,
+                  msg      => $error,
+                  ot       => 0,
+                  oper     => $operation,
+                  rowlback => $cdata
+              };
+
+              $retjson = eval { encode_json($ret) };
+              $subprocess->writeToParent ($retjson);
+              return;
+          }
+
+          if($tl) {                                                                      # Tracelevel setzen
+              $sth_ih->{TraceLevel} = "$tl|$tf";
+          }
+
+          $sth_ih->bind_param_array (1, [@timestamp]);
+          $sth_ih->bind_param_array (2, [@device]);
+          $sth_ih->bind_param_array (3, [@type]);
+          $sth_ih->bind_param_array (4, [@event]);
+          $sth_ih->bind_param_array (5, [@reading]);
+          $sth_ih->bind_param_array (6, [@value]);
+          $sth_ih->bind_param_array (7, [@unit]);
+
+          $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+
+          eval {
+              ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
+              my $nins_hist    = 0;
+              my @n2hist;
+
+              no warnings 'uninitialized';
+
+              for my $tuple (0..$ceti-1) {
+                  my $status = $tuple_status[$tuple];
+                  $status    = 0 if($status eq "0E0");
+
+                  next if($status);                                                      # $status ist "1" wenn insert ok
+
+                  Log3 ($name, 3, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
+
+                  my $nlh = ($timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple]);
+
+                  push @n2hist, $nlh;
+
+                  $nins_hist++;
+              }
+
+              use warnings;
+
+              if(!$nins_hist) {
+                  Log3 ($name, 4, "DbLog $name - $ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
+              }
+              else {
+                  if($usepkh) {
+                      Log3 ($name, 3, "DbLog $name - INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh");
+                  }
+                  else {
+                      Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
+                  }
+
+                  my $bkey = 1;
+
+                  for my $line (@n2hist) {
+                      $line             =~ s/\|/_ESC_/gxs;                                # escape Pipe "|"
+                      $rowhref->{$bkey} = $line;
+                      $bkey++;
+                  }
+              }
+
+              $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+          };
+
+          if ($@) {
+              $errorh = $@;
+
+              Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
+
+              $error    = $errorh;
+              $rowlback = $rowhref if($useta);                                             # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+          }
+      }
+
+      if (lc($DbLogType) =~ m(current)) {                                                  # insert current mit/ohne primary key
+          ($error, $sth_ic) = __DbLog_SBP_sthInsTable ( { table => $current,
+                                                          dbh   => $dbh,
+                                                          model => $model,
+                                                          usepk => $usepkc
+                                                        }
+                                                      );
+
+          if ($error) {                                                                    # Eventliste zurückgeben wenn z.B. Disk I/O error bei SQLITE
+              Log3 ($name, 2, "DbLog $name - Error: $error");
+
+              $dbh->disconnect();
+
+              $ret = {
+                  name     => $name,
+                  msg      => $error,
+                  ot       => 0,
+                  oper     => $operation,
+                  rowlback => $rowlback
+              };
+
+              $retjson = eval { encode_json($ret) };
+              $subprocess->writeToParent ($retjson);
+              return;
+          }
+
+          ($error, $sth_uc) = __DbLog_SBP_sthUpdTable ( { table => $current,          # Statement Handle "Update" current erstellen
+                                                          dbh   => $dbh,
+                                                          model => $model,
+                                                          usepk => $usepkc,
+                                                          pk    => $pkc
+                                                        }
+                                                      );
+
+          if($tl) {                                                                  # Tracelevel setzen
+              $sth_uc->{TraceLevel} = "$tl|$tf";
+              $sth_ic->{TraceLevel} = "$tl|$tf";
+          }
+
+          $sth_uc->bind_param_array (1, [@timestamp]);
+          $sth_uc->bind_param_array (2, [@type]);
+          $sth_uc->bind_param_array (3, [@event]);
+          $sth_uc->bind_param_array (4, [@value]);
+          $sth_uc->bind_param_array (5, [@unit]);
+          $sth_uc->bind_param_array (6, [@device]);
+          $sth_uc->bind_param_array (7, [@reading]);
+
+          $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+
+          undef @tuple_status;
+
+          eval {
+              ($tuples, $rows) = $sth_uc->execute_array( { ArrayTupleStatus => \@tuple_status } );
+              my $nupd_cur = 0;
+
+              no warnings 'uninitialized';
+
+              for my $tuple (0..$ceti-1) {
+                  my $status = $tuple_status[$tuple];
+                  $status    = 0 if($status eq "0E0");
+
+                  next if($status);                                                  # $status ist "1" wenn update ok
+
+                  Log3 ($name, 5, "DbLog $name - Failed to update in $current - TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple], Status = $status");
+
+                  push @timestamp_cur, $timestamp[$tuple];
+                  push @device_cur,    $device[$tuple];
+                  push @type_cur,      $type[$tuple];
+                  push @event_cur,     $event[$tuple];
+                  push @reading_cur,   $reading[$tuple];
+                  push @value_cur,     $value[$tuple];
+                  push @unit_cur,      $unit[$tuple];
+
+                  $nupd_cur++;
+              }
+
+              use warnings;
+
+              if(!$nupd_cur) {
+                  Log3 ($name, 4, "DbLog $name - $ceti of $ceti events updated in table $current".($usepkc ? " using PK on columns $pkc" : ""));
+              }
+              else {
+                  Log3 ($name, 4, "DbLog $name - $nupd_cur of $ceti events not updated and try to insert into table $current".($usepkc ? " using PK on columns $pkc" : ""));
+                  $doins = 1;
+              }
+
+              if ($doins) {                                              # events die nicht in Tabelle current updated wurden, werden in current neu eingefügt
+                  $sth_ic->bind_param_array (1, [@timestamp_cur]);
+                  $sth_ic->bind_param_array (2, [@device_cur]);
+                  $sth_ic->bind_param_array (3, [@type_cur]);
+                  $sth_ic->bind_param_array (4, [@event_cur]);
+                  $sth_ic->bind_param_array (5, [@reading_cur]);
+                  $sth_ic->bind_param_array (6, [@value_cur]);
+                  $sth_ic->bind_param_array (7, [@unit_cur]);
+
+                  undef @tuple_status;
+
+                  ($tuples, $rows) = $sth_ic->execute_array( { ArrayTupleStatus => \@tuple_status } );
+                  my $nins_cur     = 0;
+
+                  for my $tuple (0..$#device_cur) {
+                      my $status = $tuple_status[$tuple];
+                      $status    = 0 if($status eq "0E0");
+
+                      next if($status);                                 # $status ist "1" wenn insert ok
+
+                      Log3 ($name, 3, "DbLog $name - Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status");
+
+                      $nins_cur++;
+                  }
+
+                  if(!$nins_cur) {
+                      Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
+                  }
+                  else {
+                      Log3 ($name, 4, "DbLog $name - ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc ? " using PK on columns $pkc" : ""));
+                  }
+              }
+
+              $error = __DbLog_SBP_commitOnly ($name, $dbh, $current);
+          };
+      }
+  }
+
+  my $rt  = tv_interval($st);                                     # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                    # Background-Laufzeit ermitteln
+  my $ot  = $rt.",".$brt;
+
+  $ret = {
+      name     => $name,
+      msg      => $error,
+      ot       => $ot,
+      oper     => $operation,
+      rowlback => $rowlback
+  };
+
+  $retjson = eval { encode_json($ret) };
+  $subprocess->writeToParent ($retjson);
+
+return;
+}
+
 ####################################################################################################
 #       nur Datenbank "begin transaction"
 ####################################################################################################
-sub _DbLog_SBP_beginTransaction {
+sub __DbLog_SBP_beginTransaction {
   my $name  = shift;
   my $dbh   = shift;
   my $useta = shift;
@@ -3604,7 +3758,7 @@ return $err;
 #################################################################
 #          nur Datenbank "commit"
 #################################################################
-sub _DbLog_SBP_commitOnly {
+sub __DbLog_SBP_commitOnly {
   my $name  = shift;
   my $dbh   = shift;
   my $table = shift;
@@ -3631,7 +3785,7 @@ return $err;
 #################################################################
 #   erstellt SQL für Insert Daten in die HISTORY! Tabelle
 #################################################################
-sub _DbLog_SBP_sqlInsHistory {
+sub __DbLog_SBP_sqlInsHistory {
   my $table  = shift;
   my $model  = shift;
   my $usepkh = shift;
@@ -3658,7 +3812,7 @@ return $sql;
 #    erstellt Statement Handle für Insert Daten in die
 #    angegebene Tabelle
 #################################################################
-sub _DbLog_SBP_sthInsTable {
+sub __DbLog_SBP_sthInsTable {
   my $paref = shift;
 
   my $table = $paref->{table};
@@ -3696,7 +3850,7 @@ return ($err, $sth);
 #    erstellt Statement Handle für Update Daten in die
 #    angegebene Tabelle
 #################################################################
-sub _DbLog_SBP_sthUpdTable {
+sub __DbLog_SBP_sthUpdTable {
   my $paref  = shift;
 
   my $table  = $paref->{table};
@@ -3774,6 +3928,44 @@ return $err;
 }
 
 #####################################################
+#   Datenbankverbindung im SubProcess
+#   beenden
+#####################################################
+sub DbLog_SBP_dbDisconnect {
+  my $hash    = shift;
+  my $delpars = shift // 0;      # 1 - die im SubProzess gespeicherten Daten sollen gelöscht werden
+
+  my $name = $hash->{NAME};
+
+  my $subprocess = $hash->{".fhem"}{subprocess};
+  my $err        = q{};
+
+  if(!defined $subprocess) {
+      $err = qq{SubProcess isn't available. Disconnect command couldn't be sent};
+      Log3 ($name, 1, "DbLog $name - ERROR - $err");
+      return $err;
+  }
+
+  my $memc;
+
+  $memc->{dbstorepars} = 0;
+  $memc->{dbdelpars}   = $delpars;
+  $memc->{dbdisconn}   = 1;                              # Statusbit command disconnect
+  $memc->{operation}   = 'dbDisconnect';
+
+  my $json = eval { encode_json($memc);
+                  }
+                  or do { $err = $@;
+                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
+                          return $err;
+                        };
+
+  $subprocess->writeToChild($json);
+
+return;
+}
+
+#####################################################
 #   Datenbank Verbindungsparameter an SubProcess
 #   senden und dort speichern
 #####################################################
@@ -3823,50 +4015,12 @@ return;
 }
 
 #####################################################
-#   Datenbankverbindung im SubProcess
-#   beenden
-#####################################################
-sub DbLog_SBP_dbDisconnect {
-  my $hash    = shift;
-  my $delpars = shift // 0;      # 1 - die im SubProzess gespeicherten Daten sollen gelöscht werden
-
-  my $name = $hash->{NAME};
-
-  my $subprocess = $hash->{".fhem"}{subprocess};
-  my $err        = q{};
-
-  if(!defined $subprocess) {
-      $err = qq{SubProcess isn't available. Disconnect command couldn't be sent};
-      Log3 ($name, 1, "DbLog $name - ERROR - $err");
-      return $err;
-  }
-
-  my $memc;
-
-  $memc->{dbstorepars} = 0;
-  $memc->{dbdelpars}   = $delpars;
-  $memc->{dbdisconn}   = 1;                              # Statusbit command disconnect
-  $memc->{operation}   = 'dbDisconnect';
-
-  my $json = eval { encode_json($memc);
-                  }
-                  or do { $err = $@;
-                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                          return $err;
-                        };
-
-  $subprocess->writeToChild($json);
-
-return;
-}
-
-#####################################################
-#   die zu verarbeitenden Daten an SubProcess
+#   die zu verarbeitenden Log-Daten an SubProcess
 #   senden
 #   die Prozessdaten werden in Hashreferenz $memc
 #   übergeben
 #####################################################
-sub DbLog_SBP_sendProcessData {
+sub DbLog_SBP_sendLogData {
   my $hash = shift;
   my $oper = shift;            # angeforderte Operation
   my $memc = shift;
@@ -4025,19 +4179,13 @@ sub DbLog_SBP_Read {
           eval {
               for my $key (sort {$a <=>$b} keys %{$rowlback}) {
                   $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
+                 
+                  Log3 ($name, 5, "DbLog $name - rowlback to Cache: $key -> ".$rowlback->{$key});
               }
           };
           
           readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0));
       }
-
-      #if($asyncmode) {
-      #    $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
-      #                scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
-      #                0;
-
-      #    readingsSingleUpdate ($hash, 'CacheUsage', $memcount, 0);
-      #}
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
           my ($rt,$brt) = split(",", $ot);
@@ -5305,27 +5453,7 @@ sub DbLog_configcheck {
   my $mode = $hash->{MODE};
   my $bi   = AttrVal($name, "bulkInsert", 0);
   my $sfx  = AttrVal("global", "language", "EN");
-  $sfx     = ($sfx eq "EN" ? "" : "_$sfx");
-
-  $check .= "<u><b>Result of logmode check</u></b><br><br>";
-  $check .= "Logmode of DbLog-device $name is: $mode <br>";
-  if($mode =~ /asynchronous/) {
-      my $max = AttrVal("global", "blockingCallMax", 0);
-
-      if(!$max || $max >= 6) {
-          $rec = "settings o.k.";
-      }
-      else {
-          $rec = "WARNING - you are running asynchronous mode that is recommended, but the value of global device attribute \"blockingCallMax\" is set quite small. <br>";
-          $rec .= "This may cause problems in operation. It is recommended to <b>increase</b> the <b>global blockingCallMax</b> attribute.";
-      }
-  }
-  else {
-      $rec  = "Switch $name to the asynchronous logmode by setting the 'asyncMode' attribute. The advantage of this mode is to log events non-blocking. <br>";
-      $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
-      $rec .= "Please refer to commandref for further information about these attributes.";
-  }
-  $check .= "<b>Recommendation:</b> $rec <br><br>";
+  $sfx     = $sfx eq "EN" ? "" : "_$sfx";
 
   $check .= "<u><b>Result of insert mode check</u></b><br><br>";
   if(!$bi) {
