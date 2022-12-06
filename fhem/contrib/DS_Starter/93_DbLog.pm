@@ -40,7 +40,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement count command non blocking with SBP ",
+  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ",
   "5.2.0"   => "05.12.2022 LONGRUN_PID, \$hash->{prioSave}, rework SetFn ",
   "5.1.0"   => "03.12.2022 implement SubProcess for logging data in synchron Mode ",
   "5.0.0"   => "02.12.2022 implement SubProcess for logging data in asynchron Mode, delete attr traceHandles ",
@@ -269,19 +269,21 @@ my %DbLog_vNotesIntern = (
 ###############
 
 my %DbLog_hset = (                                                                # Hash der Set-Funktion
-  listCache      => { fn => \&_DbLog_setlistCache      },
-  clearReadings  => { fn => \&_DbLog_setclearReadings  },
-  eraseReadings  => { fn => \&_DbLog_seteraseReadings  },
-  stopSubProcess => { fn => \&_DbLog_setstopSubProcess },
-  purgeCache     => { fn => \&_DbLog_setpurgeCache     },
-  commitCache    => { fn => \&_DbLog_setcommitCache    },
-  configCheck    => { fn => \&_DbLog_setconfigCheck    },
-  reopen         => { fn => \&_DbLog_setreopen         },
-  rereadcfg      => { fn => \&_DbLog_setrereadcfg      },
-  addLog         => { fn => \&_DbLog_setaddLog         },
-  addCacheLine   => { fn => \&_DbLog_setaddCacheLine   },
-  count          => { fn => \&_DbLog_setcount          },
-  countNbl       => { fn => \&_DbLog_setcount          },
+  listCache        => { fn => \&_DbLog_setlistCache      },
+  clearReadings    => { fn => \&_DbLog_setclearReadings  },
+  eraseReadings    => { fn => \&_DbLog_seteraseReadings  },
+  stopSubProcess   => { fn => \&_DbLog_setstopSubProcess },
+  purgeCache       => { fn => \&_DbLog_setpurgeCache     },
+  commitCache      => { fn => \&_DbLog_setcommitCache    },
+  configCheck      => { fn => \&_DbLog_setconfigCheck    },
+  reopen           => { fn => \&_DbLog_setreopen         },
+  rereadcfg        => { fn => \&_DbLog_setrereadcfg      },
+  addLog           => { fn => \&_DbLog_setaddLog         },
+  addCacheLine     => { fn => \&_DbLog_setaddCacheLine   },
+  count            => { fn => \&_DbLog_setcount          },
+  countNbl         => { fn => \&_DbLog_setcount          },
+  deleteOldDays    => { fn => \&_DbLog_setdeleteOldDays  },
+  deleteOldDaysNbl => { fn => \&_DbLog_setdeleteOldDays  },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -462,8 +464,6 @@ sub DbLog_Undef {
   delete $hash->{HELPER}{LONGRUN_PID};
 
   BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
-  BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
-  BlockingKill($hash->{HELPER}{DELDAYS_PID})    if($hash->{HELPER}{DELDAYS_PID});
 
   $dbh->disconnect() if(defined($dbh));
 
@@ -575,7 +575,7 @@ sub DbLog_Attr {
           InternalTimer(gettimeofday()+1.5, 'DbLog_attrForSQLite', $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
 
 
-          DbLog_SBP_dbDisconnect ($hash, 1);                                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+          DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
           InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);      # neue Verbindungsdaten an SubProzess senden
       }
@@ -611,7 +611,7 @@ sub DbLog_Attr {
       }
 
       if ($init_done == 1) {
-           DbLog_SBP_dbDisconnect ($hash, 1);                                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+           DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
           InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
       }
@@ -676,7 +676,7 @@ sub DbLog_Attr {
       }
 
       if ($init_done == 1) {
-           DbLog_SBP_dbDisconnect ($hash, 1);                                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+           DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
           InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
       }
@@ -708,14 +708,14 @@ return;
 ################################################################
 sub DbLog_Set {
     my ($hash, @a) = @_;
-    
+
     return qq{"set X" needs at least an argument} if ( @a < 2 );
-    
+
     my $name  = $a[0];
     my $opt   = $a[1];
     my @args  = @a;
-    my $prop  = $a[2]; 
-    my $prop1 = $a[3];  
+    my $prop  = $a[2];
+    my $prop1 = $a[3];
 
     return if(IsDisabled ($name));
 
@@ -780,10 +780,11 @@ sub DbLog_Set {
     my $db  = (split(/;|=/, $hash->{dbconn}))[1];
 
     my ($ret,$trigger);
-    
+
     my $params = {
         hash    => $hash,
         name    => $name,
+        dbname  => $db,
         argsref => \@args,
         opt     => $opt,
         prop    => $prop,
@@ -795,9 +796,9 @@ sub DbLog_Set {
         ($ret,$trigger) = &{$DbLog_hset{$opt}{fn}} ($params);
         return ($ret,$trigger);
     }
-    
-    
-    
+
+
+
 
     if ($opt eq 'reduceLog') {
         Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
@@ -960,62 +961,6 @@ sub DbLog_Set {
 
         return;
     }
-    elsif ($opt eq 'deleteOldDays') {
-        Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
-        Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
-        my ($c, $cmd);
-
-        $dbh = _DbLog_ConnectNewDBH($hash);
-
-        if(!$dbh) {
-            Log3($name, 1, "DbLog $name: DBLog_Set - deleteOldDays - DB connect not possible");
-            return;
-        }
-        else {
-            $cmd = "delete from $history where TIMESTAMP < ";
-
-            if ($hash->{MODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$prop days')"; }
-            elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $prop DAY)"; }
-            elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$prop' DAY"; }
-            else  { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
-
-            if(defined($cmd)) {
-                $c = $dbh->do($cmd);
-                $c = 0 if($c == 0E0);
-
-                eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                $dbh->disconnect();
-
-                Log3 ($name, 3, "DbLog $name - deleteOldDays finished. $c entries of database $db deleted.");
-
-                readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
-            }
-
-            InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
-        }
-    }
-    elsif ($opt eq 'deleteOldDaysNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
-
-        if (defined $prop && $prop =~ /^\d+$/) {
-            if ($hash->{HELPER}{DELDAYS_PID} && $hash->{HELPER}{DELDAYS_PID}{pid} !~ m/DEAD/) {
-                $ret = "deleteOldDaysNbl already in progress. Please wait until the running process is finished.";
-            }
-            else {
-                delete $hash->{HELPER}{DELDAYS_PID};
-                $hash->{HELPER}{DELDAYS} = $prop;
-
-                Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
-
-                $hash->{HELPER}{DELDAYS_PID} = BlockingCall("DbLog_deldaysNbl","$name","DbLog_deldaysNbl_done");
-                return;
-            }
-        }
-        else {
-            Log3($name, 1, "DbLog $name: deleteOldDaysNbl error, no <days> given.");
-            $ret = "deleteOldDaysNbl error, no <days> given.";
-        }
-    }
     elsif ($opt eq 'userCommand') {
         Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
         $dbh = _DbLog_ConnectNewDBH($hash);
@@ -1068,13 +1013,13 @@ sub _DbLog_setlistCache {                ## no critic "not used"
   my $cache;
 
   if (!scalar(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-      return 'Memory Cache is empty'; 
+      return 'Memory Cache is empty';
   }
 
   for my $key (sort{$a <=>$b}keys %{$data{DbLog}{$name}{cache}{memcache}}) {
       $cache .= $key." => ".$data{DbLog}{$name}{cache}{memcache}{$key}."\n";
   }
-  
+
 return $cache;
 }
 
@@ -1092,7 +1037,7 @@ sub _DbLog_setclearReadings {            ## no critic "not used"
       next if($key =~ m/state/ || $key =~ m/CacheUsage/ || $key =~ m/NextSync/);
       readingsSingleUpdate($hash, $key, " ", 0);
   }
-  
+
 return;
 }
 
@@ -1108,7 +1053,7 @@ sub _DbLog_seteraseReadings {            ## no critic "not used"
   for my $key(@allrds) {
       delete($defs{$name}{READINGS}{$key}) if($key !~ m/^state$/);
   }
-  
+
 return;
 }
 
@@ -1118,11 +1063,11 @@ return;
 sub _DbLog_setstopSubProcess {           ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
-  
+
   DbLog_SBP_CleanUp ($hash);                                              # SubProcess beenden
   my $ret = 'SubProcess stopped and will be automatically restarted if needed';
   DbLog_setReadingstate ($hash, $ret);
-  
+
 return $ret;
 }
 
@@ -1133,10 +1078,10 @@ sub _DbLog_setpurgeCache {               ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  
+
   delete $data{DbLog}{$name}{cache};
   readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
-  
+
 return 'Memory Cache purged';
 }
 
@@ -1146,9 +1091,9 @@ return 'Memory Cache purged';
 sub _DbLog_setcommitCache {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
-  
+
   DbLog_execMemCacheAsync ($hash);
-  
+
 return;
 }
 
@@ -1158,7 +1103,7 @@ return;
 sub _DbLog_setconfigCheck {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
-  
+
   my $check = DbLog_configcheck($hash);
 
 return $check;
@@ -1181,7 +1126,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
       $dbh->disconnect();
   }
 
-  DbLog_SBP_dbDisconnect ($hash);
+  DbLog_SBP_sendDbDisconnect ($hash);
 
   if (!$prop) {
       Log3 ($name, 3, "DbLog $name - Reopen requested");
@@ -1205,12 +1150,8 @@ sub _DbLog_setreopen {                   ## no critic "not used"
       $hash->{HELPER}{REOPEN_RUNS} = $prop;                                              # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
 
       BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
-      BlockingKill($hash->{HELPER}{COUNT_PID})      if($hash->{HELPER}{COUNT_PID});
-      BlockingKill($hash->{HELPER}{DELDAYS_PID})    if($hash->{HELPER}{DELDAYS_PID});
 
       delete $hash->{HELPER}{LONGRUN_PID};
-      delete $hash->{HELPER}{COUNT_PID};
-      delete $hash->{HELPER}{DELDAYS_PID};
       delete $hash->{HELPER}{REDUCELOG_PID};
 
       my $ts = (split " ",FmtDateTime(gettimeofday()+$prop))[1];
@@ -1246,7 +1187,7 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
   return $ret if $ret;
 
   _DbLog_ConnectPush     ($hash);
-  DbLog_SBP_dbDisconnect ($hash, 1);                                # DB Verbindung und Verbindungsdaten im SubProzess löschen
+  DbLog_SBP_sendDbDisconnect ($hash, 1);                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
   my $rst = DbLog_SBP_sendConnectionData ($hash);                   # neue Verbindungsdaten an SubProzess senden
 
@@ -1264,23 +1205,23 @@ return $ret;
 ################################################################
 sub _DbLog_setaddLog {                   ## no critic "not used"
   my $paref   = shift;
-  
+
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $opt     = $paref->{opt};
   my $prop    = $paref->{prop};
   my $argsref = $paref->{argsref};
 
-  unless ($prop) { 
+  unless ($prop) {
       return "$opt needs an argument. Please check commandref.";
   }
-  
+
   my @args = @{$argsref};
-  
+
   my $nce = ("\!useExcludes" ~~ @args) ? 1 : 0;
-  
+
   map (s/\!useExcludes//g, @args);
-  
+
   my $cn;
 
   if(/CN=/ ~~ @args) {
@@ -1308,7 +1249,7 @@ return undef,$skip_trigger;
 ################################################################
 sub _DbLog_setaddCacheLine {              ## no critic "not used"
   my $paref   = shift;
-  
+
   my $hash    = $paref->{hash};
   my $name    = $paref->{name};
   my $opt     = $paref->{opt};
@@ -1322,7 +1263,7 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
   my @b = @{$argsref};
   shift @b;
   shift @b;
-  
+
   my $aa;
 
   for my $k (@b) {
@@ -1356,7 +1297,7 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
                          i_unit      => $i_unit
                        }
                      );
-                           
+
 return;
 }
 
@@ -1365,21 +1306,45 @@ return;
 ################################################################
 sub _DbLog_setcount {              ## no critic "not used"
   my $paref = shift;
-  
+
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  
+
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
-  
+
   Log3 ($name, 4, "DbLog $name - Records count requested.");
-  
-  DbLog_SBP_sendCommand ($hash, 'count', 'count');
-                           
+
+  DbLog_SBP_sendCommand ($hash, 'count');
+
+return;
+}
+
+################################################################
+#                      Setter deleteOldDays
+################################################################
+sub _DbLog_setdeleteOldDays {            ## no critic "not used"
+  my $paref = shift;
+
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $db    = $paref->{dbname};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+
+  if (defined $hash->{HELPER}{LONGRUN_PID}) {
+      return 'Another operation is in progress, try again a little later.';
+  }
+
+  Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
+  Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
+
+  DbLog_SBP_sendCommand ($hash, 'deleteOldDays', $prop);
+
 return;
 }
 
@@ -1426,7 +1391,7 @@ sub DbLog_Log {
           }
       }
   }
-  
+
   my $log4rel = $vb4show && !$hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
   if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
@@ -1439,7 +1404,7 @@ sub DbLog_Log {
   }
 
   my ($event,$reading,$value,$unit,$err,$DoIt);
-  
+
   my $memcount = 0;
 
   my $re                 = $hash->{REGEXP};
@@ -1546,7 +1511,7 @@ sub DbLog_Log {
               }
 
               Log3 ($name, 5, "DbLog $name - parsed Event: $dev_name , Event: $event") if($log4rel);
-              
+
               if($log4rel) {
                   Log3 ($name, 5, qq{DbLog $name - DbLogExclude of "$dev_name": $DbLogExclude}) if($DbLogExclude);
                   Log3 ($name, 5, qq{DbLog $name - DbLogInclude of "$dev_name": $DbLogInclude}) if($DbLogInclude);
@@ -1614,7 +1579,7 @@ sub DbLog_Log {
                                               reading  => $reading,
                                               value    => $value
                                              }
-                                            );                         
+                                            );
 
               if ($DoIt) {
                   my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};                          # patch Forum:#111423
@@ -1712,11 +1677,11 @@ sub DbLog_Log {
                   ($dev_name,$dev_type,$event,$reading,$value,$unit) = DbLog_cutCol($hash,$dev_name,$dev_type,$event,$reading,$value,$unit);
 
                   my $row = $timestamp."|".$dev_name."|".$dev_type."|".$event."|".$reading."|".$value."|".$unit;
-                  
+
                   if($log4rel) {
                     Log3 ($name, 4, "DbLog $name - added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit");
                   }
-                  
+
                   $memcount = DbLog_addMemCacheRow ($name, $row);                            # Datensatz zum Memory Cache hinzufügen
               }
           }
@@ -1748,7 +1713,7 @@ sub DbLog_Log {
           return if($hash->{HELPER}{REOPEN_RUNS});                                      # return wenn "reopen" mit Ablaufzeit gestartet ist
 
           $err = DbLog_execMemCacheSync ($hash);
-          DbLog_setReadingstate ($hash, $err) if($err);                                                    
+          DbLog_setReadingstate ($hash, $err) if($err);
       }
       else {
           if($hash->{HELPER}{SHUTDOWNSEQ}) {
@@ -1757,7 +1722,7 @@ sub DbLog_Log {
           }
       }
   }
-  
+
   $net = tv_interval($nst);                                                             # Notify-Routine Laufzeit ermitteln
 
   if($net && AttrVal($name, 'showNotifyTime', 0)) {
@@ -2055,10 +2020,10 @@ return @result;
 #################################################################################################
 sub _DbLog_checkDefMinInt {
   my $paref    = shift;
-  
+
   my $name     = $paref->{name};
   my $dev_name = $paref->{dev_name};
-  my $now      = $paref->{now}; 
+  my $now      = $paref->{now};
   my $reading  = $paref->{reading};
   my $value    = $paref->{value};
 
@@ -2747,15 +2712,7 @@ sub DbLog_execMemCacheAsync {
       delete $hash->{HELPER}{REDUCELOG_PID};
   }
 
-  if($hash->{HELPER}{DELDAYS_PID} && $hash->{HELPER}{DELDAYS_PID}{pid} =~ m/DEAD/) {
-      delete $hash->{HELPER}{DELDAYS_PID};
-  }
-
   if($hash->{MODEL} eq "SQLITE") {                                                           # bei SQLite Sperrverwaltung Logging wenn andere schreibende Zugriffe laufen
-      if($hash->{HELPER}{DELDAYS_PID}) {
-          $error = "deleteOldDaysNbl is running - resync at NextSync";
-          $dolog = 0;
-      }
       if($hash->{HELPER}{REDUCELOG_PID}) {
           $error = "reduceLogNbl is running - resync at NextSync";
           $dolog = 0;
@@ -2791,7 +2748,7 @@ sub DbLog_execMemCacheAsync {
   }
   else {
       if($hash->{HELPER}{LONGRUN_PID}) {
-          $error = 'Cache execution already running - resync at NextSync';
+          $error = 'Another operation is in progress - resync at NextSync';
           DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
       }
       else {
@@ -2823,11 +2780,11 @@ sub DbLog_execMemCacheSync {
 
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
-  
+
   return if($hash->{HELPER}{LONGRUN_PID});
-  
+
   my $name = $hash->{NAME};
-  
+
   if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
@@ -2845,10 +2802,10 @@ sub DbLog_execMemCacheSync {
   $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                                     # aktuellen Index an Subprozess übergeben
 
   undef $data{DbLog}{$name}{cache}{memcache};                                                  # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
-  
+
   $err = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
-  
+
 return;
 }
 
@@ -2925,6 +2882,7 @@ sub DbLog_SBP_onRun {
               Log3 ($name, 3, "DbLog $name - DB connection parameters are stored in SubProcess ...");
 
               $store->{dbparams}{dbconn}      = $memc->{dbconn};
+              $store->{dbparams}{dbname}      = (split /;|=/, $memc->{dbconn})[1];
               $store->{dbparams}{dbuser}      = $memc->{dbuser};
               $store->{dbparams}{dbpassword}  = $memc->{dbpassword};
               $store->{dbparams}{utf8}        = $memc->{utf8};                    # Database UTF8 0|1
@@ -3055,7 +3013,7 @@ sub DbLog_SBP_onRun {
 
 
           ##  Event Logging
-          #########################################################          
+          #########################################################
           if ($operation =~ /log_/xs) {
               _DbLog_SBP_onRun_Log ( { subprocess => $subprocess,
                                        name       => $name,
@@ -3068,9 +3026,9 @@ sub DbLog_SBP_onRun {
                                      }
                                    );
           }
-          
+
           ##  Kommando: count
-          #########################################################          
+          #########################################################
           if ($operation =~ /count/xs) {
               _DbLog_SBP_onRun_Count ( { subprocess => $subprocess,
                                          name       => $name,
@@ -3080,8 +3038,20 @@ sub DbLog_SBP_onRun {
                                        }
                                      );
           }
+
+          ##  Kommando: count
+          #########################################################
+          if ($operation =~ /deleteOldDays/xs) {
+              _DbLog_SBP_onRun_deleteOldDays ( { subprocess => $subprocess,
+                                                 name       => $name,
+                                                 memc       => $memc,
+                                                 store      => $store,
+                                                 bst        => $bst
+                                               }
+                                             );
+          }
       }
-  
+
   usleep(300000);                                                      # reduziert CPU Last
   }
 
@@ -3165,7 +3135,7 @@ return ($err, $dbh);
 #################################################################
 sub _DbLog_SBP_onRun_Log {
   my $paref       = shift;
-  
+
   my $subprocess  = $paref->{subprocess};
   my $name        = $paref->{name};
   my $memc        = $paref->{memc};
@@ -3174,7 +3144,7 @@ sub _DbLog_SBP_onRun_Log {
   my $useac       = $paref->{useac};
   my $useta       = $paref->{useta};
   my $bst         = $paref->{bst};
-  
+
   my $DbLogType   = $memc->{DbLogType};                                   # Log-Ziele
   my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
   my $bi          = $memc->{bi};                                          # Bulk-Insert 0|1
@@ -3183,13 +3153,13 @@ sub _DbLog_SBP_onRun_Log {
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
   my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   my $index       = $memc->{cdataindex};                                  # aktueller Cache-Index
-  
-  my $dbh         = $store->{dbh};  
+
+  my $dbh         = $store->{dbh};
   my $dbconn      = $store->{dbparams}{dbconn};
   my $model       = $store->{dbparams}{model};
   my $history     = $store->{dbparams}{history};
   my $current     = $store->{dbparams}{current};
-  
+
   my $errorh      = q{};
   my $error       = q{};
   my $doins       = 0;                                                    # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl)
@@ -3197,7 +3167,7 @@ sub _DbLog_SBP_onRun_Log {
 
   my $ret;
   my $retjson;
-  
+
   if($tl) {                                                               # Tracelevel setzen
       $dbh->{TraceLevel} = "$tl|$tf";
   }
@@ -3298,30 +3268,30 @@ sub _DbLog_SBP_onRun_Log {
           $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
           eval { $sth_ih = $dbh->prepare($sqlins);
-                 $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);               # Tracelevel setzen
+                 $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);                   # Tracelevel setzen
                  $ins_hist = $sth_ih->execute();
                  1;
                }
-               or do {
-                   $errorh = $@;
+               or do { $errorh = $@;
 
-                   Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
+                       Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
 
-                   $dbh->disconnect();
+                       $dbh->disconnect();
+                       delete $store->{dbh};
 
-                   $rowlback = $cdata if($useta);                         # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+                       $rowlback = $cdata if($useta);                         # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
 
-                   $ret = {
-                       name     => $name,
-                       msg      => $@,
-                       ot       => 0,
-                       oper     => $operation,
-                       rowlback => $rowlback
-                   };
+                       $ret = {
+                           name     => $name,
+                           msg      => $@,
+                           ot       => 0,
+                           oper     => $operation,
+                           rowlback => $rowlback
+                       };
 
-                  $retjson = eval { encode_json($ret) };
-                  $subprocess->writeToParent ($retjson);
-                  return;
+                      $retjson = eval { encode_json($ret) };
+                      $subprocess->writeToParent ($retjson);
+                      return;
                };
 
           $ins_hist = 0 if($ins_hist eq "0E0");
@@ -3353,6 +3323,7 @@ sub _DbLog_SBP_onRun_Log {
               Log3 ($name, 2, "DbLog $name - Error: $error");
 
               $dbh->disconnect();
+              delete $store->{dbh};
 
               $ret = {
                   name     => $name,
@@ -3477,6 +3448,7 @@ sub _DbLog_SBP_onRun_Log {
               Log3 ($name, 2, "DbLog $name - Error: $error");
 
               $dbh->disconnect();
+              delete $store->{dbh};
 
               $ret = {
                   name     => $name,
@@ -3508,7 +3480,7 @@ sub _DbLog_SBP_onRun_Log {
           my @n2hist;
           my $rowhref;
           my $nins_hist = 0;
-          
+
           eval {
               ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
 
@@ -3549,12 +3521,12 @@ sub _DbLog_SBP_onRun_Log {
                       $rowhref->{$bkey} = $line;
                       $bkey++;
                   }
-                  
+
                   $rowlback = $rowhref if(defined $rowhref);                              # nicht gespeicherte Datensätze zurück geben
               }
 
               $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
-              
+
               if ($error) {
                   $rowlback = $cdata if($useta);                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
               }
@@ -3582,6 +3554,7 @@ sub _DbLog_SBP_onRun_Log {
               Log3 ($name, 2, "DbLog $name - Error: $error");
 
               $dbh->disconnect();
+              delete $store->{dbh};
 
               $ret = {
                   name     => $name,
@@ -3717,23 +3690,23 @@ return;
 #################################################################
 sub _DbLog_SBP_onRun_Count {
   my $paref       = shift;
-  
+
   my $subprocess  = $paref->{subprocess};
   my $name        = $paref->{name};
   my $memc        = $paref->{memc};
   my $store       = $paref->{store};                                          # Datenspeicher
   my $bst         = $paref->{bst};
-  
-  my $dbh         = $store->{dbh};  
+
+  my $dbh         = $store->{dbh};
   my $history     = $store->{dbparams}{history};
   my $current     = $store->{dbparams}{current};
-  
+
   my $operation   = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
-  
+
   my $error       = q{};
 
   my $st          = [gettimeofday];                                           # SQL-Startzeit
-  
+
   my $ch          = $dbh->selectrow_array("SELECT count(*) FROM $history");
   my $cc          = $dbh->selectrow_array("SELECT count(*) FROM $current");
 
@@ -3748,6 +3721,97 @@ sub _DbLog_SBP_onRun_Count {
       oper     => $operation,
       ch       => $ch,
       cc       => $cc
+  };
+
+  my $retjson = eval { encode_json($ret) };
+  $subprocess->writeToParent ($retjson);
+
+return;
+}
+
+#################################################################
+# SubProcess - deleteOldDays-Routine
+#################################################################
+sub _DbLog_SBP_onRun_deleteOldDays {
+  my $paref       = shift;
+
+  my $subprocess  = $paref->{subprocess};
+  my $name        = $paref->{name};
+  my $memc        = $paref->{memc};
+  my $store       = $paref->{store};                                          # Datenspeicher
+  my $bst         = $paref->{bst};
+
+  my $dbh         = $store->{dbh};
+  my $history     = $store->{dbparams}{history};
+  my $model       = $store->{dbparams}{model};
+  my $db          = $store->{dbparams}{dbname};
+
+  my $operation   = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
+  my $args        = $memc->{arguments};
+
+  my $error       = q{};
+  my $errorh      = q{};
+  my $numdel      = 0;
+  my $ret;
+  my $retjson;
+
+  my $cmd         = "delete from $history where TIMESTAMP < ";
+
+  if ($model eq 'SQLITE') {
+      $cmd .= "datetime('now', '-$args days')";
+  }
+  elsif ($model eq 'MYSQL') {
+      $cmd .= "DATE_SUB(CURDATE(),INTERVAL $args DAY)";
+  }
+  elsif ($model eq 'POSTGRESQL') {
+      $cmd .= "NOW() - INTERVAL '$args' DAY";
+  }
+  else  {
+      $cmd   = undef;
+      $error = 'Unknown database type. Maybe you can try userCommand anyway';
+  }
+
+  my $st = [gettimeofday];                                           # SQL-Startzeit
+
+  if(defined ($cmd)) {
+      eval { $numdel = $dbh->do($cmd);
+             1;
+           }
+           or do { $errorh = $@;
+
+                   Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
+
+                   $dbh->disconnect();
+                   delete $store->{dbh};
+
+                   $ret = {
+                       name     => $name,
+                       msg      => $@,
+                       ot       => 0,
+                       oper     => $operation
+                   };
+
+                   $retjson = eval { encode_json($ret) };
+                   $subprocess->writeToParent ($retjson);
+                   return;
+                 };
+
+      $numdel = 0 if($numdel == 0E0);
+      $error  = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+
+      Log3 ($name, 3, "DbLog $name - deleteOldDays finished. $numdel entries of database $db deleted.");
+  }
+
+  my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
+  my $ot  = $rt.",".$brt;
+
+  $ret = {
+      name     => $name,
+      msg      => $error,
+      ot       => $ot,
+      oper     => $operation,
+      numdel   => $numdel
   };
 
   my $retjson = eval { encode_json($ret) };
@@ -3955,7 +4019,7 @@ return $err;
 #   Datenbankverbindung im SubProcess
 #   beenden
 #####################################################
-sub DbLog_SBP_dbDisconnect {
+sub DbLog_SBP_sendDbDisconnect {
   my $hash    = shift;
   my $delpars = shift // 0;      # 1 - die im SubProzess gespeicherten Daten sollen gelöscht werden
 
@@ -4073,7 +4137,7 @@ sub DbLog_SBP_sendLogData {
                         };
 
   $subprocess->writeToChild($json);
-  
+
   $hash->{HELPER}{LONGRUN_PID} = time();                # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
@@ -4081,15 +4145,17 @@ return;
 
 #####################################################
 #   ein Kommando zur Ausführung an SubProcess senden
-#   z.B. 
+#   z.B.
 #   $oper = count
 #   $oper = deleteOldDays
 #   etc.
+#
+#   $arg -> Argumente von $oper
 #####################################################
 sub DbLog_SBP_sendCommand {
   my $hash = shift;
   my $oper = shift;                                       # angeforderte Operation
-  my $cmd  = shift // q{};
+  my $arg  = shift // q{};
 
   my $name       = $hash->{NAME};
   my $subprocess = $hash->{".fhem"}{subprocess};
@@ -4098,12 +4164,12 @@ sub DbLog_SBP_sendCommand {
       Log3 ($name, 1, "DbLog $name - ERROR - SubProcess isn't running, processing data couldn't be sent");
       return 'no SubProcess is running';
   }
-  
+
   my $memc;
 
   $memc->{verbose}   = AttrVal ($name, 'verbose', 3);
   $memc->{operation} = $oper;
-  $memc->{command}   = $cmd;
+  $memc->{arguments} = $arg;
 
   my $json = eval { encode_json($memc);
                   }
@@ -4113,11 +4179,11 @@ sub DbLog_SBP_sendCommand {
                         };
 
   $subprocess->writeToChild($json);
-  
+
   $hash->{HELPER}{LONGRUN_PID} = time();               # Statusbit laufende Verarbeitung mit Startzeitstempel;
-  
-  DbLog_setReadingstate ($hash, "command '$cmd' is running");
-  
+
+  DbLog_setReadingstate ($hash, "operation '$oper' is running");
+
 return;
 }
 
@@ -4226,9 +4292,9 @@ sub DbLog_SBP_Read {
 
       delete $hash->{HELPER}{LONGRUN_PID};
       delete $hash->{HELPER}{LASTLIMITRUNTIME} if(!$msg);
-      
+
       my $ce = AttrVal ($name, 'cacheEvents', 0);
-      
+
       # Log3 ($name, 1, "DbLog $name - Read result of operation: $oper");
       # Log3 ($name, 1, "DbLog $name - DbLog_SBP_Read: name: $name, msg: $msg, ot: $ot, rowlback: ".Dumper $rowlback);
 
@@ -4243,33 +4309,39 @@ sub DbLog_SBP_Read {
       ###############
       if ($oper =~ /log_/xs) {
           my $rowlback = $ret->{rowlback};
-          
+
           if($rowlback) {                                                                         # one Transaction
               my $memcount;
-              
+
               eval {
                   for my $key (sort {$a <=>$b} keys %{$rowlback}) {
                       $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
-                     
+
                       Log3 ($name, 5, "DbLog $name - rowback to Cache: $key -> ".$rowlback->{$key});
                   }
               };
-              
+
               readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0));
           }
       }
 
       ## Count - Read
       #################
-      if ($oper =~ /count/xs) { 
-          my $ch = $ret->{ch} // 'unknown'; 
-          my $cc = $ret->{cc} // 'unknown'; 
-          
+      if ($oper =~ /count/xs) {
+          my $ch = $ret->{ch} // 'unknown';
+          my $cc = $ret->{cc} // 'unknown';
+
           readingsBeginUpdate ($hash);
           readingsBulkUpdate  ($hash, 'countHistory', $ch);
           readingsBulkUpdate  ($hash, 'countCurrent', $cc);
           readingsEndUpdate   ($hash, 1);
-      }      
+      }
+
+      ## deleteOldDays - Read
+      #########################
+      if ($oper =~ /deleteOldDays/xs) {
+          readingsSingleUpdate($hash, 'lastRowsDeleted', $ret->{numdel}, 1);
+      }
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
           my ($rt,$brt) = split(",", $ot);
@@ -7266,139 +7338,6 @@ sub DbLog_reduceLogNbl_finished {
 return;
 }
 
-#########################################################################################
-# DBLog - deleteOldDays non-blocking
-#########################################################################################
-sub DbLog_deldaysNbl {
-  my ($name)     = @_;
-  my $hash       = $defs{$name};
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
-  my $days       = delete($hash->{HELPER}{DELDAYS});
-  my $history    = $hash->{HELPER}{TH};
-  my $current    = $hash->{HELPER}{TC};
-  my ($cmd,$dbh,$rows,$error,$sth,$ret,$bst,$brt,$st,$rt);
-
-  Log3 ($name, 5, "DbLog $name - Start DbLog_deldaysNbl $days");
-
-  # Background-Startzeit
-  $bst = [gettimeofday];
-
-  my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
-
-  if(!$useac) {
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1 });};
-  }
-  elsif($useac == 1) {
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
-  }
-  else {
-      # Server default
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
-  }
-  if ($@) {
-      $error = encode_base64($@,"");
-      Log3 ($name, 2, "DbLog $name - Error: $@");
-      Log3 ($name, 5, "DbLog $name - DbLog_deldaysNbl finished");
-      return "$name|0|0|$error";
-  }
-
-  my $ac = ($dbh->{AutoCommit})?"ON":"OFF";
-  my $tm = ($useta)?"ON":"OFF";
-  Log3 $name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm";
-
-  $cmd = "delete from $history where TIMESTAMP < ";
-  if ($hash->{MODEL} eq 'SQLITE') {
-      $cmd .= "datetime('now', '-$days days')";
-  }
-  elsif ($hash->{MODEL} eq 'MYSQL') {
-      $cmd .= "DATE_SUB(CURDATE(),INTERVAL $days DAY)";
-  }
-  elsif ($hash->{MODEL} eq 'POSTGRESQL') {
-      $cmd .= "NOW() - INTERVAL '$days' DAY";
-  }
-  else {
-      $ret = 'Unknown database type. Maybe you can try userCommand anyway.';
-      $error = encode_base64($ret,"");
-      Log3 ($name, 2, "DbLog $name - Error: $ret");
-      Log3 ($name, 5, "DbLog $name - DbLog_deldaysNbl finished");
-      return "$name|0|0|$error";
-  }
-
-  # SQL-Startzeit
-  $st = [gettimeofday];
-
-  eval {
-      $sth = $dbh->prepare($cmd);
-      $sth->execute();
-  };
-
-  if ($@) {
-      $error = encode_base64($@,"");
-      Log3 ($name, 2, "DbLog $name - $@");
-      $dbh->disconnect;
-      Log3 ($name, 4, "DbLog $name - BlockingCall DbLog_deldaysNbl finished");
-      return "$name|0|0|$error";
- }
- else {
-     $rows = $sth->rows;
-     $dbh->commit() if(!$dbh->{AutoCommit});
-     $dbh->disconnect;
- }
-
- $rt = tv_interval($st);                                # SQL-Laufzeit ermitteln
-
- $brt = tv_interval($bst);                              # Background-Laufzeit ermitteln
- $rt = $rt.",".$brt;
-
-  Log3 ($name, 5, "DbLog $name - DbLog_deldaysNbl finished");
-return "$name|$rows|$rt|0";
-}
-
-#########################################################################################
-# DBLog - deleteOldDays non-blocking Rückkehrfunktion
-#########################################################################################
-sub DbLog_deldaysNbl_done {
-  my $string = shift;
-  my @a      = split("\\|",$string);
-  my $name   = $a[0];
-  my $hash   = $defs{$name};
-  my $rows   = $a[1];
-  my($bt,$err);
-  $bt        = $a[2]                if ($a[2]);
-  $err       = decode_base64($a[3]) if ($a[3]);
-
-  Log3 ($name, 5, "DbLog $name - Start DbLog_deldaysNbl_done");
-
-  if ($err) {
-      DbLog_setReadingstate ($hash, $err);
-      delete $hash->{HELPER}{DELDAYS_PID};
-      Log3 ($name, 5, "DbLog $name - DbLog_deldaysNbl_done finished");
-      return;
-  }
-  else {
-      if(AttrVal($name, "showproctime", undef) && $bt) {
-          my ($rt,$brt)  = split(",", $bt);
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate ($hash, "background_processing_time", sprintf("%.4f",$brt));
-          readingsBulkUpdate ($hash, "sql_processing_time", sprintf("%.4f",$rt));
-          readingsEndUpdate  ($hash, 1);
-      }
-      readingsSingleUpdate($hash, "lastRowsDeleted", $rows ,1);
-  }
-
-  my $db = (split(/;|=/, $hash->{dbconn}))[1];
-
-  Log3 ($name, 3, "DbLog $name - deleteOldDaysNbl finished. $rows entries of database $db deleted.");
-
-  delete $hash->{HELPER}{DELDAYS_PID};
-
-  Log3 ($name, 5, "DbLog $name - DbLog_deldaysNbl_done finished");
-
-return;
-}
-
 ################################################################
 # benutzte DB-Feldlängen in Helper und Internals setzen
 ################################################################
@@ -7809,12 +7748,13 @@ sub DbLog_chartQuery {
 
     if ($sql eq "error") {
        return DbLog_jsonError("Could not setup SQL String. Maybe the Database is busy, please try again!");
-    } elsif ($sql eq "errordb") {
+    }
+    elsif ($sql eq "errordb") {
        return DbLog_jsonError("The Database Type is not supported!");
     }
 
     my ($hash, @a) = @_;
-    my $dbhf = _DbLog_ConnectNewDBH($hash);
+    my $dbhf       = _DbLog_ConnectNewDBH($hash);
     return if(!$dbhf);
 
     my $totalcount;
@@ -7854,7 +7794,6 @@ sub DbLog_chartQuery {
     my $jsonstring = '{"data":[';
 
     while ( my @data = $query_handle->fetchrow_array()) {
-
         if($i == 0) {
             $jsonstring .= '{';
         }
@@ -7869,6 +7808,7 @@ sub DbLog_chartQuery {
 
             if (defined $data[$i]) {
                 my $fragment =  substr($data[$i],0,1);
+
                 if ($fragment eq "{") {
                     $jsonstring .= $data[$i];
                 }
@@ -7884,8 +7824,10 @@ sub DbLog_chartQuery {
                $jsonstring .= ',';
             }
         }
+
         $jsonstring .= '}';
     }
+
     $dbhf->disconnect();
     $jsonstring .= ']';
     if (defined $totalcount && $totalcount ne "") {
@@ -8152,7 +8094,7 @@ return;
     current or history. If you want use PostgreSQL with PK it has to be at lest version 9.5.
     <br><br>
 
-    The content of VALUE will be optimized for automated post-processing, e.g. <code>yes</code> is translated 
+    The content of VALUE will be optimized for automated post-processing, e.g. <code>yes</code> is translated
     to <code>1</code>
     <br><br>
 
@@ -8268,10 +8210,10 @@ return;
 
     <li><b>set &lt;name&gt; commitCache </b> <br><br>
     <ul>
-      In asynchronous mode (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), the cached data in memory will be written 
+      In asynchronous mode (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), the cached data in memory will be written
       into the database and subsequently the cache will be cleared. Thereby the internal timer for the asynchronous mode
       Modus will be set new.
-      The command can be usefull in case of you want to write the cached data manually, or e.g. by an AT-device, on a 
+      The command can be usefull in case of you want to write the cached data manually, or e.g. by an AT-device, on a
       defined point of time into the database.
     </li>
     </ul>
@@ -8287,7 +8229,7 @@ return;
     <li><b>set &lt;name&gt; count </b> <br><br>
       <ul>
       Determines the number of records in the tables current and history and writes the results to the readings
-      countCurrent and countHistory. 
+      countCurrent and countHistory.
     </ul>
     </li>
     <br>
@@ -8300,18 +8242,19 @@ return;
     <br>
 
     <li><b>set &lt;name&gt; deleteOldDays &lt;n&gt; </b> <br><br>
-    <ul>
-      Delete records from history older than &lt;n&gt; days. Number of deleted records will be written into reading
-      lastRowsDeleted.
-    </li>
+      <ul>
+      Deletes records older than &lt;n&gt; days in table history.
+      The number of deleted records is logged in Reading lastRowsDeleted.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt; </b> <br><br>
-    <ul>
-      Is identical to function "deleteOldDays"  whereupon deleteOldDaysNbl will be executed non-blocking.
-    </li>
+      <ul>
+      The function is identical to "set &lt;name&gt; deleteOldDays" and will be removed soon.
+      <br>
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; eraseReadings </b> <br><br>
@@ -9288,8 +9231,8 @@ attr SMA_Energymeter DbLogValueFn
     <ul>
       <code>attr &lt;device&gt; showproctime [1|0] </code><br><br>
 
-      If set, the reading "sql_processing_time" shows the required processing time (in seconds) for the 
-      SQL execution of the executed function. 
+      If set, the reading "sql_processing_time" shows the required processing time (in seconds) for the
+      SQL execution of the executed function.
       This does not consider a single SQL statement, but the sum of all executed SQL commands within the
       respective function is considered. <br>
       The reading "background_processing_time" shows the time used in the SubProcess.
@@ -9310,9 +9253,9 @@ attr SMA_Energymeter DbLogValueFn
       in the time required for event processing in synchronous or asynchronous mode. <br>
       (default: 0)
       <br><br>
-      
+
       <b>Hinweis:</b> <br>
-      The reading "notify_processing_time" generates a lot of events and burdens the system. Therefore, when using the 
+      The reading "notify_processing_time" generates a lot of events and burdens the system. Therefore, when using the
       the event generation should be limited by setting the attribute "event-min-interval" to e.g.
       "notify_processing_time:30".
     </ul>
@@ -9699,7 +9642,7 @@ attr SMA_Energymeter DbLogValueFn
     Version 9.5 sein.
     <br><br>
 
-    Der gespeicherte Wert des Readings wird optimiert für eine automatisierte Nachverarbeitung, z.B. <code>yes</code> wird 
+    Der gespeicherte Wert des Readings wird optimiert für eine automatisierte Nachverarbeitung, z.B. <code>yes</code> wird
     transformiert nach <code>1</code>. <br><br>
 
     Die gespeicherten Werte können mittels GET Funktion angezeigt werden:
@@ -9825,7 +9768,7 @@ attr SMA_Energymeter DbLogValueFn
 
     <li><b>set &lt;name&gt; commitCache </b> <br><br>
       <ul>
-      Im asynchronen Modus (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), werden die im Speicher zwischengespeicherten 
+      Im asynchronen Modus (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), werden die im Speicher zwischengespeicherten
       Daten in die Datenbank geschrieben und danach der Cache geleert. Der interne Timer des asynchronen Modus wird dabei
       neu gesetzt.
       Der Befehl kann nützlich sein um manuell, oder z.B. über ein AT, den Cacheinhalt zu einem definierten Zeitpunkt in die
@@ -9844,7 +9787,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>set &lt;name&gt; count </b> <br><br>
       <ul>
       Ermittelt die Anzahl der Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings
-      countCurrent und countHistory. 
+      countCurrent und countHistory.
     </ul>
     </li>
     <br>
@@ -9857,18 +9800,19 @@ attr SMA_Energymeter DbLogValueFn
     <br>
 
     <li><b>set &lt;name&gt; deleteOldDays &lt;n&gt; </b> <br><br>
-      <ul>Löscht Datensätze in Tabelle history, die älter sind als &lt;n&gt; Tage sind.
-      Die Anzahl der gelöschten Datens&auml;tze wird in das Reading lastRowsDeleted geschrieben.
-    </li>
+      <ul>
+      Löscht Datensätze älter als &lt;n&gt; Tage in Tabelle history.
+      Die Anzahl der gelöschten Datens&auml;tze wird im Reading lastRowsDeleted protokolliert.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; deleteOldDaysNbl &lt;n&gt; </b> <br><br>
       <ul>
-      Identisch zu Funktion "deleteOldDays" wobei deleteOldDaysNbl nicht blockierend ausgeführt wird.
+      Die Funktion ist identisch zu "set &lt;name&gt; deleteOldDays" und wird demnächst entfernt.
       <br>
-    </li>
     </ul>
+    </li>
     <br>
 
     <a id="DbLog-set-exportCache"></a>
@@ -9914,7 +9858,7 @@ attr SMA_Energymeter DbLogValueFn
 
     <li><b>set &lt;name&gt; purgeCache </b> <br><br>
       <ul>
-      Im asynchronen Modus (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), werden die im Speicher zwischengespeicherten 
+      Im asynchronen Modus (<a href="#DbLog-attr-asyncMode">asyncMode=1</a>), werden die im Speicher zwischengespeicherten
       Daten gelöscht.
       Es werden keine Daten aus dem Cache in die Datenbank geschrieben.
     </li>
@@ -10869,8 +10813,8 @@ attr SMA_Energymeter DbLogValueFn
     <ul>
       <code>attr &lt;device&gt; showproctime [1|0] </code><br><br>
 
-      Wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die 
-      SQL-Ausführung der durchgeführten Funktion. 
+      Wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden) für die
+      SQL-Ausführung der durchgeführten Funktion.
       Dabei wird nicht ein einzelnes SQL-Statement, sondern die Summe aller ausgeführten SQL-Kommandos innerhalb der
       jeweiligen Funktion betrachtet. <br>
       Das Reading "background_processing_time" zeigt die im SubProcess verbrauchte Zeit.
@@ -10891,9 +10835,9 @@ attr SMA_Energymeter DbLogValueFn
       im Zeitbedarf der Eventverarbeitung im synchronen bzw. asynchronen Modus festzustellen. <br>
       (default: 0)
       <br><br>
-      
+
       <b>Hinweis:</b> <br>
-      Das Reading "notify_processing_time" erzeugt sehr viele Events und belasted das System. Deswegen sollte bei Benutzung 
+      Das Reading "notify_processing_time" erzeugt sehr viele Events und belasted das System. Deswegen sollte bei Benutzung
       des Attributes die Eventerzeugung durch das Setzen von Attribut "event-min-interval" auf
       z.B. "notify_processing_time:30" deutlich begrenzt werden.
     </ul>
