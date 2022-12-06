@@ -1471,7 +1471,7 @@ sub DbLog_Log {
   
   my $log4rel = $vb4show && !$hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
-  if(AttrVal ($name, 'verbose', 3) =~ /[45]/) {
+  if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
       if($log4rel) {
           Log3 ($name, 4, "DbLog $name - ################################################################");
           Log3 ($name, 4, "DbLog $name - ###              start of new Logcycle                       ###");
@@ -2870,7 +2870,7 @@ sub DbLog_execMemCacheSync {
   
   my $name = $hash->{NAME};
   
-  if(AttrVal ($name, 'verbose', 3) =~ /[45]/) {
+  if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
@@ -2880,7 +2880,7 @@ sub DbLog_execMemCacheSync {
   my $memc;
 
   for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-      Log3 ($name, 5, "DbLog $name - MemCache contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
+      Log3 ($name, 5, "DbLog $name - Store contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
 
       $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};                # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   }
