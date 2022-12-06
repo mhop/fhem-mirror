@@ -80,7 +80,7 @@ span.sort-item-delete-link {
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; }
-.downText { margin-top:2px; }
+.downText { margin:2px 10px 0 10px; }
 .set .set { margin-bottom:2px; margin-top:3px; }             /* timepicker */
 
 pre { white-space: pre-wrap; }
