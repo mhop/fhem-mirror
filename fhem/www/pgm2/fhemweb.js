@@ -1001,16 +1001,17 @@ FW_detLink()
 
     } else if(cmd == "forumCopy") {
       FW_cmd(FW_root+"?cmd=list -r -i "+dev+"&XHR=1", function(data) {
-        var ta = document.createElement("textarea");
+        var ta = document.createElement("textarea"), at="";
         if(data.length > 50*1000) {
           data = data.substr(0,50*1000)+
                   "\n# ... truncated to 50k, original length "+data.length;
+          at = "<br><br>Text truncated to 50k due to forum restrictions.";
         }
         ta.value = '[code]'+data+'[/code]';
         document.body.appendChild(ta);
         ta.select();
         if(document.execCommand('copy'))
-          FW_okDialog('"forum ready" definition copied to the clipboard.');
+          FW_okDialog('"forum ready" definition copied to the clipboard.'+at);
          else
           FW_okDialog('Could not copy');
         document.body.removeChild(ta);
