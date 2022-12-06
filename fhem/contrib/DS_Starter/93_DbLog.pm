@@ -2830,8 +2830,6 @@ sub DbLog_execMemCacheAsync {
 
       $error = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                         # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
       return if($error);
-
-      $hash->{HELPER}{'LONGRUN_PID'} = time();                                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
   }
   else {
       if($hash->{HELPER}{'LONGRUN_PID'}) {
@@ -2885,8 +2883,6 @@ sub DbLog_execMemCacheSync {
   
   $err = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
-
-  $hash->{HELPER}{'LONGRUN_PID'} = time();                                                     # Statusbit laufende Verarbeitung mit Startzeitstempel;
   
 return;
 }
@@ -3224,7 +3220,6 @@ sub _DbLog_SBP_onRun_Log {
 
   my $ret;
   my $retjson;
-  my $rowhref;
   
   if($tl) {                                                               # Tracelevel setzen
       $dbh->{TraceLevel} = "$tl|$tf";
@@ -3533,10 +3528,12 @@ sub _DbLog_SBP_onRun_Log {
 
           $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
+          my @n2hist;
+          my $rowhref;
+          my $nins_hist = 0;
+          
           eval {
               ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
-              my $nins_hist    = 0;
-              my @n2hist;
 
               no warnings 'uninitialized';
 
@@ -3548,7 +3545,7 @@ sub _DbLog_SBP_onRun_Log {
 
                   Log3 ($name, 3, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
 
-                  my $nlh = ($timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple]);
+                  my $nlh = $timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple];
 
                   push @n2hist, $nlh;
 
@@ -3575,9 +3572,15 @@ sub _DbLog_SBP_onRun_Log {
                       $rowhref->{$bkey} = $line;
                       $bkey++;
                   }
+                  
+                  $rowlback = $rowhref if(defined $rowhref);                              # nicht gespeicherte Datensätze zurück geben
               }
 
               $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+              
+              if ($error) {
+                  $rowlback = $cdata if($useta);                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+              }
           };
 
           if ($@) {
@@ -3586,7 +3589,7 @@ sub _DbLog_SBP_onRun_Log {
               Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
 
               $error    = $errorh;
-              $rowlback = $rowhref if($useta);                                             # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+              $rowlback = $cdata if($useta);                                               # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
           }
       }
 
@@ -4022,7 +4025,7 @@ return;
 #####################################################
 sub DbLog_SBP_sendLogData {
   my $hash = shift;
-  my $oper = shift;            # angeforderte Operation
+  my $oper = shift;                                        # angeforderte Operation
   my $memc = shift;
 
   my $name       = $hash->{NAME};
@@ -4049,6 +4052,45 @@ sub DbLog_SBP_sendLogData {
                         };
 
   $subprocess->writeToChild($json);
+  
+  $hash->{HELPER}{'LONGRUN_PID'} = time();                # Statusbit laufende Verarbeitung mit Startzeitstempel;
+
+return;
+}
+
+#####################################################
+#   ein Kommando zur Ausführung an SubProcess senden
+#   z.B. count, deleteOldDays, etc.
+#####################################################
+sub DbLog_SBP_sendCommand {
+  my $hash = shift;
+  my $oper = shift;                                       # angeforderte Operation
+  my $cmd  = shift;
+
+  my $name       = $hash->{NAME};
+  my $subprocess = $hash->{".fhem"}{subprocess};
+
+  if(!defined $subprocess) {
+      Log3 ($name, 1, "DbLog $name - ERROR - SubProcess isn't running, processing data couldn't be sent");
+      return 'no SubProcess is running';
+  }
+  
+  my $memc;
+
+  $memc->{verbose}   = AttrVal ($name, 'verbose', 3);
+  $memc->{operation} = $oper;
+  $memc->{command}   = $cmd;
+
+  my $json = eval { encode_json($memc);
+                  }
+                  or do { my $err = $@;
+                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
+                          return $err;
+                        };
+
+  $subprocess->writeToChild($json);
+  
+  $hash->{HELPER}{'LONGRUN_PID'} = time();               # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
 }
@@ -4180,7 +4222,7 @@ sub DbLog_SBP_Read {
               for my $key (sort {$a <=>$b} keys %{$rowlback}) {
                   $memcount = DbLog_addMemCacheRow ($name, $rowlback->{$key});                # Datensatz zum Memory Cache hinzufügen
                  
-                  Log3 ($name, 5, "DbLog $name - rowlback to Cache: $key -> ".$rowlback->{$key});
+                  Log3 ($name, 5, "DbLog $name - rowback to Cache: $key -> ".$rowlback->{$key});
               }
           };
           
