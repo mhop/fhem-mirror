@@ -180,6 +180,8 @@
 # 2022-08-06 - added     attribute shortinfo for use with configdb info
 # 2022-08-07 - added     log a message if more than 20 versions stored
 #
+# 2022-12-06 - added     add raw json output in configdb info
+#
 ##############################################################################
 =cut
 
@@ -913,8 +915,9 @@ sub _cfgDB_Migrate {
 
 # show database statistics
 sub _cfgDB_Info {
-	my ($info2) = @_;
+	my ($info2,$raw) = @_;
 	$info2 //= 'unknown';
+	$raw //= 0;
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
 
@@ -942,7 +945,7 @@ sub _cfgDB_Info {
 	push @r, $l;
 	push @r, " loaded:       ".$configDB{loaded};
 	my $fhem_dbh = _cfgDB_Connect;
-	my ($sql, $sth, @line, $row);
+	my ($sql, $sth, @line, $row, $countDef, $countAttr, @raw);
 
 # read versions table statistics
 
@@ -963,13 +966,13 @@ sub _cfgDB_Info {
 		$sth = $fhem_dbh->prepare( $sql );
 		$sth->execute();
 		while (@line = $sth->fetchrow_array()) {
-			$line[3] = "" unless defined $line[3];
-			$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
-					$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
-			$row	.= " attr: ".
-					$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
-			$row    .= " tag: ".$line[8] if $line[8];
+			$line[3]   = "" unless defined $line[3];
+			$countDef  = $fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
+			$countAttr = $fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'attr' and VERSIONUUID = '$line[5]'");
+			$row  = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: $countDef attr: $countAttr";
+			$row .= " tag: ".$line[8] if $line[8];
 			push @r, $row;
+			push @raw, {version => $line[6], saved => "$line[1] $line[2] $line[3]", def => $countDef, attr => $countAttr};
 		}
     } else {
     	my $count;
@@ -987,9 +990,9 @@ sub _cfgDB_Info {
 	$row = " filesave: $count file$f stored in database";
 	push @r, $row;
 	push @r, $l;
-
 	$fhem_dbh->disconnect();
 
+	return toJSON \@raw if $raw;
 	return join("\n", @r);
 }
 
