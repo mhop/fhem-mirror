@@ -2833,8 +2833,7 @@ sub DbLog_execMemCacheSync {
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
   }
-  
-  my $name = $hash->{NAME};
+
   my $memc;
 
   for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
