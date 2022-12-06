@@ -40,7 +40,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ",
+  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ".
+                           "userCommand ",
   "5.2.0"   => "05.12.2022 LONGRUN_PID, \$hash->{prioSave}, rework SetFn ",
   "5.1.0"   => "03.12.2022 implement SubProcess for logging data in synchron Mode ",
   "5.0.0"   => "02.12.2022 implement SubProcess for logging data in asynchron Mode, delete attr traceHandles ",
@@ -284,6 +285,7 @@ my %DbLog_hset = (                                                              
   countNbl         => { fn => \&_DbLog_setcount          },
   deleteOldDays    => { fn => \&_DbLog_setdeleteOldDays  },
   deleteOldDaysNbl => { fn => \&_DbLog_setdeleteOldDays  },
+  userCommand      => { fn => \&_DbLog_setuserCommand    },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -711,11 +713,12 @@ sub DbLog_Set {
 
     return qq{"set X" needs at least an argument} if ( @a < 2 );
 
-    my $name  = $a[0];
-    my $opt   = $a[1];
+    my $name  = shift @a;
+    my $opt   = shift @a;
     my @args  = @a;
-    my $prop  = $a[2];
-    my $prop1 = $a[3];
+    my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
+    my $prop  = shift @a;
+    my $prop1 = shift @a;
 
     return if(IsDisabled ($name));
 
@@ -785,6 +788,7 @@ sub DbLog_Set {
         hash    => $hash,
         name    => $name,
         dbname  => $db,
+        arg     => $arg,
         argsref => \@args,
         opt     => $opt,
         prop    => $prop,
@@ -960,41 +964,6 @@ sub DbLog_Set {
         }
 
         return;
-    }
-    elsif ($opt eq 'userCommand') {
-        Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
-        $dbh = _DbLog_ConnectNewDBH($hash);
-
-        if(!$dbh) {
-            Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB connect not possible");
-            return;
-        }
-        else {
-            Log3($name, 4, "DbLog $name: userCommand execution requested.");
-            my ($c, @cmd, $sql);
-            @cmd = @a;
-            shift(@cmd); shift(@cmd);
-
-            $sql = join(" ",@cmd);
-            readingsSingleUpdate($hash, 'userCommand', $sql, 1);
-
-            $dbh->{RaiseError} = 1;
-            $dbh->{PrintError} = 0;
-
-            my $error;
-            eval { $c = $dbh->selectrow_array($sql); };
-            if($@) {
-                $error = $@;
-                Log3($name, 1, "DbLog $name: DBLog_Set - $error");
-            }
-
-            my $res = $error ? $error : (defined($c)) ? $c : "no result";
-            Log3 ($name, 4, "DbLog $name: DBLog_Set - userCommand - result: $res");
-            readingsSingleUpdate($hash, 'userCommandResult', $res ,1);
-            $dbh->disconnect();
-
-            InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
-        }
     }
     else {
         $ret = $usage;
@@ -1225,14 +1194,14 @@ sub _DbLog_setaddLog {                   ## no critic "not used"
   my $cn;
 
   if(/CN=/ ~~ @args) {
-      my $t = join(" ",@args);
+      my $t = join " ", @args;
       ($cn) = ($t =~ /^.*CN=(\w+).*$/);
       map(s/CN=$cn//g, @args);
   }
 
   my $params = { hash      => $hash,
-                 devrdspec => $args[2],
-                 value     => $args[3],
+                 devrdspec => $args[0],
+                 value     => $args[1],
                  nce       => $nce,
                  cn        => $cn
                };
@@ -1261,8 +1230,6 @@ sub _DbLog_setaddCacheLine {              ## no critic "not used"
   }
 
   my @b = @{$argsref};
-  shift @b;
-  shift @b;
 
   my $aa;
 
@@ -1344,6 +1311,28 @@ sub _DbLog_setdeleteOldDays {            ## no critic "not used"
   Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
 
   DbLog_SBP_sendCommand ($hash, 'deleteOldDays', $prop);
+
+return;
+}
+
+################################################################
+#                      Setter userCommand
+################################################################
+sub _DbLog_setuserCommand {              ## no critic "not used"
+  my $paref = shift;
+
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $sql   = $paref->{arg};
+
+  if (defined $hash->{HELPER}{LONGRUN_PID}) {
+      return 'Another operation is in progress, try again a little later.';
+  }
+
+  Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
+
+  DbLog_SBP_sendCommand ($hash, 'userCommand', $sql);
 
 return;
 }
@@ -3039,7 +3028,7 @@ sub DbLog_SBP_onRun {
                                      );
           }
 
-          ##  Kommando: count
+          ##  Kommando: deleteOldDays
           #########################################################
           if ($operation =~ /deleteOldDays/xs) {
               _DbLog_SBP_onRun_deleteOldDays ( { subprocess => $subprocess,
@@ -3047,6 +3036,18 @@ sub DbLog_SBP_onRun {
                                                  memc       => $memc,
                                                  store      => $store,
                                                  bst        => $bst
+                                               }
+                                             );
+          }
+          
+          ##  Kommando: userCommand
+          #########################################################
+          if ($operation =~ /userCommand/xs) {
+              _DbLog_SBP_onRun_userCommand ( { subprocess => $subprocess,
+                                               name       => $name,
+                                               memc       => $memc,
+                                               store      => $store,
+                                               bst        => $bst
                                                }
                                              );
           }
@@ -3820,6 +3821,77 @@ sub _DbLog_SBP_onRun_deleteOldDays {
 return;
 }
 
+#################################################################
+# SubProcess - userCommand-Routine
+#################################################################
+sub _DbLog_SBP_onRun_userCommand {
+  my $paref       = shift;
+
+  my $subprocess  = $paref->{subprocess};
+  my $name        = $paref->{name};
+  my $memc        = $paref->{memc};
+  my $store       = $paref->{store};                                          # Datenspeicher
+  my $bst         = $paref->{bst};
+
+  my $dbh         = $store->{dbh};
+
+  my $operation   = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
+  my $sql         = $memc->{arguments};
+
+  my $error       = q{};
+  my $errorh      = q{};
+  my $res;
+  my $ret;
+  my $retjson;
+  
+  Log3 ($name, 4, qq{DbLog $name - userCommand requested: "$sql"});
+
+  my $st = [gettimeofday];                                                    # SQL-Startzeit
+
+  eval { $res = $dbh->selectrow_array($sql);
+         1;
+       }
+       or do { $errorh = $@;
+
+               Log3 ($name, 2, "DbLog $name - Error - $errorh");
+
+               $dbh->disconnect();
+               delete $store->{dbh};
+
+               $ret = {
+                   name     => $name,
+                   msg      => $@,
+                   ot       => 0,
+                   oper     => $operation
+               };
+
+               $retjson = eval { encode_json($ret) };
+               $subprocess->writeToParent ($retjson);
+               return;
+             };
+
+  $res = defined $res ? $res : 'no result';
+
+  Log3 ($name, 4, qq{DbLog $name - userCommand result: "$res"});
+
+  my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
+  my $ot  = $rt.",".$brt;
+
+  $ret = {
+      name     => $name,
+      msg      => $error,
+      ot       => $ot,
+      oper     => $operation,
+      res      => $res
+  };
+
+  my $retjson = eval { encode_json($ret) };
+  $subprocess->writeToParent ($retjson);
+
+return;
+}
+
 ####################################################################################################
 #       nur Datenbank "begin transaction"
 ####################################################################################################
@@ -4342,6 +4414,12 @@ sub DbLog_SBP_Read {
       if ($oper =~ /deleteOldDays/xs) {
           readingsSingleUpdate($hash, 'lastRowsDeleted', $ret->{numdel}, 1);
       }
+ 
+      ## userCommand - Read
+      ######################### 
+      if ($oper =~ /userCommand/xs) {
+          readingsSingleUpdate($hash, 'userCommandResult', $ret->{res}, 1);
+      }
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
           my ($rt,$brt) = split(",", $ot);
@@ -4353,7 +4431,7 @@ sub DbLog_SBP_Read {
       }
 
       my $state = IsDisabled($name) ? 'disabled' :
-                  $msg              ? $msg     :
+                  $msg              ? $msg       :
                   'connected';
 
       DbLog_setReadingstate ($hash, $state);
@@ -8374,15 +8452,16 @@ return;
     </li>
     <br>
 
-    <li><b>set &lt;name&gt; userCommand &lt;validSqlStatement&gt; </b> <br><br>
-    <ul>
-      Performs simple sql select statements on the connected database. Usercommand and result will be written into
-      corresponding readings.</br>
-      The result can only be a single line.
-      The execution of SQL-Statements in DbLog is outdated. Therefore the analysis module
-      <a href=https://fhem.de/commandref.html#DbRep>DbRep</a> should be used.</br>
-    </li>
+    <li><b>set &lt;name&gt; userCommand &lt;validSelectStatement&gt; </b> <br><br>
+      <ul>
+        Executes simple SQL Select commands on the database. <br>
+        The result of the statement is written to the reading "userCommandResult". 
+        The result can be only one line. <br>
+        The execution of SQL commands in DbLog is deprecated. 
+        The <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> evaluation module should be used for this 
+        purpose. </br>
     </ul>
+    </li>
     <br>
 
   </ul>
@@ -9937,15 +10016,15 @@ attr SMA_Energymeter DbLogValueFn
     </li>
     <br>
 
-    <li><b>set &lt;name&gt; userCommand &lt;validSqlStatement&gt; </b> <br><br>
+    <li><b>set &lt;name&gt; userCommand &lt;validSelectStatement&gt; </b> <br><br>
       <ul>
-        Führt einfache sql select Befehle auf der Datenbank aus. Der Befehl und ein zurückgeliefertes
-        Ergebnis wird in das Reading "userCommand" bzw. "userCommandResult" geschrieben. Das Ergebnis kann nur
-        einzeilig sein.
+        Führt einfache SQL Select Befehle auf der Datenbank aus. <br>
+        Das Ergebnis des Statements wird in das Reading "userCommandResult" geschrieben. 
+        Das Ergebnis kann nur einzeilig sein. <br>
         Die Ausführung von SQL-Befehlen in DbLog ist veraltet. Dafür sollte das Auswertungsmodul
-        <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden.</br>
-    </li>
+        <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden. </br>
     </ul>
+    </li>
     <br>
 
   </ul>
