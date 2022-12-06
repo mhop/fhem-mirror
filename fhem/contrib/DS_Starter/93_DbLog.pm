@@ -3751,7 +3751,6 @@ sub _DbLog_SBP_onRun_deleteOldDays {
   my $args        = $memc->{arguments};
 
   my $error       = q{};
-  my $errorh      = q{};
   my $numdel      = 0;
   my $ret;
   my $retjson;
@@ -3778,16 +3777,16 @@ sub _DbLog_SBP_onRun_deleteOldDays {
       eval { $numdel = $dbh->do($cmd);
              1;
            }
-           or do { $errorh = $@;
+           or do { $error = $@;
 
-                   Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
+                   Log3 ($name, 2, "DbLog $name - Error table $history - $error");
 
                    $dbh->disconnect();
                    delete $store->{dbh};
 
                    $ret = {
                        name     => $name,
-                       msg      => $@,
+                       msg      => $error,
                        ot       => 0,
                        oper     => $operation
                    };
@@ -3815,7 +3814,7 @@ sub _DbLog_SBP_onRun_deleteOldDays {
       numdel   => $numdel
   };
 
-  my $retjson = eval { encode_json($ret) };
+  $retjson = eval { encode_json($ret) };
   $subprocess->writeToParent ($retjson);
 
 return;
@@ -3839,7 +3838,6 @@ sub _DbLog_SBP_onRun_userCommand {
   my $sql         = $memc->{arguments};
 
   my $error       = q{};
-  my $errorh      = q{};
   my $res;
   my $ret;
   my $retjson;
@@ -3851,16 +3849,16 @@ sub _DbLog_SBP_onRun_userCommand {
   eval { $res = $dbh->selectrow_array($sql);
          1;
        }
-       or do { $errorh = $@;
+       or do { $error = $@;
 
-               Log3 ($name, 2, "DbLog $name - Error - $errorh");
+               Log3 ($name, 2, "DbLog $name - Error - $error");
 
                $dbh->disconnect();
                delete $store->{dbh};
 
                $ret = {
                    name     => $name,
-                   msg      => $@,
+                   msg      => $error,
                    ot       => 0,
                    oper     => $operation
                };
@@ -3886,7 +3884,7 @@ sub _DbLog_SBP_onRun_userCommand {
       res      => $res
   };
 
-  my $retjson = eval { encode_json($ret) };
+  $retjson = eval { encode_json($ret) };
   $subprocess->writeToParent ($retjson);
 
 return;
