@@ -40,7 +40,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log ",
+  "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement count command non blocking with SBP ",
   "5.2.0"   => "05.12.2022 LONGRUN_PID, \$hash->{prioSave}, rework SetFn ",
   "5.1.0"   => "03.12.2022 implement SubProcess for logging data in synchron Mode ",
   "5.0.0"   => "02.12.2022 implement SubProcess for logging data in asynchron Mode, delete attr traceHandles ",
@@ -281,7 +281,7 @@ my %DbLog_hset = (                                                              
   addLog         => { fn => \&_DbLog_setaddLog         },
   addCacheLine   => { fn => \&_DbLog_setaddCacheLine   },
   count          => { fn => \&_DbLog_setcount          },
-  countNbl       => { fn => \&_DbLog_setcountNbl       },
+  countNbl       => { fn => \&_DbLog_setcount          },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -1364,65 +1364,23 @@ return;
 #                      Setter count
 ################################################################
 sub _DbLog_setcount {              ## no critic "not used"
-  my $paref   = shift;
+  my $paref = shift;
   
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $opt     = $paref->{opt};
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  
+  if (defined $hash->{HELPER}{LONGRUN_PID}) {
+      return 'Another operation is in progress, try again a little later.';
+  }
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
   
-  my $dbh = _DbLog_ConnectNewDBH($hash);
-
-  if(!$dbh) {
-      Log3 ($name, 1, "DbLog $name: DBLog_Set - count - DB connect not possible");
-      return;
-  }
-  else {
-      Log3 ($name, 4, "DbLog $name: Records count requested.");
-      
-      my $history = $hash->{HELPER}{TH};
-      my $current = $hash->{HELPER}{TC};
-      my $ch      = $dbh->selectrow_array("SELECT count(*) FROM $history");
-      my $cc      = $dbh->selectrow_array("SELECT count(*) FROM $current");
-      
-      readingsSingleUpdate($hash, 'countHistory', $ch ,1);
-      readingsSingleUpdate($hash, 'countCurrent', $cc ,1);
-      
-      readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, 'countHistory', $ch);
-      readingsBulkUpdate  ($hash, 'countCurrent', $cc);
-      readingsEndUpdate   ($hash, 1);
-
-      $dbh->disconnect();
-  }
+  Log3 ($name, 4, "DbLog $name - Records count requested.");
+  
+  DbLog_SBP_sendCommand ($hash, 'count', 'count');
                            
 return;
-}
-
-################################################################
-#                      Setter countNbl
-################################################################
-sub _DbLog_setcountNbl {                 ## no critic "not used"
-  my $paref   = shift;
-  
-  my $hash    = $paref->{hash};
-  my $name    = $paref->{name};
-  my $opt     = $paref->{opt};
-
-  Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
-  
-  my $ret;
-  
-  if ($hash->{HELPER}{COUNT_PID} && $hash->{HELPER}{COUNT_PID}{pid} !~ m/DEAD/){
-      $ret = "DbLog count already in progress. Please wait until the running process is finished.";
-  }
-  else {
-      delete $hash->{HELPER}{COUNT_PID};
-      $hash->{HELPER}{COUNT_PID} = BlockingCall("DbLog_countNbl", $name, "DbLog_countNbl_finished");
-  }
-                           
-return $ret;
 }
 
 ##################################################################################################################
@@ -4158,7 +4116,9 @@ sub DbLog_SBP_sendCommand {
   $subprocess->writeToChild($json);
   
   $hash->{HELPER}{LONGRUN_PID} = time();               # Statusbit laufende Verarbeitung mit Startzeitstempel;
-
+  
+  DbLog_setReadingstate ($hash, "command '$cmd' is running");
+  
 return;
 }
 
@@ -4302,8 +4262,14 @@ sub DbLog_SBP_Read {
 
       ## Count - Read
       #################
-      if ($oper =~ /count/xs) {  
-
+      if ($oper =~ /count/xs) { 
+          my $ch = $ret->{ch} // 'unknown'; 
+          my $cc = $ret->{cc} // 'unknown'; 
+          
+          readingsBeginUpdate ($hash);
+          readingsBulkUpdate  ($hash, 'countHistory', $ch);
+          readingsBulkUpdate  ($hash, 'countCurrent', $cc);
+          readingsEndUpdate   ($hash, 1);
       }      
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
@@ -7302,72 +7268,6 @@ return;
 }
 
 #########################################################################################
-# DBLog - count non-blocking
-#########################################################################################
-sub DbLog_countNbl {
-  my ($name)  = @_;
-  my $hash    = $defs{$name};
-  my $history = $hash->{HELPER}{TH};
-  my $current = $hash->{HELPER}{TC};
-  my ($cc,$hc,$bst,$st,$rt);
-
-  # Background-Startzeit
-  $bst = [gettimeofday];
-
-  my $dbh = _DbLog_ConnectNewDBH($hash);
-  if (!$dbh) {
-    my $err = encode_base64("DbLog $name: DBLog_Set - count - DB connect not possible","");
-    return "$name|0|0|$err|0";
-  }
-  else {
-    Log3 $name,4,"DbLog $name: Records count requested.";
-    # SQL-Startzeit
-    $st = [gettimeofday];
-    $hc = $dbh->selectrow_array("SELECT count(*) FROM $history");
-    $cc = $dbh->selectrow_array("SELECT count(*) FROM $current");
-    $dbh->disconnect();
-    # SQL-Laufzeit ermitteln
-    $rt = tv_interval($st);
-  }
-
-  # Background-Laufzeit ermitteln
-  my $brt = tv_interval($bst);
-  $rt = $rt.",".$brt;
-return "$name|$cc|$hc|0|$rt";
-}
-
-#########################################################################################
-# DBLog - count non-blocking Rückkehrfunktion
-#########################################################################################
-sub DbLog_countNbl_finished {
-  my $string = shift;
-  my @a      = split("\\|",$string);
-  my $name   = $a[0];
-  my $hash   = $defs{$name};
-  my $cc     = $a[1];
-  my $hc     = $a[2];
-  my ($err,$bt);
-  $err       = decode_base64($a[3]) if($a[3]);
-  $bt        = $a[4]                if($a[4]);
-
-  DbLog_setReadingstate ($hash, $err) if($err);
-  readingsSingleUpdate  ($hash,"countHistory",$hc,1) if ($hc);
-  readingsSingleUpdate  ($hash,"countCurrent",$cc,1) if ($cc);
-
-  if(AttrVal($name, "showproctime", undef) && $bt) {
-      my ($rt,$brt)  = split(",", $bt);
-      readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "background_processing_time", sprintf("%.4f",$brt));
-      readingsBulkUpdate  ($hash, "sql_processing_time",        sprintf("%.4f",$rt) );
-      readingsEndUpdate   ($hash, 1);
-  }
-
-  delete $hash->{HELPER}{COUNT_PID};
-
-return;
-}
-
-#########################################################################################
 # DBLog - deleteOldDays non-blocking
 #########################################################################################
 sub DbLog_deldaysNbl {
@@ -8386,17 +8286,18 @@ return;
     <br>
 
     <li><b>set &lt;name&gt; count </b> <br><br>
-     <ul>
-      Count records in tables current and history and write results into readings countCurrent and countHistory.
-    </li>
+      <ul>
+      Determines the number of records in the tables current and history and writes the results to the readings
+      countCurrent and countHistory. 
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; countNbl </b> <br><br>
-    <ul>
-      The non-blocking execution of "set &lt;name&gt; count".
-    </li>
+      <ul>
+      The function is identical to "set &lt;name&gt; count" and will be removed soon.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; deleteOldDays &lt;n&gt; </b> <br><br>
@@ -9942,17 +9843,18 @@ attr SMA_Energymeter DbLogValueFn
     <br>
 
     <li><b>set &lt;name&gt; count </b> <br><br>
-      <ul>Zählt die Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings
-      countCurrent und countHistory.
-    </li>
+      <ul>
+      Ermittelt die Anzahl der Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings
+      countCurrent und countHistory. 
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; countNbl </b> <br><br>
       <ul>
-      Die non-blocking Ausführung von "set &lt;name&gt; count".
-    </li>
+      Die Funktion ist identisch zu "set &lt;name&gt; count" und wird demnächst entfernt.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; deleteOldDays &lt;n&gt; </b> <br><br>
