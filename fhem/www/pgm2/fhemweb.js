@@ -517,7 +517,8 @@ function
 FW_renameDevice(dev)
 {
   var div = $("<div>");
-  $(div).html('Rename '+dev+' to:<br><br><input type="text" size="30">');
+  $(div).html('Rename '+dev+
+        ' to:<br><br><input type="text" size="30" value="'+dev+'">');
   $("body").append(div);
 
   $(div).dialog({
