@@ -1002,9 +1002,9 @@ FW_detLink()
     } else if(cmd == "forumCopy") {
       FW_cmd(FW_root+"?cmd=list -r -i "+dev+"&XHR=1", function(data) {
         var ta = document.createElement("textarea");
-        if(data.length > 60*1000) {
-          data = data.substr(0,60*1000)+
-                  "\n# ... truncated to 60k, original length "+data.length;
+        if(data.length > 50*1000) {
+          data = data.substr(0,50*1000)+
+                  "\n# ... truncated to 50k, original length "+data.length;
         }
         ta.value = '[code]'+data+'[/code]';
         document.body.appendChild(ta);
