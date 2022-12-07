@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.11";
+my $version = "1.3.12";
 
 my $srandUsed;
 
@@ -326,7 +326,7 @@ sub todoist_ReorderTasks ($$) {
       my $method="POST";
       
       $param = {
-        url        => "https://api.todoist.com/sync/v8/sync",
+        url        => "https://api.todoist.com/sync/v9/sync",
         data       => $data,
         method     => $method,
         wType      => "reorder",
@@ -583,7 +583,7 @@ sub todoist_UpdateTask($$$) {
       Log3 $name,4, "todoist ($name): JSON sent to todoist API: ".Dumper($data);
       
       $param = {
-        url        => "https://api.todoist.com/sync/v8/sync",
+        url        => "https://api.todoist.com/sync/v9/sync",
         data       => $data,
         tTitle     => $title,
         method     => $method,
@@ -712,7 +712,7 @@ sub todoist_CreateTask($$) {
       
         
         $param = {
-          url        => "https://todoist.com/sync/v8/items/add",
+          url        => "https://todoist.com/sync/v9/items/add",
           data       => $data,
           tTitle     => $title,
           method     => "POST",
@@ -879,10 +879,10 @@ sub todoist_GetTasks($;$) {
       };
       
       # set url for API access
-      my $url = "https://todoist.com/sync/v8/projects/get_data";
+      my $url = "https://todoist.com/sync/v9/projects/get_data";
       ## check if we get also the completed Tasks
       if ($completed == 1) {
-        $url = "https://todoist.com/sync/v8/completed/get_all";
+        $url = "https://todoist.com/sync/v9/completed/get_all";
         $data->{'limit'}=50;
       }
       
@@ -1194,7 +1194,7 @@ sub todoist_GetUsers($) {
       Log3 $name,5, "$name: hash: ".Dumper($hash);
       
       $param = {
-        url        => "https://todoist.com/sync/v8/sync",
+        url        => "https://todoist.com/sync/v9/sync",
         data       => $data,
         timeout    => 7,
         method     => "POST",
@@ -1334,7 +1334,7 @@ sub todoist_GetProjects($) {
       Log3 $name,5, "$name: hash: ".Dumper($hash);
       
       $param = {
-        url        => "https://todoist.com/sync/v8/sync",
+        url        => "https://todoist.com/sync/v9/sync",
         data       => $data,
         timeout    => 7,
         method     => "POST",

@@ -1,8 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_todoist: API v9, please check
  - change:  00_KNXIO: minor changes, Forum #127792
  - change:  10_KNX:   minor changes, Forum #122582
--  bugfix:  70_SVDRP: fix for checkStatus
+ - bugfix:  70_SVDRP: fix for checkStatus
  - change:  71_YAMAHA_AVR: PBP code restructured (part I)
  - change:  93_DbLog: revise commandref
  - bugfix:  98_vitoconnect: Missing update interval after login failure
