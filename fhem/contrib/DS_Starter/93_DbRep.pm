@@ -4363,12 +4363,12 @@ sub DbRep_diffval {
   Log3 ($name, 5, "DbRep $name - data of row_array result assigned to fields:\n");
     
   for my $row (@row_array) {
-      my @a              = split "[ \t][ \t]*", $row, 6;
+      my @a              = split /\s+/x, $row, 6;
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
-      my $timestamp      = $a[2] ? $a[1]."_".$a[2]       : $a[1];
-      my $value          = $a[3] ? $a[3]                 : 0;  
-      my $diff           = $a[4] ? sprintf("%.4f",$a[4]) : 0;
+      my $timestamp      = $a[2] ? $a[1]."_".$a[2] : $a[1];
+      my $value          = $a[3] ? $a[3]           : 0;  
+      my $diff           = $a[4] ? $a[4]           : 0;
       
       $timestamp         =~ s/\s+$//g;                                        # Leerzeichen am Ende $timestamp entfernen
       
@@ -4531,10 +4531,10 @@ sub DbRep_diffvalDone {
  
   my %rh = split("§", $rowlist);
  
-  Log3 ($name, 4, "DbRep $name - print result of diffValue calculation after decoding ...");
-  for my $key (sort(keys(%rh))) {
-      Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
-  }
+  #Log3 ($name, 4, "DbRep $name - print result of diffValue calculation after decoding ...");
+  #for my $key (sort(keys(%rh))) {
+  #    Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key}); 
+  #}
  
   readingsBeginUpdate($hash);
  
@@ -12362,7 +12362,7 @@ sub DbRep_calcount {
  my %ncp  = (); 
  
  Log3 ($name, 4, "DbRep $name - count of values used for calc:");
- foreach my $key (sort(keys%{$ch})) {
+ for my $key (sort(keys%{$ch})) {
      Log3 ($name, 4, "$key => ". $ch->{$key});
      
      if($ch->{$key} eq "1") {
