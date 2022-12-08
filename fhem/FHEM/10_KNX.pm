@@ -635,7 +635,6 @@ sub KNX_Get {
 	my $gadName = $args[0] // $hash->{FIRSTGADNAME};
 
 	#FHEM asks with a ? at startup - no action, no log - if dev is disabled: no SET/GET pulldown !
-#	return qq{unknown argument $cmd choose one of $hash->{GETSTRING}} if(defined($cmd) && ($cmd =~ m/\?/x));
 	if ($gadName  =~ m/\?/x) {
 		return (IsDisabled($name) == 1)?undef:qq{unknown argument choose one of $hash->{GETSTRING}};
 =pod
@@ -691,7 +690,6 @@ sub KNX_Set {
 	$thisSub .= qq{ ($name): };
 
 	#FHEM asks with a "?" at startup or any reload of the device-detail-view - if dev is disabled: no SET/GET pulldown !
-#	return qq{unknown argument $cmd choose one of $hash->{SETSTRING}} if(defined($cmd) && ($cmd =~ m/\?/x));
 	if(defined($cmd) && ($cmd =~ m/\?/x)) {
 		return (IsDisabled($name) == 1)?undef:qq{unknown argument $cmd choose one of $hash->{SETSTRING}};
 	}
@@ -1061,22 +1059,21 @@ sub KNX_Parse {
 			Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] GET});
 
 			#answer "old school"
-			my $value = ReadingsVal($deviceName, 'state', undef); # fetch default value from state
-#			my $value = undef;
+#			my $value = ReadingsVal($deviceName, 'state', undef); # fetch default value from state
+			my $value = undef;
 			if (AttrVal($deviceName, 'answerReading', 0) != 0) {
 				my $putVal = ReadingsVal($deviceName, $putName, undef);
 				if (defined($putVal) && ($putVal ne q{})) {
 					$value = $putVal; #medium priority, overwrite $value
 				}
-#				else {
-#					$value = ReadingsVal($deviceName, 'state', undef); #lowest priority - use state
-#				}
+				else {
+					$value = ReadingsVal($deviceName, 'state', undef); #lowest priority - use state!
+				}
 			}
 
 			#high priority - eval
 			my $cmdAttr = AttrVal($deviceName, 'putCmd', undef);
 			if ((defined($cmdAttr)) && ($cmdAttr ne q{})) {
-#				$value = ReadingsVal($deviceName, 'state', undef); # fetch default value from state
 				$value = KNX_eval ($deviceHash, $gadName, $value, $cmdAttr);
 				if (defined($value) && ($value ne q{}) && ($value ne 'ERROR')) { # answer only, if eval was successful
 					Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] replaced by Attr putCmd=$cmdAttr VALUE=$value});
