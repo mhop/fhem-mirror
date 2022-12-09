@@ -2916,7 +2916,7 @@ sub _DbLog_SBP_onRun_Log {
 
                   next if($status);                                                      # $status ist "1" wenn insert ok
 
-                  Log3 ($name, 3, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
+                  Log3 ($name, 4, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
 
                   $event[$tuple]   =~ s/\|/_ESC_/gxs;                                    # escape Pipe "|"
                   $reading[$tuple] =~ s/\|/_ESC_/gxs;
