@@ -39,6 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.1"   => "09.12.2022 commit inserted lines in array insert though some lines are faulty ",
   "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL, attr timeout adapted ",
   "5.4.0"   => "07.12.2022 implement commands with SBP: importCacheFile ",
   "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ".
@@ -2940,31 +2941,38 @@ sub _DbLog_SBP_onRun_Log {
                   }
                   else {
                       Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
-                  }
+                  
+                      my $bkey = 1;
 
-                  my $bkey = 1;
-
-                  for my $line (@n2hist) {
-                      $rowhref->{$bkey} = $line;
-                      $bkey++;
-                  }
-
-                  $rowlback = $rowhref if(defined $rowhref);                              # nicht gespeicherte Datensätze zurück geben
+                      for my $line (@n2hist) {
+                          $rowhref->{$bkey} = $line;
+                          $bkey++;
+                      }
+                  }                 
               }
 
-              $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+              # $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
-              if ($error) {
-                  $rowlback = $cdata if($useta);                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-              }
+              #if ($error) {
+              #    $rowlback = $cdata if($useta);                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+              #}
           };
 
           if ($@) {
-              $errorh = $@;
+              $error = $@;
 
-              Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
-
-              $error    = $errorh;
+              Log3 ($name, 2, "DbLog $name - Error table $history - $error");
+              
+              __DbLog_SBP_commitOnly ($name, $dbh, $history);                              # eingefügte Array-Daten bestätigen 
+              
+              if(defined $rowhref) {                                                       # nicht gespeicherte Datensätze ausgeben
+                  Log3 ($name, 4, "DbLog $name - The following data are faulty and were not saved:");
+                  
+                  for my $df (sort {$a <=>$b} keys %{$rowhref}) {
+                      Log3 ($name, 4, "DbLog $name - $rowhref->{$df}");
+                  }
+              }
+                                               
               $rowlback = $cdata if($useta);                                               # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
           }
       }
