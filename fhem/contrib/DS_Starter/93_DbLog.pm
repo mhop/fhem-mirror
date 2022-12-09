@@ -2929,10 +2929,10 @@ sub _DbLog_SBP_onRun_Log {
                   }
                   else {
                       if(defined $rowhref) {                                                   # nicht gespeicherte Datensätze ausgeben
-                          Log3 ($name, 4, "DbLog $name - The following data are faulty and were not saved:");
+                          Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
                           
                           for my $df (sort {$a <=>$b} keys %{$rowhref}) {
-                              Log3 ($name, 4, "DbLog $name - $rowhref->{$df}");
+                              Log3 ($name, 2, "DbLog $name - $rowhref->{$df}");
                           }
                       }         
                       
@@ -7951,17 +7951,19 @@ return;
     <a id="DbLog-attr-bulkInsert"></a>
     <li><b>bulkInsert</b>
     <ul>
-      <code>attr &lt;device&gt; bulkInsert [1|0]
-      </code><br><br>
+      <code>attr &lt;device&gt; bulkInsert [1|0] </code><br><br>
 
-      Toggles the Insert mode between Array (default) and Bulk. This Bulk insert mode increase the write performance
-      into the history table significant in case of plenty of data to insert, especially if asynchronous mode is
-      used.
-      To get the whole improved performance, the attribute "DbLogType" should <b>not</b> contain the current table
-      in this use case. <br>
+      Toggles the insert mode between "Array" and "Bulk". <br>
+      The bulk mode leads to a considerable performance increase when inserting a large number of data records into the 
+      history table, especially in asynchronous mode. 
+      To get the full performance increase, in this case the attribute "DbLogType" should <b>not</b> contain the 
+      current table. <br>
+      In contrast, the "Array" mode has the advantage over "Bulk" that faulty data records are extracted and reported in the
+      log file. <br>
+      (default: 0=Array)
     </ul>
-    </li>
   </ul>
+  </li>
   <br>
 
   <ul>
@@ -9588,16 +9590,18 @@ attr SMA_Energymeter DbLogValueFn
     <a id="DbLog-attr-bulkInsert"></a>
     <li><b>bulkInsert</b>
     <ul>
-      <code>attr &lt;device&gt; bulkInsert [1|0]
-      </code><br><br>
+      <code>attr &lt;device&gt; bulkInsert [1|0] </code><br><br>
 
-      Schaltet den Insert-Modus zwischen "Array" (default) und "Bulk" um. Der Bulk Modus führt beim Insert von sehr
-      vielen Datensätzen in die history-Tabelle zu einer erheblichen Performancesteigerung vor allem im asynchronen
-      Mode. Um die volle Performancesteigerung zu erhalten, sollte in diesem Fall das Attribut "DbLogType"
-      <b>nicht</b> die current-Tabelle enthalten. <br>
+      Schaltet den Insert-Modus zwischen "Array" und "Bulk" um. <br>
+      Der Bulk Modus führt beim Insert von sehr vielen Datensätzen in die history-Tabelle zu einer erheblichen 
+      Performancesteigerung vor allem im asynchronen Mode. Um die volle Performancesteigerung zu erhalten, sollte in 
+      diesem Fall das Attribut "DbLogType" <b>nicht</b> die current-Tabelle enthalten. <br>
+      Demgegenüber hat der Modus "Array" gegenüber "Bulk" den Vorteil, dass fehlerhafte Datensätze extrahiert und im
+      Logfile reported werden. <br>
+      (default: 0=Array)
     </ul>
-    </li>
   </ul>
+  </li>
   <br>
 
   <ul>
