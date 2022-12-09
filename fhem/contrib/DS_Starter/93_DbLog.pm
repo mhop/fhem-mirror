@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-08 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-09 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -39,7 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL ",
+  "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL, attr timeout adapted ",
   "5.4.0"   => "07.12.2022 implement commands with SBP: importCacheFile ",
   "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ".
                            "userCommand, exportCache ",
@@ -305,6 +305,7 @@ my %DbLog_columns = ("DEVICE"  => 64,
 ###############
 my $dblog_cachedef = 500;                       # default Größe cacheLimit bei asynchronen Betrieb
 my $dblog_cmdef    = 'basic_ta:on';             # default commitMode
+my $dblog_todef    = 86400;                     # default timeout Sekunden
 
 ################################################################
 sub DbLog_Initialize {
@@ -2073,7 +2074,6 @@ sub DbLog_execMemCacheAsync {
   my $clim       = AttrVal($name, "cacheLimit",   $dblog_cachedef);
   my $async      = AttrVal($name, "asyncMode",                  0);
   my $ce         = AttrVal($name, "cacheEvents",                0);
-  my $timeout    = AttrVal($name, "timeout",                86400);
   my $DbLogType  = AttrVal($name, "DbLogType",          'History');
 
   my $dolog      = 1;
@@ -4118,8 +4118,22 @@ return;
 #####################################################
 sub DbLog_SBP_CheckAndInit {
   my $hash = shift;
-
+  my $name = $hash->{NAME};
+  
   my $err = q{};
+  
+  if (defined $hash->{SBP_PID} && defined $hash->{HELPER}{LONGRUN_PID}) {       # Laufzeit des letzten Kommandos prüfen -> timeout
+      my $to = AttrVal($name, 'timeout', $dblog_todef);
+      my $rt = time() - $hash->{HELPER}{LONGRUN_PID};                           # aktuelle Laufzeit
+      
+      if ($rt >= $to) {                                                         # SubProcess beenden, möglicherweise tot
+          Log3 ($name, 2, qq{DbLog $name - The Subprocess >$hash->{SBP_PID}< has exceeded the timeout of $to seconds});
+          
+          DbLog_SBP_CleanUp ($hash);
+          
+          Log3 ($name, 2, qq{DbLog $name - The last running operation was canceled});
+      }
+  }
 
   if (!defined $hash->{SBP_PID}) {
       $err = _DbLog_SBP_Init ($hash);
@@ -8758,10 +8772,13 @@ attr SMA_Energymeter DbLogValueFn
       attr &lt;device&gt; timeout &lt;n&gt;
       </code><br><br>
 
-      setup timeout of the write cycle into database in asynchronous mode (default 86400s) <br>
+      Sets the timeout value for the operations in the SubProcess in seconds. <br>
+      If a started operation (logging, command) is not finished within the timeout value,
+      the running subprocess is terminated and a new process is started. <br>
+      (default: 86400)
     </ul>
-    </li>
   </ul>
+  </li>
   <br>
 
   <ul>
@@ -10409,10 +10426,13 @@ attr SMA_Energymeter DbLogValueFn
       attr &lt;device&gt; timeout &lt;n&gt;
       </code><br><br>
 
-      Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 86400s). <br>
+      Setzt den Timeout-Wert für die Operationen im SubProzess in Sekunden. <br>
+      Ist eine gestartete Operation (Logging, Kommando) nicht innerhalb des Timeout-Wertes beendet,
+      wird der laufende SubProzess abgebrochen und ein neuer Prozess gestartet. <br>
+      (default: 86400)
     </ul>
-    </li>
   </ul>
+  </li>
   <br>
 
   <ul>
