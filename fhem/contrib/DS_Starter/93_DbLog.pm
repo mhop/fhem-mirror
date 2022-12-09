@@ -39,6 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.2"   => "09.12.2022 _DbLog_ConnectPush function removed ",
   "5.5.1"   => "09.12.2022 commit inserted lines in array insert though some lines are faulty ",
   "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL, attr timeout adapted ",
   "5.4.0"   => "07.12.2022 implement commands with SBP: importCacheFile ",
@@ -460,7 +461,6 @@ sub _DbLog_initOnStart {
       Log3 ($name, 3, "DbLog $name - DB connection parameters are initialized in the SubProcess");
   }
 
-  _DbLog_ConnectPush      ($hash);
   DbLog_execMemCacheAsync ($hash);                                      # InternalTimer DbLog_execMemCacheAsync starten
 
 return;
@@ -588,12 +588,7 @@ sub DbLog_Attr {
 
   if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {
       if ($init_done == 1) {
-          InternalTimer(gettimeofday()+1.0, 'DbLog_attrForSQLite', $hash, 0);
-          InternalTimer(gettimeofday()+1.5, 'DbLog_attrForSQLite', $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
-
-
           DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
-
           InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);      # neue Verbindungsdaten an SubProzess senden
       }
   }
@@ -698,26 +693,6 @@ sub DbLog_Attr {
           InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);       # neue Verbindungsdaten an SubProzess senden
       }
   }
-
-return;
-}
-
-################################################################
-#   reopen DB beim Setzen bestimmter Attribute
-################################################################
-sub DbLog_attrForSQLite {
-  my $hash = shift;
-
-  return if($hash->{MODEL} ne "SQLITE");
-
-  my $name = $hash->{NAME};
-  my $dbh  = $hash->{DBHP};
-
-  if ($dbh) {
-      $dbh->disconnect();
-  }
-
-  _DbLog_ConnectPush ($hash, 1);
 
 return;
 }
@@ -943,8 +918,6 @@ sub _DbLog_setreopen {                   ## no critic "not used"
   if (!$prop) {
       Log3 ($name, 3, "DbLog $name - Reopen requested");
 
-      _DbLog_ConnectPush ($hash);
-
       if($hash->{HELPER}{REOPEN_RUNS}) {
           delete $hash->{HELPER}{REOPEN_RUNS};
           delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
@@ -995,7 +968,6 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
   my $ret = DbLog_readCfg($hash);
   return $ret if $ret;
 
-  _DbLog_ConnectPush     ($hash);
   DbLog_SBP_sendDbDisconnect ($hash, 1);                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
   my $rst = DbLog_SBP_sendConnectionData ($hash);                   # neue Verbindungsdaten an SubProzess senden
@@ -4680,121 +4652,17 @@ sub DbLog_readCfg {
 return;
 }
 
-
-###################################################################################
-#   eigener Database Handle für synchronous logging und dblog_get
-###################################################################################
-sub _DbLog_ConnectPush {
-  my ($hash,$get) = @_;
-  my $name        = $hash->{NAME};
-  my $dbconn      = $hash->{dbconn};
-  my $dbuser      = $hash->{dbuser};
-  my $dbpassword  = $attr{"sec$name"}{secret};
-  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
-
-  my ($dbhp,$state,$evt,$err);
-
-  return 0 if(IsDisabled($name));
-
-  Log3 ($name, 3, "DbLog $name - Creating Push-Handle to database $dbconn with user $dbuser") if(!$get);
-
-  my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
-
-  eval {
-      if(!$useac) {
-          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                      RaiseError          => 1,
-                                                                      AutoCommit          => 0,
-                                                                      AutoInactiveDestroy => 1,
-                                                                      mysql_enable_utf8   => $utf8
-                                                                    });
-      }
-      elsif($useac == 1) {
-          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                      RaiseError          => 1,
-                                                                      AutoCommit          => 1,
-                                                                      AutoInactiveDestroy => 1,
-                                                                      mysql_enable_utf8   => $utf8
-                                                                    });
-      }
-      else {           # Server default
-          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                      RaiseError          => 1,
-                                                                      AutoInactiveDestroy => 1,
-                                                                      mysql_enable_utf8   => $utf8
-                                                                    });
-      }
-  };
-
-  if($@) {
-      $err = $@;
-      Log3 $name, 2, "DbLog $name - Error: $@";
-  }
-
-  if(!$dbhp) {
-    RemoveInternalTimer ($hash, "_DbLog_ConnectPush");
-
-    Log3 ($name, 4, "DbLog $name - Trying to connect to database");
-
-    $state = IsDisabled($name) ? 'disabled' :
-             $err              ? $err       :
-             'disconnected';
-
-    DbLog_setReadingstate ($hash, $state);
-
-    InternalTimer (gettimeofday()+5, '_DbLog_ConnectPush', $hash, 0);
-
-    Log3 ($name, 4, "DbLog $name - Waiting for database connection");
-
-    return 0;
-  }
-
-  $dbhp->{RaiseError} = 0;
-  $dbhp->{PrintError} = 1;
-
-  Log3 ($name, 3, "DbLog $name - Push-Handle to db $dbconn created") if(!$get);
-  Log3 ($name, 3, "DbLog $name - UTF8 support enabled")              if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
-
-  if(!$get) {
-      $state = 'connected';
-      DbLog_setReadingstate ($hash, $state);
-  }
-
-  $hash->{DBHP} = $dbhp;
-
-  if ($hash->{MODEL} eq "SQLITE") {
-    $dbhp->do("PRAGMA temp_store=MEMORY");
-    $dbhp->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption,
-                                             # SQLite should always be run with its default synchronous setting of FULL.
-                                             # https://sqlite.org/howtocorrupt.html
-
-    if (AttrVal($name, "SQLiteJournalMode", "WAL") eq "off") {
-        $dbhp->do("PRAGMA journal_mode=off");
-        $hash->{SQLITEWALMODE} = "off";
-    }
-    else {
-        $dbhp->do("PRAGMA journal_mode=WAL");
-        $hash->{SQLITEWALMODE} = "on";
-    }
-
-    my $cs = AttrVal($name, "SQLiteCacheSize", "4000");
-    $dbhp->do("PRAGMA cache_size=$cs");
-    $hash->{SQLITECACHESIZE} = $cs;
-  }
-
-return 1;
-}
-
 ###################################################################################
 # new dbh for common use (except DbLog_Push and get-function)
 ###################################################################################
 sub _DbLog_ConnectNewDBH {
-  my ($hash)     = @_;
+  my $hash       = shift;
   my $name       = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
   my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
+  
   my $dbh;
 
   my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
@@ -4836,9 +4704,6 @@ sub _DbLog_ConnectNewDBH {
   }
 
   if($dbh) {
-      $dbh->{RaiseError} = 0;
-      $dbh->{PrintError} = 1;
-
       if ($hash->{MODEL} eq "SQLITE") {         # Forum: https://forum.fhem.de/index.php/topic,120237.0.html
         $dbh->do("PRAGMA temp_store=MEMORY");
         $dbh->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption,
@@ -4859,7 +4724,7 @@ sub _DbLog_ConnectNewDBH {
       return $dbh;
   }
 
-return 0;
+return;
 }
 
 ##########################################################################
@@ -4878,7 +4743,7 @@ sub DbLog_ExecSQL {
   Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
 
   return if(!$dbh);
-  my $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
+  my $sth = DbLog_ExecSQL1($hash, $dbh, $sql);
 
   if (!$sth) {                                                      #retry
       $dbh->disconnect();
@@ -4968,10 +4833,11 @@ sub DbLog_Get {
   if($outf eq "int") {
       $outf = "-";
       $internal = 1;
-  } elsif($outf eq "array") {
+  } 
+  elsif($outf eq "array") {
 
-  } elsif(lc($outf) eq "webchart") {
-      # redirect the get request to the DbLog_chartQuery function
+  } 
+  elsif(lc($outf) eq "webchart") {                           # redirect the get request to the DbLog_chartQuery function
       return DbLog_chartQuery($hash, @_);
   }
 
@@ -5034,33 +4900,14 @@ sub DbLog_Get {
   Log3 $name, 4, "DbLog $name - ################################################################";
   Log3($name, 4, "DbLog $name - main PID: $hash->{PID}, secondary PID: $$");
 
-  my $nh = $hash->{MODEL} ne 'SQLITE' ? 1 : 0;
-  if ($nh || $hash->{PID} != $$) {                                # 17.04.2019 Forum: https://forum.fhem.de/index.php/topic,99719.0.html
-      $dbh = _DbLog_ConnectNewDBH($hash);
-      return "Can't connect to database." if(!$dbh);
-  }
-  else {
-      $dbh = $hash->{DBHP};
-      eval {
-          if ( !$dbh || not $dbh->ping ) {                        # DB Session dead, try to reopen now !
-              _DbLog_ConnectPush($hash, 1);
-          }
-      };
-      if ($@) {
-          Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
-          return $@;
-      }
-      else {
-          $dbh = $hash->{DBHP};
-      }
-  }
+  $dbh = _DbLog_ConnectNewDBH($hash);
+  return "Can't connect to database." if(!$dbh);
 
   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{MODEL} eq "POSTGRESQL") {
       $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
       $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
       $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-      #$sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
       $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
       $sqlspec{max_value}      = "MAX(VALUE)";
       $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
@@ -5107,9 +4954,7 @@ sub DbLog_Get {
       $sqlspec{all_max}  = "";
   }
 
-  for(my $i=0; $i<int(@readings); $i++) {
-      # ueber alle Readings
-      # Variablen initialisieren
+  for (my $i = 0; $i < int(@readings); $i++) {                # ueber alle Readings Variablen initialisieren
       $min[$i]    =  (~0 >> 1);
       $max[$i]    = -(~0 >> 1);
       $sum[$i]    = 0;
@@ -5126,13 +4971,14 @@ sub DbLog_Get {
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
+          
           Log3($name, 4, "DbLog $name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
           Log3($name, 4, "DbLog $name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
       }
 
       my ($stm);
+      
       if($deltacalc) {
-          # delta-h und delta-d , geändert V4.8.0 / 14.10.2019
           $stm  = "SELECT Z.TIMESTAMP, Z.DEVICE, Z.READING, Z.VALUE from ";
 
           $stm .= "(SELECT $sqlspec{get_timestamp} AS TIMESTAMP,
@@ -5184,8 +5030,7 @@ sub DbLog_Get {
           $stm .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
           $stm .= "ORDER BY TIMESTAMP";
       }
-      else {
-          # kein deltacalc
+      else {                                                            # kein deltacalc
           $stm =  "SELECT
                       $sqlspec{get_timestamp},
                       DEVICE,
@@ -5230,12 +5075,17 @@ sub DbLog_Get {
       #                              Select Auswertung
       ####################################################################################
       my $rv = 0;
-      while($sth->fetch()) {
+      
+      while ($sth->fetch()) {
           $rv++;
+          
           no warnings 'uninitialized';                                                                     # geändert V4.8.0 / 14.10.2019
           my $ds = "PID: $$, TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
-          Log3 ($name, 5, "$name - SQL-result -> $ds");                                                    # geändert V4.8.0 / 14.10.2019
+          
+          Log3 ($name, 5, "$name - SQL-result -> $ds");                                                    
+          
           use warnings;                                                                                    # geändert V4.8.0 / 14.10.2019
+          
           $writeout = 0;                                                                                   # eingefügt V4.8.0 / 14.10.2019
 
           ############ Auswerten des 5. Parameters: Regexp ###################
@@ -5314,6 +5164,7 @@ sub DbLog_Get {
               }
               elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+                  
                   if($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
                       $lasttstamp{hour} = "00";
@@ -5321,8 +5172,7 @@ sub DbLog_Get {
                   else {
                       %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
                   }
-                  #    04                   01
-                  #    06                   23
+
                   if("$tstamp{hour}" ne "$lasttstamp{hour}") {
                       # Aenderung der Stunde, Berechne Delta
                       # wenn die Stundendifferenz größer 1 ist muss ein Dummyeintrag erstellt werden
@@ -5335,6 +5185,7 @@ sub DbLog_Get {
                               $hour       = '0'.$j if $j<10;
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
+                              
                               if ($outf =~ m/(all)/) {
                                   # Timestamp: Device, Type, Event, Reading, Value, Unit
                                   $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
@@ -5350,15 +5201,14 @@ sub DbLog_Get {
                       }
 
                       if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
-                          for (my $j=0; $j < $tstamp{hour}; $j++) {
+                          for (my $j = 0; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
                               $hour       = $j;
                               $hour       = '0'.$j if $j<10;
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
 
-                              if ($outf =~ m/(all)/) {
-                                  # Timestamp: Device, Type, Event, Reading, Value, Unit
+                              if ($outf =~ m/(all)/) {                                        # Timestamp: Device, Type, Event, Reading, Value, Unit
                                   $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
                               }
                               elsif ($outf =~ m/(array)/) {
@@ -5420,7 +5270,6 @@ sub DbLog_Get {
                       # Timestamp: Device, Type, Event, Reading, Value, Unit
                       $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
                       $retval .= $retvaldummy;
-
                   }
                   elsif ($outf =~ m/(array)/) {
                       push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
@@ -5432,19 +5281,20 @@ sub DbLog_Get {
                   }
               }
 
-              if(Scalar::Util::looks_like_number($sql_value)) {
-                  # nur setzen wenn numerisch
+              if(Scalar::Util::looks_like_number($sql_value)) {                  # nur setzen wenn numerisch
                   if($deltacalc) {
                       if(Scalar::Util::looks_like_number($out_value)) {
                           if($out_value < $min[$i]) {
                               $min[$i]  = $out_value;
                               $mind[$i] = $out_tstamp;
                           }
+                          
                           if($out_value > $max[$i]) {
                               $max[$i]  = $out_value;
                               $maxd[$i] = $out_tstamp;
                           }
                       }
+                      
                       $maxval = $sql_value;
                   }
                   else {
@@ -5454,12 +5304,12 @@ sub DbLog_Get {
                       }
 
                       if($sql_value < $min[$i]) {
-                          $min[$i] = $sql_value;
+                          $min[$i]  = $sql_value;
                           $mind[$i] = $sql_timestamp;
                       }
 
                       if($sql_value > $max[$i]) {
-                          $max[$i] = $sql_value;
+                          $max[$i]  = $sql_value;
                           $maxd[$i] = $sql_timestamp;
                       }
 
@@ -5486,8 +5336,8 @@ sub DbLog_Get {
 
               $lastd[$i] = $sql_timestamp;
           }
-      }
-                                                                  ##### while fetchrow Ende #####
+      }                                                        #### while fetchrow Ende #####
+      
       Log3 ($name, 4, "$name - PID: $$, rows count: $rv");
 
       ######## den letzten Abschlusssatz rausschreiben ##########
@@ -5500,12 +5350,11 @@ sub DbLog_Get {
           }
           else {
               %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-
               $out_value  = ($minval != (~0 >> 1) && $maxval != -(~0 >> 1)) ? sprintf("%g", $maxval - $minval) : 0;       # if there was no previous reading in the selected time range, produce a null delta
-
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
           }
+          
           $sum[$i] += $out_value;
           $cnt[$i]++;
 
@@ -5538,7 +5387,7 @@ sub DbLog_Get {
   }                                                                # Ende for @readings-Schleife über alle Readinggs im get
 
   # Ueberfuehren der gesammelten Werte in die globale Variable %data
-  for(my $j=0; $j<int(@readings); $j++) {
+  for(my $j = 0; $j < int(@readings); $j++) {
       $min[$j] = 0 if ($min[$j] == (~0 >> 1));                     # if min/max values could not be calculated due to the lack of query results, set them to 0
       $max[$j] = 0 if ($max[$j] == -(~0 >> 1));
 
@@ -5556,7 +5405,7 @@ sub DbLog_Get {
       $data{"maxdate$k"}   = $maxd[$j];
   }
 
-  $dbh->disconnect() if($nh || $hash->{PID} != $$);
+  $dbh->disconnect();
 
   if($internal) {
       $internal_data = \$retval;
@@ -7174,6 +7023,7 @@ sub DbLog_chartQuery {
     }
 
     my ($hash, @a) = @_;
+    
     my $dbhf       = _DbLog_ConnectNewDBH($hash);
     return if(!$dbhf);
 
