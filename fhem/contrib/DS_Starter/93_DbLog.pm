@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-07 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-08 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -28,7 +28,6 @@ eval "use FHEM::Utility::CTZ qw(:all);1" or my $ctzAbsent     = 1;
 eval "use JSON;1;"                       or my $jsonabs       = "JSON";              ## no critic 'eval' # Debian: apt-get install libjson-perl
 
 use Data::Dumper;
-use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
 use Time::Local;
 use Encode qw(encode_utf8);
@@ -40,6 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL ",
   "5.4.0"   => "07.12.2022 implement commands with SBP: importCacheFile ",
   "5.3.0"   => "05.12.2022 activate func _DbLog_SBP_onRun_Log, implement commands with SBP: count(Nbl), deleteOldDays(Nbl) ".
                            "userCommand, exportCache ",
@@ -289,6 +289,8 @@ my %DbLog_hset = (                                                              
   userCommand      => { fn => \&_DbLog_setuserCommand     },
   exportCache      => { fn => \&_DbLog_setexportCache     },
   importCachefile  => { fn => \&_DbLog_setimportCachefile },
+  reduceLog        => { fn => \&_DbLog_setreduceLog       },
+  reduceLogNbl     => { fn => \&_DbLog_setreduceLog       },
 );
 
 my %DbLog_columns = ("DEVICE"  => 64,
@@ -414,11 +416,9 @@ sub DbLog_Define {
   InternalTimer(gettimeofday()+2, 'DbLog_setinternalcols', $hash, 0);                                         # set used COLUMNS
 
   readingsSingleUpdate ($hash, 'state', 'waiting for connection', 1);
-  
+
   DbLog_SBP_CheckAndInit ($hash);                                                                             # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
-  #_DbLog_ConnectPush       ($hash);
-  # DbLog_execMemCacheAsync ($hash);                                                                           # initial execution of DbLog_execMemCacheAsync
-  _DbLog_initOnStart ($hash);                                                                                 # von init_done abhängige Prozesse initialisieren
+  _DbLog_initOnStart     ($hash);                                                                             # von init_done abhängige Prozesse initialisieren
 
 return;
 }
@@ -438,8 +438,19 @@ sub _DbLog_initOnStart {
   }
 
   my $name = $hash->{NAME};
-  
-  readingsDelete         ($hash, 'CacheUsage');
+
+  my @rdel = qw ( CacheUsage
+                  userCommandResult
+                  reduceLogState
+                  lastRowsDeleted
+                  countCurrent
+                  countHistory
+                );
+
+  for my $r (@rdel) {
+      readingsDelete ($hash, $r);
+  }
+
   DbLog_SBP_CheckAndInit ($hash);
 
   my $rst = DbLog_SBP_sendConnectionData ($hash);                       # Verbindungsdaten an SubProzess senden
@@ -468,8 +479,6 @@ sub DbLog_Undef {
   my $dbh  = $hash->{DBHP};
 
   delete $hash->{HELPER}{LONGRUN_PID};
-
-  BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
 
   $dbh->disconnect() if(defined($dbh));
 
@@ -756,12 +765,12 @@ sub DbLog_Set {
 
     my (@logs,$dir,$ret,$trigger);
 
-    my $dirdef = AttrVal("global", "logdir", $attr{global}{modpath}."/log/");
-    $dir       = AttrVal($name,    "expimpdir",                     $dirdef);
-    $dir       = $dir."/" if($dir !~ /.*\/$/);
+    my $dirdef = AttrVal('global', 'logdir', $attr{global}{modpath}.'/log/');
+    $dir       = AttrVal($name,    'expimpdir',                     $dirdef);
+    $dir       = $dir.'/' if($dir !~ /.*\/$/);
 
     opendir(DIR,$dir);
-    my $sd = "cache_".$name."_";
+    my $sd = 'cache_'.$name.'_';
 
     while (my $file = readdir(DIR)) {
         next unless (-f "$dir/$file");
@@ -770,17 +779,16 @@ sub DbLog_Set {
     }
     closedir(DIR);
 
-    my $cj = "";
+    my $cj = q{};
     $cj    = join(",",reverse(sort @logs)) if (@logs);
 
     if (@logs) {
-        $usage .= "importCachefile:".$cj." ";
+        $usage .= 'importCachefile:'.$cj.' ';
     }
     else {
-        $usage .= "importCachefile ";
+        $usage .= 'importCachefile ';
     }
 
-    my $dbh = $hash->{DBHP};
     my $db  = (split(/;|=/, $hash->{dbconn}))[1];
 
     my $params = {
@@ -802,68 +810,7 @@ sub DbLog_Set {
         return ($ret,$trigger);
     }
 
-
-
-
-    if ($opt eq 'reduceLog') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
-
-        my ($od,$nd) = split ":", $prop;         # $od - Tage älter als , $nd - Tage neuer als
-
-        if ($nd && $nd <= $od) {
-            return "The second day value must be greater than the first one ! ";
-        }
-
-        if (defined($prop1) && $prop1 !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
-            return "ReduceLog syntax error in set command. Please see commandref for help.";
-        }
-
-        if (defined $prop && $prop =~ /(^\d+$)|(^\d+:\d+$)/) {
-            $ret = DbLog_reduceLog ($hash, @a);
-            InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
-        }
-        else {
-            Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
-            $ret = "reduceLog error, no <days> given.";
-        }
-    }
-    elsif ($opt eq 'reduceLogNbl') {
-        Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
-
-        my ($od,$nd) = split(":",$prop);         # $od - Tage älter als , $nd - Tage neuer als
-
-        if ($nd && $nd <= $od) {
-            return "The second day value must be greater than the first one ! ";
-        }
-
-        if (defined($prop1) && $prop1 !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
-            return "ReduceLogNbl syntax error in set command. Please see commandref for help.";
-        }
-
-        if (defined $prop && $prop =~ /(^\d+$)|(^\d+:\d+$)/) {
-            if ($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} !~ m/DEAD/) {
-                $ret = "reduceLogNbl already in progress. Please wait until the running process is finished.";
-            }
-            else {
-                delete $hash->{HELPER}{REDUCELOG_PID};
-                my @b = @a;
-                shift(@b);
-                readingsSingleUpdate($hash,"reduceLogState","@b started",1);
-                $hash->{HELPER}{REDUCELOG} = \@a;
-                $hash->{HELPER}{REDUCELOG_PID} = BlockingCall("DbLog_reduceLogNbl","$name","DbLog_reduceLogNbl_finished");
-                return;
-            }
-        }
-        else {
-            Log3($name, 1, "DbLog $name: reduceLogNbl syntax error, no <days>[:<days>] given.");
-            $ret = "reduceLogNbl error, no <days> given.";
-        }
-    }
-    else {
-        $ret = $usage;
-    }
-
-return $ret;
+return $usage;
 }
 
 ################################################################
@@ -1012,10 +959,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
 
       $hash->{HELPER}{REOPEN_RUNS} = $prop;                                              # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
 
-      BlockingKill($hash->{HELPER}{REDUCELOG_PID})  if($hash->{HELPER}{REDUCELOG_PID});
-
       delete $hash->{HELPER}{LONGRUN_PID};
-      delete $hash->{HELPER}{REDUCELOG_PID};
 
       my $ts = (split " ",FmtDateTime(gettimeofday()+$prop))[1];
       Log3 ($name, 2, "DbLog $name - Connection closed until $ts ($prop seconds).");
@@ -1252,7 +1196,7 @@ sub _DbLog_setexportCache {              ## no critic "not used"
   my $now   = strftime('%Y-%m-%d_%H-%M-%S',localtime);
 
   my ($out,$outfile,$error);
-  
+
   if(@logs && AttrVal($name, 'exportCacheAppend', 0)) {              # exportiertes Cachefile existiert und es soll an das neueste angehängt werden
       $outfile = $dir.pop(@logs);
       $out     = ">>$outfile";
@@ -1276,7 +1220,7 @@ sub _DbLog_setexportCache {              ## no critic "not used"
           print FH $cln ;
           $crows++;
       }
-      
+
       close(FH);
       readingsSingleUpdate ($hash, 'lastCachefile', $outfile.' ('.$crows.' cache rows exported)', 1);
   }
@@ -1291,7 +1235,7 @@ sub _DbLog_setexportCache {              ## no critic "not used"
   if (lc($args[-1]) =~ m/^purgecache/i) {
       delete $data{DbLog}{$name}{cache};
       readingsSingleUpdate ($hash, 'CacheUsage', 0, 1);
-      
+
       Log3 ($name, 3, "DbLog $name - Cache purged after exporting rows to $outfile.");
   }
 
@@ -1314,7 +1258,7 @@ sub _DbLog_setimportCachefile {          ## no critic "not used"
   readingsDelete($hash, 'lastCachefile');
 
   return if($hash->{HELPER}{REOPEN_RUNS});                                    # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
-  
+
   if (!$prop) {
       return "Wrong function-call. Use set <name> importCachefile <file> without directory (see attr expimpdir)." ;
   }
@@ -1323,6 +1267,46 @@ sub _DbLog_setimportCachefile {          ## no critic "not used"
   }
 
   DbLog_SBP_sendCommand ($hash, 'importCachefile', $infile);
+
+return;
+}
+
+################################################################
+#                      Setter reduceLog
+################################################################
+sub _DbLog_setreduceLog {                ## no critic "not used"
+  my $paref = shift;
+
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  my $arg   = $paref->{arg};
+
+  if (defined $hash->{HELPER}{LONGRUN_PID}) {
+      return 'Another operation is in progress, try again a little later.';
+  }
+
+  Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
+
+  my ($od,$nd) = split ":", $prop;                                 # $od - Tage älter als , $nd - Tage neuer als
+
+  if ($nd && $nd <= $od) {
+      return "The second day value must be greater than the first one!";
+  }
+
+  if (defined($prop1) && $prop1 !~ /^average$|^average=.+|^EXCLUDE=.+$|^INCLUDE=.+$/i) {
+      return "reduceLog syntax error in set command. Please see commandref for help.";
+  }
+
+  if (defined $prop && $prop =~ /(^\d+$)|(^\d+:\d+$)/) {
+      DbLog_SBP_sendCommand ($hash, 'reduceLog', $arg);
+  }
+  else {
+      Log3 ($name, 2, "DbLog $name: reduceLog error, no <days> given.");
+      return "reduceLog syntax error, no <days> given.";
+  }
 
 return;
 }
@@ -2092,12 +2076,8 @@ sub DbLog_execMemCacheAsync {
   my $timeout    = AttrVal($name, "timeout",                86400);
   my $DbLogType  = AttrVal($name, "DbLogType",          'History');
 
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
   my $dolog      = 1;
-
-  my ($dbh,$error);
+  my $error;
 
   RemoveInternalTimer($hash, 'DbLog_execMemCacheAsync');
 
@@ -2126,17 +2106,6 @@ sub DbLog_execMemCacheAsync {
 
   if($hash->{HELPER}{LONGRUN_PID}) {
       $dolog = 0;
-  }
-
-  if($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} =~ m/DEAD/) {
-      delete $hash->{HELPER}{REDUCELOG_PID};
-  }
-
-  if($hash->{MODEL} eq "SQLITE") {                                                           # bei SQLite Sperrverwaltung Logging wenn andere schreibende Zugriffe laufen
-      if($hash->{HELPER}{REDUCELOG_PID}) {
-          $error = "reduceLogNbl is running - resync at NextSync";
-          $dolog = 0;
-      }
   }
 
   readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 2 ? 1 : 0));
@@ -2469,7 +2438,7 @@ sub DbLog_SBP_onRun {
                                                }
                                              );
           }
-          
+
           ##  Kommando: userCommand
           #########################################################
           if ($operation =~ /userCommand/xs) {
@@ -2481,7 +2450,7 @@ sub DbLog_SBP_onRun {
                                                }
                                              );
           }
-          
+
           ##  Kommando: importCachefile
           #########################################################
           if ($operation =~ /importCachefile/xs) {
@@ -2493,6 +2462,18 @@ sub DbLog_SBP_onRun {
                                                    bst        => $bst
                                                  }
                                                );
+          }
+
+          ##  Kommando: reduceLog
+          #########################################################
+          if ($operation =~ /reduceLog/xs) {
+              _DbLog_SBP_onRun_reduceLog ( { subprocess => $subprocess,
+                                             name       => $name,
+                                             memc       => $memc,
+                                             store      => $store,
+                                             bst        => $bst
+                                           }
+                                         );
           }
       }
 
@@ -2608,7 +2589,7 @@ sub _DbLog_SBP_onRun_Log {
   my $doins       = 0;                                                    # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl)
   my $rowlback    = q{};                                                  # Eventliste für Rückgabe wenn Fehler
   my $nins_hist   = 0;
-  
+
   my $ret;
   my $retjson;
 
@@ -2940,7 +2921,7 @@ sub _DbLog_SBP_onRun_Log {
                   $reading[$tuple] =~ s/\|/_ESC_/gxs;
                   $value[$tuple]   =~ s/\|/_ESC_/gxs;
                   $unit[$tuple]    =~ s/\|/_ESC_/gxs;
-                  
+
                   my $nlh = $timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple];
 
                   push @n2hist, $nlh;
@@ -3111,7 +3092,7 @@ sub _DbLog_SBP_onRun_Log {
           };
       }
   }
-  
+
   if ($operation eq 'importCachefile') {
       return ($error, $nins_hist, $rowlback);
   }
@@ -3289,7 +3270,7 @@ sub _DbLog_SBP_onRun_userCommand {
   my $res;
   my $ret;
   my $retjson;
-  
+
   Log3 ($name, 4, qq{DbLog $name - userCommand requested: "$sql"});
 
   my $st = [gettimeofday];                                                    # SQL-Startzeit
@@ -3385,25 +3366,25 @@ sub _DbLog_SBP_onRun_importCachefile {
   }
 
   my $st = [gettimeofday];                                                    # SQL-Startzeit
-  
+
   while (<FH>) {
       my $row   = $_;
       $row      = DbLog_charfilter($row)    if(AttrVal($name, 'useCharfilter', 0));
-      
+
       $logstore->{$crows} = $row;
-      
+
       $crows++;
   }
-  
+
   close(FH);
 
   my $msg = "$crows rows read from $infile into temporary Memory store";
-  
+
   Log3 ($name, 3, "DbLog $name - $msg");
-  
+
   $memc->{DbLogType} = 'history';                                                          # nur history-Insert !
   $memc->{bi}        = 0;                                                                  # Array-Insert !
-  
+
   ($error, $nins_hist, $rowlback) = _DbLog_SBP_onRun_Log ( { subprocess => $subprocess,
                                                              name       => $name,
                                                              memc       => $memc,
@@ -3416,17 +3397,17 @@ sub _DbLog_SBP_onRun_importCachefile {
 
   if (!$error && $nins_hist) {
       Log3 ($name, 2, "DbLog $name - WARNING - $nins_hist datasets from $infile were not imported:");
-      
+
       for my $index (sort {$a<=>$b} keys %{$rowlback}) {
           chomp $rowlback->{$index};
 
           Log3 ($name, 2, "$index -> ".$rowlback->{$index});
       }
   }
-  
+
   my $improws = 'unknown';
-  $improws    = $crows - $nins_hist if(!$error);  
-  
+  $improws    = $crows - $nins_hist if(!$error);
+
   my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
   my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
   my $ot  = $rt.",".$brt;
@@ -3437,6 +3418,499 @@ sub _DbLog_SBP_onRun_importCachefile {
       ot       => $ot,
       oper     => $operation,
       res      => $improws
+  };
+
+  $retjson = eval { encode_json($ret) };
+  $subprocess->writeToParent ($retjson);
+
+return;
+}
+
+#################################################################
+# SubProcess - reduceLog-Routine
+#################################################################
+sub _DbLog_SBP_onRun_reduceLog {
+  my $paref       = shift;
+
+  my $subprocess  = $paref->{subprocess};
+  my $name        = $paref->{name};
+  my $memc        = $paref->{memc};
+  my $store       = $paref->{store};                                          # Datenspeicher
+  my $bst         = $paref->{bst};
+  my $useta       = 1;                                                        # immer Transaktion ein !
+
+  my $dbh         = $store->{dbh};
+  my $model       = $store->{dbparams}{model};
+  my $history     = $store->{dbparams}{history};
+
+  my $operation   = $memc->{operation} // 'unknown';                          # aktuell angeforderte Operation (log, etc.)
+  my $arg         = $memc->{arguments};
+
+  my $error       = q{};
+  my $res;
+  my $ret;
+  my $retjson;
+
+  my @a = split " ", $arg;
+
+  my ($row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay);
+  my ($lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
+  my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
+
+  if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
+      ($filter)     = $a[-1] =~ /^EXCLUDE=(.+)/i;
+      @excludeRegex = split ',', $filter;
+  }
+  elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
+      $filter = 1;
+  }
+
+  if (defined($a[1])) {
+      $average = $a[1] =~ /average=day/i ? "AVERAGE=DAY"  :
+                 $a[1] =~ /average/i     ? "AVERAGE=HOUR" :
+                 0;
+  }
+
+  Log3 ($name, 3, "DbLog $name - reduceLog requested with DAYS=$a[0]"
+      .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
+      .(($average && $filter) ? ", " : '').(($filter)  ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
+
+  my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
+  my $tm = $useta             ? "ON" : "OFF";
+
+  Log3 ($name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm");
+
+  my ($od,$nd) = split ":", $a[0];                                             # $od - Tage älter als , $nd - Tage neuer als
+  my ($ots,$nts);
+
+  if ($model eq 'SQLITE') {
+      $ots = "datetime('now', '-$od days')";
+      $nts = "datetime('now', '-$nd days')" if($nd);
+  }
+  elsif ($model eq 'MYSQL') {
+      $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)";
+      $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd);
+  }
+  elsif ($model eq 'POSTGRESQL') {
+      $ots = "NOW() - INTERVAL '$od' DAY";
+      $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
+  }
+  else {
+      $ret = 'Unknown database type.';
+  }
+
+  if ($ret || !$od) {
+      $error  = $ret    if($ret);
+      $error .= " and " if($error);
+      $error .= "the <no> older days are not set for reduceLog command" if(!$od);
+
+      Log3 ($name, 2, "DbLog $name - ERROR - $error");
+
+      $ret = {
+          name  => $name,
+          msg   => $error,
+          ot    => 0,
+          oper  => $operation
+      };
+
+      $retjson = eval { encode_json($ret) };
+      $subprocess->writeToParent ($retjson);
+      return;
+  }
+
+  my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
+  eval { $sth_del  = $dbh->prepare_cached("DELETE FROM $history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+         $sth_upd  = $dbh->prepare_cached("UPDATE $history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
+         $sth_delD = $dbh->prepare_cached("DELETE FROM $history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+         $sth_updD = $dbh->prepare_cached("UPDATE $history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
+         $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $history WHERE "
+                     .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
+                     ."TIMESTAMP < $ots".($nts?" AND TIMESTAMP >= $nts ":" ")."ORDER BY TIMESTAMP ASC");                        # '' was EVENT, no longer in use
+         1;
+       }
+       or do { $error = $@;
+
+               Log3 ($name, 2, "DbLog $name - ERROR - $error");
+
+               $dbh->disconnect();
+               delete $store->{dbh};
+
+               $ret = {
+                   name     => $name,
+                   msg      => $error,
+                   ot       => 0,
+                   oper     => $operation
+               };
+
+               $retjson = eval { encode_json($ret) };
+               $subprocess->writeToParent ($retjson);
+               return;
+             };
+
+  eval { $sth_get->execute();
+         1;
+       }
+       or do { $error = $@;
+
+               Log3 ($name, 2, "DbLog $name - ERROR - $error");
+
+               $dbh->disconnect();
+               delete $store->{dbh};
+
+               $ret = {
+                   name     => $name,
+                   msg      => $error,
+                   ot       => 0,
+                   oper     => $operation
+               };
+
+               $retjson = eval { encode_json($ret) };
+               $subprocess->writeToParent ($retjson);
+               return;
+             };
+
+  my $st = [gettimeofday];                                                                           # SQL-Startzeit
+
+  do {
+      $row         = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];          # || execute last-day dummy
+      $ret         = 1;
+      ($day,$hour) = $row->[0] =~ /-(\d{2})\s(\d{2}):/;
+
+      $rowCount++ if($day != 00);
+
+      if ($day != $currentDay) {
+          if ($currentDay) {                                                                         # false on first executed day
+              if (scalar @dayRows) {
+                  ($lastHour) = $dayRows[-1]->[0] =~ /(.*\d+\s\d{2}):/;
+                  $c          = 0;
+
+                  for my $delRow (@dayRows) {
+                      $c++ if($day != 00 || $delRow->[0] !~ /$lastHour/);
+                  }
+
+                  if($c) {
+                      $deletedCount += $c;
+
+                      Log3 ($name, 3, "DbLog $name - reduceLog deleting $c records of day: $processingDay");
+
+                      $dbh->{RaiseError} = 1;
+                      $dbh->{PrintError} = 0;
+
+                      $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+                      if ($error) {
+                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      }
+                      $error = q{};
+
+                      eval {
+                          my $i  = 0;
+                          my $k  = 1;
+                          my $th = ($#dayRows <= 2000)  ? 100  :
+                                   ($#dayRows <= 30000) ? 1000 :
+                                   10000;
+
+                          for my $delRow (@dayRows) {
+                              if($day != 00 || $delRow->[0] !~ /$lastHour/) {
+
+                                  Log3 ($name, 4, "DbLog $name - DELETE FROM $history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
+
+                                  $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
+                                  $i++;
+
+                                  if($i == $th) {
+                                      my $prog = $k * $i;
+
+                                      Log3 ($name, 3, "DbLog $name - reduceLog deletion progress of day: $processingDay is: $prog");
+
+                                      $i = 0;
+                                      $k++;
+                                  }
+                              }
+                          }
+                      };
+                      if ($@) {
+                          $error = $@;
+
+                          Log3 ($name, 2, "DbLog $name - reduceLog ! FAILED ! for day $processingDay: $error");
+
+                          $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                          if ($error) {
+                              Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          }
+                          $error = q{};
+                          $ret   = 0;
+                      }
+                      else {
+                          $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                          if ($error) {
+                              Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                          }
+                          $error = q{};
+                      }
+
+                      $dbh->{RaiseError} = 0;
+                      $dbh->{PrintError} = 1;
+                  }
+
+                  @dayRows = ();
+              }
+
+              if ($ret && defined($a[1]) && $a[1] =~ /average/i) {
+                  $dbh->{RaiseError} = 1;
+                  $dbh->{PrintError} = 0;
+
+                  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+                  if ($error) {
+                      Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                  }
+                  $error = q{};
+
+                  eval {
+                      push(@averageUpd, {%hourlyKnown}) if($day != 00);
+
+                      $c = 0;
+                      for my $hourHash (@averageUpd) {                                               # Only count for logging...
+                          for my $hourKey (keys %$hourHash) {
+                              $c++ if ($hourHash->{$hourKey}->[0] && scalar(@{$hourHash->{$hourKey}->[4]}) > 1);
+                          }
+                      }
+
+                      $updateCount += $c;
+
+                      Log3 ($name, 3, "DbLog $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c); # else only push to @averageUpdD
+
+                      my $i  = 0;
+                      my $k  = 1;
+                      my $th = ($c <= 2000)  ? 100  :
+                               ($c <= 30000) ? 1000 :
+                               10000;
+
+                      for my $hourHash (@averageUpd) {
+                          for my $hourKey (keys %$hourHash) {
+                              if ($hourHash->{$hourKey}->[0]) {                                                # true if reading is a number
+                                  ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
+
+                                  if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {                             # true if reading has multiple records this hour
+                                      for (@{$hourHash->{$hourKey}->[4]}) {
+                                          $sum += $_;
+                                      }
+
+                                      $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
+                                      $sum     = 0;
+
+                                      Log3 ($name, 4, "DbLog $name - UPDATE $history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
+
+                                      $sth_upd->execute("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]);
+
+                                      $i++;
+                                      if($i == $th) {
+                                          my $prog = $k * $i;
+
+                                          Log3 ($name, 3, "DbLog $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
+
+                                          $i = 0;
+                                          $k++;
+                                      }
+                                      push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[1]) && $a[1] =~ /average=day/i);
+                                  }
+                                  else {
+                                      push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[1]) && $a[1] =~ /average=day/i);
+                                  }
+                              }
+                          }
+                      }
+                  };
+
+                  if ($@) {
+                      $error = $@;
+
+                      Log3 ($name, 2, "DbLog $name - reduceLog average=hour ! FAILED ! for day $processingDay: $error");
+
+                      $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                      if ($error) {
+                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      }
+
+                      $error = q{};
+                      @averageUpdD = ();
+                  }
+                  else {
+                      $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                      if ($error) {
+                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      }
+
+                      $error = q{};
+                  }
+
+                  $dbh->{RaiseError} = 0;
+                  $dbh->{PrintError} = 1;
+
+                  @averageUpd = ();
+              }
+
+              if (defined($a[1]) && $a[1] =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
+                  $dbh->{RaiseError} = 1;
+                  $dbh->{PrintError} = 0;
+
+                  $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
+                  if ($error) {
+                      Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                  }
+                  $error = q{};
+
+                  eval {
+                      for (@averageUpdD) {
+                          push(@{$averageHash{$_->[3].$_->[4]}->{tedr}}, [$_->[0], $_->[1], $_->[3], $_->[4]]);
+                          $averageHash{$_->[3].$_->[4]}->{sum} += $_->[2];
+                          $averageHash{$_->[3].$_->[4]}->{date} = $_->[5];
+                      }
+
+                      $c = 0;
+                      for (keys %averageHash) {
+                          if(scalar @{$averageHash{$_}->{tedr}} == 1) {
+                              delete $averageHash{$_};
+                          }
+                          else {
+                              $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
+                          }
+                      }
+
+                      $deletedCount += $c;
+                      $updateCount  += keys(%averageHash);
+
+                      my ($id,$iu) = (0,0);
+                      my ($kd,$ku) = (1,1);
+                      my $thd      = ($c <= 2000)  ? 100  :
+                                     ($c <= 30000) ? 1000 :
+                                     10000;
+                      my $thu      = ((keys %averageHash) <= 2000)  ? 100  :
+                                     ((keys %averageHash) <= 30000) ? 1000 :
+                                     10000;
+
+                      Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay") if(keys %averageHash);
+
+                      for my $reading (keys %averageHash) {
+                          $average  = sprintf('%.3f', $averageHash{$reading}->{sum}/scalar(@{$averageHash{$reading}->{tedr}}));
+                          $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
+
+                          for (@{$averageHash{$reading}->{tedr}}) {
+                              Log3 ($name, 5, "DbLog $name - DELETE FROM $history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
+
+                              $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
+
+                              $id++;
+                              if($id == $thd) {
+                                  my $prog = $kd * $id;
+
+                                  Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
+
+                                  $id = 0;
+                                  $kd++;
+                              }
+                          }
+
+                          Log3 ($name, 4, "DbLog $name - UPDATE $history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
+
+                          $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
+
+                          $iu++;
+
+                          if($iu == $thu) {
+                              my $prog = $ku * $id;
+
+                              Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
+
+                              $iu = 0;
+                              $ku++;
+                          }
+                      }
+                  };
+                  if ($@) {
+                      Log3 ($name, 3, "DbLog $name - reduceLog average=day ! FAILED ! for day $processingDay");
+
+                      $error = __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                      if ($error) {
+                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      }
+
+                      $error = q{};
+                  }
+                  else {
+                      $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                      if ($error) {
+                          Log3 ($name, 2, "DbLog $name - reduceLog - $error");
+                      }
+
+                      $error = q{};
+                  }
+
+                  $dbh->{RaiseError} = 0;
+                  $dbh->{PrintError} = 1;
+              }
+
+              %averageHash = ();
+              %hourlyKnown = ();
+              @averageUpd  = ();
+              @averageUpdD = ();
+              $currentHour = 99;
+          }
+
+          $currentDay = $day;
+      }
+
+      if ($hour != $currentHour) {                                                            # forget records from last hour, but remember these for average
+          if (defined($a[1]) && $a[1] =~ /average/i && keys(%hourlyKnown)) {
+              push(@averageUpd, {%hourlyKnown});
+          }
+
+          %hourlyKnown = ();
+          $currentHour = $hour;
+      }
+      if (defined $hourlyKnown{$row->[1].$row->[3]}) {                                        # remember first readings for device per h, other can be deleted
+          push(@dayRows, [@$row]);
+          if (defined($a[1]) && $a[1] =~ /average/i && defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && $hourlyKnown{$row->[1].$row->[3]}->[0]) {
+              if ($hourlyKnown{$row->[1].$row->[3]}->[0]) {
+                  push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
+              }
+          }
+      }
+      else {
+          $exclude = 0;
+          for (@excludeRegex) {
+              $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
+          }
+
+          if ($exclude) {
+              $excludeCount++ if($day != 00);
+          }
+          else {
+              $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
+          }
+      }
+      $processingDay = (split(' ',$row->[0]))[0];
+
+  } while( $day != 00 );
+
+  $res  = "reduceLog finished. ";
+  $res .= "Rows processed: $rowCount, deleted: $deletedCount"
+          .((defined($a[1]) && $a[1] =~ /average/i)? ", updated: $updateCount" : '')
+          .(($excludeCount)? ", excluded: $excludeCount" : '')
+          .", time: ".sprintf('%.2f',time() - $startTime)."sec";
+
+  Log3 ($name, 3, "DbLog $name - $res");
+
+
+  my $rt  = tv_interval($st);                                                 # SQL-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                                # Background-Laufzeit ermitteln
+  my $ot  = $rt.",".$brt;
+
+  $ret = {
+      name     => $name,
+      msg      => $error,
+      ot       => $ot,
+      oper     => $operation,
+      res      => $res
   };
 
   $retjson = eval { encode_json($ret) };
@@ -3489,7 +3963,34 @@ sub __DbLog_SBP_commitOnly {
         }
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - Error commit table $table - $@");
+              Log3 ($name, 2, "DbLog $name - Error commit table $table - $err");
+            };
+
+return $err;
+}
+
+#################################################################
+#          nur Datenbank "rollback"
+#################################################################
+sub __DbLog_SBP_rollbackOnly {
+  my $name  = shift;
+  my $dbh   = shift;
+  my $table = shift;
+
+  my $err  = q{};
+
+  eval{ if(!$dbh->{AutoCommit}) {
+            $dbh->rollback();
+            Log3 ($name, 4, "DbLog $name - transaction rollback table $table");
+            1;
+        }
+        else {
+            Log3 ($name, 4, "DbLog $name - data auto rollback table $table");
+            1;
+        }
+      }
+      or do { $err = $@;
+              Log3 ($name, 2, "DbLog $name - Error - $err");
             };
 
 return $err;
@@ -3803,11 +4304,11 @@ sub DbLog_SBP_sendCommand {
                           return $err;
                         };
 
-  $subprocess->writeToChild($json);
-
-  $hash->{HELPER}{LONGRUN_PID} = time();               # Statusbit laufende Verarbeitung mit Startzeitstempel;
-
   DbLog_setReadingstate ($hash, "operation '$oper' is running");
+
+  $hash->{HELPER}{LONGRUN_PID} = time();                 # Statusbit laufende Verarbeitung mit Startzeitstempel;
+
+  $subprocess->writeToChild($json);
 
 return;
 }
@@ -3899,10 +4400,7 @@ sub DbLog_SBP_Read {
   #my $name = $hash->{NAME};
 
   my $subprocess = $hash->{".fhem"}{subprocess};
-
-  # hier lesen wir aus der globalen Select-Schleife, was
-  # in der onRun-Funktion geschrieben wurde
-  my $retjson = $subprocess->readFromChild();
+  my $retjson    = $subprocess->readFromChild();                                              # hier lesen wir aus der globalen Select-Schleife, was in der onRun-Funktion geschrieben wurde
 
   if(defined($retjson)) {
       my $ret = eval { decode_json($retjson) };
@@ -3967,18 +4465,24 @@ sub DbLog_SBP_Read {
       if ($oper =~ /deleteOldDays/xs) {
           readingsSingleUpdate($hash, 'lastRowsDeleted', $ret->{numdel}, 1);
       }
- 
+
       ## userCommand - Read
-      ######################### 
+      #########################
       if ($oper =~ /userCommand/xs) {
           readingsSingleUpdate($hash, 'userCommandResult', $ret->{res}, 1);
       }
-      
+
       ## importCachefile - Read
-      ########################### 
+      ###########################
       if ($oper =~ /importCachefile/xs) {
           my $improws = $ret->{res};
           $msg        = $msg ? $msg : "$oper finished, $improws datasets were imported";
+      }
+
+      ## reduceLog - Read
+      #########################
+      if ($oper =~ /reduceLog/xs) {
+          readingsSingleUpdate($hash, 'reduceLogState', $ret->{res}, 1) if($ret->{res});
       }
 
       if(AttrVal($name, 'showproctime', 0) && $ot) {
@@ -5724,11 +6228,11 @@ sub DbLog_checkModVer {
   my $ctrlFileName = $2;
 
   my ($remCtrlFile, $err) = DbLog_updGetUrl($name,$src);
-  return ("check of new DbLog version not possible: $err") if($err);
+  return "check of new DbLog version not possible: $err" if($err);
 
   if(!$remCtrlFile) {
       Log3 ($name, 1, "DbLog $name - configCheck: No valid remote control file");
-      return ("check of new DbLog version not possible, see logfile.");
+      return "check of new DbLog version not possible, see logfile.";
   }
 
   my @remList = split(/\R/, $remCtrlFile);
@@ -5744,7 +6248,7 @@ sub DbLog_checkModVer {
   }
   else {
       Log3 ($name, 1, "DbLog $name - configCheck: can't open $root/FHEM/$ctrlFileName: $!");
-      return ("check of new DbLog version not possible, see logfile.");
+      return "check of new DbLog version not possible, see logfile.";
   }
 
   my %lh;
@@ -5762,9 +6266,11 @@ sub DbLog_checkModVer {
   for my $rem (@remList) {
       my @r = split(" ", $rem, 4);
       next if($r[0] ne "UPD" || $r[3] !~ /93_DbLog/);
+
       my $fName  = $r[3];
       my $fPath  = "$root/$fName";
       my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
+
       if(!$fileOk) {
           Log3 ($name, 4, "DbLog $name - configCheck: New remote version of $fName found - creation time: ".$r[1]." - bytes: ".$r[2]);
           return ("",1,"A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)");
@@ -5790,15 +6296,16 @@ sub DbLog_updGetUrl {
 
   $url                        =~ s/%/%25/g;
   $upd_connecthash{url}       = $url;
-  $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
+  $upd_connecthash{keepalive} = $url =~ m/localUpdate/ ? 0 : 1;                                   # Forum #49798
 
   my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
+
   if($err) {
-      Log3 $name, 1, "DbLog $name - configCheck: ERROR while connecting to fhem.de:  $err";
+      Log3 ($name, 1, "DbLog $name - configCheck: ERROR while connecting to fhem.de:  $err");
       return ("",$err);
   }
   if(!$data) {
-      Log3 $name, 1, "DbLog $name - configCheck: ERROR $url: empty file received";
+      Log3 ($name, 1, "DbLog $name - configCheck: ERROR $url: empty file received");
       $err = 1;
       return ("",$err);
   }
@@ -5813,11 +6320,11 @@ sub DbLog_sqlget {
   my ($hash,$sql) = @_;
   my $name        = $hash->{NAME};
 
-  my ($dbh,$sth,@sr);
+  my ($sth,@sr);
 
   Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
 
-  $dbh = _DbLog_ConnectNewDBH($hash);
+  my $dbh = _DbLog_ConnectNewDBH($hash);
   return if(!$dbh);
 
   eval { $sth = $dbh->prepare("$sql");
@@ -5833,6 +6340,7 @@ sub DbLog_sqlget {
 
   $sth->finish;
   $dbh->disconnect;
+
   no warnings 'uninitialized';
   Log3 ($name, 4, "DbLog $name - SQL result: @sr");
   use warnings;
@@ -5879,13 +6387,13 @@ sub DbLog_AddLog {
   my $devspec = join(':',@dc);
   my @exdvs   = devspec2array($devspec);
 
-  Log3 $name, 4, "DbLog $name - Addlog known devices by devspec: @exdvs";
+  Log3 ($name, 4, "DbLog $name - Addlog known devices by devspec: @exdvs");
 
   for (@exdvs) {
       $dev_name = $_;
 
       if(!$defs{$dev_name}) {
-          Log3 $name, 2, "DbLog $name - Device '$dev_name' used by addLog doesn't exist !";
+          Log3 ($name, 2, "DbLog $name - Device '$dev_name' used by addLog doesn't exist !");
           next;
       }
 
@@ -5916,7 +6424,8 @@ sub DbLog_AddLog {
                                $do    = 1 if($rd =~ m,^$v4[0]$,);             # Reading matcht $DbLogInclude -> wieder in addLog einschließen
                            }
                        }
-                       Log3 $name, 2, "DbLog $name - Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !" if($do == 0 && $rd =~ m/^$rdspec$/);
+
+                       Log3 ($name, 2, "DbLog $name - Device: \"$dev_name\", reading: \"$v2[0]\" excluded by attribute DbLogExclude from addLog !") if($do == 0 && $rd =~ m/^$rdspec$/);
                    }
                }
            }
@@ -6010,6 +6519,7 @@ sub DbLog_AddLog {
               }
 
               my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+
               eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
               if (!$@) {
                   $ts = $TIMESTAMP;
@@ -6123,6 +6633,7 @@ sub DbLog_addCacheLine {
       }
 
       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+
       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
       if (!$@) {
           $i_timestamp = $TIMESTAMP;
@@ -6167,16 +6678,16 @@ return;
 sub DbLog_cutCol {
   my ($hash,$dn,$dt,$evt,$rd,$val,$unit) = @_;
   my $name       = $hash->{NAME};
-  my $colevent   = AttrVal($name, 'colEvent', undef);
+  my $colevent   = AttrVal($name, 'colEvent',   undef);
   my $colreading = AttrVal($name, 'colReading', undef);
-  my $colvalue   = AttrVal($name, 'colValue', undef);
+  my $colvalue   = AttrVal($name, 'colValue',   undef);
 
   if ($hash->{MODEL} ne 'SQLITE' || defined($colevent) || defined($colreading) || defined($colvalue) ) {
-      $dn   = substr($dn,0,   $hash->{HELPER}{DEVICECOL});
-      $dt   = substr($dt,0,   $hash->{HELPER}{TYPECOL});
-      $evt  = substr($evt,0,  $hash->{HELPER}{EVENTCOL});
-      $rd   = substr($rd,0,   $hash->{HELPER}{READINGCOL});
-      $val  = substr($val,0,  $hash->{HELPER}{VALUECOL});
+      $dn   = substr($dn,  0, $hash->{HELPER}{DEVICECOL});
+      $dt   = substr($dt,  0, $hash->{HELPER}{TYPECOL});
+      $evt  = substr($evt, 0, $hash->{HELPER}{EVENTCOL});
+      $rd   = substr($rd,  0, $hash->{HELPER}{READINGCOL});
+      $val  = substr($val, 0, $hash->{HELPER}{VALUECOL});
       $unit = substr($unit,0, $hash->{HELPER}{UNITCOL}) if($unit);
   }
 return ($dn,$dt,$evt,$rd,$val,$unit);
@@ -6237,794 +6748,6 @@ sub DbLog_charfilter {
   $txt =~ s/1degree1/°/g;
 
 return($txt);
-}
-
-#########################################################################################
-### DBLog - Historische Werte ausduennen (alte blockiernde Variante) > Forum #41089
-#########################################################################################
-sub DbLog_reduceLog {
-    my ($hash,@a) = @_;
-    
-    my $history   = $hash->{HELPER}{TH};
-    my $current   = $hash->{HELPER}{TC};
-    
-    my ($ret,$row,$err,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay);
-    my ($lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
-    my ($name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{NAME},time(),99,0,0,0,0,0,0);
-    
-    my $dbh = _DbLog_ConnectNewDBH($hash);
-    return if(!$dbh);
-
-    if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
-        ($filter) = $a[-1] =~ /^EXCLUDE=(.+)/i;
-        @excludeRegex = split(',',$filter);
-    } 
-    elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
-        $filter = 1;
-    }
-    
-    if (defined($a[3])) {
-        $average = $a[3] =~ /average=day/i ? "AVERAGE=DAY"  : 
-                   $a[3] =~ /average/i     ? "AVERAGE=HOUR" : 
-                   0;
-    }
-    
-    Log3 ($name, 3, "DbLog $name - reduceLog requested with DAYS=$a[2]"
-        .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
-        .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
-
-    my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
-    my $ac             = $dbh->{AutoCommit} ? "ON" : "OFF";
-    my $tm             = $useta             ? "ON" : "OFF";
-
-    Log3 ($name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm");
-
-    my ($od,$nd) = split ":", $a[2];                                     # $od - Tage älter als , $nd - Tage neuer als
-    my ($ots,$nts);
-
-    if ($hash->{MODEL} eq 'SQLITE') {
-        $ots = "datetime('now', '-$od days')";
-        $nts = "datetime('now', '-$nd days')" if($nd);
-    }
-    elsif ($hash->{MODEL} eq 'MYSQL') {
-        $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)";
-        $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd);
-    }
-    elsif ($hash->{MODEL} eq 'POSTGRESQL') {
-        $ots = "NOW() - INTERVAL '$od' DAY";
-        $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
-    }
-    else {
-        $ret = 'Unknown database type.';
-    }
-
-    if ($ots) {
-        my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
-        eval { $sth_del  = $dbh->prepare_cached("DELETE FROM $history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-               $sth_upd  = $dbh->prepare_cached("UPDATE $history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-               $sth_delD = $dbh->prepare_cached("DELETE FROM $history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-               $sth_updD = $dbh->prepare_cached("UPDATE $history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-               $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $history WHERE "
-                           .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
-                           ."TIMESTAMP < $ots".($nts?" AND TIMESTAMP >= $nts ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
-             };
-
-        $sth_get->execute();
-
-        do {
-            $row = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];  # || execute last-day dummy
-            $ret = 1;
-            
-            ($day,$hour) = $row->[0] =~ /-(\d{2})\s(\d{2}):/;
-            $rowCount++ if($day != 00);
-            
-            if ($day != $currentDay) {
-                if ($currentDay) {                                                      # false on first executed day
-                    if (scalar @dayRows) {
-                        ($lastHour) = $dayRows[-1]->[0] =~ /(.*\d+\s\d{2}):/;
-                        $c          = 0;
-                        
-                        for my $delRow (@dayRows) {
-                            $c++ if($day != 00 || $delRow->[0] !~ /$lastHour/);
-                        }
-                        
-                        if($c) {
-                            $deletedCount += $c;
-                            
-                            Log3 ($name, 3, "DbLog $name - reduceLog deleting $c records of day: $processingDay");
-                            
-                            $dbh->{RaiseError} = 1;
-                            $dbh->{PrintError} = 0;
-                            
-                            eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                            eval {
-                                my $i  = 0;
-                                my $k  = 1;
-                                my $th = $#dayRows <= 2000  ? 100  :
-                                         $#dayRows <= 30000 ? 1000 :
-                                         10000;
-
-                                for my $delRow (@dayRows) {
-                                    if($day != 00 || $delRow->[0] !~ /$lastHour/) {
-                                        
-                                        Log3 ($name, 5, "DbLog $name - DELETE FROM $history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
-                                        
-                                        $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
-                                        $i++;
-
-                                        if($i == $th) {
-                                            my $prog = $k * $i;
-                                            
-                                            Log3 ($name, 3, "DbLog $name - reduceLog deletion progress of day: $processingDay is: $prog");
-                                            
-                                            $i = 0;
-                                            $k++;
-                                        }
-                                    }
-                                }
-                            };
-
-                            if ($@) {
-                                Log3 ($name, 3, "DbLog $name - reduceLog ! FAILED ! for day $processingDay");
-
-                                eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                                $ret = 0;
-                            }
-                            else {
-                                eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                            }
-                            
-                            $dbh->{RaiseError} = 0;
-                            $dbh->{PrintError} = 1;
-                        }
-
-                        @dayRows = ();
-                    }
-
-                    if ($ret && defined($a[3]) && $a[3] =~ /average/i) {
-                        $dbh->{RaiseError} = 1;
-                        $dbh->{PrintError} = 0;
-                        
-                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                        eval {
-                            push(@averageUpd, {%hourlyKnown}) if($day != 00);
-
-                            $c = 0;
-                            
-                            for my $hourHash (@averageUpd) {                                     # Only count for logging...
-                                for my $hourKey (keys %$hourHash) {
-                                    $c++ if ($hourHash->{$hourKey}->[0] && scalar(@{$hourHash->{$hourKey}->[4]}) > 1);
-                                }
-                            }
-                            
-                            $updateCount += $c;
-                            
-                            Log3 ($name, 3, "DbLog $name - reduceLog (hourly-average) updating $c records of day: $processingDay") if($c); # else only push to @averageUpdD
-
-                            my $i  = 0;
-                            my $k  = 1;
-                            my $th = ($c <= 2000)?100:($c <= 30000)?1000:10000;
-
-                            for my $hourHash (@averageUpd) {
-                                for my $hourKey (keys %$hourHash) {
-                                    if ($hourHash->{$hourKey}->[0]) {                              # true if reading is a number
-                                        ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
-                                        
-                                        if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {           # true if reading has multiple records this hour
-                                            for (@{$hourHash->{$hourKey}->[4]}) { $sum += $_; }
-                                            $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
-                                            $sum     = 0;
-                                            
-                                            Log3 ($name, 5, "DbLog $name - UPDATE $history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
-                                            
-                                            $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
-
-                                            $i++;
-                                            
-                                            if($i == $th) {
-                                                my $prog = $k * $i;
-                                                
-                                                Log3 ($name, 3, "DbLog $name - reduceLog (hourly-average) updating progress of day: $processingDay is: $prog");
-                                                
-                                                $i = 0;
-                                                $k++;
-                                            }
-                                            
-                                            push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
-                                        }
-                                        else {
-                                            push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
-                                        }
-                                    }
-                                }
-                            }
-                        };
-                        
-                        if ($@) {
-                            $err = $@;
-                            
-                            Log3 ($name, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
-                            
-                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                            @averageUpdD = ();
-                        }
-                        else {
-                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                        }
-
-                        $dbh->{RaiseError} = 0;
-                        $dbh->{PrintError} = 1;
-                        @averageUpd        = ();
-                    }
-
-                    if (defined($a[3]) && $a[3] =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
-                        $dbh->{RaiseError} = 1;
-                        $dbh->{PrintError} = 0;
-                        
-                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                        eval {
-                            for (@averageUpdD) {
-                                push(@{$averageHash{$_->[3].$_->[4]}->{tedr}}, [$_->[0], $_->[1], $_->[3], $_->[4]]);
-                                $averageHash{$_->[3].$_->[4]}->{sum} += $_->[2];
-                                $averageHash{$_->[3].$_->[4]}->{date} = $_->[5];
-                            }
-
-                            $c = 0;
-                            for (keys %averageHash) {
-                                if(scalar @{$averageHash{$_}->{tedr}} == 1) {
-                                    delete $averageHash{$_};
-                                }
-                                else {
-                                    $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
-                                }
-                            }
-                            $deletedCount += $c;
-                            $updateCount += keys(%averageHash);
-
-                            my ($id,$iu) = (0,0);
-                            my ($kd,$ku) = (1,1);
-                            my $thd      = $c <= 2000  ? 100  : 
-                                           $c <= 30000 ? 1000 : 
-                                           10000;
-                            my $thu      = (keys %averageHash) <= 2000  ? 100  :
-                                           (keys %averageHash) <= 30000 ? 1000 :
-                                           10000;
-
-                            Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay") if(keys %averageHash);
-
-                            for my $reading (keys %averageHash) {
-                                $average  = sprintf('%.3f', $averageHash{$reading}->{sum}/scalar(@{$averageHash{$reading}->{tedr}}));
-                                $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
-
-                                for (@{$averageHash{$reading}->{tedr}}) {
-                                    Log3 ($name, 5, "DbLog $name - DELETE FROM $history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
-                                    
-                                    $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
-
-                                    $id++;
-                                    
-                                    if($id == $thd) {
-                                        my $prog = $kd * $id;
-                                        
-                                        Log3($name, 3, "DbLog $name - reduceLog (daily-average) deleting progress of day: $processingDay is: $prog");
-                                        
-                                        $id = 0;
-                                        $kd++;
-                                    }
-                                }
-
-                                Log3 ($name, 5, "DbLog $name - UPDATE $history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
-
-                                $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
-
-                                $iu++;
-                                
-                                if($iu == $thu) {
-                                    my $prog = $ku * $id;
-                                    
-                                    Log3 ($name, 3, "DbLog $name - reduceLog (daily-average) updating progress of day: $processingDay is: $prog");
-                                    
-                                    $iu = 0;
-                                    $ku++;
-                                }
-                            }
-                        };
-                        if ($@) {
-                            $err = $@;
-                            
-                            Log3 ($name, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
-                            
-                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                        }
-                        else {
-                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                        }
-
-                        $dbh->{RaiseError} = 0;
-                        $dbh->{PrintError} = 1;
-                    }
-
-                    %averageHash = ();
-                    %hourlyKnown = ();
-                    @averageUpd  = ();
-                    @averageUpdD = ();
-                    $currentHour = 99;
-                }
-                
-                $currentDay = $day;
-            }
-
-            if ($hour != $currentHour) {                                              # forget records from last hour, but remember these for average
-                if (defined($a[3]) && $a[3] =~ /average/i && keys(%hourlyKnown)) {
-                    push(@averageUpd, {%hourlyKnown});
-                }
-
-                %hourlyKnown = ();
-                $currentHour = $hour;
-            }
-
-            if (defined $hourlyKnown{$row->[1].$row->[3]}) {                          # remember first readings for device per h, other can be deleted
-                push(@dayRows, [@$row]);
-                
-                if (defined($a[3]) && $a[3] =~ /average/i && defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && $hourlyKnown{$row->[1].$row->[3]}->[0]) {
-                    if ($hourlyKnown{$row->[1].$row->[3]}->[0]) {
-                        push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
-                    }
-                }
-            }
-            else {
-                $exclude = 0;
-                
-                for (@excludeRegex) {
-                    $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
-                }
-
-                if ($exclude) {
-                    $excludeCount++ if($day != 00);
-                }
-                else {
-                    $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
-                }
-            }
-
-            $processingDay = (split(' ',$row->[0]))[0];
-
-        } while ($day != 00);
-
-        my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                   .((defined($a[3]) && $a[3] =~ /average/i)? ", updated: $updateCount" : '')
-                   .(($excludeCount)? ", excluded: $excludeCount" : '')
-                   .", time: ".sprintf('%.2f',time() - $startTime)."sec";
-
-        Log3 ($name, 3, "DbLog $name - reduceLog executed. $result");
-
-        readingsSingleUpdate($hash,"reduceLogState",$result,1);
-        
-        $ret = "reduceLog executed. $result";
-    }
-
-    $dbh->disconnect();
-    return $ret;
-}
-
-#########################################################################################
-### DBLog - Historische Werte ausduennen non-blocking > Forum #41089
-#########################################################################################
-sub DbLog_reduceLogNbl {
-    my ($name)     = @_;
-    my $hash       = $defs{$name};
-    my $dbconn     = $hash->{dbconn};
-    my $dbuser     = $hash->{dbuser};
-    my $dbpassword = $attr{"sec$name"}{secret};
-    my @a          = @{$hash->{HELPER}{REDUCELOG}};
-    my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-    my $history    = $hash->{HELPER}{TH};
-    my $current    = $hash->{HELPER}{TC};
-
-    delete $hash->{HELPER}{REDUCELOG};
-
-    my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
-    my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
-    my ($dbh,$err);
-
-    Log3 ($name, 5, "DbLog $name - Start DbLog_reduceLogNbl");
-
-    my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
-
-    if (!$useac) {
-        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 0 });};
-    }
-    elsif ($useac == 1) {
-        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 1 });};
-    }
-    else {
-        # Server default
-        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
-    }
-    if ($@) {
-        $err = encode_base64($@,"");
-        Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-        Log3 ($name, 5, "DbLog $name - DbLog_reduceLogNbl finished");
-        return "$name|''|$err";
-    }
-
-    if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
-        ($filter) = $a[-1] =~ /^EXCLUDE=(.+)/i;
-        @excludeRegex = split(',',$filter);
-    }
-    elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
-        $filter = 1;
-    }
-
-    if (defined($a[3])) {
-        $average = ($a[3] =~ /average=day/i) ? "AVERAGE=DAY" : ($a[3] =~ /average/i) ? "AVERAGE=HOUR" : 0;
-    }
-
-    Log3($name, 3, "DbLog $name: reduceLogNbl requested with DAYS=$a[2]"
-        .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
-        .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
-
-    my $ac = ($dbh->{AutoCommit}) ? "ON" : "OFF";
-    my $tm = ($useta)             ? "ON" : "OFF";
-
-    Log3 $name, 4, "DbLog $name - AutoCommit mode: $ac, Transaction mode: $tm";
-
-    my ($od,$nd) = split(":",$a[2]);                                             # $od - Tage älter als , $nd - Tage neuer als
-    my ($ots,$nts);
-
-    if ($hash->{MODEL} eq 'SQLITE') {
-        $ots = "datetime('now', '-$od days')";
-        $nts = "datetime('now', '-$nd days')" if($nd);
-    }
-    elsif ($hash->{MODEL} eq 'MYSQL') {
-        $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)";
-        $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd);
-    }
-    elsif ($hash->{MODEL} eq 'POSTGRESQL') {
-        $ots = "NOW() - INTERVAL '$od' DAY";
-        $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
-    }
-    else {
-        $ret = 'Unknown database type.';
-    }
-
-    if ($ots) {
-        my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
-        eval { $sth_del  = $dbh->prepare_cached("DELETE FROM $history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-               $sth_upd  = $dbh->prepare_cached("UPDATE $history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
-               $sth_delD = $dbh->prepare_cached("DELETE FROM $history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-               $sth_updD = $dbh->prepare_cached("UPDATE $history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-               $sth_get  = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM $history WHERE "
-                           .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
-                           ."TIMESTAMP < $ots".($nts?" AND TIMESTAMP >= $nts ":" ")."ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
-             };
-        if ($@) {
-            $err = encode_base64($@,"");
-            Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-            Log3 ($name, 5, "DbLog $name - DbLog_reduceLogNbl finished");
-            return "$name|''|$err";
-        }
-
-        eval { $sth_get->execute(); };
-        if ($@) {
-            $err = encode_base64($@,"");
-            Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-            Log3 ($name, 5, "DbLog $name - DbLog_reduceLogNbl finished");
-            return "$name|''|$err";
-        }
-
-        do {
-            $row = $sth_get->fetchrow_arrayref || ['0000-00-00 00:00:00','D','','R','V'];  # || execute last-day dummy
-            $ret = 1;
-            ($day,$hour) = $row->[0] =~ /-(\d{2})\s(\d{2}):/;
-            $rowCount++ if($day != 00);
-
-            if ($day != $currentDay) {
-                if ($currentDay) { # false on first executed day
-                    if (scalar @dayRows) {
-                        ($lastHour) = $dayRows[-1]->[0] =~ /(.*\d+\s\d{2}):/;
-                        $c = 0;
-
-                        for my $delRow (@dayRows) {
-                            $c++ if($day != 00 || $delRow->[0] !~ /$lastHour/);
-                        }
-
-                        if($c) {
-                            $deletedCount += $c;
-
-                            Log3($name, 3, "DbLog $name: reduceLogNbl deleting $c records of day: $processingDay");
-
-                            $dbh->{RaiseError} = 1;
-                            $dbh->{PrintError} = 0;
-                            eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-
-                            if ($@) {
-                                Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                            }
-
-                            eval {
-                                my $i  = 0;
-                                my $k  = 1;
-                                my $th = ($#dayRows <= 2000)?100:($#dayRows <= 30000)?1000:10000;
-
-                                for my $delRow (@dayRows) {
-                                    if($day != 00 || $delRow->[0] !~ /$lastHour/) {
-                                        Log3($name, 4, "DbLog $name: DELETE FROM $history WHERE (DEVICE=$delRow->[1]) AND (READING=$delRow->[3]) AND (TIMESTAMP=$delRow->[0]) AND (VALUE=$delRow->[4])");
-                                        $sth_del->execute(($delRow->[1], $delRow->[3], $delRow->[0], $delRow->[4]));
-                                        $i++;
-                                        if($i == $th) {
-                                            my $prog = $k * $i;
-                                            Log3($name, 3, "DbLog $name: reduceLogNbl deletion progress of day: $processingDay is: $prog");
-                                            $i = 0;
-                                            $k++;
-                                        }
-                                    }
-                                }
-                            };
-                            if ($@) {
-                                $err = $@;
-                                Log3 ($name, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
-                                eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                                if ($@) {
-                                    Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                                }
-                                $ret = 0;
-                            }
-                            else {
-                                eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                                if ($@) {
-                                    Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                                }
-                            }
-
-                            $dbh->{RaiseError} = 0;
-                            $dbh->{PrintError} = 1;
-                        }
-
-                        @dayRows = ();
-                    }
-
-                    if ($ret && defined($a[3]) && $a[3] =~ /average/i) {
-                        $dbh->{RaiseError} = 1;
-                        $dbh->{PrintError} = 0;
-                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                        if ($@) {
-                            Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                        }
-
-                        eval {
-                            push(@averageUpd, {%hourlyKnown}) if($day != 00);
-
-                            $c = 0;
-                            for my $hourHash (@averageUpd) {  # Only count for logging...
-                                for my $hourKey (keys %$hourHash) {
-                                    $c++ if ($hourHash->{$hourKey}->[0] && scalar(@{$hourHash->{$hourKey}->[4]}) > 1);
-                                }
-                            }
-
-                            $updateCount += $c;
-                            Log3($name, 3, "DbLog $name: reduceLogNbl (hourly-average) updating $c records of day: $processingDay") if($c); # else only push to @averageUpdD
-
-                            my $i  = 0;
-                            my $k  = 1;
-                            my $th = ($c <= 2000)?100:($c <= 30000)?1000:10000;
-
-                            for my $hourHash (@averageUpd) {
-                                for my $hourKey (keys %$hourHash) {
-                                    if ($hourHash->{$hourKey}->[0]) { # true if reading is a number
-                                        ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
-                                        if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {  # true if reading has multiple records this hour
-                                            for (@{$hourHash->{$hourKey}->[4]}) { $sum += $_; }
-                                            $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
-                                            $sum     = 0;
-
-                                            Log3($name, 4, "DbLog $name: UPDATE $history SET TIMESTAMP=$updDate $updHour:30:00, EVENT='rl_av_h', VALUE=$average WHERE DEVICE=$hourHash->{$hourKey}->[1] AND READING=$hourHash->{$hourKey}->[3] AND TIMESTAMP=$hourHash->{$hourKey}->[0] AND VALUE=$hourHash->{$hourKey}->[4]->[0]");
-
-                                            $sth_upd->execute(("$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[4]->[0]));
-
-                                            $i++;
-                                            if($i == $th) {
-                                                my $prog = $k * $i;
-                                                Log3($name, 3, "DbLog $name: reduceLogNbl (hourly-average) updating progress of day: $processingDay is: $prog");
-                                                $i = 0;
-                                                $k++;
-                                            }
-                                            push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
-                                        }
-                                        else {
-                                            push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
-                                        }
-                                    }
-                                }
-                            }
-                        };
-
-                        if ($@) {
-                            $err = $@;
-                            Log3 ($name, 2, "DbLog $name - reduceLogNbl average=hour ! FAILED ! for day $processingDay: $err");
-
-                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                            if ($@) {
-                                Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                            }
-
-                            @averageUpdD = ();
-                        }
-                        else {
-                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                            if ($@) {
-                                Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                            }
-                        }
-
-                        $dbh->{RaiseError} = 0;
-                        $dbh->{PrintError} = 1;
-                        @averageUpd = ();
-                    }
-
-                    if (defined($a[3]) && $a[3] =~ /average=day/i && scalar(@averageUpdD) && $day != 00) {
-                        $dbh->{RaiseError} = 1;
-                        $dbh->{PrintError} = 0;
-                        eval {$dbh->begin_work() if($dbh->{AutoCommit});};
-                        if ($@) {
-                            Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                        }
-
-                        eval {
-                            for (@averageUpdD) {
-                                push(@{$averageHash{$_->[3].$_->[4]}->{tedr}}, [$_->[0], $_->[1], $_->[3], $_->[4]]);
-                                $averageHash{$_->[3].$_->[4]}->{sum} += $_->[2];
-                                $averageHash{$_->[3].$_->[4]}->{date} = $_->[5];
-                            }
-
-                            $c = 0;
-                            for (keys %averageHash) {
-                                if(scalar @{$averageHash{$_}->{tedr}} == 1) {
-                                    delete $averageHash{$_};
-                                }
-                                else {
-                                    $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
-                                }
-                            }
-                            $deletedCount += $c;
-                            $updateCount += keys(%averageHash);
-
-                            my ($id,$iu) = (0,0);
-                            my ($kd,$ku) = (1,1);
-                            my $thd      = ($c <= 2000)  ? 100  :
-                                           ($c <= 30000) ? 1000 :
-                                           10000;
-                            my $thu      = ((keys %averageHash) <= 2000)  ? 100  :
-                                           ((keys %averageHash) <= 30000) ? 1000 :
-                                           10000;
-
-                            Log3($name, 3, "DbLog $name: reduceLogNbl (daily-average) updating ".(keys %averageHash).", deleting $c records of day: $processingDay") if(keys %averageHash);
-
-                            for my $reading (keys %averageHash) {
-                                $average  = sprintf('%.3f', $averageHash{$reading}->{sum}/scalar(@{$averageHash{$reading}->{tedr}}));
-                                $lastUpdH = pop @{$averageHash{$reading}->{tedr}};
-
-                                for (@{$averageHash{$reading}->{tedr}}) {
-                                    Log3($name, 5, "DbLog $name: DELETE FROM $history WHERE DEVICE='$_->[2]' AND READING='$_->[3]' AND TIMESTAMP='$_->[0]'");
-                                    $sth_delD->execute(($_->[2], $_->[3], $_->[0]));
-
-                                    $id++;
-                                    if($id == $thd) {
-                                        my $prog = $kd * $id;
-                                        Log3($name, 3, "DbLog $name: reduceLogNbl (daily-average) deleting progress of day: $processingDay is: $prog");
-                                        $id = 0;
-                                        $kd++;
-                                    }
-                                }
-
-                                Log3($name, 4, "DbLog $name: UPDATE $history SET TIMESTAMP=$averageHash{$reading}->{date} 12:00:00, EVENT='rl_av_d', VALUE=$average WHERE (DEVICE=$lastUpdH->[2]) AND (READING=$lastUpdH->[3]) AND (TIMESTAMP=$lastUpdH->[0])");
-
-                                $sth_updD->execute(($averageHash{$reading}->{date}." 12:00:00", 'rl_av_d', $average, $lastUpdH->[2], $lastUpdH->[3], $lastUpdH->[0]));
-
-                                $iu++;
-                                if($iu == $thu) {
-                                    my $prog = $ku * $id;
-                                    Log3($name, 3, "DbLog $name: reduceLogNbl (daily-average) updating progress of day: $processingDay is: $prog");
-                                    $iu = 0;
-                                    $ku++;
-                                }
-                            }
-                        };
-                        if ($@) {
-                            Log3 ($name, 3, "DbLog $name: reduceLogNbl average=day ! FAILED ! for day $processingDay");
-                            eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                            if ($@) {
-                                Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                            }
-                        }
-                        else {
-                            eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-                            if ($@) {
-                                Log3 ($name, 2, "DbLog $name - DbLog_reduceLogNbl - $@");
-                            }
-                        }
-
-                        $dbh->{RaiseError} = 0;
-                        $dbh->{PrintError} = 1;
-                    }
-
-                    %averageHash = ();
-                    %hourlyKnown = ();
-                    @averageUpd  = ();
-                    @averageUpdD = ();
-                    $currentHour = 99;
-                }
-
-                $currentDay = $day;
-            }
-
-            if ($hour != $currentHour) { # forget records from last hour, but remember these for average
-                if (defined($a[3]) && $a[3] =~ /average/i && keys(%hourlyKnown)) {
-                    push(@averageUpd, {%hourlyKnown});
-                }
-                %hourlyKnown = ();
-                $currentHour = $hour;
-            }
-            if (defined $hourlyKnown{$row->[1].$row->[3]}) { # remember first readings for device per h, other can be deleted
-                push(@dayRows, [@$row]);
-                if (defined($a[3]) && $a[3] =~ /average/i && defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/ && $hourlyKnown{$row->[1].$row->[3]}->[0]) {
-                    if ($hourlyKnown{$row->[1].$row->[3]}->[0]) {
-                        push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
-                    }
-                }
-            }
-            else {
-                $exclude = 0;
-                for (@excludeRegex) {
-                    $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
-                }
-
-                if ($exclude) {
-                    $excludeCount++ if($day != 00);
-                }
-                else {
-                    $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
-                }
-            }
-            $processingDay = (split(' ',$row->[0]))[0];
-
-        } while( $day != 00 );
-
-        my $result = "Rows processed: $rowCount, deleted: $deletedCount"
-                   .((defined($a[3]) && $a[3] =~ /average/i)? ", updated: $updateCount" : '')
-                   .(($excludeCount)? ", excluded: $excludeCount" : '')
-                   .", time: ".sprintf('%.2f',time() - $startTime)."sec";
-
-        Log3($name, 3, "DbLog $name: reduceLogNbl finished. $result");
-
-        $ret = $result;
-        $ret = "reduceLogNbl finished. $result";
-    }
-
-    $dbh->disconnect();
-    $ret = encode_base64($ret,"");
-    Log3 ($name, 5, "DbLog $name - DbLog_reduceLogNbl finished");
-
-return "$name|$ret|0";
-}
-
-#########################################################################################
-# DBLog - reduceLogNbl non-blocking Rückkehrfunktion
-#########################################################################################
-sub DbLog_reduceLogNbl_finished {
-  my $string = shift;
-  my @a      = split("\\|",$string);
-  my $name   = $a[0];
-  my $hash   = $defs{$name};
-  my $ret    = decode_base64($a[1]);
-  my $err;
-  $err       = decode_base64($a[2]) if ($a[2]);
-
-  readingsSingleUpdate($hash,"reduceLogState", $err // $ret, 1);
-
-  delete $hash->{HELPER}{REDUCELOG_PID};
-
-return;
 }
 
 ################################################################
@@ -7148,27 +6871,29 @@ sub DbLog_sampleDataFn {
   my $dbhf = _DbLog_ConnectNewDBH($defs{$dlName});
   return if(!$dbhf);
 
-  # check presence of table current
-  # avoids fhem from crash if table 'current' is not present and attr DbLogType is set to /Current/
   my $prescurr = eval {$dbhf->selectrow_array("select count(*) from $current");} || 0;
-  Log3($dlName, 5, "DbLog $dlName: Table $current present : $prescurr (0 = not present or no content)");
 
-  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {
-    # Table Current present, use it for sample data
+  Log3 ($dlName, 5, "DbLog $dlName: Table $current present : $prescurr (0 = not present or no content)");
+
+  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {                                         # Table Current present, use it for sample data
     my $query = "select device,reading from $current where device <> '' group by device,reading";
-    my $sth = $dbhf->prepare( $query );
+    my $sth   = $dbhf->prepare( $query );
+
     $sth->execute();
+
     while (my @line = $sth->fetchrow_array()) {
       $counter++;
-      push (@example, join (" ",@line)) if($counter <= 8);   # show max 8 examples
-      push (@colregs, "$line[0]:$line[1]");                  # push all eventTypes to selection list
+      push (@example, join (" ",@line)) if($counter <= 8);                                            # show max 8 examples
+      push (@colregs, "$line[0]:$line[1]");                                                           # push all eventTypes to selection list
     }
+
     $dbhf->disconnect();
     my $cols = join(",", sort { "\L$a" cmp "\L$b" } @colregs);
 
-    # $max = 8 if($max > 8);                                 # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
-    for(my $r=0; $r < $max; $r++) {
-      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+    # $max = 8 if($max > 8);                                                            # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
+
+    for(my $r = 0; $r < $max; $r++) {
+      my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
       $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
 #      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
@@ -7178,15 +6903,13 @@ sub DbLog_sampleDataFn {
     }
 
   }
-  else {
-  # Table Current not present, so create an empty input field
+  else {                                                                               # Table Current not present, so create an empty input field
     push @example, "No sample data due to missing table '$current'";
-
-    # $max = 8 if($max > 8);                                 # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
-    for(my $r=0; $r < $max; $r++) {
-      my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+    # $max = 8 if($max > 8);                                                           # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
+    for(my $r = 0; $r < $max; $r++) {
+      my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
-      no warnings 'uninitialized';                           # Forum:74690, bug unitialized
+      no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
       $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
       use warnings;
 #      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
@@ -7194,7 +6917,6 @@ sub DbLog_sampleDataFn {
 #      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
       push @htmlArr, $ret;
     }
-
   }
 
 return ($desc, \@htmlArr, join("<br>", @example));
@@ -7205,6 +6927,7 @@ return ($desc, \@htmlArr, join("<br>", @example));
 ################################################################
 sub DbLog_jsonError {
   my $errormsg = $_[0];
+
   my $json = '{"success": "false", "msg":"'.$errormsg.'"}';
 
 return $json;
@@ -7257,31 +6980,31 @@ sub DbLog_prepareSql {
     if ($dbmodel eq "POSTGRESQL") {
         ### POSTGRESQL Queries for Statistics ###
         ### hour:
-        $hourstats = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $hourstats  = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $hourstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
         $hourstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### day:
-        $daystats = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $daystats  = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $daystats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
         $daystats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### week:
-        $weekstats = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $weekstats  = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $weekstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
         $weekstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### month:
-        $monthstats = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $monthstats  = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $monthstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
         $monthstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### year:
-        $yearstats = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
+        $yearstats  = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, ";
         $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
         $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
@@ -7289,64 +7012,64 @@ sub DbLog_prepareSql {
     } elsif ($dbmodel eq "MYSQL") {
         ### MYSQL Queries for Statistics ###
         ### hour:
-        $hourstats = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $hourstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
         $hourstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
         $hourstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### day:
-        $daystats = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $daystats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $daystats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
         $daystats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
         $daystats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### week:
-        $weekstats = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $weekstats  = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $weekstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
         $weekstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
         $weekstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ";
         $weekstats .= "GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
 
         ### month:
-        $monthstats = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $monthstats  = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $monthstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
         $monthstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
         $monthstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
 
         ### year:
-        $yearstats = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
+        $yearstats  = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
         $yearstats .= "AVG(CAST(VALUE AS DECIMAL(12,4))) AS AVG, MIN(CAST(VALUE AS DECIMAL(12,4))) AS MIN, ";
         $yearstats .= "MAX(CAST(VALUE AS DECIMAL(12,4))) AS MAX, COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' ";
         $yearstats .= "AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-    } elsif ($dbmodel eq "SQLITE") {
+    }
+    elsif ($dbmodel eq "SQLITE") {
         ### SQLITE Queries for Statistics ###
         ### hour:
-        $hourstats = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $hourstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $hourstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
         $hourstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $hourstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
 
         ### day:
-        $daystats = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $daystats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $daystats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
         $daystats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $daystats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
 
         ### week:
-        $weekstats = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $weekstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $weekstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
         $weekstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $weekstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
 
         ### month:
-        $monthstats = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $monthstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $monthstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
         $monthstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $monthstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
 
         ### year:
-        $yearstats = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
+        $yearstats  = "SELECT TIMESTAMP, SUM(CAST(VALUE AS FLOAT)) AS SUM, AVG(CAST(VALUE AS FLOAT)) AS AVG, ";
         $yearstats .= "MIN(CAST(VALUE AS FLOAT)) AS MIN, MAX(CAST(VALUE AS FLOAT)) AS MAX, COUNT(VALUE) AS COUNT ";
         $yearstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
@@ -7432,7 +7155,6 @@ return $sql;
 #
 ################################################################
 sub DbLog_chartQuery {
-
     my ($sql, $countsql) = DbLog_prepareSql(@_);
 
     if ($sql eq "error") {
@@ -7479,7 +7201,7 @@ sub DbLog_chartQuery {
         return '{"success": "true", "msg":"All ok"}';
     }
 
-    my $i = 0;
+    my $i          = 0;
     my $jsonstring = '{"data":[';
 
     while ( my @data = $query_handle->fetchrow_array()) {
@@ -7519,6 +7241,7 @@ sub DbLog_chartQuery {
 
     $dbhf->disconnect();
     $jsonstring .= ']';
+
     if (defined $totalcount && $totalcount ne "") {
         $jsonstring .= ',"totalCount": '.$totalcount.'}';
     }
@@ -7542,23 +7265,27 @@ sub DbLog_dbReadings {
   return if(!$dbhf);
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
+
   my $DbLogType = AttrVal($a[0],'DbLogType','current');
   my $query;
+
   if (lc($DbLogType) =~ m(current) ) {
     $query = "select VALUE,TIMESTAMP from $current where DEVICE= '$a[2]' and READING= '$a[3]'";
   }
   else {
     $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
   }
+
   my ($reading,$timestamp) = $dbhf->selectrow_array($query);
   $dbhf->disconnect();
 
-  $reading   = (defined($reading)) ? $reading : $a[4];
+  $reading   = (defined($reading))   ? $reading   : $a[4];
   $timestamp = (defined($timestamp)) ? $timestamp : $a[4];
 
   return $reading   if $a[1] eq 'ReadingsVal';
   return $timestamp if $a[1] eq 'ReadingsTimestamp';
-  return "Syntax error: $a[1]";
+
+return "Syntax error: $a[1]";
 }
 
 ################################################################
@@ -7920,9 +7647,9 @@ return;
       Determines the number of records in the tables current and history and writes the results to the readings
       countCurrent and countHistory.
       <br><br>
-      
+
       <b>Note</b> <br>
-      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the 
+      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the
       database written to the database after the command is finished.
     </ul>
     </li>
@@ -7940,9 +7667,9 @@ return;
       Deletes records older than &lt;n&gt; days in table history.
       The number of deleted records is logged in Reading lastRowsDeleted.
       <br><br>
-      
+
       <b>Note</b> <br>
-      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the 
+      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the
       database written to the database after the command is finished.
     </ul>
     </li>
@@ -7970,15 +7697,15 @@ return;
       The file is created by default in the directory (global->modpath)/log/. The destination directory can be changed with
       the <a href="#DbLog-attr-expimpdir">expimpdir</a> attribute. <br><br>
 
-      The name of the file is generated automatically and contains the prefix "cache_&lt;name&gt;" followed by 
+      The name of the file is generated automatically and contains the prefix "cache_&lt;name&gt;" followed by
       the current timestamp. <br><br>
 
       <b>Example </b> <br>
       cache_LogDB_2017-03-23_22-13-55 <br><br>
-      
+
       The "nopurge" and "purgecache" options determine whether or not the cache contents are to be deleted after the export.
       With "nopurge" (default) the cache content is preserved. <br>
-      The <a href="#DbLog-attr-exportCacheAppend">exportCacheAppend</a> attribute determines whether with each export 
+      The <a href="#DbLog-attr-exportCacheAppend">exportCacheAppend</a> attribute determines whether with each export
       operation a new export file is created (default) or the cache content is appended to the latest existing export file.
     </ul>
     </li>
@@ -7991,18 +7718,18 @@ return;
       with the files are found. <br>
       The source directory can be changed with the <a href="#DbLog-attr-expimpdir">expimpdir</a> attribute. <br>
       Only the files matching the pattern "cache_&lt;name&gt;" are displayed. <br><br>
-      
+
       <b>Example </b><br>
-      cache_LogDB_2017-03-23_22-13-55 <br> 
+      cache_LogDB_2017-03-23_22-13-55 <br>
       if the DbLog device is called "LogDB". <br><br>
 
       After a successful import the file is prefixed with "impdone_" and no longer appears in the drop-down list.
       If a cache file is to be imported into a database other than the source database, the name of the
       DbLog device in the file name can be adjusted so that this file appears in the drop-down list.
       <br><br>
-      
+
       <b>Note</b> <br>
-      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written 
+      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written
       to the database after the command is finished.
     </ul>
     </li>
@@ -8024,39 +7751,39 @@ return;
     <br>
 
     <li><b>set &lt;name&gt; reduceLog &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
+    <ul>
+      Reduces historical records older than &lt;no&gt; days and (optionally) newer than &lt;nn&gt; days
+      to one record (the first) per hour per device & reading.<br>
+      Inside device/reading <b>SQL wildcards "%" and "_"</b> can be used. <br><br>
+
+      The optional specification of 'average' or 'average=day' not only cleans the database, but also reduces all
+      numerical values of an hour or a day are reduced to a single average value. <br><br>
+
+      Optionally, the last parameter "exclude=device1:reading1,device2:reading2,...." can be specified
+      to exclude device/reading combinations from reduceLog. <br>
+      Instead of "exclude", "include=device:reading" can be specified as the last parameter in order to
+      limit the SELECT query executed on the database. This reduces the RAM load and increases performance.
+      The option "include" can only be specified with a device:reading combination. <br><br>
+
       <ul>
-      Reduces records older than &lt;no&gt; days and (optional) newer than &lt;nn&gt; days to one record (the 1st) each hour per device & reading. <br>
-      Within the device/reading name <b>SQL-Wildcards "%" and "_"</b> can be used. <br><br>
-
-      With the optional argument 'average' not only the records will be reduced, but all numerical values of an hour
-      will be reduced to a single average. <br>
-      With the optional argument 'average=day' not only the records will be reduced, but all numerical values of a
-      day will be reduced to a single average. (implies 'average') <br><br>
-
-      You can optional set the last argument to "exclude=device1:reading1,device2:reading2,..." to exclude
-      device/readings from reduceLog. <br>
-      Also you can optional set the last argument to "include=device:reading" to delimit the SELECT statement which
-      is executed on the database. This may reduce the system RAM load and increases the performance. <br><br>
-
-      <ul>
-        <b>Example: </b> <br>
+        <b>Examples: </b> <br>
         set &lt;name&gt; reduceLog 270 average include=Luftdaten_remote:% <br>
-        </ul>
-        <br>
+        set &lt;name&gt; reduceLog 100:200 average exclude=SMA_Energymeter:Bezug_Wirkleistung
+      </ul>
+      <br>
 
-        <b>CAUTION:</b> It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 'history'! <br>
-        The execution of this command may take (without INDEX) extremely long. FHEM will be <b>blocked completely</b> after issuing the command to completion ! <br><br>
-
-    </li>
+      <b>Note</b> <br>
+      During the runtime of the command, data to be logged is temporarily stored in the memory cache and written to
+      the database after the command is finished.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
     <ul>
-      Same function as "set &lt;name&gt; reduceLog" but FHEM won't be blocked due to this function is implemented
-      non-blocking !
-    </li>
+      The function is identical to "set &lt;name&gt; reduceLog" and will be removed soon.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; reopen [n] </b> <br><br>
@@ -8088,14 +7815,14 @@ return;
     <li><b>set &lt;name&gt; userCommand &lt;validSelectStatement&gt; </b> <br><br>
     <ul>
       Executes simple SQL Select commands on the database. <br>
-      The result of the statement is written to the reading "userCommandResult". 
+      The result of the statement is written to the reading "userCommandResult".
       The result can be only one line. <br>
-      The execution of SQL commands in DbLog is deprecated. 
-      The <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> evaluation module should be used for this 
+      The execution of SQL commands in DbLog is deprecated.
+      The <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> evaluation module should be used for this
       purpose. <br><br>
-      
+
       <b>Note</b> <br>
-      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the 
+      During the runtime of the command, data to be logged are temporarily stored in the memory cache and written to the
       database written to the database after the command is finished.
     </ul>
     </li>
@@ -9505,9 +9232,9 @@ attr SMA_Energymeter DbLogValueFn
       Ermittelt die Anzahl der Datensätze in den Tabellen current und history und schreibt die Ergebnisse in die Readings
       countCurrent und countHistory.
       <br><br>
-      
+
       <b>Hinweis</b> <br>
-      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung 
+      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
       des Befehls in die Datenbank geschrieben.
     </ul>
     </li>
@@ -9525,9 +9252,9 @@ attr SMA_Energymeter DbLogValueFn
       Löscht Datensätze älter als &lt;n&gt; Tage in Tabelle history.
       Die Anzahl der gelöschten Datens&auml;tze wird im Reading lastRowsDeleted protokolliert.
       <br><br>
-      
+
       <b>Hinweis</b> <br>
-      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung 
+      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
       des Befehls in die Datenbank geschrieben.
     </ul>
     </li>
@@ -9549,15 +9276,15 @@ attr SMA_Energymeter DbLogValueFn
       Das File wird per default im Verzeichnis (global->modpath)/log/ erstellt. Das Zielverzeichnis kann mit
       dem <a href="#DbLog-attr-expimpdir">expimpdir</a> Attribut geändert werden. <br><br>
 
-      Der Name des Files wird automatisch generiert und enthält den Präfix "cache_&lt;name&gt;", gefolgt von 
+      Der Name des Files wird automatisch generiert und enthält den Präfix "cache_&lt;name&gt;", gefolgt von
       dem aktuellen Zeitstempel. <br><br>
 
       <b>Beispiel </b> <br>
       cache_LogDB_2017-03-23_22-13-55 <br><br>
-      
+
       Mit den Optionen "nopurge" bzw. "purgecache" wird festgelegt, ob der Cacheinhalt nach dem Export gelöscht werden
       soll oder nicht. Mit "nopurge" (default) bleibt der Cacheinhalt erhalten. <br>
-      Das <a href="#DbLog-attr-exportCacheAppend">exportCacheAppend</a> Attribut bestimmt ob mit jedem Exportvorgang 
+      Das <a href="#DbLog-attr-exportCacheAppend">exportCacheAppend</a> Attribut bestimmt ob mit jedem Exportvorgang
       ein neues Exportfile angelegt wird (default) oder der Cacheinhalt an das neuste vorhandene Exportfile angehängt wird.
     </ul>
     </li>
@@ -9570,18 +9297,18 @@ attr SMA_Energymeter DbLogValueFn
       erzeugt sofern Dateien gefunden werden. <br>
       Das Quellenverzeichnis kann mit dem <a href="#DbLog-attr-expimpdir">expimpdir</a> Attribut geändert werden. <br>
       Es werden nur die Dateien angezeigt, die dem Muster "cache_&lt;name&gt;" entsprechen. <br><br>
-      
+
       <b>Beispiel </b><br>
-      cache_LogDB_2017-03-23_22-13-55 <br> 
+      cache_LogDB_2017-03-23_22-13-55 <br>
       wenn das DbLog Device "LogDB" heißt. <br><br>
 
       Nach einem erfolgreichen Import wird das File mit dem Präfix "impdone_" versehen und erscheint nicht mehr
-      in der Drop-Down Liste. Soll ein Cachefile in eine andere als die Quellendatenbank importiert werden, kann der 
+      in der Drop-Down Liste. Soll ein Cachefile in eine andere als die Quellendatenbank importiert werden, kann der
       Name des DbLog Device im Filenamen angepasst werden damit dieses File in der Drop-Down Liste erscheint.
       <br><br>
-      
+
       <b>Hinweis</b> <br>
-      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung 
+      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
       des Befehls in die Datenbank geschrieben.
     </ul>
     </li>
@@ -9604,44 +9331,39 @@ attr SMA_Energymeter DbLogValueFn
     <br>
 
     <li><b>set &lt;name&gt; reduceLog &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
-      <ul>
+    <ul>
       Reduziert historische Datensätze, die älter sind als &lt;no&gt; Tage und (optional) neuer sind als &lt;nn&gt; Tage
       auf einen Eintrag (den ersten) pro Stunde je Device & Reading.<br>
       Innerhalb von device/reading können <b>SQL-Wildcards "%" und "_"</b> verwendet werden. <br><br>
 
-      Das Reading "reduceLogState" zeigt den Ausführungsstatus des letzten reduceLog-Befehls. <br><br>
-      Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern alle numerischen Werte
-      einer Stunde werden auf einen einzigen Mittelwert reduziert. <br>
-      Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern alle numerischen
-      Werte eines Tages auf einen einzigen Mittelwert reduziert. (impliziert 'average') <br><br>
+      Durch die optionale Angabe von 'average' bzw. 'average=day' wird nicht nur die Datenbank bereinigt, sondern alle
+      numerischen Werte einer Stunde bzw. eines Tages werden auf einen einzigen Mittelwert reduziert. <br><br>
 
       Optional kann als letzer Parameter "exclude=device1:reading1,device2:reading2,...."
-      angegeben werden um device/reading Kombinationen von reduceLog auszuschließen. <br><br>
-
-      Optional kann als letzer Parameter "include=device:reading" angegeben werden um
-      die auf die Datenbank ausgeführte SELECT-Abfrage einzugrenzen, was die RAM-Belastung verringert und die
-      Performance erhöht. <br><br>
+      angegeben werden um device/reading Kombinationen von reduceLog auszuschließen. <br>
+      Anstatt "exclude" kann als letzer Parameter "include=device:reading" angegeben werden um
+      die auf die Datenbank ausgeführte SELECT-Abfrage einzugrenzen. Dadurch wird die RAM-Belastung verringert und die
+      Performance erhöht. Die Option "include" kann nur mit einer device:reading Kombination angegeben werden. <br><br>
 
       <ul>
-        <b>Beispiel: </b> <br>
+        <b>Beispiele: </b> <br>
         set &lt;name&gt; reduceLog 270 average include=Luftdaten_remote:% <br>
-
+        set &lt;name&gt; reduceLog 100:200 average exclude=SMA_Energymeter:Bezug_Wirkleistung
       </ul>
       <br>
 
-      <b>ACHTUNG:</b> Es wird dringend empfohlen zu überprüfen ob der standard INDEX 'Search_Idx' in der Tabelle 'history' existiert! <br>
-      Die Abarbeitung dieses Befehls dauert unter Umständen (ohne INDEX) extrem lange. FHEM wird durch den Befehl bis
-      zur Fertigstellung <b>komplett blockiert !</b>
-    </li>
+      <b>Hinweis</b> <br>
+      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
+      des Befehls in die Datenbank geschrieben.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; reduceLogNbl &lt;no&gt;[:&lt;nn&gt;] [average[=day]] [exclude=device1:reading1,device2:reading2,...] </b> <br><br>
-      <ul>
-      Führt die gleiche Funktion wie "set &lt;name&gt; reduceLog" aus. Im Gegensatz zu reduceLog wird mit FHEM wird durch den Befehl reduceLogNbl nicht
-      mehr blockiert da diese Funktion non-blocking implementiert ist !
-    </li>
+    <ul>
+      Die Funktion ist identisch zu "set &lt;name&gt; reduceLog" und wird demnächst entfernt.
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; reopen [n] </b> <br><br>
@@ -9678,13 +9400,13 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>set &lt;name&gt; userCommand &lt;validSelectStatement&gt; </b> <br><br>
     <ul>
       Führt einfache SQL Select Befehle auf der Datenbank aus. <br>
-      Das Ergebnis des Statements wird in das Reading "userCommandResult" geschrieben. 
+      Das Ergebnis des Statements wird in das Reading "userCommandResult" geschrieben.
       Das Ergebnis kann nur einzeilig sein. <br>
       Die Ausführung von SQL-Befehlen in DbLog ist veraltet. Dafür sollte das Auswertungsmodul
       <a href=https://fhem.de/commandref_DE.html#DbRep>DbRep</a> genutzt werden. <br><br>
-        
+
       <b>Hinweis</b> <br>
-      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung 
+      Während der Laufzeit des Befehls werden zu loggende Daten temporär im Memory Cache gespeichert und nach Beendigung
       des Befehls in die Datenbank geschrieben.
     </ul>
     </li>
@@ -10866,7 +10588,6 @@ attr SMA_Energymeter DbLogValueFn
         "perl": 5.014,
         "Data::Dumper": 0,
         "DBI": 0,
-        "Blocking": 0,
         "Time::HiRes": 0,
         "Time::Local": 0,
         "HttpUtils": 0,
