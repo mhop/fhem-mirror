@@ -71,6 +71,7 @@ sub km200_Initialize($) {
 		HttpUtils
 		Encode
 		Text::Wrap
+		Data::Dumper
 	");
 
 	foreach my $Library (grep(/\S/, @UseLibraries)) {	
@@ -299,6 +300,10 @@ sub km200_FirstInit($) {
 	my $hash = @_;
 	my $name = "73_km200";
 	Log3 $name, 4, $name. " : km200_FirstInit -  hash                                  : " . Dumper($hash);
+
+	### Stop the current timer if one exists errornous 
+	RemoveInternalTimer($hash);
+	Log3 $name, 4, $name. " : km200 - InternalTimer has been removed.";
 
 	###START###### Reset fullResponse error message ############################################################START####
 	readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
