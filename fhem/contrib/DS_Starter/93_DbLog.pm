@@ -2254,7 +2254,7 @@ sub DbLog_SBP_onRun {
               my $msg0 = $dbdelpars ? ' and stored DB params in SubProcess were deleted' : '';
               my $msg1 = 'database disconnected by request'.$msg0;
 
-              Log3 ($name, 3, "DbLog $name - INFO: $msg1");
+              Log3 ($name, 3, "DbLog $name - $msg1");
 
               $ret = {
                   name => $name,
@@ -2331,18 +2331,20 @@ sub DbLog_SBP_onRun {
 
           ## Verbindungsaufbau Datenbank
           ################################
+          my $params = { name       => $name,
+                         dbconn     => $dbconn,
+                         dbname     => $store->{dbparams}{dbname},
+                         dbuser     => $store->{dbparams}{dbuser},
+                         dbpassword => $store->{dbparams}{dbpassword},
+                         utf8       => $store->{dbparams}{utf8},
+                         useac      => $useac,
+                         model      => $model,
+                         sltjm      => $store->{dbparams}{sltjm},
+                         sltcs      => $store->{dbparams}{sltcs}
+                       };
+          
           if (!defined $store->{dbh}) {
-              ($error, $dbh) = _DbLog_SBP_onRun_connectDB ( { name       => $name,
-                                                              dbconn     => $dbconn,
-                                                              dbuser     => $store->{dbparams}{dbuser},
-                                                              dbpassword => $store->{dbparams}{dbpassword},
-                                                              utf8       => $store->{dbparams}{utf8},
-                                                              useac      => $useac,
-                                                              model      => $model,
-                                                              sltjm      => $store->{dbparams}{sltjm},
-                                                              sltcs      => $store->{dbparams}{sltcs}
-                                                            }
-                                                          );
+              ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
               if ($error) {
                   Log3 ($name, 2, "DbLog $name - Error: $error");
@@ -2372,17 +2374,7 @@ sub DbLog_SBP_onRun {
               Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
               delete $store->{dbh};
 
-              ($error, $dbh) = _DbLog_SBP_onRun_connectDB ( { name       => $name,
-                                                              dbconn     => $dbconn,
-                                                              dbuser     => $store->{dbparams}{dbuser},
-                                                              dbpassword => $store->{dbparams}{dbpassword},
-                                                              utf8       => $store->{dbparams}{utf8},
-                                                              useac      => $useac,
-                                                              model      => $model,
-                                                              sltjm      => $store->{dbparams}{sltjm},
-                                                              sltcs      => $store->{dbparams}{sltcs}
-                                                            }
-                                                          );
+              ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
               if ($error) {
                   Log3 ($name, 2, "DbLog $name - Error: $error");
@@ -2552,6 +2544,8 @@ sub _DbLog_SBP_onRun_connectDB {
       $dbh->do("PRAGMA journal_mode=$sltjm");
       $dbh->do("PRAGMA cache_size=$sltcs");
   }
+  
+  Log3 ($name, 3, "DbLog $name - SubProcess connected to $paref->{dbname}");
 
 return ($err, $dbh);
 }
@@ -2952,12 +2946,6 @@ sub _DbLog_SBP_onRun_Log {
                   }                 
               }
               1;
-
-              # $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
-
-              #if ($error) {
-              #    $rowlback = $cdata if($useta);                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-              #}
           }
           or do { $error = $@;
 
@@ -6807,20 +6795,15 @@ sub DbLog_reopen {
 
   RemoveInternalTimer($hash, "DbLog_reopen");
 
-  if (_DbLog_ConnectPush($hash)) {
-      my $delay = delete $hash->{HELPER}{REOPEN_RUNS};                           # Statusbit "Kein Schreiben in DB erlauben" löschen
-      delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
+  my $delay = delete $hash->{HELPER}{REOPEN_RUNS};                           # Statusbit "Kein Schreiben in DB erlauben" löschen
+  delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
 
-      if($delay) {
-          Log3 ($name, 2, "DbLog $name - Database connection reopened (it was $delay seconds closed).");
-      }
+  if($delay) {
+      Log3 ($name, 2, "DbLog $name - Database connection reopened (it was $delay seconds closed).");
+  }
 
-      DbLog_setReadingstate   ($hash, 'reopened');
-      DbLog_execMemCacheAsync ($hash) if($async);
-  }
-  else {
-      InternalTimer(gettimeofday()+30, 'DbLog_reopen', $hash, 0);
-  }
+  DbLog_setReadingstate   ($hash, 'reopened');
+  DbLog_execMemCacheAsync ($hash) if($async);
 
 return;
 }
