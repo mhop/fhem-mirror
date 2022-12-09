@@ -2585,7 +2585,6 @@ sub _DbLog_SBP_onRun_Log {
   my $history     = $store->{dbparams}{history};
   my $current     = $store->{dbparams}{current};
 
-  my $errorh      = q{};
   my $error       = q{};
   my $doins       = 0;                                                    # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl)
   my $rowlback    = q{};                                                  # Eventliste für Rückgabe wenn Fehler
@@ -2693,35 +2692,36 @@ sub _DbLog_SBP_onRun_Log {
 
           $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
-          eval { $sth_ih = $dbh->prepare($sqlins);
-                 $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);                   # Tracelevel setzen
-                 $ins_hist = $sth_ih->execute();
+          eval { $sth_ih               = $dbh->prepare($sqlins);
+                 $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);                    # Tracelevel setzen
+                 $ins_hist             = $sth_ih->execute();
+                 $ins_hist             = 0 if($ins_hist eq "0E0");
                  1;
                }
-               or do { $errorh = $@;
+               or do { $error = $@;
 
-                       Log3 ($name, 2, "DbLog $name - Error table $history - $errorh");
+                       Log3 ($name, 2, "DbLog $name - Error table $history - $error");
 
-                       $dbh->disconnect();
-                       delete $store->{dbh};
-
-                       $rowlback = $cdata if($useta);                         # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-
+                       if($useta) {
+                           $rowlback = $cdata;                                 # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+                           __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                       }
+                       else {
+                           __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                       }
+                       
                        $ret = {
                            name     => $name,
-                           msg      => $errorh,
+                           msg      => $error,
                            ot       => 0,
                            oper     => $operation,
                            rowlback => $rowlback
                        };
 
-                      $retjson = eval { encode_json($ret) };
-                      $subprocess->writeToParent ($retjson);
-                      return;
-               };
-
-          $ins_hist = 0 if($ins_hist eq "0E0");
-          $error    = __DbLog_SBP_commitOnly ($name, $dbh, $history);
+                       $retjson = eval { encode_json($ret) };
+                       $subprocess->writeToParent ($retjson);
+                       return;
+                     };
 
           if($ins_hist == $ceti) {
               Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
@@ -2844,6 +2844,7 @@ sub _DbLog_SBP_onRun_Log {
 
                   $nins_cur++;
               }
+              
               if(!$nins_cur) {
                   Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
               }
@@ -2900,10 +2901,10 @@ sub _DbLog_SBP_onRun_Log {
           $sth_ih->bind_param_array (6, [@value]);
           $sth_ih->bind_param_array (7, [@unit]);
 
-          $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
-
           my @n2hist;
           my $rowhref;
+          
+          $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
           eval {
               ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
@@ -2950,31 +2951,34 @@ sub _DbLog_SBP_onRun_Log {
                       }
                   }                 
               }
+              1;
 
               # $error = __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
               #if ($error) {
               #    $rowlback = $cdata if($useta);                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
               #}
-          };
-
-          if ($@) {
-              $error = $@;
-
-              Log3 ($name, 2, "DbLog $name - Error table $history - $error");
-              
-              __DbLog_SBP_commitOnly ($name, $dbh, $history);                              # eingefügte Array-Daten bestätigen 
-              
-              if(defined $rowhref) {                                                       # nicht gespeicherte Datensätze ausgeben
-                  Log3 ($name, 4, "DbLog $name - The following data are faulty and were not saved:");
-                  
-                  for my $df (sort {$a <=>$b} keys %{$rowhref}) {
-                      Log3 ($name, 4, "DbLog $name - $rowhref->{$df}");
-                  }
-              }
-                                               
-              $rowlback = $cdata if($useta);                                               # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
           }
+          or do { $error = $@;
+
+                  Log3 ($name, 2, "DbLog $name - Error table $history - $error");                               
+                                                                     
+                  if($useta) {
+                      $rowlback = $cdata;                                                 # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+                      __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
+                  }
+                  else {
+                      if(defined $rowhref) {                                                   # nicht gespeicherte Datensätze ausgeben
+                          Log3 ($name, 4, "DbLog $name - The following data are faulty and were not saved:");
+                          
+                          for my $df (sort {$a <=>$b} keys %{$rowhref}) {
+                              Log3 ($name, 4, "DbLog $name - $rowhref->{$df}");
+                          }
+                      }         
+                      
+                      __DbLog_SBP_commitOnly ($name, $dbh, $history);                     # eingefügte Array-Daten bestätigen
+                  }
+                };
       }
 
       if (lc($DbLogType) =~ m(current)) {                                                  # insert current mit/ohne primary key
@@ -6737,8 +6741,8 @@ sub DbLog_commitMode {
 
   my ($ac,$ta) = split "_", $cm;
 
-  $useac = ($ac =~ /off/) ? 0 :
-           ($ac =~ /on/)  ? 1 :
+  $useac = $ac =~ /off/xs ? 0 :
+           $ac =~ /on/xs  ? 1 :
            2;
 
   $useta = 0 if($ta =~ /off/);
