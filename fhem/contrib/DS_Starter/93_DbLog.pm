@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-09 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-10 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -31,7 +31,6 @@ use Data::Dumper;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
 use Time::Local;
 use Encode qw(encode_utf8);
-use MIME::Base64;
 use HttpUtils;
 use SubProcess;
 
@@ -39,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.3"   => "10.12.2022 more internal code rework ",
   "5.5.2"   => "09.12.2022 _DbLog_ConnectPush function removed ",
   "5.5.1"   => "09.12.2022 commit inserted lines in array insert though some lines are faulty ",
   "5.5.0"   => "08.12.2022 implement commands with SBP: reduceLog, reduceLogNbL, attr timeout adapted ",
@@ -2335,6 +2335,8 @@ sub DbLog_SBP_onRun {
               }
 
               $store->{dbh} = $dbh;
+              
+              Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
           }
 
           $dbh = $store->{dbh};
@@ -2363,6 +2365,8 @@ sub DbLog_SBP_onRun {
                   $subprocess->writeToParent($retjson);
                   next;
               }
+              
+              Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
           };
 
 
@@ -2464,8 +2468,8 @@ sub _DbLog_SBP_onRun_connectDB {
   my $sltjm      = $paref->{sltjm};
   my $sltcs      = $paref->{sltcs};
 
-  my $dbh = '';
-  my $err = '';
+  my $dbh = q{};
+  my $err = q{};
 
   eval { if (!$useac) {
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
@@ -2516,8 +2520,6 @@ sub _DbLog_SBP_onRun_connectDB {
       $dbh->do("PRAGMA journal_mode=$sltjm");
       $dbh->do("PRAGMA cache_size=$sltcs");
   }
-  
-  Log3 ($name, 3, "DbLog $name - SubProcess connected to $paref->{dbname}");
 
 return ($err, $dbh);
 }
@@ -4653,76 +4655,30 @@ return;
 }
 
 ###################################################################################
-# new dbh for common use (except DbLog_Push and get-function)
+# Neuer dbh Handle zur allegmeinen Verwendung
 ###################################################################################
 sub _DbLog_ConnectNewDBH {
   my $hash       = shift;
   my $name       = $hash->{NAME};
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
-  my $utf8       = defined($hash->{UTF8}) ? $hash->{UTF8} : 0;
   
-  my $dbh;
-
   my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
+  
+  my $params = { name       => $name,
+                 dbconn     => $hash->{dbconn},
+                 dbname     => (split /;|=/, $hash->{dbconn})[1],
+                 dbuser     => $hash->{dbuser},
+                 dbpassword => $attr{"sec$name"}{secret},
+                 utf8       => defined($hash->{UTF8}) ? $hash->{UTF8} : 0,
+                 useac      => $useac,
+                 model      => $hash->{MODEL},
+                 sltjm      => AttrVal ($name, 'SQLiteJournalMode', 'WAL'),
+                 sltcs      => AttrVal ($name, 'SQLiteCacheSize',    4000)
+               };
+  
 
-  eval {
-      if(!$useac) {
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                     RaiseError          => 1,
-                                                                     AutoCommit          => 0,
-                                                                     AutoInactiveDestroy => 1,
-                                                                     mysql_enable_utf8   => $utf8
-                                                                   });
-      }
-      elsif($useac == 1) {
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                     RaiseError          => 1,
-                                                                     AutoCommit          => 1,
-                                                                     AutoInactiveDestroy => 1,
-                                                                     mysql_enable_utf8   => $utf8
-                                                                   });
-      }
-      else {                        # Server default
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                     RaiseError          => 1,
-                                                                     AutoInactiveDestroy => 1,
-                                                                     mysql_enable_utf8   => $utf8
-                                                                   });
-      }
-  };
+  my ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
-  if($@) {
-    Log3 ($name, 2, "DbLog $name - $@");
-
-    my $state = IsDisabled($name) ? 'disabled' :
-                $@                ? $@         :
-                'disconnected';
-
-    DbLog_setReadingstate ($hash, $state);
-  }
-
-  if($dbh) {
-      if ($hash->{MODEL} eq "SQLITE") {         # Forum: https://forum.fhem.de/index.php/topic,120237.0.html
-        $dbh->do("PRAGMA temp_store=MEMORY");
-        $dbh->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption,
-                                                # SQLite should always be run with its default synchronous setting of FULL.
-                                                # https://sqlite.org/howtocorrupt.html
-
-        if (AttrVal($name, "SQLiteJournalMode", "WAL") eq "off") {
-            $dbh->do("PRAGMA journal_mode=off");
-        }
-        else {
-            $dbh->do("PRAGMA journal_mode=WAL");
-        }
-
-        my $cs = AttrVal($name, "SQLiteCacheSize", "4000");
-        $dbh->do("PRAGMA cache_size=$cs");
-      }
-
-      return $dbh;
-  }
+  return $dbh if(!$error);  
 
 return;
 }
@@ -7117,29 +7073,21 @@ return $jsonstring;
 ################################################################
 sub DbLog_dbReadings {
   my($hash,@a) = @_;
+  
   my $history  = $hash->{HELPER}{TH};
-  my $current  = $hash->{HELPER}{TC};
-
-  my $dbhf = _DbLog_ConnectNewDBH($hash);
-  return if(!$dbhf);
+  
+  my $dbh = _DbLog_ConnectNewDBH($hash);
+  return if(!$dbh);
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
 
-  my $DbLogType = AttrVal($a[0],'DbLogType','current');
-  my $query;
+  my $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
 
-  if (lc($DbLogType) =~ m(current) ) {
-    $query = "select VALUE,TIMESTAMP from $current where DEVICE= '$a[2]' and READING= '$a[3]'";
-  }
-  else {
-    $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
-  }
+  my ($reading,$timestamp) = $dbh->selectrow_array($query);
+  $dbh->disconnect();
 
-  my ($reading,$timestamp) = $dbhf->selectrow_array($query);
-  $dbhf->disconnect();
-
-  $reading   = (defined($reading))   ? $reading   : $a[4];
-  $timestamp = (defined($timestamp)) ? $timestamp : $a[4];
+  $reading   = defined $reading   ? $reading   : $a[4];
+  $timestamp = defined $timestamp ? $timestamp : $a[4];
 
   return $reading   if $a[1] eq 'ReadingsVal';
   return $timestamp if $a[1] eq 'ReadingsTimestamp';
@@ -8365,21 +8313,6 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-attr-disable"></a>
-    <li><b>disable</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; disable [0|1]
-      </code><br><br>
-
-      Disables the DbLog device (1) or enables it (0).
-      <br>
-    </ul>
-    </li>
-  </ul>
-  <br>
-
-  <ul>
      <a id="DbLog-attr-excludeDevs"></a>
      <li><b>excludeDevs</b>
      <ul>
@@ -9016,9 +8949,9 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </b> <br><br>
 
     <ul>
-    Fügt einen zusätzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. Die eventuell im Attribut
-    "DbLogExclude" spezifizierten Readings (im Quelldevice) werden nicht geloggt, es sei denn sie sind im Attribut
-    "DbLogInclude"  enthalten bzw. der addLog-Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
+    Fügt einen zusätzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. <br>
+    Die eventuell im Attribut "DbLogExclude" spezifizierten Readings (im Quellendevice) werden nicht geloggt, es sei denn 
+    sie sind im Attribut "DbLogInclude" enthalten bzw. der addLog Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
 
       <ul>
       <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
@@ -10022,21 +9955,6 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
-    <a id="DbLog-attr-disable"></a>
-    <li><b>disable</b>
-    <ul>
-      <code>
-      attr &lt;device&gt; disable [0|1]
-      </code><br><br>
-
-      Das DbLog Device wird disabled (1) bzw. enabled (0).
-      <br>
-    </ul>
-    </li>
-  </ul>
-  <br>
-
-  <ul>
      <a id="DbLog-attr-excludeDevs"></a>
      <li><b>excludeDevs</b>
      <ul>
@@ -10461,7 +10379,6 @@ attr SMA_Energymeter DbLogValueFn
         "Time::Local": 0,
         "HttpUtils": 0,
         "Encode": 0,
-        "MIME::Base64": 0,
         "SubProcess": 0,
         "JSON": 0
       },
