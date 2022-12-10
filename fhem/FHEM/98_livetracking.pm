@@ -503,6 +503,7 @@ sub livetracking_ParseLife360($$) {
       $tst = $dataset->{endTimestamp};
     }
 
+    $lastreading = 0 if($dataset->{endTimestamp} && $lastreading < $dataset->{endTimestamp});
     next if($lastreading > $dataset->{startTimestamp});
 
     Log3 ($name, 6, "$name new l360 data: /n".Dumper($dataset));
@@ -567,6 +568,12 @@ sub livetracking_ParseLife360($$) {
       readingsBulkUpdate($hash, "batteryState", (int($dataset->{battery}) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
       readingsBulkUpdate($hash, "batteryCharge", ($charge == -1)?"unknown":($charge == 1)?"charge":"discharge");
+      $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
+    }
+
+    if(defined($dataset->{wifiState}))
+    {
+      readingsBulkUpdate($hash, "connection", (($dataset->{wifiState})?'wifi':'mobile'));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
     }
 
