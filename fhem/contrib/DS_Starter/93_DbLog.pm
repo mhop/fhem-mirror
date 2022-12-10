@@ -587,7 +587,7 @@ sub DbLog_Attr {
       }
   }
 
-  if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {
+  if ($aName =~ /SQLite/xs) {
       if ($init_done == 1) {
           DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
           InternalTimer(gettimeofday()+2.0, 'DbLog_SBP_sendConnectionData', $hash, 0);      # neue Verbindungsdaten an SubProzess senden
@@ -2565,8 +2565,11 @@ sub _DbLog_SBP_onRun_Log {
   my $ret;
   my $retjson;
 
-  if($tl) {                                                               # Tracelevel setzen
+  if ($tl) {                                                              # Tracelevel setzen
       $dbh->{TraceLevel} = "$tl|$tf";
+  }
+  else {
+      $dbh->{TraceLevel} = '0';
   }
 
   my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
@@ -2669,10 +2672,17 @@ sub _DbLog_SBP_onRun_Log {
 
           $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
-          eval { $sth_ih               = $dbh->prepare($sqlins);
-                 $sth_ih->{TraceLevel} = "$tl|$tf" if($tl);                    # Tracelevel setzen
-                 $ins_hist             = $sth_ih->execute();
-                 $ins_hist             = 0 if($ins_hist eq "0E0");
+          eval { $sth_ih = $dbh->prepare($sqlins);
+                 
+                 if ($tl) {                                                    # Tracelevel setzen
+                     $sth_ih->{TraceLevel} = "$tl|$tf";                    
+                 }
+                 else {
+                     $sth_ih->{TraceLevel} = '0';  
+                 }
+                 
+                 $ins_hist = $sth_ih->execute();
+                 $ins_hist = 0 if($ins_hist eq "0E0");
                  1;
                }
                or do { $error = $@;
@@ -2748,9 +2758,13 @@ sub _DbLog_SBP_onRun_Log {
                                                         }
                                                       );
 
-          if($tl) {                                                                   # Tracelevel setzen
+          if ($tl) {                                                                  # Tracelevel setzen
               $sth_uc->{TraceLevel} = "$tl|$tf";
               $sth_ic->{TraceLevel} = "$tl|$tf";
+          }
+          else {
+              $sth_uc->{TraceLevel} = '0';
+              $sth_ic->{TraceLevel} = '0';
           }
 
           $sth_uc->bind_param_array (1, [@timestamp]);
@@ -2865,8 +2879,11 @@ sub _DbLog_SBP_onRun_Log {
               return;
           }
 
-          if($tl) {                                                                      # Tracelevel setzen
+          if ($tl) {                                                                     # Tracelevel setzen
               $sth_ih->{TraceLevel} = "$tl|$tf";
+          }
+          else {
+              $sth_ih->{TraceLevel} = '0';
           }
 
           $sth_ih->bind_param_array (1, [@timestamp]);
@@ -2995,9 +3012,13 @@ sub _DbLog_SBP_onRun_Log {
                                                         }
                                                       );
 
-          if($tl) {                                                                  # Tracelevel setzen
+          if ($tl) {                                                                  # Tracelevel setzen
               $sth_uc->{TraceLevel} = "$tl|$tf";
               $sth_ic->{TraceLevel} = "$tl|$tf";
+          }
+          else {
+              $sth_uc->{TraceLevel} = '0';
+              $sth_ic->{TraceLevel} = '0';
           }
 
           $sth_uc->bind_param_array (1, [@timestamp]);
