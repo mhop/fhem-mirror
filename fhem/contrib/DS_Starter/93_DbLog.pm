@@ -2103,7 +2103,7 @@ sub DbLog_execMemCacheAsync {
 
       $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                             # aktuellen Index an Subprozess übergeben
 
-      undef $data{DbLog}{$name}{cache}{memcache};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      undef %{$data{DbLog}{$name}{cache}{memcache}};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
       $error = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                         # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
       return if($error);
@@ -2156,7 +2156,7 @@ sub DbLog_execMemCacheSync {
   my $memc;
 
   for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-      Log3 ($name, 5, "DbLog $name - Store contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
+      Log3 ($name, 5, "DbLog $name - TempStore contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
 
       $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};                # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   }
@@ -2241,7 +2241,7 @@ sub DbLog_SBP_onRun {
           }
 
           if ($dbstorepars) {                                                     # DB Verbindungsparameter speichern
-              Log3 ($name, 3, "DbLog $name - DB connection parameters are stored in SubProcess ...");
+              Log3 ($name, 3, "DbLog $name - DB connection parameters are stored in SubProcess");
 
               $store->{dbparams}{dbconn}      = $memc->{dbconn};
               $store->{dbparams}{dbname}      = (split /;|=/, $memc->{dbconn})[1];
@@ -2256,7 +2256,14 @@ sub DbLog_SBP_onRun {
               $store->{dbparams}{current}     = $memc->{current};                 # Name current-Tabelle
               $store->{dbparams}{dbstorepars} = $memc->{dbstorepars};             # Status Speicherung DB Parameter 0|1
 
-              Log3 ($name, 5, "DbLog $name - DB Parameter stored in SubProcess: \n".Dumper $store->{dbparams});
+              if ($verbose == 5) {
+                  Log3 ($name, 5, "DbLog $name - DB Parameter stored in SubProcess:");
+                  
+                  for my $dbp (sort keys %{$store->{dbparams}}) {
+                      next if(!defined $store->{dbparams}{$dbp});
+                      Log3 ($name, 5, "DbLog $name - $dbp -> ".$store->{dbparams}{$dbp});
+                  }
+              }
 
               $ret = {
                   name => $name,
@@ -2277,6 +2284,7 @@ sub DbLog_SBP_onRun {
 
               for my $idx (sort {$a<=>$b} keys %{$cdata}) {
                   $logstore->{$idx} = $cdata->{$idx};
+                  
                   Log3 ($name, 4, "DbLog $name - stored: $idx -> ".$logstore->{$idx});
               }
 
@@ -2314,7 +2322,7 @@ sub DbLog_SBP_onRun {
                          sltjm      => $store->{dbparams}{sltjm},
                          sltcs      => $store->{dbparams}{sltcs}
                        };
-          
+
           if (!defined $store->{dbh}) {
               ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
@@ -2335,7 +2343,7 @@ sub DbLog_SBP_onRun {
               }
 
               $store->{dbh} = $dbh;
-              
+
               Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
           }
 
@@ -2365,8 +2373,6 @@ sub DbLog_SBP_onRun {
                   $subprocess->writeToParent($retjson);
                   next;
               }
-              
-              Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
           };
 
 
@@ -2586,15 +2592,20 @@ sub _DbLog_SBP_onRun_Log {
   else {
       Log3 ($name, 5, "DbLog $name - Primary Key usage suppressed by attribute noSupportPK");
   }
-
-  if (defined $logstore) {                                                           # temporär gespeicherte Daten hinzufügen
+  
+  
+  my $ln = scalar keys %{$logstore};
+  if ($ln) {                                                           # temporär gespeicherte Daten hinzufügen
+      
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
-          $cdata->{$index} = $logstore->{$index};
-
           Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
+          
+          $cdata->{$index} = delete $logstore->{$index};
       }
 
-      undef $logstore;
+      undef %{$logstore};
+      
+      Log3 ($name, 4, "DbLog $name - logstore deleted - $ln stored datasets added for processing");
   }
 
   my $ceti = scalar keys %{$cdata};
@@ -2677,7 +2688,7 @@ sub _DbLog_SBP_onRun_Log {
                        else {
                            __DbLog_SBP_commitOnly ($name, $dbh, $history);
                        }
-                       
+
                        $ret = {
                            name     => $name,
                            msg      => $error,
@@ -2690,6 +2701,8 @@ sub _DbLog_SBP_onRun_Log {
                        $subprocess->writeToParent ($retjson);
                        return;
                      };
+                     
+          __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
           if($ins_hist == $ceti) {
               Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
@@ -2812,7 +2825,7 @@ sub _DbLog_SBP_onRun_Log {
 
                   $nins_cur++;
               }
-              
+
               if(!$nins_cur) {
                   Log3 ($name, 4, "DbLog $name - ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc ? " using PK on columns $pkc" : ""));
               }
@@ -2871,7 +2884,7 @@ sub _DbLog_SBP_onRun_Log {
 
           my @n2hist;
           my $rowhref;
-          
+
           $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
           eval {
@@ -2910,34 +2923,45 @@ sub _DbLog_SBP_onRun_Log {
                   }
                   else {
                       Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
-                  
+
                       my $bkey = 1;
 
                       for my $line (@n2hist) {
                           $rowhref->{$bkey} = $line;
                           $bkey++;
                       }
-                  }                 
+                  }
               }
+              
+              if(defined $rowhref) {                                                      # nicht gespeicherte Datensätze ausgeben
+                  Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
+
+                  for my $df (sort {$a <=>$b} keys %{$rowhref}) {
+                      Log3 ($name, 2, "DbLog $name - $rowhref->{$df}");
+                  }
+              }
+              
+              __DbLog_SBP_commitOnly ($name, $dbh, $history);
+              
               1;
           }
           or do { $error = $@;
 
-                  Log3 ($name, 2, "DbLog $name - Error table $history - $error");                               
-                                                                     
+                  Log3 ($name, 2, "DbLog $name - Error table $history - $error");
+
                   if($useta) {
                       $rowlback = $cdata;                                                 # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
                       __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
                   }
                   else {
-                      if(defined $rowhref) {                                                   # nicht gespeicherte Datensätze ausgeben
+                      if(defined $rowhref) {                                              # nicht gespeicherte Datensätze ausgeben
                           Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
-                          
+
                           for my $df (sort {$a <=>$b} keys %{$rowhref}) {
                               Log3 ($name, 2, "DbLog $name - $rowhref->{$df}");
                           }
-                      }         
-                      
+                      }
+
                       __DbLog_SBP_commitOnly ($name, $dbh, $history);                     # eingefügte Array-Daten bestätigen
                   }
                 };
@@ -4093,18 +4117,18 @@ return;
 sub DbLog_SBP_CheckAndInit {
   my $hash = shift;
   my $name = $hash->{NAME};
-  
+
   my $err = q{};
-  
+
   if (defined $hash->{SBP_PID} && defined $hash->{HELPER}{LONGRUN_PID}) {       # Laufzeit des letzten Kommandos prüfen -> timeout
       my $to = AttrVal($name, 'timeout', $dblog_todef);
       my $rt = time() - $hash->{HELPER}{LONGRUN_PID};                           # aktuelle Laufzeit
-      
+
       if ($rt >= $to) {                                                         # SubProcess beenden, möglicherweise tot
           Log3 ($name, 2, qq{DbLog $name - The Subprocess >$hash->{SBP_PID}< has exceeded the timeout of $to seconds});
-          
+
           DbLog_SBP_CleanUp ($hash);
-          
+
           Log3 ($name, 2, qq{DbLog $name - The last running operation was canceled});
       }
   }
@@ -4412,7 +4436,7 @@ sub DbLog_SBP_Read {
       if($reqdbdat) {                                                                         # Übertragung DB Verbindungsparameter ist requested
           my $rst = DbLog_SBP_sendConnectionData ($hash);
           if (!$rst) {
-              Log3 ($name, 3, "DbLog $name - requested DB connection parameters are transmitted ...");
+              Log3 ($name, 3, "DbLog $name - requested DB connection parameters are transmitted");
           }
       }
 
@@ -4660,9 +4684,9 @@ return;
 sub _DbLog_ConnectNewDBH {
   my $hash       = shift;
   my $name       = $hash->{NAME};
-  
+
   my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
-  
+
   my $params = { name       => $name,
                  dbconn     => $hash->{dbconn},
                  dbname     => (split /;|=/, $hash->{dbconn})[1],
@@ -4674,11 +4698,11 @@ sub _DbLog_ConnectNewDBH {
                  sltjm      => AttrVal ($name, 'SQLiteJournalMode', 'WAL'),
                  sltcs      => AttrVal ($name, 'SQLiteCacheSize',    4000)
                };
-  
+
 
   my ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
-  return $dbh if(!$error);  
+  return $dbh if(!$error);
 
 return;
 }
@@ -4789,10 +4813,10 @@ sub DbLog_Get {
   if($outf eq "int") {
       $outf = "-";
       $internal = 1;
-  } 
+  }
   elsif($outf eq "array") {
 
-  } 
+  }
   elsif(lc($outf) eq "webchart") {                           # redirect the get request to the DbLog_chartQuery function
       return DbLog_chartQuery($hash, @_);
   }
@@ -4927,13 +4951,13 @@ sub DbLog_Get {
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
-          
+
           Log3($name, 4, "DbLog $name - deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
           Log3($name, 4, "DbLog $name - deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
       }
 
       my ($stm);
-      
+
       if($deltacalc) {
           $stm  = "SELECT Z.TIMESTAMP, Z.DEVICE, Z.READING, Z.VALUE from ";
 
@@ -5031,17 +5055,17 @@ sub DbLog_Get {
       #                              Select Auswertung
       ####################################################################################
       my $rv = 0;
-      
+
       while ($sth->fetch()) {
           $rv++;
-          
+
           no warnings 'uninitialized';                                                                     # geändert V4.8.0 / 14.10.2019
           my $ds = "PID: $$, TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
-          
-          Log3 ($name, 5, "$name - SQL-result -> $ds");                                                    
-          
+
+          Log3 ($name, 5, "$name - SQL-result -> $ds");
+
           use warnings;                                                                                    # geändert V4.8.0 / 14.10.2019
-          
+
           $writeout = 0;                                                                                   # eingefügt V4.8.0 / 14.10.2019
 
           ############ Auswerten des 5. Parameters: Regexp ###################
@@ -5120,7 +5144,7 @@ sub DbLog_Get {
               }
               elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-                  
+
                   if($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
                       $lasttstamp{hour} = "00";
@@ -5141,7 +5165,7 @@ sub DbLog_Get {
                               $hour       = '0'.$j if $j<10;
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
-                              
+
                               if ($outf =~ m/(all)/) {
                                   # Timestamp: Device, Type, Event, Reading, Value, Unit
                                   $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
@@ -5244,13 +5268,13 @@ sub DbLog_Get {
                               $min[$i]  = $out_value;
                               $mind[$i] = $out_tstamp;
                           }
-                          
+
                           if($out_value > $max[$i]) {
                               $max[$i]  = $out_value;
                               $maxd[$i] = $out_tstamp;
                           }
                       }
-                      
+
                       $maxval = $sql_value;
                   }
                   else {
@@ -5293,7 +5317,7 @@ sub DbLog_Get {
               $lastd[$i] = $sql_timestamp;
           }
       }                                                        #### while fetchrow Ende #####
-      
+
       Log3 ($name, 4, "$name - PID: $$, rows count: $rv");
 
       ######## den letzten Abschlusssatz rausschreiben ##########
@@ -5310,7 +5334,7 @@ sub DbLog_Get {
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
           }
-          
+
           $sum[$i] += $out_value;
           $cnt[$i]++;
 
@@ -6979,7 +7003,7 @@ sub DbLog_chartQuery {
     }
 
     my ($hash, @a) = @_;
-    
+
     my $dbhf       = _DbLog_ConnectNewDBH($hash);
     return if(!$dbhf);
 
@@ -7073,9 +7097,9 @@ return $jsonstring;
 ################################################################
 sub DbLog_dbReadings {
   my($hash,@a) = @_;
-  
+
   my $history  = $hash->{HELPER}{TH};
-  
+
   my $dbh = _DbLog_ConnectNewDBH($hash);
   return if(!$dbh);
 
@@ -7381,47 +7405,67 @@ return;
     </ul>
     <br>
 
+  <ul>
+    <li><b>set &lt;name&gt; addCacheLine YYYY-MM-DD HH:MM:SS|&lt;device&gt;|&lt;type&gt;|&lt;event&gt;|&lt;reading&gt;|&lt;value&gt;|[&lt;unit&gt;]  </b> <br><br>
+
+    <ul>
+    Im asynchronen Modus wird ein neuer Datensatz in den Cache eingefügt und beim nächsten Synclauf mit abgearbeitet.
+    <br><br>
+
+      <b>Beispiel:</b> <br>
+      set &lt;name&gt; addCacheLine 2017-12-05 17:03:59|MaxBathRoom|MAX|valveposition: 95|valveposition|95|% <br>
+    </li>
+    </ul>
+    <br>
+
     <li><b>set &lt;name&gt; addLog &lt;devspec&gt;:&lt;Reading&gt; [Value] [CN=&lt;caller name&gt;] [!useExcludes] </b> <br><br>
 
     <ul>
-    Inserts an additional log entry of a device/reading combination into the database. Readings which are possibly specified
-    in attribute "DbLogExclude" (in source device) are not logged, unless they are enclosed in attribute "DbLogInclude"
-    or addLog was called with option "!useExcludes". <br><br>
+    Inserts an additional log entry of a device/reading combination into the database. <br>
+    Any readings specified in the "DbLogExclude" attribute (in the source device) will not be logged, unless
+    they are included in the "DbLogInclude" attribute or the addLog call was made with the "!useExcludes" option.
+    <br><br>
 
-      <ul>
-      <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - The device can be declared by a <a href="#devspec">device specification
-                                                    (devspec)</a>. "Reading" will be evaluated as regular expression. If
-                                                    The reading isn't available and the value "Value" is specified, the
-                                                    reading will be added to database as new one if it isn't a regular
-                                                    expression and the readingname is valid.  </li>
-      <li> <b>Value</b> - Optionally you can enter a "Value" that is used as reading value in the dataset. If the value isn't
-                          specified (default), the current value of the specified reading will be inserted into the database. </li>
-      <li> <b>CN=&lt;caller name&gt;</b> - By the key "CN=" (<b>C</b>aller <b>N</b>ame) you can specify an additional string,
-                                           e.g. the name of a calling device (for example an at- or notify-device).
-                                           Via the function defined in <a href="#DbLog-attr-valueFn">valueFn</a> this key can be analyzed
-                                           by the variable $CN. Thereby it is possible to control the behavior of the addLog dependend from
-                                           the calling source. </li>
-      <li> <b>!useExcludes</b> - The function considers attribute "DbLogExclude" in the source device if it is set. If the optional
-                                 keyword "!useExcludes" is set, the attribute "DbLogExclude" isn't considered. </li>
-      </ul>
+      <table>
+       <colgroup> <col width=20%> <col width=80%> </colgroup>
+       <tr><td> <b>&lt;devspec&gt;:&lt;Reading&gt;</b>   </td><td>The device can be specified as <a href="#devspec">device specification</a>.                      </td></tr>
+       <tr><td>                                          </td><td>The specification of "Reading" is evaluated as a regular expression.                             </td></tr>
+	   <tr><td>                                          </td><td>If the reading does not exist and the value "Value" is specified, the reading                    </td></tr>
+	   <tr><td>                                          </td><td>will be inserted into the DB if it is not a regular expression and a valid reading name.         </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td> <b>Value</b>                             </td><td>Optionally, "Value" can be specified for the reading value.                                      </td></tr>
+	   <tr><td>                                          </td><td>If Value is not specified, the current value of the reading is inserted into the DB.             </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td> <b>CN=&lt;caller name&gt;</b>            </td><td>With the key "CN=" (<b>C</b>aller <b>N</b>ame) a string, e.g. the name of the calling device,    </td></tr>
+	   <tr><td>                                          </td><td>can be added to the addLog call.                                                                 </td></tr>
+	   <tr><td>                                          </td><td>With the help of the function stored in the attribute <a href="#DbLog-attr-valueFn">valueFn</a>  </td></tr>
+	   <tr><td>                                          </td><td>this key can be evaluated via the variable $CN.                                                  </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td> <b>!useExcludes</b>                      </td><td>addLog by default takes into account the readings excluded with the "DbLogExclude" attribute.    </td></tr>
+	   <tr><td>                                          </td><td>With the keyword "!useExcludes" the set attribute "DbLogExclude" is ignored.                     </td></tr>
+      </table>
       <br>
 
-      The database field "EVENT" will be filled with the string "addLog" automatically. <br>
-      The addLog-command dosn't create an additional event in your system !<br><br>
+      The database field "EVENT" is automatically filled with "addLog". <br>
+      There will be <b>no</b> additional event created in the system!   <br><br>
 
       <b>Examples:</b> <br>
-      set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung <br>
-      set &lt;name&gt; addLog TYPE=SSCam:state <br>
-      set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
+      set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung        <br>
+      set &lt;name&gt; addLog TYPE=SSCam:state                          <br>
+      set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*)                   <br>
       set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 !useExcludes <br>
       set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br><br>
 
-      set &lt;name&gt; addLog USV:state CN=di.cronjob <br>
-      In the valueFn-function the caller "di.cronjob" is evaluated via the variable $CN and the timestamp is corrected: <br><br>
-      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/\s([^\s]+)/ 23:59:59/ }
+      set &lt;name&gt; addLog USV:state CN=di.cronjob <br><br>
 
-    </li>
+      In the valueFn function the caller "di.cronjob" is evaluated via the variable $CN and depending on this the
+      timestamp of this addLog is corrected: <br><br>
+
+      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/\s([^\s]+)/ 23:59:59/ }
     </ul>
+    </li>
     <br>
 
     <li><b>set &lt;name&gt; clearReadings </b> <br><br>
@@ -7902,9 +7946,9 @@ return;
       <code>attr &lt;device&gt; bulkInsert [1|0] </code><br><br>
 
       Toggles the insert mode between "Array" and "Bulk". <br>
-      The bulk mode leads to a considerable performance increase when inserting a large number of data records into the 
-      history table, especially in asynchronous mode. 
-      To get the full performance increase, in this case the attribute "DbLogType" should <b>not</b> contain the 
+      The bulk mode leads to a considerable performance increase when inserting a large number of data records into the
+      history table, especially in asynchronous mode.
+      To get the full performance increase, in this case the attribute "DbLogType" should <b>not</b> contain the
       current table. <br>
       In contrast, the "Array" mode has the advantage over "Bulk" that faulty data records are extracted and reported in the
       log file. <br>
@@ -8950,43 +8994,49 @@ attr SMA_Energymeter DbLogValueFn
 
     <ul>
     Fügt einen zusätzlichen Logeintrag einer Device/Reading-Kombination in die Datenbank ein. <br>
-    Die eventuell im Attribut "DbLogExclude" spezifizierten Readings (im Quellendevice) werden nicht geloggt, es sei denn 
-    sie sind im Attribut "DbLogInclude" enthalten bzw. der addLog Aufruf erfolgte mit der Option "!useExcludes".  <br><br>
+    Die eventuell im Attribut "DbLogExclude" spezifizierten Readings (im Quellendevice) werden nicht geloggt, es sei denn
+    sie sind im Attribut "DbLogInclude" enthalten bzw. der addLog Aufruf erfolgte mit der Option "!useExcludes".
+    <br><br>
 
-      <ul>
-      <li> <b>&lt;devspec&gt;:&lt;Reading&gt;</b> - Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden. <br>
-                                                    Die Angabe von "Reading" wird als regulärer Ausdruck ausgewertet. Ist
-                                                    das Reading nicht vorhanden und der Wert "Value" angegeben, wird das Reading
-                                                    in die DB eingefügt wenn es kein regulärer Ausdruck und ein valider
-                                                    Readingname ist. </li>
-      <li> <b>Value</b> - Optional kann "Value" für den Readingwert angegeben werden. Ist Value nicht angegeben, wird der aktuelle
-                          Wert des Readings in die DB eingefügt. </li>
-      <li> <b>CN=&lt;caller name&gt;</b> - Mit dem Schlüssel "CN=" (<b>C</b>aller <b>N</b>ame) kann dem addLog-Aufruf ein String,
-                                           z.B. der Name des aufrufenden Devices (z.B. eines at- oder notify-Devices), mitgegeben
-                                           werden. Mit Hilfe der im <a href="#DbLog-attr-valueFn">valueFn</a> hinterlegten
-                                           Funktion kann dieser Schlüssel über die Variable $CN ausgewertet werden. Dadurch ist es
-                                           möglich, das Verhalten des addLogs abhängig von der aufrufenden Quelle zu beeinflussen.
-                                           </li>
-      <li> <b>!useExcludes</b> - Ein eventuell im Quell-Device gesetztes Attribut "DbLogExclude" wird von der Funktion berücksichtigt. Soll dieses
-                                 Attribut nicht berücksichtigt werden, kann das Schüsselwort "!useExcludes" verwendet werden. </li>
-      </ul>
+      <table>
+       <colgroup> <col width=20%> <col width=80%> </colgroup>
+       <tr><td> <b>&lt;devspec&gt;:&lt;Reading&gt;</b>   </td><td>Das Device kann als <a href="#devspec">Geräte-Spezifikation</a> angegeben werden.                </td></tr>
+       <tr><td>                                          </td><td>Die Angabe von "Reading" wird als regulärer Ausdruck ausgewertet.                                </td></tr>
+	   <tr><td>                                          </td><td>Ist das Reading nicht vorhanden und der Wert "Value" angegeben, wird das Reading                 </td></tr>
+	   <tr><td>                                          </td><td>in die DB eingefügt wenn es kein regulärer Ausdruck und ein valider Readingname ist.             </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td> <b>Value</b>                             </td><td>Optional kann "Value" für den Readingwert angegeben werden.                                      </td></tr>
+	   <tr><td>                                          </td><td>Ist Value nicht angegeben, wird der aktuelle Wert des Readings in die DB eingefügt.              </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td> <b>CN=&lt;caller name&gt;</b>            </td><td>Mit dem Schlüssel "CN=" (<b>C</b>aller <b>N</b>ame) kann dem addLog-Aufruf ein String,           </td></tr>
+	   <tr><td>                                          </td><td>z.B. der Name des aufrufenden Devices, mitgegeben werden.                                        </td></tr>
+	   <tr><td>                                          </td><td>Mit Hilfe der im Attribut <a href="#DbLog-attr-valueFn">valueFn</a> hinterlegten Funktion kann   </td></tr>
+	   <tr><td>                                          </td><td>dieser Schlüssel über die Variable $CN ausgewertet werden.                                       </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td>                                          </td><td>                                                                                                 </td></tr>
+	   <tr><td> <b>!useExcludes</b>                      </td><td>addLog berücksichtigt per default die mit dem Attribut "DbLogExclude" ausgeschlossenen Readings. </td></tr>
+	   <tr><td>                                          </td><td>Mit dem Schüsselwort "!useExcludes" wird das gesetzte Attribut "DbLogExclude" ignoriert.         </td></tr>
+      </table>
       <br>
 
       Das Datenbankfeld "EVENT" wird automatisch mit "addLog" belegt. <br>
-      Es wird KEIN zusätzlicher Event im System erzeugt !<br><br>
+      Es wird <b>kein</b> zusätzlicher Event im System erzeugt!       <br><br>
 
       <b>Beispiele:</b> <br>
-      set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung <br>
-      set &lt;name&gt; addLog TYPE=SSCam:state <br>
-      set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*) <br>
+      set &lt;name&gt; addLog SMA_Energymeter:Bezug_Wirkleistung        <br>
+      set &lt;name&gt; addLog TYPE=SSCam:state                          <br>
+      set &lt;name&gt; addLog MyWetter:(fc10.*|fc8.*)                   <br>
       set &lt;name&gt; addLog MyWetter:(wind|wind_ch.*) 20 !useExcludes <br>
       set &lt;name&gt; addLog TYPE=CUL_HM:FILTER=model=HM-CC-RT-DN:FILTER=subType!=(virtual|):(measured-temp|desired-temp|actuator) <br><br>
 
-      set &lt;name&gt; addLog USV:state CN=di.cronjob <br>
+      set &lt;name&gt; addLog USV:state CN=di.cronjob <br><br>
+
       In der valueFn-Funktion wird der Aufrufer "di.cronjob" über die Variable $CN ausgewertet und davon abhängig der
       Timestamp dieses addLog korrigiert: <br><br>
-      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/\s([^\s]+)/ 23:59:59/ }
 
+      valueFn = if($CN eq "di.cronjob" and $TIMESTAMP =~ m/\s00:00:[\d:]+/) { $TIMESTAMP =~ s/\s([^\s]+)/ 23:59:59/ }
     </ul>
     </li>
     <br>
@@ -9526,8 +9576,8 @@ attr SMA_Energymeter DbLogValueFn
       <code>attr &lt;device&gt; bulkInsert [1|0] </code><br><br>
 
       Schaltet den Insert-Modus zwischen "Array" und "Bulk" um. <br>
-      Der Bulk Modus führt beim Insert von sehr vielen Datensätzen in die history-Tabelle zu einer erheblichen 
-      Performancesteigerung vor allem im asynchronen Mode. Um die volle Performancesteigerung zu erhalten, sollte in 
+      Der Bulk Modus führt beim Insert von sehr vielen Datensätzen in die history-Tabelle zu einer erheblichen
+      Performancesteigerung vor allem im asynchronen Mode. Um die volle Performancesteigerung zu erhalten, sollte in
       diesem Fall das Attribut "DbLogType" <b>nicht</b> die current-Tabelle enthalten. <br>
       Demgegenüber hat der Modus "Array" gegenüber "Bulk" den Vorteil, dass fehlerhafte Datensätze extrahiert und im
       Logfile reported werden. <br>
