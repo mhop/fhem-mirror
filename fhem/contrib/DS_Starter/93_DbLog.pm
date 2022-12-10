@@ -17,7 +17,7 @@
 #
 #  Leerzeichen entfernen: sed -i 's/[[:space:]]*$//' 93_DbLog.pm
 #
-#########################################################################################################################
+############################################################################################################################################
 
 package main;
 use strict;
@@ -2103,7 +2103,7 @@ sub DbLog_execMemCacheAsync {
 
       $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                             # aktuellen Index an Subprozess übergeben
 
-      undef %{$data{DbLog}{$name}{cache}{memcache}};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      undef %{$data{DbLog}{$name}{cache}{memcache}};                                       # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
       $error = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                         # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
       return if($error);
@@ -2258,7 +2258,7 @@ sub DbLog_SBP_onRun {
 
               if ($verbose == 5) {
                   Log3 ($name, 5, "DbLog $name - DB Parameter stored in SubProcess:");
-                  
+
                   for my $dbp (sort keys %{$store->{dbparams}}) {
                       next if(!defined $store->{dbparams}{$dbp});
                       Log3 ($name, 5, "DbLog $name - $dbp -> ".$store->{dbparams}{$dbp});
@@ -2278,15 +2278,17 @@ sub DbLog_SBP_onRun {
           }
 
           if (!defined $store->{dbparams}{dbstorepars}) {
-              $error = qq{DB params have not yet been passed to the subprocess. Data is stored temporarily, Params are requested ...};
+              $error = qq{DB connection params havn't yet been passed to the subprocess. Data is stored temporarily.};
 
               Log3 ($name, 3, "DbLog $name - $error");
 
               for my $idx (sort {$a<=>$b} keys %{$cdata}) {
                   $logstore->{$idx} = $cdata->{$idx};
-                  
+
                   Log3 ($name, 4, "DbLog $name - stored: $idx -> ".$logstore->{$idx});
               }
+
+              Log3 ($name, 3, "DbLog $name - DB Connection parameters were requested ...");
 
               $ret = {
                   name     => $name,
@@ -2592,19 +2594,19 @@ sub _DbLog_SBP_onRun_Log {
   else {
       Log3 ($name, 5, "DbLog $name - Primary Key usage suppressed by attribute noSupportPK");
   }
-  
-  
+
+
   my $ln = scalar keys %{$logstore};
   if ($ln) {                                                           # temporär gespeicherte Daten hinzufügen
-      
+
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
           Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
-          
+
           $cdata->{$index} = delete $logstore->{$index};
       }
 
       undef %{$logstore};
-      
+
       Log3 ($name, 4, "DbLog $name - logstore deleted - $ln stored datasets added for processing");
   }
 
@@ -2701,8 +2703,6 @@ sub _DbLog_SBP_onRun_Log {
                        $subprocess->writeToParent ($retjson);
                        return;
                      };
-                     
-          __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
           if($ins_hist == $ceti) {
               Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
@@ -2715,6 +2715,8 @@ sub _DbLog_SBP_onRun_Log {
                   Log3 ($name, 2, "DbLog $name - WARNING - only ".$ins_hist." of $ceti events inserted into table $history");
               }
           }
+
+          __DbLog_SBP_commitOnly ($name, $dbh, $history);
       }
 
                                                                                    # insert current mit/ohne primary key
@@ -2932,7 +2934,7 @@ sub _DbLog_SBP_onRun_Log {
                       }
                   }
               }
-              
+
               if(defined $rowhref) {                                                      # nicht gespeicherte Datensätze ausgeben
                   Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
 
@@ -2940,9 +2942,9 @@ sub _DbLog_SBP_onRun_Log {
                       Log3 ($name, 2, "DbLog $name - $rowhref->{$df}");
                   }
               }
-              
+
               __DbLog_SBP_commitOnly ($name, $dbh, $history);
-              
+
               1;
           }
           or do { $error = $@;
@@ -7655,10 +7657,16 @@ return;
     </li>
     <br>
 
+    <a id="DbLog-set-stopSubProcess"></a>
     <li><b>set &lt;name&gt; stopSubProcess </b> <br><br>
     <ul>
       A running SubProcess is terminated. <br>
       As soon as a new subprocess is required by a Log operation, an automatic reinitialization of a process takes place.
+      <br><br>
+
+      <b>Note</b> <br>
+      If the sub-process is reinitialized during runtime, the RAM consumption is increased, which is normalized
+      again after a FHEM restart.
     </ul>
     </li>
     <br>
@@ -9235,11 +9243,17 @@ attr SMA_Energymeter DbLogValueFn
     </li>
     <br>
 
+    <a id="DbLog-set-stopSubProcess"></a>
     <li><b>set &lt;name&gt; stopSubProcess </b> <br><br>
     <ul>
       Ein laufender SubProzess wird beendet. <br>
-      Sobald durch eine Log-Operation ein neuer SubProzess benötigt wird, erfolgt eine automatische Neuinitialisierung
-      eines Prozesses.
+      Sobald durch eine Operation ein neuer SubProzess benötigt wird, erfolgt die automatische Neuinitialisierung
+      eines SubProzesses.
+      <br><br>
+
+      <b>Hinweis</b> <br>
+      Bei Neuinitialisierung des SubProzesses während der Laufzeit ergibt sich ein erhöhter RAM Verbrauch der sich
+      nach einem FHEM Neustart wieder normalisiert.
     </ul>
     </li>
     <br>
