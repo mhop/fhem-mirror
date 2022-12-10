@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_livetracking: fixed Life360 login
  - bugfix:  10_KNX: fix bug introduced w. last change, Forum #122582  
  - bugfix:  93_DbRep: fix diffValue for newer MariaDB Forum: #130697
  - change:  98_todoist: API v9, please check

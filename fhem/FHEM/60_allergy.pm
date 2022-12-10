@@ -524,6 +524,10 @@ sub allergy_utf8clean($) {
       <br>
       Daily levels for all allergens that are not being ignored due to <i>ignoreList</i>
       </li><br>
+      <li><code>date</code>
+      <br>
+      Forecast end date from alternative data source
+      </li><br>
   </ul>
   <br>
    <b>Attributes</b>
@@ -601,6 +605,10 @@ sub allergy_utf8clean($) {
       <li><code>fc<i>n</i>_<i>allergen</i></code>
       <br>
       Tägliche Werte für alle Allergene, die nicht aufgrund der Ignoreliste <i>(attr ignoreList)</i> ignoriert werden.
+      </li><br>
+      <li><code>date</code>
+      <br>
+      Vorhersage-End-Datum bei alternativer Datenquelle
       </li><br>
   </ul>
   <br>
