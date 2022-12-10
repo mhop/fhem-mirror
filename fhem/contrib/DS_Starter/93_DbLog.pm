@@ -397,11 +397,12 @@ sub DbLog_Define {
   return "Bad regexp: $@" if($@);
 
   $hash->{REGEXP}                = $regexp;
-  $hash->{MODE}                  = AttrVal($name, "asyncMode", undef) ? "asynchronous" : "synchronous";       # Mode setzen Forum:#76213
-  $hash->{HELPER}{OLDSTATE}      = "initialized";
+  #$hash->{MODE}                  = AttrVal($name, 'asyncMode', undef) ? 'asynchronous' : 'synchronous';       # Mode setzen Forum:#76213
+  $hash->{MODE}                  = 'synchronous'; 
+  $hash->{HELPER}{OLDSTATE}      = 'initialized';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
-  $hash->{HELPER}{TH}            = "history";                                                                 # Tabelle history (wird ggf. durch Datenbankschema ergänzt)
-  $hash->{HELPER}{TC}            = "current";                                                                 # Tabelle current (wird ggf. durch Datenbankschema ergänzt)
+  $hash->{HELPER}{TH}            = 'history';                                                                 # Tabelle history (wird ggf. durch Datenbankschema ergänzt)
+  $hash->{HELPER}{TC}            = 'current';                                                                 # Tabelle current (wird ggf. durch Datenbankschema ergänzt)
 
   DbLog_setVersionInfo ($hash);                                                                               # Versionsinformationen setzen
   notifyRegexpChanged  ($hash, $regexp);                                                                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
@@ -418,8 +419,7 @@ sub DbLog_Define {
 
   InternalTimer(gettimeofday()+2, 'DbLog_setinternalcols', $hash, 0);                                         # set used COLUMNS
 
-  readingsSingleUpdate ($hash, 'state', 'waiting for connection', 1);
-
+  DbLog_setReadingstate  ($hash, 'waiting for connection');
   DbLog_SBP_CheckAndInit ($hash);                                                                             # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
   _DbLog_initOnStart     ($hash);                                                                             # von init_done abhängige Prozesse initialisieren
 
@@ -823,7 +823,7 @@ sub _DbLog_setclearReadings {            ## no critic "not used"
 
   for my $key(@allrds) {
       next if($key =~ m/state/ || $key =~ m/CacheUsage/ || $key =~ m/NextSync/);
-      readingsSingleUpdate($hash, $key, " ", 0);
+      readingsSingleUpdate($hash, $key, ' ', 0);
   }
 
 return;
@@ -940,7 +940,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
       my $ts = (split " ",FmtDateTime(gettimeofday()+$prop))[1];
       Log3 ($name, 2, "DbLog $name - Connection closed until $ts ($prop seconds).");
 
-      readingsSingleUpdate($hash, "state", "closed until $ts ($prop seconds)", 1);
+      DbLog_setReadingstate ($hash, "closed until $ts ($prop seconds)");
 
       InternalTimer(gettimeofday()+$prop, "DbLog_reopen", $hash, 0);
 
@@ -2126,7 +2126,7 @@ sub DbLog_execMemCacheAsync {
   my $nsdt     = FmtDateTime ($nextsync);
   my $se       = AttrVal     ($name, "syncEvents", undef) ? 1 : 0;
 
-  readingsSingleUpdate($hash, "NextSync", $nsdt. " or when CacheUsage ".$clim." is reached", $se);
+  readingsSingleUpdate($hash, 'NextSync', $nsdt. " or when CacheUsage ".$clim." is reached", $se);
 
   DbLog_setReadingstate ($hash, $error);
 
@@ -2236,8 +2236,7 @@ sub DbLog_SBP_onRun {
                   ot   => 0
               };
 
-              $retjson = eval { encode_json($ret) };
-              $subprocess->writeToParent ($retjson);
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
               next;
           }
 
@@ -2270,11 +2269,10 @@ sub DbLog_SBP_onRun {
                   name => $name,
                   msg  => 'connection params saved into SubProcess. Connection to DB is established when it is needed',
                   oper => $operation,
-                  ot   => 0,
+                  ot   => 0
               };
 
-              $retjson = eval { encode_json($ret) };
-              $subprocess->writeToParent ($retjson);
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
               next;
           }
 
@@ -2299,8 +2297,7 @@ sub DbLog_SBP_onRun {
                   reqdbdat => 1                                                   # Request Übertragung DB Verbindungsparameter
               };
 
-              $retjson = eval { encode_json($ret) };
-              $subprocess->writeToParent ($retjson);
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
               next;
           }
 
@@ -2340,8 +2337,7 @@ sub DbLog_SBP_onRun {
                       rowlback => $cdata                                                        # Rückgabe alle übergebenen Log-Daten
                   };
 
-                  $retjson = eval { encode_json($ret) };
-                  $subprocess->writeToParent ($retjson);
+                  __DbLog_SBP_sendToParent ($subprocess, $ret);
                   next;
               }
 
@@ -2372,8 +2368,7 @@ sub DbLog_SBP_onRun {
                       rowlback => $cdata                                                        # Rückgabe alle übergebenen Log-Daten
                   };
 
-                  $retjson = eval { encode_json($ret) };
-                  $subprocess->writeToParent($retjson);
+                  __DbLog_SBP_sendToParent ($subprocess, $ret);
                   next;
               }
           };
@@ -2455,7 +2450,7 @@ sub DbLog_SBP_onRun {
           }
       }
 
-  usleep(300000);                                                      # reduziert CPU Last
+  usleep(300000);                                                      # reduziert CPU Last im "Leerlauf"
   }
 
 return;
@@ -2700,8 +2695,7 @@ sub _DbLog_SBP_onRun_Log {
                            rowlback => $rowlback
                        };
 
-                       $retjson = eval { encode_json($ret) };
-                       $subprocess->writeToParent ($retjson);
+                       __DbLog_SBP_sendToParent ($subprocess, $ret);
                        return;
                      };
 
@@ -2742,8 +2736,7 @@ sub _DbLog_SBP_onRun_Log {
                   oper     => $operation
               };
 
-              $retjson = eval { encode_json($ret) };
-              $subprocess->writeToParent ($retjson);
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
               return;
           }
 
@@ -2868,8 +2861,7 @@ sub _DbLog_SBP_onRun_Log {
                   rowlback => $cdata
               };
 
-              $retjson = eval { encode_json($ret) };
-              $subprocess->writeToParent ($retjson);
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
               return;
           }
 
@@ -2991,8 +2983,7 @@ sub _DbLog_SBP_onRun_Log {
                   oper     => $operation
               };
 
-              $retjson = eval { encode_json($ret) };
-              $subprocess->writeToParent ($retjson);
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
               return;
           }
 
@@ -3110,8 +3101,7 @@ sub _DbLog_SBP_onRun_Log {
       rowlback => $rowlback
   };
 
-  $retjson = eval { encode_json($ret) };
-  $subprocess->writeToParent ($retjson);
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
 
 return;
 }
@@ -3154,8 +3144,7 @@ sub _DbLog_SBP_onRun_Count {
       cc       => $cc
   };
 
-  my $retjson = eval { encode_json($ret) };
-  $subprocess->writeToParent ($retjson);
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
 
 return;
 }
@@ -3221,8 +3210,7 @@ sub _DbLog_SBP_onRun_deleteOldDays {
                        oper     => $operation
                    };
 
-                   $retjson = eval { encode_json($ret) };
-                   $subprocess->writeToParent ($retjson);
+                   __DbLog_SBP_sendToParent ($subprocess, $ret);
                    return;
                  };
 
@@ -3244,8 +3232,7 @@ sub _DbLog_SBP_onRun_deleteOldDays {
       numdel   => $numdel
   };
 
-  $retjson = eval { encode_json($ret) };
-  $subprocess->writeToParent ($retjson);
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
 
 return;
 }
@@ -3293,8 +3280,7 @@ sub _DbLog_SBP_onRun_userCommand {
                    oper     => $operation
                };
 
-               $retjson = eval { encode_json($ret) };
-               $subprocess->writeToParent ($retjson);
+               __DbLog_SBP_sendToParent ($subprocess, $ret);
                return;
              };
 
@@ -3314,8 +3300,7 @@ sub _DbLog_SBP_onRun_userCommand {
       res      => $res
   };
 
-  $retjson = eval { encode_json($ret) };
-  $subprocess->writeToParent ($retjson);
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
 
 return;
 }
@@ -3361,8 +3346,7 @@ sub _DbLog_SBP_onRun_importCachefile {
           oper     => $operation
       };
 
-      $retjson = eval { encode_json($ret) };
-      $subprocess->writeToParent ($retjson);
+      __DbLog_SBP_sendToParent ($subprocess, $ret);
       return;
   }
 
@@ -3421,8 +3405,7 @@ sub _DbLog_SBP_onRun_importCachefile {
       res      => $improws
   };
 
-  $retjson = eval { encode_json($ret) };
-  $subprocess->writeToParent ($retjson);
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
 
 return;
 }
@@ -3514,8 +3497,7 @@ sub _DbLog_SBP_onRun_reduceLog {
           oper  => $operation
       };
 
-      $retjson = eval { encode_json($ret) };
-      $subprocess->writeToParent ($retjson);
+      __DbLog_SBP_sendToParent ($subprocess, $ret);
       return;
   }
 
@@ -3543,8 +3525,7 @@ sub _DbLog_SBP_onRun_reduceLog {
                    oper     => $operation
                };
 
-               $retjson = eval { encode_json($ret) };
-               $subprocess->writeToParent ($retjson);
+               __DbLog_SBP_sendToParent ($subprocess, $ret);
                return;
              };
 
@@ -3565,8 +3546,7 @@ sub _DbLog_SBP_onRun_reduceLog {
                    oper     => $operation
                };
 
-               $retjson = eval { encode_json($ret) };
-               $subprocess->writeToParent ($retjson);
+               __DbLog_SBP_sendToParent ($subprocess, $ret);
                return;
              };
 
@@ -3914,8 +3894,7 @@ sub _DbLog_SBP_onRun_reduceLog {
       res      => $res
   };
 
-  $retjson = eval { encode_json($ret) };
-  $subprocess->writeToParent ($retjson);
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
 
 return;
 }
@@ -4100,6 +4079,20 @@ sub __DbLog_SBP_sthUpdTable {
              };
 
 return ($err, $sth);
+}
+
+#################################################################
+#   Information an Parent Prozess senden, Verarbeitung in 
+#   read Schleife DbLog_SBP_Read
+#################################################################
+sub __DbLog_SBP_sendToParent {
+  my $subprocess = shift;
+  my $ret        = shift;
+
+  my $json = eval {encode_json($ret)};
+  $subprocess->writeToParent  ($json);
+
+return;
 }
 
 #####################################################
@@ -4505,7 +4498,7 @@ sub DbLog_SBP_Read {
 
           readingsBeginUpdate ($hash);
           readingsBulkUpdate  ($hash, 'background_processing_time', sprintf("%.4f",$brt));
-          readingsBulkUpdate  ($hash, 'sql_processing_time',        sprintf("%.4f",$rt));
+          readingsBulkUpdate  ($hash, 'sql_processing_time',        sprintf("%.4f",$rt) );
           readingsEndUpdate   ($hash, 1);
       }
 
