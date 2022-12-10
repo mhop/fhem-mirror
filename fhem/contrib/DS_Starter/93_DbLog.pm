@@ -444,6 +444,7 @@ sub _DbLog_initOnStart {
 
   my @rdel = qw ( CacheUsage
                   userCommandResult
+                  lastCachefile
                   reduceLogState
                   lastRowsDeleted
                   countCurrent
