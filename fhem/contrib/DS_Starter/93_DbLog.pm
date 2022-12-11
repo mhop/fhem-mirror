@@ -323,6 +323,7 @@ sub DbLog_Initialize {
   $hash->{ReadFn}            = "DbLog_SBP_Read";
   $hash->{SVG_regexpFn}      = "DbLog_regexpFn";
   $hash->{DelayedShutdownFn} = "DbLog_DelayedShutdown";
+  $hash->{ShutdownFn}        = "DbLog_Shutdown";
   $hash->{AttrList}          = "addStateEvent:0,1 ".
                                "asyncMode:1,0 ".
                                "bulkInsert:1,0 ".
@@ -522,6 +523,20 @@ sub DbLog_DelayedShutdown {
 return $delay_needed;
 }
 
+###################################################################################
+#  Mit der X_Shutdown Funktion kann ein Modul Aktionen durchführen bevor FHEM 
+#  gestoppt wird. Dies kann z.B. der ordnungsgemäße Verbindungsabbau mit dem 
+#  physikalischen Gerät sein (z.B. Session beenden, Logout, etc.). Nach der 
+#  Ausführung der Shutdown-Fuktion wird FHEM sofort beendet.
+###################################################################################
+sub DbLog_Shutdown {  
+  my $hash = shift;
+ 
+  DbLog_SBP_CleanUp ($hash);
+  
+return; 
+}
+
 #####################################################
 #   DelayedShutdown abschließen
 #   letzte Aktivitäten vor Freigabe des Shutdowns
@@ -530,7 +545,6 @@ sub _DbLog_finishDelayedShutdown {
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  DbLog_SBP_CleanUp     ($hash);
   CancelDelayedShutdown ($name);
 
 return;
