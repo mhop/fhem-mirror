@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-10 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-11 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -27,7 +27,7 @@ eval "use FHEM::Meta;1"                  or my $modMetaAbsent = 1;
 eval "use FHEM::Utility::CTZ qw(:all);1" or my $ctzAbsent     = 1;
 eval "use JSON;1;"                       or my $jsonabs       = "JSON";              ## no critic 'eval' # Debian: apt-get install libjson-perl
 
-use Data::Dumper;
+#use Data::Dumper;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
 use Time::Local;
 use Encode qw(encode_utf8);
@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
   "5.5.3"   => "10.12.2022 more internal code rework ",
   "5.5.2"   => "09.12.2022 _DbLog_ConnectPush function removed ",
   "5.5.1"   => "09.12.2022 commit inserted lines in array insert though some lines are faulty ",
@@ -503,16 +504,22 @@ return;
 sub DbLog_DelayedShutdown {
   my $hash   = shift;
   my $name   = $hash->{NAME};
-  my $async  = AttrVal($name, "asyncMode", "");
-
-  return 0 if(IsDisabled($name));
-
+  my $async  = AttrVal($name, 'asyncMode', 0);
+  
   $hash->{HELPER}{SHUTDOWNSEQ} = 1;
-
-  Log3 ($name, 2, "DbLog $name - Last database write cycle due to shutdown ...");
+  
   DbLog_execMemCacheAsync ($hash);
+  
+  my $delay_needed = IsDisabled($name)            ? 0 :
+                     $hash->{HELPER}{LONGRUN_PID} ? 1 :
+                     0;
 
-return 1;
+  if ($delay_needed) {
+      Log3 ($name, 2, "DbLog $name - Wait for last database cycle due to shutdown ...");
+      
+  }
+
+return $delay_needed;
 }
 
 #####################################################
@@ -523,8 +530,7 @@ sub _DbLog_finishDelayedShutdown {
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  DbLog_SBP_CleanUp ($hash);
-  delete $hash->{HELPER}{SHUTDOWNSEQ};
+  DbLog_SBP_CleanUp     ($hash);
   CancelDelayedShutdown ($name);
 
 return;
@@ -1647,18 +1653,20 @@ sub DbLog_Log {
   }
 
   if(!$async) {
+      return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft
+      
       if($memcount) {                                                                   # synchroner non-blocking Mode
           return if($hash->{HELPER}{REOPEN_RUNS});                                      # return wenn "reopen" mit Ablaufzeit gestartet ist
 
           $err = DbLog_execMemCacheSync ($hash);
           DbLog_setReadingstate ($hash, $err) if($err);
       }
-      else {
-          if($hash->{HELPER}{SHUTDOWNSEQ}) {
-              Log3 ($name, 2, "DbLog $name - no data for last database write cycle");
-              _DbLog_finishDelayedShutdown ($hash);
-          }
-      }
+      #else {
+      #    if($hash->{HELPER}{SHUTDOWNSEQ}) {
+      #        Log3 ($name, 2, "DbLog $name - no data for last database write cycle");
+      #        _DbLog_finishDelayedShutdown ($hash);
+      #    }
+      #}
   }
 
   $net = tv_interval($nst);                                                             # Notify-Routine Laufzeit ermitteln
@@ -2107,7 +2115,6 @@ sub DbLog_execMemCacheAsync {
       undef %{$data{DbLog}{$name}{cache}{memcache}};                                       # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
       $error = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                         # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
-      return if($error);
   }
   else {
       if($hash->{HELPER}{LONGRUN_PID}) {
@@ -2124,7 +2131,7 @@ sub DbLog_execMemCacheAsync {
 
   my $nextsync = gettimeofday()+$syncival;
   my $nsdt     = FmtDateTime ($nextsync);
-  my $se       = AttrVal     ($name, "syncEvents", undef) ? 1 : 0;
+  my $se       = AttrVal     ($name, 'syncEvents', undef) ? 1 : 0;
 
   readingsSingleUpdate($hash, 'NextSync', $nsdt. " or when CacheUsage ".$clim." is reached", $se);
 
@@ -2458,6 +2465,12 @@ return;
 
 ###################################################################################
 #               neue Datenbankverbindung im SubProcess
+#
+#   RaiseError - handle attribute (which tells DBI to call the Perl die( ) 
+#                function upon error
+#   PrintError - handle attribute tells DBI to call the Perl warn( ) function 
+#                (which typically results in errors being printed to the screen 
+#                when encountered)
 ###################################################################################
 sub _DbLog_SBP_onRun_connectDB {
   my $paref      = shift;
@@ -2503,6 +2516,8 @@ sub _DbLog_SBP_onRun_connectDB {
               Log3 ($name, 2, "DbLog $name - Error: $err");
               return $err;
             };
+            
+  return $DBI::errstr if($DBI::errstr);
 
   if($utf8) {
       if($model eq "MYSQL") {
@@ -2829,7 +2844,7 @@ sub _DbLog_SBP_onRun_Log {
                   my $status = $tuple_status[$tuple];
                   $status    = 0 if($status eq "0E0");
 
-                  next if($status);                                              # $status ist "1" wenn insert ok
+                  next if($status);                                                # $status ist "1" wenn insert ok
 
                   Log3 ($name, 3, "DbLog $name - Insert into $current rejected - TS: $timestamp[$tuple], Device: $device_cur[$tuple], Reading: $reading_cur[$tuple], Status = $status");
 
@@ -2948,9 +2963,7 @@ sub _DbLog_SBP_onRun_Log {
               if(defined $rowhref) {                                                      # nicht gespeicherte Datensätze ausgeben
                   Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
 
-                  for my $df (sort {$a <=>$b} keys %{$rowhref}) {
-                      Log3 ($name, 2, "DbLog $name - $rowhref->{$df}");
-                  }
+                  __DbLog_SBP_logHashContent ($name, $rowhref);
               }
 
               __DbLog_SBP_commitOnly ($name, $dbh, $history);
@@ -2962,19 +2975,19 @@ sub _DbLog_SBP_onRun_Log {
                   Log3 ($name, 2, "DbLog $name - Error table $history - $error");
 
                   if($useta) {
-                      $rowlback = $cdata;                                                 # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+                      $rowlback = $cdata;                                                  # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
                       __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
                   }
                   else {
-                      if(defined $rowhref) {                                              # nicht gespeicherte Datensätze ausgeben
+                      if(defined $rowhref) {                                               # nicht gespeicherte Datensätze ausgeben
                           Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
 
-                          for my $df (sort {$a <=>$b} keys %{$rowhref}) {
-                              Log3 ($name, 2, "DbLog $name - $rowhref->{$df}");
-                          }
+                          __DbLog_SBP_logHashContent ($name, $rowhref);                          
+                          __DbLog_SBP_commitOnly     ($name, $dbh, $history);              # eingefügte Array-Daten bestätigen
                       }
-
-                      __DbLog_SBP_commitOnly ($name, $dbh, $history);                     # eingefügte Array-Daten bestätigen
+                      else {
+                          __DbLog_SBP_logHashContent ($name, $cdata);                             
+                      }
                   }
                 };
       }
@@ -3941,6 +3954,21 @@ sub __DbLog_SBP_beginTransaction {
             };
 
 return $err;
+}
+
+#################################################################
+#    einen Hashinhalt mit Schlüssel ausgeben
+#    $href - Rferenz auf den Hash
+#################################################################
+sub __DbLog_SBP_logHashContent {                               
+  my $name = shift;
+  my $href = shift;
+
+  for my $key (sort {$a<=>$b} keys %{$href}) {
+      Log3 ($name, 2, "DbLog $name - $key -> $href->{$key}");
+  } 
+
+return;
 }
 
 #################################################################
@@ -10479,7 +10507,6 @@ attr SMA_Energymeter DbLogValueFn
       "requires": {
         "FHEM": 5.00918799,
         "perl": 5.014,
-        "Data::Dumper": 0,
         "DBI": 0,
         "Time::HiRes": 0,
         "Time::Local": 0,
@@ -10495,9 +10522,10 @@ attr SMA_Energymeter DbLogValueFn
         "FHEM::Utility::CTZ": 0
       },
       "suggests": {
-        "DBD::Pg" :0,
-        "DBD::mysql" :0,
-        "DBD::SQLite" :0
+        "Data::Dumper": 0,
+        "DBD::Pg": 0,
+        "DBD::mysql": 0,
+        "DBD::SQLite": 0
       }
     }
   },
