@@ -38,7 +38,9 @@
 #    1.01.17  add TW9400
 #    1.01.18  added undocumented settings (IMGPROC, IRIS, LIRIS)
 #    1.01.19  added LS12000 (added POPLP, LENS, HLENS)
-#    1.01.20  added more LS12000 options, enable 2-value commands 
+#    1.01.20  added more LS12000 options, enable 2-value commands
+#    1.01.21  added HC2150
+#    1.01.22  added "on" and "off" as direct set commands (line 1334)
 #
 ################################################################################
 #
@@ -72,7 +74,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.20";
+my $version = "1.01.22";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -100,7 +102,9 @@ my %ESCVP21net_defaultsets = (
   "KEY"       => ":get,HDMI1,PC",
   "LAMP"      => ":get",
   "MUTE"      => ":get,on,off,toggle",
-  "PWR"       => ":get,on,off,toggle"
+  "PWR"       => ":get,on,off,toggle",
+  "on"        => ":noArg",
+  "off"       => ":noArg"
 );
 
 my %ESCVP21net_Entrysets = (  
@@ -129,6 +133,7 @@ my %ESCVP21net_Miscsets = (
 );
 
 # TW5650 sets
+# also valid for HC2150 
 my %ESCVP21net_TW5650sets = (
   "ASPECT"       => ":get,Auto,Auto20,Normal,Full,Zoom",
   "AUTOHOME"     => ":get,off,on",
@@ -1177,6 +1182,7 @@ sub ESCVP21net_Set {
   }
   
   $hash = $defs{$name};
+  $hash->{version} = $version;
   my $list = "";
   my $timeout    = 10;
   my $blockingFn = "ESCVP21net_setValue";
@@ -1325,6 +1331,16 @@ sub ESCVP21net_setValue($){
   my @cmds2set;
   my $hash = $defs{$name};
 
+  # handle special on/off command
+  if($cmd eq "on") {
+    $cmd = "PWR";
+    $val = "on";
+  }
+  if($cmd eq "off") {
+    $cmd = "PWR";
+    $val = "off";
+  }
+
   # add ? if cmd is get
   if ($val eq "get"){
     $data = "$cmd?\r\n";
@@ -1338,7 +1354,8 @@ sub ESCVP21net_setValue($){
   elsif(!defined($val)){
     # val is empty for GetAll, GetStatus
     $val = "none";
-  }  
+  }
+
   # else get the correct raw command from data hash
   else {
     $datakey = $cmd.":".$val;
@@ -1373,6 +1390,8 @@ sub ESCVP21net_setValue($){
     $data = "$cmd $val\r\n";
     $encdata = encode("utf8",$data);  
   }
+
+  main::Log3 $name, 5, "[$name]: setValue: command to send is $data";
 
   # now open socket - couldn't get read/write to socket via DevIo
   my $sock = ESCVP21net_openSocket($hash);
@@ -1948,8 +1967,9 @@ sub ESCVP21net_setTypeCmds ($){
   my $name = $hash->{NAME};
   my %ESCVP21net_typesets;
   my %ESCVP21net_typeresults;
+  main::Log3 $name, 5, "[$name]: setTypeCmds: model type is $hash->{model}";
   
-  if ($hash->{model} eq "TW5650"){
+  if (($hash->{model} eq "TW5650") || ($hash->{model} eq "HC2150")){
     %ESCVP21net_typesets = (%ESCVP21net_defaultsets,%ESCVP21net_Entrysets,%ESCVP21net_HomeBasicsets,%ESCVP21net_TW5650sets, %VP21addattrs);
     %ESCVP21net_typeresults = (%ESCVP21net_defaultresults,%ESCVP21net_TW5650result);
     main::Log3 $name, 5, "[$name]: setTypeCmds: loaded TW5650 sets and result";
@@ -2147,7 +2167,7 @@ sub ESCVP21net_openDevice{
       <li><b>model</b> - defines your type of projector. It is used for loading a suitable pre-defined command set.
         <br>No parameter or <i>default</i> will provide you with a limit "set" (PWR, MUTE, LAMP, KEY, GetAll, GetStatus).
         <br>You can try <i>TW5650</i> to get a typical set of implemented commands. Providing the maintainer with a suitable set for your projector will extend the module's capabilities ;-)
-        <br>Individually supported by now: TW5650, EB2250U, TW6100, TW7400, TW9400, LS12000
+        <br>Individually supported by now: TW5650, EB2250U, TW6100, TW7400, TW9400, LS12000, HC2150
         <br>"Hidden Feature:" Type <i>Scotty</i> will give you everything (as he does always ;) ). Not every command will work for you. You are the Captain, so decide wisely what to choose...
       </li>
       <li>Example: <code>define EPSON ESCVP21net 10.10.0.1 3629 TW5650</code>
@@ -2164,23 +2184,6 @@ sub ESCVP21net_openDevice{
     <br>For the predefined commands, "nice" names will be shown in the readings, e.g. for PWR: <b>Standby (Net on)</b> instead of the boring <b>PWR=04</b> (which is the device's answer if the projector is in Standby with LAN on).
     <br>Default set commands are
     <br><br>
-    <li>PWR
-      <br><i>on</i> or <i>off</i> to switch power, <i>get</i> to query current value
-    </li>
-    <br>
-    <li>MUTE
-      <br><i>on</i> or <i>off</i> to mute video signal (i.e. blank screen), <i>get</i> to query current state
-    </li>
-    <br>
-    <li>LAMP
-      <br><i>get</i> to query lamp hours
-    </li>
-    <br>
-    <li>KEY
-      <br>sends the value you enter to the projector.
-      <br>E.g.<i>KEY 03</i> should open the OSD menu, <i>KEY 05</i> should close it.
-    </li>
-    <br>
     <li>GetAll
       <br>This is a little bit special - it does not send just one command to the projector, but will select <b>every</b> command defined which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetAll is shown in the <b>GetAll</b> reading. It will either show the read commands, or inform if an error was received.
@@ -2189,7 +2192,33 @@ sub ESCVP21net_openDevice{
     <li>GetStatus
       <br>Also special - also does not send just one command to the projector, but will select <b>every</b> command you defined in attr "statusCheckCmd" which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetStatus is shown in the <b>GetStatus</b> reading. It will either show the read commands, or inform if an error was received.
-    </li>    
+    </li>
+    <br>    
+    <li>LAMP
+      <br><i>get</i> to query lamp hours.
+    </li>
+    <br>
+    <li>MUTE
+      <br><i>on</i> or <i>off</i> to mute video signal (i.e. blank screen), <i>get</i> to query current state.
+    </li>
+    <br>
+    <li>KEY
+      <br>sends the value you enter to the projector.
+      <br>E.g.<i>KEY 03</i> should open the OSD menu, <i>KEY 05</i> should close it.
+    </li>
+    <br>
+    <li>PWR
+      <br><i>on</i> or <i>off</i> to switch power, <i>get</i> to query current value.
+    </li>
+    <br>
+    <li>on
+      <br>Hm, what could that mean ... OK, shortcut to switch your projector on - give it a try!
+    </li>
+    <br>
+    <li>off
+      <br>Wohoo ... want to switch it off again? Then use this command.
+    </li>
+    <br>
   </ul>
   <br>
 
