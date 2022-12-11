@@ -11,6 +11,10 @@
 #    1.01.02      bugfix for single-digit NextTimer 
 #    1.01.03      corrections for german Umlaute
 #    1.01.04      fix statusCheckIntervall
+#    1.01.05      added capability to control plugins (PLUG)
+#                 added name to next timer
+#                 expicit set for SatIP plugin
+#                 handle HELP responses
 #
 ########################################################################################
 #
@@ -42,7 +46,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.04";
+my $version = "1.01.05";
 
 my %SVDRP_gets = (
   #
@@ -78,7 +82,11 @@ my %SVDRP_defaultsets = (
   "connect"           => ":noArg",
   "PowerOff"          => ":noArg",
   "ListRecording"     => "",
-  "GetAll"            => ":noArg"
+  "GetAll"            => ":noArg",
+  "Plugin"            => "",
+  "StreamdevServer"   => ":LSTC,DISC",
+  "SatIP"             => ":INFO,MODE,LIST,SCAN,STAT,CONT,OPER,ATTA,DETA,TRAC",
+  "Help"              => ":noArg"
 );
 
 my %SVDRP_defaultsets_unused = (
@@ -94,7 +102,11 @@ my %SVDRP_cmdmap = (
   "Channel"          => "CHAN",
   "DeleteTimer"      => "DELT",
   "Volume"           => "VOLU",
-  "ListRecording"    => "LSTR"
+  "ListRecording"    => "LSTR",
+  "Plugin"           => "PLUG",
+  "StreamdevServer"  => "PLUG streamdev-server",
+  "SatIP"            => "PLUG satip",
+  "Help"             => "HELP"
 );
 
 my @SVDRP_statusCmds = ("LSTT", "NEXT", "CHAN", "VOLU", "STAT");
@@ -104,6 +116,10 @@ my %SVDRP_cmdmap_unused = (
 );
 
 my %SVDRP_data = (
+  #
+);
+
+my %SVDRP_timers = (
   #
 );
 
@@ -364,6 +380,8 @@ sub SVDRP_cleanUp {
   #DevIo_CloseDev($hash);
   #$hash->{STATE} = "closed";
   #$hash->{PARTIAL}="";
+  # reset .sendingcmd to indicate that cmd sending cycle is done
+  readingsSingleUpdate($hash, ".sendingcmd", "0", 1);
   return ;
 }
 
@@ -518,8 +536,10 @@ sub SVDRP_parseMessage {
   my $parsedmsg = "";
   my $code;
   my $recording = "";
+  my $plugin = "";
+  my $text="";
    
-  readingsBeginUpdate($hash);
+  #readingsBeginUpdate($hash);
    
   ### now we should analyse which message was received, and put it to the right reading
   #if ($msg =~ /^22[0|1]/){
@@ -554,9 +574,10 @@ sub SVDRP_parseMessage {
   elsif ($msg =~ /^250[ ]\d+[ ][A-Za-z]{3}[ ][A-Za-z]{3}[ ]{1,2}[0-9]{1,2}[ ][0-9]{2}:[0-9]{2}:[0-9]{2}[ ][0-9]{4}\s$/){  
     # next timer format: 250 1 Tue Mar 15 09:50:00 2022
     $reading = "NextTimer";
-    (my $code, $msg) = split (/ /, $msg, 2);
-    $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
-    #Log3 $name, 5, "[$name] Parse: updated $reading with $msg";    
+    $msg = SVDRP_parseNextTimer($hash, $reading, $msg);
+    # seems that only with newline the sprintf formatting is kept - but I don't like it here ;-)
+    #$msg = $timers."\n".$msg;
+    readingsSingleUpdate($hash, $reading, $msg, 1); 
   }  
   elsif ($msg =~ /^250[ ]\d+[ ][A-Za-z0-9\h\.\-_?!#]+\s$/){
     # Channel format: 250 4 RTL Television
@@ -575,7 +596,7 @@ sub SVDRP_parseMessage {
   }
   elsif ($msg =~ /^250[ ]Key[ ][A-Za-z0-9"]+[ ]accepted\s$/){
     # HitKey format: 250 Key "up" accepted
-    $reading = "HitKey";
+    $reading = "HitKeyInfo";
     (my $code, $msg) = split (/ /, $msg, 2);
     $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
     #Log3 $name, 5, "[$name] Parse: updated $reading with $msg"
@@ -639,6 +660,81 @@ sub SVDRP_parseMessage {
     #$rv = readingsSingleUpdate($hash, $reading, $msg, 1);
     #Log3 $name, 5, "[$name] Parse: updated $reading with $msg"
   }
+
+  elsif ($msg =~ /^214/){
+    # Helpinfo format: 214-xxxx
+    $reading = "HelpInfo";
+    # empty HelpInfo reading, if we got a new one
+    my $sendingcmd = ReadingsVal($name,".sendingcmd","0");
+    if ($sendingcmd eq "1") {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, ".sendingcmd", "0", 1);
+      readingsBulkUpdate($hash, $reading, "", 1);
+      readingsEndUpdate($hash, 1);
+    }
+    # check if we got "214-n"
+    if (substr($msg, 3, 1) eq "-"){
+      ($code, $msg) = split (/-/, $msg, 2);
+      #Log3 $name, 5, "[$name] Parse: HelpInfo: substring contains '-'";
+    }
+    else{
+      ($code, $msg) = split (/ /, $msg, 2);
+    }
+    $text = ReadingsVal($name, $reading, "");
+    $msg = SVDRP_parseHelpinfo($name, $msg);
+    if ($msg ne "none"){
+      $msg = $text."\n".$msg;
+      $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
+      Log3 $name, 5, "[$name] Parse: HelpInfo: updated $reading with '$msg'";    
+    }
+    #$rv = readingsSingleUpdate($hash, $reading, $msg, 1);
+    #Log3 $name, 5, "[$name] Parse: HelpInfo: updated $reading with $msg"
+  }
+
+  elsif ($msg =~ /^9[0-9][0-9]/){
+    # PLUG resonse is like
+    # 900-SAT>IP device: 0
+    # 900-CardIndex: 0
+    # 900-Stream: rtsp://10.1.1.9/?src=1&freq=11185&pol=v&ro=0.35&msys=dvbs2&mtype=8psk&sr=22000&fec=23 (Unicast) [stream=1]
+    # 900-Signal: lock=1 strength=67 quality=100 frontend=1
+    # 900-Stream bitrate: 75 kB/s
+    # 900-Buffer bitrate: 0 kB/s
+    # 900-Buffer usage: 0/2048 kB (0,0%)
+    # 900-Channel: Das Erste HD;ARD:11493:HC23M5O35P0S1:S19.2E:22000:5101=27:5102=deu@3,5103=mis@3,5107=qks@3;5106=deu@106:5104;5105=deu:0:10301:1:1019:0
+    # 900-Active pids:
+    # 900-Active section filters:
+    # 900-Filter 0:    7 (   9 kB/s) Pid=0x12 (EIT)
+    # 900-Filter 1:    0 (   0 kB/s) Pid=0x14 (TDT)
+    # 900-Filter 2:    2 (   0 kB/s) Pid=0x00 (PAT)
+    # 900-Filter 3:    0 (   0 kB/s) Pid=0x11 (SDT)
+    # 900-Filter 4:    0 (   0 kB/s) Pid=0x10 (NIT)
+    # 900 Filter 5:    0 (   0 kB/s) Pid=0x60 (---)
+    $reading = "PluginInfo";
+
+    # check if we got "900-n"
+    if (substr($msg, 3, 1) eq "-"){
+      ($code, $msg) = split (/-/, $msg, 2);
+      #Log3 $name, 5, "[$name] Parse: substring contains '-'";
+    }
+    else{
+      ($code, $msg) = split (/ /, $msg, 2);
+    }
+  
+    $plugin = ReadingsVal($name, $reading, "");
+    $msg = SVDRP_parsePlugin($name, $msg);
+
+    if ($msg ne "none"){
+      $msg = $plugin."\n".$msg;
+      $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
+      Log3 $name, 5, "[$name] Parse: updated $reading with '$msg'";    
+    }
+
+    #Log3 $name, 5, "[$name] Parse: parsePlugin returned $msg";
+    #$msg = $plugin."\n".$msg;
+    #$rv = readingsSingleUpdate($hash, $reading, $msg, 1);
+    #Log3 $name, 5, "[$name] Parse: updated $reading with $parsedmsg"
+  }
+
   #Log3 $name, 5, "[$name] Parse: updated $reading with '$msg'";
 }
 
@@ -679,6 +775,7 @@ sub SVDRP_parseDiskStatus{
 
 sub SVDRP_parseTimer{
   my ($name, $msg) = @_;
+  my $hash = $defs{$name};
   #$count = 0;
   #$output = "";
   my $parsedmsg = "none";
@@ -704,13 +801,49 @@ sub SVDRP_parseTimer{
     ($i1, $i2, $day, $start, $end, $i3, $i4, $timername) = split (":", $timerstr, 8);
     substr ($start, 2, 0) = ":";
     substr ($end, 2, 0) = ":";
-    #$output .= "\n" if ($count > 0); # add LF only if first line is contained 
+    
+    # store timer ID and Name in hidden setting, to re-use with NextTimer command
+    $timername =~ s/[:\r\n]//g;
+    $SVDRP_timers{$timerid} = $timername;
+    readingsSingleUpdate( $hash, ".Timers", encode_json( \%SVDRP_timers ), 1 );
+   
     $parsedmsg = "ID: ".sprintf("%2s",$timerid)." | Day: ".sprintf("%-10s",$day)." | Start: ".$start." | Stop: ".$end." | Name: ".$timername;
+    
   }
   #Log3 $name, 5, "[$name] parseTimer: parsed output is $parsedmsg";
   return $parsedmsg;
 }
 
+sub SVDRP_parseNextTimer {
+  my ($hash, $reading, $msg) = @_;
+  #my $hash = $defs{$name};
+  my $name = $hash->{NAME};
+  my $timername = "";
+  (my $code, $msg) = split (/ /, $msg, 2);
+  # replace double blank by single blank
+  $msg =~ s/  / /g;
+  Log3 $name, 5, "[$name] Parse: NextTimer: $msg";
+  (my $tid, my $tday, my $tmonth, my $tdate, my $tstart, my $tyear) = split (/ /,$msg);
+  Log3 $name, 5, "[$name] Parse: NextTimer: $tid - $tday - $tmonth - $tdate - $tstart - $tyear";
+  # get timer name from hidden reading (requires ListTimer to be run)
+  my %myVDRtimers = SVDRP_restoreJson($hash, ".Timers");
+  if (exists($myVDRtimers{$tid})){
+    $timername = $myVDRtimers{$tid};
+    Log3 $name, 5, "[$name] Parse: NextTimer: ID: $tid, name: $timername"; 
+
+  }
+  my $parsedmsg = "ID: ".sprintf("%2s",$tid)." | Day: ".sprintf("%3s",$tday).sprintf("%3s",$tdate).".".sprintf("%3s",$tmonth)." ".sprintf("%4i",$tyear)." | Start: ".$tstart." | Name: ".$timername;
+  Log3 $name, 5, "[$name] Parse: NextTimer: $parsedmsg"; 
+
+  #readingsSingleUpdate($hash, $reading, $parsedmsg, 1);
+  #Log3 $name, 5, "[$name] Parse: updated $reading with $msg";
+  return $parsedmsg;
+}
+
+sub SVDRP_getTimerNames {
+  my ($name, $msg) = @_;
+  
+}
 sub SVDRP_parseRecording {
    my ($name, $msg) = @_;
    my $type = "none";
@@ -753,6 +886,19 @@ sub SVDRP_parseRecording {
    return $msg;
 }
 
+sub SVDRP_parseHelpinfo {
+  my ($name, $msg) = @_;
+  Log3 $name, 5, "[$name] parseHelpinfo: parsed output is $msg";
+  return $msg;
+}
+
+
+sub SVDRP_parsePlugin {
+  my ($name, $msg) = @_;
+  Log3 $name, 5, "[$name] parsePlugin: parsed output is $msg";
+  return $msg;
+}
+
 sub SVDRP_Set {
   my ($hash, @param) = @_;
 	
@@ -760,7 +906,7 @@ sub SVDRP_Set {
 	
   my $name = shift @param;
   my $opt = shift @param;
-  my $value = join("", @param);
+  my $value = join(" ", @param);
   #my $value = shift @param;
   my $msg;
   my $msg2;
@@ -770,6 +916,7 @@ sub SVDRP_Set {
   my $writecmd;
   
   $hash = $defs{$name};
+  $hash->{version} = $version;
 
   # construct set list
   my @cList = (keys %SVDRP_sets);
@@ -788,6 +935,9 @@ sub SVDRP_Set {
   # empty reading error
   readingsSingleUpdate($hash, "globalError", "", 1);
   readingsSingleUpdate($hash, "infoError", "", 1);
+  # set .sendingcmd to indicate that cmd sending cycle is started
+  # needed e.g. to empty HelpInfo as soon as new info is received
+  readingsSingleUpdate($hash, ".sendingcmd", "1", 1);
 
   if ($opt eq "cleanUp"){
     main::Log3 $name, 5, "[$name]: Set: $name cleanUp";
@@ -823,6 +973,8 @@ sub SVDRP_Set {
   if ($opt eq "LSTT"){
     # delete ListTimers, will be re-filled completely
     readingsSingleUpdate($hash, "ListTimers", "", 1);
+    #$SVDRP_timers{$timerid} = $timername;
+    %SVDRP_timers = ();
     main::Log3 $name, 5, "[$name]: Set: deleted ListTimers, value is now ".ReadingsVal($name,"ListTimers","none");
   }
 
@@ -839,6 +991,11 @@ sub SVDRP_Set {
     #my $recid = "Recording ID: ".((split / /, AttrVal($name,"LastCmd","unknown"), 2)[1] || "all");
     readingsSingleUpdate($hash, "Recordings", $recid, 1);
     main::Log3 $name, 5, "[$name]: Set: deleted Recordings, value is now ".ReadingsVal($name,"Recordings","none");
+  }
+
+  if ($opt =~ /^PLUG/){
+    readingsSingleUpdate($hash, "PluginInfo", "", 1);
+    main::Log3 $name, 5, "[$name]: Set: $name PluginInfo";
   }
 
   # get or no value will sent send $msg to the given command $opt
@@ -867,6 +1024,11 @@ sub SVDRP_Set {
     my $cmds = join (" ", @SVDRP_statusCmds);
     $writecmd = $name."|".$cmds."|".$optorg;
     InternalTimer( $next, "SVDRP_multiWrite", $writecmd);
+  }
+  elsif($msg =~ /NEXT/) {
+    my $cmds = "LSTT NEXT";
+    $writecmd = $name."|".$cmds."|".$optorg;
+    InternalTimer( $next, "SVDRP_multiWrite", $writecmd);    
   }
   else{
     $writecmd = $name."|".$msg."|".$optorg;
@@ -905,6 +1067,7 @@ sub SVDRP_multiWrite {
     if ($_ eq "LSTT"){
       # delete ListTimers, will be re-filled completely
       readingsSingleUpdate($hash, "ListTimers", "", 1);
+      %SVDRP_timers = ();
     }
     if ($_ eq "STAT"){
       $send = $_." disk\r\n"
@@ -1003,6 +1166,16 @@ sub SVDRP_checkStatus ($){
   }  
 }
 
+sub SVDRP_restoreJson {
+  my ($hash, $reading) = @_;
+  my $name = $hash->{NAME};
+  my $jsets = ReadingsVal($name, $reading, "{none:none}");
+  my $decode = decode_json($jsets);
+  # just for logging
+  #my %decode = %$decode;
+  #main::Log3 $name, 5, "[$name]: restore: ". keys(%decode);
+  return %$decode;
+}
 ###################################################
 #                    end                          #
 ###################################################
@@ -1069,6 +1242,9 @@ sub SVDRP_checkStatus ($){
       <br>(i.e. ListTimers, NextTimer, Channel, Volume, DiskStatus)
     </li>
     <br>
+    <li>Help
+      <br>gets the avaialble SVDRP commands from VDR and stores them in reading "HelpInfo" 
+    </li>
     <li>HitKey
       <br>Enables you to send any Key defined by http://www.vdr-wiki.de/wiki/index.php/SVDRP
       <br>E.g.<i>set &lt;name&gt; HitKey Power</i> will cleanly power off VDR.
@@ -1080,17 +1256,32 @@ sub SVDRP_checkStatus ($){
       <br>Attention: Depending on the number of number of recordings, this might take a while! fhem might show "timeout", and a screen refresh might be necessary. Use with care... 
     </li>
     <br>
-    <li>PowerOff
-      <br>A shortcut to cleanly power off VDR, same as <i>set &lt;name&gt; HitKey Power</i>
-    </li>
-    <br>
     <li>ListTimers
       <br>no value or <i>get</i> will query all timers from VDR.
       <br>raw answer from VDR will be parsed into a little bit nicer format. 
     </li>
     <br>
     <li>NextTimer
-      <br>no value or <i>get</i> will exactly get what it says. 
+      <br>no value or <i>get</i> will exactly get what it says.
+      <br>(to get the timer name, ListTimers will be called before) 
+    </li>
+    <br>
+    <li>Plugin
+      <br>calls SVDRP with PLUG - you can enter any Plugin's SVDRP commands here to control the plugin
+      <br>calling without parameter gets the list of avaialble plugins and stroes them in reading "HelpInfo"
+      <br>I cannot test this with any plugin, but the Plugin's answer should go to the reading "PluginInfo" or "InfoError" (if Plugin gives an error message)
+    </li>
+    <br>
+    <li>PowerOff
+      <br>A shortcut to cleanly power off VDR, same as <i>set &lt;name&gt; HitKey Power</i>
+    </li>
+    <br>
+    <li>SatIP
+      <br>send control commands to your SatIP plugin
+    </li>
+    <br>
+    <li>StreamdevServer
+      <br>sends the corresponding SVDRP command to the streamdev-Plugin (LSTC,DISC)
     </li>
     <br>
     <li>UpdateRecordings
