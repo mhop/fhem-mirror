@@ -7710,15 +7710,29 @@ return;
   <br>
   <br>
 
-    <ul>
-      <li><b>get &lt;name&gt; ReadingsVal &lt;device&gt; &lt;reading&gt; &lt;default&gt; </b> <br> </li>
-      <li><b>get &lt;name&gt; ReadingsTimestamp &lt;device&gt; &lt;reading&gt; &lt;default&gt; </b> <br><br>
-
-      Retrieve one single value, use and syntax are similar to ReadingsVal() and ReadingsTimestamp() functions.
-
-    </li>
-    </ul>
-    <br>
+  <ul>
+    <a id="DbLog-get-ReadingsVal"></a>
+    <li><b>get &lt;name&gt; ReadingsVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+      <ul>
+      Reads the last (newest) value of the specified device/reading combination stored in the history table 
+      and returns this value. <br>
+      &lt;default&gt; specifies a defined return value if no value is found in the database.
+      </ul>
+  </ul>
+  </li>
+  <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsTimestamp"></a>
+    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+      <ul>
+      Reads the timestamp of the last (newest) record stored in the history table of the specified 
+      Device/Reading combination and returns this value. <br>
+      &lt;default&gt; specifies a defined return value if no value is found in the database.
+      </ul>
+  </ul>
+  </li>
+  <br>
 
   <ul>
     <li><b>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
@@ -9295,16 +9309,29 @@ attr SMA_Energymeter DbLogValueFn
   <b>Get</b>
   <br>
   <br>
-
+  
   <ul>
-    <li><b>get &lt;name&gt; ReadingsVal &lt;device&gt; &lt;reading&gt; &lt;default&gt; </b> <br>
-    </li>
-    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;device&gt; &lt;reading&gt; &lt;default&gt; </b> <br><br>
-
-    Liest einen einzelnen Wert aus der Datenbank. Die Syntax ist weitgehend identisch zu ReadingsVal() und ReadingsTimestamp().
-    <br/>
-  </li>
+    <a id="DbLog-get-ReadingsVal"></a>
+    <li><b>get &lt;name&gt; ReadingsVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+      <ul>
+      Liest den letzten (neuesten) in der history Tabelle gespeicherten Wert der angegebenen Device/Reading 
+      Kombination und gibt diesen Wert zurück. <br>
+      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
+      </ul>
   </ul>
+  </li>
+  <br>
+  
+  <ul>
+    <a id="DbLog-get-ReadingsTimestamp"></a>
+    <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
+      <ul>
+      Liest den Zeitstempel des letzten (neuesten) in der history Tabelle gespeicherten Datensatzes der angegebenen 
+      Device/Reading Kombination und gibt diesen Wert zurück. <br>
+      &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
+      </ul>
+  </ul>
+  </li>
   <br>
 
   <ul>
