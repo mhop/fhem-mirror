@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-11 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-12 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -22,10 +22,10 @@
 package main;
 use strict;
 use warnings;
-eval "use DBI;1"                         or my $DbLogMMDBI    = "DBI";
-eval "use FHEM::Meta;1"                  or my $modMetaAbsent = 1;
-eval "use FHEM::Utility::CTZ qw(:all);1" or my $ctzAbsent     = 1;
-eval "use JSON;1;"                       or my $jsonabs       = "JSON";              ## no critic 'eval' # Debian: apt-get install libjson-perl
+eval "use DBI;1;"                                or my $DbLogMMDBI    = "DBI";              ## no critic 'eval' 
+eval "use FHEM::Meta;1;"                         or my $modMetaAbsent = 1;                  ## no critic 'eval' 
+eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;                  ## no critic 'eval' 
+eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval' 
 
 #use Data::Dumper;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
@@ -38,6 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON ",
+  "5.5.5"   => "11.12.2022 Array Log -> may be better error processing ",
   "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
   "5.5.3"   => "10.12.2022 more internal code rework ",
   "5.5.2"   => "09.12.2022 _DbLog_ConnectPush function removed ",
@@ -379,15 +381,20 @@ sub DbLog_Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
   my @a            = split "[ \t][ \t]*", $def;
-
+  
+  my $err;
+  
   if($DbLogMMDBI) {
-      Log3($name, 1, "DbLog $name - ERROR - Perl module ".$DbLogMMDBI." is missing. DbLog module is not loaded ! On Debian systems you can install it with \"sudo apt-get install libdbi-perl\" ");
-      return "Error: Perl module ".$DbLogMMDBI." is missing. Install it on Debian with: sudo apt-get install libdbi-perl";
+      $err = "Perl module ".$DbLogMMDBI." is missing. On Debian you can install it with: sudo apt-get install libdbi-perl";
+      Log3($name, 1, "DbLog $name - ERROR - $err");
+      return "Error: $err";
   }
+  
+  if ($storabs) {
+      $err = "Perl module ".$storabs." is missing. On Debian you can install it with: sudo apt-get install libstorable-perl";
+      Log3($name, 1, "DbLog $name - ERROR - $err");
+      return "Error: $err";
 
-  if($jsonabs) {
-      Log3($name, 1, "DbLog $name - ERROR - Perl module ".$jsonabs." is missing. Install it on Debian with: sudo apt-get install libjson-perl");
-      return "Error: Perl module ".$jsonabs." is missing. Install it on Debian with: sudo apt-get install libjson-perl";
   }
 
   return "wrong syntax: define <name> DbLog configuration regexp" if(int(@a) != 4);
@@ -405,7 +412,7 @@ sub DbLog_Define {
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
   $hash->{HELPER}{TH}            = 'history';                                                                 # Tabelle history (wird ggf. durch Datenbankschema ergänzt)
   $hash->{HELPER}{TC}            = 'current';                                                                 # Tabelle current (wird ggf. durch Datenbankschema ergänzt)
-
+  
   DbLog_setVersionInfo ($hash);                                                                               # Versionsinformationen setzen
   notifyRegexpChanged  ($hash, $regexp);                                                                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
 
@@ -2207,10 +2214,10 @@ sub DbLog_SBP_onRun {
   my $logstore;                                                                   # temporärer Logdatenspeicher
 
   while (1) {
-      my $json = $subprocess->readFromParent();
+      my $serial = $subprocess->readFromParent();
 
-      if(defined($json)) {
-          my $memc        = eval { decode_json($json) };
+      if(defined $serial) {
+          my $memc        = eval { thaw ($serial) };
 
           my $dbstorepars = $memc->{dbstorepars};                                 # 1 -> DB Parameter werden zum Speichern übermittelt, sonst 0
           my $dbdelpars   = $memc->{dbdelpars};                                   # 1 -> gespeicherte DB Parameter sollen gelöscht werden
@@ -2223,7 +2230,6 @@ sub DbLog_SBP_onRun {
           my $error       = q{};
           my $dbh;
           my $ret;
-          my $retjson;
 
           ##  Vorbereitungen
           #############################################################################
@@ -2592,7 +2598,6 @@ sub _DbLog_SBP_onRun_Log {
   my $nins_hist   = 0;
 
   my $ret;
-  my $retjson;
 
   if ($tl) {                                                              # Tracelevel setzen
       $dbh->{TraceLevel} = "$tl|$tf";
@@ -2930,80 +2935,69 @@ sub _DbLog_SBP_onRun_Log {
 
           eval {
               ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
+          };
+ 
+          if ($@) { 
+              $error = $@;
 
-              no warnings 'uninitialized';
+              Log3 ($name, 2, "DbLog $name - Error table $history - $error");
 
-              for my $tuple (0..$ceti-1) {
-                  my $status = $tuple_status[$tuple];
-                  $status    = 0 if($status eq "0E0");
-
-                  next if($status);                                                      # $status ist "1" wenn insert ok
-
-                  Log3 ($name, 4, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
-
-                  $event[$tuple]   =~ s/\|/_ESC_/gxs;                                    # escape Pipe "|"
-                  $reading[$tuple] =~ s/\|/_ESC_/gxs;
-                  $value[$tuple]   =~ s/\|/_ESC_/gxs;
-                  $unit[$tuple]    =~ s/\|/_ESC_/gxs;
-
-                  my $nlh = $timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple];
-
-                  push @n2hist, $nlh;
-
-                  $nins_hist++;
+              if($useta) {
+                  $rowlback = $cdata;                                                # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+                   __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
               }
+          };
+          
+          no warnings 'uninitialized';
 
-              use warnings;
+          for my $tuple (0..$ceti-1) {
+              my $status = $tuple_status[$tuple];
+              $status    = 0 if($status eq "0E0");
 
-              if(!$nins_hist) {
-                  Log3 ($name, 4, "DbLog $name - $ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
+              next if($status);                                                      # $status ist "1" wenn insert ok
+
+              Log3 ($name, 4, "DbLog $name - Insert into $history rejected".($usepkh ? " (possible PK violation) " : " ")."- TS: $timestamp[$tuple], Device: $device[$tuple], Reading: $reading[$tuple]");
+
+              $event[$tuple]   =~ s/\|/_ESC_/gxs;                                    # escape Pipe "|"
+              $reading[$tuple] =~ s/\|/_ESC_/gxs;
+              $value[$tuple]   =~ s/\|/_ESC_/gxs;
+              $unit[$tuple]    =~ s/\|/_ESC_/gxs;
+
+              my $nlh = $timestamp[$tuple]."|".$device[$tuple]."|".$type[$tuple]."|".$event[$tuple]."|".$reading[$tuple]."|".$value[$tuple]."|".$unit[$tuple];
+
+              push @n2hist, $nlh;
+
+              $nins_hist++;
+          }
+
+          use warnings;
+
+          if(!$nins_hist) {
+              Log3 ($name, 4, "DbLog $name - $ceti of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
+          }
+          else {
+              if($usepkh) {
+                  Log3 ($name, 3, "DbLog $name - INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh");
               }
               else {
-                  if($usepkh) {
-                      Log3 ($name, 3, "DbLog $name - INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh");
-                  }
-                  else {
-                      Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
+                  Log3 ($name, 2, "DbLog $name - WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history");
 
-                      my $bkey = 1;
+                  my $bkey = 1;
 
-                      for my $line (@n2hist) {
-                          $rowhref->{$bkey} = $line;
-                          $bkey++;
-                      }
+                  for my $line (@n2hist) {
+                      $rowhref->{$bkey} = $line;
+                      $bkey++;
                   }
               }
-
-              if(defined $rowhref) {                                                      # nicht gespeicherte Datensätze ausgeben
-                  Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
-
-                  __DbLog_SBP_logHashContent ($name, $rowhref);
-              }
-
-              __DbLog_SBP_commitOnly ($name, $dbh, $history);
-
-              1;
           }
-          or do { $error = $@;
 
-                  Log3 ($name, 2, "DbLog $name - Error table $history - $error");
+          __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
-                  if($useta) {
-                      $rowlback = $cdata;                                                  # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-                      __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
-                  }
-                  else {
-                      if(defined $rowhref) {                                               # nicht gespeicherte Datensätze ausgeben
-                          Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
+          if(defined $rowhref) {                                                      # nicht gespeicherte Datensätze ausgeben
+              Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
 
-                          __DbLog_SBP_logHashContent ($name, $rowhref);                          
-                          __DbLog_SBP_commitOnly     ($name, $dbh, $history);              # eingefügte Array-Daten bestätigen
-                      }
-                      else {
-                          __DbLog_SBP_logHashContent ($name, $cdata);                             
-                      }
-                  }
-                };
+              __DbLog_SBP_logHashContent ($name, $rowhref);
+          }
       }
 
       if (lc($DbLogType) =~ m(current)) {                                                  # insert current mit/ohne primary key
@@ -3220,7 +3214,6 @@ sub _DbLog_SBP_onRun_deleteOldDays {
   my $error       = q{};
   my $numdel      = 0;
   my $ret;
-  my $retjson;
 
   my $cmd         = "delete from $history where TIMESTAMP < ";
 
@@ -3305,7 +3298,6 @@ sub _DbLog_SBP_onRun_userCommand {
   my $error       = q{};
   my $res;
   my $ret;
-  my $retjson;
 
   Log3 ($name, 4, qq{DbLog $name - userCommand requested: "$sql"});
 
@@ -3379,9 +3371,7 @@ sub _DbLog_SBP_onRun_importCachefile {
   my $rowlback    = q{};
   my $crows       = 0;
   my $nins_hist   = 0;
-  my $res;
   my $ret;
-  my $retjson;
 
   if (open(FH, $infile)) {
       binmode (FH);
@@ -3481,7 +3471,6 @@ sub _DbLog_SBP_onRun_reduceLog {
   my $error       = q{};
   my $res;
   my $ret;
-  my $retjson;
 
   my @a = split " ", $arg;
 
@@ -4152,8 +4141,8 @@ sub __DbLog_SBP_sendToParent {
   my $subprocess = shift;
   my $ret        = shift;
 
-  my $json = eval {encode_json($ret)};
-  $subprocess->writeToParent  ($json);
+  my $serial = eval { freeze ($ret) };
+  $subprocess->writeToParent ($serial);
 
 return;
 }
@@ -4238,14 +4227,14 @@ sub DbLog_SBP_sendDbDisconnect {
   $memc->{dbdisconn}   = 1;                              # Statusbit command disconnect
   $memc->{operation}   = 'dbDisconnect';
 
-  my $json = eval { encode_json($memc);
-                  }
-                  or do { $err = $@;
-                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                          return $err;
-                        };
+  my $serial = eval { freeze ($memc);
+                    }
+                    or do { $err = $@;
+                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
+                            return $err;
+                          };
 
-  $subprocess->writeToChild($json);
+  $subprocess->writeToChild ($serial);
 
 return;
 }
@@ -4287,14 +4276,14 @@ sub DbLog_SBP_sendConnectionData {
       $memc->{sltcs} = AttrVal ($name, 'SQLiteCacheSize',    4000);
   }
 
-  my $json = eval { encode_json($memc);
-                  }
-                  or do { $err = $@;
-                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                          return $err;
-                        };
+  my $serial = eval { freeze ($memc);
+                    }
+                    or do { $err = $@;
+                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
+                            return $err;
+                          };
 
-  $subprocess->writeToChild($json);
+  $subprocess->writeToChild ($serial);
 
 return;
 }
@@ -4326,14 +4315,14 @@ sub DbLog_SBP_sendLogData {
   $memc->{verbose}   = AttrVal ($name, 'verbose',             3);
   $memc->{operation} = $oper;
 
-  my $json = eval { encode_json($memc);
-                  }
-                  or do { my $err = $@;
-                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                          return $err;
-                        };
+  my $serial = eval { freeze ($memc);
+                    }
+                    or do { my $err = $@;
+                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
+                            return $err;
+                          };
 
-  $subprocess->writeToChild($json);
+  $subprocess->writeToChild ($serial);
 
   $hash->{HELPER}{LONGRUN_PID} = time();                # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
@@ -4368,18 +4357,18 @@ sub DbLog_SBP_sendCommand {
   $memc->{operation} = $oper;
   $memc->{arguments} = $arg;
 
-  my $json = eval { encode_json($memc);
-                  }
-                  or do { my $err = $@;
-                          Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                          return $err;
-                        };
+  my $serial = eval { freeze ($memc);
+                    }
+                    or do { my $err = $@;
+                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
+                            return $err;
+                          };
 
   DbLog_setReadingstate ($hash, "operation '$oper' is running");
 
   $hash->{HELPER}{LONGRUN_PID} = time();                 # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
-  $subprocess->writeToChild($json);
+  $subprocess->writeToChild ($serial);
 
 return;
 }
@@ -4442,7 +4431,7 @@ sub DbLog_SBP_CleanUp {
   my $pid = $subprocess->pid();
   return if(!defined $pid);
 
-  Log3 ($name, 2, qq{DbLog $name - stopping Subprocess >$pid< ...});
+  Log3 ($name, 2, qq{DbLog $name - stopping SubProcess PID >$pid< ...});
 
   #$subprocess->terminate();
   #$subprocess->wait();
@@ -4450,7 +4439,7 @@ sub DbLog_SBP_CleanUp {
   kill 'SIGKILL', $pid;
   waitpid($pid, 0);
 
-  Log3 ($name, 2, qq{DbLog $name - Subprocess >$pid< stopped});
+  Log3 ($name, 2, qq{DbLog $name - SubProcess PID >$pid< stopped});
 
   delete ($selectlist{"$name.$pid"});
   delete $hash->{FD};
@@ -4471,10 +4460,10 @@ sub DbLog_SBP_Read {
   #my $name = $hash->{NAME};
 
   my $subprocess = $hash->{".fhem"}{subprocess};
-  my $retjson    = $subprocess->readFromChild();                                              # hier lesen wir aus der globalen Select-Schleife, was in der onRun-Funktion geschrieben wurde
+  my $retserial  = $subprocess->readFromChild();                                              # hier lesen wir aus der globalen Select-Schleife, was in der onRun-Funktion geschrieben wurde
 
-  if(defined($retjson)) {
-      my $ret = eval { decode_json($retjson) };
+  if(defined $retserial) {
+      my $ret = eval { thaw ($retserial) };
 
       return if(defined($ret) && ref($ret) ne "HASH");
 
@@ -7722,8 +7711,8 @@ return;
       <br><br>
 
       <b>Note</b> <br>
-      If the sub-process is reinitialized during runtime, the RAM consumption is increased, which is normalized
-      again after a FHEM restart.
+      The re-initialization of the sub-process during runtime causes an increased RAM consumption until
+      to a FHEM restart .
     </ul>
     </li>
     <br>
@@ -9323,8 +9312,8 @@ attr SMA_Energymeter DbLogValueFn
       <br><br>
 
       <b>Hinweis</b> <br>
-      Bei Neuinitialisierung des SubProzesses während der Laufzeit ergibt sich ein erhöhter RAM Verbrauch der sich
-      nach einem FHEM Neustart wieder normalisiert.
+      Die Neuinitialisierung des SubProzesses während der Laufzeit verursacht einen erhöhten RAM Verbrauch bis
+      zu einem FHEM Neustart .
     </ul>
     </li>
     <br>
@@ -10527,7 +10516,7 @@ attr SMA_Energymeter DbLogValueFn
         "HttpUtils": 0,
         "Encode": 0,
         "SubProcess": 0,
-        "JSON": 0
+        "Storable": 0
       },
       "recommends": {
         "FHEM::Meta": 0,
