@@ -87,7 +87,7 @@ name:MQTT2_IO_ignoreRegexp_homeassistant
 filter:TYPE=MQTT2_DEVICE
 desc:Expands existing or adds a ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages meant for homeassistant for auto-discovery of devices. You are strongly encouraged to not use homeassistant autodiscovery at all, but in case you need it for some reason, adding this ignoreRegexp-expression might help to avoid confusion!<br>NOTE: early experimental version...
 order:000002a
-farewell:template has been applied successfully. If you will not be redirected to IODev detail page, no changes have been made.<br>Check further extending the ignoreRegexp by yourself!
+farewell:template has been applied successfully. If you will not be redirected to IODev detail page, no changes have been made. Check further extending the ignoreRegexp by yourself!
 par:IODEVNAME;Name of the IO-Device; { InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})) }
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old = AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})),'ignoreRegexp','homeassistant/[^:"]+/config'); 'homeassistant/[^:"]+/config' =~ m/$old/ ? $old : $old.'|homeassistant/[^:"]+/config' }
 option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})),'ignoreRegexp','not_set');return 0}
@@ -128,7 +128,7 @@ name:zigbee2mqtt_bridge
 desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
 order:L_01
-farewell:template has been applied successfully. <br>Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|zigbee2mqtt/[A-Za-z0-9._]+/set</i>.
+farewell:template has been applied successfully. Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like |zigbee2mqtt/[A-Za-z0-9._]+/set.
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic","") =~ m,[\b]?([^/:]+)(/.+)?, ? $1 : AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)/bridge/.+, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
@@ -1035,7 +1035,7 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
 par:WPNAME;weekprofile attr value, defaults to device name;{ AttrVal("DEVICE","weekprofile","DEVICE") }
-farewell:template has been applied successfully. <br>NOTE: code has been downloaded from svn (contrib). <br>For use with weekprofile, additional configuration is needed!
+farewell:template has been applied successfully. NOTE: code has been downloaded from svn (contrib). For use with weekprofile, additional configuration is needed!
 { Svn_GetFile("contrib/AttrTemplate/99_attrT_z2m_thermostat_Utils.pm", "FHEM/99_attrT_z2m_thermostat_Utils.pm", sub(){ CommandReload(undef, "99_attrT_z2m_thermostat_Utils.pm") }) }
 attr DEVICE comment For use with weekprofile, additional configuration is needed
 attr DEVICE icon ICON
@@ -1641,7 +1641,7 @@ Use the "set x_configuration" Option. Example: "set x_configuration ShutterOpenD
 Shutter specific commands available: ShutterOpenDuration1, ShutterCloseDuration1, ShutterRelay1, ShutterSetHalfway1, ShutterSetClose1, ShutterInvert1, ShutterMotordelay1, ShutterCalibration1; you may use this for general setOptions in tasmota also.\
 commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
-farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
+farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the Tasmota wiki (https://tasmota.github.io/docs/Blinds-and-Shutters/).
 attr DEVICE model tasmota_2ch_shutter_invert_1
 setreading DEVICE attrTemplateVersion 20210607
 option:{ CALLSPEECHRECOGN }
@@ -1755,7 +1755,7 @@ attr DEVICE comment After applying the template set "ShutterOpenDuration1", "Shu
 Use the "set x_configuration" Option. Example: "set x_configuration ShutterOpenDuration1 35".\
 This is for a tilt range from -90 to 90 degrees, if you have different tilt options, adopt range manually\
 For calibration, tilt range settings, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
-farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
+farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and shuttertiltconfig1, see short instruction in comment attribute or the Tasmota wiki (https://tasmota.github.io/docs/Blinds-and-Shutters/).
 attr DEVICE model tasmota_2ch_shutter_venetian_invert_0
 setreading DEVICE attrTemplateVersion 20220218
 option:{ CALLSPEECHRECOGN }
@@ -2254,7 +2254,7 @@ attr DEVICE autocreate 0
 attr DEVICE devStateIcon off:light_light_dim_00:on on:light_light_dim_90:off
 attr DEVICE webCmd pct
 attr DEVICE comment After applying the template, the device to be controlled needs further configuration. For the necessary steps see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
-farewell:template has been applied successfully. Now it's recommended to do some configruation, see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
+farewell:template has been applied successfully. Now it's recommended to do some configruation, see Tasmota wiki instructions (https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer).
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_TuyaMCU_dimmer
 setreading DEVICE attrTemplateVersion 20220228
@@ -4112,7 +4112,7 @@ attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
   getAll:noArg DEV_ID/list
 set DEVICE getKnown
 attr DEVICE comment <html>NOTE: additional templates and code have been downloaded from svn (contrib).<br>Pls. inform the maintainer, if the bridgeRegexp doesn't fit to all of your devices connected to the bus.
-farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>, to see more info about the provided code, issue <i>help attrTmqtt2_ebus_Utils</i></html>.
+farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the Wiki (https://wiki.fhem.de/wiki/EBUS-MQTT2), to see more info about the provided code, issue "help attrTmqtt2_ebus_Utils".
 attr DEVICE model eBus_daemon_splitter
 setreading DEVICE attrTemplateVersion 20210715
 
@@ -4251,7 +4251,7 @@ name:esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>Recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
 order:X_01
-farewell:template has been applied successfully. <br>Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|milight/0x[0-9a-fA-F]{1,4}/.*/[0-8]</i>.
+farewell:template has been applied successfully. Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like "|milight/0x[0-9a-fA-F]{1,4}/.*/[0-8]".
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)/LWT:, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
@@ -4860,7 +4860,7 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
 attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map seperately, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">
-farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>Generated map will be shown as devStateIcon or define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. NOTE: For use with rand256-Valetudo variant of the code with external map generator, change "svg" in devStateIcon code to "png", change readingList entry for map_data to "BASE_ID/DEVNAME/map_data:.* {}" and add the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
+farewell:template has been applied successfully. NOTE: additional code has been downloaded from svn (contrib). Generated map will be shown as devStateIcon or define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see this forum thread: https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304. NOTE: For use with rand256-Valetudo variant of the code with external map generator, change "svg" in devStateIcon code to "png", change readingList entry for map_data to "BASE_ID/DEVNAME/map_data:.* {}" and add the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
 attr DEVICE model roborock
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
@@ -5133,7 +5133,7 @@ attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$
   url:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
   volume:slider,0,1,100 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}
 attr DEVICE comment For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
-farewell:template has been applied successfully. For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
+farewell:template has been applied successfully. For further info on configuration and available commands see the project page (https://thanksmister.com/wallpanel-android/).
 attr DEVICE model wallpanel_app
 setreading DEVICE attrTemplateVersion 20200921
 
@@ -5220,7 +5220,7 @@ attr DEVICE webCmdLabel RGB:Brightness\
 attr DEVICE setStateList on off toggle dimdown dimup effect_prev effect_next effect_random palette_prev palette_next palette_random palette_reset effect_reset
 attr DEVICE comment For questions about the use of different widgets for color selection see discussion at https://forum.fhem.de/index.php/topic,98880.msg995308.html
 set DEVICE attrTemplate speechcontrol_type_light_255
-farewell:template has been applied successfully. <br>Note: webCmd and eventMap are just examples; adopt this to your needs.
+farewell:template has been applied successfully. Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
 setreading DEVICE attrTemplateVersion 20211220
 
@@ -5417,7 +5417,7 @@ ALW:Activation\
 attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE comment NOTE: additional code has been downloaded from svn (contrib).<br>There may be room for improvement, please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html; issue "help attrT_go_e_Utils" for more info about.
-farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>This is in early development stage, there may be room for improvement! Please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html. To see more info about the provided code, issue <i>help attrT_go_e_Utils</i>.
+farewell:template has been applied successfully. NOTE: additional code has been downloaded from svn (contrib). <br>This is in early development stage, there may be room for improvement! Please adress any issues in https://forum.fhem.de/index.php/topic,115620.0.html. To see more info about the provided code, issue "help attrT_go_e_Utils".
 attr DEVICE model go_eCharger
 setreading DEVICE attrTemplateVersion 20210804
 
@@ -5426,7 +5426,7 @@ name:hoymiles_microinverter_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:Early version! Use this with "ahoy" firmware for ESP8266+nRF24L01+. For further details visit https://github.com/grindylow/ahoy and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
 order:W_06
-farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|devcontrol/[0-8]+/[0-8]+</i>. For the single microinverters, please be patient, until the Readings concerning the AC will have been sent in.
+farewell:template has been applied successfully. <br>Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like "|devcontrol/[0-8]+/[0-8]+". For the single microinverters, please be patient, until the Readings concerning the AC will have been sent in.
 par:BASE_ID;BASE_ID as set on the esp;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/version:, ? $1 : undef }
 par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
 attr DEVICE icon ICON
