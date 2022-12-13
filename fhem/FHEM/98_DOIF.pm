@@ -4854,7 +4854,11 @@ sub card
       $unit1[$i]=${$unit_a}[$i];
     }
   } else {
-    $unit1[0]=$unit_a;
+    if (!defined $unit_a) {
+      $unit1[0]="";
+    } else {
+      $unit1[0]=$unit_a;
+    }
   }
   if (defined $col2) {
     if (ref($col2) eq "ARRAY") {
@@ -4890,7 +4894,11 @@ sub card
       $unit2[$i]=${$unit_b}[$i];
     }
   } else {
-    $unit2[0]=$unit_b;
+    if (!defined $unit_b) {
+      $unit2[0]="";
+    } else {
+      $unit2[0]=$unit_b;
+    }
   }
 
   
@@ -5198,15 +5206,20 @@ sub card
   if ($hring eq "") {
     $out.=sprintf('<g transform="translate(%s,6)">',$bwidth-49);
     if (@value1 >= 2 ) {
+      my $unit_1=(split(",",$unit1[0]))[0];
+      my $unit_2=(split(",",$unit1[1]))[0];
       my $unitColor=(split(",",$unit1[0]))[1];
       my $unitColor2=(split(",",$unit1[1]))[1];
       $decfont="" if (!defined $decfont);
-      $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
-             $value1[1]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[1]))[0],$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $head or !defined $icon) ? undef: $icon,$model);
+      $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,defined $unitColor ? $decfont.",,fill:".$unitColor:$decfont,
+             $value1[1]{value},$min,$max,$minColor,$maxColor,$unit_2,$func,defined $unitColor2 ? $decfont.",,fill:".$unitColor2:$decfont,$lightness,(defined $head or !defined $icon) ? undef: $icon,$model);
     } elsif (@value1 == 1 and @value2 >= 1) {
-        $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$value2[0]{value},$min2,$max2,$minColor2,$maxColor2,(split(",",$unit2[0]))[0],$func2,$decfont2,$lightness,((defined $head or !defined $icon) ? undef: $icon),$model);
+        my $unit_1=(split(",",$unit1[0]))[0];
+        my $unit_2=(split(",",$unit2[0]))[0];
+        $out.= ui_Table::ring2($value1[0]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,$decfont,$value2[0]{value},$min2,$max2,$minColor2,$maxColor2,$unit_2,$func2,$decfont2,$lightness,((defined $head or !defined $icon) ? undef: $icon),$model);
     } else {
-        $out.= ui_Table::ring($value1[0]{value},$min,$max,$minColor,$maxColor,(split(",",$unit1[0]))[0],92,$func,$decfont,$model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
+        my $unit_1=(split(",",$unit1[0]))[0];
+        $out.= ui_Table::ring($value1[0]{value},$min,$max,$minColor,$maxColor,$unit_1,92,$func,$decfont,$model,$lightness,(defined $head or !defined $icon) ? undef: $icon);
     }
     $out.='</g>';
     $out.=sprintf('<text text-anchor="middle" x="%s" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth-21,::strftime("%H:%M:%S",localtime($time)));
