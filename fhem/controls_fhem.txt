@@ -1,4 +1,4 @@
-REV 26843
+REV 26847
 DIR unused
 UPD 2022-12-12_07:45:03 385836 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -375,7 +375,7 @@ UPD 2020-10-26_19:49:05 39446 FHEM/71_DENON_AVR_ZONE.pm
 UPD 2017-05-29_07:45:02 63897 FHEM/71_ONKYO_AVR_ZONE.pm
 UPD 2019-02-26_07:45:02 96052 FHEM/71_PHILIPS_AUDIO.pm
 UPD 2020-09-21_07:45:03 31314 FHEM/71_PIONEERAVRZONE.pm
-UPD 2022-12-03_07:45:04 169195 FHEM/71_YAMAHA_AVR.pm
+UPD 2022-12-13_07:45:02 169261 FHEM/71_YAMAHA_AVR.pm
 UPD 2017-09-27_07:45:02 51988 FHEM/71_YAMAHA_BD.pm
 UPD 2021-01-17_07:45:02 273182 FHEM/71_YAMAHA_MC.pm
 UPD 2019-07-13_07:45:02 131256 FHEM/71_YAMAHA_NP.pm
@@ -654,10 +654,10 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-12-02_07:45:03 398738 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-12-13_07:45:02 398593 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2022-12-03_07:45:04 11267 FHEM/lib/AttrTemplate/speechcontrol.template
+UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2021-10-13_07:45:02 25586 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-23_07:45:02 9355 FHEM/lib/EnO_ReCom_Device_Descr.xml
 UPD 2015-07-28_14:05:30 11604 FHEM/lib/LiquidCrystal.pm
@@ -750,8 +750,8 @@ UPD 2022-12-12_07:45:07 4820846 docs/commandref.html
 UPD 2022-12-11_07:45:20 2867875 docs/commandref_DE.html
 UPD 2022-11-15_07:45:02 83658 docs/commandref_frame.html
 UPD 2022-11-15_07:45:02 93676 docs/commandref_frame_DE.html
-UPD 2022-12-12_07:45:11 292889 docs/commandref_modular.html
-UPD 2022-12-12_07:45:12 304099 docs/commandref_modular_DE.html
+UPD 2022-12-13_07:45:10 292889 docs/commandref_modular.html
+UPD 2022-12-13_07:45:11 304099 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
