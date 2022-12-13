@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-12 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-13 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON ",
+  "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
   "5.5.5"   => "11.12.2022 Array Log -> may be better error processing ",
   "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
   "5.5.3"   => "10.12.2022 more internal code rework ",
@@ -2125,7 +2125,7 @@ sub DbLog_execMemCacheAsync {
 
       my $memc;
 
-      for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+      for my $key (sort {$a<=>$b} (keys %{$data{DbLog}{$name}{cache}{memcache}})) {
           Log3 ($name, 5, "DbLog $name - MemCache contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
 
           $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};        # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
@@ -2184,7 +2184,7 @@ sub DbLog_execMemCacheSync {
 
   my $memc;
 
-  for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+  for my $key (sort {$a<=>$b} (keys %{$data{DbLog}{$name}{cache}{memcache}})) {
       Log3 ($name, 5, "DbLog $name - TempStore contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
 
       $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};                # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
@@ -2284,12 +2284,7 @@ sub DbLog_SBP_onRun {
               $store->{dbparams}{dbstorepars} = $memc->{dbstorepars};             # Status Speicherung DB Parameter 0|1
 
               if ($verbose == 5) {
-                  Log3 ($name, 5, "DbLog $name - DB Parameter stored in SubProcess:");
-
-                  for my $dbp (sort keys %{$store->{dbparams}}) {
-                      next if(!defined $store->{dbparams}{$dbp});
-                      Log3 ($name, 5, "DbLog $name - $dbp -> ".$store->{dbparams}{$dbp});
-                  }
+                  DbLog_logHashContent ($name, $store->{dbparams}, 5);
               }
 
               $ret = {
@@ -2585,7 +2580,7 @@ sub _DbLog_SBP_onRun_Log {
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
   my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   my $index       = $memc->{cdataindex};                                  # aktueller Cache-Index
-
+  
   my $dbh         = $store->{dbh};
   my $dbconn      = $store->{dbparams}{dbconn};
   my $model       = $store->{dbparams}{model};
@@ -2996,7 +2991,7 @@ sub _DbLog_SBP_onRun_Log {
           if(defined $rowhref) {                                                      # nicht gespeicherte Datensätze ausgeben
               Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
 
-              __DbLog_SBP_logHashContent ($name, $rowhref);
+              DbLog_logHashContent ($name, $rowhref, 2);
           }
       }
 
@@ -3960,21 +3955,6 @@ return $err;
 }
 
 #################################################################
-#    einen Hashinhalt mit Schlüssel ausgeben
-#    $href - Rferenz auf den Hash
-#################################################################
-sub __DbLog_SBP_logHashContent {                               
-  my $name = shift;
-  my $href = shift;
-
-  for my $key (sort {$a<=>$b} keys %{$href}) {
-      Log3 ($name, 2, "DbLog $name - $key -> $href->{$key}");
-  } 
-
-return;
-}
-
-#################################################################
 #          nur Datenbank "commit"
 #################################################################
 sub __DbLog_SBP_commitOnly {
@@ -4139,9 +4119,9 @@ return ($err, $sth);
 #################################################################
 sub __DbLog_SBP_sendToParent {
   my $subprocess = shift;
-  my $ret        = shift;
+  my $data       = shift;
 
-  my $serial = eval { freeze ($ret) };
+  my $serial = eval { freeze ($data) };
   $subprocess->writeToParent ($serial);
 
 return;
@@ -4227,14 +4207,8 @@ sub DbLog_SBP_sendDbDisconnect {
   $memc->{dbdisconn}   = 1;                              # Statusbit command disconnect
   $memc->{operation}   = 'dbDisconnect';
 
-  my $serial = eval { freeze ($memc);
-                    }
-                    or do { $err = $@;
-                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                            return $err;
-                          };
-
-  $subprocess->writeToChild ($serial);
+  $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
+  return $err if($err);
 
 return;
 }
@@ -4275,15 +4249,9 @@ sub DbLog_SBP_sendConnectionData {
       $memc->{sltjm} = AttrVal ($name, 'SQLiteJournalMode', 'WAL');
       $memc->{sltcs} = AttrVal ($name, 'SQLiteCacheSize',    4000);
   }
-
-  my $serial = eval { freeze ($memc);
-                    }
-                    or do { $err = $@;
-                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                            return $err;
-                          };
-
-  $subprocess->writeToChild ($serial);
+  
+  $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
+  return $err if($err);
 
 return;
 }
@@ -4296,7 +4264,7 @@ return;
 #####################################################
 sub DbLog_SBP_sendLogData {
   my $hash = shift;
-  my $oper = shift;                                        # angeforderte Operation
+  my $oper = shift;                                                   # angeforderte Operation
   my $memc = shift;
 
   my $name       = $hash->{NAME};
@@ -4315,16 +4283,10 @@ sub DbLog_SBP_sendLogData {
   $memc->{verbose}   = AttrVal ($name, 'verbose',             3);
   $memc->{operation} = $oper;
 
-  my $serial = eval { freeze ($memc);
-                    }
-                    or do { my $err = $@;
-                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                            return $err;
-                          };
+  my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
+  return $err if($err);
 
-  $subprocess->writeToChild ($serial);
-
-  $hash->{HELPER}{LONGRUN_PID} = time();                # Statusbit laufende Verarbeitung mit Startzeitstempel;
+  $hash->{HELPER}{LONGRUN_PID} = time();                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
 }
@@ -4340,7 +4302,7 @@ return;
 #####################################################
 sub DbLog_SBP_sendCommand {
   my $hash = shift;
-  my $oper = shift;                                       # angeforderte Operation
+  my $oper = shift;                                                   # angeforderte Operation
   my $arg  = shift // q{};
 
   my $name       = $hash->{NAME};
@@ -4356,17 +4318,31 @@ sub DbLog_SBP_sendCommand {
   $memc->{verbose}   = AttrVal ($name, 'verbose', 3);
   $memc->{operation} = $oper;
   $memc->{arguments} = $arg;
-
-  my $serial = eval { freeze ($memc);
-                    }
-                    or do { my $err = $@;
-                            Log3 ($name, 1, "DbLog $name - JSON error: $err");
-                            return $err;
-                          };
+  
+  my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
+  return $err if($err);
+  
+  $hash->{HELPER}{LONGRUN_PID} = time();                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
   DbLog_setReadingstate ($hash, "operation '$oper' is running");
 
-  $hash->{HELPER}{LONGRUN_PID} = time();                 # Statusbit laufende Verarbeitung mit Startzeitstempel;
+return;
+}
+
+#################################################################
+#   Information Serialisieren und an Child Prozess senden
+#################################################################
+sub _DbLog_SBP_sendToChild {
+  my $name       = shift;             
+  my $subprocess = shift;
+  my $data       = shift;
+
+  my $serial = eval { freeze ($data);
+                    }
+                    or do { my $err = $@;
+                            Log3 ($name, 1, "DbLog $name - Serialization error: $err");
+                            return $err;
+                          };
 
   $subprocess->writeToChild ($serial);
 
@@ -6658,6 +6634,29 @@ sub DbLog_setinternalcols {
   $hash->{COLUMNS} = "field length used for Device: $hash->{HELPER}{DEVICECOL}, Type: $hash->{HELPER}{TYPECOL}, Event: $hash->{HELPER}{EVENTCOL}, Reading: $hash->{HELPER}{READINGCOL}, Value: $hash->{HELPER}{VALUECOL}, Unit: $hash->{HELPER}{UNITCOL} ";
 
   $hash->{HELPER}{COLSET} = 1;                                        # Statusbit "Columns sind gesetzt"
+
+return;
+}
+
+#################################################################
+#    einen Hashinhalt mit Schlüssel ausgeben
+#    $href    - Referenz auf den Hash
+#    $verbose - Level für Logausgabe
+#################################################################
+sub DbLog_logHashContent {                               
+  my $name    = shift;
+  my $href    = shift;
+  my $verbose = shift // 3;
+
+  no warnings 'numeric';
+  
+  for my $key (sort {$a<=>$b} keys %{$href}) {
+      next if(!defined $href->{$key});
+      
+      Log3 ($name, $verbose, "DbLog $name - $key -> $href->{$key}");
+  }
+
+  use warnings;  
 
 return;
 }
