@@ -25,7 +25,7 @@ use warnings;
 eval "use DBI;1;"                                or my $DbLogMMDBI    = "DBI";              ## no critic 'eval' 
 eval "use FHEM::Meta;1;"                         or my $modMetaAbsent = 1;                  ## no critic 'eval' 
 eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;                  ## no critic 'eval' 
-eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval' 
+eval "use Storable qw(freeze thaw dclone);1;"    or my $storabs       = "Storable";         ## no critic 'eval' 
 
 #use Data::Dumper;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
@@ -1682,12 +1682,6 @@ sub DbLog_Log {
           $err = DbLog_execMemCacheSync ($hash);
           DbLog_setReadingstate ($hash, $err) if($err);
       }
-      #else {
-      #    if($hash->{HELPER}{SHUTDOWNSEQ}) {
-      #        Log3 ($name, 2, "DbLog $name - no data for last database write cycle");
-      #        _DbLog_finishDelayedShutdown ($hash);
-      #    }
-      #}
   }
 
   $net = tv_interval($nst);                                                             # Notify-Routine Laufzeit ermitteln
@@ -2073,14 +2067,9 @@ return $memcount;
 sub DbLog_execMemCacheAsync {
   my $hash       = shift;
   my $name       = $hash->{NAME};
-  my $syncival   = AttrVal($name, "syncInterval",              30);
-  my $clim       = AttrVal($name, "cacheLimit",   $dblog_cachedef);
+  
   my $async      = AttrVal($name, "asyncMode",                  0);
-  my $ce         = AttrVal($name, "cacheEvents",                0);
-  my $DbLogType  = AttrVal($name, "DbLogType",          'History');
 
-  my $dolog      = 1;
-  my $error;
 
   RemoveInternalTimer($hash, 'DbLog_execMemCacheAsync');
 
@@ -2088,14 +2077,23 @@ sub DbLog_execMemCacheAsync {
       InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
       return;
   }
+  
+  my $nextsync = gettimeofday() + AttrVal($name, 'syncInterval', 30);
+  my $se       = AttrVal ($name, 'syncEvents', undef) ? 1 : 0;
+  my $clim     = AttrVal ($name, "cacheLimit", $dblog_cachedef);
+
+  readingsSingleUpdate($hash, 'NextSync', FmtDateTime ($nextsync). " or when CacheUsage ".$clim." is reached", $se);
 
   DbLog_SBP_CheckAndInit ($hash);                                                            # Subprocess checken und ggf. initialisieren
   return if(!defined $hash->{".fhem"}{subprocess});
-
+  
+  my $ce       = AttrVal ($name, 'cacheEvents', 0);
   my $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
                  scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
                  0;
-
+                 
+  readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 2 ? 1 : 0));
+  
   my $params   = {
       hash     => $hash,
       clim     => $clim,
@@ -2107,39 +2105,36 @@ sub DbLog_execMemCacheAsync {
       return;
   }
 
+  my $err;
+  my $verbose = AttrVal ($name, 'verbose', 3);
+  my $dolog   = $memcount ? 1 : 0;
+
   if($hash->{HELPER}{LONGRUN_PID}) {
       $dolog = 0;
   }
 
-  readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 2 ? 1 : 0));
-
-  if($memcount && $dolog) {
+  if($verbose =~ /[45]/xs && $dolog) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP asynchronous    ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - MemCache contains $memcount entries to process");
-      Log3 ($name, 4, "DbLog $name - DbLogType is: $DbLogType");
-
+      Log3 ($name, 4, "DbLog $name - DbLogType is: ".AttrVal($name, 'DbLogType', 'History'));
+  }
+  
+  if($dolog) {
       my $wrotefile = DbLog_writeFileIfCacheOverflow ($params);                            # Cache exportieren bei Overflow
       return if($wrotefile);
-
-      my $memc;
-
-      for my $key (sort {$a<=>$b} (keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-          Log3 ($name, 5, "DbLog $name - MemCache contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
-
-          $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};        # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
+      
+      if ($verbose == 5) {
+          DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'MemCache contains: ');
       }
 
-      $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                             # aktuellen Index an Subprozess übergeben
-
-      undef %{$data{DbLog}{$name}{cache}{memcache}};                                       # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
-
-      $error = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                         # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
+      my $memc = _DbLog_copyCache      ($name);
+      $err     = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                       # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   }
   else {
       if($hash->{HELPER}{LONGRUN_PID}) {
-          $error = 'Another operation is in progress - resync at NextSync';
+          $err = 'Another operation is in progress - resync at NextSync';
           DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
       }
       else {
@@ -2150,13 +2145,7 @@ sub DbLog_execMemCacheAsync {
       }
   }
 
-  my $nextsync = gettimeofday()+$syncival;
-  my $nsdt     = FmtDateTime ($nextsync);
-  my $se       = AttrVal     ($name, 'syncEvents', undef) ? 1 : 0;
-
-  readingsSingleUpdate($hash, 'NextSync', $nsdt. " or when CacheUsage ".$clim." is reached", $se);
-
-  DbLog_setReadingstate ($hash, $error);
+  DbLog_setReadingstate ($hash, $err);
 
   InternalTimer($nextsync, 'DbLog_execMemCacheAsync', $hash, 0);
 
@@ -2174,30 +2163,43 @@ sub DbLog_execMemCacheSync {
 
   return if($hash->{HELPER}{LONGRUN_PID});
 
-  my $name = $hash->{NAME};
+  my $name    = $hash->{NAME};
+  my $verbose = AttrVal ($name, 'verbose', 3);
 
-  if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
+  if($verbose =~ /[45]/xs) {
       Log3 ($name, 4, "DbLog $name - ################################################################");
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
   }
-
-  my $memc;
-
-  for my $key (sort {$a<=>$b} (keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-      Log3 ($name, 5, "DbLog $name - TempStore contains: $key -> ".$data{DbLog}{$name}{cache}{memcache}{$key});
-
-      $memc->{cdata}{$key} = delete $data{DbLog}{$name}{cache}{memcache}{$key};                # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
+  
+  if ($verbose == 5) {
+      DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'TempStore contains: ');
   }
-
-  $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                                     # aktuellen Index an Subprozess übergeben
-
-  undef $data{DbLog}{$name}{cache}{memcache};                                                  # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
-
-  $err = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
+  
+  my $memc = _DbLog_copyCache      ($name);
+  $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
 
 return;
+}
+
+#################################################################################################
+#        Memory Cache kopieren und löschen
+#################################################################################################
+sub _DbLog_copyCache {       
+  my $name = shift;
+  
+  my $memc;
+  
+  while (my ($key, $val) = each %{$data{DbLog}{$name}{cache}{memcache}} ) {
+      $memc->{cdata}{$key} = $val;                                              # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
+  }
+                                 
+  $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                      # aktuellen Index an Subprozess übergeben
+
+  undef %{$data{DbLog}{$name}{cache}{memcache}};                                # Löschen mit Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+  
+return $memc;
 }
 
 #################################################################
@@ -4560,7 +4562,7 @@ sub DbLog_writeFileIfCacheOverflow {
 
   my $name    = $hash->{NAME};
   my $success = 0;
-  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);                                 # Steuerung exportCache statt schreiben in DB
+  my $coft    = AttrVal($name, 'cacheOverflowThreshold', 0);                                 # Steuerung exportCache statt schreiben in DB
   $coft       = ($coft && $coft < $clim) ? $clim : $coft;                                    # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
 
   my $overflowstate = "normal";
@@ -6647,13 +6649,14 @@ sub DbLog_logHashContent {
   my $name    = shift;
   my $href    = shift;
   my $verbose = shift // 3;
+  my $logtxt  = shift // q{};
 
   no warnings 'numeric';
   
   for my $key (sort {$a<=>$b} keys %{$href}) {
       next if(!defined $href->{$key});
       
-      Log3 ($name, $verbose, "DbLog $name - $key -> $href->{$key}");
+      Log3 ($name, $verbose, "DbLog $name - $logtxt $key -> $href->{$key}");
   }
 
   use warnings;  
