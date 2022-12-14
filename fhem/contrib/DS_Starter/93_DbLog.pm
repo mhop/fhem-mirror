@@ -25,7 +25,7 @@ use warnings;
 eval "use DBI;1;"                                or my $DbLogMMDBI    = "DBI";              ## no critic 'eval' 
 eval "use FHEM::Meta;1;"                         or my $modMetaAbsent = 1;                  ## no critic 'eval' 
 eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;                  ## no critic 'eval' 
-eval "use Storable qw(freeze thaw dclone);1;"    or my $storabs       = "Storable";         ## no critic 'eval' 
+eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval' 
 
 #use Data::Dumper;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
