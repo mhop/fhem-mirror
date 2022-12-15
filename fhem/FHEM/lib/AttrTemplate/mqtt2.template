@@ -5538,6 +5538,141 @@ attr DEVICE setStateList on off
 attr DEVICE model hoymiles_microinverter_inverter
 setreading DEVICE attrTemplateVersion 20200905
 
+# contributed by tpm88, https://forum.fhem.de/index.php/topic,94495.msg1251265.html#msg1251265
+name:hoymiles_opendtu_hub_bridge
+filter:TYPE=MQTT2_DEVICE
+desc:Early version! Use this with "openDTU" firmware for ESP8266+nRF24L01+. For further details visit  https://github.com/tbnobody/OpenDTU and https://www.mikrocontroller.net/topic/525778. Resulting <b>device represents the interfacing ESP-MCU</b>, all inverters will be forwarded into own MQTT2_DEVICE instances.
+order:W_07
+farewell:template has been applied successfully. Note: In case you use an external MQTT server or not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like "|devcontrol/[0-8]+/[0-8]+". For the single microinverters, please be patient, until the Readings concerning the AC will have been sent in.
+par:BASE_ID;Base topic as set in OpenDTU MQTT settings;{ AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $1 : undef }
+par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+#par:BR_REG_NAME;Bridge RegEx Name for target inverter device;{ my $r1 = AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $1 : "xxx";; my $r2 = AttrVal('DEVICE','readingList','') =~ m,([^:]+)/([^:]+)/name:, ? $2 : "yyy";; my $rn = $r1 . "_" . $r2 ."_name";; return ReadingsVal('DEVICE',"$rn",undef) }
+attr DEVICE icon ICON
+attr DEVICE bridgeRegexp BASE_ID/([0-9]+)/.*/.*:.* "BASE_ID_$1"
+#attr DEVICE bridgeRegexp BASE_ID/[0-9]+/.*/.*:.* "BR_REG_NAME"
+attr DEVICE autocreate 1
+attr DEVICE readingList BASE_ID/dtu/uptime:.* uptime\
+  BASE_ID/dtu/status:.* status\
+  BASE_ID/dtu/ip:.* ip\
+  BASE_ID/dtu/rssi:.' rssi\
+  BASE_ID/dtu/hostname:.* hostname
+attr DEVICE setStateList on off
+attr DEVICE model hoymiles_opendtu_hub_bridge
+setreading DEVICE attrTemplateVersion 20221215
+{ AttrTemplate_Initialize() }
+
+name:hoymiles_opendtu_microinverter
+prereq:{my @devices=devspec2array('model=hoymiles_opendtu_hub_bridge');return 1 if $devices[0];return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/status/producing:.*
+desc:Early version, device represents a single microinverter. Use this with "opendtu" firmware for ESP8266+nRF24L01+. Wait some time until the target device got <b>readings for channel 0</b> (AC part, refreshing your browser window may help to get them visible)!
+order:W_071
+par:INVERTERLONG_ID;INVERTERLONG_ID Serieal Id of inverter as set in webinterface;{ AttrVal('DEVICE','readingList','') =~ m,^\s*([^:]+/[^/]+)/status/producing:,m ? $1 : undef }
+par:RADIO_SINGLE;inverter has just one channel;{ undef }
+par:RADIO_DOUBLE;inverter has two channels;{ undef }
+par:RADIO_QUATTRO;inverter has four channels;{ undef }
+par:ICON;ICON as set, defaults to solar;{ AttrVal('DEVICE','icon','solar') }
+attr DEVICE icon ICON
+deletereading -q DEVICE .*_.*
+option:{ RADIO_SINGLE }
+attr DEVICE readingList \
+  INVERTERLONG_ID/0/powerdc:.* powerdc\
+  INVERTERLONG_ID/0/yieldday:.* {}\
+  INVERTERLONG_ID/0/yieldtotal:.* {}\
+  INVERTERLONG_ID/0/voltage:.* voltage\
+  INVERTERLONG_ID/0/current:.* current\
+  INVERTERLONG_ID/0/power:.* power\
+  INVERTERLONG_ID/0/frequency:.* frequency\
+  INVERTERLONG_ID/0/temperature:.* temperature\
+  INVERTERLONG_ID/0/powerfactor:.* powerfactor\
+  INVERTERLONG_ID/0/efficiency:.* efficiency\
+  INVERTERLONG_ID/0/reactivepower:.* reactivepower\
+  INVERTERLONG_ID/1/voltage:.* voltage1\
+  INVERTERLONG_ID/1/current:.* current1\
+  INVERTERLONG_ID/1/power:.* power1\
+  INVERTERLONG_ID/1/irradiation:.* irradiation1\
+  INVERTERLONG_ID/1/yieldday:.* yieldday\
+  INVERTERLONG_ID/1/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/name:.* name\
+  INVERTERLONG_ID/status/reachable:.* reachable\
+  INVERTERLONG_ID/status/producing:.* producing\
+  INVERTERLONG_ID/status/last_update:.* last_update
+option:{ RADIO_DOUBLE }
+attr DEVICE readingList \
+  INVERTERLONG_ID/0/powerdc:.* powerdc\
+  INVERTERLONG_ID/0/yieldday:.* yieldday\
+  INVERTERLONG_ID/0/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/0/voltage:.* voltage\
+  INVERTERLONG_ID/0/current:.* current\
+  INVERTERLONG_ID/0/power:.* power\
+  INVERTERLONG_ID/0/frequency:.* frequency\
+  INVERTERLONG_ID/0/temperature:.* temperature\
+  INVERTERLONG_ID/0/powerfactor:.* powerfactor\
+  INVERTERLONG_ID/0/efficiency:.* efficiency\
+  INVERTERLONG_ID/0/reactivepower:.* reactivepower\
+  INVERTERLONG_ID/1/voltage:.* voltage1\
+  INVERTERLONG_ID/1/current:.* current1\
+  INVERTERLONG_ID/1/power:.* power1\
+  INVERTERLONG_ID/1/irradiation:.* irradiation1\
+  INVERTERLONG_ID/1/yieldday:.* yieldday1\
+  INVERTERLONG_ID/1/yieldtotal:.* yieldtotal1\
+  INVERTERLONG_ID/2/voltage:.* voltage2\
+  INVERTERLONG_ID/2/current:.* current2\
+  INVERTERLONG_ID/2/power:.* power2\
+  INVERTERLONG_ID/2/irradiation:.* irradiation2\
+  INVERTERLONG_ID/2/yieldday:.* yieldday2\
+  INVERTERLONG_ID/2/yieldtotal:.* yieldtotal2\
+  INVERTERLONG_ID/name:.* name\
+  INVERTERLONG_ID/status/reachable:.* reachable\
+  INVERTERLONG_ID/status/producing:.* producing\
+  INVERTERLONG_ID/status/last_update:.* last_update
+option:{ RADIO_QUATTRO }
+attr DEVICE readingList \
+  INVERTERLONG_ID/0/powerdc:.* powerdc\
+  INVERTERLONG_ID/0/yieldday:.* yieldday\
+  INVERTERLONG_ID/0/yieldtotal:.* yieldtotal\
+  INVERTERLONG_ID/0/voltage:.* voltage\
+  INVERTERLONG_ID/0/current:.* current\
+  INVERTERLONG_ID/0/power:.* power\
+  INVERTERLONG_ID/0/frequency:.* frequency\
+  INVERTERLONG_ID/0/temperature:.* temperature\
+  INVERTERLONG_ID/0/powerfactor:.* powerfactor\
+  INVERTERLONG_ID/0/efficiency:.* efficiency\
+  INVERTERLONG_ID/0/reactivepower:.* reactivepower\
+  INVERTERLONG_ID/1/voltage:.* voltage1\
+  INVERTERLONG_ID/1/current:.* current1\
+  INVERTERLONG_ID/1/power:.* power1\
+  INVERTERLONG_ID/1/irradiation:.* irradiation1\
+  INVERTERLONG_ID/1/yieldday:.* yieldday1\
+  INVERTERLONG_ID/2/yieldtotal:.* yieldtotal2\
+  INVERTERLONG_ID/3/voltage:.* voltage3\
+  INVERTERLONG_ID/3/current:.* current3\
+  INVERTERLONG_ID/3/power:.* power3\
+  INVERTERLONG_ID/3/irradiation:.* irradiation3\
+  INVERTERLONG_ID/3/yieldday:.* yieldday3\
+  INVERTERLONG_ID/3/yieldtotal:.* yieldtotal3\
+  INVERTERLONG_ID/4/voltage:.* voltage4\
+  INVERTERLONG_ID/4/current:.* current4\
+  INVERTERLONG_ID/4/power:.* power4\
+  INVERTERLONG_ID/4/irradiation:.* irradiation4\
+  INVERTERLONG_ID/4/yieldday:.* yieldday4\
+  INVERTERLONG_ID/4/yieldtotal:.* yieldtotal4\
+  INVERTERLONG_ID/name:.* name\
+  INVERTERLONG_ID/status/reachable:.* reachable\
+  INVERTERLONG_ID/status/producing:.* producing\
+  INVERTERLONG_ID/status/last_update:.* last_update
+option:global
+attr DEVICE setList \
+  on:noArg INVERTERLONG_ID/cmd/power 1\
+  off:noArg INVERTERLONG_ID/cmd/power 0\
+  reboot:noArg INVERTERLONG_ID/cmd/restart 1\
+  limit_non_persistent_abs INVERTERLONG_ID/cmd/limit_persistent_absolute $EVTPART1\
+  limit_non_persistent_pct:slider,2,1,100 INVERTERLONG_ID/cmd/limit_persistent_relative $EVTPART1\
+  limit_persistent_abs INVERTERLONG_ID/cmd/limit_nonpersistent_absolute $EVTPART1\
+  limit_persistent_pct:slider,2,1,100 INVERTERLONG_ID/cmd/limit_nonpersistent_relative $EVTPART1
+attr DEVICE setStateList on off
+attr DEVICE model hoymiles_opendtu_microinverter
+setreading DEVICE attrTemplateVersion 20221215
+
 
 ###########################################
 # provided as mqtt2_siedle.template by hydrotec
