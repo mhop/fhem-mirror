@@ -42,7 +42,7 @@ package main;
 use strict;                           
 use warnings;
 use POSIX qw(strftime SIGALRM);
-use Time::HiRes qw(gettimeofday tv_interval ualarm);
+use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
 eval "use DBI;1"               or my $DbRepMMDBI = "DBI";
 eval "use FHEM::Meta;1"        or my $modMetaAbsent = 1;
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.6"  => "14.12.2022  remove ularm from Time::HiRes, Forum: https://forum.fhem.de/index.php/topic,53584.msg1251313.html#msg1251313 ", 
   "8.50.5"  => "05.12.2022  fix diffValue problem (DbRep_diffval) for newer MariaDB versions: https://forum.fhem.de/index.php/topic,130697.0.html ", 
   "8.50.4"  => "04.11.2022  fix daylight saving bug in aggregation eq 'month' (_DbRep_collaggstr) ",
   "8.50.3"  => "19.09.2022  reduce memory allocation of function DbRep_reduceLog ",

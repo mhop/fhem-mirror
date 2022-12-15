@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: minor code change (ualarm removed)
  - feature: 70_ESCVP21net: added HC2150, added on/off as direct set commands
  - feature: 70_SVDRP: added Plugin support, NextTimer name 
  - bugfix:  98_livetracking: fixed Life360 login
