@@ -205,12 +205,12 @@ KS300_Parse($$)
     $v[3] = "$a[22]$a[21]" + 0;
     $v[4] = "$a[20]$a[19].$a[18]" + 0;
     $v[4] = sprintf("%0.1f", $v[4]);
-    $v[4] = -$v[4] if(hex($v[8]) & 8); # Negative temp
     $v[5] = ((hex($a[17]) & 0x2) || $haverain) ? "yes" : "no";
     $v[6] = $a[29];
     $v[7] = $a[16];
     $v[8] = $a[17];
     $v[9] = KS300_windIndex($v[2]);
+    $v[4] = -$v[4] if(hex($v[8]) & 8); # Negative temp
 
     my $std = AttrVal($name, "strangeTempDiff", 0);
     if($std) {
