@@ -51,7 +51,7 @@ sub FW_textfield($$$);
 sub FW_textfieldv($$$$);
 sub FW_updateHashes();
 sub FW_visibleDevices(;$);
-sub FW_widgetOverride($$);
+sub FW_widgetOverride($$;$);
 sub FW_Read($$);
 
 use vars qw($FW_dir);     # base directory for web server
@@ -1578,9 +1578,9 @@ FW_doDetail($)
 
 
   FW_pO FW_detailSelect($d, "set",
-                        FW_widgetOverride($d, getAllSets($d, $FW_chash)));
+                      FW_widgetOverride($d, getAllSets($d, $FW_chash), "set"));
   FW_pO FW_detailSelect($d, "get",
-                        FW_widgetOverride($d, getAllGets($d, $FW_chash)));
+                      FW_widgetOverride($d, getAllGets($d, $FW_chash), "get"));
 
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
@@ -1594,7 +1594,7 @@ FW_doDetail($)
   $attrList =~ s/\broom\b/room:$roomList/;
   $attrList =~ s/\bgroup\b/group:$groupList/;
 
-  $attrList = FW_widgetOverride($d, $attrList);
+  $attrList = FW_widgetOverride($d, $attrList, "attr");
   $attrList =~ s/\\/\\\\/g;
   $attrList =~ s/'/\\'/g;
   FW_pO FW_detailSelect($d, "attr", $attrList, undef, \%attrTypeHash);
@@ -1928,7 +1928,7 @@ FW_makeDeviceLine($$$$$)
     my $cl2 = $cmdlist; $cl2 =~ s/ [^:]*//g; $cl2 =~ s/:/ /g;  # Forum #74053
     $allSets = "$allSets $cl2";
   }
-  $allSets = FW_widgetOverride($d, $allSets);
+  $allSets = FW_widgetOverride($d, $allSets, "set");
 
   my $colSpan = ($usuallyAtEnd->{$d} ? ' colspan="2"' : '');
   FW_pO "<td informId=\"$d\"$colSpan>$txt</td>";
@@ -3323,7 +3323,7 @@ FW_devState($$@)
 
   my $cmdList = AttrVal($d, "webCmd", $defs{$d}{webCmd});
   $cmdList = "" if(!defined($cmdList));
-  my $allSets = FW_widgetOverride($d, getAllSets($d, $FW_chash));
+  my $allSets = FW_widgetOverride($d, getAllSets($d, $FW_chash), "set");
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
@@ -3632,9 +3632,9 @@ FW_ActivateInform($;$)
 }
 
 sub
-FW_widgetOverride($$)
+FW_widgetOverride($$;$)
 {
-  my ($d, $str) = @_;
+  my ($d, $str, $type) = @_;
 
   return $str if(!$str);
 
@@ -3646,6 +3646,10 @@ FW_widgetOverride($$)
   push @list, split(" ", $fa) if($fa);
   push @list, split(" ", $da) if($da);
   foreach my $na (@list) {
+    if($type && $na =~ m/^([^:]*)@(set|get|attr):(.*)/) {
+      next if($2 ne $type);
+      $na = "$1:$3";
+    }
     my ($n,$a) = split(":", $na, 2);
     $str =~ s/\b($n)\b(:[^ ]*)?/$1:$a/g;
   }
@@ -4514,6 +4518,8 @@ FW_log($$)
     <li>widgetOverride<br>
         Space separated list of name:modifier pairs, to override the widget
         for a set/get/attribute specified by the module author.
+        To specify the widget for a specific type, use the name@type:modifier
+        syntax, where type is one of set, get and attr.
         Following is the list of known modifiers:
         <ul>
         <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
@@ -5360,10 +5366,11 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-widgetOverride"></a>
     <li>widgetOverride<br>
-        Leerzeichen separierte Liste von Name/Modifier Paaren, mit dem man den
+        Leerzeichen separierte Liste von Name:Modifier Paaren, mit dem man den
         vom Modulautor f&uuml;r einen bestimmten Parameter (Set/Get/Attribut)
-        vorgesehene Widgets &auml;ndern kann.  Folgendes ist die Liste der
-        bekannten Modifier:
+        vorgesehenes Widget &auml;ndern kann.  Die Syntax f&uuml;r eine
+        Typspezifische &Auml;nderung ist Name@Typ:Modifier, wobei Typ set, get
+        oder attr sein kann. Folgendes ist die Liste der bekannten Modifier:
         <ul>
         <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
         </ul></li>
