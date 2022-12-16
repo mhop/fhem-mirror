@@ -1,6 +1,6 @@
-REV 26855
+REV 26858
 DIR unused
-UPD 2022-12-12_07:45:03 385836 ./CHANGED
+UPD 2022-12-16_07:45:04 385893 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-11-10_07:45:03 46102 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
@@ -456,7 +456,7 @@ UPD 2022-06-02_07:45:02 19537 FHEM/91_watchdog.pm
 UPD 2022-08-17_22:13:19 65743 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2022-11-27_07:45:03 462204 FHEM/93_DbLog.pm
-UPD 2022-12-08_07:45:04 1015521 FHEM/93_DbRep.pm
+UPD 2022-12-16_07:45:04 1015655 FHEM/93_DbRep.pm
 UPD 2022-02-19_07:45:02 23626 FHEM/93_FHEM2FHEM.pm
 UPD 2022-02-08_07:45:02 37562 FHEM/93_InfluxDBLogger.pm
 UPD 2021-03-02_07:45:03 176340 FHEM/93_Log2Syslog.pm
@@ -654,7 +654,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2022-12-13_07:45:02 398593 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2022-12-16_07:45:04 405784 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -750,8 +750,8 @@ UPD 2022-12-12_07:45:07 4820846 docs/commandref.html
 UPD 2022-12-11_07:45:20 2867875 docs/commandref_DE.html
 UPD 2022-11-15_07:45:02 83658 docs/commandref_frame.html
 UPD 2022-11-15_07:45:02 93676 docs/commandref_frame_DE.html
-UPD 2022-12-15_07:45:12 292889 docs/commandref_modular.html
-UPD 2022-12-15_07:45:14 304099 docs/commandref_modular_DE.html
+UPD 2022-12-16_07:45:12 292889 docs/commandref_modular.html
+UPD 2022-12-16_07:45:14 304099 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
