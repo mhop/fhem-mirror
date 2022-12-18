@@ -4192,8 +4192,8 @@ Dispatch($$;$$)
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
         my ($order, $mname) = split(":", $m);
-        next if(!$modules{$mname} ||
-                !$modules{$mname}{LOADED}); # checked in the loop above, #125292
+        next if(!$modules{$mname} ||       # #130952 / FS20V
+                $modules{$mname}{LOADED}); # checked in the loop above, #125292
         if($dmsg =~ m/$h->{$m}/s) {
           if(AttrVal("global", "autoload_undefined_devices", 1)) {
             my $newm = LoadModule($mname);
