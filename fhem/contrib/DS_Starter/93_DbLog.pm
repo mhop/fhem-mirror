@@ -2944,7 +2944,10 @@ sub _DbLog_SBP_onRun_LogArray {
                
                Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
           }
-      };
+      }
+      else {
+          __DbLog_SBP_commitOnly ($name, $dbh, $history);
+      }
       
       no warnings 'uninitialized';
 
@@ -2989,9 +2992,7 @@ sub _DbLog_SBP_onRun_LogArray {
           }
       }
 
-      __DbLog_SBP_commitOnly ($name, $dbh, $history) if(!$error);
-
-      if(defined $rowhref) {                                                           # nicht gespeicherte Datensätze ausgeben
+      if (defined $rowhref) {                                                           # nicht gespeicherte Datensätze ausgeben
           Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
 
           DbLog_logHashContent ($name, $rowhref, 2);
