@@ -2780,7 +2780,10 @@ sub _DbLog_SBP_onRun_LogBulk {
 
       __DbLog_SBP_commitOnly ($name, $dbh, $history);
   }
-
+  
+  if ($operation eq 'importCachefile') {
+      return ($error, $nins_hist, $rowlback);
+  }
                                                                                
   if (lc($DbLogType) =~ m(current)) {                                         
       $error = __DbLog_SBP_onRun_LogCurrent ( { subprocess => $subprocess,
@@ -2794,10 +2797,6 @@ sub _DbLog_SBP_onRun_LogBulk {
                                                 faref      => $faref
                                               }
                                             );
-  }
-
-  if ($operation eq 'importCachefile') {
-      return ($error, $nins_hist, $rowlback);
   }
 
   my $rt  = tv_interval($st);                                     # SQL-Laufzeit ermitteln
@@ -4093,7 +4092,7 @@ sub __DbLog_SBP_beginTransaction {
   my $name  = shift;
   my $dbh   = shift;
   my $useta = shift;
-  my $info  = shift // "begin transaction";
+  my $info  = shift // "begin Transaction";
 
   my $err   = q{};
 
@@ -4148,7 +4147,7 @@ sub __DbLog_SBP_rollbackOnly {
 
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->rollback();
-            Log3 ($name, 4, "DbLog $name - transaction rollback table $table");
+            Log3 ($name, 4, "DbLog $name - Transaction rollback table $table");
             1;
         }
         else {
@@ -6698,7 +6697,7 @@ sub DbLog_addCacheLine {
 
   use warnings;
 
-  eval {                                                                            # one transaction
+  eval {                                                                            # one Transaction
       my $memcount = DbLog_addMemCacheRow ($name, $row);                            # Datensatz zum Memory Cache hinzufügen
 
       if ($async) {
