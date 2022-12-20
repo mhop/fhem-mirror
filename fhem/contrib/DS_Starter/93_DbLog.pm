@@ -2565,6 +2565,7 @@ sub _DbLog_SBP_onRun_connectDB {
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
                                                                         RaiseError          => 1,
                                                                         AutoCommit          => 0,
+                                                                        ShowErrorStatement  => 1,
                                                                         AutoInactiveDestroy => 1
                                                                       }
                                 ); 1;
@@ -2573,6 +2574,7 @@ sub _DbLog_SBP_onRun_connectDB {
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
                                                                         RaiseError          => 1,
                                                                         AutoCommit          => 1,
+                                                                        ShowErrorStatement  => 1,
                                                                         AutoInactiveDestroy => 1
                                                                       }
                                 ); 1;
@@ -2580,6 +2582,7 @@ sub _DbLog_SBP_onRun_connectDB {
          else {                                                                                          # Server default
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0,
                                                                         RaiseError => 1,
+                                                                        ShowErrorStatement  => 1,
                                                                         AutoInactiveDestroy => 1
                                                                       }
                                 ); 1;
@@ -2967,6 +2970,9 @@ sub _DbLog_SBP_onRun_LogArray {
                __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
                
                Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
+          }
+          else {
+              Log3 ($name, 2, "DbLog $name - Transaction is switched off. Transferred data is lost.");
           }
       }
       else {
