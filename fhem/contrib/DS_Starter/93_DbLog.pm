@@ -2202,7 +2202,11 @@ sub DbLog_execMemCacheSync {
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
-  return if($hash->{HELPER}{LONGRUN_PID});
+  if($hash->{HELPER}{LONGRUN_PID}) {
+      $err = 'Another operation is in progress - data is stored temporarily (check with listCache)';
+      DbLog_setReadingstate ($hash, $err);
+      return;
+  }
 
   my $name    = $hash->{NAME};
   my $verbose = AttrVal ($name, 'verbose', 3);
@@ -2972,7 +2976,8 @@ sub _DbLog_SBP_onRun_LogArray {
                Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
           }
           else {
-              Log3 ($name, 2, "DbLog $name - Transaction is switched off. Transferred data is lost.");
+              __DbLog_SBP_commitOnly ($name, $dbh, $history);
+              Log3 ($name, 4, "DbLog $name - Transaction is switched off. Some or all of the transferred data will be lost. Note the following information.");
           }
       }
       else {
@@ -3023,7 +3028,7 @@ sub _DbLog_SBP_onRun_LogArray {
       }
 
       if (defined $rowhref) {                                                           # nicht gespeicherte Datensätze ausgeben
-          Log3 ($name, 2, "DbLog $name - The following data are faulty and were not saved:");
+          Log3 ($name, 2, "DbLog $name - The following data was not saved due to problems that may have been displayed previously:");
 
           DbLog_logHashContent ($name, $rowhref, 2);
       }
