@@ -39,7 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
   "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
-               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes ",
+               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck ",
   "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
   "5.5.5"   => "11.12.2022 Array Log -> may be better error processing ",
   "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
@@ -3028,7 +3028,7 @@ sub _DbLog_SBP_onRun_LogArray {
       }
 
       if (defined $rowhref) {                                                           # nicht gespeicherte Datensätze ausgeben
-          Log3 ($name, 2, "DbLog $name - The following data was not saved due to problems that may have been displayed previously:");
+          Log3 ($name, 2, "DbLog $name - The following data was not saved due to causes that may have been previously displayed:");
 
           DbLog_logHashContent ($name, $rowhref, 2);
       }
@@ -5652,6 +5652,21 @@ sub DbLog_configcheck {
   my $current = $hash->{HELPER}{TC};
 
   my ($check, $rec,%dbconfig);
+  
+  ### verfügbare Treiber
+  #######################################################################
+  my @ary = DBI->available_drivers('true');
+  my $dlst;
+  
+  for my $drv (@ary) {
+      $dlst .= ', ' if($dlst);
+      $dlst .= 'DBD::'.$drv;
+  }
+  
+  $check  = "<html>";
+  $check .= "<u><b>Available Drivers in your system</u></b><br><br>";
+  $check .= $dlst ? $dlst : 'no drivers found';
+  $check .= "<br><br>";
 
   ### Version check
   #######################################################################
@@ -5689,7 +5704,7 @@ sub DbLog_configcheck {
 
   my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);                            # DbLog Version
 
-  $check  = "<html>";
+  $check .= "<html>";
   $check .= "<u><b>Result of version check</u></b><br><br>";
   $check .= "Used Perl version: $pv <br>";
   $check .= "Used DBI (Database independent interface) version: $dbi <br>";
