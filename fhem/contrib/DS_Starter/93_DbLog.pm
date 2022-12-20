@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-19 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-20 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,8 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.7"   => "19.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
-               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays ",
+  "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
+               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes ",
   "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
   "5.5.5"   => "11.12.2022 Array Log -> may be better error processing ",
   "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
@@ -431,7 +431,7 @@ sub DbLog_Define {
   InternalTimer(gettimeofday()+2, 'DbLog_setinternalcols', $hash, 0);                                         # set used COLUMNS
 
   DbLog_setReadingstate  ($hash, 'waiting for connection');
-  DbLog_SBP_CheckAndInit ($hash);                                                                             # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
+  DbLog_SBP_CheckAndInit ($hash, 1);                                                                             # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
   _DbLog_initOnStart     ($hash);                                                                             # von init_done abhängige Prozesse initialisieren
 
 return;
@@ -1121,10 +1121,17 @@ sub _DbLog_setcount {              ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-
+  
+  if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
+      return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
+  }
+   
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
+  
+  my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
+  return $err if(!defined $hash->{".fhem"}{subprocess});
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> countEntries" instead.});
 
@@ -1147,9 +1154,16 @@ sub _DbLog_setdeleteOldDays {            ## no critic "not used"
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop};
 
+  if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
+      return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
+  }
+  
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
+  
+  my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
+  return $err if(!defined $hash->{".fhem"}{subprocess});
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> delEntries" instead.});
   Log3 ($name, 3, "DbLog $name - Deletion of records older than $prop days in database $db requested");
@@ -1169,10 +1183,17 @@ sub _DbLog_setuserCommand {              ## no critic "not used"
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $sql   = $paref->{arg};
-
+  
+  if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
+      return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
+  }
+  
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
+  
+  my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
+  return $err if(!defined $hash->{".fhem"}{subprocess});
 
   Log3 ($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> sqlCmd" instead.});
 
@@ -1262,27 +1283,24 @@ sub _DbLog_setimportCachefile {          ## no critic "not used"
   my $infile;
 
   readingsDelete($hash, 'lastCachefile');
-
-  return if($hash->{HELPER}{REOPEN_RUNS});                                    # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
-
+  
   if (!$prop) {
       return "Wrong function-call. Use set <name> importCachefile <file> without directory (see attr expimpdir)." ;
   }
   else {
       $infile = $dir.$prop;
   }
-    
-  my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
-  return $err if(!defined $hash->{".fhem"}{subprocess});
   
+  if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
+      return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
+  }
+      
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
   
-  my $rst = DbLog_SBP_sendConnectionData ($hash);
-  if (!$rst) {
-      Log3 ($name, 3, "DbLog $name - requested DB connection parameters are transmitted");
-  }
+  my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
+  return $err if(!defined $hash->{".fhem"}{subprocess});
 
   DbLog_SBP_sendCommand ($hash, 'importCachefile', $infile);
 
@@ -1301,11 +1319,7 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
   my $prop  = $paref->{prop};
   my $prop1 = $paref->{prop1};
   my $arg   = $paref->{arg};
-
-  if (defined $hash->{HELPER}{LONGRUN_PID}) {
-      return 'Another operation is in progress, try again a little later.';
-  }
-
+  
   Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
 
   my ($od,$nd) = split ":", $prop;                                 # $od - Tage älter als , $nd - Tage neuer als
@@ -1319,6 +1333,17 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
   }
 
   if (defined $prop && $prop =~ /(^\d+$)|(^\d+:\d+$)/) {
+      if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
+          return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
+      }
+  
+      if (defined $hash->{HELPER}{LONGRUN_PID}) {
+          return 'Another operation is in progress, try again a little later.';
+      }
+      
+      my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
+      return $err if(!defined $hash->{".fhem"}{subprocess});
+      
       DbLog_SBP_sendCommand ($hash, 'reduceLog', $arg);
   }
   else {
@@ -4274,6 +4299,8 @@ return;
 #####################################################
 sub DbLog_SBP_CheckAndInit {
   my $hash = shift;
+  my $nscd = shift // 0;                                                        # 1 - kein senden Connectiondata direkt nach Start Subprozess
+  
   my $name = $hash->{NAME};
 
   my $err = q{};
@@ -4292,7 +4319,7 @@ sub DbLog_SBP_CheckAndInit {
   }
 
   if (!defined $hash->{SBP_PID}) {
-      $err = _DbLog_SBP_Init ($hash);
+      $err = _DbLog_SBP_Init ($hash, $nscd);
       return $err if(!defined $hash->{SBP_PID});
   }
 
@@ -4305,7 +4332,7 @@ sub DbLog_SBP_CheckAndInit {
       $hash->{SBP_STATE} = "dead (".$hash->{SBP_PID}.")";
       delete $hash->{SBP_PID};
       delete $hash->{HELPER}{LONGRUN_PID};                                # Statusbit laufende Verarbeitung löschen
-      $err = _DbLog_SBP_Init ($hash);
+      $err = _DbLog_SBP_Init ($hash, $nscd);
   }
 
 return $err;
@@ -4488,6 +4515,8 @@ return;
 #####################################################
 sub _DbLog_SBP_Init {
   my $hash = shift;
+  my $nscd = shift // 0;                                                        # 1 - kein senden Connectiondata direkt nach Start Subprozess
+  
   my $name = $hash->{NAME};
 
   $hash->{".fhem"}{subprocess} = undef;
@@ -4509,8 +4538,10 @@ sub _DbLog_SBP_Init {
   if (!defined $pid) {
       my $err = "DbLog $name - Cannot create subprocess for non-blocking operation";
       Log3 ($name, 1, $err);
+      
       DbLog_SBP_CleanUp     ($hash);
       DbLog_setReadingstate ($hash, $err);
+      
       return 'no SubProcess PID created';
   }
 
@@ -4524,6 +4555,13 @@ sub _DbLog_SBP_Init {
   $selectlist{"$name.$pid"} = $hash;
   $hash->{SBP_PID}          = $pid;
   $hash->{SBP_STATE}        = 'running';
+  
+  if (!$nscd) {
+      my $rst = DbLog_SBP_sendConnectionData ($hash);                                        # Verbindungsdaten übertragen
+      if (!$rst) {
+          Log3 ($name, 3, "DbLog $name - requested DB connection parameters are transmitted");
+      }
+  }
 
 return;
 }
