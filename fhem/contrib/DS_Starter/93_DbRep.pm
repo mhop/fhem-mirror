@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 26811 2022-12-07 20:17:20Z DS_Starter $
+# $Id: 93_DbRep.pm 26865 2022-12-21 10:15:58Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
+  "8.50.7"  => "17.12.2022  Commandref edited ",
   "8.50.6"  => "14.12.2022  remove ularm from Time::HiRes, Forum: https://forum.fhem.de/index.php/topic,53584.msg1251313.html#msg1251313 ", 
   "8.50.5"  => "05.12.2022  fix diffValue problem (DbRep_diffval) for newer MariaDB versions: https://forum.fhem.de/index.php/topic,130697.0.html ", 
   "8.50.4"  => "04.11.2022  fix daylight saving bug in aggregation eq 'month' (_DbRep_collaggstr) ",
@@ -6658,7 +6660,7 @@ sub DbRep_sqlCmd {
   my (@rows,$row,@head);
   my $nrows = 0;
 
-  if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
           $row = join("$srs", @head);
@@ -13100,12 +13102,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 26811 2022-12-07 20:17:20Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 26865 2022-12-17 10:15:58Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 26811 2022-12-07 20:17:20Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 26865 2022-12-17 10:15:58Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -13236,43 +13238,52 @@ sub DbRep_sqlCmdBlocking {
   
   if ($failed) {
       $err = $failed eq "Timeout\n" ? $totxt : $failed;
+      
       Log3 ($name, 2, "DbRep $name - $err");
+      
       $sth->finish if($sth);
       $dbh->disconnect;
+      
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
       return $err;  
   }
   
   my $nrows = 0;
-  if($sql =~ m/^\s*(select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
       while (my @line = $sth->fetchrow_array()) {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $ret .= "\n" if($nrows);                                              # Forum: #103295
           $ret .= join("$srs", @line);
           $nrows++;                                                             # Anzahl der Datensätze
       }
-    
-  } else {
+  } 
+  else {
       $nrows = $sth->rows;
+      
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};
       if ($@) {
           $err = $@;
+          
           Log3 ($name, 2, "DbRep $name - $err");
+          
           $dbh->disconnect;
           ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
           ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+          
           return $err;    
       }
+      
       $ret = $nrows; 
   }
   
   $sth->finish;
   $dbh->disconnect;
   
-  my $rt = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
-  
+  my $rt  = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
   my $com = (split " ", $sql, 2)[0];
+  
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
   
   readingsBeginUpdate         ($hash);
@@ -15482,12 +15493,26 @@ sub dbval {
   <li><b>dumpCompress </b>    - if set, the dump files are compressed after operation of "dumpMySQL" bzw. "dumpSQLite" </li> <br>
 
   <a name="dumpDirLocal"></a>  
-  <li><b>dumpDirLocal </b>    - Target directory of database dumps by command "dumpMySQL clientSide" or "dumpSQLite"
-                                (default: "{global}{modpath}/log/" on the FHEM-Server). <br>
-                                In this directory also the internal version administration searches for old backup-files 
-                                and deletes them if the number exceeds attribute "dumpFilesKeep". 
-                                The attribute is also relevant to publish a local mounted directory "dumpDirRemote" (dumpMySQL serverSide) to
-                                DbRep. </li> <br>
+  <li><b>dumpDirLocal </b>  <br><br> 
+  <ul>
+    Destination directory for creating dumps with "dumpMySQL clientSide" or "dumpSQLite".  <br>
+    
+    Setting this attribute activates the internal version management.
+    In this directory backup files are searched and deleted if the found number exceeds the attribute value 
+    "dumpFilesKeep". 
+    The attribute is also used to make a locally mounted directory "dumpDirRemote" (for dumpMySQL serverSide)
+    known to DbRep. <br>
+    
+    (default: "{global}{modpath}/log/")   
+    <br><br>
+    
+    <b>Example: </b> <br>
+    attr &lt;Name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/
+ 
+  <br>
+  <br>
+  </li>
+  </ul>
 
   <a name="dumpDirRemote"></a>                              
   <li><b>dumpDirRemote </b>   - Target directory of database dumps by command "dumpMySQL serverSide" 
@@ -15504,10 +15529,18 @@ sub dbval {
                                 This parameter impacts the run-time and consumption of resources directly.  </li> <br>
 
   <a name="dumpFilesKeep"></a>
-  <li><b>dumpFilesKeep </b>   - The specified number of dumpfiles remain in the dump directory (default: 3). 
-                                If there more (older) files has been found, these files will be deleted after a new database dump 
-                                was created successfully. 
-                                The global attrubute "archivesort" will be considered. </li> <br> 
+  <li><b>dumpFilesKeep </b>   <br><br>
+  <ul>
+    The integrated version management leaves the specified number of backup files in the backup directory. <br>
+    Version management must be enabled by setting the "dumpDirLocal" attribute. <br>
+    If there are more (older) backup files, they will be deleted after a new backup has been successfully created. 
+    The global attribute "archivesort" is taken into account. <br>
+    (default: 3)
+    
+  <br>
+  <br>
+  </li> 
+  </ul>
   
   <a name="executeAfterProc"></a>
   <li><b>executeAfterProc </b> - you can specify a FHEM command or perl function which should be executed 
@@ -18322,13 +18355,27 @@ sub dbval {
   <li><b>dumpCompress </b>    - wenn gesetzt, werden die Dumpfiles nach "dumpMySQL" bzw. "dumpSQLite" komprimiert </li> <br>
 
   <a name="dumpDirLocal"></a>  
-  <li><b>dumpDirLocal </b>    - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide" oder "dumpSQLite". 
-                                default: "{global}{modpath}/log/" auf dem FHEM-Server. <br>
-                                Ebenfalls werden in diesem Verzeichnis alte Backup-Files durch die interne Versionsverwaltung 
-                                gesucht und gelöscht wenn die gefundene Anzahl den Attributwert "dumpFilesKeep"
-                                überschreitet. Das Attribut dient auch dazu ein lokal gemountetes Verzeichnis "dumpDirRemote" (bei dumpMySQL serverSide)
-                                DbRep bekannt zu machen. </li> <br>
-
+  <li><b>dumpDirLocal </b>  <br><br> 
+  <ul>
+    Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide" oder "dumpSQLite".  <br>
+    
+    Durch Setzen dieses Attributes wird die interne Versionsverwaltung aktiviert.
+    In diesem Verzeichnis werden Backup Dateien gesucht und gelöscht wenn die gefundene Anzahl den Attributwert 
+    "dumpFilesKeep" überschreitet. 
+    Mit dem Attribut wird ebenfalls ein lokal gemountetes Verzeichnis "dumpDirRemote" (bei dumpMySQL serverSide)
+    DbRep bekannt gemacht. <br>
+    
+    (default: {global}{modpath}/log/)   
+    <br><br>
+    
+    <b>Beispiel: </b> <br>
+    attr &lt;Name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/
+ 
+  <br>
+  <br>
+  </li>
+  </ul>
+  
   <a name="dumpDirRemote"></a>                              
   <li><b>dumpDirRemote </b>   - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL serverSide". 
                                 default: das Home-Dir des MySQL-Servers auf dem MySQL-Host </li> <br>
@@ -18343,9 +18390,18 @@ sub dbval {
                                 Dieser Parameter hat direkten Einfluß auf die Laufzeit und den Ressourcenverbrauch zur Laufzeit.  </li> <br>
 
   <a name="dumpFilesKeep"></a>
-  <li><b>dumpFilesKeep </b>   - Es wird die angegebene Anzahl Dumpfiles im Dumpdir belassen (default: 3). Sind mehr (ältere) Dumpfiles 
-                                vorhanden, werden diese gelöscht nachdem ein neuer Dump erfolgreich erstellt wurde. Das globale
-                                Attribut "archivesort" wird berücksichtigt. </li> <br> 
+  <li><b>dumpFilesKeep </b>   <br><br>
+  <ul>
+    Die integrierte Versionsverwaltung belässt die angegebene Anzahl Backup Dateien im Backup Verzeichnis. <br>
+    Die Versionsverwaltung muß durch Setzen des Attributs "dumpDirLocal" eingeschaltet sein. <br>
+    Sind mehr (ältere) Backup Dateien vorhanden, werden diese gelöscht nachdem ein neues Backup erfolgreich erstellt wurde. 
+    Das globale Attribut "archivesort" wird berücksichtigt. <br>
+    (default: 3)
+    
+  <br>
+  <br>
+  </li> 
+  </ul>                                
 
   <a name="executeAfterProc"></a>
   <li><b>executeAfterProc </b> - Es kann ein FHEM-Kommando oder eine Perl-Funktion angegeben werden welche <b>nach der 
