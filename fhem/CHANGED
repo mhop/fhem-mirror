@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_SVDRP: claen timer name, fix stateFormat overwrite
  - feature: 93_DbRep: sqlCmd supports execute DB Procedures
  - bugfix:  47_OBIS: Support DZG hack for power_L1/2/3
  - change:  93_DbRep: minor code change (ualarm removed)
