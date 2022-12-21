@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
   "8.50.7"  => "17.12.2022  Commandref edited ",
   "8.50.6"  => "14.12.2022  remove ularm from Time::HiRes, Forum: https://forum.fhem.de/index.php/topic,53584.msg1251313.html#msg1251313 ", 
   "8.50.5"  => "05.12.2022  fix diffValue problem (DbRep_diffval) for newer MariaDB versions: https://forum.fhem.de/index.php/topic,130697.0.html ", 
@@ -66,7 +67,7 @@ my %DbRep_vNotesIntern = (
   "8.50.1"  => "05.09.2022  DbRep_setLastCmd, change changeValue syntax, minor fixes ",
   "8.50.0"  => "20.08.2022  rework of DbRep_reduceLog - add max, max=day, min, min=day, sum, sum=day ",
   "8.49.1"  => "03.08.2022  fix DbRep_deleteOtherFromDB, Forum: https://forum.fhem.de/index.php/topic,128605.0.html ".
-               "some code changes and bug fixes ",
+                            "some code changes and bug fixes ",
   "8.49.0"  => "16.05.2022  allow optionally set device / reading in the insert command ",
   "8.48.4"  => "16.05.2022  fix perl warning of set ... insert, Forum: topic,53584.msg1221588.html#msg1221588 ",
   "8.48.3"  => "09.04.2022  minor code fix in DbRep_reduceLog ",
@@ -6659,7 +6660,7 @@ sub DbRep_sqlCmd {
   my (@rows,$row,@head);
   my $nrows = 0;
 
-  if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
       @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
           $row = join("$srs", @head);
@@ -13237,43 +13238,52 @@ sub DbRep_sqlCmdBlocking {
   
   if ($failed) {
       $err = $failed eq "Timeout\n" ? $totxt : $failed;
+      
       Log3 ($name, 2, "DbRep $name - $err");
+      
       $sth->finish if($sth);
       $dbh->disconnect;
+      
       ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      
       return $err;  
   }
   
   my $nrows = 0;
-  if($sql =~ m/^\s*(select|pragma|show)/is) {
+  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
       while (my @line = $sth->fetchrow_array()) {
           Log3 ($name, 4, "DbRep $name - SQL result: @line");
           $ret .= "\n" if($nrows);                                              # Forum: #103295
           $ret .= join("$srs", @line);
           $nrows++;                                                             # Anzahl der Datensätze
       }
-    
-  } else {
+  } 
+  else {
       $nrows = $sth->rows;
+      
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};
       if ($@) {
           $err = $@;
+          
           Log3 ($name, 2, "DbRep $name - $err");
+          
           $dbh->disconnect;
           ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
           ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+          
           return $err;    
       }
+      
       $ret = $nrows; 
   }
   
   $sth->finish;
   $dbh->disconnect;
   
-  my $rt = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
-  
+  my $rt  = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
   my $com = (split " ", $sql, 2)[0];
+  
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
   
   readingsBeginUpdate         ($hash);
