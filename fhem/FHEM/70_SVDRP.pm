@@ -15,6 +15,7 @@
 #                 added name to next timer
 #                 expicit set for SatIP plugin
 #                 handle HELP responses
+#    1.01.06      strip <epgsearch> info from timername, fix stateFormat overwrite
 #
 ########################################################################################
 #
@@ -46,7 +47,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.05";
+my $version = "1.01.06";
 
 my %SVDRP_gets = (
   #
@@ -391,7 +392,7 @@ sub SVDRP_closeDev {
   main::Log3 $name, 5,"[$name]: closeDev: closing...";
   delete $hash->{DevIoJustClosed} if (defined($hash->{DevIoJustClosed}));
   DevIo_CloseDev($hash);
-  $hash->{STATE} = "closed";
+  #$hash->{STATE} = "closed";
   $hash->{PARTIAL}="";
 }
 
@@ -789,6 +790,7 @@ sub SVDRP_parseTimer{
   my $i3 = "0";
   my $i4 = "0";
   my $timername = "none";
+  my $timernameraw = "none";
   if (!defined($msg)){
     $parsedmsg = "error";
   }
@@ -798,12 +800,16 @@ sub SVDRP_parseTimer{
     # 2 1:4:2022-02-13:1858:1915:50:99:RTL Aktuell - Das Wetter:
     #Log3 $name, 5, "[$name] ParseTimer: reading: $reading, result: $resultarr[$count]";
     ($timerid, $timerstr) = split (" ", $msg,2);
-    ($i1, $i2, $day, $start, $end, $i3, $i4, $timername) = split (":", $timerstr, 8);
+    ($i1, $i2, $day, $start, $end, $i3, $i4, $timernameraw) = split (":", $timerstr, 8);
     substr ($start, 2, 0) = ":";
     substr ($end, 2, 0) = ":";
     
+    # strip <epgsearch> info from timername
+    $timernameraw =~ s/[:\r]//g;
+    $timername = (split /<epgsearch>/, $timernameraw, 2)[0];
     # store timer ID and Name in hidden setting, to re-use with NextTimer command
-    $timername =~ s/[:\r\n]//g;
+    #$timername =~ s/[:\r\n]//g;
+    #$timername =~ s/[:\r]//g;
     $SVDRP_timers{$timerid} = $timername;
     readingsSingleUpdate( $hash, ".Timers", encode_json( \%SVDRP_timers ), 1 );
    
