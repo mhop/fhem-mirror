@@ -465,7 +465,7 @@ Ger&auml;t dokumentiert.
 <h4>readingFnAttribute</h4>
 
     Die folgenden Attribute werden bei Modulen verwendet, die standardisierte
-    "readings" Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der
+    Readings Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der
     Liste der Modulattribute wenn Sie wissen m&ouml;chten ob dies
     unterst&uuml;tzt wird.<br><br>
 
@@ -486,20 +486,21 @@ Ger&auml;t dokumentiert.
 
     <a name="event-on-update-reading"></a>
     <li>event-on-update-reading<br>
-    Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines "readings" ein
+    Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines Readings ein
     Ereignis, welches z.B. von <a href="#notify">notify</a> oder<a
     href="FileLog"> FileLog</a> ber&uuml;cksichtigt wird. Wenn gesetzt erzeugen
-    nur Aktualisierungen der eingetragenen "readings" ein Ereignis.
+    nur Aktualisierungen der eingetragenen Readings ein Ereignis.
     </li>
 
     <a name="event-on-change-reading"></a>
     <li>event-on-change-reading<br>
     Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
-    "readings".  Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten
-    "readings" ein Ereignis. Wenn die aktualiserten Werte der gelisteten
-    "readings" identisch sind, wird kein Ereignis generiert.<br>
+    Readings. Statt Reading kann auch ein regul&auml;rer Ausdruck verwendet
+    werden. Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten
+    Readings ein Ereignis. Wenn die aktualiserten Werte der gelisteten Readings
+    identisch sind, wird kein Ereignis generiert.<br>
 
-    Wenn hinter dem Namen eines "readings" eine :Schwelle angegeben ist, wird
+    Wenn hinter dem Namen eines Readings eine :Schwelle angegeben ist, wird
     das Event nur getriggert wenn die &Auml;nderung gr&ouml;sser als diese
     Schwelle ist.
     </li>
@@ -509,21 +510,21 @@ Ger&auml;t dokumentiert.
     event-on-change-reading sind folgende:
     <ol>
     <li>Wenn beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung
-        eines jeden "readings" eines Ger&auml;tes ein Ereignis.</li>
+        eines jeden Readings eines Ger&auml;tes ein Ereignis.</li>
     <li>Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder
-        &auml;nderungen von "readings" die in einem der Attribute gesetzt
+        &auml;nderungen von Readings die in einem der Attribute gesetzt
         sind ein Ereignis.</li>
-    <li>Wenn ein "reading" in event-on-update-reading aufgef&uuml;hrt ist,
+    <li>Wenn ein Reading in event-on-update-reading aufgef&uuml;hrt ist,
         erzeugt eine Aktualisierung ein Ereignis unabh&auml;ngig ob das
-        "reading" auch in event-on-change-reading aufgelistet ist.</li>
+        Reading auch in event-on-change-reading aufgelistet ist.</li>
     </ol>
 
     <a name="timestamp-on-change-reading"></a>
     <li>timestamp-on-change-reading<br>
     Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
-    "readings". Wenn gesetzt, werden die Zeitstempel der gelisteten "readings"
+    Readings. Wenn gesetzt, werden die Zeitstempel der gelisteten Readings
     nicht aktualisiert wenn durch ein ebenfalls gesetztes event-on-change-reading
-    f&uuml;r dieses "reading" kein Ereignis erzeugen w&uuml;rde.
+    f&uuml;r dieses Reading kein Ereignis erzeugen w&uuml;rde.
     </li>
     <p>
 
