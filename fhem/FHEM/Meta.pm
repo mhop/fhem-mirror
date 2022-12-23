@@ -1078,6 +1078,14 @@ sub ModuleIsPerlCore {
     }
 }
 
+# Extract metadata from FHEM module file, public function - CoolTux
+sub getMetadata {
+    my $filePath = shift;
+    my $modMeta  = shift;
+
+    return __GetMetadata($filePath,$modMeta);
+}
+
 ##########
 # Private functions
 #
