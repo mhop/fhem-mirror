@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 06/2022
-my $thzversion = "0.205";
+# by immi 12/2022
+my $thzversion = "0.206";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -168,7 +168,7 @@ my %parsinghash = (
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 1],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 1]
 	      ],
-  "E8fan"	=> [[" inputFanSpeed: ",	58, 2, "hex", 1],    # like in sGlobal
+  "E8fan"	=> [["inputFanSpeed: ",	58, 2, "hex", 1],    # like in sGlobal
 		[" outputFanSpeed: ",		60, 2, "hex", 1],    # like in sGlobal
 		[" pFanstageXAirflowInlet: ",	62, 4, "hex", 1],    # m3/h  corresponding to p37Fanstage1AirflowInlet or p38Fanstage2AirflowInlet
 		[" pFanstageXAirflowOutlet: ",	66, 4, "hex", 1],    # m3/h corresponding to p40Fanstage1AirflowOutlet or p41Fanstage2AirflowOutlet
@@ -361,10 +361,10 @@ my %parsinghash = (
 	     ],
   "FDfirm" => [["version: ", 	4, 4, "hexdate", 1]
 	     ],
-  "FEfirmId" => [[" HW: ",		30,  2, "hex", 1], 	[" SW: ",	32,  4, "swver", 1],
+  "FEfirmId" => [["HW: ",		30,  2, "hex", 1], 	[" SW: ",	32,  4, "swver", 1],
 	      [" Date: ",		36, 22, "hex2ascii", 1]
 	     ],
-  "0A0176Dis" => [[" switchingProg: ",	11, 1, "bit0", 1],  [" compressor: ",	11, 1, "bit1", 1],
+  "0A0176Dis" => [["switchingProg: ",	11, 1, "bit0", 1],  [" compressor: ",	11, 1, "bit1", 1],
 	      [" heatingHC: ",		11, 1, "bit2", 1],  [" heatingDHW: ",	10, 1, "bit0", 1],
 	      [" boosterHC: ",		10, 1, "bit1", 1],  [" filterBoth: ",	 9, 1, "bit0", 1],
 	      [" ventStage: ",		 9, 1, "bit1", 1],  [" pumpHC: ",	 9, 1, "bit2", 1],
