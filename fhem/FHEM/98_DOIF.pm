@@ -5780,9 +5780,9 @@ sub ring_param {
 
   if (!defined $mode or $mode eq "minmax") {
     $mode="";
-  } elsif ($mode eq "negnullpos") {
+  } elsif ($mode eq "negzeropos") {
     $mode=1;
-  } elsif ($mode eq "nullnegpos") {
+  } elsif ($mode eq "zeronegpos") {
     $mode=2;
   }
  
