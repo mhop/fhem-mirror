@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-20 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26750 2022-12-25 16:38:54Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -39,7 +39,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
   "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
-               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck ",
+               "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck, edit comref ",
   "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
   "5.5.5"   => "11.12.2022 Array Log -> may be better error processing ",
   "5.5.4"   => "11.12.2022 Array Log -> print out all cache not saved, DbLog_DelayedShutdown processing changed ",
@@ -8295,16 +8295,18 @@ return;
        attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt;
        </code><br><br>
 
-       In asynchronous log mode, sets the threshold of &lt;n&gt; records above which the cache contents are exported to a file
-       instead of writing the data to the database. <br>
-       The function corresponds to the "exportCache purgecache" set command and uses its settings. <br>
-       With this attribute an overload of the server memory can be prevented if the database is not available for a longer period of time.
-       time (e.g. in case of error or maintenance). If the attribute value is smaller or equal to the value of the
-       attribute "cacheLimit", the value of "cacheLimit" is used for "cacheOverflowThreshold". <br>
-       In this case, the cache will <b>always</b> be written to a file instead of to the database if the threshold value
+       In asynchronous log mode, sets the threshold of &lt;n&gt; records above which the cache contents are exported to a
+       file instead of writing the data to the database. <br>
+       The executed function corresponds to the set command "exportCache purgecache" and uses its settings. 
+       <br><br>
+       
+       This attribute can be used to prevent an overload of the server memory if the database is not available for a 
+       longer period of time (e.g. in case of error or maintenance). If the attribute value is less than or equal to the 
+       value of the cacheLimit attribute, the value of cacheLimit is used for cacheOverflowThreshold. <br>
+       In this case the cache will <b>always</b> be written to a file instead of to the database if the threshold value
        has been reached. <br>
-       Thus, the data can be specifically written to one or more files with this setting, in order to import them into the
-       database at a later time with the set command "importCachefile".
+       With this setting, the data can be written to one or more files in order to import them into the database
+       at a later time with the set command "importCachefile".
      </ul>
      </li>
   </ul>
@@ -8546,32 +8548,36 @@ return;
        attr &lt;device&gt; DbLogValueFn {}
        </code><br><br>
 
-       The attribute <i>DbLogValueFn</i> will be propagated to all devices if DbLog is used.
-       This attribute contains a Perl expression that can use and change values of $TIMESTAMP, $READING, $VALUE (value of
-       reading) and $UNIT (unit of reading value). That means the changed values are logged. <br>
-       Furthermore you have readonly access to $DEVICE (the source device name), $EVENT, $LASTTIMESTAMP and $LASTVALUE
-       for evaluation in your expression.
-       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged dataset of $DEVICE / $READING. <br>
-       If the $TIMESTAMP is to be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't
-       be changed.
-       In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br>
-
-       The device specific function in "DbLogValueFn" is applied to the dataset before the potential existing attribute
-       "valueFn" in the DbLog device.
+       If DbLog is used, the <i>DbLogValueFn</i> attribute is propagated in all devices.
+       This attribute is set in the <b>source devices</b> and allows to change the values before logging
+       or exclude the record from logging. <br><br>
+       
+       The variables $TIMESTAMP, $READING, $VALUE (value of the reading) and $UNIT (unit of the reading value)
+       can be accessed and modified before logging to the database. <br>
+       Read access is available to $DEVICE (the name of the source device), $EVENT, $LASTTIMESTAMP, and $LASTVALUE. <br><br>
+       
+       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of 
+       $DEVICE / $READING. <br>
+       If $TIMESTAMP is to be changed, the form "yyyy-mm-dd hh:mm:ss" must be followed.
+       Otherwise the changed $TIMESTAMP variable will not be applied.
+       By setting the variable "$IGNORE=1" the record is excluded from logging. <br><br>
+       
+       The device specific function in "DbLogValueFn" is applied to the record before the function in the "valueFn" 
+       attribute of the DbLog device.
        <br><br>
 
        <b>Example</b> <br>
-       <pre>
+<pre>
 attr SMA_Energymeter DbLogValueFn
 {
-  if ($READING eq "Bezug_WirkP_Kosten_Diff"){
+  if ($READING eq "Bezug_WirkP_Kosten_Diff") {
     $UNIT="Diff-W";
   }
-  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
+  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2) {
     $IGNORE=1;
   }
 }
-       </pre>
+</pre>
      </ul>
      </li>
   </ul>
@@ -8952,17 +8958,23 @@ attr SMA_Energymeter DbLogValueFn
      <a id="DbLog-attr-valueFn"></a>
      <li><b>valueFn</b>
      <ul>
-       <code>
-       attr &lt;device&gt; valueFn {}
-       </code><br><br>
+      <code>
+      attr &lt;device&gt; valueFn {}
+      </code><br><br>
 
-       The attribute contains a Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING,
-       $VALUE (value of reading) and $UNIT (unit of reading value). <br>
-       Furthermore you have readonly access to $EVENT, $LASTTIMESTAMP and $LASTVALUE for evaluation in your expression.
-       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged dataset of $DEVICE / $READING. <br>
-       If $TIMESTAMP is to be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't
-       be changed.
-       In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br><br>
+      This attribute is set in the <b>DbLog device</b> and allows to modify the values before logging
+      or exclude the record from logging. <br><br>
+       
+      It is possible to access the variables $TIMESTAMP, $DEVICE (source device), $DEVICETYPE, $READING, $VALUE (reading value) and
+      $UNIT (unit of reading value) can be accessed and modified before logging to the database. <br>
+      Read access exists to $EVENT, $LASTTIMESTAMP and $LASTVALUE. <br><br>
+       
+      The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of 
+      $DEVICE / $READING. <br>
+      If $TIMESTAMP is to be changed, the form "yyyy-mm-dd hh:mm:ss" must be followed. 
+      Otherwise the changed $TIMESTAMP variable will not be applied.
+      By setting the variable "$IGNORE=1" the record is excluded from logging. 
+      <br><br>
 
       <b>Examples</b> <br>
       <code>
@@ -9922,7 +9934,9 @@ attr SMA_Energymeter DbLogValueFn
 
        Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cacheinhalt in ein File
        exportiert wird anstatt die Daten in die Datenbank zu schreiben. <br>
-       Die Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen. <br>
+       Die ausgeführte Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen. 
+       <br><br>
+       
        Mit diesem Attribut kann eine Überlastung des Serverspeichers verhindert werden falls die Datenbank für eine längere
        Zeit nicht verfügbar ist (z.B. im Fehler- oder Wartungsfall). Ist der Attributwert kleiner oder gleich dem Wert des
        Attributs "cacheLimit", wird der Wert von "cacheLimit" für "cacheOverflowThreshold" verwendet. <br>
@@ -10215,30 +10229,35 @@ attr SMA_Energymeter DbLogValueFn
        </code><br><br>
 
        Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
-       Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und
-       $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt. <br>
-       Außerdem hat man Lesezugriff auf $DEVICE (den Namen des Quellgeräts), $EVENT, $LASTTIMESTAMP und $LASTVALUE
-       zur Bewertung in Ihrem Ausdruck. <br>
-       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von $DEVICE / $READING. <br>
-       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der
-       geänderte $timestamp nicht übernommen.
-       Zusätzlich kann durch Setzen der Variable "$IGNORE=1" der Datensatz vom Logging ausgeschlossen werden. <br>
+       Dieses Attribut wird in den <b>Quellendevices</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
+       oder den Ausschluß des Datensatzes vom Logging. <br><br>
+       
+       Es kann auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und $UNIT (Einheit des Readingswert) 
+       zugegriffen werden und diese vor dem Loggen in die Datenbank verändern. <br>
+       Lesezugriff besteht auf $DEVICE (den Namen des Quellengeräts), $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
+       
+       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von 
+       $DEVICE / $READING. <br>
+       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden.
+       Anderenfalls wird die geänderte $TIMESTAMP Variable nicht übernommen.
+       Durch Setzen der Variable "$IGNORE=1" wird der Datensatz vom Logging ausgeschlossen. <br><br>
+       
        Die devicespezifische Funktion in "DbLogValueFn" wird vor der eventuell im DbLog-Device vorhandenen Funktion im Attribut
        "valueFn" auf den Datensatz angewendet.
        <br><br>
 
        <b>Beispiel</b> <br>
-       <pre>
+<pre>
 attr SMA_Energymeter DbLogValueFn
 {
-  if ($READING eq "Bezug_WirkP_Kosten_Diff"){
+  if ($READING eq "Bezug_WirkP_Kosten_Diff") {
     $UNIT="Diff-W";
   }
-  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
+  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2) {
     $IGNORE=1;
   }
 }
-       </pre>
+</pre>
      </ul>
      </li>
   </ul>
@@ -10622,14 +10641,20 @@ attr SMA_Energymeter DbLogValueFn
        <code>
        attr &lt;device&gt; valueFn {}
        </code><br><br>
-
-       Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (Wert des Readings) und
-       $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt. <br>
-       Außerdem hat man Lesezugriff auf $EVENT, $LASTTIMESTAMP und $LASTVALUE zur Bewertung im Ausdruck. <br>
-       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von $DEVICE / $READING. <br>
-       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden. Anderenfalls wird der
-       geänderte $timestamp nicht übernommen.
-       Zusätzlich kann durch Setzen der Variable "$IGNORE=1" ein Datensatz vom Logging ausgeschlossen werden. <br><br>
+       
+       Dieses Attribut wird im <b>DbLog-Device</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
+       oder den Ausschluß des Datensatzes vom Logging. <br><br>
+       
+       Es kann auf die Variablen $TIMESTAMP, $DEVICE (Quellendevice), $DEVICETYPE, $READING, $VALUE (Wert des Readings) und
+       $UNIT (Einheit des Readingswert) zugegriffen werden und diese vor dem Loggen in die Datenbank verändern. <br>
+       Lesezugriff besteht auf $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
+       
+       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von 
+       $DEVICE / $READING. <br>
+       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden. 
+       Anderenfalls wird die geänderte $TIMESTAMP Variable nicht übernommen.
+       Durch Setzen der Variable "$IGNORE=1" wird der Datensatz vom Logging ausgeschlossen. 
+       <br><br>
 
       <b>Beispiele</b> <br>
       <code>
