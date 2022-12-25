@@ -5776,7 +5776,7 @@ sub ring_param {
       $innerRing=1;
   }      
   
-  $pointer="" if (!defined $pointer);
+  $pointer="" if (!defined $pointer or $pointer eq "nopointer");
 
   if (!defined $mode or $mode eq "minmax") {
     $mode="";
