@@ -1,6 +1,6 @@
-REV 26890
+REV 26892
 DIR unused
-UPD 2022-12-22_07:45:02 386074 ./CHANGED
+UPD 2022-12-25_07:45:02 386144 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2022-11-10_07:45:03 46102 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
@@ -547,7 +547,7 @@ UPD 2021-09-24_07:45:12 9349 FHEM/98_help.pm
 UPD 2019-02-01_07:45:03 13576 FHEM/98_inotify.pm
 UPD 2022-12-11_07:45:13 70884 FHEM/98_livetracking.pm
 UPD 2022-03-08_07:45:02 44836 FHEM/98_logProxy.pm
-UPD 2022-10-13_07:45:03 61586 FHEM/98_monitoring.pm
+UPD 2022-12-25_07:45:02 61596 FHEM/98_monitoring.pm
 UPD 2016-08-19_14:49:02 25936 FHEM/98_notice.pm
 UPD 2015-08-13_07:45:10 8668 FHEM/98_pilight.pm
 UPD 2016-02-26_07:45:12 6994 FHEM/98_ping.pm
@@ -750,8 +750,8 @@ UPD 2022-12-18_07:45:07 4821103 docs/commandref.html
 UPD 2022-12-23_07:45:10 2868262 docs/commandref_DE.html
 UPD 2022-11-15_07:45:02 83658 docs/commandref_frame.html
 UPD 2022-12-23_07:45:03 93721 docs/commandref_frame_DE.html
-UPD 2022-12-24_07:45:11 292889 docs/commandref_modular.html
-UPD 2022-12-24_07:45:12 304144 docs/commandref_modular_DE.html
+UPD 2022-12-25_07:45:10 292889 docs/commandref_modular.html
+UPD 2022-12-25_07:45:12 304144 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
