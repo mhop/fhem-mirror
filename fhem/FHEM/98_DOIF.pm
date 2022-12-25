@@ -5782,7 +5782,7 @@ sub ring_param {
     $mode="";
   } elsif ($mode eq "negnullpos") {
     $mode=1;
-  } elsif ($mode eq "nullminmax") {
+  } elsif ($mode eq "nullnegpos") {
     $mode=2;
   }
  
