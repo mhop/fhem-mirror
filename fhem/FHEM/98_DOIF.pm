@@ -4919,11 +4919,36 @@ sub card
 
   my ($size,$plot,$steps,$noFooter,$noColor,$hring,$bwidth);
   ($size,$plot,$steps,$noFooter,$noColor,$hring,$bwidth)=split (/,/,$prop) if (defined $prop);
-  $plot = "" if (!defined $plot);
-  $steps = "" if (!defined $steps);
-  $noFooter = "" if (!defined $noFooter);
-  $noColor = "" if (!defined $noColor);
-  $hring = "" if (!defined $hring);
+  
+  if (!defined $plot or $plot eq "autoscaling") {
+    $plot = "";
+  } elsif ($plot eq "fixscaling") {
+    $plot=1;
+  }
+  if (!defined $steps or $steps eq "nosteps") {
+    $steps = "";
+  } elsif ($steps eq "steps") {
+    $steps = 1;
+  }
+  if (!defined $noFooter or $noFooter eq "footer") {
+    $noFooter = "" 
+  } elsif ($noFooter eq "nofooter") {
+    $noFooter = 1;
+  }
+  if (!defined $noColor or $noColor eq "ycolor") {
+    $noColor = "";
+  } elsif ($noColor eq "noycolor") {
+    $noColor = 1;
+  }
+  
+  if (!defined $hring or $hring eq "ring") {
+    $hring = "";
+  } elsif ($hring  eq "noring") {
+    $hring = 0;
+  }  elsif ($hring eq "halfring") {
+    $hring = 1
+  }
+    
   
   if (!defined $bwidth or $bwidth eq "") {
     $bwidth=180;
@@ -5733,11 +5758,33 @@ sub ring_param {
 
   my ($monochrom,$minMax,$innerRing,$pointer,$mode);
   ($monochrom,$minMax,$innerRing,$pointer,$mode)=split (/,/,$model) if (defined $model);
-  $monochrom="" if (!defined $monochrom);
-  $minMax="" if (!defined $minMax);
-  $innerRing="" if (!defined $innerRing);
+  if (!defined $monochrom or $monochrom eq "gradient") {
+    $monochrom="";
+  } elsif ($monochrom eq "nogradient") {
+    $monochrom=1;
+  }
+  if (!defined $minMax or $minMax eq "nominmaxvalue") {
+    $minMax="";
+  } elsif ($minMax eq "minmaxvalue") {
+    $minMax=1;
+  }
+  
+  
+  if (!defined $innerRing or $innerRing eq "noinnerring") {
+    $innerRing=""; 
+  } elsif ($innerRing eq "innerring") {
+      $innerRing=1;
+  }      
+  
   $pointer="" if (!defined $pointer);
-  $mode="" if (!defined $mode);
+
+  if (!defined $mode or $mode eq "minmax") {
+    $mode="";
+  } elsif ($mode eq "negnullpos") {
+    $mode=1;
+  } elsif ($mode eq "nullminmax") {
+    $mode=2;
+  }
  
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont,3) if (defined $decfont);
@@ -5832,7 +5879,7 @@ sub ring_param {
       $arcEnd=$minArc if ($arcEnd < $minArc);
     } elsif ($mode eq "2") {
       $arcBegin = $minArc;
-      $arcEnd = $value < 0 ? int(-$value*$m*10)/10:int($value*$m*10)/10;
+      $arcEnd = $value < 0 ? int((-$value*$m+$n)*10)/10:int(($value*$m+$n)*10)/10;
       $beginColor = $nullColor;
       if ($value < 0) {
         $maxCol=$minCol;
