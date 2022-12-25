@@ -1368,10 +1368,11 @@ return;
 # $hash is my entry, $dev_hash is the entry of the changed device
 
 sub DbLog_Log {
-  my ($hash, $dev_hash) = @_;
-  my $name              = $hash->{NAME};
-  my $dev_name          = $dev_hash->{NAME};
-  my $dev_type          = uc($dev_hash->{TYPE});
+  my $hash     = shift;
+  my $dev_hash = shift;
+  my $name     = $hash->{NAME};
+  my $dev_name = $dev_hash->{NAME};
+  my $dev_type = uc($dev_hash->{TYPE});
 
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
 
@@ -1382,10 +1383,10 @@ sub DbLog_Log {
   my $events = deviceEvents($dev_hash, AttrVal($name, "addStateEvent", 1));
   return if(!$events);
 
-  my $max = int(@{$events});
-
+  my $max      = int(@{$events});
   my $vb4show  = 0;
   my @vb4devs  = split ",", AttrVal ($name, 'verbose4Devs', '');                # verbose4 Logs nur für Devices in Attr "verbose4Devs"
+  
   if (!@vb4devs) {
       $vb4show = 1;
   }
@@ -1411,8 +1412,7 @@ sub DbLog_Log {
 
   my ($event,$reading,$value,$unit,$err,$DoIt);
 
-  my $memcount = 0;
-
+  my $memcount           = 0;
   my $re                 = $hash->{REGEXP};
   my $ts_0               = TimeNow();                                            # timestamp in SQL format YYYY-MM-DD hh:mm:ss
   my $now                = gettimeofday();                                       # get timestamp in seconds since epoch
@@ -1527,7 +1527,6 @@ sub DbLog_Log {
               # entsprechend unterschiedlich vorbelegt sein.
               # keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
               $DoIt = 0;
-
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
 
               if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {                                        # Bsp: "(temperature|humidity):300,battery:3600:force"
@@ -1607,7 +1606,9 @@ sub DbLog_Log {
                       my $CN            = " ";
 
                       eval $DbLogValueFn;
-                      Log3 ($name, 2, "DbLog $name - error device \"$dev_name\" specific DbLogValueFn: ".$@) if($@);
+                      if($@) {
+                          Log3 ($name, 2, "DbLog $name - error device \"$dev_name\" specific DbLogValueFn: ".$@);
+                      }
 
                       if($IGNORE) {                                                                                        # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                     # patch Forum:#111423
@@ -1621,8 +1622,8 @@ sub DbLog_Log {
                       }
 
                       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                      
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
                       }
@@ -1649,7 +1650,9 @@ sub DbLog_Log {
                       my $CN            = " ";
 
                       eval $value_fn;
-                      Log3 ($name, 2, "DbLog $name - error valueFn: ".$@) if($@);
+                      if($@) {
+                          Log3 ($name, 2, "DbLog $name - error valueFn: ".$@);
+                      }
 
                       if($IGNORE) {                                                                                     # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME}  = $lastt if($lastt);                  # patch Forum:#111423
@@ -1663,8 +1666,8 @@ sub DbLog_Log {
                       }
 
                       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                      
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
-
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
                       }
@@ -1693,41 +1696,46 @@ sub DbLog_Log {
           }
       }
   };
+  
+  if (!$memcount) {
+      $net = tv_interval($nst);                                                              # Notify-Routine Laufzeit ermitteln
+
+      if(AttrVal($name, 'showNotifyTime', 0)) {
+          readingsSingleUpdate($hash, 'notify_processing_time', sprintf("%.4f",$net), 1);
+      }
+      
+      return;      
+  }
 
   if($async) {                                                                               # asynchoner non-blocking Mode
-      if($memcount) {
-          readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0)) if($DoIt);
+      readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0)) if($DoIt);
 
-          if($memcount >= $clim) {                                                           # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
-              my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
-              my $syncival = AttrVal($name, "syncInterval", 30);
+      if($memcount >= $clim) {                                                           # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
+          my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
+          my $syncival = AttrVal($name, "syncInterval", 30);
 
-              if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
+          if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
 
-                  Log3 ($name, 4, "DbLog $name - Number of cache entries reached cachelimit $clim - start database sync.");
+              Log3 ($name, 4, "DbLog $name - Number of cache entries reached cachelimit $clim - start database sync.");
 
-                  DbLog_execMemCacheAsync ($hash);
+              DbLog_execMemCacheAsync ($hash);
 
-                  $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
-              }
+              $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
           }
       }
   }
 
-  if(!$async) {
-      return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft
-      
-      if($memcount) {                                                                   # synchroner non-blocking Mode
-          return if($hash->{HELPER}{REOPEN_RUNS});                                      # return wenn "reopen" mit Ablaufzeit gestartet ist
+  if(!$async) {                                                                         # synchroner non-blocking Mode
+      return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft                                                                       
+      return if($hash->{HELPER}{REOPEN_RUNS});                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
 
-          $err = DbLog_execMemCacheSync ($hash);
-          DbLog_setReadingstate ($hash, $err) if($err);
-      }
+      $err = DbLog_execMemCacheSync ($hash);
+      DbLog_setReadingstate ($hash, $err) if($err);
   }
 
   $net = tv_interval($nst);                                                             # Notify-Routine Laufzeit ermitteln
 
-  if($net && AttrVal($name, 'showNotifyTime', 0)) {
+  if(AttrVal($name, 'showNotifyTime', 0)) {
       readingsSingleUpdate($hash, 'notify_processing_time', sprintf("%.4f",$net), 1);
   }
 
