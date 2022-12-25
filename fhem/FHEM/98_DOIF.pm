@@ -4922,7 +4922,7 @@ sub card
   
   if (!defined $plot or $plot eq "autoscaling") {
     $plot = "";
-  } elsif ($plot eq "fixscaling") {
+  } elsif ($plot eq "fixedscaling") {
     $plot=1;
   }
   if (!defined $steps or $steps eq "nosteps") {
