@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: roll out version 5.5.7, NOTE: Please read Forum
+                      https://forum.fhem.de/index.php/topic,130743.0.html
+                      for information about this version
  - change:  93_DbRep: Commandref changed to a id tags
  - change:  98_monitoring: white- and blacklist now are more accurate
  - bugfix:  70_SVDRP: claen timer name, fix stateFormat overwrite
