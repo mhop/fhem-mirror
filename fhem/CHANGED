@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_ESCVP21net: adding some default attributes on Define
  - change:  00_KNXIO: minor changes, Forum #127792
  - change:  10_KNX:   multiple changes, Forum #122582
  - change:  93_DbLog: roll out version 5.5.7, NOTE: Please read Forum
