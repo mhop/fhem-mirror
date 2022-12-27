@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
   "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
                "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck, edit comref ",
   "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
@@ -313,6 +314,7 @@ my %DbLog_columns = ("DEVICE"  => 64,
 my $dblog_cachedef = 500;                       # default Größe cacheLimit bei asynchronen Betrieb
 my $dblog_cmdef    = 'basic_ta:on';             # default commitMode
 my $dblog_todef    = 86400;                     # default timeout Sekunden
+my $dblog_lrpth    = 0.8;                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
 
 ################################################################
 sub DbLog_Initialize {
@@ -520,8 +522,8 @@ sub DbLog_DelayedShutdown {
 
   DbLog_execMemCacheAsync ($hash);
 
-  my $delay_needed = IsDisabled($name)            ? 0 :
-                     $hash->{HELPER}{LONGRUN_PID} ? 1 :
+  my $delay_needed = IsDisabled($name)                    ? 0 :
+                     defined $hash->{HELPER}{LONGRUN_PID} ? 1 :
                      0;
 
   if ($delay_needed) {
@@ -1399,7 +1401,7 @@ sub DbLog_Log {
       }
   }
 
-  my $log4rel = $vb4show && !$hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
+  my $log4rel = $vb4show && !defined $hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
   if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
       if($log4rel) {
@@ -2158,7 +2160,7 @@ sub DbLog_execMemCacheAsync {
   my $verbose = AttrVal ($name, 'verbose', 3);
   my $dolog   = $memcount ? 1 : 0;
 
-  if($hash->{HELPER}{LONGRUN_PID}) {
+  if(defined $hash->{HELPER}{LONGRUN_PID}) {
       $dolog = 0;
   }
 
@@ -2182,12 +2184,12 @@ sub DbLog_execMemCacheAsync {
       $err     = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                       # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   }
   else {
-      if($hash->{HELPER}{LONGRUN_PID}) {
+      if(defined $hash->{HELPER}{LONGRUN_PID}) {
           $err = 'Another operation is in progress - resync at NextSync';
           DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
       }
       else {
-          if($hash->{HELPER}{SHUTDOWNSEQ}) {
+          if(defined $hash->{HELPER}{SHUTDOWNSEQ}) {
               Log3 ($name, 2, "DbLog $name - no data for last database write cycle");
               _DbLog_finishDelayedShutdown ($hash);
           }
@@ -2210,9 +2212,11 @@ sub DbLog_execMemCacheSync {
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
-  if($hash->{HELPER}{LONGRUN_PID}) {
-      $err = 'Another operation is in progress - data is stored temporarily (check with listCache)';
-      DbLog_setReadingstate ($hash, $err);
+  if(defined $hash->{HELPER}{LONGRUN_PID}) {
+      if (gettimeofday() - $hash->{HELPER}{LONGRUN_PID} > $dblog_lrpth) {
+          $err = 'Another operation is in progress. <br>Data is stored temporarily.';
+          DbLog_setReadingstate ($hash, $err);
+      }
       return;
   }
 
@@ -2311,8 +2315,8 @@ sub DbLog_SBP_onRun {
                   delete $store->{dbparams};
               }
 
-              my $msg0 = $dbdelpars ? ' and stored DB params in SubProcess were deleted' : '';
-              my $msg1 = 'database disconnected by request'.$msg0;
+              my $msg0 = $dbdelpars ? ' <br>Stored DB params in SubProcess were deleted.' : '';
+              my $msg1 = 'Database disconnected by request.'.$msg0;
 
               Log3 ($name, 3, "DbLog $name - $msg1");
 
@@ -2349,7 +2353,7 @@ sub DbLog_SBP_onRun {
 
               $ret = {
                   name => $name,
-                  msg  => 'connection params saved into SubProcess. Connection to DB is established when it is needed',
+                  msg  => 'Connection parameters saved into SubProcess. <br>Connection to DB is established when it is needed.',
                   oper => $operation,
                   ot   => 0
               };
@@ -4325,7 +4329,7 @@ sub DbLog_SBP_CheckAndInit {
 
   if (defined $hash->{SBP_PID} && defined $hash->{HELPER}{LONGRUN_PID}) {       # Laufzeit des letzten Kommandos prüfen -> timeout
       my $to = AttrVal($name, 'timeout', $dblog_todef);
-      my $rt = time() - $hash->{HELPER}{LONGRUN_PID};                           # aktuelle Laufzeit
+      my $rt = gettimeofday() - $hash->{HELPER}{LONGRUN_PID};                   # aktuelle Laufzeit
 
       if ($rt >= $to) {                                                         # SubProcess beenden, möglicherweise tot
           Log3 ($name, 2, qq{DbLog $name - The Subprocess >$hash->{SBP_PID}< has exceeded the timeout of $to seconds});
@@ -4461,7 +4465,7 @@ sub DbLog_SBP_sendLogData {
   my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
   return $err if($err);
 
-  $hash->{HELPER}{LONGRUN_PID} = time();                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
+  $hash->{HELPER}{LONGRUN_PID} = gettimeofday();                      # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
 }
@@ -4501,7 +4505,7 @@ sub DbLog_SBP_sendCommand {
   my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
   return $err if($err);
 
-  $hash->{HELPER}{LONGRUN_PID} = time();                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
+  $hash->{HELPER}{LONGRUN_PID} = gettimeofday();                       # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
   DbLog_setReadingstate ($hash, "operation '$oper' is running");
 
@@ -4796,8 +4800,9 @@ sub DbLog_setReadingstate {
   my $val  = shift // $hash->{HELPER}{OLDSTATE};
 
   my $evt  = $val eq $hash->{HELPER}{OLDSTATE} ? 0 : 1;
+  my $out  = $val =~ /<br>/xs ? '<html>'.$val.'</html>' : $val;
 
-  readingsSingleUpdate($hash, 'state', $val, $evt);
+  readingsSingleUpdate($hash, 'state', $out, $evt);
 
   $hash->{HELPER}{OLDSTATE} = $val;
 
