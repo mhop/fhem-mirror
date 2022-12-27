@@ -40,7 +40,8 @@
 #    1.01.19  added LS12000 (added POPLP, LENS, HLENS)
 #    1.01.20  added more LS12000 options, enable 2-value commands
 #    1.01.21  added HC2150
-#    1.01.22  added "on" and "off" as direct set commands (line 1334)
+#    1.01.22  added "on" and "off" as direct set commands
+#    1.01.23  adding some default attributes on Define (icon, webCmd, cmdIcon,stateFormat)
 #
 ################################################################################
 #
@@ -74,7 +75,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.22";
+my $version = "1.01.23";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -733,10 +734,19 @@ sub ESCVP21net_Define {
   ESCVP21net_setTypeCmds($hash);
   
 	# check if definition is new or existing 
-	if($init_done && !defined($hash->{OLDDEF}))
+	#if($init_done && !defined($hash->{OLDDEF}))
+  if($init_done)
 	{
-		# set stateFormat
-    $attr{$name}{"stateFormat"} = "PWR";
+		# commands here seem not to be run on restart, but only on new define
+    # set stateFormat
+    #$attr{$name}{"stateFormat"} = "LAMP";
+    #$attr{$name}{cmdIcon} = "PWRon:remotecontrol/black_btn_GREEN PWRoff:remotecontrol/black_btn_RED GetStatus:remotecontrol/black_btn_STATUS GetAll:remotecontrol/black_btn_INFO" if (!defined ($attr{$name}{cmdIcon}));
+    $attr{$name}{cmdIcon} = "on:remotecontrol/black_btn_GREEN off:remotecontrol/black_btn_RED GetStatus:remotecontrol/black_btn_STATUS GetAll:remotecontrol/black_btn_INFO" if (!defined ($attr{$name}{cmdIcon}));
+    #$attr{$name}{eventMap} = "/PWR on:PWRon/PWR off:PWRoff/" if (!defined ($attr{$name}{eventMap}));
+    $attr{$name}{icon} = "it_camera" if (!defined ($attr{$name}{icon}));
+    $attr{$name}{stateFormat} = "PWR" if (!defined ($attr{$name}{stateFormat}));
+    #$attr{$name}{webCmd} = "PWRon:PWRoff:GetStatus:GetAll" if (!defined ($attr{$name}{webCmd}));
+    $attr{$name}{webCmd} = "on:off:GetStatus:GetAll" if (!defined ($attr{$name}{webCmd}));
  	}
   main::Log3 $name, 5, "[$name]: Define: device $name defined";
   
@@ -748,6 +758,7 @@ sub ESCVP21net_Undef {
   RemoveInternalTimer($hash);
   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
   DevIo_CloseDev($hash);
+  delete($modules{ESCVP21net}{defptr});
   return ;
 }
 
@@ -809,6 +820,7 @@ sub ESCVP21net_Notify($$) {
       ESCVP21net_Attr("set",$name,"AdditionalSettings",$hash->{AdditionalSettings});
       main::Log3 $name, 5, "adding attrs: $name, ".$hash->{AdditionalSettings};
     }
+    
   }
 
   if($devName eq $name && grep(m/^CONNECTED|opened$/, @{$events})){
@@ -2172,6 +2184,14 @@ sub ESCVP21net_openDevice{
       </li>
       <li>Example: <code>define EPSON ESCVP21net 10.10.0.1 3629 TW5650</code>
       </li>
+    </ul>
+    <br>
+    <br>The first Define (or defmod) will configure
+    <ul>
+      <li>a standard icon (it will use "it_camera", since I am not really a good designer)</li>
+      <li>webCmds for on, off, GetStatus, GetAll</li>
+      <li>cmdIcons for the webCmds</li>
+      <li>stateFormat as PWR</li>
     </ul>      
   </ul>
   <br>
