@@ -164,7 +164,7 @@ FHEM2FHEM_Read($)
   #Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
   $data .= $buf;
 
-  if($data =~ m/\0/) {
+  if($hash->{".waitingForSet"}  && $data =~ m/\0/) {
     if($data !~ m/^(.*)\0(.*)\0(.*)$/s) {
       $hash->{PARTIAL} = $data;
       return;
@@ -179,6 +179,8 @@ FHEM2FHEM_Read($)
       Log3 $name, 3, "Remote command response:$resp";
     }
     $hash->{cmdResponse} = $resp;
+    delete($hash->{".waitingForSet"});
+    delete($hash->{".lcmd"});
 
     $data = $1.$3; # Continue with the rest
   }
@@ -233,7 +235,9 @@ FHEM2FHEM_Read($)
       my ($type, $rname, $msg) = split(" ", $rmsg, 3);
       my $rdev = $hash->{rawDevice};
       next if($rname ne $rdev);
-      Log3 $name, 4, "$name: $rmsg";
+      my $dbg_rmsg = $rmsg;
+      $dbg_rmsg =~ s/([^ -~])/"(".ord($1).")"/ge;
+      Log3 $name, 4, "$name: RAW RCVD: $dbg_rmsg";
       Dispatch($defs{$rdev}, $msg, undef);
 
     }
@@ -387,6 +391,7 @@ FHEM2FHEM_Set($@)
     $cmd = '{my $r=fhem("'.$cmd.'");; defined($r) ? "\\0$r\\0" : $r}'."\n";
     F2F_sw($hash->{TCPDev}, $cmd);
     $hash->{".lcmd"} = $hash->{CL};
+    $hash->{".waitingForSet"} = 1;
   }
   return undef;
 }
