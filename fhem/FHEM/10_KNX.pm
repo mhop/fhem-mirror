@@ -1,5 +1,7 @@
-##############################################
+## no critic (Modules::RequireVersionVar) ######################################
 # $Id$  
+################################################################################
+### changelog:
 # ABU 20180218 restructuring, removed older documentation
 # MH  20210908 deleted part of change history
 # ABU 20181007 fixed dpt19
@@ -100,6 +102,12 @@
 # MH 202212xx  fix dpt217 range/fomatting, cmd-ref links,
 #              remove support for IODev in define
 #              modify disabled logic
+# MH 20221226  device define after init_complete
+#              remove $hash->{DEVNAME}
+#              modify autocreate, get/set logic
+#              changed not user relevant internals to {.XXXX}
+#              changed DbLog_split function
+#              disabled StateFn
 
 
 package KNX; ## no critic 'package'
@@ -112,7 +120,7 @@ use Scalar::Util qw(looks_like_number);
 use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 
 ### perlcritic parameters
-# these ones are NOT used! (constants,Policy::Modules::RequireFilenameMatchesPackage,Modules::RequireVersionVar,NamingConventions::Capitalization)
+# these ones are NOT used! (constants,Policy::Modules::RequireFilenameMatchesPackage,NamingConventions::Capitalization)
 # these ones are NOT used! (ControlStructures::ProhibitCascadingIfElse)
 ### the following percritic items will be ignored global ###
 ## no critic (ValuesAndExpressions::RequireNumberSeparators,ValuesAndExpressions::ProhibitMagicNumbers)
@@ -144,10 +152,8 @@ BEGIN {
           fhemTimeLocal)
     );
 }
-    # export to main context
-    GP_Export(
-        qw(Initialize)
-    );
+# export to main context
+GP_Export( qw(Initialize) );
 
 #string constants
 my $MODELERR    = 'MODEL_NOT_DEFINED'; # for autocreate
@@ -427,7 +433,7 @@ sub KNX_Define {
 	$hash->{NAME} = $name;
 
 	$svnid =~ s/.*\.pm\s(.+)Z.*/$1/ix;
-	$hash->{SVN} = $svnid; # store svn info in dev hash
+	$hash->{'.SVN'} = $svnid; # store svn info in dev hash
 
 	my $logtxt = qq{KNX_define ($name): }; # leading txt
 
@@ -442,10 +448,29 @@ sub KNX_Define {
 	if ( $a[int(@a) - 1] !~ m/^(?:$PAT_GAD|$PAT_GAD_HEX)/ix ) {
 		my $iodevCandidate = pop(@a); # remove from array, but do nothing with it!
 		my $logtxtIO = qq{$logtxt specifying IODev $iodevCandidate is deprecated in define } .
-                                qq{- use "attr $name IODev $iodevCandidate"};
+                               qq{- use "attr $name IODev $iodevCandidate"};
 		Log3 ($name, 2, $logtxtIO);
 		return $logtxtIO if ($init_done); # allow durin start
 	}
+
+### new wait for initdone...
+	$hash->{'.DEFLINE'} = join(q{ },@a); # temp store defs for define2...
+	return InternalTimer(gettimeofday() + 5.0,\&KNX_Define2,$hash) if (! $init_done);
+	return KNX_Define2($hash);
+}
+
+### continue define 5 sec after init complete!
+sub KNX_Define2 {
+	my $hash = shift // return;
+
+	my $name = $hash->{NAME};
+	my $def  = $hash->{'.DEFLINE'};
+	delete $hash->{'.DEFLINE'}; 
+	my @a = split(/\s+/x, $def);
+	RemoveInternalTimer($hash);
+
+	my $logtxt = qq{KNX_define2 ($name): }; # leading txt
+### end new
 
 	AssignIoPort($hash); # AssignIoPort will take device from $attr{$name}{IODev} if defined
 
@@ -454,7 +479,7 @@ sub KNX_Define {
 	$hash->{GADTABLE} = {};
 
 	#delete all defptr entries for this device (defmod & copy problem)
-	KNX_delete_defptr($hash) if ($init_done); # verify with: {PrintHash($modules{KNX}->{defptr},3) }
+	KNX_delete_defptr($hash); # verify with: {PrintHash($modules{KNX}->{defptr},3) }
 
 	#create groups and models, iterate through all possible args
 	foreach my $i (2 .. $#a) { 
@@ -478,7 +503,8 @@ sub KNX_Define {
 		return ($logtxt . qq{no model defined for group-number $gadNo}) if(! defined($gadModel));
 
 		if ($gadModel eq $MODELERR) { #within autocreate no model is supplied - throw warning
-			Log3 ($name, 3, $logtxt . 'autocreate device will be disabled, correct def with valid dpt and enable device') if ($init_done);
+			Log3 ($name, 3, $logtxt . 'autocreate device will be disabled, correct def with valid dpt and enable device');
+			$attr{$name}->{disable} = 1 if (AttrVal($name,'disable',0) != 1);
 		}
 		elsif (!defined($dpttypes{$gadModel})) { #check model-type
 			return $logtxt . qq{invalid model: $gadModel for group-number $gadNo} . 
@@ -504,9 +530,6 @@ sub KNX_Define {
 			return ($logtxt . qq{invalid option for group-number $gadNo. Use one of: $PAT_GAD_OPTIONS}) if (defined($gadOption) && ($gadOption !~ m/^(?:$PAT_GAD_OPTIONS)$/ix));
 			return ($logtxt . qq{invalid suffix for group-number $gadNo. Use $PAT_GAD_SUFFIX}) if (defined($gadNoSuffix) && ($gadNoSuffix !~ m/$PAT_GAD_SUFFIX/ix));
 		}
-
-		#save 1st gadName for later backwardCompatibility
-		$hash->{FIRSTGADNAME} = $gadName if ($gadNo == 1);
 
 		###GADTABLE
 		#create a hash with gadCode and gadName for later mapping
@@ -545,7 +568,7 @@ sub KNX_Define {
 		if (defined ($dptDetails->{SETLIST})) { # list is given, pass it through
 			$setlist = q{:} . $dptDetails->{SETLIST};
 		}
-		elsif (defined ($dptDetails->{MIN}) and looks_like_number($dptDetails->{MIN})) { #number? - place slider
+		elsif (defined ($dptDetails->{MIN}) && looks_like_number($dptDetails->{MIN})) { #number? - place slider
 			my $min = $dptDetails->{MIN};
 			my $max = $dptDetails->{MAX};
 			my $interval = int(($max-$min)/100);
@@ -574,38 +597,20 @@ sub KNX_Define {
 		#restore list
 		@{$modules{KNX}->{defptr}->{$gadCode}} = @devList;
 
-		#create setlist/getlist for setFn / getFn
+		#create setlist for setFn / getlist will be created during get-cmd!
 		my $setString = q{};
-		my $getString = q{};
 		foreach my $key (keys %{$hash->{GADDETAILS}}) {
-			#no set-command for listenonly or get / no get cmds for set
+			#no set-command for get or listenonly
 			my $option = $hash->{GADDETAILS}->{$key}->{OPTION};
-			if (defined ($option)) {
-				if ($option eq 'get') {
-					$getString .= q{ } . $key . ':noArg';
-				}
-				elsif ($option eq 'set') {
-					$setString .= ' on:noArg off:noArg' if (($hash->{GADDETAILS}->{$key}->{NO} == 1) && ($hash->{GADDETAILS}->{$key}->{MODEL} =~ /^(dpt1|dpt1.001)$/x)); 
-					$setString .= q{ } . $key . $hash->{GADDETAILS}->{$key}->{SETLIST};
-				}
-				# must be listenonly, do nothing
-			}
-			else {  # no option def, select all
-				$getString .= q{ } . $key . ':noArg';
-				$setString .= ' on:noArg off:noArg' if (($hash->{GADDETAILS}->{$key}->{NO} == 1) && ($hash->{GADDETAILS}->{$key}->{MODEL} =~ /^(dpt1|dpt1.001)$/x));
-				$setString .= q{ } . $key . $hash->{GADDETAILS}->{$key}->{SETLIST};
+			if ((defined($option) && $option eq 'set') || (! defined($option))) {
+					$setString .= 'on:noArg off:noArg ' if (($hash->{GADDETAILS}->{$key}->{NO} == 1) && ($hash->{GADDETAILS}->{$key}->{MODEL} =~ /^(dpt1|dpt1.001)$/x));
+					$setString .= $key . $hash->{GADDETAILS}->{$key}->{SETLIST} . q{ };
 			}
 		}
-		$setString =~ s/^[\s?](.*)/$1/ix; # trim leading blank
-		$getString =~ s/^[\s?](.*)/$1/ix;
-		$hash->{SETSTRING} = $setString;
-		$hash->{GETSTRING} = $getString;
+		$hash->{'.SETSTRING'} = $setString;
 
-		Log3 ($name, 5, $logtxt . qq{getstring= $hash->{GETSTRING} , setstring= $hash->{SETSTRING}});
+		Log3 ($name, 5, qq{$logtxt setstring= $hash->{'.SETSTRING'}});
 	}
-
-	#backup name for a later rename
-	$hash->{DEVNAME} = $name;
 
 	Log3 ($name, 5, $logtxt . 'define complete');
 	return;
@@ -629,44 +634,37 @@ sub KNX_Undef {
 #The answer is treated as regular telegram
 #############################
 sub KNX_Get {
-	my ($hash, $name, @args) = @_;
-
-	#determine gadName to read - use first defined GAD if no argument is supplied
-	my $gadName = $args[0] // $hash->{FIRSTGADNAME};
+	my $hash = shift;
+	my $name = shift;
+	my $gadName = shift // KNX_gadNameByNO($hash,1); # use first defined GAD if no argument is supplied
+	
+	return qq{KNX_Get ($name): gadName not defined} if (! defined($gadName));
+	Log3 ($name, 3, qq{KNX_Get ($name): too much arguments. Only one argument allowed (gadName). Other Arguments are discarded.}) if (defined(shift));
 
 	#FHEM asks with a ? at startup - no action, no log - if dev is disabled: no SET/GET pulldown !
 	if ($gadName  =~ m/\?/x) {
-		return (IsDisabled($name) == 1)?undef:qq{unknown argument choose one of $hash->{GETSTRING}};
-=pod
-### option for future use
-		return if (IsDisabled($name) == 1); # no get option
-
-		#check for a widgetoverride that we dont want in get's...
-		my @getlist = split(/\s/gix,$hash->{GETSTRING}); 
-		my @wgoverride = split(/\s/gix,AttrVal($name,'widgetOverride',q{}));
-		foreach my $wgentry (@wgoverride) {
-#tbT			$wgentry  =~ s/^([^:]).*/$1/gix;
-			$wgentry  =~ s/(.*)[:].*/$1/gix;
-			@getlist = grep(! /$wgentry/, @getlist); # remove it
+		my $getter = q{};
+		foreach my $key (keys %{$hash->{GADDETAILS}}) {
+			last if (! defined($key));
+			my $option = $hash->{GADDETAILS}->{$key}->{OPTION};
+			next if (defined($option) && $option =~ /(?:set|listenonly)/ix);
+			$getter .= q{ } . $key . ':noArg';
 		}
-		return qq{unknown argument $cmd choose one of } . join(q{ },@getlist); 
-=cut
+		$getter =~ s/^\s+//gix; #trim leading blank
+		$getter = q{} if (IsDisabled($name) == 1);
+
+		return qq{unknown argument $gadName choose one of $getter};
 	}
 	return qq{KNX_Get ($name): is disabled} if (IsDisabled($name) == 1);
 
-
 	Log3 ($name, 5, qq{KNX_Get ($name): -enter: CMD= $gadName});
 
-	#no more than 1 argument allowed
-	Log3 ($name, 3, qq{KNX_Get ($name): too much arguments. Only one argument allowed (gadName). Other Arguments are discarded.}) if (scalar(@args) > 1);
-
+	#return, if unknown group
+	return qq{KNX_Get ($name): invalid gadName: $gadName} if(! exists($hash->{GADDETAILS}->{$gadName}));
 	#get groupCode, groupAddress, option
 	my $groupc = $hash->{GADDETAILS}->{$gadName}->{CODE};
 	my $group  = $hash->{GADDETAILS}->{$gadName}->{GROUP};
 	my $option = $hash->{GADDETAILS}->{$gadName}->{OPTION};
-
-	#return, if unknown group
-	return qq{KNX_Get ($name): no valid address stored for gad: $gadName} if(!$groupc);
 
 	#exit if get is prohibited
 	return qq{KNX_Get ($name): did not request a value - "set" or "listenonly" option is defined.} if (defined ($option) and ($option =~ m/(set|listenonly)/ix));
@@ -691,13 +689,15 @@ sub KNX_Set {
 
 	#FHEM asks with a "?" at startup or any reload of the device-detail-view - if dev is disabled: no SET/GET pulldown !
 	if(defined($cmd) && ($cmd =~ m/\?/x)) {
-		return (IsDisabled($name) == 1)?undef:qq{unknown argument $cmd choose one of $hash->{SETSTRING}};
+		my $setter = exists($hash->{'.SETSTRING'})?$hash->{'.SETSTRING'}:q{};
+		$setter = q{} if (IsDisabled($name) == 1);
+		return qq{unknown argument $cmd choose one of $setter};
 	}
+
 	return $thisSub . 'is disabled' if (IsDisabled($name) == 1);
-
-	Log3 ($name, 5, $thisSub . qq{-enter: $cmd } . join(q{ }, @arg)) if (defined ($cmd));
-
 	return $thisSub . 'no parameter(s) specified for set cmd' if((!defined($cmd)) || ($cmd eq q{})); #return, if no cmd specified
+
+	Log3 ($name, 5, $thisSub . qq{-enter: $cmd } . join(q{ }, @arg));
 
 	my $targetGadName = $cmd =~ s/^\s+|\s+$//girx; # gad-name or cmd (in old syntax)
 
@@ -718,14 +718,14 @@ sub KNX_Set {
 	my $rdName    = $hash->{GADDETAILS}->{$targetGadName}->{RDNAMESET};
 	my $model     = $hash->{GADDETAILS}->{$targetGadName}->{MODEL}; 
 
-	return $thisSub . q{did not set a value - "get" or "listenonly" option is defined.} if (defined ($option) and ($option =~ m/(get|listenonly)/ix));
+	return $thisSub . q{did not set a value - "get" or "listenonly" option is defined.} if (defined ($option) and ($option =~ m/(?:get|listenonly)/ix));
 
 	my $value = $cmd; #process set command with $value as output
 	#Text neads special treatment - additional args may be blanked words
 	$value .= q{ } . join (q{ }, @arg) if (($model =~ m/^dpt16/ix) and (scalar (@arg) > 0));
 
 	#Special commands for dpt1 and dpt1.001
-	if ($model =~ m/((dpt1)|(dpt1.001))$/ix) {
+	if ($model =~ m/^(?:dpt1|dpt1.001)$/ix) {
 		(my $err, $value) = KNX_Set_dpt1($hash, $targetGadName, $cmd, @arg);
 		return $err if defined($err);
 	}
@@ -741,9 +741,7 @@ sub KNX_Set {
 	Log3 ($name, 4, $thisSub . qq{cmd= $cmd , value= $value , translated= $transvale});
 
 	# decode again for values that have been changed in encode process
-	if ($model =~ m/^(dpt3|dpt10|dpt11|dpt19)/ix) {
-		$transval = KNX_decodeByDpt($hash, $transvale, $targetGadName);
-	}
+	$transval = KNX_decodeByDpt($hash, $transvale, $targetGadName) if ($model =~ m/^(?:dpt3|dpt10|dpt11|dpt19)/ix);
 
 	#apply post processing for state and set all readings
 	KNX_SetReadings($hash, $targetGadName, $transval, $rdName, undef); 
@@ -776,12 +774,7 @@ sub KNX_Set_oldsyntax {
 		return qq{an invalid gadName: $cmd was used in set-cmd};
 	}
 
-	foreach my $key (keys %{$hash->{GADDETAILS}}) {
-		if (int ($hash->{GADDETAILS}->{$key}->{NO}) == int ($groupnr)) {
-			$targetGadName = $key;
-			last;
-		}
-	}
+	$targetGadName = KNX_gadNameByNO($hash, $groupnr);
 	return qq{gadName not found for $groupnr} if(!defined($targetGadName));
 
 	# all of the following cmd's need at least 1 Argument (or more)
@@ -903,6 +896,7 @@ sub KNX_Set_dpt1 {
 #In case setstate is executed, a readingsupdate is initiated
 #############################
 sub KNX_State {
+=pod
 	my $hash    = shift;
 	my $time    = shift;
 	my $reading = shift // return;
@@ -920,7 +914,7 @@ sub KNX_State {
 
 	#write value and update reading
 	readingsSingleUpdate($hash, $reading, $value, 1);
-
+=cut
 	return;
 }
 
@@ -946,6 +940,24 @@ sub KNX_Attr {
 		elsif ($aName eq 'IODev' && $init_done) {
 			return KNX_chkIODev($hash,$aVal);
 		}
+=pod
+		# force @set for widgetoverride
+		# new function introduced 12/2022 by Rudi
+		elsif ($aName eq 'widgetOverride' ) {
+			my @overrides = split(/\s/ix,$aVal);
+			foreach my $overr (@overrides) {
+###				$overr =~ s/([^\@^\:]+)(?:@.*?)?:([^ ]+)?[\s]?/$1\@set:$2 /ixg; # add @set to each wgoverride
+				$overr =~ /([^\@^\:]+)(?:\@(?:set|get|attr))?:?([^ ]+)?[\s]?/ixg;
+				if (exists($hash->{GADDETAILS}->{$1}) && defined($2)) { # only for existing gadNames
+					$value .= qq{$1\@set:$2 };
+				}
+				else {
+					$value .= $overr . q{ }; # append original 
+				}
+			}
+			@_[3] = $value; # change $aVal in caller
+		}
+=cut
 	} # /set
 
 	if ($cmd eq 'del') {
@@ -968,24 +980,20 @@ sub KNX_Attr {
 #############################
 sub KNX_DbLog_split {
 	my ($event, $device) = @_;
-	my ($reading, $value, $unit);
 
-	#split input-string
-	my @strings = split (q{ }, $event);
-	return if (not defined ($strings[0]));
+	my $unit = q{}; # default
 
-	#detect reading - real reading or state?
-	if ($strings[0] =~ m/.*:$/x) { # real reading
-		$reading = shift(@strings);
-		$reading =~ s/:$//x;
-	}
-	else {
+	# split event into reading & value
+	my ($reading, $value) = split(/:\s/x, $event, 2);
+	if (! defined($reading)) {
 		$reading = 'state';
-	}
+		$value   = $event;
+	} 
 
-	#per default join all single pieces
-	$value = join(q{ }, @strings);
-
+	# split value
+	my @strings = split(/\s/x, $value);
+	$strings[0] = q{} if (! defined($strings[0]));
+	
 	#numeric value? and last value non numeric? - assume unit
 	if (looks_like_number($strings[0]) && (! looks_like_number($strings[scalar(@strings)-1]))) {
 		$value = join(q{ },@strings[0 .. (scalar(@strings)-2)]);
@@ -1013,9 +1021,7 @@ sub KNX_Parse {
 	Log3 ($ioName, 4, qq{KNX_Parse -enter: IO-name=$ioName src=} . KNX_hexToName2($src) . q{ dest=} . KNX_hexToName($gadCode) . qq{ msg=$msg});
 
 	#gad not defined yet, give feedback for autocreate
-	if (not (exists $modules{KNX}->{defptr}->{$gadCode})) {
-		return KNX_autoCreate($iohash,$gadCode);
-	}
+	return KNX_autoCreate($iohash,$gadCode) if (! (exists $modules{KNX}->{defptr}->{$gadCode}));
 
 	#get list from device-hashes using given gadCode (==destination)
 	# check on cmd line with: {PrintHash($modules{KNX}->{defptr},3) }
@@ -1042,24 +1048,23 @@ sub KNX_Parse {
 			my $getName = $deviceHash->{GADDETAILS}->{$gadName}->{RDNAMEGET};
 			my $transval = KNX_decodeByDpt ($deviceHash, $val, $gadName);
 			#message invalid
-			if (not defined($transval) or ($transval eq q{})) {
-				Log3 ($deviceName, 2, qq{KNX_Parse ($deviceName): [wp] readingName=$getName message=$msg} . 
+			if (! defined($transval) || ($transval eq q{})) {
+				Log3 ($deviceName, 2, qq{KNX_Parse_wp ($deviceName): readingName=$getName message=$msg} . 
                                                       ' could not be decoded');
 				next;
 			}
-			Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): [wp] readingName=$getName value=$transval});
+			Log3 ($deviceName, 4, qq{KNX_Parse_wp ($deviceName): readingName=$getName value=$transval});
 
 			#apply post processing for state and set all readings
 			KNX_SetReadings($deviceHash, $gadName, $transval, $getName, $src);
 		}
 
 		#handle read messages
-		elsif ($cmd =~ /[r]/x) {
+		elsif ($cmd =~ /[r]/ix) {
 			my $putName = $deviceHash->{GADDETAILS}->{$gadName}->{RDNAMEPUT};
-			Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] GET});
+			Log3 ($deviceName, 5, qq{KNX_Parse_r ($deviceName): GET});
 
 			#answer "old school"
-#			my $value = ReadingsVal($deviceName, 'state', undef); # fetch default value from state
 			my $value = undef;
 			if (AttrVal($deviceName, 'answerReading', 0) != 0) {
 				my $putVal = ReadingsVal($deviceName, $putName, undef);
@@ -1076,11 +1081,11 @@ sub KNX_Parse {
 			if ((defined($cmdAttr)) && ($cmdAttr ne q{})) {
 				$value = KNX_eval ($deviceHash, $gadName, $value, $cmdAttr);
 				if (defined($value) && ($value ne q{}) && ($value ne 'ERROR')) { # answer only, if eval was successful
-					Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] replaced by Attr putCmd=$cmdAttr VALUE=$value});
-					readingsSingleUpdate($deviceHash, $putName, $value,1);
+					Log3 ($deviceName, 5, qq{KNX_Parse_r ($deviceName): replaced by Attr putCmd=$cmdAttr VALUE=$value});
+					readingsSingleUpdate($deviceHash, $putName, $value,0);
 				}
 				else {
-					Log3 ($deviceName, 5, qq{KNX_Parse ($deviceName): [r] gadName=$gadName - no reply sent!});
+					Log3 ($deviceName, 5, qq{KNX_Parse_r ($deviceName): gadName=$gadName - no reply sent!});
 					$value = undef; # dont send !
 				} 
 			}
@@ -1088,7 +1093,7 @@ sub KNX_Parse {
 			#send transval
 			if (defined($value)) {
 				my $transval = KNX_encodeByDpt($deviceHash, $value, $gadName);
-				Log3 ($deviceName, 4, qq{KNX_Parse ($deviceName): [r] send answer: reading=$gadName VALUE=$transval});
+				Log3 ($deviceName, 4, qq{KNX_Parse_r ($deviceName): send answer: reading=$gadName VALUE=$transval});
 				IOWrite ($deviceHash, $TULid, 'p' . $gadCode . $transval);
 			}
 		}
@@ -1185,6 +1190,7 @@ sub KNX_chkIODev {
 		push(@IOList2,$iodev);
 		next if ($iodev ne $iocandidate);
 		return if ($defs{$iodev}->{TYPE} ne 'FHEM2FHEM'); # ok for std io-dev
+
 		# add support for fhem2fhem as io-dev
 		my $rawdef = $defs{$iodev}->{rawDevice}; #name of fake local IO-dev or remote IO-dev
 		if (defined($rawdef)) {
@@ -1320,8 +1326,7 @@ sub KNX_replaceByRegex {
 		next if ($rdName ne $regName); # must match completely!
 
 		if (not defined ($regPair[1])) { # cut value
-			Log3 ($name, 5, qq{KNX_replaceByRegex ($name): replaced $rdName value from: $input to undefined});
-			return;
+			$retVal = 'undefined';
 		}
 		elsif ($regPair[0] eq $tempVal) { # complete match
 			$retVal = $regPair[1];
@@ -1336,7 +1341,7 @@ sub KNX_replaceByRegex {
 		last;
 	}
 	Log3 ($name, 5, qq{KNX_replaceByRegex ($name): replaced $rdName value from: $input to $retVal}) if ($input ne $retVal);
-	return $retVal;
+	return ($retVal eq 'undefined')?undef:$retVal;
 }
 
 # limit numeric values. Valid directions: encode, decode
@@ -1834,6 +1839,24 @@ sub dec_dpt232 { #RGB-Code
 	return sprintf ('%.6x',$numval);
 }
 
+### lookup gadname by gadnumber
+### called from: KNX_Get, KNX_setOldsyntax
+### entry: $hash, desired gadNO
+### return: undef on error / gadName
+sub KNX_gadNameByNO {
+	my $hash = shift;
+	my $groupnr  = shift // 1; # default: seaarch for g1
+
+	my $targetGadName = undef;
+	foreach my $key (keys %{$hash->{GADDETAILS}}) {
+		if ($hash->{GADDETAILS}->{$key}->{NO} == $groupnr) {
+			$targetGadName = $key;
+			last;
+		}
+	}
+	return $targetGadName;
+}
+
 ########## public utility functions ##########
 
 ### get state of devices from KNX_Hardware
@@ -1870,17 +1893,15 @@ sub main::KNX_scan {
 		next if ($iostate ne 'connected');
  
 		$i++;
-		my $getstring = $devhash->{GETSTRING};
-		next if ((! defined($getstring)) || $getstring eq q{});
-		$j++;
-		my @getnames = split(/\s/ix,$getstring);
-
-		foreach my $gads (@getnames) {
-			my $gad = (split(/[:]/ix,$gads))[0];
+		my $k0 = $k; #save previous number of get's
+		foreach my $key (keys %{$devhash->{GADDETAILS}}) {
+			last if (! defined($key));
+			my $option = $devhash->{GADDETAILS}->{$key}->{OPTION};
+			next if (defined($option) && $option =~ /(?:set|listenonly)/ix);
 			$k++;
-			Log3 ($knxdef, 4, qq{KNX_scan-exec: [$k] CMD= "get $knxdef $gad"});
-			$getsarr .= $knxdef . q{ } . $gad . q{,};
+			$getsarr .= $knxdef . q{ } . $key . q{,};
 		}
+		$j++ if ($k > $k0);
 	}
 	Log3 (undef, 3, qq{KNX_scan: $i devices selected / $j devices with get / $k "gets" executing...});
 	doKNX_scan($getsarr) if ($k > 0);
@@ -2070,7 +2091,7 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
 <a href="#verbose">verbose</a><br /> 
 <a href="#FHEMWEB-attr-webCmd">webCmd</a><br /> 
 <a href="#FHEMWEB-attr-webCmdLabel">webCmdLabel</a><br /> 
-<a href="#FHEMWEB-attr-widgetOverride">widgetOverride</a>
+<a href="#KNX-attr-widgetOverride">widgetOverride</a>
 </ol>
 
 <p><strong>Special attributes</strong></p>
@@ -2121,6 +2142,11 @@ The answer from the bus-device updates the readings &lt;getName&gt; and state.</
   Due to changes in IO-Device handling, (default IO-Device will be stored in <b>reading IODev</b>), setting this Attribute is no longer required,  
   except in cases where multiple IO-devices (of type TUL/KNXTUL/KNXIO) exist in your config. Defining more than one IO-device is <b>NOT recommended</b> 
   unless you take special care with yr. knxd or KNX-router definitions - to prevent multiple path from KNX-Bus to FHEM resulting in message loops.</li>   
+<br/>
+<a id="KNX-attr-widgetOverride"></a><li>widgetOverride<br/>
+  This is a standard FHEMWEB-attribute, the recommendation for use in KNX-module is to specify the following form:
+  <b>&lt;gadName&gt;@set&colon;&lt;widgetName,parameter&gt;</b> This avoids overwriting the GET pulldown in FHEMWEB detail page.
+  For details, pls see <a href="#FHEMWEB-attr-widgetOverride">FHEMWEB-attribute</a>.</li>
 <br/>
 <a id="KNX-attr-listenonly"></a><li>listenonly - This attr is deprecated - use "listenonly" option in device definition</li> 
 <a id="KNX-attr-readonly"></a><li>readonly - This attr is deprecated - use "get" option in device definition</li>

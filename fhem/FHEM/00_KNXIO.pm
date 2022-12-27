@@ -1,4 +1,4 @@
-##############################################
+## no critic (Modules::RequireVersionVar) ######################################
 # $Id$
 # base module for KNX-communication
 # idea: merge some functions of TUL- & KNXTUL-module into one and add more connectivity 
@@ -13,8 +13,7 @@
 #           FIFO - queing of incoming messages (less latency for fhem-system) read= ~4ms vs ~34ms with KNXTUL/TUL
 #           discard duplicate incoming messages
 #           more robust parser of incoming messages
-#
-##############################################
+################################################################################
 ### changelog:
 # 19/10/2021 01.60 initial beta version
 #            enable hostnames for mode H & T
@@ -37,11 +36,12 @@
 #            unify Log msgs
 # 13/11/2022 modify fifo logic
 #            improve cmd-ref
-# xx/12/2022 change parameter parsing in define
+# 05/12/2022 change parameter parsing in define
 #            add renameFn - correct reading & attr IODev in KNX-devices after rename of KNXIO-device
 #            change disabled handling
 #            fix src-addr for Mode M,H
 #            change internal PhyAddr to reabable format + range checking on define.
+# 19/12/2022 cleanup
 
 
 package KNXIO; ## no critic 'package'
@@ -57,7 +57,7 @@ use HttpUtils;
 use GPUtils qw(GP_Import GP_Export); # Package Helper Fn
 
 ### perlcritic parameters
-# these ones are NOT used! (constants,Policy::Modules::RequireFilenameMatchesPackage,Modules::RequireVersionVar,NamingConventions::Capitalization)
+# these ones are NOT used! (constants,Policy::Modules::RequireFilenameMatchesPackage,NamingConventions::Capitalization)
 ### the following percritic items will be ignored global ###
 ## no critic (ValuesAndExpressions::RequireNumberSeparators,ValuesAndExpressions::ProhibitMagicNumbers)
 ## no critic (RegularExpressions::RequireDotMatchAnything,RegularExpressions::RequireLineBoundaryMatching)
@@ -142,16 +142,12 @@ sub KNXIO_Define {
 	return InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash) if ($mode eq q{X});
 
 	return q{KNXIO-define syntax: "define <name> KNXIO <H|M|T> <ip-address|hostname>:<port> <phy-adress>" } . "\n" . 
-               q{         or          "define <name> KNXIO S <pathToUnixSocket> <phy-adress>" } if (scalar(@arg) < 5);
+               q{         or          "define <name> KNXIO S <pathToUnixSocket> <phy-address>" } if (scalar(@arg) < 5);
 
 	my ($host,$port) = split(/[:]/ix,$arg[3]);
 
 	return q{KNXIO-define: invalid ip-address or port, correct syntax is: } .
-               q{"define <name> KNXIO <H|M|T> <ip-address|name>:<port> <phy-adress>"} if ($mode =~ /[MHT]/ix && $port !~ /$PAT_PORT/ix);
-
-	if (exists($hash->{OLDDEF})) { # modify definition....
-		KNXIO_closeDev($hash);
-	}
+               q{"define <name> KNXIO <H|M|T> <ip-address|name>:<port> <phy-address>"} if ($mode =~ /[MHT]/ix && $port !~ /$PAT_PORT/ix);
 
 	if ($mode eq q{M}) { # multicast
 		my $host1 = (split(/\./ix,$host))[0];
@@ -183,12 +179,11 @@ sub KNXIO_Define {
 		}
 	}
 
-	my $phyaddr      = (defined($arg[4]))?$arg[4]:'0.0.0'; 
-#	$hash->{PhyAddr} = sprintf('%05x',KNXIO_hex2addr($phyaddr));
+	my $phyaddr = (defined($arg[4]))?$arg[4]:'0.0.0'; 
 	my $phytemp = KNXIO_hex2addr($phyaddr); 
 	$hash->{PhyAddr} = KNXIO_addr2hex($phytemp,2); #convert 2 times for correcting input!
 
-	KNXIO_closeDev($hash) if ($init_done);
+	KNXIO_closeDev($hash) if ($init_done || exists($hash->{OLDDEF})); # modify definition....
 
 	$hash->{PARTIAL} = q{};
 	# define helpers
@@ -215,8 +210,6 @@ sub KNXIO_Attr {
 		if ($cmd eq 'set' && defined($aVal) && $aVal == 1) {
 			KNXIO_closeDev($hash);
 		} else {
-### should work w. KNXIO_Open 
-#			CommandModify(undef, qq{-silent $name $hash->{DEF}}); # do a defmod ...
 			InternalTimer(gettimeofday() + 0.2,\&KNXIO_openDev,$hash);
 		}
 	}
@@ -430,7 +423,6 @@ sub KNXIO_ReadH {
 		}
 		my $phyaddr = unpack('x18n',$buf);
 		$hash->{PhyAddr} = KNXIO_addr2hex($phyaddr,2); # correct Phyaddr.
-#		$hash->{PhyAddr} = sprintf('%05x',$phyaddr); # correct Phyaddr.
 		readingsSingleUpdate($hash, 'state', 'connected', 1);
 		Log3 ($name, 3, qq{KNXIO ($name) connected});
 		InternalTimer(gettimeofday() + 60, \&KNXIO_keepAlive, $hash); # start keepalive
@@ -528,14 +520,12 @@ sub KNXIO_Write {
 		}
 		elsif ($mode eq 'M') {
 			$completemsg = pack('nnnnnnnCCC*',0x0610,0x0530,$datasize + 16,0x2900,0xBCE0,$src,$dst,$datasize,0,@data); # use src addr
-#			$completemsg = pack('nnnnnnnCCC*',0x0610,0x0530,$datasize + 16,0x2900,0xBCE0,0,$dst,$datasize,0,@data);
 			$ret = TcpServer_MCastSend($hash,$completemsg);
 		}
 		else { # $mode eq 'H'
 			# total length= $size+20 - include 2900BCEO,src,dst,size,0
 			$completemsg = pack('nnnCC',0x0610,0x0420,$datasize + 20,4,$hash->{KNXIOhelper}->{CCID}) .
                                        pack('CCnnnnCCC*',$hash->{KNXIOhelper}->{SEQUENCECNTR_W},0,0x1100,0xBCE0,$src,$dst,$datasize,0,@data); # send TunnelInd
-#                                      pack('CCnnnnCCC*',$hash->{KNXIOhelper}->{SEQUENCECNTR_W},0,0x1100,0xBCE0,0,$dst,$datasize,0,@data); # send TunnelInd
 
 			# Timeout function - expect TunnelAck within 1 sec! - but if fhem has a delay....
 			$hash->{KNXIOhelper}->{LASTSENTMSG} = $completemsg; # save msg for resend in case of TO
