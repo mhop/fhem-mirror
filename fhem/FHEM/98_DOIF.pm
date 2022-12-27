@@ -2824,6 +2824,20 @@ DOIF_Notify($$)
         DOIF_SetTimer ($hash,"DOIF_TimerTrigger",$j);
       }
     }
+     
+    for my $attr ("DOIF_Readings","event_Readings") {
+      my $defs=AttrVal($pn, $attr, 0);
+      if ($defs) {
+        my ($def,$err)=addDOIF_Readings($hash,$defs,$attr);
+        if ($err) {
+          Log3 ($pn,3,"$pn: error in $def, $err") ;
+        } else {
+          foreach my $reading (keys %{$hash->{$attr}}) {
+            setDOIF_Reading ($hash,$reading,"",$attr,"","","");
+          }
+        }
+      }
+    }
     
     if (AttrVal($pn,"initialize",0) and !AttrVal($pn,"disable",0)) {
       readingsBeginUpdate($hash);
@@ -2846,6 +2860,7 @@ DOIF_Notify($$)
       }
     }
 
+  
     my $startup=AttrVal($pn, "startup", 0);
     if ($startup  and !AttrVal($pn,"disable",0)) {
       $startup =~ s/\$SELF/$pn/g;
@@ -3847,12 +3862,12 @@ DOIF_Attr(@)
     delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
     @{$hash->{attr}{waitsame}}=SplitDoIf(':',$a[3]);
   } elsif($a[0] eq "set" && ($a[2] eq "DOIF_Readings" or $a[2] eq "event_Readings")) {
-    my ($def,$err)=addDOIF_Readings($hash,$a[3],$a[2]);
-    if ($err) {
-      $hs=$cur_hs;
-      return ("error in $a[2] $def, $err");
-    } else {
-      if ($init_done) {
+    if ($init_done) {
+      my ($def,$err)=addDOIF_Readings($hash,$a[3],$a[2]);
+      if ($err) {
+        $hs=$cur_hs;
+        return ("error in $a[2] $def, $err");
+      } else {
         foreach my $reading (keys %{$hash->{$a[2]}}) {
           setDOIF_Reading ($hash,$reading,"",$a[2],"","","");
         }
@@ -4570,8 +4585,6 @@ sub footer {
   
 }
 
-
-
 sub plot {
   
   my ($collect,$min_a,$max_a,$minColor,$maxColor,$dec,$func,$steps,$x_prop,$chart_dim,$noColor,$lmm,$ln,$lr,$plot,$bwidth,$footerPos,$fill,$pos,$anchor,$unitColor,$unit)=@_;
@@ -4660,16 +4673,17 @@ sub plot {
   
   $minVal=$value if (!defined $minVal);
   $maxVal=$value if (!defined $maxVal);
-  my $opacity=0.5;
+  my $opacity=0.4;
+  my $minopacity=0.05;
   if ($minPlot < 0 and $maxPlot > 0) {
     $xpos=50-int($n*10)/10;
     $topVal=($maxVal > 0 ? $maxVal : 0);
     $bottomVal=($minVal < 0 ? $minVal : 0);
     ($nullColor)=get_color(0,$min,$max,$minColor,$maxColor,$func);
     $nullProp=int ($topVal/($topVal-$bottomVal)*100)/100 if ($bottomVal<0 and $topVal>0);
-    $topOpacity=($topVal==0 ? 0 : $opacity);
-    $bottomOpacity=($bottomVal==0 ? 0: $opacity);
-    $nullOpacity=0.0;
+    $topOpacity=($topVal==0 ? $minopacity : $opacity);
+    $bottomOpacity=($bottomVal==0 ? $minopacity: $opacity);
+    $nullOpacity=$minopacity;
   } elsif ($maxPlot <= 0) {
     $xpos=0;
     $topVal=$maxPlot;
@@ -4680,7 +4694,7 @@ sub plot {
     $xpos=50;
     $topVal=$maxVal;
     $topOpacity=$opacity;
-    $bottomOpacity=0;
+    $bottomOpacity=$minopacity;
     $bottomVal=$minPlot;
   }
   
@@ -4754,14 +4768,14 @@ sub plot {
     if (!defined $unitColor) {
       $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
       $out.= $points;
-      $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.4" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
+      $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.4;stroke-opacity:1" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
     } else {
       $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
       $out.= $points;
-      $out.= sprintf('" style="fill:url(#gradplotLight_%s);stroke:%s;stroke-width:0.5" />',$unitColor,$unitColor);
+      $out.= sprintf('" style="fill:url(#gradplotLight_%s);stroke:%s;stroke-width:0.4;stroke-opacity:1" />',$unitColor,$unitColor);
     }
   }
-  $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-opacity:1" />',$xpos,$chart_dim,$xpos);
+  $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.3; stroke-opacity:1" />',$xpos,$chart_dim,$xpos);
 
   ##$out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),defined $unitColor ? $unitColor:color($maxValColor,$ln)) if (defined $maxValSlot);
   my ($x1,$y1)=($maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10)-2.3);
