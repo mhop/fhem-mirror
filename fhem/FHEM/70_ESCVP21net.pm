@@ -42,6 +42,7 @@
 #    1.01.21  added HC2150
 #    1.01.22  added "on" and "off" as direct set commands
 #    1.01.23  adding some default attributes on Define (icon, webCmd, cmdIcon,stateFormat)
+#    1.01.24  optimize help text
 #
 ################################################################################
 #
@@ -75,7 +76,7 @@ use POSIX;
 
 #use JSON::XS qw (encode_json decode_json);
 
-my $version = "1.01.23";
+my $version = "1.01.24";
 my $missingModul = "";
 
 eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
@@ -100,7 +101,7 @@ my %ESCVP21net_defaultsets = (
   "GetAll"    => ":noArg",
   "GetStatus" => ":noArg",
   "ASPECT"    => ":get,HDMI,PC",
-  "KEY"       => ":get,HDMI1,PC",
+  "KEY"       => ":03,05,3C,3D",
   "LAMP"      => ":get",
   "MUTE"      => ":get,on,off,toggle",
   "PWR"       => ":get,on,off,toggle",
@@ -1847,7 +1848,7 @@ sub ESCVP21net_VP21init ($$) {
 sub ESCVP21net_checkConnection ($) {
   # checks each intervall if connection is still alive - DevIo recognizes a broken connection
   # (like device switched completely off) only after TCP timeout of 60-90 minutes
-  # check can be omitted by setting checkIntervall to "off"  
+  # check can be omitted by setting checkInterval to "off"  
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
@@ -2204,39 +2205,277 @@ sub ESCVP21net_openDevice{
     <br>For the predefined commands, "nice" names will be shown in the readings, e.g. for PWR: <b>Standby (Net on)</b> instead of the boring <b>PWR=04</b> (which is the device's answer if the projector is in Standby with LAN on).
     <br>Default set commands are
     <br><br>
+    <a id="ESCVP21net-set-GetAll"></a>
     <li>GetAll
       <br>This is a little bit special - it does not send just one command to the projector, but will select <b>every</b> command defined which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetAll is shown in the <b>GetAll</b> reading. It will either show the read commands, or inform if an error was received.
     </li>
     <br>
+    <a id="ESCVP21net-set-GetStatus"></a>
     <li>GetStatus
       <br>Also special - also does not send just one command to the projector, but will select <b>every</b> command you defined in attr "statusCheckCmd" which has a <b>get</b> option, send it to the projector and update the corresponding reading. If a command gives no result or an error, this will be suppressed, the old value is silently kept.
       <br>The status of GetStatus is shown in the <b>GetStatus</b> reading. It will either show the read commands, or inform if an error was received.
     </li>
     <br>    
+    <a id="ESCVP21net-set-LAMP"></a>
     <li>LAMP
       <br><i>get</i> to query lamp hours.
     </li>
     <br>
+    <a id="ESCVP21net-set-MUTE"></a>
     <li>MUTE
       <br><i>on</i> or <i>off</i> to mute video signal (i.e. blank screen), <i>get</i> to query current state.
     </li>
     <br>
+    <a id="ESCVP21net-set-KEY"></a>
     <li>KEY
       <br>sends the value you enter to the projector.
-      <br>E.g.<i>KEY 03</i> should open the OSD menu, <i>KEY 05</i> should close it.
+      <br>E.g.<i>KEY 03</i> or <i>KEY 3C</i> should open the OSD menu, <i>KEY 05</i> or or <i>KEY 3D</i> should close it.
+      <br>Feel free to define your own KEY sets via the attribute "AdditionalSettings".
     </li>
     <br>
+    <a id="ESCVP21net-set-PWR"></a>
     <li>PWR
       <br><i>on</i> or <i>off</i> to switch power, <i>get</i> to query current value.
     </li>
     <br>
+    <a id="ESCVP21net-set-on"></a>
     <li>on
       <br>Hm, what could that mean ... OK, shortcut to switch your projector on - give it a try!
     </li>
     <br>
+    <a id="ESCVP21net-set-off"></a>
     <li>off
       <br>Wohoo ... want to switch it off again? Then use this command.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-ASPECT"></a>
+    <li>ASPECT
+      <br>set/get aspect ratio. Values depend on your model.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-AUTOHOME"></a>
+    <li>AUTOHOME
+      <br>set/get auto display of home screen.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-AUTOKEYSTONE"></a>
+    <li>AUTOKEYSTONE
+      <br>set/get auto keystone correction.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-BRIGHT"></a>
+    <li>BRIGHT
+      <br>get brightness value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-BRIGHTset"></a>
+    <li>BRIGHTset
+      <br>Set brightness value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-BTAUDIO"></a>
+    <li>BTAUDIO
+      <br>set/get bluetooth audio (on/off).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-CMODE"></a>
+    <li>CMODE
+      <br>set/get color mode.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-CONTRAST"></a>
+    <li>CONTRAST
+      <br>get contrast enhancement value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-CONTRASTset"></a>
+    <li>CONTRASTset
+      <br>set contrast enhancement value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-DENSITY"></a>
+    <li>DENSITY
+      <br>get density value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-DENSITYset"></a>
+    <li>DENSITYset
+      <br>set density value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-ERASEMEM"></a>
+    <li>ERASEMEM
+      <br>Erase picture setting memory slot (1...10), related to PUSHMEM, POPMEM.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-GAMMA"></a>
+    <li>GAMMA
+      <br>set/get gamma value (-2...2)
+    </li>
+    <br>
+    <a id="ESCVP21net-set-HREVERSE"></a>
+    <li>HREVERSE
+      <br>set/get horizontal reverse setting.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-ILLUM"></a>
+    <li>ILLUM
+      <br>set/get illumination setting of on-device control lights.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-IMGPROC"></a>
+    <li>IMGPROC
+      <br>undocumented setting for image processing (fine/fast). Might not be available on some devices.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-IRIS"></a>
+    <li>IRIS
+      <br>undocumented setting for iris setting. Might not be available on some devices.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-LIRIS"></a>
+    <li>LIRIS
+      <br>undocumented setting for L-iris setting (whatever that means...). Might not be available on some devices.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-LUMINANCE"></a>
+    <li>LUMINANCE
+      <br>set/get luminance setting (high/low).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-MCFI"></a>
+    <li>MCFI
+      <br>set/get frame interpolation setting.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-MSEL"></a>
+    <li>MSEL
+      <br>set/get background color for A/V mute screen.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-OVSCAN"></a>
+    <li>OVSCAN
+      <br>set/get overscan ratio.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-POPMEM"></a>
+    <li>POPMEM
+      <br>restore image setting from memory slot (1...10), related to PUSHMEM, ERASEMEM.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-PUSHMEM"></a>
+    <li>PUSHMEM
+      <br>save current image setting to memory slot (1...10), related to POPMEM, ERASEMEM.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-PWSTATUS"></a>
+    <li>PWSTATUS
+      <br>undocumented. Gets pwer status (see PWR).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-SHARP"></a>
+    <li>SHARP
+      <br>get sharpness value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-SHARPset"></a>
+    <li>SHARPset
+      <br>set sharpness value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-SIGNAL"></a>
+    <li>SIGNAL
+      <br>set/get signal state (e.g 2D/3D).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-SNO"></a>
+    <li>SNO
+      <br>get serial number of device.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-SOURCE"></a>
+    <li>SOURCE
+      <br>set/get current source of video input.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-TINT"></a>
+    <li>TINT
+      <br>get tint value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-TINTset"></a>
+    <li>TINTset
+      <br>set tint value.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-VOL"></a>
+    <li>VOL
+      <br>get volume setting. Normally a multiple of 12 (whyever...).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-VOLset"></a>
+    <li>VOLset
+      <br>set volume. Range is 1...20, since epson wants a multiple of 12 to be set (whyever...).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-VREVERSE"></a>
+    <li>VREVERSE
+      <br>set/get vertical reverse setting.
+    </li>
+    <br><br>
+    <br> The following commands are only available if debug is set to 1. They are not meant for normal operation.
+    <br> Use at your own risk, might crash fhem if used in the "wrong" situation.
+    <br> But stay calm - restart always helps (at least I hope so...)
+    <br><br>
+    <a id="ESCVP21net-set-cleanup"></a>
+    <li>cleanup
+      <br>debug option. Deletes timers, closes connection, kills nonblocking function. Handle with care!
+    </li>
+    <br>
+    <a id="ESCVP21net-set-closeDevice"></a>
+    <li>closeDevice
+      <br>debug option. Closes connection to device.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-connect"></a>
+    <li>connect
+      <br>debug option. Closes active connection to device and forces reconnect.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-decode"></a>
+    <li>decode
+      <br>debug option. Decodes stored json values for set.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-deleteNextOpen"></a>
+    <li>deleteNextOpen
+      <br>debug option. Deletes timer for next device open command.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-encode"></a>
+    <li>encode
+      <br>debug option. Force new json encoding of set values.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-isOpen"></a>
+    <li>isOpen
+      <br>debug option. Query if connection to device is open and logs result in logfile (verbose 5 required).
+    </li>
+    <br>
+    <a id="ESCVP21net-set-openDevice"></a>
+    <li>openDevice
+      <br>debug option. Force new connection to device. Handle with care.
+    </li>
+    <br>
+    <a id="ESCVP21net-set-reRead"></a>
+    <li>reRead
+      <br>debug option. Force update of set commands, useful if you changed e.g "AdditionalSettings".
+    </li>
+    <br>
+    <a id="ESCVP21net-set-removeTimer"></a>
+    <li>removeTimer
+      <br>debug option. Removes all timers for connection check.
     </li>
     <br>
   </ul>
@@ -2246,48 +2485,57 @@ sub ESCVP21net_openDevice{
   <b>Attributes</b>
   <br>
   <ul>
+    <a id="ESCVP21net-attr-Manufacturer"></a>
     <li>Manufacturer
       <br><i>Epson|default</i> - is not used currently.
     </li>
     <br>
+    <a id="ESCVP21net-attr-AdditionalSettings"></a>
     <li>AdditionalSettings
       <br><i>cmd1:val_1,...,val_n cmd2:val_1,...,val_n</i>
       <br>You can specify own set commands here, they will be added to the <b>set</b> list.
       <br>Multiple own sets can be specified, separated by a blank.
       <br>command and values are separated by <b>":"</b>, values are separated by <b>","</b>.
       <br>Example: <i>ASPECT:get,10,20,30 SN:noArg</i>
-      <br>Each command with <i>get</i> will we queried when unsing <i>set &lt;name&gt; GetAll</i> 
+      <br>Each command with <i>get</i> will we queried when unsing <i>set &lt;name&gt; GetAll</i>
+      <br>Might need a restart to be recognized, or use "reRead" setting. 
     </li>
     <br>
+    <a id="ESCVP21net-attr-connectionCheck"></a>
     <li>connectionCheck
       <br><i>off|(value in seconds)</i>
       <br><i>value</i> defines the intervall in seconds to perform an connection check. This is useful, since the standard connection handling of fhem (DevIo) will not detect an broken TCP connection, so the state <b>disconnected</b> will only trigger after TCP timeout (60-90 minutes). If you are ok with this, just set it to <i>off</i>.
       <br>Default value is 60 seconds.
     </li>
     <br>            
-    <li>statusCheckIntervall
+    <a id="ESCVP21net-attr-statusCheckInterval"></a>
+    <li>statusCheckInterval
       <br><i>off|(value in seconds)</i>
       <br><i>value</i> defines the intervall in seconds to perform an status check. Each <i>interval</i> the projector is queried with the command defined by <i>statusCheckCmd</i> (default: PWR to get power status).
       <br>Default value is 60 seconds.
     </li>
     <br>
+    <a id="ESCVP21net-attr-statusCheckCmd"></a>
     <li>statusCheckCmd
       <br><i>(any command(s) you set)</i>
-      <br>Defines the command(s) used by statusCheckIntervall. Multiple commands can specified, e.g. <i>PWR LAMP</i>. Default: PWR to get power status.
+      <br>Defines the command(s) used by statusCheckInterval. Multiple commands can specified, e.g. <i>PWR LAMP</i>. Default: PWR to get power status.
       <br>Wrong commands or commands without a <i>get</i> will be ignored.
     </li>
     <br>            
+    <a id="ESCVP21net-attr-statusOfflineMsg"></a>
     <li>statusOfflineMsg
       <br><i>(any message text you set)</i>
-      <br>Defines the message to set in the Reading related to <i>statusCheckCmd</i> when the device goes offline. Status of device will be checked after each <i>statusCheckIntervall</i> (default: 60s), querying the <i>statusCheckCmd</i> command (default: PWR), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: offline.
+      <br>Defines the message to set in the Reading related to <i>statusCheckCmd</i> when the device goes offline. Status of device will be checked after each <i>statusCheckInterval</i> (default: 60s), querying the <i>statusCheckCmd</i> command (default: PWR), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: offline.
     </li>
     <br>
-    <li>cyclicReconnectg
+    <a id="ESCVP21net-attr-cyclicConnect"></a>
+    <li>cyclicConnect
       <br><i>off|(value in seconds)</i>
       <br><i>value</i> defines the intervall in seconds to perform an periodic reconnect. Each <i>interval</i> we try to re-open the TCP connectionto the projector. Implemented to work around DevIo not recognizing a server-side broken connection, which can lead to a unnecessary, however non-blocking, system load.
       <br>Default value is 3600 seconds.
     </li>
     <br>
+    <a id="ESCVP21net-attr-debug"></a>
     <li>debug
       <br>You won't need it. But ok, if you insist...
       <br>debug will reveal some more set commands, namely <i>encode, decode, reread</i>. They will store the currents sets and results in json format to hidden readings <i>(encode)</i> or restore them <i>(decode)</i>. <i>reread</i> will just restore the available set commands for your projector type in case they got "lost". Don't use the other debug commands - unnless you know what you do...
