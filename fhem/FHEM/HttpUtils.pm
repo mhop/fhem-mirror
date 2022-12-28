@@ -736,7 +736,10 @@ HttpUtils_Connect2($)
       }
     };
 
-    $data = $hdr.(defined($data) ? $data:"");
+    $data = "" if(!defined($data));
+    $data = Encode::decode("UTF-8", $data) if($unicodeEncoding);
+    $data = $hdr.$data;
+
     $hash->{directWriteFn} = sub($) { # Nonblocking write
       my $ret = syswrite $hash->{conn}, $data;
       if(!defined($ret) || $ret <= 0) {
