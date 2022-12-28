@@ -55,7 +55,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.50.9"  => "26.12.2022  Commandref changed to a id-links ",
+  "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
   "8.50.7"  => "17.12.2022  Commandref edited ",
   "8.50.6"  => "14.12.2022  remove ularm from Time::HiRes, Forum: https://forum.fhem.de/index.php/topic,53584.msg1251313.html#msg1251313 ",
@@ -5655,7 +5655,7 @@ sub DbRep_fetchrowsDone {
 
   ReadingsBulkUpdateValue($hash, "number_fetched_rows", ($nrows>$limit) ? $nrows-1 : $nrows);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($nrows-$limit>0) ?
-      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a></html>" : $state);
+      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>" : $state);
   readingsEndUpdate($hash, 1);
 
 return;
