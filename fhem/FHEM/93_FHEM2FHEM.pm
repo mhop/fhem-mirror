@@ -234,7 +234,7 @@ FHEM2FHEM_Read($)
     } else {    # RAW
       my ($type, $rname, $msg) = split(" ", $rmsg, 3);
       my $rdev = $hash->{rawDevice};
-      next if($rname ne $rdev);
+      next if(!$rname || $rname ne $rdev);
       my $dbg_rmsg = $rmsg;
       $dbg_rmsg =~ s/([^ -~])/"(".ord($1).")"/ge;
       Log3 $name, 4, "$name: RAW RCVD: $dbg_rmsg";
