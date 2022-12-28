@@ -10,12 +10,13 @@
 #    1.01.01      first released version
 #    1.01.02      bugfix for single-digit NextTimer 
 #    1.01.03      corrections for german Umlaute
-#    1.01.04      fix statusCheckIntervall
+#    1.01.04      fix statusCheckInterval
 #    1.01.05      added capability to control plugins (PLUG)
 #                 added name to next timer
 #                 expicit set for SatIP plugin
 #                 handle HELP responses
 #    1.01.06      strip <epgsearch> info from timername, fix stateFormat overwrite
+#    1.01.07      optimize help text
 #
 ########################################################################################
 #
@@ -47,7 +48,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.06";
+my $version = "1.01.07";
 
 my %SVDRP_gets = (
   #
@@ -1227,79 +1228,95 @@ sub SVDRP_restoreJson {
     <br>For the predefined "raw" commands, "nice" names will be shown for the readings, e.g. <b>DiskStatus</b> instead of <b>STAT disk</b>.
     <br>Default set commands are
     <br><br>
+    <a id="SVDRP-set-Channel"></a>
     <li>Channel
       <br>set value can be <i>"+"</i> or <i>"-"</i> or any channel number you want to switch to.
       <br><i>set &lt;name&gt; Channel</i> will get you the channel VDR is currently tuned to.
     </li>
     <br>
+    <a id="SVDRP-set-DeleteTimer"></a>
     <li>DeleteTimer
       <br><i>set &lt;name&gt; DeleteTimer &lt;number&gt;</i> will delete ... hm, guess?
       <br>(you can get the timer numbers via <i>ListTimers</i>) 
     </li>
     <br>
+    <a id="SVDRP-set-DiskStatus"></a>
     <li>DiskStatus
       <br>no value or <i>get</i> will display the current disk usage in <i>DiskStatus</i>
       <br>Additionally, the reading <i>DiskUsed</i> will be set to the disk fill level.
     </li>
     <br>
+    <a id="SVDRP-set-GetAll"></a>
     <li>GetAll
       <br>no value or <i>get</i> will query several SVDRP settings:
       <br>"LSTT", "NEXT", "CHAN", "VOLU", "STAT"
       <br>(i.e. ListTimers, NextTimer, Channel, Volume, DiskStatus)
     </li>
     <br>
+    <a id="SVDRP-set-Help"></a>
     <li>Help
       <br>gets the avaialble SVDRP commands from VDR and stores them in reading "HelpInfo" 
     </li>
+    <a id="SVDRP-set-HitKey"></a>
     <li>HitKey
       <br>Enables you to send any Key defined by http://www.vdr-wiki.de/wiki/index.php/SVDRP
       <br>E.g.<i>set &lt;name&gt; HitKey Power</i> will cleanly power off VDR.
     </li>
     <br>
+    <a id="SVDRP-set-ListRecording"></a>
     <li>ListRecording
       <br>set value should be an existing recording ID. Depending on the attribute <i>RecordingInfo</i> either all available info will be shown, or a reasonable subset.
       <br>If no value is given, all available recordings will be read and shown.
       <br>Attention: Depending on the number of number of recordings, this might take a while! fhem might show "timeout", and a screen refresh might be necessary. Use with care... 
     </li>
     <br>
+    <a id="SVDRP-set-ListTimers"></a>
     <li>ListTimers
       <br>no value or <i>get</i> will query all timers from VDR.
       <br>raw answer from VDR will be parsed into a little bit nicer format. 
     </li>
     <br>
+    <a id="SVDRP-set-NextTimer"></a>
     <li>NextTimer
       <br>no value or <i>get</i> will exactly get what it says.
       <br>(to get the timer name, ListTimers will be called before) 
     </li>
     <br>
+    <a id="SVDRP-set-Plugin"></a>
     <li>Plugin
       <br>calls SVDRP with PLUG - you can enter any Plugin's SVDRP commands here to control the plugin
       <br>calling without parameter gets the list of avaialble plugins and stroes them in reading "HelpInfo"
       <br>I cannot test this with any plugin, but the Plugin's answer should go to the reading "PluginInfo" or "InfoError" (if Plugin gives an error message)
     </li>
     <br>
+    <a id="SVDRP-set-PowerOff"></a>
     <li>PowerOff
       <br>A shortcut to cleanly power off VDR, same as <i>set &lt;name&gt; HitKey Power</i>
     </li>
     <br>
+    <a id="SVDRP-set-SatIP"></a>
     <li>SatIP
       <br>send control commands to your SatIP plugin
     </li>
     <br>
+    <a id="SVDRP-set-StreamdevServer"></a>
     <li>StreamdevServer
       <br>sends the corresponding SVDRP command to the streamdev-Plugin (LSTC,DISC)
     </li>
     <br>
+    <a id="SVDRP-set-UpdateRecordings"></a>
     <li>UpdateRecordings
       <br>no value or <i>get</i> will trigger VDR to re-read the recordings.
       <br>(No output to fhem - no sense to show all recordings here)
     </li>
     <br>
+    <a id="SVDRP-set-Volume"></a>
     <li>Volume
       <br>set value can be <i>"+"</i> or <i>"-"</i> or <i>mute</i> or any Volume (0-255) you want to set.
       <br><i>set &lt;name&gt; Volume</i> will get you VDR's current Volume setting.
     </li>
     <br>
+    <a id="SVDRP-set-connect"></a>
     <li>connect
       <br>just connects to VDR, no further action.
       <br>Reading "info" will be updated.
@@ -1307,11 +1324,13 @@ sub SVDRP_restoreJson {
       <br>You might want to use "cleanup" to be able to reconnect other clients.
     </li>
     <br>
-    <li>cleanup
+    <a id="SVDRP-set-cleanUp"></a>
+    <li>cleanUp
       <br>closes connection to VDR, no further action.
       <br>Reading "info" will be updated.
     </li>
     <br>
+    <a id="SVDRP-set-closeDev"></a>
     <li>closeDev
       <br>subset of cleanup. Just closes DevIo connection.
       <br>If you don't know what that means, you don't need it ;-)
@@ -1323,6 +1342,7 @@ sub SVDRP_restoreJson {
   <b>Attributes</b>
   <br>
   <ul>
+    <a id="SVDRP-attr-AdditionalSettings"></a>
     <li>AdditionalSettings
       <br><i>cmd1:val_1,...,val_n cmd2:val_1,...,val_n</i>
       <br>You can specify own set commands here, they will be added to the <b>set</b> list.
@@ -1331,6 +1351,7 @@ sub SVDRP_restoreJson {
       <br>Example: <i>HITK:up,down,Power MESG</i>
     </li>
     <br>
+    <a id="SVDRP-attr-RecordingInfo"></a>
     <li>RecordingInfo
       <br><i>short|long</i>
       <br>defines the amount of information shown on <i>ListRecording </i>
@@ -1339,6 +1360,7 @@ sub SVDRP_restoreJson {
       <br>Default value is "short"
     </li>
     <br>
+    <a id="SVDRP-attr-connectionCheck"></a>
     <li>connectionCheck
       <br><i>off|(value in seconds)</i>
       <br><i>value</i> defines the intervall in seconds to perform an connection check.
@@ -1346,24 +1368,28 @@ sub SVDRP_restoreJson {
       <br>Default value is "off".
     </li>
     <br>            
-    <li>statusCheckIntervall
+    <a id="SVDRP-attr-statusCheckInterval"></a>
+    <li>statusCheckInterval
       <br><i>off|(value in seconds)</i>
-      <br><i>value</i> defines the intervall in seconds to perform an status check.
+      <br><i>value</i> defines the interval in seconds to perform an status check.
       <br>Each <i>interval</i> the VDR is queried with the command defined by <i>statusCheckCmd</i> (default: DiskStatus).
       <br>Default value is off.
     </li>
     <br>
+    <a id="SVDRP-attr-statusCheckCmd"></a>
     <li>statusCheckCmd
       <br><i>(any command(s) you set)</i>
-      <br>Defines the command(s) used by statusCheckIntervall.
+      <br>Defines the command(s) used by statusCheckInterval.
     </li>
     <br>            
+    <a id="SVDRP-attr-statusOfflineMsg"></a>
     <li>statusOfflineMsg
       <br><i>(any message text you set)</i>
       <br>Defines the message to set in the Reading related to <i>statusCheckCmd</i> when the device goes offline.
-      <br>Status of device will be checked after each <i>statusCheckIntervall</i> (default: off), querying the <i>statusCheckCmd</i> command (default: DiskStatus), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: closed.
+      <br>Status of device will be checked after each <i>statusCheckInterval</i> (default: off), querying the <i>statusCheckCmd</i> command (default: DiskStatus), and if STATE is <i>disconnected</i> the Reading of <i>statusCheckCmd</i> will be set to this message. Default: closed.
     </li>
     <br>
+    <a id="SVDRP-attr-delay"></a>
     <li>delay
       <br><i>delay time in seconds</i>
       <br>Depending on the answering speed of your VDR, it might be necessary to grant a certain delay beween opening the connection (and getting the initial answer shown in reading "info"), sending a command, receiving the result and closing the connection.
