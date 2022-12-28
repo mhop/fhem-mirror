@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26750 2022-12-25 16:38:54Z DS_Starter $
+# $Id: 93_DbLog.pm 26907 2022-12-27 11:38:39Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -22,10 +22,10 @@
 package main;
 use strict;
 use warnings;
-eval "use DBI;1;"                                or my $DbLogMMDBI    = "DBI";              ## no critic 'eval' 
-eval "use FHEM::Meta;1;"                         or my $modMetaAbsent = 1;                  ## no critic 'eval' 
-eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;                  ## no critic 'eval' 
-eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval' 
+eval "use DBI;1;"                                or my $DbLogMMDBI    = "DBI";              ## no critic 'eval'
+eval "use FHEM::Meta;1;"                         or my $modMetaAbsent = 1;                  ## no critic 'eval'
+eval "use FHEM::Utility::CTZ qw(:all);1;"        or my $ctzAbsent     = 1;                  ## no critic 'eval'
+eval "use Storable qw(freeze thaw);1;"           or my $storabs       = "Storable";         ## no critic 'eval'
 
 #use Data::Dumper;
 use Time::HiRes qw(gettimeofday tv_interval usleep);
@@ -38,6 +38,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.9"   => "28.12.2022 delete \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC} ".
+                           "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
+  "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
   "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
                "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck, edit comref ",
   "5.5.6"   => "12.12.2022 Serialize with Storable instead of JSON, more code rework ",
@@ -313,6 +316,7 @@ my %DbLog_columns = ("DEVICE"  => 64,
 my $dblog_cachedef = 500;                       # default Größe cacheLimit bei asynchronen Betrieb
 my $dblog_cmdef    = 'basic_ta:on';             # default commitMode
 my $dblog_todef    = 86400;                     # default timeout Sekunden
+my $dblog_lrpth    = 0.8;                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
 
 ################################################################
 sub DbLog_Initialize {
@@ -383,15 +387,15 @@ sub DbLog_Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
   my @a            = split "[ \t][ \t]*", $def;
-  
+
   my $err;
-  
+
   if($DbLogMMDBI) {
       $err = "Perl module ".$DbLogMMDBI." is missing. On Debian you can install it with: sudo apt-get install libdbi-perl";
       Log3($name, 1, "DbLog $name - ERROR - $err");
       return "Error: $err";
   }
-  
+
   if ($storabs) {
       $err = "Perl module ".$storabs." is missing. On Debian you can install it with: sudo apt-get install libstorable-perl";
       Log3($name, 1, "DbLog $name - ERROR - $err");
@@ -409,12 +413,10 @@ sub DbLog_Define {
 
   $hash->{REGEXP}                = $regexp;
   #$hash->{MODE}                  = AttrVal($name, 'asyncMode', undef) ? 'asynchronous' : 'synchronous';       # Mode setzen Forum:#76213
-  $hash->{MODE}                  = 'synchronous'; 
+  $hash->{MODE}                  = 'synchronous';
   $hash->{HELPER}{OLDSTATE}      = 'initialized';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
-  $hash->{HELPER}{TH}            = 'history';                                                                 # Tabelle history (wird ggf. durch Datenbankschema ergänzt)
-  $hash->{HELPER}{TC}            = 'current';                                                                 # Tabelle current (wird ggf. durch Datenbankschema ergänzt)
-  
+
   DbLog_setVersionInfo ($hash);                                                                               # Versionsinformationen setzen
   notifyRegexpChanged  ($hash, $regexp);                                                                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
 
@@ -431,7 +433,7 @@ sub DbLog_Define {
   InternalTimer(gettimeofday()+2, 'DbLog_setinternalcols', $hash, 0);                                         # set used COLUMNS
 
   DbLog_setReadingstate  ($hash, 'waiting for connection');
-  DbLog_SBP_CheckAndInit ($hash, 1);                                                                             # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
+  DbLog_SBP_CheckAndInit ($hash, 1);                                                                          # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
   _DbLog_initOnStart     ($hash);                                                                             # von init_done abhängige Prozesse initialisieren
 
 return;
@@ -515,35 +517,35 @@ sub DbLog_DelayedShutdown {
   my $hash   = shift;
   my $name   = $hash->{NAME};
   my $async  = AttrVal($name, 'asyncMode', 0);
-  
+
   $hash->{HELPER}{SHUTDOWNSEQ} = 1;
-  
+
   DbLog_execMemCacheAsync ($hash);
-  
-  my $delay_needed = IsDisabled($name)            ? 0 :
-                     $hash->{HELPER}{LONGRUN_PID} ? 1 :
+
+  my $delay_needed = IsDisabled($name)                    ? 0 :
+                     defined $hash->{HELPER}{LONGRUN_PID} ? 1 :
                      0;
 
   if ($delay_needed) {
       Log3 ($name, 2, "DbLog $name - Wait for last database cycle due to shutdown ...");
-      
+
   }
 
 return $delay_needed;
 }
 
 ###################################################################################
-#  Mit der X_Shutdown Funktion kann ein Modul Aktionen durchführen bevor FHEM 
-#  gestoppt wird. Dies kann z.B. der ordnungsgemäße Verbindungsabbau mit dem 
-#  physikalischen Gerät sein (z.B. Session beenden, Logout, etc.). Nach der 
+#  Mit der X_Shutdown Funktion kann ein Modul Aktionen durchführen bevor FHEM
+#  gestoppt wird. Dies kann z.B. der ordnungsgemäße Verbindungsabbau mit dem
+#  physikalischen Gerät sein (z.B. Session beenden, Logout, etc.). Nach der
 #  Ausführung der Shutdown-Fuktion wird FHEM sofort beendet.
 ###################################################################################
-sub DbLog_Shutdown {  
+sub DbLog_Shutdown {
   my $hash = shift;
- 
+
   DbLog_SBP_CleanUp ($hash);
-  
-return; 
+
+return;
 }
 
 #####################################################
@@ -707,15 +709,6 @@ sub DbLog_Attr {
       }
 
       $do = 0 if($cmd eq "del");
-
-      if ($do == 1) {
-          $hash->{HELPER}{TH} = $aVal.'.history';
-          $hash->{HELPER}{TC} = $aVal.'.current';
-      }
-      else {
-          $hash->{HELPER}{TH} = 'history';
-          $hash->{HELPER}{TC} = 'current';
-      }
 
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
@@ -882,9 +875,9 @@ sub _DbLog_setstopSubProcess {           ## no critic "not used"
   my $hash  = $paref->{hash};
 
   DbLog_SBP_CleanUp ($hash);                                              # SubProcess beenden
-  
+
   my $ret = 'SubProcess stopped and will be automatically restarted if needed';
-  
+
   DbLog_setReadingstate ($hash, $ret);
 
 return $ret;
@@ -1121,15 +1114,15 @@ sub _DbLog_setcount {              ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  
+
   if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
       return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
   }
-   
+
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
-  
+
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
@@ -1157,11 +1150,11 @@ sub _DbLog_setdeleteOldDays {            ## no critic "not used"
   if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
       return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
   }
-  
+
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
-  
+
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
@@ -1183,15 +1176,15 @@ sub _DbLog_setuserCommand {              ## no critic "not used"
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $sql   = $paref->{arg};
-  
+
   if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
       return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
   }
-  
+
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
-  
+
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
@@ -1283,22 +1276,22 @@ sub _DbLog_setimportCachefile {          ## no critic "not used"
   my $infile;
 
   readingsDelete($hash, 'lastCachefile');
-  
+
   if (!$prop) {
       return "Wrong function-call. Use set <name> importCachefile <file> without directory (see attr expimpdir)." ;
   }
   else {
       $infile = $dir.$prop;
   }
-  
+
   if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
       return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
   }
-      
+
   if (defined $hash->{HELPER}{LONGRUN_PID}) {
       return 'Another operation is in progress, try again a little later.';
   }
-  
+
   my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
@@ -1319,7 +1312,7 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
   my $prop  = $paref->{prop};
   my $prop1 = $paref->{prop1};
   my $arg   = $paref->{arg};
-  
+
   Log3($name, 2, qq{DbLog $name - WARNING - "$opt" is outdated. Please consider use of DbRep "set <Name> reduceLog" instead.});
 
   my ($od,$nd) = split ":", $prop;                                 # $od - Tage älter als , $nd - Tage neuer als
@@ -1336,14 +1329,14 @@ sub _DbLog_setreduceLog {                ## no critic "not used"
       if($hash->{HELPER}{REOPEN_RUNS}) {                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
           return "Connection to database is closed until ".$hash->{HELPER}{REOPEN_RUNS_UNTIL};
       }
-  
+
       if (defined $hash->{HELPER}{LONGRUN_PID}) {
           return 'Another operation is in progress, try again a little later.';
       }
-      
+
       my $err = DbLog_SBP_CheckAndInit ($hash);                                   # Subprocess checken und ggf. initialisieren
       return $err if(!defined $hash->{".fhem"}{subprocess});
-      
+
       DbLog_SBP_sendCommand ($hash, 'reduceLog', $arg);
   }
   else {
@@ -1386,7 +1379,7 @@ sub DbLog_Log {
   my $max      = int(@{$events});
   my $vb4show  = 0;
   my @vb4devs  = split ",", AttrVal ($name, 'verbose4Devs', '');                # verbose4 Logs nur für Devices in Attr "verbose4Devs"
-  
+
   if (!@vb4devs) {
       $vb4show = 1;
   }
@@ -1399,7 +1392,7 @@ sub DbLog_Log {
       }
   }
 
-  my $log4rel = $vb4show && !$hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
+  my $log4rel = $vb4show && !defined $hash->{HELPER}{LONGRUN_PID} ? 1 : 0;
 
   if(AttrVal ($name, 'verbose', 3) =~ /[45]/xs) {
       if($log4rel) {
@@ -1622,7 +1615,7 @@ sub DbLog_Log {
                       }
 
                       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-                      
+
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
@@ -1666,7 +1659,7 @@ sub DbLog_Log {
                       }
 
                       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-                      
+
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
@@ -1696,15 +1689,15 @@ sub DbLog_Log {
           }
       }
   };
-  
+
   if (!$memcount) {
       $net = tv_interval($nst);                                                              # Notify-Routine Laufzeit ermitteln
 
       if(AttrVal($name, 'showNotifyTime', 0)) {
           readingsSingleUpdate($hash, 'notify_processing_time', sprintf("%.4f",$net), 1);
       }
-      
-      return;      
+
+      return;
   }
 
   if($async) {                                                                               # asynchoner non-blocking Mode
@@ -1726,7 +1719,7 @@ sub DbLog_Log {
   }
 
   if(!$async) {                                                                         # synchroner non-blocking Mode
-      return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft                                                                       
+      return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft
       return if($hash->{HELPER}{REOPEN_RUNS});                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
 
       $err = DbLog_execMemCacheSync ($hash);
@@ -2116,7 +2109,7 @@ return $memcount;
 sub DbLog_execMemCacheAsync {
   my $hash       = shift;
   my $name       = $hash->{NAME};
-  
+
   my $async      = AttrVal($name, "asyncMode",                  0);
 
 
@@ -2126,7 +2119,7 @@ sub DbLog_execMemCacheAsync {
       InternalTimer(gettimeofday()+5, 'DbLog_execMemCacheAsync', $hash, 0);
       return;
   }
-  
+
   my $nextsync = gettimeofday() + AttrVal($name, 'syncInterval', 30);
   my $se       = AttrVal ($name, 'syncEvents', undef) ? 1 : 0;
   my $clim     = AttrVal ($name, "cacheLimit", $dblog_cachedef);
@@ -2135,14 +2128,14 @@ sub DbLog_execMemCacheAsync {
 
   DbLog_SBP_CheckAndInit ($hash);                                                            # Subprocess checken und ggf. initialisieren
   return if(!defined $hash->{".fhem"}{subprocess});
-  
+
   my $ce       = AttrVal ($name, 'cacheEvents', 0);
   my $memcount = defined $data{DbLog}{$name}{cache}{memcache}         ?
                  scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) :
                  0;
-                 
+
   readingsSingleUpdate ($hash, 'CacheUsage', $memcount, ($ce == 2 ? 1 : 0));
-  
+
   my $params   = {
       hash     => $hash,
       clim     => $clim,
@@ -2158,7 +2151,7 @@ sub DbLog_execMemCacheAsync {
   my $verbose = AttrVal ($name, 'verbose', 3);
   my $dolog   = $memcount ? 1 : 0;
 
-  if($hash->{HELPER}{LONGRUN_PID}) {
+  if(defined $hash->{HELPER}{LONGRUN_PID}) {
       $dolog = 0;
   }
 
@@ -2169,11 +2162,11 @@ sub DbLog_execMemCacheAsync {
       Log3 ($name, 4, "DbLog $name - MemCache contains $memcount entries to process");
       Log3 ($name, 4, "DbLog $name - DbLogType is: ".AttrVal($name, 'DbLogType', 'History'));
   }
-  
+
   if($dolog) {
       my $wrotefile = DbLog_writeFileIfCacheOverflow ($params);                            # Cache exportieren bei Overflow
       return if($wrotefile);
-      
+
       if ($verbose == 5) {
           DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'MemCache contains: ');
       }
@@ -2182,12 +2175,12 @@ sub DbLog_execMemCacheAsync {
       $err     = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                       # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   }
   else {
-      if($hash->{HELPER}{LONGRUN_PID}) {
+      if(defined $hash->{HELPER}{LONGRUN_PID}) {
           $err = 'Another operation is in progress - resync at NextSync';
           DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
       }
       else {
-          if($hash->{HELPER}{SHUTDOWNSEQ}) {
+          if(defined $hash->{HELPER}{SHUTDOWNSEQ}) {
               Log3 ($name, 2, "DbLog $name - no data for last database write cycle");
               _DbLog_finishDelayedShutdown ($hash);
           }
@@ -2210,9 +2203,11 @@ sub DbLog_execMemCacheSync {
   my $err = DbLog_SBP_CheckAndInit ($hash);                                                    # Subprocess checken und ggf. initialisieren
   return $err if(!defined $hash->{".fhem"}{subprocess});
 
-  if($hash->{HELPER}{LONGRUN_PID}) {
-      $err = 'Another operation is in progress - data is stored temporarily (check with listCache)';
-      DbLog_setReadingstate ($hash, $err);
+  if(defined $hash->{HELPER}{LONGRUN_PID}) {
+      if (gettimeofday() - $hash->{HELPER}{LONGRUN_PID} > $dblog_lrpth) {
+          $err = 'Another operation is in progress. <br>Data is stored temporarily.';
+          DbLog_setReadingstate ($hash, $err);
+      }
       return;
   }
 
@@ -2224,11 +2219,11 @@ sub DbLog_execMemCacheSync {
       Log3 ($name, 4, "DbLog $name - ###      New database processing cycle - SBP synchronous     ###");
       Log3 ($name, 4, "DbLog $name - ################################################################");
   }
-  
+
   if ($verbose == 5) {
       DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'TempStore contains: ');
   }
-  
+
   my $memc = _DbLog_copyCache      ($name);
   $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
@@ -2239,19 +2234,19 @@ return;
 #################################################################################################
 #        Memory Cache kopieren und löschen
 #################################################################################################
-sub _DbLog_copyCache {       
+sub _DbLog_copyCache {
   my $name = shift;
-  
+
   my $memc;
-  
+
   while (my ($key, $val) = each %{$data{DbLog}{$name}{cache}{memcache}} ) {
       $memc->{cdata}{$key} = $val;                                              # Subprocess Daten, z.B.:  2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   }
-                                 
+
   $memc->{cdataindex} = $data{DbLog}{$name}{cache}{index};                      # aktuellen Index an Subprozess übergeben
 
   undef %{$data{DbLog}{$name}{cache}{memcache}};                                # Löschen mit Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
-  
+
 return $memc;
 }
 
@@ -2261,18 +2256,23 @@ return $memc;
 # $subprocess->readFromParent()
 #
 # my $parent = $subprocess->parent();
+#
+# $store    - semipermanenter Datenspeicher
+# $logstore - temporärer Logdatenspeicher
+# $memc     - Operationsspeicher
+#
 #################################################################
 sub DbLog_SBP_onRun {
   my $subprocess = shift;
   my $name       = $subprocess->{name};
-  my $store;                                                                      # Datenspeicher
+  my $store;                                                                      # semipermanenter Datenspeicher
   my $logstore;                                                                   # temporärer Logdatenspeicher
 
   while (1) {
       my $serial = $subprocess->readFromParent();
 
       if(defined $serial) {
-          my $memc        = eval { thaw ($serial) };
+          my $memc        = eval { thaw ($serial) };                              # Operationsspeicher
 
           my $dbstorepars = $memc->{dbstorepars};                                 # 1 -> DB Parameter werden zum Speichern übermittelt, sonst 0
           my $dbdelpars   = $memc->{dbdelpars};                                   # 1 -> gespeicherte DB Parameter sollen gelöscht werden
@@ -2306,8 +2306,8 @@ sub DbLog_SBP_onRun {
                   delete $store->{dbparams};
               }
 
-              my $msg0 = $dbdelpars ? ' and stored DB params in SubProcess were deleted' : '';
-              my $msg1 = 'database disconnected by request'.$msg0;
+              my $msg0 = $dbdelpars ? ' <br>Stored DB params in SubProcess were deleted.' : '';
+              my $msg1 = 'Database disconnected by request.'.$msg0;
 
               Log3 ($name, 3, "DbLog $name - $msg1");
 
@@ -2344,7 +2344,7 @@ sub DbLog_SBP_onRun {
 
               $ret = {
                   name => $name,
-                  msg  => 'connection params saved into SubProcess. Connection to DB is established when it is needed',
+                  msg  => 'Connection parameters saved into SubProcess. <br>Connection to DB is established when it is needed.',
                   oper => $operation,
                   ot   => 0
               };
@@ -2378,24 +2378,19 @@ sub DbLog_SBP_onRun {
               next;
           }
 
-          my $model   = $store->{dbparams}{model};
-          my $dbconn  = $store->{dbparams}{dbconn};
-          my $cm      = $store->{dbparams}{cm};
-          my $history = $store->{dbparams}{history};
-          my $current = $store->{dbparams}{current};
-
+          my $cm             = $store->{dbparams}{cm};
           my ($useac,$useta) = DbLog_commitMode ($name, $cm);
 
           ## Verbindungsaufbau Datenbank
           ################################
           my $params = { name       => $name,
-                         dbconn     => $dbconn,
+                         dbconn     => $store->{dbparams}{dbconn},
                          dbname     => $store->{dbparams}{dbname},
                          dbuser     => $store->{dbparams}{dbuser},
                          dbpassword => $store->{dbparams}{dbpassword},
                          utf8       => $store->{dbparams}{utf8},
                          useac      => $useac,
-                         model      => $model,
+                         model      => $store->{dbparams}{model},
                          sltjm      => $store->{dbparams}{sltjm},
                          sltcs      => $store->{dbparams}{sltcs}
                        };
@@ -2455,7 +2450,7 @@ sub DbLog_SBP_onRun {
           #########################################################
           if ($operation =~ /log_/xs) {
               my $bi = $memc->{bi};                                          # Bulk-Insert 0|1
-              
+
               if ($bi) {
                   _DbLog_SBP_onRun_LogBulk ( { subprocess => $subprocess,
                                                name       => $name,
@@ -2551,10 +2546,10 @@ return;
 ###################################################################################
 #               neue Datenbankverbindung im SubProcess
 #
-#   RaiseError - handle attribute (which tells DBI to call the Perl die( ) 
+#   RaiseError - handle attribute (which tells DBI to call the Perl die( )
 #                function upon error
-#   PrintError - handle attribute tells DBI to call the Perl warn( ) function 
-#                (which typically results in errors being printed to the screen 
+#   PrintError - handle attribute tells DBI to call the Perl warn( ) function
+#                (which typically results in errors being printed to the screen
 #                when encountered)
 ###################################################################################
 sub _DbLog_SBP_onRun_connectDB {
@@ -2604,7 +2599,7 @@ sub _DbLog_SBP_onRun_connectDB {
               Log3 ($name, 2, "DbLog $name - Error: $err");
               return $err;
             };
-            
+
   return $DBI::errstr if($DBI::errstr);
 
   if($utf8) {
@@ -2653,7 +2648,7 @@ sub _DbLog_SBP_onRun_LogBulk {
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
   my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   my $index       = $memc->{cdataindex};                                  # aktueller Cache-Index
-  
+
   my $dbh         = $store->{dbh};
   my $dbconn      = $store->{dbparams}{dbconn};
   my $model       = $store->{dbparams}{model};
@@ -2691,7 +2686,7 @@ sub _DbLog_SBP_onRun_LogBulk {
   }
 
   my $ln = scalar keys %{$logstore};
-  
+
   if ($ln) {                                                           # temporär gespeicherte Daten hinzufügen
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
           Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
@@ -2703,10 +2698,10 @@ sub _DbLog_SBP_onRun_LogBulk {
 
       Log3 ($name, 4, "DbLog $name - logstore deleted - $ln stored datasets added for processing");
   }
- 
+
   my $faref = __DbLog_SBP_fieldArrays ($name, $cdata);                 # Feldarrays erstellen
   my $ceti  = scalar keys %{$cdata};
-  
+
   my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
 
   $st = [gettimeofday];                                                # SQL-Startzeit
@@ -2742,14 +2737,14 @@ sub _DbLog_SBP_onRun_LogBulk {
       $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
 
       eval { $sth_ih = $dbh->prepare($sqlins);
-             
+
              if ($tl) {                                                    # Tracelevel setzen
-                 $sth_ih->{TraceLevel} = "$tl|$tf";                    
+                 $sth_ih->{TraceLevel} = "$tl|$tf";
              }
              else {
-                 $sth_ih->{TraceLevel} = '0';  
+                 $sth_ih->{TraceLevel} = '0';
              }
-             
+
              $ins_hist = $sth_ih->execute();
              $ins_hist = 0 if($ins_hist eq "0E0");
              1;
@@ -2760,13 +2755,13 @@ sub _DbLog_SBP_onRun_LogBulk {
 
                    if($useta) {
                        $rowlback = $cdata;                                 # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
-                       
+
                        Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
                    }
                    else {
                       Log3 ($name, 2, "DbLog $name - Transaction is switched off. Transferred data is lost.");
                    }
-                   
+
                    __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
 
                    $ret = {
@@ -2795,12 +2790,12 @@ sub _DbLog_SBP_onRun_LogBulk {
 
       __DbLog_SBP_commitOnly ($name, $dbh, $history);
   }
-  
+
   if ($operation eq 'importCachefile') {
       return ($error, $nins_hist, $rowlback);
   }
-                                                                               
-  if (lc($DbLogType) =~ m(current)) {                                         
+
+  if (lc($DbLogType) =~ m(current)) {
       $error = __DbLog_SBP_onRun_LogCurrent ( { subprocess => $subprocess,
                                                 name       => $name,
                                                 memc       => $memc,
@@ -2853,7 +2848,7 @@ sub _DbLog_SBP_onRun_LogArray {
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
   my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
   my $index       = $memc->{cdataindex};                                  # aktueller Cache-Index
-  
+
   my $dbh         = $store->{dbh};
   my $dbconn      = $store->{dbparams}{dbconn};
   my $model       = $store->{dbparams}{model};
@@ -2891,7 +2886,7 @@ sub _DbLog_SBP_onRun_LogArray {
   }
 
   my $ln = scalar keys %{$logstore};
-  
+
   if ($ln) {                                                           # temporär gespeicherte Daten hinzufügen
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
           Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
@@ -2905,12 +2900,12 @@ sub _DbLog_SBP_onRun_LogArray {
   }
 
   my $faref = __DbLog_SBP_fieldArrays ($name, $cdata);
-  my $ceti  = scalar keys %{$cdata};  
-  
+  my $ceti  = scalar keys %{$cdata};
+
   my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
   my ($tuples, $rows);
   my @tuple_status;
-    
+
   my @timestamp = @{$faref->{timestamp}};
   my @device    = @{$faref->{device}};
   my @type      = @{$faref->{type}};
@@ -2971,7 +2966,7 @@ sub _DbLog_SBP_onRun_LogArray {
           ($tuples, $rows) = $sth_ih->execute_array( { ArrayTupleStatus => \@tuple_status } );
       };
 
-      if ($@) { 
+      if ($@) {
           $error     = $@;
           $nins_hist = $ceti;
 
@@ -2980,7 +2975,7 @@ sub _DbLog_SBP_onRun_LogArray {
           if($useta) {
               $rowlback  = $cdata;                                                # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
                __DbLog_SBP_rollbackOnly ($name, $dbh, $history);
-               
+
                Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
           }
           else {
@@ -2991,7 +2986,7 @@ sub _DbLog_SBP_onRun_LogArray {
       else {
           __DbLog_SBP_commitOnly ($name, $dbh, $history);
       }
-      
+
       no warnings 'uninitialized';
 
       for my $tuple (0..$ceti-1) {
@@ -3041,12 +3036,12 @@ sub _DbLog_SBP_onRun_LogArray {
           DbLog_logHashContent ($name, $rowhref, 2);
       }
   }
-  
+
   if ($operation eq 'importCachefile') {
       return ($error, $nins_hist, $rowlback);
   }
 
-  if (lc($DbLogType) =~ m(current)) {                                                  
+  if (lc($DbLogType) =~ m(current)) {
       $error = __DbLog_SBP_onRun_LogCurrent ( { subprocess => $subprocess,
                                                 name       => $name,
                                                 memc       => $memc,
@@ -3079,7 +3074,7 @@ return;
 
 #################################################################
 # SubProcess - Log-Routine Insert/Update current Tabelle
-# Array-Insert wird auch bei Bulk verwendet weil im Bulk-Mode 
+# Array-Insert wird auch bei Bulk verwendet weil im Bulk-Mode
 # die nicht upgedateten Sätze nicht identifiziert werden können
 #################################################################
 sub __DbLog_SBP_onRun_LogCurrent {
@@ -3099,7 +3094,7 @@ sub __DbLog_SBP_onRun_LogCurrent {
   my $tf          = $memc->{tf};                                          # traceFlag
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
   my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
-  
+
   my $dbh         = $store->{dbh};
   my $model       = $store->{dbparams}{model};
   my $current     = $store->{dbparams}{current};
@@ -3108,7 +3103,7 @@ sub __DbLog_SBP_onRun_LogCurrent {
   my $doins       = 0;                                                    # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl)
 
   my $ret;
-    
+
   my @timestamp = @{$faref->{timestamp}};
   my @device    = @{$faref->{device}};
   my @type      = @{$faref->{type}};
@@ -3116,11 +3111,11 @@ sub __DbLog_SBP_onRun_LogCurrent {
   my @reading   = @{$faref->{reading}};
   my @value     = @{$faref->{value}};
   my @unit      = @{$faref->{unit}};
-                                       
+
   my (@timestamp_cur,@device_cur,@type_cur,@event_cur,@reading_cur,@value_cur,@unit_cur);
   my ($tuples,$rows,$sth_ic,$sth_uc);
-  my @tuple_status;      
-  
+  my @tuple_status;
+
   ($error, $sth_ic) = __DbLog_SBP_sthInsTable ( { table => $current,
                                                   dbh   => $dbh,
                                                   model => $model,
@@ -3137,7 +3132,7 @@ sub __DbLog_SBP_onRun_LogCurrent {
                                                   pk    => $pkc
                                                 }
                                               );
-                                              
+
   return $error if ($error);
 
   if ($tl) {                                                                  # Tracelevel setzen
@@ -3232,17 +3227,17 @@ return;
 }
 
 #################################################################
-#    Aufteilung der Logdaten auf Arrays für jedes 
+#    Aufteilung der Logdaten auf Arrays für jedes
 #    Datenbankfeld (für Array-Insert)
 #################################################################
 sub __DbLog_SBP_fieldArrays {
   my $name  = shift;
   my $cdata = shift;                                                       # Referenz zu Log Daten Hash
-  
+
   my (@timestamp,@device,@type,@event,@reading,@value,@unit);
-  
+
   no warnings 'uninitialized';
-  
+
   for my $key (sort {$a<=>$b} keys %{$cdata}) {
       my $row = $cdata->{$key};
       my @a   = split "\\|", $row;
@@ -3260,7 +3255,7 @@ sub __DbLog_SBP_fieldArrays {
   }
 
   use warnings;
-  
+
   my $faref = {
       timestamp => \@timestamp,
       device    => \@device,
@@ -3279,17 +3274,17 @@ return $faref;
 #################################################################
 sub __DbLog_SBP_logLogmodes {
   my $paref       = shift;
-  
+
   my $store       = $paref->{store};                                      # Datenspeicher
   my $memc        = $paref->{memc};
-  
+
   my $name        = $paref->{name};
   my $useta       = $paref->{useta};
   my $dbh         = $store->{dbh};
   my $bi          = $memc->{bi};                                          # Bulk-Insert 0|1
   my $DbLogType   = $memc->{DbLogType};                                   # Log-Ziele
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
-  
+
   my $ac = $dbh->{AutoCommit} ? "ON" : "OFF";
   my $tm = $useta             ? "ON" : "OFF";
 
@@ -3560,7 +3555,7 @@ sub _DbLog_SBP_onRun_importCachefile {
 
   $memc->{DbLogType} = 'history';                                                          # nur history-Insert !
   $memc->{bi}        = 0;                                                                  # Array-Insert !
-                                                         
+
   ($error, $nins_hist, $rowlback) = _DbLog_SBP_onRun_LogArray ( { subprocess => $subprocess,
                                                                   name       => $name,
                                                                   memc       => $memc,
@@ -3582,14 +3577,14 @@ sub _DbLog_SBP_onRun_importCachefile {
   }
 
   my $improws = 'unknown';
-  
+
   if (!$error) {
       $improws    = $crows - $nins_hist;
-      
+
       my @parts   = split "/", $infile;
       $infile     = pop @parts;
       my $dir     = (join "/", @parts).'/';
-      
+
       unless (rename ($dir.$infile, $dir."impdone_".$infile)) {
           $error = "cachefile $dir$infile couldn't be renamed after import: ".$!;
           Log3 ($name, 2, "DbLog $name - ERROR - $error");
@@ -4287,7 +4282,7 @@ return ($err, $sth);
 }
 
 #################################################################
-#   Information an Parent Prozess senden, Verarbeitung in 
+#   Information an Parent Prozess senden, Verarbeitung in
 #   read Schleife DbLog_SBP_Read
 #################################################################
 sub __DbLog_SBP_sendToParent {
@@ -4318,14 +4313,14 @@ return;
 sub DbLog_SBP_CheckAndInit {
   my $hash = shift;
   my $nscd = shift // 0;                                                        # 1 - kein senden Connectiondata direkt nach Start Subprozess
-  
+
   my $name = $hash->{NAME};
 
   my $err = q{};
 
   if (defined $hash->{SBP_PID} && defined $hash->{HELPER}{LONGRUN_PID}) {       # Laufzeit des letzten Kommandos prüfen -> timeout
       my $to = AttrVal($name, 'timeout', $dblog_todef);
-      my $rt = time() - $hash->{HELPER}{LONGRUN_PID};                           # aktuelle Laufzeit
+      my $rt = gettimeofday() - $hash->{HELPER}{LONGRUN_PID};                   # aktuelle Laufzeit
 
       if ($rt >= $to) {                                                         # SubProcess beenden, möglicherweise tot
           Log3 ($name, 2, qq{DbLog $name - The Subprocess >$hash->{SBP_PID}< has exceeded the timeout of $to seconds});
@@ -4416,15 +4411,15 @@ sub DbLog_SBP_sendConnectionData {
   $memc->{cm}          = AttrVal ($name, 'commitMode', $dblog_cmdef);
   $memc->{verbose}     = AttrVal ($name, 'verbose',               3);
   $memc->{utf8}        = defined ($hash->{UTF8}) ? $hash->{UTF8} : 0;
-  $memc->{history}     = $hash->{HELPER}{TH};
-  $memc->{current}     = $hash->{HELPER}{TC};
+  $memc->{history}     = DbLog_combineTablename ($hash, 'history');
+  $memc->{current}     = DbLog_combineTablename ($hash, 'current');
   $memc->{operation}   = 'sendDbConnectData';
 
   if ($hash->{MODEL} eq 'SQLITE') {
       $memc->{sltjm} = AttrVal ($name, 'SQLiteJournalMode', 'WAL');
       $memc->{sltcs} = AttrVal ($name, 'SQLiteCacheSize',    4000);
   }
-  
+
   $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
   return $err if($err);
 
@@ -4461,7 +4456,7 @@ sub DbLog_SBP_sendLogData {
   my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
   return $err if($err);
 
-  $hash->{HELPER}{LONGRUN_PID} = time();                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
+  $hash->{HELPER}{LONGRUN_PID} = gettimeofday();                      # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
 return;
 }
@@ -4497,11 +4492,11 @@ sub DbLog_SBP_sendCommand {
   $memc->{verbose}   = AttrVal ($name, 'verbose',        3);
   $memc->{operation} = $oper;
   $memc->{arguments} = $arg;
-  
+
   my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
   return $err if($err);
-  
-  $hash->{HELPER}{LONGRUN_PID} = time();                             # Statusbit laufende Verarbeitung mit Startzeitstempel;
+
+  $hash->{HELPER}{LONGRUN_PID} = gettimeofday();                       # Statusbit laufende Verarbeitung mit Startzeitstempel;
 
   DbLog_setReadingstate ($hash, "operation '$oper' is running");
 
@@ -4512,7 +4507,7 @@ return;
 #   Information Serialisieren und an Child Prozess senden
 #################################################################
 sub _DbLog_SBP_sendToChild {
-  my $name       = shift;             
+  my $name       = shift;
   my $subprocess = shift;
   my $data       = shift;
 
@@ -4534,7 +4529,7 @@ return;
 sub _DbLog_SBP_Init {
   my $hash = shift;
   my $nscd = shift // 0;                                                        # 1 - kein senden Connectiondata direkt nach Start Subprozess
-  
+
   my $name = $hash->{NAME};
 
   $hash->{".fhem"}{subprocess} = undef;
@@ -4556,10 +4551,10 @@ sub _DbLog_SBP_Init {
   if (!defined $pid) {
       my $err = "DbLog $name - Cannot create subprocess for non-blocking operation";
       Log3 ($name, 1, $err);
-      
+
       DbLog_SBP_CleanUp     ($hash);
       DbLog_setReadingstate ($hash, $err);
-      
+
       return 'no SubProcess PID created';
   }
 
@@ -4573,7 +4568,7 @@ sub _DbLog_SBP_Init {
   $selectlist{"$name.$pid"} = $hash;
   $hash->{SBP_PID}          = $pid;
   $hash->{SBP_STATE}        = 'running';
-  
+
   if (!$nscd) {
       my $rst = DbLog_SBP_sendConnectionData ($hash);                                        # Verbindungsdaten übertragen
       if (!$rst) {
@@ -4796,8 +4791,9 @@ sub DbLog_setReadingstate {
   my $val  = shift // $hash->{HELPER}{OLDSTATE};
 
   my $evt  = $val eq $hash->{HELPER}{OLDSTATE} ? 0 : 1;
+  my $out  = $val =~ /<br>/xs ? '<html>'.$val.'</html>' : $val;
 
-  readingsSingleUpdate($hash, 'state', $val, $evt);
+  readingsSingleUpdate($hash, 'state', $out, $evt);
 
   $hash->{HELPER}{OLDSTATE} = $val;
 
@@ -4993,8 +4989,8 @@ sub DbLog_Get {
   my ($hash, @a) = @_;
   my $name       = $hash->{NAME};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  my $history    = $hash->{HELPER}{TH};
-  my $current    = $hash->{HELPER}{TC};
+  my $history    = DbLog_combineTablename ($hash, 'history');
+  my $current    = DbLog_combineTablename ($hash, 'current');
   my ($dbh,$err);
 
   return DbLog_dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
@@ -5656,21 +5652,21 @@ sub DbLog_configcheck {
   my $dbmodel = $hash->{MODEL};
   my $dbconn  = $hash->{dbconn};
   my $dbname  = (split(/;|=/, $dbconn))[1];
-  my $history = $hash->{HELPER}{TH};
-  my $current = $hash->{HELPER}{TC};
+  my $history = DbLog_combineTablename ($hash, 'history');
+  my $current = DbLog_combineTablename ($hash, 'current');
 
   my ($check, $rec,%dbconfig);
-  
+
   ### verfügbare Treiber
   #######################################################################
   my @ary = DBI->available_drivers('true');
   my $dlst;
-  
+
   for my $drv (@ary) {
       $dlst .= ', ' if($dlst);
       $dlst .= 'DBD::'.$drv;
   }
-  
+
   $check  = "<html>";
   $check .= "<u><b>Available Drivers in your system</u></b><br><br>";
   $check .= $dlst ? $dlst : 'no drivers found';
@@ -6848,21 +6844,21 @@ return;
 #    $href    - Referenz auf den Hash
 #    $verbose - Level für Logausgabe
 #################################################################
-sub DbLog_logHashContent {                               
+sub DbLog_logHashContent {
   my $name    = shift;
   my $href    = shift;
   my $verbose = shift // 3;
   my $logtxt  = shift // q{};
 
   no warnings 'numeric';
-  
+
   for my $key (sort {$a<=>$b} keys %{$href}) {
       next if(!defined $href->{$key});
-      
+
       Log3 ($name, $verbose, "DbLog $name - $logtxt $key -> $href->{$key}");
   }
 
-  use warnings;  
+  use warnings;
 
 return;
 }
@@ -6932,14 +6928,16 @@ sub DbLog_fhemwebFn {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
   my $ret;
-  my $newIdx=1;
+  my $newIdx = 1;
+
   while($defs{"SVG_${d}_$newIdx"}) {
       $newIdx++;
   }
+
   my $name = "SVG_${d}_$newIdx";
-  $ret .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
-                 "set $name copyGplotFile&detail=$name",
-                 "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
+  $ret    .= FW_pH("cmd=define $name SVG $d:templateDB:HISTORY;".
+                   "set $name copyGplotFile&detail=$name",
+                   "<div class=\"dval\">Create SVG plot from DbLog</div>", 0, "dval", 1);
 return $ret;
 }
 
@@ -6950,7 +6948,7 @@ sub DbLog_sampleDataFn {
   my ($dlName, $dlog, $max, $conf, $wName) = @_;
   my $desc    = "Device:Reading";
   my $hash    = $defs{$dlName};
-  my $current = $hash->{HELPER}{TC};
+  my $current = DbLog_combineTablename ($hash, 'current');
 
   my @htmlArr;
   my @example;
@@ -7025,6 +7023,20 @@ return $json;
 }
 
 ################################################################
+#     Tabellenname incl. Schema erstellen
+################################################################
+sub DbLog_combineTablename {
+  my $hash  = shift;
+  my $table = shift;
+  
+  my $name   = $hash->{NAME};
+  my $scheme = AttrVal($name, 'dbSchema', '');
+  $table     = $scheme.'.'.$table if($scheme);
+
+return $table;
+}
+
+################################################################
 #              Check Zeitformat
 #              Zeitformat: YYYY-MM-DD HH:MI:SS
 ################################################################
@@ -7064,8 +7076,8 @@ sub DbLog_prepareSql {
     my $pagingstart     = $_[13];
     my $paginglimit     = $_[14];
     my $dbmodel         = $hash->{MODEL};
-    my $history         = $hash->{HELPER}{TH};
-    my $current         = $hash->{HELPER}{TC};
+    my $history         = DbLog_combineTablename ($hash, 'history');
+    my $current         = DbLog_combineTablename ($hash, 'current');
     my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
 
     if ($dbmodel eq "POSTGRESQL") {
@@ -7351,7 +7363,7 @@ return $jsonstring;
 sub DbLog_dbReadings {
   my($hash,@a) = @_;
 
-  my $history  = $hash->{HELPER}{TH};
+  my $history  = DbLog_combineTablename ($hash, 'history');
 
   my $dbh = _DbLog_ConnectNewDBH($hash);
   return if(!$dbh);
@@ -7387,13 +7399,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 26750 2022-11-26 16:38:54Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 26907 2022-12-27 11:38:39Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 26750 2022-11-26 16:38:54Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 26907 2022-12-27 11:38:39Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -7658,7 +7670,6 @@ return;
     </ul>
     <br>
 
-  <ul>
     <li><b>set &lt;name&gt; addCacheLine YYYY-MM-DD HH:MM:SS|&lt;device&gt;|&lt;type&gt;|&lt;event&gt;|&lt;reading&gt;|&lt;value&gt;|[&lt;unit&gt;]  </b> <br><br>
 
     <ul>
@@ -7950,19 +7961,19 @@ return;
     <a id="DbLog-get-ReadingsVal"></a>
     <li><b>get &lt;name&gt; ReadingsVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
       <ul>
-      Reads the last (newest) value of the specified device/reading combination stored in the history table 
+      Reads the last (newest) value of the specified device/reading combination stored in the history table
       and returns this value. <br>
       &lt;default&gt; specifies a defined return value if no value is found in the database.
       </ul>
   </ul>
   </li>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsTimestamp"></a>
     <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
       <ul>
-      Reads the timestamp of the last (newest) record stored in the history table of the specified 
+      Reads the timestamp of the last (newest) record stored in the history table of the specified
       Device/Reading combination and returns this value. <br>
       &lt;default&gt; specifies a defined return value if no value is found in the database.
       </ul>
@@ -8305,11 +8316,11 @@ return;
 
        In asynchronous log mode, sets the threshold of &lt;n&gt; records above which the cache contents are exported to a
        file instead of writing the data to the database. <br>
-       The executed function corresponds to the set command "exportCache purgecache" and uses its settings. 
+       The executed function corresponds to the set command "exportCache purgecache" and uses its settings.
        <br><br>
-       
-       This attribute can be used to prevent an overload of the server memory if the database is not available for a 
-       longer period of time (e.g. in case of error or maintenance). If the attribute value is less than or equal to the 
+
+       This attribute can be used to prevent an overload of the server memory if the database is not available for a
+       longer period of time (e.g. in case of error or maintenance). If the attribute value is less than or equal to the
        value of the cacheLimit attribute, the value of cacheLimit is used for cacheOverflowThreshold. <br>
        In this case the cache will <b>always</b> be written to a file instead of to the database if the threshold value
        has been reached. <br>
@@ -8559,18 +8570,18 @@ return;
        If DbLog is used, the <i>DbLogValueFn</i> attribute is propagated in all devices.
        This attribute is set in the <b>source devices</b> and allows to change the values before logging
        or exclude the record from logging. <br><br>
-       
+
        The variables $TIMESTAMP, $READING, $VALUE (value of the reading) and $UNIT (unit of the reading value)
        can be accessed and modified before logging to the database. <br>
        Read access is available to $DEVICE (the name of the source device), $EVENT, $LASTTIMESTAMP, and $LASTVALUE. <br><br>
-       
-       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of 
+
+       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of
        $DEVICE / $READING. <br>
        If $TIMESTAMP is to be changed, the form "yyyy-mm-dd hh:mm:ss" must be followed.
        Otherwise the changed $TIMESTAMP variable will not be applied.
        By setting the variable "$IGNORE=1" the record is excluded from logging. <br><br>
-       
-       The device specific function in "DbLogValueFn" is applied to the record before the function in the "valueFn" 
+
+       The device specific function in "DbLogValueFn" is applied to the record before the function in the "valueFn"
        attribute of the DbLog device.
        <br><br>
 
@@ -8972,16 +8983,16 @@ attr SMA_Energymeter DbLogValueFn
 
       This attribute is set in the <b>DbLog device</b> and allows to modify the values before logging
       or exclude the record from logging. <br><br>
-       
+
       It is possible to access the variables $TIMESTAMP, $DEVICE (source device), $DEVICETYPE, $READING, $VALUE (reading value) and
       $UNIT (unit of reading value) can be accessed and modified before logging to the database. <br>
       Read access exists to $EVENT, $LASTTIMESTAMP and $LASTVALUE. <br><br>
-       
-      The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of 
+
+      The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged record of
       $DEVICE / $READING. <br>
-      If $TIMESTAMP is to be changed, the form "yyyy-mm-dd hh:mm:ss" must be followed. 
+      If $TIMESTAMP is to be changed, the form "yyyy-mm-dd hh:mm:ss" must be followed.
       Otherwise the changed $TIMESTAMP variable will not be applied.
-      By setting the variable "$IGNORE=1" the record is excluded from logging. 
+      By setting the variable "$IGNORE=1" the record is excluded from logging.
       <br><br>
 
       <b>Examples</b> <br>
@@ -9557,24 +9568,24 @@ attr SMA_Energymeter DbLogValueFn
   <b>Get</b>
   <br>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsVal"></a>
     <li><b>get &lt;name&gt; ReadingsVal &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
       <ul>
-      Liest den letzten (neuesten) in der history Tabelle gespeicherten Wert der angegebenen Device/Reading 
+      Liest den letzten (neuesten) in der history Tabelle gespeicherten Wert der angegebenen Device/Reading
       Kombination und gibt diesen Wert zurück. <br>
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
       </ul>
   </ul>
   </li>
   <br>
-  
+
   <ul>
     <a id="DbLog-get-ReadingsTimestamp"></a>
     <li><b>get &lt;name&gt; ReadingsTimestamp &lt;Device&gt; &lt;Reading&gt; &lt;default&gt; </b> <br><br>
       <ul>
-      Liest den Zeitstempel des letzten (neuesten) in der history Tabelle gespeicherten Datensatzes der angegebenen 
+      Liest den Zeitstempel des letzten (neuesten) in der history Tabelle gespeicherten Datensatzes der angegebenen
       Device/Reading Kombination und gibt diesen Wert zurück. <br>
       &lt;default&gt; gibt einen definierten Rückgabewert an, wenn kein Wert in der Datenbank gefunden wird.
       </ul>
@@ -9942,9 +9953,9 @@ attr SMA_Energymeter DbLogValueFn
 
        Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cacheinhalt in ein File
        exportiert wird anstatt die Daten in die Datenbank zu schreiben. <br>
-       Die ausgeführte Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen. 
+       Die ausgeführte Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen.
        <br><br>
-       
+
        Mit diesem Attribut kann eine Überlastung des Serverspeichers verhindert werden falls die Datenbank für eine längere
        Zeit nicht verfügbar ist (z.B. im Fehler- oder Wartungsfall). Ist der Attributwert kleiner oder gleich dem Wert des
        Attributs "cacheLimit", wird der Wert von "cacheLimit" für "cacheOverflowThreshold" verwendet. <br>
@@ -10239,17 +10250,17 @@ attr SMA_Energymeter DbLogValueFn
        Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
        Dieses Attribut wird in den <b>Quellendevices</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
        oder den Ausschluß des Datensatzes vom Logging. <br><br>
-       
-       Es kann auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und $UNIT (Einheit des Readingswert) 
+
+       Es kann auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und $UNIT (Einheit des Readingswert)
        zugegriffen werden und diese vor dem Loggen in die Datenbank verändern. <br>
        Lesezugriff besteht auf $DEVICE (den Namen des Quellengeräts), $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
-       
-       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von 
+
+       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von
        $DEVICE / $READING. <br>
        Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden.
        Anderenfalls wird die geänderte $TIMESTAMP Variable nicht übernommen.
        Durch Setzen der Variable "$IGNORE=1" wird der Datensatz vom Logging ausgeschlossen. <br><br>
-       
+
        Die devicespezifische Funktion in "DbLogValueFn" wird vor der eventuell im DbLog-Device vorhandenen Funktion im Attribut
        "valueFn" auf den Datensatz angewendet.
        <br><br>
@@ -10649,19 +10660,19 @@ attr SMA_Energymeter DbLogValueFn
        <code>
        attr &lt;device&gt; valueFn {}
        </code><br><br>
-       
+
        Dieses Attribut wird im <b>DbLog-Device</b> gesetzt und erlaubt die Veränderung der Werte vor dem Logging
        oder den Ausschluß des Datensatzes vom Logging. <br><br>
-       
+
        Es kann auf die Variablen $TIMESTAMP, $DEVICE (Quellendevice), $DEVICETYPE, $READING, $VALUE (Wert des Readings) und
        $UNIT (Einheit des Readingswert) zugegriffen werden und diese vor dem Loggen in die Datenbank verändern. <br>
        Lesezugriff besteht auf $EVENT, $LASTTIMESTAMP und $LASTVALUE. <br><br>
-       
-       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von 
+
+       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von
        $DEVICE / $READING. <br>
-       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden. 
+       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden.
        Anderenfalls wird die geänderte $TIMESTAMP Variable nicht übernommen.
-       Durch Setzen der Variable "$IGNORE=1" wird der Datensatz vom Logging ausgeschlossen. 
+       Durch Setzen der Variable "$IGNORE=1" wird der Datensatz vom Logging ausgeschlossen.
        <br><br>
 
       <b>Beispiele</b> <br>
