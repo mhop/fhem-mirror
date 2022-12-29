@@ -688,6 +688,7 @@ HttpUtils_Connect2($)
               if($hash->{auth});
   $hdr .= $hash->{header}."\r\n" if($hash->{header});
   if(defined($data) && length($data) > 0) {
+    $data = Encode::encode("UTF-8", $data) if($unicodeEncoding);
     $ha->("Content-Length", length($data));
     $ha->("Content-Type", "application/x-www-form-urlencoded");
   }
@@ -736,10 +737,8 @@ HttpUtils_Connect2($)
       }
     };
 
-    $data = "" if(!defined($data));
-    $data = Encode::decode("UTF-8", $data) if($unicodeEncoding);
-    $data = $hdr.$data;
-
+    $hdr = Encode::encode("UTF-8", $hdr) if($unicodeEncoding); #Tainting/131207
+    $data = $hdr.(defined($data) ? $data:"");
     $hash->{directWriteFn} = sub($) { # Nonblocking write
       my $ret = syswrite $hash->{conn}, $data;
       if(!defined($ret) || $ret <= 0) {
