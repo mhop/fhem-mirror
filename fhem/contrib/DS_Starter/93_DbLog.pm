@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.9"   => "28.12.2022 delete \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC} ".
+  "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
   "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
@@ -412,8 +412,7 @@ sub DbLog_Define {
   return "Bad regexp: $@" if($@);
 
   $hash->{REGEXP}                = $regexp;
-  #$hash->{MODE}                  = AttrVal($name, 'asyncMode', undef) ? 'asynchronous' : 'synchronous';       # Mode setzen Forum:#76213
-  $hash->{MODE}                  = 'synchronous';
+  $hash->{MODE}                  = AttrVal ($name, 'asyncMode', 0) ? 'asynchronous' : 'synchronous';          # Mode setzen Forum:#76213
   $hash->{HELPER}{OLDSTATE}      = 'initialized';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
 
@@ -467,6 +466,8 @@ sub _DbLog_initOnStart {
   for my $r (@rdel) {
       readingsDelete ($hash, $r);
   }
+  
+  DbLog_setSchemeTable ($hash);
 
   DbLog_SBP_CheckAndInit ($hash);
 
@@ -516,7 +517,6 @@ return;
 sub DbLog_DelayedShutdown {
   my $hash   = shift;
   my $name   = $hash->{NAME};
-  my $async  = AttrVal($name, 'asyncMode', 0);
 
   $hash->{HELPER}{SHUTDOWNSEQ} = 1;
 
@@ -686,7 +686,7 @@ sub DbLog_Attr {
   }
 
   if ($aName eq "disable") {
-      my $async = AttrVal($name, "asyncMode", 0);
+      my $async = AttrVal($name, 'asyncMode', 0);
 
       if($cmd eq "set") {
           $do = $aVal ? 1 : 0;
@@ -709,6 +709,13 @@ sub DbLog_Attr {
       }
 
       $do = 0 if($cmd eq "del");
+      
+      if ($do == 1) {
+          DbLog_setSchemeTable ($hash, $aVal);
+      }
+      else {
+          DbLog_setSchemeTable ($hash, '');
+      }
 
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
@@ -2110,7 +2117,7 @@ sub DbLog_execMemCacheAsync {
   my $hash       = shift;
   my $name       = $hash->{NAME};
 
-  my $async      = AttrVal($name, "asyncMode",                  0);
+  my $async      = AttrVal($name, 'asyncMode', 0);
 
 
   RemoveInternalTimer($hash, 'DbLog_execMemCacheAsync');
@@ -4411,8 +4418,8 @@ sub DbLog_SBP_sendConnectionData {
   $memc->{cm}          = AttrVal ($name, 'commitMode', $dblog_cmdef);
   $memc->{verbose}     = AttrVal ($name, 'verbose',               3);
   $memc->{utf8}        = defined ($hash->{UTF8}) ? $hash->{UTF8} : 0;
-  $memc->{history}     = DbLog_combineTablename ($hash, 'history');
-  $memc->{current}     = DbLog_combineTablename ($hash, 'current');
+  $memc->{history}     = $hash->{HELPER}{TH};
+  $memc->{current}     = $hash->{HELPER}{TC};
   $memc->{operation}   = 'sendDbConnectData';
 
   if ($hash->{MODEL} eq 'SQLITE') {
@@ -4989,8 +4996,8 @@ sub DbLog_Get {
   my ($hash, @a) = @_;
   my $name       = $hash->{NAME};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  my $history    = DbLog_combineTablename ($hash, 'history');
-  my $current    = DbLog_combineTablename ($hash, 'current');
+  my $history    = $hash->{HELPER}{TH};
+  my $current    = $hash->{HELPER}{TC};
   my ($dbh,$err);
 
   return DbLog_dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
@@ -5652,8 +5659,8 @@ sub DbLog_configcheck {
   my $dbmodel = $hash->{MODEL};
   my $dbconn  = $hash->{dbconn};
   my $dbname  = (split(/;|=/, $dbconn))[1];
-  my $history = DbLog_combineTablename ($hash, 'history');
-  my $current = DbLog_combineTablename ($hash, 'current');
+  my $history = $hash->{HELPER}{TH};
+  my $current = $hash->{HELPER}{TC};
 
   my ($check, $rec,%dbconfig);
 
@@ -6948,7 +6955,7 @@ sub DbLog_sampleDataFn {
   my ($dlName, $dlog, $max, $conf, $wName) = @_;
   my $desc    = "Device:Reading";
   my $hash    = $defs{$dlName};
-  my $current = DbLog_combineTablename ($hash, 'current');
+  my $current = $hash->{HELPER}{TC};
 
   my @htmlArr;
   my @example;
@@ -7025,15 +7032,20 @@ return $json;
 ################################################################
 #     Tabellenname incl. Schema erstellen
 ################################################################
-sub DbLog_combineTablename {
-  my $hash  = shift;
-  my $table = shift;
+sub DbLog_setSchemeTable {
+  my $hash   = shift;
+  my $scheme = shift // AttrVal($hash->{NAME}, 'dbSchema', '');
   
-  my $name   = $hash->{NAME};
-  my $scheme = AttrVal($name, 'dbSchema', '');
-  $table     = $scheme.'.'.$table if($scheme);
+ if ($scheme) {
+      $hash->{HELPER}{TH} = $scheme.'.history';
+      $hash->{HELPER}{TC} = $scheme.'.current';
+  }
+  else {
+      $hash->{HELPER}{TH} = 'history';
+      $hash->{HELPER}{TC} = 'current';
+  }
 
-return $table;
+return;
 }
 
 ################################################################
@@ -7076,8 +7088,8 @@ sub DbLog_prepareSql {
     my $pagingstart     = $_[13];
     my $paginglimit     = $_[14];
     my $dbmodel         = $hash->{MODEL};
-    my $history         = DbLog_combineTablename ($hash, 'history');
-    my $current         = DbLog_combineTablename ($hash, 'current');
+    my $history         = $hash->{HELPER}{TH};
+    my $current         = $hash->{HELPER}{TC};
     my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
 
     if ($dbmodel eq "POSTGRESQL") {
@@ -7363,7 +7375,7 @@ return $jsonstring;
 sub DbLog_dbReadings {
   my($hash,@a) = @_;
 
-  my $history  = DbLog_combineTablename ($hash, 'history');
+  my $history  = $hash->{HELPER}{TH};
 
   my $dbh = _DbLog_ConnectNewDBH($hash);
   return if(!$dbh);
