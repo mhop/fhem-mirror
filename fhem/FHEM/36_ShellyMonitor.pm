@@ -195,20 +195,28 @@ my $SHELLY_DEF_SEN = {
 
 # Copied from 36_Shelly, keep up to date..:
 my %shelly_models = (
-    #(relays,rollers,dimmers,meters)
-    "generic" => [4,4,4,4],
-    "shellygeneric" => [4,4,4,4],
-    "shelly1" => [1,0,0,0],
-    "shelly1pm" => [1,0,0,1],
-    "shelly2" => [2,1,0,1],
-    "shelly2.5" => [2,1,0,2],
-    "shellyplug" => [1,0,0,1],
-    "shelly4" => [4,0,0,4],
-    "shellyrgbw" => [0,0,4,1],
-    "shellydimmer" => [0,0,1,1],
-    "shellyem" => [1,0,0,2],
-    "shellybulb" => [0,0,1,1],
-    );
+    #(relays,rollers,dimmers,meters,NG)
+    "generic" => [4,4,4,4,0],
+    "shellygeneric" => [4,4,4,4,0],
+    "shelly1" => [1,0,0,0,0],
+    "shelly1pm" => [1,0,0,1,0],
+    "shelly2" => [2,1,0,1,0],
+    "shelly2.5" => [2,1,0,2,0],
+    "shellyplug" => [1,0,0,1,0],
+    "shelly4" => [4,0,0,4,0],
+    "shellypro4" => [4,0,0,4,0],
+    "shellyrgbw" => [0,0,4,1,0],
+    "shellydimmer" => [0,0,1,1,0],
+    "shellyem" => [1,0,0,2,0],
+    "shelly3em" => [1,0,0,3,0],
+    "shellybulb" => [0,0,1,1,0],
+    "shellyuni" => [2,0,0,1,0],
+    #-- 2nd generation devices
+    "shellyplus1" => [1,0,0,0,1],
+    "shellyplus1pm" => [1,0,0,1,1],
+    "shellypro4pm" => [4,0,0,4,1]
+);
+
 
 my %shelly_models_by_mod_shelly = ();
 
@@ -696,7 +704,7 @@ sub ShellyMonitor_DoRead
         if (defined $defarr) {
           my $rname = $defarr->{"desc"};
 
-          if ($rname =~ /^(power|output|energy|brightness|extTemp)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*|colorTemp)$/) {
+          if ($rname =~ /^(power|output|energy|energyReturned|brightness|extTemp)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*|colorTemp)$/) {
             my $rtype = $1;
             my $rno = $2;
 
@@ -714,9 +722,10 @@ sub ShellyMonitor_DoRead
               if ($rtype eq "power") {
                 my $subs = ($shelly_models{$model}[3] ==1) ? "" : "_".$rno;
                 readingsBulkUpdateIfChanged($device, "power" . $subs, $svalue);
-              } elsif ($rtype eq "energy") {
+              } elsif ($rtype =~ /^energy/) {
                 my $subs = ($shelly_models{$model}[3] ==1) ? "" : "_".$rno;
-                readingsBulkUpdateIfChanged($device, "energy" . $subs, int($svalue/6)/10);
+                readingsBulkUpdateIfChanged($device, $rtype . $subs,
+                   $defarr->{"unit"} eq "Wmin" ? int($svalue/6)/10 : $svalue);
               } elsif ($rtype eq "output") {
                 my $subs = ($shelly_models{$model}[0] ==1) ? "" : "_".$rno;
                 my $state = ( $svalue == 0 ? "off" : ( $svalue == 1 ? "on" : undef ));
