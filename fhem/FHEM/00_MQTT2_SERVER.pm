@@ -875,7 +875,11 @@ MQTT2_SERVER_ReadDebug($$)
     <a id="MQTT2_SERVER-attr-ignoreRegexp"></a>
     <li>ignoreRegexp<br>
       if $topic:$message matches ignoreRegexp, then it will be silently ignored.
-      </li>
+      For general purpose servers, it is a good idea to set it e.g. to
+      <ul>
+        homeassistant/[^:"]+/config|tasmota/discovery/[^/:]+/(config|sensors)
+      </ul> and also include the topics used to send commands towards your MQTT
+      clients.</li>
 
     <a id="MQTT2_SERVER-attr-keepaliveFactor"></a>
     <li>keepaliveFactor<br>
