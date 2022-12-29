@@ -38,6 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
+                           "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
   "5.5.7"   => "20.12.2022 cutted _DbLog_SBP_onRun_Log into _DbLog_SBP_onRun_LogArray and _DbLog_SBP_onRun_LogBulk ".
                "__DbLog_SBP_onRun_LogCurrent, __DbLog_SBP_fieldArrays, some bugfixes, add drivers to configCheck, edit comref ",
@@ -410,12 +412,9 @@ sub DbLog_Define {
   return "Bad regexp: $@" if($@);
 
   $hash->{REGEXP}                = $regexp;
-  #$hash->{MODE}                  = AttrVal($name, 'asyncMode', undef) ? 'asynchronous' : 'synchronous';       # Mode setzen Forum:#76213
-  $hash->{MODE}                  = 'synchronous';
+  $hash->{MODE}                  = AttrVal ($name, 'asyncMode', 0) ? 'asynchronous' : 'synchronous';          # Mode setzen Forum:#76213
   $hash->{HELPER}{OLDSTATE}      = 'initialized';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                      # Modul Meta.pm nicht vorhanden
-  $hash->{HELPER}{TH}            = 'history';                                                                 # Tabelle history (wird ggf. durch Datenbankschema ergänzt)
-  $hash->{HELPER}{TC}            = 'current';                                                                 # Tabelle current (wird ggf. durch Datenbankschema ergänzt)
 
   DbLog_setVersionInfo ($hash);                                                                               # Versionsinformationen setzen
   notifyRegexpChanged  ($hash, $regexp);                                                                      # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
@@ -433,7 +432,7 @@ sub DbLog_Define {
   InternalTimer(gettimeofday()+2, 'DbLog_setinternalcols', $hash, 0);                                         # set used COLUMNS
 
   DbLog_setReadingstate  ($hash, 'waiting for connection');
-  DbLog_SBP_CheckAndInit ($hash, 1);                                                                             # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
+  DbLog_SBP_CheckAndInit ($hash, 1);                                                                          # SubProcess starten - direkt nach Define !! um wenig Speicher zu allokieren
   _DbLog_initOnStart     ($hash);                                                                             # von init_done abhängige Prozesse initialisieren
 
 return;
@@ -467,6 +466,8 @@ sub _DbLog_initOnStart {
   for my $r (@rdel) {
       readingsDelete ($hash, $r);
   }
+  
+  DbLog_setSchemeTable ($hash);
 
   DbLog_SBP_CheckAndInit ($hash);
 
@@ -516,7 +517,6 @@ return;
 sub DbLog_DelayedShutdown {
   my $hash   = shift;
   my $name   = $hash->{NAME};
-  my $async  = AttrVal($name, 'asyncMode', 0);
 
   $hash->{HELPER}{SHUTDOWNSEQ} = 1;
 
@@ -686,7 +686,7 @@ sub DbLog_Attr {
   }
 
   if ($aName eq "disable") {
-      my $async = AttrVal($name, "asyncMode", 0);
+      my $async = AttrVal($name, 'asyncMode', 0);
 
       if($cmd eq "set") {
           $do = $aVal ? 1 : 0;
@@ -709,14 +709,12 @@ sub DbLog_Attr {
       }
 
       $do = 0 if($cmd eq "del");
-
+      
       if ($do == 1) {
-          $hash->{HELPER}{TH} = $aVal.'.history';
-          $hash->{HELPER}{TC} = $aVal.'.current';
+          DbLog_setSchemeTable ($hash, $aVal);
       }
       else {
-          $hash->{HELPER}{TH} = 'history';
-          $hash->{HELPER}{TC} = 'current';
+          DbLog_setSchemeTable ($hash, '');
       }
 
       if ($init_done == 1) {
@@ -2119,7 +2117,7 @@ sub DbLog_execMemCacheAsync {
   my $hash       = shift;
   my $name       = $hash->{NAME};
 
-  my $async      = AttrVal($name, "asyncMode",                  0);
+  my $async      = AttrVal($name, 'asyncMode', 0);
 
 
   RemoveInternalTimer($hash, 'DbLog_execMemCacheAsync');
@@ -7029,6 +7027,25 @@ sub DbLog_jsonError {
   my $json = '{"success": "false", "msg":"'.$errormsg.'"}';
 
 return $json;
+}
+
+################################################################
+#     Tabellenname incl. Schema erstellen
+################################################################
+sub DbLog_setSchemeTable {
+  my $hash   = shift;
+  my $scheme = shift // AttrVal($hash->{NAME}, 'dbSchema', '');
+  
+ if ($scheme) {
+      $hash->{HELPER}{TH} = $scheme.'.history';
+      $hash->{HELPER}{TC} = $scheme.'.current';
+  }
+  else {
+      $hash->{HELPER}{TH} = 'history';
+      $hash->{HELPER}{TC} = 'current';
+  }
+
+return;
 }
 
 ################################################################
