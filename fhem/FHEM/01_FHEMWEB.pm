@@ -916,16 +916,12 @@ FW_answerCall($)
   } else {
     my $redirectTo = AttrVal($FW_wname, "redirectTo","");
     if($redirectTo) {
-      Log3 $FW_wname, 1, "$FW_wname: redirecting $arg to $FW_ME/$redirectTo$arg";
+      Log3 $FW_wname, 1,"$FW_wname: redirecting $arg to $FW_ME/$redirectTo$arg";
       return FW_answerCall("$FW_ME/$redirectTo$arg") 
     }
 
     Log3 $FW_wname, 4, "$FW_wname: redirecting $arg to $FW_ME";
-    TcpServer_WriteBlocking($me,
-             "HTTP/1.1 302 Found\r\n".
-             "Content-Length: 0\r\n".
-             $FW_headerlines.
-             "Location: $FW_ME\r\n\r\n");
+    FW_redirect($FW_ME);
     FW_closeConn($FW_chash);
     return -1;
   }
@@ -1040,11 +1036,7 @@ FW_answerCall($)
        if($FW_detail) { $tgt .= "?detail=$FW_detail&fw_id=$FW_id" }
     elsif($FW_room)   { $tgt .= "?room=".urlEncode($FW_room)."&fw_id=$FW_id" }
     else              { $tgt .= "?fw_id=$FW_id" }
-    TcpServer_WriteBlocking($me,
-             "HTTP/1.1 302 Found\r\n".
-             "Content-Length: 0\r\n". $FW_headerlines.
-             "Location: $tgt\r\n".
-             "\r\n");
+    FW_redirect($tgt);
     return -1;
   }
 
@@ -1223,6 +1215,18 @@ FW_answerCall($)
   return $srVal if($srVal);
   FW_pO "</body></html>";
   return 0;
+}
+
+sub
+FW_redirect($)
+{
+  my ($tgt) = @_;
+
+  TcpServer_WriteBlocking($defs{$FW_cname},
+           "HTTP/1.1 302 Found\r\n".
+           "Content-Length: 0\r\n".
+           $FW_headerlines.
+           "Location: $tgt\r\n\r\n");
 }
 
 sub
@@ -2637,7 +2641,7 @@ FW_style($$)
 
   } elsif($a[1] eq "setIF") {
     FW_fC("attr $a[2] icon $a[3]");
-    FW_doDetail($a[2]);
+    FW_redirect("$FW_ME?detail=$a[2]");
 
   } elsif($a[1] eq "showDSI") {
     FW_iconTable("devStateIcon", "",
@@ -2647,7 +2651,7 @@ FW_style($$)
     my $dsi = AttrVal($a[2], "devStateIcon", "");
     $dsi .= " " if($dsi);
     FW_fC("attr $a[2] devStateIcon $dsi$FW_data:$a[3]");
-    FW_doDetail($a[2]);
+    FW_redirect("$FW_ME?detail=$a[2]");
 
   } elsif($a[1] eq "eventMonitor") {
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
