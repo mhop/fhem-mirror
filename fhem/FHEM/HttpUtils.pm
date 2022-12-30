@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use MIME::Base64;
 use Digest::MD5 qw(md5_hex);
+use Digest::SHA qw(sha256_hex);
 use vars qw($SSL_ERROR);
 
 # Note: video does not work for every browser (Forum #73214)
@@ -847,7 +848,7 @@ HttpUtils_DataComplete($)
 sub
 HttpUtils_DigestHeader($$)
 {
-  my ($hash, $header) = @_;
+  my ($hash, $header) = @_; # header is $1 from WWW-Authenticate: Digest (.*)
   my %digdata;
  
   while($header =~ /(\w+)="?([^"]+?)"?(?:\s*,\s*|$)/gc) {
@@ -863,35 +864,50 @@ HttpUtils_DigestHeader($$)
   }
   $digdata{uri} = $hash->{path};
   $digdata{username} = $user;
+  $digdata{algorithm} = "MD5" if(!$digdata{algorithm} ||
+                   $digdata{algorithm} !~ m/MD5|MD5-sess|SHA-256|SHA-256-sess/);
 
-  if(exists($digdata{algorithm}) && $digdata{algorithm} eq "MD5-sess") {
+  if ($digdata{algorithm} eq "SHA-256") {
+    $ha1 = sha256_hex($user.":".$digdata{realm}.":".$passwd);
+
+  } elsif ($digdata{algorithm} eq "SHA-256-sess") {
+    $ha1 = sha256_hex(sha256_hex($user.":".$digdata{realm}.":".$passwd).
+                  ":".$digdata{nonce}.":".$digdata{cnonce});
+
+  } elsif($digdata{algorithm} eq "MD5-sess") {
     $ha1 = md5_hex(md5_hex($user.":".$digdata{realm}.":".$passwd).
                   ":".$digdata{nonce}.":".$digdata{cnonce});
+
   } else {
     $ha1 = md5_hex($user.":".$digdata{realm}.":".$passwd);
+
   }
  
-  # forcing qop=auth as qop=auth-int is not implemented
-  $digdata{qop} = "auth" if($digdata{qop});
   my $method = $hash->{method};
   $method = ($hash->{data} ? "POST" : "GET") if( !$method );
-  $ha2 = md5_hex($method.":".$hash->{path});
+  $ha2 = $digdata{algorithm} =~ m/SHA-256/ ? 
+              sha256_hex($method.":".$hash->{path}) :
+              md5_hex   ($method.":".$hash->{path});
 
-  if(exists($digdata{qop}) && $digdata{qop} =~ /(auth-int|auth)/) {
-    $digdata{response} =  md5_hex($ha1.":".
-                                  $digdata{nonce}.":".
-                                  $digdata{nc}.":".
-                                  $digdata{cnonce}.":".
-                                  $digdata{qop}.":".
-                                  $ha2);
+  if($digdata{qop}) {
+    # forcing qop=auth as qop=auth-int is not implemented
+    $digdata{qop} = "auth" if($digdata{qop});
+    $response = $ha1.":".
+                $digdata{nonce}.":".
+                $digdata{nc}.":".
+                $digdata{cnonce}.":".
+                $digdata{qop}.":".
+                $ha2;
   } else {
-    $digdata{response} = md5_hex($ha1.":".$digdata{nonce}.":".$ha2)
+    $response = $ha1.":".$digdata{nonce}.":".$ha2;
   }
+
+  $digdata{response} = $digdata{algorithm} =~ m/SHA-256/ ? 
+                   sha256_hex($response) : md5_hex($response);
  
   return "Authorization: Digest ".
          join(", ", map(($_.'='.($_ ne "nc" ? '"' :'').
                          $digdata{$_}.($_ ne "nc" ? '"' :'')), keys(%digdata)));
-
 }
 
 sub
