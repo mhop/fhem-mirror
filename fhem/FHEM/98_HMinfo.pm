@@ -124,6 +124,7 @@ sub HMinfo_Attr(@) {###########################################################
 
   if   ($attrName eq "autoUpdate"){# 00:00 hh:mm
     delete $hash->{helper}{autoUpdate};
+    RemoveInternalTimer("sUpdt:".$name);#frank:
     return if ($cmd eq "del");
     my ($h,$m) = split":",$attrVal;
     return "please enter time [hh:mm]" if (!defined $h||!defined $m);
@@ -174,7 +175,7 @@ sub HMinfo_Attr(@) {###########################################################
       foreach (split ",",$attrVal){    #prepare reading filter for error counts
         my ($p,@a) = split ":",$_;
         return "parameter illegal - " 
-              if(!$p || !$a[0]);
+              if(!$p || !defined $a[0]);
       }
     }
   }
@@ -366,6 +367,9 @@ sub HMinfo_status($){##########################################################
     }
     foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
       my $val = $ehash->{READINGS}{$read}{VAL};
+      if($val =~ m/\?/) {#frank: check to avoid crash => https://forum.fhem.de/index.php/topic,129878.0.html
+        $val =~ s/\?/x/g;
+      }
       next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
       $errFltN{$read."_".$val}{$eName} = 1;
       $err{$read}{$val} = 0 if (!$err{$read}{$val});
