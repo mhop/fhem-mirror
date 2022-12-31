@@ -1,4 +1,4 @@
-REV 26929
+REV 26932
 DIR unused
 UPD 2022-12-30_07:45:03 386716 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -585,7 +585,7 @@ UPD 2019-06-21_07:45:02 2767 FHEM/GPUtils.pm
 UPD 2022-10-21_07:45:02 91542 FHEM/HMCCUConf.pm
 UPD 2021-10-31_07:45:02 203693 FHEM/HMConfig.pm
 UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
-UPD 2022-12-30_07:45:03 35216 FHEM/HttpUtils.pm
+UPD 2022-12-31_07:45:03 35767 FHEM/HttpUtils.pm
 UPD 2020-05-09_07:45:02 3459 FHEM/MaxCommon.pm
 UPD 2022-12-24_07:45:03 119890 FHEM/Meta.pm
 UPD 2017-04-18_07:45:02 272672 FHEM/ONKYOdb.pm
@@ -746,12 +746,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2022-12-30_07:45:07 4824923 docs/commandref.html
-UPD 2022-12-27_07:45:09 2862349 docs/commandref_DE.html
-UPD 2022-11-15_07:45:02 83658 docs/commandref_frame.html
-UPD 2022-12-23_07:45:03 93721 docs/commandref_frame_DE.html
-UPD 2022-12-30_07:45:11 295718 docs/commandref_modular.html
-UPD 2022-12-30_07:45:12 306973 docs/commandref_modular_DE.html
+UPD 2022-12-31_07:45:07 4824918 docs/commandref.html
+UPD 2022-12-31_07:45:10 2862349 docs/commandref_DE.html
+UPD 2022-12-31_07:45:03 83653 docs/commandref_frame.html
+UPD 2022-12-31_07:45:03 93721 docs/commandref_frame_DE.html
+UPD 2022-12-31_07:45:11 295713 docs/commandref_modular.html
+UPD 2022-12-31_07:45:13 306973 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
