@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2022 by Heiko Maaz
+#       (c) 2016-2023 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -55,6 +55,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.50.10" => "01.01.2023  Commandref edited ",
   "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
   "8.50.7"  => "17.12.2022  Commandref edited ",
@@ -15439,7 +15440,9 @@ sub dbval {
                                 In that case the device names are derived from the device specification and the existing
                                 devices in FHEM before carry out the SQL selection. <br>
                                 If the the device, list or device specification is prepended by "EXCLUDE=",
-                                the devices are excluded from database selection.
+                                the devices are excluded from database selection. <br>
+                                The database selection is executed as a logical AND operation of "device" and the attribute 
+                                 <a href="#DbRep-attr-reading">reading</a>.
                                 <br><br>
 
                                 <ul>
@@ -15743,7 +15746,9 @@ sub bdump {
                                 More than one reading can be specified by a comma separated list. <br>
                                 SQL wildcard (%) can be used. <br>
                                 If the reading or the reading list is prepended by "EXCLUDE=", those readings are not
-                                included.
+                                included. <br>
+                                The database selection is executed as a logical AND operation of "reading" and the attribute 
+                                <a href="#DbRep-attr-device">device</a>.
                                 <br><br>
 
                                 <ul>
@@ -18302,12 +18307,14 @@ sub dbval {
                                      </li> <br>
 
  <a id="DbRep-attr-device"></a>
-  <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Devices. <br>
+ <li><b>device </b>           - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Devices. <br>
                                 Es können Geräte-Spezifikationen (devspec) angegeben werden. <br>
                                 In diesem Fall werden die Devicenamen vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM
                                 vorhandenen Devices aufgelöst. <br>
                                 Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt,
-                                werden diese Devices von der Selektion ausgeschlossen.
+                                werden diese Devices von der Selektion ausgeschlossen. <br>
+                                Die Datenbankselektion wird als logische UND-Verknüpfung aus "device" und dem Attribut 
+                                <a href="#DbRep-attr-reading">reading</a> ausgeführt.
                                 <br><br>
 
                                 <ul>
@@ -18614,7 +18621,9 @@ sub bdump {
                                 Mehrere Readings werden als Komma separierte Liste angegeben.
                                 Es können SQL Wildcard (%) verwendet werden. <br>
                                 Wird dem Reading bzw. der Reading-Liste ein "EXCLUDE=" vorangestellt, werden diese Readings
-                                nicht inkludiert.
+                                nicht inkludiert. <br>
+                                Die Datenbankselektion wird als logische UND Verknüpfung aus "reading" und dem Attribut 
+                                <a href="#DbRep-attr-device">device</a> ausgeführt.
                                 <br><br>
 
                                 <ul>
