@@ -5124,34 +5124,30 @@ sub card
   
   my $scale;
   my $scale_strokes;
-  my $description;
-  my $strokes;
+  my $description=4;
+  my $strokes=12;
   
   my $div = $hours > 168 ? ($hours % 168 == 0 ? 168 : ($hours % 24 == 0 ? 24 : 1)):1;
   
   if ($div==168 and $hours/$div/2 == 1) {  #2w
-    $scale=$hours/7;
     $description=7;
     $strokes=$description;
-    $scale_strokes=$scale;
   } elsif ($hours <= 168*7) {
     for (my $i=7;$i>=3;$i--) {
       if  ($hours/$div % $i == 0) {
-        $scale=$hours/$i;
-        $scale_strokes=$scale;
         $description=$i;
-        $strokes=$description;
         if ($div == 168 and $chart_dim > 130) {
           $strokes=$description*7;
-          $scale_strokes=$scale/7;
-        }        
+        } else {
+          $strokes=$description;
+        }
         last;
       }
     }
   }
-    
-
-  if (defined $scale) {
+  $scale=$hours/$description;
+  $scale_strokes=$hours/$strokes;
+  if ($hours > 2) {
     my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($timebeginn);
     my $beginhour=int($hour/$scale)*$scale;
     my $diffsec=($hour-$beginhour)*3600+$minutes*60+$sec;
@@ -5162,39 +5158,34 @@ sub card
      my $x=int((($i)*($chart_dim/$strokes)+$pos_strokes)*10)/10;
      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0 and $x <= $chart_dim);
     }
-    
     for (my $i=0;$i<$description;$i++) {
       my $h=$beginhour+($i+1)*$scale;
       $hour=($h >= 24 ? $h % 24:$h);
       my $x=int((($i*($chart_dim/$description)+$pos))*10)/10;
-      if ($hour == 0) {
-        if ($hours <= 168) {
-          $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,substr(::strftime("%a",localtime($timebeginn+$h*3600)),0,2));
+      if ($hours <= 2) {
+   #     $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,::strftime("%H:%M",localtime($time-$hours*3600*(1-$i/3))));
+      } elsif ($hours <= 168) {
+        if ($hour != 0) {
+          $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%02d:</text>',$x,$hour);
         } else {
-          $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,::strftime("%d.",localtime($timebeginn+$h*3600)));
+          $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,substr(::strftime("%a",localtime($timebeginn+$h*3600)),0,2));
         }
+      } elsif ($hours <= 168*7) {
+         $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,::strftime("%d.",localtime($timebeginn+$h*3600)));
       } else {
-        $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%02d:</text>',$x,$hour);
-      }
+         $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,::strftime("%d.%m",localtime($timebeginn+$h*3600)));
+      }  
     }
   } else {
     for (my $i=0;$i<=12;$i++) {
-      my $x=int((($i)*($chart_dim/12)+1)*10)/10;
+      my $x=int((($i)*($chart_dim/12)+1)*10)/10;      
       $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#505050; stroke-width:0.3; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0 and $x <= $chart_dim);
-    }
-   
-    for (my $i=0;$i<=3;$i++) {
-      my $x=int(($i*($chart_dim/3)-1)*10)/10;
-      if  ($hours <=168) {
+      for (my $i=0;$i<=3;$i++) {
+        my $x=int(($i*($chart_dim/3)-1)*10)/10;
         $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x+2,::strftime("%H:%M",localtime($time-$hours*3600*(1-$i/3))));
-      } elsif ($hours <=168*7 and $hours % 24 == 0) {
-        $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,::strftime("%d.%H:",localtime($time-$hours*3600*(1-$i/3))));
-      } else {
-        $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x+2,::strftime("%d.%m",localtime($time-$hours*3600*(1-$i/3))));
       }
     }
   }
-  
   my ($outplot,$outfooter);
   my @outfooter;
   
