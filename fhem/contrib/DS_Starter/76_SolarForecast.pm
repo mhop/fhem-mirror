@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
-#       (c) 2020-2022 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
+#       (c) 2020-2023 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This script is part of fhem.
 #
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.74.7" => "23.01.2023  fix evaljson evaluation ",
   "0.74.6" => "22.11.2022  bugfix consumerLegend tooltip start/end time if language is set to english ",
   "0.74.5" => "21.11.2022  new Attr affectSolCastPercentile ",
   "0.74.4" => "19.11.2022  calculate Today_PVreal from the etotal daily difference after sunset ", 
@@ -1005,8 +1006,8 @@ sub _readCacheFile {
   my ($error, @content) = FileRead ($file);
 
   if(!$error) {
-      my $json    = join "", @content;
-      my $success = evaljson ($hash, $json);
+      my $json      = join "", @content;
+      my ($success) = evaljson ($hash, $json);
 
       if($success) {
            $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
@@ -3057,6 +3058,7 @@ sub centralTask {
       $n = sprintf "%02d", $n;
       deleteReadingspec ($hash, "pvSolCastPercentile_${n}.*");
   }
+  #Log3 ($name, 1, "$name - all Hash Elemente:\n".Dumper $hash);
   ###############################################################
 
   setModel ($hash);                                                                                # Model setzen
@@ -4820,14 +4822,16 @@ sub __planSwitchTimes {
   my $dnp = ___noPlanRelease ($paref);
   if ($dnp) {
       if($debug =~ /consumerPlanning/x) {
-          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', ''));
+          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
+                          qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
           Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - $dnp});
       }
       return;
   }
   
   if($debug =~ /consumerPlanning/x) {
-      Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', ''));
+      Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
+                      qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
   }
 
   my $type   = $paref->{type};
