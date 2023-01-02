@@ -25,7 +25,7 @@
       <Product config="gr/gr-302n.xml" id="0003" name="ZSE02 Motion Sensor" type="0500"/>
     </Manufacturer>
     <Manufacturer id="0344" name="HELTUN">
-      <Product config="heltun/HE-RS01.xml" id="0009" type="0004" name="RS01" />
+      <Product config="heltun/HE-RS01.xml" id="0009" type="0004" name="RS01" forumNr="117879" />
     </Manufacturer>
     <Manufacturer id="000c" name="HomeSeer Technologies">
       <Product type="201" id="8" name="HS-DS100+ Door/Window Sensor" config="homeseer/hs-ds100plus.xml"/>
