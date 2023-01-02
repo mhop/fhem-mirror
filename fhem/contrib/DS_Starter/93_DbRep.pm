@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.0"  => "02.01.2023  new sub _DbRep_sqlFormOnline, Commandref edited ",
+  "8.51.0"  => "02.01.2023  new sub _DbRep_sqlFormOnline, Commandref edited  ",
   "8.50.10" => "01.01.2023  Commandref edited ",
   "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
