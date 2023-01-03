@@ -1025,9 +1025,9 @@ sub DbRep_Set {
   }
   elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
       return qq{"set $opt" needs at least an argument} if ( @a < 3 );
-      
+
       delete $data{DbRep}{$name}{sqlcache}{temp};
-      
+
       my $sqlcmd;
 
       if($opt eq "sqlSpecial") {
@@ -1082,11 +1082,11 @@ sub DbRep_Set {
 
       if($opt eq "sqlCmd") {
           my @cmd = @a;
-          shift @cmd; 
+          shift @cmd;
           shift @cmd;
 
           $sqlcmd = join ' ', @cmd;
-          $sqlcmd = DbRep_trim ($sqlcmd);
+          #$sqlcmd = DbRep_trim ($sqlcmd);
 
           if ($sqlcmd =~ /^ckey:/ix) {
               my $key = (split ":", $sqlcmd)[1];
@@ -1109,7 +1109,7 @@ sub DbRep_Set {
           $sqlcmd =~ s/_ESC_ECS_/§/g;
           $sqlcmd =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
           $sqlcmd =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
-          
+
           if($sqlcmd eq "___purge_sqlhistory___") {
               DbRep_deleteSQLcmdCache ($name);
               return "SQL command historylist of $name deleted.";
@@ -1135,15 +1135,16 @@ sub DbRep_Set {
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }
-      
+
       $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                                # SQL Statement online formatieren
-      
+
+      $sqlcmd                             = DbRep_trim ($sqlcmd);
       $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                                  # SQL incl. Formatierung zwischenspeichern
 
       my @cmd = split /\s+/, $sqlcmd;
       $sqlcmd = join ' ', @cmd;
 
-      DbRep_setLastCmd ($name, $opt, $sqlcmd);  
+      DbRep_setLastCmd ($name, $opt, $sqlcmd);
       DbRep_Main       ($hash, $opt, $sqlcmd);
   }
   elsif ($opt =~ /changeValue/) {
@@ -1195,13 +1196,22 @@ return;
 sub _DbRep_sqlFormOnline {
   my $hash   = shift;
   my $sqlcmd = shift;
-  
+
   my $name   = $hash->{NAME};
+  my $fs     = AttrVal($name, 'sqlFormatService', '');
+  $fs        = 'https://sqlformat.org';
+  return $sqlcmd if(!$fs);
+
+  if ($fs eq 'https://sqlformat.org') {
+      $fs .= '/api/v1/format';
+  }
+
   my @cmds   = split ';', $sqlcmd;
+
   my $newcmd;
-  
+
   for my $part (@cmds) {
-      my ($err, $dat) = HttpUtils_BlockingGet ({ url         => 'https://sqlformat.org/api/v1/format',
+      my ($err, $dat) = HttpUtils_BlockingGet ({ url         => $fs,
                                                  timeout     => 5,
                                                  data        => "reindent=1&sql=$part",
                                                  method      => 'POST',
@@ -1210,17 +1220,20 @@ sub _DbRep_sqlFormOnline {
                                                  loglevel    => 4
                                                }
                                               );
-      
+
       if ($err) {
           Log3 ($name, 3, "DbRep $name - ERROR format SQL online: ".$err);
           return $sqlcmd;
       }
       else {
           my ($success, $decoded) = evalDecodeJSON ($hash, $dat);
-          
+
+          my $res = $decoded->{result};
+          next if(!$res);
+
           if ($success) {
-              $newcmd .= Encode::encode_utf8 ($decoded->{result}).';';
-                 
+              $newcmd .= Encode::encode_utf8 ($res).';';
+
           }
           else {
               Log3 ($name, 3, "DbRep $name - ERROR decode JSON from SQL online formatter");
@@ -1228,7 +1241,7 @@ sub _DbRep_sqlFormOnline {
           }
       }
   }
-  
+
   Log3 ($name, 4, "DbRep $name - SQL online formatted: ".$newcmd);
 
 return $newcmd;
@@ -15487,7 +15500,7 @@ sub dbval {
                                 devices in FHEM before carry out the SQL selection. <br>
                                 If the the device, list or device specification is prepended by "EXCLUDE=",
                                 the devices are excluded from database selection. <br>
-                                The database selection is executed as a logical AND operation of "device" and the attribute 
+                                The database selection is executed as a logical AND operation of "device" and the attribute
                                  <a href="#DbRep-attr-reading">reading</a>.
                                 <br><br>
 
@@ -15793,7 +15806,7 @@ sub bdump {
                                 SQL wildcard (%) can be used. <br>
                                 If the reading or the reading list is prepended by "EXCLUDE=", those readings are not
                                 included. <br>
-                                The database selection is executed as a logical AND operation of "reading" and the attribute 
+                                The database selection is executed as a logical AND operation of "reading" and the attribute
                                 <a href="#DbRep-attr-device">device</a>.
                                 <br><br>
 
@@ -15899,12 +15912,12 @@ sub bdump {
 
   <a id="DbRep-attr-sqlCmdHistoryLength"></a>
   <li><b>sqlCmdHistoryLength </b> <br><br>
-    
+
     Activates the command history of "sqlCmd" with a value > 0 and defines the number of
     SQL statements to be stored. <br>
-    (default: 0)                                
-    
-  </li> 
+    (default: 0)
+
+  </li>
   <br>
 
   <a id="DbRep-attr-sqlCmdVars"></a>
@@ -15919,7 +15932,7 @@ sub bdump {
       attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
     </ul>
   <br>
-  </li> 
+  </li>
   <br>
 
   <a id="DbRep-attr-sqlResultFieldSep"></a>
@@ -18368,7 +18381,7 @@ sub dbval {
                                 vorhandenen Devices aufgelöst. <br>
                                 Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt,
                                 werden diese Devices von der Selektion ausgeschlossen. <br>
-                                Die Datenbankselektion wird als logische UND-Verknüpfung aus "device" und dem Attribut 
+                                Die Datenbankselektion wird als logische UND-Verknüpfung aus "device" und dem Attribut
                                 <a href="#DbRep-attr-reading">reading</a> ausgeführt.
                                 <br><br>
 
@@ -18677,7 +18690,7 @@ sub bdump {
                                 Es können SQL Wildcard (%) verwendet werden. <br>
                                 Wird dem Reading bzw. der Reading-Liste ein "EXCLUDE=" vorangestellt, werden diese Readings
                                 nicht inkludiert. <br>
-                                Die Datenbankselektion wird als logische UND Verknüpfung aus "reading" und dem Attribut 
+                                Die Datenbankselektion wird als logische UND Verknüpfung aus "reading" und dem Attribut
                                 <a href="#DbRep-attr-device">device</a> ausgeführt.
                                 <br><br>
 
@@ -18787,12 +18800,12 @@ sub bdump {
 
   <a id="DbRep-attr-sqlCmdHistoryLength"></a>
   <li><b>sqlCmdHistoryLength </b> <br><br>
-    
+
     Aktiviert mit einem Wert > 0 die Kommandohistorie von "sqlCmd" und legt die Anzahl der zu speichernden
     SQL Statements fest. <br>
-    (default: 0)                                
-    
-  </li> 
+    (default: 0)
+
+  </li>
   <br>
 
   <a id="DbRep-attr-sqlCmdVars"></a>
@@ -18807,7 +18820,7 @@ sub bdump {
       attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
     </ul>
   <br>
-  </li> 
+  </li>
   <br>
 
   <a id="DbRep-attr-sqlResultFieldSep"></a>
