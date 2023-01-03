@@ -408,7 +408,6 @@ my $dbrep_fName               = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbR
 
 
 
-
 ###################################################################################
 # DbRep_Initialize
 ###################################################################################
@@ -1210,8 +1209,9 @@ sub _DbRep_sqlFormOnline {
   my @cmds   = split ';', $sqlcmd;
 
   my $newcmd;
-
+      
   for my $part (@cmds) {
+      $part           = urlEncode ($part);
       my ($err, $dat) = HttpUtils_BlockingGet ({ url         => $fs,
                                                  timeout     => 5,
                                                  data        => "reindent=1&sql=$part",
@@ -1227,7 +1227,7 @@ sub _DbRep_sqlFormOnline {
           return $sqlcmd;
       }
       else {
-          my ($success, $decoded) = evalDecodeJSON ($hash, $dat);
+          my ($success, $decoded) = evalDecodeJSON ($hash, urlDecode ($dat));
 
           my $res = $decoded->{result};
           next if(!$res);
