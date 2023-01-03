@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -84,7 +84,7 @@ our %EXPORT_TAGS = (
           PerlCodeCheck
           IsAdv
           IsInTime
-          )
+        )
     ],
 );
 
@@ -207,7 +207,7 @@ sub CheckIfShuttersWindowRecOpen {
         m{[Cc]lose|true}xms )
     {
         return 0;
-    }                            # CK: covers: close|closed
+    }    # CK: covers: close|closed
 }
 
 sub ExtractNotifyDevFromEvent {
@@ -408,7 +408,7 @@ sub _IsDay {
 
 sub ShuttersSunrise {
     my $shuttersDev = shift;
-    my $tm = shift; # Tm steht für Timemode und bedeutet Realzeit oder Unixzeit
+    my $tm = shift;  # Tm steht für Timemode und bedeutet Realzeit oder Unixzeit
 
     my $autoAstroMode;
     $FHEM::Automation::ShuttersControl::shutters->setShuttersDev($shuttersDev);
@@ -829,7 +829,7 @@ sub ShuttersSunrise {
 
 sub ShuttersSunset {
     my $shuttersDev = shift;
-    my $tm = shift; # Tm steht für Timemode und bedeutet Realzeit oder Unixzeit
+    my $tm = shift;  # Tm steht für Timemode und bedeutet Realzeit oder Unixzeit
 
     my $autoAstroMode;
     $FHEM::Automation::ShuttersControl::shutters->setShuttersDev($shuttersDev);

@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -161,10 +161,6 @@ sub setDriveCmd {
         $FHEM::Automation::ShuttersControl::shutters->setDelayCmd($posValue);
         $FHEM::Automation::ShuttersControl::ascDev->setDelayCmdReading;
         $FHEM::Automation::ShuttersControl::shutters->setNoDelay(0);
-
-#         $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerStatus(0)
-#           if ( $FHEM::Automation::ShuttersControl::shutters
-#             ->getExternalTriggerStatus );
 
         FHEM::Automation::ShuttersControl::ASC_Debug( 'setDriveCmd: '
               . $FHEM::Automation::ShuttersControl::shutters->getShuttersDev
@@ -598,7 +594,7 @@ sub getShuttersPosCmdValueNegate {
 sub getQueryShuttersPos
 { # Es wird geschaut ob die aktuelle Position des Rollos unterhalb der Zielposition ist
     my $self     = shift;
-    my $posValue = shift; #   wenn dem so ist wird 1 zurück gegeben ansonsten 0
+    my $posValue = shift;  #   wenn dem so ist wird 1 zurück gegeben ansonsten 0
 
     return (
         $FHEM::Automation::ShuttersControl::shutters
@@ -889,7 +885,7 @@ sub getIdleDetection {
 ### Begin Beschattung Objekt mit Daten befüllen
 sub setShadingStatus {
     my $self  = shift;
-    my $value = shift; ### Werte für value = in, out, in reserved, out reserved
+    my $value = shift;  ### Werte für value = in, out, in reserved, out reserved
 
 # Es wird durch das return die ShadingWaitingTime nicht mehr beachtet, Bugmeldung von Bernd Griemsmann
 #     return
@@ -1002,7 +998,7 @@ sub getBrightnessAverage {
     return;
 }
 
-sub getShadingStatus {   # Werte für value = in, out, in reserved, out reserved
+sub getShadingStatus {    # Werte für value = in, out, in reserved, out reserved
     my $self = shift;
 
     return (

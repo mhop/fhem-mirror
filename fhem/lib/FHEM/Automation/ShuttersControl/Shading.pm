@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -62,7 +62,7 @@ our %EXPORT_TAGS = (
           CheckASC_ConditionsForShadingFn
           ShadingProcessing
           ShadingProcessingDriveCommand
-          )
+        )
     ],
 );
 

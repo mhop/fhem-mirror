@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -80,7 +80,7 @@ use FHEM::Automation::ShuttersControl::Dev;
 use FHEM::Automation::ShuttersControl::Shading
   qw (CheckASC_ConditionsForShadingFn);
 use FHEM::Automation::ShuttersControl::EventProcessingFunctions qw (:ALL);
-use FHEM::Automation::ShuttersControl::Helper qw (:ALL);
+use FHEM::Automation::ShuttersControl::Helper                   qw (:ALL);
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -167,7 +167,7 @@ BEGIN {
           ascAPIget
           ascAPIset
           DevStateIcon
-          )
+        )
     );
 }
 
@@ -187,24 +187,24 @@ our %userAttrList = (
     'ASC_Open_Pos:0,10,20,30,40,50,60,70,80,90,100'   => [ '', 0,   100 ],
     'ASC_Closed_Pos:0,10,20,30,40,50,60,70,80,90,100' => [ '', 100, 0 ],
     'ASC_Sleep_Pos:0,10,20,30,40,50,60,70,80,90,100'  => [ '', -1,  -1 ],
-    'ASC_Pos_Reading'                            => [ '', 'position', 'pct' ],
-    'ASC_Time_Up_Early'                          => '-',
-    'ASC_Time_Up_Late'                           => '-',
-    'ASC_Time_Up_WE_Holiday'                     => '-',
-    'ASC_Time_Down_Early'                        => '-',
-    'ASC_Time_Down_Late'                         => '-',
-    'ASC_PrivacyUpValue_beforeDayOpen'           => '-',
-    'ASC_PrivacyDownValue_beforeNightClose'      => '-',
-    'ASC_PrivacyUp_Pos'                          => [ '', 50, 50 ],
-    'ASC_PrivacyDown_Pos'                        => [ '', 50, 50 ],
-    'ASC_TempSensor'                             => '-',
-    'ASC_Ventilate_Window_Open:on,off'           => '-',
-    'ASC_LockOut:soft,hard,off'                  => '-',
-    'ASC_LockOut_Cmd:inhibit,blocked,protection' => '-',
-    'ASC_BlockingTime_afterManual'               => '-',
-    'ASC_BlockingTime_beforeNightClose'          => '-',
-    'ASC_BlockingTime_beforeDayOpen'             => '-',
-    'ASC_BrightnessSensor'                       => '-',
+    'ASC_Pos_Reading'                       => [ '', 'position', 'pct' ],
+    'ASC_Time_Up_Early'                     => '-',
+    'ASC_Time_Up_Late'                      => '-',
+    'ASC_Time_Up_WE_Holiday'                => '-',
+    'ASC_Time_Down_Early'                   => '-',
+    'ASC_Time_Down_Late'                    => '-',
+    'ASC_PrivacyUpValue_beforeDayOpen'      => '-',
+    'ASC_PrivacyDownValue_beforeNightClose' => '-',
+    'ASC_PrivacyUp_Pos'                     => [ '', 50, 50 ],
+    'ASC_PrivacyDown_Pos'                   => [ '', 50, 50 ],
+    'ASC_TempSensor'                                       => '-',
+    'ASC_Ventilate_Window_Open:on,off'                     => '-',
+    'ASC_LockOut:soft,hard,off'                            => '-',
+    'ASC_LockOut_Cmd:inhibit,blocked,protection'           => '-',
+    'ASC_BlockingTime_afterManual'                         => '-',
+    'ASC_BlockingTime_beforeNightClose'                    => '-',
+    'ASC_BlockingTime_beforeDayOpen'                       => '-',
+    'ASC_BrightnessSensor'                                 => '-',
     'ASC_Shading_Pos:10,20,30,40,50,60,70,80,90,100'       => [ '', 80, 20 ],
     'ASC_Shading_Mode:absent,always,off,home'              => '-',
     'ASC_Shading_InOutAzimuth'                             => '-',
@@ -1447,10 +1447,14 @@ sub SunRiseShuttersAfterTimerFn {
             || $shutters->getSelfDefenseMode eq 'off'
             || (
                 $ascDev->getSelfDefense eq 'on'
-                && (   $shutters->getSelfDefenseMode eq 'gone'
-                    || $shutters->getSelfDefenseMode eq 'absent' )
-                && $ascDev->getResidentsStatus ne 'gone'
-                && $ascDev->getResidentsStatus ne 'absent'
+                && (
+                    (
+                           $shutters->getSelfDefenseMode eq 'gone'
+                        && $ascDev->getResidentsStatus ne 'gone'
+                    )
+                    || (   $shutters->getSelfDefenseMode eq 'absent'
+                        && $ascDev->getResidentsStatus ne 'absent' )
+                )
             )
         )
         && (
@@ -1849,7 +1853,7 @@ sub SetCmdFn {
 
     if ( $commandTemplate ne 'none' )
     { # Patch von Beta-User Forum https://forum.fhem.de/index.php/topic,123659.0.html
-            # Nutzervariablen setzen
+         # Nutzervariablen setzen
         my %specials = (
             '$name'    => $shuttersDev,
             '$pos'     => $posValue,
