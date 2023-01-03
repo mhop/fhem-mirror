@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.0"  => "02.01.2023  new sub _DbRep_sqlFormOnline, Commandref edited  ",
+  "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited ",
   "8.50.10" => "01.01.2023  Commandref edited ",
   "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
@@ -1034,58 +1034,50 @@ sub DbRep_Set {
           my ($tq,$gcl);
 
           if($prop eq "50mostFreqLogsLast2days") {
-              $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
-              $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
-              $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
+              $sqlcmd = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
           }
           elsif ($prop eq "allDevReadCount") {
-              $prop = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
+              $sqlcmd = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
           }
           elsif ($prop eq "50DevReadCount") {
-              $prop = "select DEVICE AS device, READING AS reading, count(0) AS number from history group by DEVICE, READING order by number DESC limit 50;";
+              $sqlcmd = "select DEVICE AS device, READING AS reading, count(0) AS number from history group by DEVICE, READING order by number DESC limit 50;";
           }
           elsif ($prop eq "allDevCount") {
-              $prop = "select device, count(*) from history group by DEVICE;";
+              $sqlcmd = "select device, count(*) from history group by DEVICE;";
           }
           elsif ($prop eq "recentReadingsOfDevice") {
               if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
               if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
               if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
 
-              $prop = "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
-                       FROM history t1
-                       INNER JOIN
-                       (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
-                          from history where §device§ AND TIMESTAMP > ".$tq." group by ".$gcl.") x
-                       ON x.TIMESTAMP = t1.TIMESTAMP AND
-                          x.DEVICE    = t1.DEVICE    AND
-                          x.READING   = t1.READING;";
+              $sqlcmd = "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
+                         FROM history t1
+                         INNER JOIN
+                         (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
+                            from history where §device§ AND TIMESTAMP > ".$tq." group by ".$gcl.") x
+                         ON x.TIMESTAMP = t1.TIMESTAMP AND
+                            x.DEVICE    = t1.DEVICE    AND
+                            x.READING   = t1.READING;";
           }
           elsif ($prop eq "readingsDifferenceByTimeDelta") {
-              $prop = "SET \@diff=0;
-                       SET \@delta=NULL;
-                       SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA
-                       FROM (SELECT TIMESTAMP,READING,VALUE,
-                              cast((VALUE-\@diff) AS DECIMAL(12,4))   AS DIFF,
-                              \@diff:=VALUE                           AS curr_V,
-                              TIMESTAMPDIFF(MINUTE,\@delta,TIMESTAMP) AS TIME_DELTA,
-                              \@delta:=TIMESTAMP                      AS curr_T
-                                FROM  history
-                            WHERE §device§  AND
-                                  §reading§ AND
-                                  TIMESTAMP >= §timestamp_begin§ AND
-                                  TIMESTAMP <= §timestamp_end§
-                                  ORDER BY TIMESTAMP
-                            ) t1;";
+              $sqlcmd = 'SET @diff=0;
+                         SET @delta=NULL;
+                         SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA
+                         FROM (SELECT TIMESTAMP,READING,VALUE,
+                                cast((VALUE-@diff) AS DECIMAL(12,4))   AS DIFF,
+                                @diff:=VALUE                           AS curr_V,
+                                TIMESTAMPDIFF(MINUTE,@delta,TIMESTAMP) AS TIME_DELTA,
+                                @delta:=TIMESTAMP                      AS curr_T
+                                  FROM  history
+                              WHERE §device§  AND
+                                    §reading§ AND
+                                    TIMESTAMP >= §timestamp_begin§ AND
+                                    TIMESTAMP <= §timestamp_end§
+                                    ORDER BY TIMESTAMP
+                              ) t1;';
           }
-
-          $sqlcmd = $prop;
-          
-          $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                            # SQL Statement online formatieren
-          $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                              # SQL incl. Formatierung zwischenspeichern
-
-          my @cmd = split /\s+/, $sqlcmd;
-          $sqlcmd = join " ", @cmd;
       }
 
       if($opt eq "sqlCmd") {
@@ -1108,13 +1100,6 @@ sub DbRep_Set {
           }
 
           $sqlcmd .= ";" if ($sqlcmd !~ m/\;$/x);
-          
-          $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                             # SQL Statement online formatieren
-          
-          $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                               # SQL incl. Formatierung zwischenspeichern
-
-          @cmd    = split /\s+/, $sqlcmd;
-          $sqlcmd = join ' ', @cmd;
       }
 
       if($opt eq "sqlCmdHistory") {
@@ -1151,9 +1136,9 @@ sub DbRep_Set {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }
       
-      $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                             # SQL Statement online formatieren
+      $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                                # SQL Statement online formatieren
       
-      $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                               # SQL incl. Formatierung zwischenspeichern
+      $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                                  # SQL incl. Formatierung zwischenspeichern
 
       my @cmd = split /\s+/, $sqlcmd;
       $sqlcmd = join ' ', @cmd;
@@ -1212,33 +1197,41 @@ sub _DbRep_sqlFormOnline {
   my $sqlcmd = shift;
   
   my $name   = $hash->{NAME};
+  my @cmds   = split ';', $sqlcmd;
+  my $newcmd;
   
-  my ($err, $dat) = HttpUtils_BlockingGet ({ url         => 'https://sqlformat.org/api/v1/format',
-                                             timeout     => 5,
-                                             data        => "reindent=1&sql=$sqlcmd",
-                                             method      => 'POST',
-                                             sslargs     => { SSL_verify_mode => 0 },
-                                             httpversion => '1.1',
-                                             loglevel    => 4
-                                           }
-                                          );
-  
-  if ($err) {
-      Log3 ($name, 3, "DbRep $name - ERROR format SQL online: ".$err);
-  }
-  else {
-      my ($success,$decoded) = evalDecodeJSON ($hash, $dat);
+  for my $part (@cmds) {
+      my ($err, $dat) = HttpUtils_BlockingGet ({ url         => 'https://sqlformat.org/api/v1/format',
+                                                 timeout     => 5,
+                                                 data        => "reindent=1&sql=$part",
+                                                 method      => 'POST',
+                                                 sslargs     => { SSL_verify_mode => 0 },
+                                                 httpversion => '1.1',
+                                                 loglevel    => 4
+                                               }
+                                              );
       
-      if ($success) {
-          $sqlcmd = Encode::encode_utf8 ($decoded->{result});
-          Log3 ($name, 4, "DbRep $name - SQL online formatted: ".$sqlcmd);   
+      if ($err) {
+          Log3 ($name, 3, "DbRep $name - ERROR format SQL online: ".$err);
+          return $sqlcmd;
       }
       else {
-          Log3 ($name, 3, "DbRep $name - ERROR decode JSON from SQL online formatter");
+          my ($success, $decoded) = evalDecodeJSON ($hash, $dat);
+          
+          if ($success) {
+              $newcmd .= Encode::encode_utf8 ($decoded->{result}).';';
+                 
+          }
+          else {
+              Log3 ($name, 3, "DbRep $name - ERROR decode JSON from SQL online formatter");
+              return $sqlcmd;
+          }
       }
   }
+  
+  Log3 ($name, 4, "DbRep $name - SQL online formatted: ".$newcmd);
 
-return $sqlcmd;
+return $newcmd;
 }
 
 ###################################################################################
