@@ -472,6 +472,7 @@ sub DbRep_Initialize {
                        "showTableInfo ".
                        "sqlCmdHistoryLength:slider,0,1,200 ".
                        "sqlCmdVars ".
+                       "sqlFormatService:https://sqlformat.org,none ".
                        "sqlResultFormat:separated,mline,sline,table,json ".
                        "sqlResultFieldSep:|,:,\/ ".
                        "timeYearPeriod ".
@@ -1198,9 +1199,9 @@ sub _DbRep_sqlFormOnline {
   my $sqlcmd = shift;
 
   my $name   = $hash->{NAME};
-  my $fs     = AttrVal($name, 'sqlFormatService', '');
-  $fs        = 'https://sqlformat.org';
-  return $sqlcmd if(!$fs);
+  my $fs     = AttrVal ($name, 'sqlFormatService', 'none');
+  
+  return $sqlcmd if($fs eq 'none');
 
   if ($fs eq 'https://sqlformat.org') {
       $fs .= '/api/v1/format';
@@ -15899,16 +15900,18 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-showTableInfo"></a>
-  <li><b>showTableInfo </b>   - Determine the tablenames which are selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard
-                                (%) can be used.
-                                <br><br>
+  <li><b>showTableInfo </b> <br><br>
+  
+  Limits the result set of the command "get &lt;name&gt; tableinfo". SQL wildcard (%) can be used.
+  <br><br>
 
-                                <ul>
-                                <b>Example: </b><br>
-                                attr &lt;name&gt; showTableInfo current,history  <br>
-                                # Only informations about tables "current" and "history" will be shown <br>
-                                </ul><br>
-                                </li>
+  <ul>
+    <b>Example: </b> <br>
+    attr &lt;name&gt; showTableInfo current,history  <br>
+    # Only information from the "current" and "history" tables is displayed. <br>
+  </ul>
+  <br>
+  </li>
 
   <a id="DbRep-attr-sqlCmdHistoryLength"></a>
   <li><b>sqlCmdHistoryLength </b> <br><br>
@@ -15934,9 +15937,27 @@ sub bdump {
   <br>
   </li>
   <br>
+  
+  <a id="DbRep-attr-sqlFormatService"></a>
+  <li><b>sqlFormatService </b> <br><br>
+  
+    Automated formatting of SQL statements can be activated via an online service. <br>
+    This option is especially useful for complex SQL statements of the setters sqlCmd, sqlCmdHistory, and sqlSpecial 
+    to improve structuring and readability. <br>
+    An Internet connection is required. <br>    
+    (default: none)
+    
+  </li> 
+  <br>
 
   <a id="DbRep-attr-sqlResultFieldSep"></a>
-  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of some sql-commands.  </li> <br>
+  <li><b>sqlResultFieldSep </b> <br><br>
+  
+    Sets the used field separator in the result of the command "set ... sqlCmd". <br>  
+    (default: "|")
+    
+  </li> 
+  <br>
 
   <a id="DbRep-attr-sqlResultFormat"></a>
   <li><b>sqlResultFormat </b> - determines the formatting of the "set &lt;name&gt; sqlCmd" command result.
@@ -18787,16 +18808,18 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-showTableInfo"></a>
-  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können
-                                SQL-Wildcard (%) verwendet werden.
-                                <br><br>
+  <li><b>showTableInfo </b> <br><br>
+  
+  Grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können SQL-Wildcard (%) verwendet werden.
+  <br><br>
 
-                                <ul>
-                                <b>Bespiel: </b> <br>
-                                attr &lt;name&gt; showTableInfo current,history  <br>
-                                # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
-                                </ul><br>
-                                </li>
+  <ul>
+    <b>Bespiel: </b> <br>
+    attr &lt;name&gt; showTableInfo current,history  <br>
+    # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
+  </ul>
+  <br>
+  </li>
 
   <a id="DbRep-attr-sqlCmdHistoryLength"></a>
   <li><b>sqlCmdHistoryLength </b> <br><br>
@@ -18822,10 +18845,27 @@ sub bdump {
   <br>
   </li>
   <br>
+  
+  <a id="DbRep-attr-sqlFormatService"></a>
+  <li><b>sqlFormatService </b> <br><br>
+  
+    Über einen Online-Dienst kann eine automatisierte Formatierung von SQL-Statements aktiviert werden. <br>
+    Diese Möglichkeit ist insbesondere für komplexe SQL-Statements der Setter sqlCmd, sqlCmdHistory und sqlSpecial 
+    hilfreich um die Strukturierung und Lesbarkeit zu verbessern. <br>
+    Eine Internetverbindung wird benötigt. <br>    
+    (default: none)
+    
+  </li> 
+  <br>
 
   <a id="DbRep-attr-sqlResultFieldSep"></a>
-  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos
-                                  "set ... sqlCmd" fest.  </li> <br>
+  <li><b>sqlResultFieldSep </b> <br><br>
+  
+    Legt den verwendeten Feldseparator im Ergebnis des Kommandos "set ... sqlCmd" fest. <br>  
+    (default: "|")
+    
+  </li> 
+  <br>
 
   <a id="DbRep-attr-sqlResultFormat"></a>
   <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set &lt;name&gt; sqlCmd" fest.
@@ -18846,6 +18886,7 @@ sub bdump {
                                                     des Datensatzes (Key) und dessen Wert zusammen. <br><br>
 
         Die Weiterverarbeitung des Ergebnisses kann z.B. mit der folgenden userExitFn in 99_myUtils.pm erfolgen: <br>
+        
         <pre>
         sub resfromjson {
           my ($name,$reading,$value) = @_;
