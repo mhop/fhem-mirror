@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.13";
+my $version = "1.3.15";
 my $apiUrl = "https://api.todoist.com/sync/v9/";
 
 my $srandUsed;
@@ -332,7 +332,8 @@ sub todoist_ReorderTasks ($$) {
         method     => $method,
         wType      => "reorder",
         timeout    => 7,
-        header     => "Content-Type: application/x-www-form-urlencoded",
+        header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					  "Authorization: Bearer ".$pwd,
         hash       => $hash,
         callback   => \&todoist_HandleTaskCallback,  ## call callback sub to work with the data we get
       };
@@ -591,7 +592,8 @@ sub todoist_UpdateTask($$$) {
         wType      => $type,
         taskId     => $taskId,
         timeout    => 7,
-        header     => "Content-Type: application/x-www-form-urlencoded",
+        header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					  "Authorization: Bearer ".$pwd,
         hash       => $hash,
         callback   => \&todoist_HandleTaskCallback,  ## call callback sub to work with the data we get
       };
@@ -720,7 +722,8 @@ sub todoist_CreateTask($$) {
           wType      => "create",
           parentId   => $parentId,
           timeout    => 7,
-          header     => "Content-Type: application/x-www-form-urlencoded",
+          header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					    "Authorization: Bearer ".$pwd,
           hash       => $hash,
           callback   => \&todoist_HandleTaskCallback,  ## call callback sub to work with the data we get
         };
@@ -894,7 +897,8 @@ sub todoist_GetTasks($;$) {
         url        => $url,
         method     => "POST",
         data       => $data,
-        header     => "Content-Type: application/x-www-form-urlencoded",
+		header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					  "Authorization: Bearer ".$pwd,
         timeout    => 7,
         completed  => $completed,
         hash       => $hash,
@@ -1199,7 +1203,8 @@ sub todoist_GetUsers($) {
         data       => $data,
         timeout    => 7,
         method     => "POST",
-        header     => "Content-Type: application/x-www-form-urlencoded",
+        header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					  "Authorization: Bearer ".$pwd,
         hash       => $hash,
         callback   => \&todoist_GetUsersCallback,  ## call callback sub to work with the data we get
       };
@@ -1339,7 +1344,8 @@ sub todoist_GetProjects($) {
         data       => $data,
         timeout    => 7,
         method     => "POST",
-        header     => "Content-Type: application/x-www-form-urlencoded",
+        header     => "Content-Type: application/x-www-form-urlencoded\r\n".
+					  "Authorization: Bearer ".$pwd,
         hash       => $hash,
         callback   => \&todoist_GetProjectsCallback,  ## call callback sub to work with the data we get
       };

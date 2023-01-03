@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_todoist: key in header
  - feature: 36_ShellyMonitor: Support Shelly3EM correctly
  - feature: 70_ESCVP21net: optimze help text
  - feature: 70_SVDRP: optimize help text
