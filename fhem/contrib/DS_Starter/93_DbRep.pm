@@ -59,7 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited ",
+  "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
+                            "sqlCmdBlocking customized like sqlCmd ",
   "8.50.10" => "01.01.2023  Commandref edited ",
   "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
@@ -1086,7 +1087,6 @@ sub DbRep_Set {
           shift @cmd;
 
           $sqlcmd = join ' ', @cmd;
-          #$sqlcmd = DbRep_trim ($sqlcmd);
 
           if ($sqlcmd =~ /^ckey:/ix) {
               my $key = (split ":", $sqlcmd)[1];
@@ -1099,7 +1099,7 @@ sub DbRep_Set {
               }
           }
 
-          $sqlcmd .= ";" if ($sqlcmd !~ m/\;$/x);
+          $sqlcmd .= ';' if ($sqlcmd !~ m/\;$/x);
       }
 
       if($opt eq "sqlCmdHistory") {
@@ -1323,18 +1323,16 @@ sub DbRep_Get {
       $prop //= '';
       DbRep_firstconnect("$name|$opt|$prop");
   }
-  elsif ($opt =~ /sqlCmdBlocking|dbValue/) {
+  elsif ($opt =~ /sqlCmdBlocking/) {
       return qq{get "$opt" needs at least an argument} if ( @a < 3 );
 
-      if($opt eq "dbValue") {
-          Log3($name, 1, qq{$name - WARNING - the command "dbValue" is deprecated and will be removed soon. Please use "sqlCmdBlocking" instead.});
-      }
-
       my @cmd = @a;
-      shift @cmd; shift @cmd;
-
-      my $sqlcmd       = join " ", @cmd;
-      $sqlcmd          =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+      shift @cmd; 
+      shift @cmd;
+      
+      my $sqlcmd  = join ' ', @cmd;
+      $sqlcmd     =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+      $sqlcmd    .= ';' if ($sqlcmd !~ m/\;$/xs);
 
       DbRep_setLastCmd ($name, $opt, $sqlcmd);
 
@@ -6622,13 +6620,14 @@ sub DbRep_sqlCmd {
   my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
 
   if ($vars) {
-      @pms = split(";",$vars);
+      @pms = split ';', $vars;
 
       for my $pm (@pms) {
           if($pm !~ /PRAGMA|SET/i) {
               next;
           }
-          $pm = ltrim($pm).";";
+          
+          $pm = ltrim($pm).';';
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
           $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
@@ -6639,17 +6638,16 @@ sub DbRep_sqlCmd {
   # Abarbeitung von Session Variablen vor einem SQL-Statement
   # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
   if($cmd =~ /^\s*SET.*;/i) {
-      @pms = split(";",$cmd);
+      @pms = split ';', $cmd;
       $sql = q{};
 
       for my $pm (@pms) {
-
           if($pm !~ /SET/i) {
-              $sql .= $pm.";";
+              $sql .= $pm.';';
               next;
           }
 
-          $pm = ltrim($pm).";";
+          $pm = ltrim($pm).';';
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
           $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
@@ -6660,17 +6658,16 @@ sub DbRep_sqlCmd {
   # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
   # wenn Pragmas im SQL vorangestellt sind
   if($cmd =~ /^\s*PRAGMA.*;/i) {
-      @pms = split ";", $cmd;
+      @pms = split ';', $cmd;
       $sql = q{};
 
       for my $pm (@pms) {
-
           if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
-              $sql .= $pm.";";
+              $sql .= $pm.';';
               next;
           }
 
-          $pm = ltrim($pm).";";
+          $pm = ltrim($pm).';';
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
           $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
@@ -6681,16 +6678,16 @@ sub DbRep_sqlCmd {
   # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
   # z.B. PREPARE statement FROM @CMD
   if($sql =~ /^\s*PREPARE.*;/i) {
-      @pms = split(";",$sql);
+      @pms = split ';', $sql;
       $sql = q{};
+      
       for my $pm (@pms) {
-
           if($pm !~ /PREPARE/i) {
-              $sql .= $pm.";";
+              $sql .= $pm.';';
               next;
           }
 
-          $pm = ltrim($pm).";";
+          $pm = ltrim($pm).';';
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
           $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
@@ -6708,7 +6705,7 @@ sub DbRep_sqlCmd {
                                                rsn     => $rsn
                                              }
                                            );
-  return $err if ($err);
+  return "$name|$err" if ($err);
 
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
@@ -6783,7 +6780,7 @@ sub _DbRep_sqlReplaceKeywords {
   my $rsf     = $paref->{rsf};
   my $rsn     = $paref->{rsn};
 
-  my $ret  = q{};
+  my $err  = q{};
   my $name = $hash->{NAME};
   my $sfx  = AttrVal("global", "language", "EN");
   $sfx     = $sfx eq 'EN' ? '' : "_$sfx";
@@ -6791,7 +6788,7 @@ sub _DbRep_sqlReplaceKeywords {
   $sql =~ s/§timestamp_begin§/'$rsf'/g;
   $sql =~ s/§timestamp_end§/'$rsn'/g;
 
-  my ($rdspec,$err);
+  my $rdspec;
 
   my @keywords = qw(device reading);
 
@@ -6810,8 +6807,7 @@ sub _DbRep_sqlReplaceKeywords {
           $err = qq{<html> $err </html>};
           $err =~ s/"${kw}"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#${kw}' target='_blank'>${kw}<\/a>/xs;
           $err = encode_base64($err,"");
-          $ret = "$name|$err";
-          return $ret;
+          return $err;
       }
 
       $rdspec = DbRep_createCommonSql( {hash => $hash, ${kw} => $vna, dbmodel => $dbmodel} );
@@ -6819,7 +6815,7 @@ sub _DbRep_sqlReplaceKeywords {
       $sql    =~ s/§${kw}§/$rdspec/xg;
   }
 
-return ($ret, $sql);
+return ($err, $sql);
 }
 
 ####################################################################################################
@@ -13189,80 +13185,158 @@ sub DbRep_sqlCmdBlocking {
   my $name       = shift;
   my $cmd        = shift;
   my $hash       = $defs{$name};
-  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
-  my $dblogname  = $dbloghash->{NAME};
-  my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = $hash->{UTF8} // 0;
 
-  my $srs        = AttrVal($name, "sqlResultFieldSep", "|"  );
-  my $to         = AttrVal($name, "timeout",           10   );
+  my $srs        = AttrVal ($name, "sqlResultFieldSep", "|");
+  my $to         = AttrVal ($name, "timeout",           10 );
 
-  my ($err,$ret,$dbh,@pms);
+  my ($ret);
 
   readingsDelete            ($hash, "errortext");
   ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                    RaiseError          => 1,
-                                                                    AutoCommit          => 1,
-                                                                    AutoInactiveDestroy => 1,
-                                                                    mysql_enable_utf8   => $utf8
-                                                                  }
-                            );
-  };
-
-  if ($@) {
-      $err = $@;
-      Log3 ($name, 2, "DbRep $name - $err");
-      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-      return $err;
+  
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
+  if ($err) {
+      $err = decode_base64 ($err);
+      
+      Log3 ($name, 2, "DbRep $name - ERROR - $err");
+      
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+      ReadingsBulkUpdateValue ($hash, 'state',     'error');
+      readingsEndUpdate       ($hash, 1);
+      
+      return $err;      
   }
+  
+  $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
 
-  my $sql = ($cmd =~ m/\;$/xs) ? $cmd : $cmd.";";
+  $cmd   .= ";" if ($cmd !~ m/\;$/x);
+  my $sql = $cmd;
 
   Log3 ($name, 4, "DbRep $name - -------- New selection --------- ");
-  Log3 ($name, 4, "DbRep $name - Command: sqlCmdBlocking");
-  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+  Log3 ($name, 4, "DbRep $name - sqlCmdBlocking Command:\n$sql");
+  
+  my @pms;
+  my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
 
-  # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
-  my $vars = AttrVal($name, "sqlCmdVars", "");
   if ($vars) {
-      @pms = split(";",$vars);
+      @pms = split ';', $vars;
 
       for my $pm (@pms) {
           if($pm !~ /PRAGMA|SET/i) {
               next;
           }
-          $pm = ltrim($pm).";";
-          Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");
-          eval {$dbh->do($pm);} or do { Log3 ($name, 2, "DbRep $name - ERROR - $@");
-                                        $dbh->disconnect;
-                                        return $@;
-                                      }
+          
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
+          if ($err) {
+              $err = decode_base64 ($err);
+              
+              Log3 ($name, 2, "DbRep $name - ERROR - $err");
+              
+              readingsBeginUpdate     ($hash);
+              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+              ReadingsBulkUpdateValue ($hash, 'state',     'error');
+              readingsEndUpdate       ($hash, 1);
+              
+              return $err;      
+          }
       }
   }
+  
+  # Abarbeitung von Session Variablen vor einem SQL-Statement
+  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
+  if($cmd =~ /^\s*SET.*;/i) {
+      @pms = split ';', $cmd;
+      $sql = q{};
 
-  my $set;
-  if($cmd =~ /^SET.*;/i) {                                                         # split SQL-Parameter Statement falls mitgegeben ->
-      $cmd =~ m/^(SET.*?;)(.*)/i;                                                  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-      $set = $1;
-      $sql = $2;
+      for my $pm (@pms) {
+          if($pm !~ /SET/i) {
+              $sql .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
+          if ($err) {
+              $err = decode_base64 ($err);
+              
+              Log3 ($name, 2, "DbRep $name - ERROR - $err");
+              
+              readingsBeginUpdate     ($hash);
+              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+              ReadingsBulkUpdateValue ($hash, 'state',     'error');
+              readingsEndUpdate       ($hash, 1);
+              
+              return $err;      
+          }
+      }
   }
+  
+  # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
+  # wenn Pragmas im SQL vorangestellt sind
+  if($cmd =~ /^\s*PRAGMA.*;/i) {
+      @pms = split ';', $cmd;
+      $sql = q{};
 
-  if($set) {
-      Log3($name, 4, "DbRep $name - Set SQL session variables: $set");
-      eval {$dbh->do($set);};                                                      # @\RB = Resetbit wenn neues Selektionsintervall beginnt
+      for my $pm (@pms) {
+          if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
+              $sql .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
+          if ($err) {
+              $err = decode_base64 ($err);
+              
+              Log3 ($name, 2, "DbRep $name - ERROR - $err");
+              
+              readingsBeginUpdate     ($hash);
+              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+              ReadingsBulkUpdateValue ($hash, 'state',     'error');
+              readingsEndUpdate       ($hash, 1);
+              
+              return $err;      
+          }
+      }
   }
+  
+  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
+  # z.B. PREPARE statement FROM @CMD
+  if($sql =~ /^\s*PREPARE.*;/i) {
+      @pms = split ';', $sql;
+      $sql = q{};
+      
+      for my $pm (@pms) {
+          if($pm !~ /PREPARE/i) {
+              $sql .= $pm.';';
+              next;
+          }
 
-  if ($@) {
-      $err = $@;
-      Log3 ($name, 2, "DbRep $name - $err");
-      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-      return ($err);
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
+          if ($err) {
+              $err = decode_base64 ($err);
+              
+              Log3 ($name, 2, "DbRep $name - ERROR - $err");
+              
+              readingsBeginUpdate     ($hash);
+              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+              ReadingsBulkUpdateValue ($hash, 'state',     'error');
+              readingsEndUpdate       ($hash, 1);
+              
+              return $err;      
+          }
+      }
   }
 
   my $st = [gettimeofday];                                                        # SQL-Startzeit
@@ -13304,8 +13378,10 @@ sub DbRep_sqlCmdBlocking {
       $sth->finish if($sth);
       $dbh->disconnect;
 
-      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+      ReadingsBulkUpdateValue ($hash, 'state',     'error');
+      readingsEndUpdate       ($hash, 1);
 
       return $err;
   }
@@ -13329,8 +13405,11 @@ sub DbRep_sqlCmdBlocking {
           Log3 ($name, 2, "DbRep $name - $err");
 
           $dbh->disconnect;
-          ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-          ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+          
+          readingsBeginUpdate     ($hash);
+          ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+          ReadingsBulkUpdateValue ($hash, 'state',     'error');
+          readingsEndUpdate       ($hash, 1);
 
           return $err;
       }
@@ -13347,7 +13426,7 @@ sub DbRep_sqlCmdBlocking {
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
 
   readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateTimeState ($hash,undef,$rt,"done");
+  ReadingsBulkUpdateTimeState ($hash, undef, $rt, 'done');
   readingsEndUpdate           ($hash, 1);
 
 return $ret;
@@ -15297,50 +15376,52 @@ return;
                             <br><br>
 
     <a id="DbRep-get-sqlCmdBlocking"></a>
-    <li><b> sqlCmdBlocking &lt;SQL-statement&gt;</b> -
-                            Executes the specified SQL statement <b>blocking</b> with a default timeout of 10 seconds.
-                            The timeout can be set with the attribute <a href="#DbRep-attr-timeout">timeout</a>.
-                            <br><br>
+    <li><b> sqlCmdBlocking &lt;SQL-statement&gt;</b> <br><br>
+    Executes the specified SQL statement <b>blocking</b> with a default timeout of 10 seconds.
+    The timeout can be set with the attribute <a href="#DbRep-attr-timeout">timeout</a>.
+    <br><br>
 
-                            <ul>
-                              <b>Examples:</b>  <br>
-                              { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-                            </ul>
-                            </li>
-                            <br>
+    <ul>
+      <b>Examples:</b>  <br>
+      { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+    </ul>
+    </li>
+    <br>
 
-                            Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
-                            The input accepts multi line commands and delivers multi line results as well.
-                            This command also accept the setting of SQL session variables like "SET @open:=NULL,
-                            @closed:=NULL;". <br>
-                            If several fields are selected and passed back, the fieds are separated by the separator defined
-                            by attribute <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Several result lines
-                            are separated by newline ("\n"). <br>
-                            This function only set/update status readings, the userExitFn function isn't called.
-                            <br><br>
+    Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
+    The input accepts multi line commands and delivers multi line results as well.
+    This command also accept the setting of SQL session variables like "SET @open:=NULL,
+    @closed:=NULL;" or PRAGMA for SQLite. <br>
+    If several fields are selected and passed back, the fieds are separated by the separator defined
+    by attribute <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Several result lines
+    are separated by newline ("\n"). <br>
+    This function only set/update status readings, the userExitFn function isn't called.
+    <br><br>
 
-                            If you create a little routine in 99_myUtils, for example:
-                            <br>
-                            <pre>
+    If you create a little routine in 99_myUtils, for example:
+    <br>
+    
+    <pre>
 sub dbval {
   my $name = shift;
   my $cmd) = shift;
   my $ret = CommandGet(undef,"$name sqlCmdBlocking $cmd");
   return $ret;
 }
-                            </pre>
-                            it can be accessed with e.g. those calls:
-                            <br><br>
+    </pre>
+    
+    it can be accessed with e.g. those calls:
+    <br><br>
 
-                            <ul>
-                               <b>Examples:</b>  <br>
-                               { dbval("&lt;name&gt;","select count(*) from history") } <br>
-                               $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
-                            </ul>
+    <ul>
+       <b>Examples:</b>  <br>
+       { dbval("&lt;name&gt;","select count(*) from history") } <br>
+       $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+    </ul>
 
-                            <br><br>
+    <br><br>
 
     <a id="DbRep-get-storedCredentials"></a>
     <li><b> storedCredentials </b> - Reports the users / passwords stored for database access by the device. <br>
@@ -18191,52 +18272,55 @@ return;
                             <br><br>
 
     <a id="DbRep-get-sqlCmdBlocking"></a>
-    <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> -
-                            Führt das angegebene SQL-Statement <b>blockierend</b> mit einem Standardtimeout von 10 Sekunden aus.
-                            Der Timeout kann mit dem Attribut <a href="#DbRep-attr-timeout">timeout</a> eingestellt werden.
-                            <br><br>
+    <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> <br><br>
+    
+    Führt das angegebene SQL-Statement <b>blockierend</b> mit einem Standardtimeout von 10 Sekunden aus.
+    Der Timeout kann mit dem Attribut <a href="#DbRep-attr-timeout">timeout</a> eingestellt werden.
+    <br><br>
 
-                            <ul>
-                              <b>Beispiele:</b>  <br>
-                              { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-                            </ul>
-                            </li>
-                            <br>
+    <ul>
+      <b>Beispiele:</b>  <br>
+      { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+    </ul>
+    </li>
+    <br>
 
-                            Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
-                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
-                            Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
-                            "SET @open:=NULL, @closed:=NULL;". <br>
-                            Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner
-                            des Attributs <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Mehrere Ergebniszeilen
-                            werden mit Newline ("\n") separiert. <br>
-                            Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn"
-                            wird nicht aufgerufen.
-                            <br><br>
+    Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
+    Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
+    Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+    "SET @open:=NULL, @closed:=NULL;" oder PRAGMA für SQLite. <br>
+    Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner
+    des Attributs <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Mehrere Ergebniszeilen
+    werden mit Newline ("\n") separiert. <br>
+    Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn"
+    wird nicht aufgerufen.
+    <br><br>
 
-                            Erstellt man eine kleine Routine in 99_myUtils, wie z.B.:
-                            <br>
-                            <pre>
+    Erstellt man eine kleine Routine in 99_myUtils, wie z.B.:
+    <br>
+                            
+    <pre>
 sub dbval {
   my $name = shift;
   my $cmd  = shift;
   my $ret  = CommandGet(undef,"$name sqlCmdBlocking $cmd");
   return $ret;
 }
-                            </pre>
-                            kann sqlCmdBlocking vereinfacht verwendet werden mit Aufrufen wie:
-                            <br><br>
+    </pre>
+    
+    kann sqlCmdBlocking vereinfacht verwendet werden mit Aufrufen wie:
+    <br><br>
 
-                             <ul>
-                               <b>Beispiele:</b>  <br>
-                               { dbval("&lt;name&gt;","select count(*) from history") } <br>
-                               oder <br>
-                               $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
-                             </ul>
+     <ul>
+       <b>Beispiele:</b>  <br>
+       { dbval("&lt;name&gt;","select count(*) from history") } <br>
+       oder <br>
+       $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+     </ul>
 
-                             <br><br>
+     <br><br>
 
     <a id="DbRep-get-storedCredentials"></a>
     <li><b> storedCredentials </b> - Listet die im Device gespeicherten User / Passworte für den Datenbankzugriff auf. <br>
