@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26907 2022-12-27 11:38:39Z DS_Starter $
+# $Id: 93_DbLog.pm 26923 2022-12-29 10:28:14Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2022 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2023 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster) adapted by DS_Starter
@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.10"  => "04.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ",
   "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
@@ -1489,10 +1490,10 @@ sub DbLog_Log {
 
               if($exc) {
                   $exc    =~ s/[\s\n]/,/g;
-                  @excldr = split(",",$exc);
+                  @excldr = split ',', $exc;
 
                   for my $excl (@excldr) {
-                      ($ds,$rd) = split("#",$excl);
+                      ($ds,$rd) = split '#', $excl;
                       @exdvs    = devspec2array($ds);
 
                       if(@exdvs) {
@@ -1533,7 +1534,7 @@ sub DbLog_Log {
                   my @v1 = split(/,/, $DbLogExclude);
 
                   for (my $i = 0; $i < int(@v1); $i++) {
-                      my @v2 = split(/:/, $v1[$i]);
+                      my @v2 = split /:/, $v1[$i];
                       $DoIt  = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,);                                      # Reading matcht auf Regexp, kein MinIntervall angegeben
 
                       if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                     # Regexp matcht und MinIntervall ist angegeben
@@ -1554,10 +1555,10 @@ sub DbLog_Log {
               # Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
               if($DoIt == 0) {
                   if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
-                      my @v1 = split(/,/, $DbLogInclude);
+                      my @v1 = split /,/, $DbLogInclude;
 
                       for (my $i = 0; $i < int(@v1); $i++) {
-                          my @v2 = split(/:/, $v1[$i]);
+                          my @v2 = split /:/, $v1[$i];
                           $DoIt  = 1 if($reading =~ m,^$v2[0]$,);                                               # Reading matcht auf Regexp
 
                           if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                   # Regexp matcht und MinIntervall ist angegeben
@@ -1729,6 +1730,8 @@ sub DbLog_Log {
       return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft
       return if($hash->{HELPER}{REOPEN_RUNS});                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
 
+      readingsSingleUpdate ($hash, 'CacheUsage', $memcount, 0);
+      
       $err = DbLog_execMemCacheSync ($hash);
       DbLog_setReadingstate ($hash, $err) if($err);
   }
@@ -2231,8 +2234,8 @@ sub DbLog_execMemCacheSync {
       DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'TempStore contains: ');
   }
 
-  my $memc = _DbLog_copyCache      ($name);
-  $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                                    # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
+  my $memc = _DbLog_copyCache      ($name);  
+  $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                               # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
 
 return;
@@ -2290,44 +2293,24 @@ sub DbLog_SBP_onRun {
           my $cdata       = $memc->{cdata};                                       # Log Daten, z.B.: 3399 => 2022-11-29 09:33:32|SolCast|SOLARFORECAST||nextCycletime|09:33:47|
 
           my $error       = q{};
+          my $doNext      = 0;
           my $dbh;
           my $ret;
 
           ##  Vorbereitungen
-          #############################################################################
+          ####################
 
           $attr{$name}{verbose} = $verbose if(defined $verbose);                  # verbose Level übergeben
+          my $bst               = [gettimeofday];                                 # Background-Startzeit
+          
+          $doNext = _DbLog_SBP_onRun_checkDiscDelpars ({ subprocess => $subprocess,
+                                                         name       => $name,
+                                                         memc       => $memc,
+                                                         store      => $store
+                                                       }
+                                                      );
+          next if($doNext);
 
-          my $bst = [gettimeofday];                                               # Background-Startzeit
-
-          if ($dbdisconn) {                                                       # Datenbankverbindung soll beendet werden
-              $dbh = $store->{dbh};
-
-              if (defined $store->{dbh}) {
-                  $dbh->disconnect();
-              }
-
-              delete $store->{dbh};
-
-              if ($dbdelpars) {
-                  delete $store->{dbparams};
-              }
-
-              my $msg0 = $dbdelpars ? ' <br>Stored DB params in SubProcess were deleted.' : '';
-              my $msg1 = 'Database disconnected by request.'.$msg0;
-
-              Log3 ($name, 3, "DbLog $name - $msg1");
-
-              $ret = {
-                  name => $name,
-                  msg  => $msg1,
-                  oper => $operation,
-                  ot   => 0
-              };
-
-              __DbLog_SBP_sendToParent ($subprocess, $ret);
-              next;
-          }
 
           if ($dbstorepars) {                                                     # DB Verbindungsparameter speichern
               Log3 ($name, 3, "DbLog $name - DB connection parameters are stored in SubProcess");
@@ -2551,6 +2534,55 @@ return;
 }
 
 ###################################################################################
+#   prüfen ob Datenbankverbindung beendet werden soll und ob die 
+#   gespeicherten Verbindungsparameter gelöscht werden sollen
+###################################################################################
+sub _DbLog_SBP_onRun_checkDiscDelpars {
+  my $paref      = shift;
+
+  my $subprocess = $paref->{subprocess};
+  my $name       = $paref->{name};
+  my $memc       = $paref->{memc};
+  my $store      = $paref->{store};                                        # Datenspeicher
+  
+  my $dbdelpars  = $memc->{dbdelpars};                                     # 1 -> gespeicherte DB Parameter sollen gelöscht werden
+  my $dbdisconn  = $memc->{dbdisconn};                                     # 1 -> die Datenbankverbindung lösen/löschen
+  my $operation  = $memc->{operation} // 'unknown';
+  my $doNext     = 0;
+  
+  if ($dbdisconn) {                                                       
+      if (defined $store->{dbh}) {
+          my $dbh = delete $store->{dbh};
+          $dbh->disconnect();
+      }
+      
+      if ($dbdelpars) {
+          delete $store->{dbparams};
+      }
+
+      my $msg0 = $dbdelpars ? ' <br>Stored DB params in SubProcess were deleted.' : '';
+      my $msg1 = 'Database disconnected by request.'.$msg0;
+      my $msg2 = $msg1;
+      $msg2    =~ s/<br>//xs;
+      
+      Log3 ($name, 3, "DbLog $name - $msg2");
+
+      my $ret = {
+            name => $name,
+            msg  => $msg1,
+            oper => $operation,
+            ot   => 0
+      };
+
+      __DbLog_SBP_sendToParent ($subprocess, $ret);
+      
+      $doNext = 1;
+  }
+
+return $doNext;
+}
+
+###################################################################################
 #               neue Datenbankverbindung im SubProcess
 #
 #   RaiseError - handle attribute (which tells DBI to call the Perl die( )
@@ -2723,14 +2755,26 @@ sub _DbLog_SBP_onRun_LogBulk {
           my @a   = split "\\|", $row;
           s/_ESC_/\|/gxs for @a;                                      # escaped Pipe back to "|"
 
-          $a[3] =~ s/'/''/g;                                          # escape ' with ''
-          $a[5] =~ s/'/''/g;                                          # escape ' with ''
-          $a[6] =~ s/'/''/g;                                          # escape ' with ''
-          $a[3] =~ s/\\/\\\\/g;                                       # escape \ with \\
-          $a[5] =~ s/\\/\\\\/g;                                       # escape \ with \\
-          $a[6] =~ s/\\/\\\\/g;                                       # escape \ with \\
+          #$a[3] =~ s/'/''/g;                                          # escape ' with ''
+          #$a[5] =~ s/'/''/g;                                          # escape ' with ''
+          #$a[6] =~ s/'/''/g;                                          # escape ' with ''
+          #$a[3] =~ s/\\/\\\\/g;                                       # escape \ with \\
+          #$a[5] =~ s/\\/\\\\/g;                                       # escape \ with \\
+          #$a[6] =~ s/\\/\\\\/g;                                       # escape \ with \\
 
-          $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
+          #$sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
+          
+          # TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT
+          
+          $a[0] = $dbh->quote($a[0]);
+          $a[1] = $dbh->quote($a[1]);
+          $a[2] = $dbh->quote($a[2]);
+          $a[3] = $dbh->quote($a[3]);
+          $a[4] = $dbh->quote($a[4]);
+          $a[5] = $dbh->quote($a[5]);
+          $a[6] = $dbh->quote($a[6]);
+          
+          $sqlins .= qq{($a[0],$a[1],$a[2],$a[3],$a[4],$a[5],$a[6]),};
       }
 
       use warnings;
@@ -7411,13 +7455,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 26907 2022-12-27 11:38:39Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 26923 2022-12-29 10:28:14Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 26907 2022-12-27 11:38:39Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 26923 2022-12-29 10:28:14Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
