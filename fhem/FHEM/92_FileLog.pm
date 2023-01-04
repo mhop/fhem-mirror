@@ -1000,7 +1000,7 @@ RESCAN:
         my $ld = substr($fld[0],0,$hd);     # TimeStamp-Part (hour or date)
         if(!defined($h->{last1}) || $h->{last3} ne $ld) {
           if(defined($h->{last1})) {
-            my @lda = split("[_:]", $lastdate{$hd});
+            my @lda = split("[_:]", $lastdate{$i});
             my $ts = "12:00:00";            # middle timestamp
             $ts = "$lda[1]:30:00" if($hd == 13);
             my $v = $fld[$col]-$h->{last1};
@@ -1018,7 +1018,7 @@ RESCAN:
           $h->{last3} = $ld;
         }
         $h->{last2} = $fld[$col];
-        $lastdate{$hd} = $fld[0];
+        $lastdate{$i} = $fld[0];
 
       } elsif($t == 3) {                    # int function
         $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
@@ -1100,7 +1100,7 @@ RESCAN:
   for(my $i = 0; $i < int(@a); $i++) {
     my $h = $d[$i];
     my $hd = $h->{didx};
-    if($hd && $lastdate{$hd}) {
+    if($hd && $lastdate{$i}) {
       my $val = defined($h->{last1}) ? $h->{last2}-$h->{last1} : 0;
       $min[$i] = $val if($min[$i] ==  999999);
       $max[$i] = $val if($max[$i] == -999999);
@@ -1108,7 +1108,7 @@ RESCAN:
       $sum[$i] = ($sum[$i] ? $sum[$i] + $val : $val);
       $cnt[$i]++;
 
-      my @lda = split("[_:]", $lastdate{$hd});
+      my @lda = split("[_:]", $lastdate{$i});
       my $ts = "12:00:00";                   # middle timestamp
       $ts = "$lda[1]:30:00" if($hd == 13);
       my $line = sprintf("%s_%s %0.1f\n", $lda[0],$ts,
