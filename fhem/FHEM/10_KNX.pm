@@ -108,6 +108,8 @@
 #              changed not user relevant internals to {.XXXX}
 #              changed DbLog_split function
 #              disabled StateFn
+# MH 202301xx  change pattern matching for dpt1 and dptxxx
+#              fix DbLogSplitFn
 
 
 package KNX; ## no critic 'package'
@@ -182,9 +184,11 @@ my $PAT_GAD_SUFFIX = 'nosuffix';
 #pattern for forbidden GAD-Names
 my $PAT_GAD_NONAME = '^(on|off|value|raw|' . $PAT_GAD_OPTIONS . q{|} . $PAT_GAD_SUFFIX . ')';
 #pattern for DPT
-my $PAT_GAD_DPT = 'dpt\d*\.?\d*';
+#my $PAT_GAD_DPT = 'dpt\d*\.?\d*';
+my $PAT_GAD_DPT = 'dpt\d+\.?\d*';
 #pattern for dpt1 (standard)
-my $PAT_DPT1_PAT = '(on)|(off)|(0?1)|(0?0)';
+#my $PAT_DPT1_PAT = '(on)|(off)|(0?1)|(0?0)';
+my $PAT_DPT1_PAT = 'on|off|[01]$';
 #pattern for date
 my $PAT_DTSEP  = qr/(?:_)/ix; # date/time separator
 my $PAT_DATEdm = qr/^(3[01]|[1-2][0-9]|0?[1-9])\.(1[0-2]|0?[1-9])/ix; # day/month
@@ -984,7 +988,8 @@ sub KNX_DbLog_split {
 	my $unit = q{}; # default
 
 	# split event into reading & value
-	my ($reading, $value) = split(/:\s/x, $event, 2);
+	my ($reading,$value) = ($event =~ /^([^\s]+)[:]\s(.*)/x );
+#	my ($reading, $value) = split(/:\s/x, $event, 2);
 	if (! defined($reading)) {
 		$reading = 'state';
 		$value   = $event;
