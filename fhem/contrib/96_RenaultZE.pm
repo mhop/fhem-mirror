@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id: 96_RenaultZE.pm  2022-11-16 plin $
+# $Id: 96_RenaultZE.pm  2023-01-04 plin $
 # 96_RenaultZE.pm
 #
 # Forum : https://forum.fhem.de/index.php/topic,116273.0.html
@@ -37,6 +37,10 @@
 
 ############################################################################################################################
 # Version History
+# v 1.04 typo denbled corrected
+# v 1.03 hvac settings output corrected
+# v 1.02 some minor corrections
+# v 1.01 added hvac-settings
 # v 1.00 added module to the contrib directory
 # v 0.32 added attribute disabled
 # v 0.31 changed API keys due to change by Renault
@@ -91,7 +95,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.00 / 16.11.2022";
+my $RenaultZE_version ="V1.04 / 04.01.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -105,6 +109,7 @@ my %RenaultZE_gets = (
 	"charges"                           => "",
 	"charging-settings:noArg"           => "",
 	"hvac-history"                      => "",
+	"hvac-settings:noArg"               => "",
 	"notification-settings:noArg"       => "",
 	"update:noArg"                      => "",
 	"vehicles:noArg"                    => "",
@@ -253,6 +258,12 @@ sub RenaultZE_Get($@) {
            }
         }
 
+        elsif ($opt eq "hvac-settings")
+        {
+	   readingsSingleUpdate($hash,"ze_Step","getHvacSettings",1);
+	   RenaultZE_Main1($hash, @param);
+        }
+
         elsif ($opt eq "charging-settings")
         {
 	   readingsSingleUpdate($hash,"ze_Step","getChargingSettings",1);
@@ -395,7 +406,7 @@ sub RenaultZE_Main1($@) {
            Log3 $name, 5, "RenaultZE_Main1 - gettimeofday=".gettimeofday();
 
            if ( $ze_Gigya_JWT_Token eq ""  ||  $gigya_time < gettimeofday() - 70000 ) {
-              $res = RenaultZE_getCreds_Step1($hash);
+              my $res = RenaultZE_getCreds_Step1($hash);
               Log3 $name, 5, "RenaultZE_Main1 - RC=".$res;
            }
 	   else
@@ -462,7 +473,7 @@ sub RenaultZE_Main3($) {
 
         if ($key eq "GET_update")
         {
-		#my $res = RenaultZE_getData_Step1($hash);
+	      #my $res = RenaultZE_getData_Step1($hash);
               my $res = RenaultZE_gData_Step1($hash,'battery-status');
               Log3 $name, 5, "RenaultZE_gData_Step1 - battery-status - RC=".$res;
               $res = RenaultZE_gData_Step1($hash,'cockpit');
@@ -503,6 +514,12 @@ sub RenaultZE_Main3($) {
         {
               my $res = RenaultZE_gData_Step1($hash,'hvac-history');
               Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-history - RC=".$res;
+	}
+
+        if ($key eq "GET_hvac-settings")
+        {
+              my $res = RenaultZE_gData_Step1($hash,'hvac-settings');
+              Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-settings - RC=".$res;
 	}
 
         if ($key eq "GET_notification-settings")
@@ -581,7 +598,7 @@ sub RenaultZE_Attr(@) {
            }
 	   elsif (($attrName eq "disabled") )
            {
-                readingsSingleUpdate($hash,"state","denbled",1);
+                readingsSingleUpdate($hash,"state","enabled",1);
 	        readingsSingleUpdate($hash,"ze_Step","RenaultZE ($name) is enabled",1);
                 $_[3] = $attrVal;
                 $hash->{".reset"} = 1 if defined($hash->{LPID});
@@ -933,6 +950,8 @@ sub RenaultZE_gData_Step2($)
     my $lastErr = $hash->{READINGS}{ze_lastErr}{VAL};
     return undef                    								    if ($lastErr ne "");
 
+    my $lastUrl = $hash->{READINGS}{ze_lastUrl}{VAL};
+
     Log3 $name, 3, "RenaultZE_gData_Step2 - DataError ".$data					    if ($data =~ /\<html\>/);
     return undef           								            if ($data =~ /\<html\>/);
 
@@ -962,8 +981,19 @@ sub RenaultZE_gData_Step2($)
         return 0;
     }
 
+    ### cockpit ###
     if($data =~ /totalMileage/) {
        readingsSingleUpdate($hash,"totalMileageKm",$decode_json->{data}->{attributes}->{totalMileage},1);
+        readingsBulkUpdate($hash,"fuelAutonomy",$decode_json->{data}->{attributes}->{fuelAutonomy})			if (my $decode_json->{data}->{attributes}->{fuelAutonomy} gt 0);
+        readingsBulkUpdate($hash,"fuelQuantity",$decode_json->{data}->{attributes}->{fuelQuantity})			if (my $decode_json->{data}->{attributes}->{fuelQuantity} gt 0);
+        return 0;
+    }
+
+    ### hvac-status ###
+    if($data =~ /hvacStatus/) {
+       readingsSingleUpdate($hash,"hvacStatus",$decode_json->{data}->{attributes}->{hvacStatus},1);
+        readingsBulkUpdate($hash,"socThreshold",$decode_json->{data}->{attributes}->{socThreshold})			if (my $decode_json->{data}->{attributes}->{socThreshold} gt 0);
+        readingsBulkUpdate($hash,"xternalTemperature",$decode_json->{data}->{attributes}->{xternalTemperature})		if (my $decode_json->{data}->{attributes}->{xternalTemperature} gt 0);
         return 0;
     }
 
@@ -1116,12 +1146,14 @@ sub RenaultZE_gData_Step2($)
     }
 
     ### charging-settings?country=DE
-    if($data =~ /mode.*schedules/) {
+    if(($data =~ /mode.*schedules/) && ($lastUrl =~ /charg/)){
         my $mtab = $decode_json->{data}->{attributes}->{schedules};
+        my $sss = @$mtab;
         #print scalar @$mtab."\n";
         my $output = "<html><body><b>Charging Settings</b><p>Mode=".$decode_json->{data}->{attributes}->{mode}."<br>";
         my @wdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "saturday" );
-        foreach my $item( @$mtab ) {
+	if  ( $sss > 0 ) {
+           foreach my $item( @$mtab ) {
              $output = $output."Schedules, activated =".$item->{activated}."<table border=1 center>";
              $output = $output."<tr>";
              $output = $output."<td align=center>Day of Week</td>";
@@ -1136,11 +1168,46 @@ sub RenaultZE_gData_Step2($)
              $output = $output."</tr>";
              }
    	     last;
+           }
+           $output = $output."</table>";
         }
-        $output = $output."</table></body></html>";
+        $output = $output."</body></html>";
         readingsSingleUpdate($hash,"chargingSettings",$output,1);
         return 0;
     }
+
+    ### hvac-settings?country=DE
+    if(($data =~ /mode.*schedules/) && ($lastUrl =~ /hvac/)){
+        my $mtab = $decode_json->{data}->{attributes}->{schedules};
+        my $sss = @$mtab;
+        #print scalar @$mtab."\n";
+        my $output = "<html><body><b>HVAC Settings</b><p>Mode=".$decode_json->{data}->{attributes}->{mode}."<br>";
+        my @wdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "saturday" );
+        if  ( $sss > 0 ) {
+           $output = $output."<p>Schedules";
+           foreach my $item( @$mtab ) {
+            if ($item->{activated} == 1 ) {
+             $output = $output."<p>activated =".$item->{activated}."<table border=1 center>";
+             $output = $output.", Target Temperature =".$item->{targetTemperature}."<table border=1 center>";
+             $output = $output."<tr>";
+             $output = $output."<td align=center>Day of Week</td>";
+             $output = $output."<td align=center>readyAtTime</td>";
+             $output = $output."</tr>";
+             foreach my $wd( @wdays ) {
+                 $output = $output."<tr>";
+                 $output = $output."<td align=center>".$wd."</td>";
+                 $output = $output."<td align=center>".$item->{$wd}->{readyAtTime}."</td>";
+             $output = $output."</tr>";
+             }
+           $output = $output."</table>";
+           }
+          }
+        }
+        $output = $output."</body></html>";
+        readingsSingleUpdate($hash,"hvacSettings",$output,1);
+        return 0;
+    }
+
 
     ### notification-settings?country=DE
     if($data =~ /settings.*messageKey/) {
@@ -1660,12 +1727,15 @@ sub RenaultZE_EpochFromDateTime($) {
 		  type=day&start=YYYYMMDD&end=YYYYMMDD   (default: 1.1.2000 till today)<br>
 		  type=month&start=YYYYMM&end=YYYYMM
               </li>
+              <li><a name="hvac-settings"></a><i>hvac-settings</i><br>
+                  shows the ac settingS <br>
+              </li>
               <li><a name="notification-settings"></a><i>notification-settings</i><br>
 	          <b>only for Phase1 models</b><br>
                   lists the settings for cnotifications
               </li>
               <li><a name="update"></a><i>update</i><br>
-                  force update of the current readings</li>
+                  force update of the current readings (battery-status, cockpit, location, hvac-status, charge-mode)</li>
               <li><a name="vehicles"></a><i>vehicles</i><br>
 	          get a list of your vehicles with details, set the readings for the images<br>
 		  if the attribute ze_showimage is set you get readings with the cars images</li>
@@ -1673,10 +1743,10 @@ sub RenaultZE_EpochFromDateTime($) {
                   Option to test new API functions which might be implemented one day ...<br>
 		  sub parameters are<br>
                   hvac-sessions?start=20201101&end=20210108&country=DE<br>
-                  charges?start=20201101&end=20210108&country=DE<br>
                   charge-history?type=day&start=20201101&end=20210108&country=DE<br>
                   charge-history?type=month&start=202011&end=202101&country=DE<br>
                   lock-status?country=DE<br>
+                  res-state?country=DE<br>
 		  As result you will either get a msgbox when the function is implemented by Renault, otherwise the ze-Readings will tell you more
               </li>
         </ul>
