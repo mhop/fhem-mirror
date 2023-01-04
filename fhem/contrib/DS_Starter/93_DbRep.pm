@@ -6618,83 +6618,18 @@ sub DbRep_sqlCmd {
   my $sql = $cmd;
 
   my @pms;
-  my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
+  
+  $err = _DbRep_setSessAttrVars ($name, $dbh);  
+  return "$name|$err" if ($err);
 
-  if ($vars) {
-      @pms = split ';', $vars;
+  $err = _DbRep_setSessVars ($name, $dbh, \$sql);   
+  return "$name|$err" if ($err);
 
-      for my $pm (@pms) {
-          if($pm !~ /PRAGMA|SET/i) {
-              next;
-          }
+  $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
+  return "$name|$err" if ($err);
 
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
-
-  # Abarbeitung von Session Variablen vor einem SQL-Statement
-  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  if($cmd =~ /^\s*SET.*;/i) {
-      @pms = split ';', $cmd;
-      $sql = q{};
-
-      for my $pm (@pms) {
-          if($pm !~ /SET/i) {
-              $sql .= $pm.';';
-              next;
-          }
-
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
-
-  # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
-  # wenn Pragmas im SQL vorangestellt sind
-  if($cmd =~ /^\s*PRAGMA.*;/i) {
-      @pms = split ';', $cmd;
-      $sql = q{};
-
-      for my $pm (@pms) {
-          if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
-              $sql .= $pm.';';
-              next;
-          }
-
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
-
-  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
-  # z.B. PREPARE statement FROM @CMD
-  if($sql =~ /^\s*PREPARE.*;/i) {
-      @pms = split ';', $sql;
-      $sql = q{};
-
-      for my $pm (@pms) {
-          if($pm !~ /PREPARE/i) {
-              $sql .= $pm.';';
-              next;
-          }
-
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
+  $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
+  return "$name|$err" if ($err);
 
   # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
   ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
@@ -6807,127 +6742,62 @@ sub DbRep_sqlCmdBlocking {
   Log3 ($name, 4, "DbRep $name - sqlCmdBlocking Command:\n$sql");
 
   my @pms;
-  my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
 
-  if ($vars) {
-      @pms = split ';', $vars;
+  $err = _DbRep_setSessAttrVars ($name, $dbh);
+  if ($err) {
+      $err = decode_base64 ($err);
 
-      for my $pm (@pms) {
-          if($pm !~ /PRAGMA|SET/i) {
-              next;
-          }
+      Log3 ($name, 2, "DbRep $name - ERROR - $err");
 
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+      ReadingsBulkUpdateValue ($hash, 'state',     'error');
+      readingsEndUpdate       ($hash, 1);
 
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
-          if ($err) {
-              $err = decode_base64 ($err);
-
-              Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-              readingsBeginUpdate     ($hash);
-              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-              ReadingsBulkUpdateValue ($hash, 'state',     'error');
-              readingsEndUpdate       ($hash, 1);
-
-              return $err;
-          }
-      }
+      return $err;
   }
+            
+  $err = _DbRep_setSessVars ($name, $dbh, \$sql);
+  if ($err) {
+      $err = decode_base64 ($err);
 
-  # Abarbeitung von Session Variablen vor einem SQL-Statement
-  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  if($cmd =~ /^\s*SET.*;/i) {
-      @pms = split ';', $cmd;
-      $sql = q{};
+      Log3 ($name, 2, "DbRep $name - ERROR - $err");
 
-      for my $pm (@pms) {
-          if($pm !~ /SET/i) {
-              $sql .= $pm.';';
-              next;
-          }
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+      ReadingsBulkUpdateValue ($hash, 'state',     'error');
+      readingsEndUpdate       ($hash, 1);
 
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+      return $err;
+  } 
 
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
-          if ($err) {
-              $err = decode_base64 ($err);
+  $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
+  if ($err) {
+      $err = decode_base64 ($err);
 
-              Log3 ($name, 2, "DbRep $name - ERROR - $err");
+      Log3 ($name, 2, "DbRep $name - ERROR - $err");
 
-              readingsBeginUpdate     ($hash);
-              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-              ReadingsBulkUpdateValue ($hash, 'state',     'error');
-              readingsEndUpdate       ($hash, 1);
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+      ReadingsBulkUpdateValue ($hash, 'state',     'error');
+      readingsEndUpdate       ($hash, 1);
 
-              return $err;
-          }
-      }
+      return $err;
   }
+  
+  $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
+  if ($err) {
+      $err = decode_base64 ($err);
 
-  # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
-  # wenn Pragmas im SQL vorangestellt sind
-  if($cmd =~ /^\s*PRAGMA.*;/i) {
-      @pms = split ';', $cmd;
-      $sql = q{};
+      Log3 ($name, 2, "DbRep $name - ERROR - $err");
 
-      for my $pm (@pms) {
-          if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
-              $sql .= $pm.';';
-              next;
-          }
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+      ReadingsBulkUpdateValue ($hash, 'state',     'error');
+      readingsEndUpdate       ($hash, 1);
 
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
-          if ($err) {
-              $err = decode_base64 ($err);
-
-              Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-              readingsBeginUpdate     ($hash);
-              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-              ReadingsBulkUpdateValue ($hash, 'state',     'error');
-              readingsEndUpdate       ($hash, 1);
-
-              return $err;
-          }
-      }
-  }
-
-  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
-  # z.B. PREPARE statement FROM @CMD
-  if($sql =~ /^\s*PREPARE.*;/i) {
-      @pms = split ';', $sql;
-      $sql = q{};
-
-      for my $pm (@pms) {
-          if($pm !~ /PREPARE/i) {
-              $sql .= $pm.';';
-              next;
-          }
-
-          $pm = ltrim($pm).';';
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
-          if ($err) {
-              $err = decode_base64 ($err);
-
-              Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-              readingsBeginUpdate     ($hash);
-              ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-              ReadingsBulkUpdateValue ($hash, 'state',     'error');
-              readingsEndUpdate       ($hash, 1);
-
-              return $err;
-          }
-      }
-  }
+      return $err;
+  } 
 
   my $st = [gettimeofday];                                                        # SQL-Startzeit
 
@@ -7020,6 +6890,127 @@ sub DbRep_sqlCmdBlocking {
   readingsEndUpdate           ($hash, 1);
 
 return $ret;
+}
+
+################################################################
+#   Set Session Variablen "SET" oder PRAGMA aus 
+#   Attribut "sqlCmdVars"
+################################################################
+sub _DbRep_setSessAttrVars {
+  my $name = shift;
+  my $dbh  = shift;
+
+  my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
+
+  if ($vars) {
+      my @pms = split ';', $vars;
+
+      for my $pm (@pms) {
+          if($pm !~ /PRAGMA|SET/i) {
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+################################################################
+# Abarbeitung von Session Variablen vor einem SQL-Statement
+# z.B. SET  @open:=NULL, @closed:=NULL; Select ...
+################################################################
+sub _DbRep_setSessVars {
+  my $name   = shift;
+  my $dbh    = shift;
+  my $sqlref = shift;
+
+  if(${$sqlref} =~ /^\s*SET.*;/i) {
+      my @pms    = split ';', ${$sqlref};
+      ${$sqlref} = q{};
+
+      for my $pm (@pms) {
+          if($pm !~ /SET/i) {
+              ${$sqlref} .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+################################################################
+# Abarbeitung aller Pragmas vor einem SQLite Statement, 
+# SQL wird extrahiert wenn Pragmas im SQL vorangestellt sind
+################################################################
+sub _DbRep_setSessPragma {
+  my $name   = shift;
+  my $dbh    = shift;
+  my $sqlref = shift;
+  
+  if(${$sqlref} =~ /^\s*PRAGMA.*;/i) {
+      my @pms    = split ';', ${$sqlref};
+      ${$sqlref} = q{};
+
+      for my $pm (@pms) {
+          if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
+              ${$sqlref} .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+####################################################################
+# Abarbeitung von PREPARE statement als Befehl als Bestandteil 
+# des SQL 
+# Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
+# z.B. PREPARE statement FROM @CMD
+####################################################################
+sub _DbRep_execSessPrepare {
+  my $name   = shift;
+  my $dbh    = shift;
+  my $sqlref = shift;
+  
+  if(${$sqlref} =~ /^\s*PREPARE.*;/i) {
+      my @pms    = split ';', ${$sqlref};
+      ${$sqlref} = q{};
+
+      for my $pm (@pms) {
+          if($pm !~ /PREPARE/i) {
+              ${$sqlref} .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
 }
 
 ####################################################################################################
