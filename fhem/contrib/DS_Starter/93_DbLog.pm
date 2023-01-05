@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.10"  => "04.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ",
+  "5.5.10"  => "05.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ",
   "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
@@ -1730,7 +1730,7 @@ sub DbLog_Log {
       return if(defined $hash->{HELPER}{SHUTDOWNSEQ});                                  # Shutdown Sequenz läuft
       return if($hash->{HELPER}{REOPEN_RUNS});                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
 
-      readingsSingleUpdate ($hash, 'CacheUsage', $memcount, 0);
+      readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0)) if($DoIt);
       
       $err = DbLog_execMemCacheSync ($hash);
       DbLog_setReadingstate ($hash, $err) if($err);
@@ -2234,7 +2234,10 @@ sub DbLog_execMemCacheSync {
       DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'TempStore contains: ');
   }
 
-  my $memc = _DbLog_copyCache      ($name);  
+  my $memc = _DbLog_copyCache      ($name);
+
+  readingsSingleUpdate($hash, 'CacheUsage', 0, 0);
+  
   $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                               # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
 
@@ -2752,34 +2755,25 @@ sub _DbLog_SBP_onRun_LogBulk {
 
       for my $key (sort {$a<=>$b} keys %{$cdata}) {
           my $row = $cdata->{$key};
-          my @a   = split "\\|", $row;
-          s/_ESC_/\|/gxs for @a;                                      # escaped Pipe back to "|"
-
-          #$a[3] =~ s/'/''/g;                                          # escape ' with ''
-          #$a[5] =~ s/'/''/g;                                          # escape ' with ''
-          #$a[6] =~ s/'/''/g;                                          # escape ' with ''
-          #$a[3] =~ s/\\/\\\\/g;                                       # escape \ with \\
-          #$a[5] =~ s/\\/\\\\/g;                                       # escape \ with \\
-          #$a[6] =~ s/\\/\\\\/g;                                       # escape \ with \\
-
-          #$sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
+          my @ao  = split '\\|', $row;
+          s/_ESC_/\|/gxs for @ao;                                      # escaped Pipe back to "|"
           
           # TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT
           
-          $a[0] = $dbh->quote($a[0]);
-          $a[1] = $dbh->quote($a[1]);
-          $a[2] = $dbh->quote($a[2]);
-          $a[3] = $dbh->quote($a[3]);
-          $a[4] = $dbh->quote($a[4]);
-          $a[5] = $dbh->quote($a[5]);
-          $a[6] = $dbh->quote($a[6]);
+          $ao[0] = $dbh->quote($ao[0]);
+          $ao[1] = $dbh->quote($ao[1]);
+          $ao[2] = $dbh->quote($ao[2]);
+          $ao[3] = $dbh->quote($ao[3]);
+          $ao[4] = $dbh->quote($ao[4]);
+          $ao[5] = $dbh->quote($ao[5]);
+          $ao[6] = $dbh->quote($ao[6]);
           
-          $sqlins .= qq{($a[0],$a[1],$a[2],$a[3],$a[4],$a[5],$a[6]),};
+          $sqlins .= "($ao[0],$ao[1],$ao[2],$ao[3],$ao[4],$ao[5],$ao[6]),";
       }
-
+      
       use warnings;
 
-      chop($sqlins);
+      chop $sqlins;
 
       if ($usepkh && $model eq 'POSTGRESQL') {
           $sqlins .= " ON CONFLICT DO NOTHING";
@@ -8255,7 +8249,8 @@ return;
 	  <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> 0 - </td><td><b>Synchronous log mode.</b> The data to be logged is written to the database immediately after it is received.                        </td></tr>
+       <tr><td> 0 - </td><td><b>Synchronous log mode.</b> The data to be logged is only briefly cached and immediately                                              </td></tr>
+       <tr><td>     </td><td>written to the database.                                                                                                               </td></tr>
        <tr><td>     </td><td><b>Advantages:</b>                                                                                                                     </td></tr>
 	   <tr><td>     </td><td>In principle, the data is immediately available in the database.                                                                       </td></tr>
 	   <tr><td>     </td><td>Very little to no data is lost when FHEM crashes.                                                                                      </td></tr>
@@ -9915,7 +9910,8 @@ attr SMA_Energymeter DbLogValueFn
 	  <ul>
        <table>
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> 0 - </td><td><b>Synchroner Log-Modus.</b> Die zu loggenden Daten werden sofort nach dem Empfang in die Datenbank geschrieben.      </td></tr>
+       <tr><td> 0 - </td><td><b>Synchroner Log-Modus.</b> Die zu loggenden Daten werden nur kurz im Cache zwischengespeichert und sofort           </td></tr>
+       <tr><td>     </td><td>in die Datenbank geschrieben.                                                                                         </td></tr>
        <tr><td>     </td><td><b>Vorteile:</b>                                                                                                      </td></tr>
 	   <tr><td>     </td><td>Die Daten stehen im Prinzip sofort in der Datenbank zur Verfügung.                                                    </td></tr>
 	   <tr><td>     </td><td>Bei einem Absturz von FHEM gehen sehr wenige bis keine Daten verloren.                                                </td></tr>
