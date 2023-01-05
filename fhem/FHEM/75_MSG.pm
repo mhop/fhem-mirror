@@ -31,7 +31,7 @@ use utf8;
 # initialize ##################################################################
 sub MSG_Initialize($$) {
     my %hash = (
-        Fn => "CommandMsg",
+        Fn  => "CommandMsg",
         Hlp =>
 "[<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message-text>",
     );
@@ -42,6 +42,7 @@ sub MSG_Initialize($$) {
 
 # regular Fn ##################################################################
 sub CommandMsg($$;$$);
+
 sub CommandMsg($$;$$) {
     my ( $cl, $msg, $testMode ) = @_;
     my $return = "";
@@ -112,7 +113,7 @@ sub CommandMsg($$;$$) {
     ### extract message details
     ###
 
-    my ( $msgA, $params ) = parseParams($msg, "[^\\S\\n]", " ");
+    my ( $msgA, $params ) = parseParams( $msg, "[^\\S\\n]", " " );
 
     # only use output from parseParams when
     # parameters where found
@@ -638,8 +639,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                                         ReadingsVal(
                                                             $gatewayDev,
                                                             "presence",
-                                                            "present"
-                                                          ) eq $_
+                                                            "present" ) eq $_
                                                     } @unavailabilityIndicators
                                                 )
 
@@ -648,8 +648,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                                                         ReadingsVal(
                                                             $gatewayDev,
                                                             "state",
-                                                            "present"
-                                                          ) eq $_
+                                                            "present" ) eq $_
                                                     } @unavailabilityIndicators
                                                 )
 
@@ -1636,9 +1635,9 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                             $loopTitleShrt =
                               substr( $loopTitleShrt, 0, 37 ) . "..."
                               if ( length($loopTitleShrt) > 40 );
-                            $cmd =~ s/%TITLESHRT%/$loopTitleShrt/gi;
+                            $cmd           =~ s/%TITLESHRT%/$loopTitleShrt/gi;
                             $loopTitleShrt =~ s/ /_/;
-                            $cmd =~ s/%TITLESHRT2%/$loopTitleShrt/gi;
+                            $cmd           =~ s/%TITLESHRT2%/$loopTitleShrt/gi;
                             $loopTitleShrt =~ s/^([\s\t ]*\w+).*/$1/g;
                             $loopTitleShrt =
                               substr( $loopTitleShrt, 0, 17 ) . "..."
@@ -1955,19 +1954,24 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
                                         Log3 $logDevice, 5,
                                           "msg $device: "
                                           . "$type[$i] route command (Perl): $cmd";
+
                                         #eval $cmd;
-                                        my $ret = AnalyzePerlCommand(undef, $cmd);
-                                        unless ( !$ret || $ret =~ m/^[\s\t\n ]*$/ )
+                                        my $ret =
+                                          AnalyzePerlCommand( undef, $cmd );
+                                        unless ( !$ret
+                                            || $ret =~ m/^[\s\t\n ]*$/ )
                                         {
                                             $error = 1;
-                                            $loopReturn3 .= "$gatewayDev: $ret\n";
+                                            $loopReturn3 .=
+                                              "$gatewayDev: $ret\n";
                                         }
                                     }
                                     else {
                                         Log3 $logDevice, 5,
                                           "msg $device: "
                                           . "$type[$i] route command (fhem): $cmd";
-                                        my $ret = AnalyzeCommandChain(undef,$cmd);
+                                        my $ret =
+                                          AnalyzeCommandChain( undef, $cmd );
                                         unless ( !$ret
                                             || $ret =~ m/^[\s\t\n ]*$/ )
                                         {
@@ -2463,26 +2467,47 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 
 1;
 
+__END__
+
 =pod
 =item command
 =item summary dynamic routing of messages to FHEM devices and modules
 =item summary_DE dynamisches Routing f&uuml;r Nachrichten an FHEM Ger&auml;te und Module
 =begin html
 
-<a name="MSG"></a>
+<a id="MSG"></a>
 <h3>msg</h3>
-<ul>
+  <p>For documentation in german see <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a> or <a href="https://wiki.fhem.de/wiki/Msg">FHEM Wiki</a></p>
+  Syntax is:<br>
   <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
+  <br><br>
+  Except for <i>message</i> all parameters are optional, for configuration of the entire messageing logics see also <a href="#msgConfig">msgConfig</a>.<br>
   <br>
+  Basic idea behind the command (and msgConfig) is to establish a central logic for dispatching messages to be sent to the user, so e.g. in case an address of an recipient changes, you only have to change one single point in your entire configuration.<br>
+  Parameters are as follows:<br>
+  <ul>
+    <li>type<br>
+      Is optional and one of <i>text</i>, <i>audio</i>, <i>light</i> or <i>screen</i>. If ommitted, it defaults to <i>text</i>.<br>
+      You may provide more than one type by providing a comma-seperated list.
+    </li>
+    <li>@device or e-mail address<br>
+      For <i>@device</i> you may opt for any instance of a messenger service available in <i>mscConfig</i>, by default <a href="#Pushover">Pushover</a> will be used (if available). <br>
+      For emailing, per default <code>system()</code> command per <code>/usr/bin/mail</code> is issued.
+      You may provide more than one recipent by providing a comma-seperated list here (also mixed).
+    </li>
+    <li>priority<br>
+      Is also optional. You may any (nummeric) value understood by your addressed messaging device, good idea is to use values common in the Pushover API (-2 to 2). 
+    </li>
+    <li>title<br>
+      Is also optional, but when given, it has to be enclosed in <i>pipe</i> characters.
+    </li>
   <br>
-  No documentation here yet, sorry.<br>
-  <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a>
-</ul>
+  </ul>
 
 =end html
-=begin html_DE
+=begin html_old_DE
 
-<a name="MSG"></a>
+<a id="MSG"></a>
 <h3>msg</h3>
 <ul>
   <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
@@ -2493,7 +2518,7 @@ m/^(absent|disappeared|unauthorized|disconnected|unreachable)$/i
 </ul>
 
 
-=end html_DE
+=end html_old_DE
 
 =for :application/json;q=META.json 75_MSG.pm
 {

@@ -143,7 +143,7 @@ sub msgConfig_Initialize($) {
         "msgType:text,push,mail,screen,light,audio,queue",
       )
     {
-        addToAttrList($_);
+        addToAttrList( $_, 'msgConfig' );
     }
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
@@ -190,9 +190,9 @@ sub msgConfig_Define($$) {
         readingsEndUpdate( $hash, 1 );
     }
 
-    $hash->{NOTIFYDEV} = "TYPE=(Jabber|TelegramBot|yowsup)";
+    setNotifyDev( $hash, 'TYPE=(Jabber|TelegramBot|yowsup|Signalbot)' );
 
-    return undef;
+    return;
 }
 
 sub msgConfig_Undefine($$) {
@@ -226,9 +226,9 @@ sub msgConfig_Set($@) {
     # addLocation
     elsif ( lc($what) eq "addlocation" ) {
         my $location = join( " ", @a );
-        my $group = AttrVal( $name, "group", $TYPE );
-        my $room  = AttrVal( $name, "room",  "" );
-        my $return = "";
+        my $group    = AttrVal( $name, "group", $TYPE );
+        my $room     = AttrVal( $name, "room",  "" );
+        my $return   = "";
 
         return "Missing argument 'location'"
           if ( $location eq "" );
@@ -250,7 +250,7 @@ sub msgConfig_Set($@) {
         }
 
         $attr{$device}{group} = $group if ( !defined( $attr{$device}{group} ) );
-        $attr{$device}{room} = $room
+        $attr{$device}{room}  = $room
           if ( !defined( $attr{$device}{room} ) && $room ne "" );
         $attr{$device}{comment} = "Auto-created by $name"
           if ( !defined( $attr{$device}{comment} ) );
@@ -616,6 +616,12 @@ sub msgConfig_Notify($$) {
             $msg     = ReadingsVal( $devName, "message", undef );
         }
 
+        #Signalbot
+        elsif ( $devType eq 'Signalbot' ) {
+            $sender = ReadingsVal( $devName, 'msgSender', undef );
+            $msg    = ReadingsVal( $devName, 'msgText',   undef );
+        }
+
         next unless ( $msg && $msg ne "" );
 
         unless ( $sender && $sender ne "" ) {
@@ -809,14 +815,19 @@ sub msgConfig_QueueReleaseMsgId($$) {
 
 1;
 
+__END__
+
 =pod
+
+=encoding utf8
+
 =item helper
 =item summary global settings and tools for FHEM command <a href="#MSG">msg</a>
-=item summary_DE globale Einstellungen und Tools f&uml;r das FHEM Kommando <a href="#MSG">msg</a>
+=item summary_DE globale Einstellungen und Tools für das FHEM Kommando <a href="#MSG">msg</a>
 =begin html
 
     <p>
-      <a name="msgConfig" id="msgConfig"></a>
+      <a id="msgConfig"></a>
     </p>
     <h3>
       msgConfig
@@ -826,30 +837,30 @@ sub msgConfig_QueueReleaseMsgId($$) {
       A device named globalMsg will be created automatically when using msg-command for the first time and no msgConfig device could be found.<br>
       The device name can be renamed and reconfigured afterwards if desired.<br>
       <br>
-      <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
+      <a id="msgConfig-define"></a> <h4>Define</h4>
       <ul>
         <code>define &lt;name&gt; msgConfig</code><br>
       </ul><br>
       <br>
-      <a name="msgConfigset" id="msgConfigset"></a> <b>Set</b>
+      <a id="msgConfig-set"></a> <h4>Set</h4>
       <ul>
         <ul>
           <li>
-            <b>addLocation</b> &nbsp;&nbsp;<Location Name>&nbsp;&nbsp;<br>
+            <a id="msgConfig-set-addLocation"></a><b>addLocation</b> &nbsp;&nbsp;<Location Name>&nbsp;&nbsp;<br>
             Conveniently creates a Dummy device based on the given location name. It will be pre-configured to be used together with location-based routing when using the msg-command. The dummy device will be added to attribute msgLocationDevs automatically. Afterwards additional configuration is required by adding msgContact* or msgRecipient* attributes for gateway devices placed at this specific location.
           </li>
           <li>
-            <b>cleanReadings</b> &nbsp;&nbsp;[<device and/or regex>]&nbsp;&nbsp;<br>
+            <a id="msgConfig-set-cleanReadings"></a><b>cleanReadings</b> &nbsp;&nbsp;[<device and/or regex>]&nbsp;&nbsp;<br>
             Easy way to cleanup all fhemMsg readings. A parameter is optional and can be a concrete device name or mixed together with regex. This command is an alias for "deletereading <device and/or regex> fhemMsg.*".
           </li>
           <li>
-            <b>createResidentsDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
+            <a id="msgConfig-set-createResidentsDev"></a><b>createResidentsDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
             Creates a new device named rgr_Residents of type <a href="#RESIDENTS">RESIDENTS</a>. It will be pre-configured based on the given language. In case rgr_Residents exists it will be updated based on the given language (basically only a language change). Afterwards next configuration steps will be displayed to use RESIDENTS together with presence-based routing of the msg-command.<br>
 This next step is basically to set attribute msgResidentsDevice to refer to this RESIDENTS device either globally or for any other specific FHEM device (most likely you do NOT want to have this attribute set globally as otherwise this will affect ALL devices and therefore ALL msg-commands in your automations).<br>
             Note that use of RESIDENTS only makes sense together with ROOMMATE and or GUEST devices which still need to be created manually. See <a href="#RESIDENTSset">RESIDENTS Set commands</a> addRoommate and addGuest respectively.
           </li>
           <li>
-            <b>createSwitcherDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
+            <a id="msgConfig-set-createSwitcherDev"></a><b>createSwitcherDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
             Creates a pre-configured Dummy device named HouseAnn and updates globalMsg attribute msgSwitcherDev to refer to it.
           </li>
         </ul>
@@ -861,7 +872,7 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
 =begin html_DE
 
     <p>
-      <a name="msgConfig" id="msgConfig"></a>
+      <a id="msgConfig"></a>
     </p>
     <h3>
       msgConfig
@@ -871,20 +882,54 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
       Ein Device mit dem Namen globalMsg wird automatisch bei der ersten Benutzung des msg Kommandos angelegt, sofern kein msgConfig Device gefunden wurde.<br>
       Der Device Name kann anschlie&szlig;end beliebig umbenannt und umkonfiguriert werden.<br>
       <br>
-      <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
+      <a id="msgConfig-define"></a> <h4>Define</h4>
       <ul>
         <code>define &lt;name&gt; msgConfig</code><br>
       </ul><br>
       <br>
-      <a name="msgConfigset" id="msgConfigset"></a> <b>Set</b>
+      
+      <a id="msgConfig-set"></a> <h4>Set</h4>
       <ul>
         <ul>
           <li>
-            <b>addLocation</b> &nbsp;&nbsp;<Name der Lokation>&nbsp;&nbsp;<br>
+            <a id="msgConfig-set-addLocation"></a><b>addLocation</b> &nbsp;&nbsp;<Name der Lokation>&nbsp;&nbsp;<br>
             Erstellt auf einfache Weise ein Dummy Device basierend auf dem &uuml;bergebenen Lokationsnamen. Es wird for die lokations-basierte Verwendung mit dem msg-Kommando vorkonfiguriert. Das Dummy Device wird automatisch zum Attribut msgLocationDevs hinzugef&uuml;gt. Anschlie&szlig;end ist eine weitere Konfiguration &uuml;ber die Attribute msgContact* oder msgRecipient* notwendig, die auf entsprechende Gateway Devices verweisen, die an dieser Lokation stehen.
+          </li>
+          <li>
+            <a id="msgConfig-set-cleanReadings"></a><b>cleanReadings</b> &nbsp;&nbsp;[<device and/or regex>]&nbsp;&nbsp;<br>
+            Einfache Methode, um alle fhemMsg-Readings zu säubern. Optional kann ein Parameter angegeben werden, um ein bestimmtes Device zu säubern, als Device Name kann auch regex angegeben werden. Dieses Kommando ist ein Alias for "deletereading <device and/or regex> fhemMsg.*".
+          </li>
+          <li>
+            <a id="msgConfig-set-createResidentsDev"></a><b>createResidentsDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
+            Creates a new device named rgr_Residents of type <a href="#RESIDENTS">RESIDENTS</a>. It will be pre-configured based on the given language. In case rgr_Residents exists it will be updated based on the given language (basically only a language change). Afterwards next configuration steps will be displayed to use RESIDENTS together with presence-based routing of the msg-command.<br>
+This next step is basically to set attribute msgResidentsDevice to refer to this RESIDENTS device either globally or for any other specific FHEM device (most likely you do NOT want to have this attribute set globally as otherwise this will affect ALL devices and therefore ALL msg-commands in your automations).<br>
+            Note that use of RESIDENTS only makes sense together with ROOMMATE and or GUEST devices which still need to be created manually. See <a href="#RESIDENTSset">RESIDENTS Set commands</a> addRoommate and addGuest respectively.
+          </li>
+          <li>
+            <a id="msgConfig-set-createSwitcherDev"></a><b>createSwitcherDev</b> &nbsp;&nbsp;<de|en>&nbsp;&nbsp;<br>
+            Creates a pre-configured Dummy device named HouseAnn and updates globalMsg attribute msgSwitcherDev to refer to it.
           </li>
         </ul>
       </ul>
+      
+      <a id="msgConfig-attr"></a> <h4>Attribute</h4>
+      <ul>
+        <ul>
+          <li>
+            <a id="msgConfig-attr-msgContact" data-pattern="msgContact.*"></a><b>msgContact&lt;TYPE&gt;</b> <br>
+            FHEM Gerätename, welcher zur Übermittlung von Nachrichten des jeweiligen Typs angesprochen werden soll.
+            <ul>
+              <li>Muss bei Audio Nachrichten ohne eigene Definition von msgCmdAudio* ein Gerät vom Typ SONOSPLAYER sein.</li>
+              <li>Muss bei Screen Nachrichten ohne eigene Definition von msgCmdScreen* ein Gerät vom Typ ENIGMA2 sein.</li>
+              <li>Muss bei Light Nachrichten ohne eigene Definition von msgCmdLight* ein Gerät vom Typ HUEDevice sein.</li>
+              <li>Muss bei Push Nachrichten ohne eigene Definition von msgCmdPush* ein Gerät vom Typ Pushover sein.</li>
+              <li>Muss bei Mail Nachrichten eine oder mehrere gültige E-Mail Adressen enthalten.</li>
+            </ul>
+            Bei FHEM Gerätenamen, über die mehrere Empfänger adressiert werden können, kann der Empfänger mittels Doppelpunkt getrennt vom FHEM Gerätenamen angegeben werden. Je nach Modul ist das optional oder verbindlich.
+          </li>
+        </ul>
+      </ul>
+      
     </ul>
 
 =end html_DE
