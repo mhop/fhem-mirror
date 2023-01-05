@@ -343,7 +343,7 @@ if ($reading eq 'Input') {
    my $currentTrack_TrackUri = ReadingsVal($name,'currentTrack_TrackUri','');
    return $currentTrack_TrackUri =~ 'x-rincon-stream'
       ? 'LineIn': $currentTrack_TrackUri =~ 'spdif'
-      ? 'TV'    : ReadingsVal($name,'enqueuedMetadata_UpnpClass','') eq 'object.item.audioItem.audioBroadcast'
+      ? 'TV'    : ReadingsVal($name,'enqueuedMetadata_UpnpClass','') eq 'object.item.audioItem.audioBroadcast' or $currentTrack_TrackUri =~ 'x-rincon-mp3radio'
       ? 'Radio' : 'Playlist'
   }
 }
@@ -365,7 +365,7 @@ my @out;
      my $dec = encode($enc, decode_entities($_->{'Title'}));
      $dec =~ s/\s/./g;
      if ($reading eq 'Favorites') {
-	    if ( $_->{'TrackUri'} =~ /x-sonosapi-stream/) {
+	    if ( $_->{'TrackUri'} =~ /x-sonosapi-stream/ or $_->{'TrackUri'} =~ /x-sonosapi-radio/ or $_->{'TrackUri'} =~ /x-rincon-mp3radio/) {
 	       push @out,$dec
 	    }
 	 } else {push @out,$dec}
