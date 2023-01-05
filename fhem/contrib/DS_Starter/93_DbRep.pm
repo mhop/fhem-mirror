@@ -60,7 +60,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # Version History intern
 my %DbRep_vNotesIntern = (
   "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
-                            "sqlCmdBlocking customized like sqlCmd ",
+                            "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
   "8.50.10" => "01.01.2023  Commandref edited ",
   "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
@@ -2161,6 +2161,7 @@ sub _DbRep_getInitData_grants {
 
       eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();");
             $sth->execute();
+            1;
            }
            or do { Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
                    return $grants;
@@ -3451,6 +3452,7 @@ sub DbRep_averval {
 
           eval { $tf = ($dbh->selectrow_array($sqlf))[0];
                  $tl = ($dbh->selectrow_array($sqll))[0];
+                 1;
                }
                or do { $err = encode_base64($@,"");
                        Log3 ($name, 2, "DbRep $name - $@");
@@ -3465,7 +3467,8 @@ sub DbRep_averval {
               my ($yyyyf, $mmf, $ddf, $hhf, $minf, $secf) = ($tf =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
               my ($yyyyl, $mml, $ddl, $hhl, $minl, $secl) = ($tl =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
 
-              $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-(timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));
+              $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-
+                      (timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));
 
               if ($IsTimeSet || $IsAggrSet) {
                   $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
@@ -6503,14 +6506,17 @@ sub DbRep_impfile {
       Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");
 
       if($i_timestamp && $i_device && $i_reading) {
-          eval { $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit); }
-                 or do { $err = encode_base64($@,"");
-                         Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
-                         close(FH);
-                         $dbh->rollback;
-                         $dbh->disconnect;
-                         return "$name|$err";
-                       };
+          eval { $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit); 
+               }
+               or do { $err = encode_base64($@,"");
+                       Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
+                       close(FH);
+                       
+                       $dbh->rollback;
+                       $dbh->disconnect;
+                       
+                       return "$name|$err";
+                     };
 
           $irowdone++;
       }
@@ -6721,15 +6727,7 @@ sub DbRep_sqlCmdBlocking {
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
   if ($err) {
-      $err = decode_base64 ($err);
-
-      Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-      ReadingsBulkUpdateValue ($hash, 'state',     'error');
-      readingsEndUpdate       ($hash, 1);
-
+      _DbRep_setErrorState ($name, $err);
       return $err;
   }
 
@@ -6745,57 +6743,25 @@ sub DbRep_sqlCmdBlocking {
 
   $err = _DbRep_setSessAttrVars ($name, $dbh);
   if ($err) {
-      $err = decode_base64 ($err);
-
-      Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-      ReadingsBulkUpdateValue ($hash, 'state',     'error');
-      readingsEndUpdate       ($hash, 1);
-
+      _DbRep_setErrorState ($name, $err);
       return $err;
   }
             
   $err = _DbRep_setSessVars ($name, $dbh, \$sql);
   if ($err) {
-      $err = decode_base64 ($err);
-
-      Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-      ReadingsBulkUpdateValue ($hash, 'state',     'error');
-      readingsEndUpdate       ($hash, 1);
-
+      _DbRep_setErrorState ($name, $err);
       return $err;
   } 
 
   $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
   if ($err) {
-      $err = decode_base64 ($err);
-
-      Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-      ReadingsBulkUpdateValue ($hash, 'state',     'error');
-      readingsEndUpdate       ($hash, 1);
-
+      _DbRep_setErrorState ($name, $err);
       return $err;
   }
   
   $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
   if ($err) {
-      $err = decode_base64 ($err);
-
-      Log3 ($name, 2, "DbRep $name - ERROR - $err");
-
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-      ReadingsBulkUpdateValue ($hash, 'state',     'error');
-      readingsEndUpdate       ($hash, 1);
-
+      _DbRep_setErrorState ($name, $err);
       return $err;
   } 
 
@@ -6812,21 +6778,21 @@ sub DbRep_sqlCmdBlocking {
       eval {
           $sth = $dbh->prepare($sql);
           $r   = $sth->execute();
-          1;
       };
       alarm(0);                                                                   # Alarm aufheben (wenn der Code schnell lief)
 
       if ($@) {
           if($@ eq "Timeout\n") {                                                 # timeout
               $failed = $totxt;
-
-          } else {                                                                # ein anderer Fehler
+          } 
+          else {                                                                  # ein anderer Fehler
               $failed = $@;
           }
       }
       1;
 
-  } or $failed = $@;
+  } 
+  or $failed = $@;
 
   alarm(0);                                                                      # Schutz vor Race Condition
 
@@ -6857,20 +6823,10 @@ sub DbRep_sqlCmdBlocking {
   }
   else {
       $nrows = $sth->rows;
-
-      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-      if ($@) {
-          $err = $@;
-
-          Log3 ($name, 2, "DbRep $name - $err");
-
-          $dbh->disconnect;
-
-          readingsBeginUpdate     ($hash);
-          ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-          ReadingsBulkUpdateValue ($hash, 'state',     'error');
-          readingsEndUpdate       ($hash, 1);
-
+      
+      $err = DbRep_commitOnly ($name, $dbh);
+      if ($err) {
+          _DbRep_setErrorState ($name, $err);
           return $err;
       }
 
@@ -6883,7 +6839,7 @@ sub DbRep_sqlCmdBlocking {
   my $rt  = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
   my $com = (split " ", $sql, 2)[0];
 
-  Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
+  Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows");
 
   readingsBeginUpdate         ($hash);
   ReadingsBulkUpdateTimeState ($hash, undef, $rt, 'done');
@@ -7009,6 +6965,26 @@ sub _DbRep_execSessPrepare {
           return $err if ($err);
       }
   }
+
+return;
+}
+
+####################################################################
+#  Error -> Readings errortext und state
+####################################################################
+sub _DbRep_setErrorState {
+  my $hash = shift;
+  my $err  = shift;
+  
+  my $name = $hash->{NAME};
+  $err     = decode_base64 ($err);
+
+  Log3 ($name, 2, "DbRep $name - ERROR - $err");
+
+  readingsBeginUpdate     ($hash);
+  ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+  ReadingsBulkUpdateValue ($hash, 'state',     'error');
+  readingsEndUpdate       ($hash, 1);
 
 return;
 }
@@ -8867,6 +8843,7 @@ sub DbRep_mysql_RestoreServerSide {
 
   eval{ $sth = $dbh->prepare($sql);
         $drh = $sth->execute();
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - $@");
@@ -11121,6 +11098,7 @@ sub DbRep_prepareExecuteQuery {
 
   eval{ $sth    = $dbh->prepare($sql);
         $result = $sth->execute();
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -11157,7 +11135,7 @@ return $err;
 }
 
 ####################################################################################################
-#          nur Datenbank "begin transaction"
+#       nur Datenbank "begin transaction"
 #       $dbh->{AutoCommit} = 0;  # enable transactions, if possible
 #           oder
 #       $dbh->begin_work();
@@ -11172,8 +11150,8 @@ sub DbRep_beginDatabaseTransaction {
   eval{ if($dbh->{AutoCommit}) {
             $dbh->begin_work();
             Log3 ($name, 4, "DbRep $name - $info");
-            1;
         }
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -11196,12 +11174,11 @@ sub DbRep_commitOnly {
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->commit();
             Log3 ($name, 4, "DbRep $name - $info");
-            1;
         }
         else {
             Log3 ($name, 4, "DbRep $name - data autocommitted");
-            1;
         }
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -11224,12 +11201,11 @@ sub DbRep_rollbackOnly {
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->rollback();
             Log3 ($name, 4, "DbRep $name - $info");
-            1;
         }
         else {
             Log3 ($name, 4, "DbRep $name - data auto rollback");
-            1;
         }
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -15532,28 +15508,33 @@ sub dbval {
                               </li> <br>
 
   <a id="DbRep-attr-averageCalcForm"></a>
-  <li><b>averageCalcForm </b> - specifies the calculation variant of average peak by "averageValue". <br><br>
+  <li><b>averageCalcForm </b> <br><br>
+  
+  Defines the calculation variant for determining the average value with "averageValue". <br><br>
 
-                                 At the moment the following methods are implemented: <br><br>
+  Currently the following variants are implemented: <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>avgArithmeticMean:</b>       </td><td>the arithmetic average is calculated (default)                                         </td></tr>
-                                      <tr><td>                                </td><td>                                                                                       </td></tr>
-                                      <tr><td><b>avgDailyMeanGWS:</b>         </td><td>calculates the daily medium temperature according the                                  </td></tr>
-                                      <tr><td>                                </td><td>specifications of german weather service (see also "get &lt;name&gt; versionNotes 2")  </td></tr>
-                                      <tr><td>                                </td><td>This variant uses aggregation "day" automatically.                                     </td></tr>
-                                      <tr><td>                                </td><td>                                                                                       </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>like "avgDailyMeanGWS" and additionally the grassland temperature sum                  </td></tr>
-                                      <tr><td>                                </td><td>If the value 200 is reached, the reading "reachedGTSthreshold" is created with the     </td></tr>
-                                      <tr><td>                                </td><td>date of the first time this threshold value is reached.                                </td></tr>                                        <tr><td>                                </td><td><b>Note:</b> the attribute timestamp_begin must be set to the beginning of a year !    </td></tr>
-                                      <tr><td>                                </td><td>(see also "get &lt;name&gt; versionNotes 5")                                           </td></tr>
-                                      <tr><td>                                </td><td>                                                                                       </td></tr>
-                                      <tr><td><b>avgTimeWeightMean:</b>       </td><td>calculates a time weighted average mean value is calculated                            </td></tr>
-                                   </table>
-                                   </ul>
-                                </li><br>
+  <ul>
+    <table>
+    <colgroup> <col width=20%> <col width=80%> </colgroup>
+       <tr><td><b>avgArithmeticMean:</b>       </td><td>The arithmetic average is calculated. (default)                                         </td></tr>
+       <tr><td>                                </td><td>                                                                                        </td></tr>
+       <tr><td><b>avgDailyMeanGWS:</b>         </td><td>Calculates the daily medium temperature according the                                   </td></tr>
+       <tr><td>                                </td><td>specifications of german weather service. (see also "get &lt;name&gt; versionNotes 2")  </td></tr>
+       <tr><td>                                </td><td>This variant uses aggregation "day" automatically.                                      </td></tr>
+       <tr><td>                                </td><td>                                                                                        </td></tr>
+       <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>Same as "avgDailyMeanGWS" and additionally calculates the grassland temperature sum.    </td></tr>
+       <tr><td>                                </td><td>If the value 200 is reached, the reading "reachedGTSthreshold" is created with the      </td></tr>
+       <tr><td>                                </td><td>date of the first time this threshold value is reached.                                 </td></tr>                                        <tr><td>                                </td><td><b>Note:</b> the attribute timestamp_begin must be set to the beginning of a year !    </td></tr>
+       <tr><td>                                </td><td><b>Note:</b> The attribute timestamp_begin must be set to the beginning of a year!      </td></tr>
+       <tr><td>                                </td><td>(see also "get &lt;name&gt; versionNotes 5")                                            </td></tr>
+       <tr><td>                                </td><td>                                                                                        </td></tr>
+       <tr><td><b>avgTimeWeightMean:</b>       </td><td>Calculates the time-weighted average.                                                   </td></tr>
+       <tr><td>                                </td><td><b>Note:</b> There must be at least two data points per aggregation period.             </td></tr>
+    </table>
+ </ul>
+ </li>
+ <br>
 
   <a id="DbRep-attr-countEntriesDetail"></a>
   <li><b>countEntriesDetail </b>   - If set, the function countEntries creates a detailed report of counted datasets of
@@ -18420,31 +18401,34 @@ sub dbval {
                               </li> <br>
 
   <a id="DbRep-attr-averageCalcForm"></a>
-  <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue"
-                                fest.
-                                <br><br>
+  <li><b>averageCalcForm </b> <br><br>
+  
+  Legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" fest.
+  <br><br>
 
-                                Zur Zeit sind folgende Varianten implementiert: <br><br>
+  Zur Zeit sind folgende Varianten implementiert: <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean:          </b></td><td>es wird der arithmetische Mittelwert berechnet (default)                                </td></tr>
-                                      <tr><td>                                </td><td>                                                                                            </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS:</b>        </td><td>berechnet die Tagesmitteltemperatur entsprechend den                                        </td></tr>
-                                      <tr><td>                                </td><td>Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2")         </td></tr>
-                                      <tr><td>                                </td><td>Diese Variante verwendet automatisch die Aggregation "day".                                 </td></tr>
-                                      <tr><td>                                </td><td>                                                                                            </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>wie "avgDailyMeanGWS" und berechnet zusätzlich die Grünlandtemperatursumme.                 </td></tr>
-                                      <tr><td>                                </td><td>Ist der Wert 200 erreicht, wird das Reading "reachedGTSthreshold" mit dem Datum             </td></tr>
-                                      <tr><td>                                </td><td>des erstmaligen Erreichens dieses Schwellenwertes erstellt.                                 </td></tr>
-                                      <tr><td>                                </td><td><b>Hinweis:</b> das Attribut timestamp_begin muß auf den Anfang eines Jahres gesetzt sein ! </td></tr>
-                                      <tr><td>                                </td><td>(siehe "get &lt;name&gt; versionNotes 5")                                                   </td></tr>
-                                      <tr><td>                                </td><td>                                                                                            </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean:</b>      </td><td>berechnet den zeitgewichteten Mittelwert                                                    </td></tr>
-                                   </table>
-                                   </ul>
-                                </li><br>
+  <ul>
+     <table>
+     <colgroup> <col width=20%> <col width=80%> </colgroup>
+        <tr><td> <b>avgArithmeticMean:</b>      </td><td>Es wird der arithmetische Mittelwert berechnet. (default)                                     </td></tr>
+        <tr><td>                                </td><td>                                                                                              </td></tr>
+        <tr><td> <b>avgDailyMeanGWS:</b>        </td><td>Berechnet die Tagesmitteltemperatur entsprechend den                                          </td></tr>
+        <tr><td>                                </td><td>Vorschriften des deutschen Wetterdienstes. (siehe "get &lt;name&gt; versionNotes 2")          </td></tr>
+        <tr><td>                                </td><td>Diese Variante verwendet automatisch die Aggregation "day".                                   </td></tr>
+        <tr><td>                                </td><td>                                                                                              </td></tr>
+        <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>Wie "avgDailyMeanGWS" und berechnet zusätzlich die Grünlandtemperatursumme.                   </td></tr>
+        <tr><td>                                </td><td>Ist der Wert 200 erreicht, wird das Reading "reachedGTSthreshold" mit dem Datum               </td></tr>
+        <tr><td>                                </td><td>des erstmaligen Erreichens dieses Schwellenwertes erstellt.                                   </td></tr>
+        <tr><td>                                </td><td><b>Hinweis:</b> Das Attribut timestamp_begin muss auf den Beginn eines Jahres gesetzt werden! </td></tr>
+        <tr><td>                                </td><td>(siehe "get &lt;name&gt; versionNotes 5")                                                     </td></tr>
+        <tr><td>                                </td><td>                                                                                              </td></tr>
+        <tr><td> <b>avgTimeWeightMean:</b>      </td><td>Berechnet den zeitgewichteten Mittelwert.                                                     </td></tr>
+        <tr><td>                                </td><td><b>Hinweis:</b> Es müssen mindestens zwei Datenpunkte pro aggregation Periode vorhanden sein. </td></tr>
+     </table>
+  </ul>
+  </li>
+  <br>
 
   <a id="DbRep-attr-countEntriesDetail"></a>
   <li><b>countEntriesDetail </b>   - Wenn gesetzt, erstellt die Funktion "countEntries" eine detallierte Ausgabe der Datensatzzahl
