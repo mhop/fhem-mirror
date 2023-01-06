@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_WS.pm: new sensor Bresser 7-in-1 Comfort Wetter Center
+                         new set command to allow battery replacement
+                         new sensor SM60020 multi purpose environment sensor
+                         new sensor TFA 30.3251.10 
+                         new senosr TFA 35.1077.54.S2 with 30.3151 
+                          temp/hum, 30.3152 (rain) and 30.3153 (wind)
+                        new sensor TM40, wireless Grill-, Meat-, 
+                          Roasting-Thermometer with 4 temp sensors
  - feature: 00_SIGNALduino.pm: Updated to vversion 3.5.4
                                update commandref
                                make SIGNALduino_IdList more robust
