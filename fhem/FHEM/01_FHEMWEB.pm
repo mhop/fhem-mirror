@@ -3298,6 +3298,7 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
     shift;
   }
   my $dev = $_[0];
+  $dev =~ s/-.*//;      # 131373
   foreach my $ntfy (values(%defs)) {
     next if(!$ntfy->{TYPE} ||
             $ntfy->{TYPE} ne "FHEMWEB" ||
