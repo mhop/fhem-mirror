@@ -21,19 +21,20 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
 # werden benötigt, aber im Programm noch extra abgetestet 
 #use Digest::CRC qw(crc);
 #use Math::Trig;
 
-sub SD_WS09_Initialize($) {
+sub SD_WS09_Initialize {
 	my ($hash) = @_;
 
 	$hash->{Match}     = "^P9#F[A-Fa-f0-9]+";    ## pos 7 ist aktuell immer 0xF
-	$hash->{DefFn}     = "SD_WS09_Define";
-	$hash->{UndefFn}   = "SD_WS09_Undef";
-	$hash->{ParseFn}   = "SD_WS09_Parse";
-	$hash->{AttrFn}	   = "SD_WS09_Attr";
+	$hash->{DefFn}     = \&SD_WS09_Define;
+	$hash->{UndefFn}   = \&SD_WS09_Undef;
+	$hash->{ParseFn}   = \&SD_WS09_Parse;
+	$hash->{AttrFn}	   = \&SD_WS09_Attr;
 	$hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 "
                        ."model:CTW600,WH1080 ignore:0,1 "
                        ."windKorrektur:-3,-2,-1,0,1,2,3 "
@@ -44,6 +45,8 @@ sub SD_WS09_Initialize($) {
                        ."$readingFnAttributes ";
 	$hash->{AutoCreate} =
 		{ "SD_WS09.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.* windKorrektur:.*:0 verbose:5" , FILTER => "%NAME", GPLOT => "WH1080wind4:windSpeed/windGust,",  autocreateThreshold => "2:180"} };
+
+	return FHEM::Meta::InitMod( __FILE__, $hash );		
 }
 
 #############################
@@ -917,5 +920,96 @@ sub SD_WS09_CRCCHECK($) {
 </ul>
 
 =end html_DE
+=for :application/json;q=META.json 14_SD_WS09.pm
+{
+  "abstract": "Supports weather sensors (WH1080/3080/CTW-600) protocl 9 from SIGNALduino",
+  "author": [
+    "Sidey <>",
+    "ralf9 <>",
+	"pejonp",
+	"homeautouser"
+  ],
+  "x_fhem_maintainer": [
+    "Sidey",
+	"pejonp"
+  ],
+  "x_fhem_maintainer_github": [
+    "Sidey79",
+	"HomeAutoUser",
+	"elektron-bbs"
+  ],
+  "description": "The SD_WS09 module interprets temperature sensor messages received by a Device like CUL, CUN, SIGNALduino etc",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino",
+    "weather",
+    "station",
+    "sensor"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::SD_WS",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+		"Math::Trig" : "0",
+		"Digest::CRC" : "0"
+      }
+    },
+    "develop": {
+      "requires": {
+      	"Math::Trig" : "0",
+		"Digest::CRC" : "0"
+	  }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/RFD-FHEM/RFFHEM/issues/"
+    },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/t/FHEM/14_SD_WS09/testData.json",
+        "testname": "Testdata with SD_WS09 sensors"
+      }
+    ],
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://github.com/RFD-FHEM/RFFHEM/tree/master"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/14_SD_WS09.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/14_SD_WS09.pm"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "description": "Sonstige Hausautomations-Systeme",
+      "forum": "FHEM Forum",
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=29",
+      "title": "FHEM Forum: Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    },
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SIGNALduino"
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut
 
