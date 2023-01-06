@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 00_SIGNALduino.pm: Updated to vversion 3.5.4
+                               update commandref
+                               make SIGNALduino_IdList more robust
+                               timer creation and deletion to uses
+                                 FHEM::Core::Timer::Helper
+                               clone protocol object for every definition
  - feature: SD_Protocols.pm: add sub ConvBresser_7in1 for XOR over all 
                              nibbles and check
                              add sub LFSR_digest16 linear-feedback 
@@ -18,7 +24,7 @@
                                 Temola TM 40 support
                                 remote control DC-1961-TG 
  - bugfix: SD_ProtocolData.pm: bugfix Bresser protocols
-                              prevents Perl warning WS2000
+                               prevents Perl warning WS2000
  - feature: 75_MSG: add new msg schema entry for Matrix and SignalBot
  - feature: 75_msgConfig: add commandref
  - bugfix:  98_todoist: key in header
