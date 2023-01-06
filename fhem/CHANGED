@@ -1,5 +1,24 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: SD_Protocols.pm: add sub ConvBresser_7in1 for XOR over all 
+                             nibbles and check
+                             add sub LFSR_digest16 linear-feedback 
+                             shift register
+ - feature: SD_ProtocolData.pm: new protocol 117 for BRESSER 7-in-1 
+                                 Weather Center
+                                new protocol 118 for Meikee remote controls 
+                                additional sensors protocol 115 for 
+                                 Bresser 6-in-1 Comfort Wetter Center
+                                Protocol 85 new sensor TFA 30.3251.10 
+                                Basic funkbus support 
+                                Busch-Transcontrol HF - 6861 support 
+                                new protocol 120 
+                                 Weather station TFA 35.1077.54.S2
+                                remote control RCnoName20_10 
+                                Temola TM 40 support
+                                remote control DC-1961-TG 
+ - bugfix: SD_ProtocolData.pm: bugfix Bresser protocols
+                              prevents Perl warning WS2000
  - feature: 75_MSG: add new msg schema entry for Matrix and SignalBot
  - feature: 75_msgConfig: add commandref
  - bugfix:  98_todoist: key in header
