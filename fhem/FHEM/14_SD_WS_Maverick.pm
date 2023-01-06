@@ -21,32 +21,27 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
 #use Data::Dumper;
-sub SD_WS_Maverick_Initialize($);
-sub SD_WS_Maverick_Define($$);
-sub SD_WS_Maverick_Undef($$);
-sub SD_WS_Maverick_Parse($$);
-sub SD_WS_Maverick_Attr(@);
-sub SD_WS_Maverick_SetSensor1Inactive($);
-sub SD_WS_Maverick_SetSensor2Inactive($);
-sub SD_WS_Maverick_UpdateState($);
 
-sub
-SD_WS_Maverick_Initialize($)
+
+sub SD_WS_Maverick_Initialize
 {
   my ($hash) = @_;
 
   $hash->{Match}     = "^P47#[A-Fa-f0-9]+";
-  $hash->{DefFn}     = "SD_WS_Maverick_Define";
-  $hash->{UndefFn}   = "SD_WS_Maverick_Undef";
-  $hash->{ParseFn}   = "SD_WS_Maverick_Parse";
-  $hash->{AttrFn}	   = "SD_WS_Maverick_Attr";
+  $hash->{DefFn}     = \&SD_WS_Maverick_Define;
+  $hash->{UndefFn}   = \&SD_WS_Maverick_Undef;
+  $hash->{ParseFn}   = \&SD_WS_Maverick_Parse;
+  $hash->{AttrFn}	   = \&SD_WS_Maverick_Attr;
   $hash->{AttrList}  = "do_not_notify:1,0 ignore:0,1 showtime:1,0 inactivityinterval " .
                         "$readingFnAttributes ";
   $hash->{AutoCreate} =
         { "SD_WS_Maverick.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME",  autocreateThreshold => "2:180"} };
 ## Todo: Pruefen der Autocreate Einstellungen
+
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 
 }
 
@@ -71,8 +66,7 @@ SD_WS_Maverick_Define($$)
 }
 
 #####################################
-sub
-SD_WS_Maverick_Undef($$)
+sub SD_WS_Maverick_Undef
 {
   my ($hash, $name) = @_;
   RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor1Inactive');
@@ -80,7 +74,7 @@ SD_WS_Maverick_Undef($$)
   delete($modules{SD_WS_Maverick}{defptr}{$hash->{CODE}})
      if(defined($hash->{CODE}) &&
         defined($modules{SD_WS_Maverick}{defptr}{$hash->{CODE}}));
-  return undef;
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 
@@ -423,4 +417,90 @@ sub SD_WS_Maverick_UpdateState($) {
 </ul>
 
 =end html_DE
+=for :application/json;q=META.json 14_SD_WS_Maverick.pm
+{
+  "abstract": "Supports maverick temperature sensors protocl 47 from SIGNALduino",
+  "author": [
+    "Sidey <>",
+    "ralf9 <>",
+    "Cruizer <>"
+  ],
+  "x_fhem_maintainer": [
+    "Sidey",
+	  "Cruizer"
+  ],
+  "x_fhem_maintainer_github": [
+    "Sidey79",
+	  "HomeAutoUser",
+	  "elektron-bbs"
+  ],
+  "description": "The SD_WS_Maverick module interprets temperature sensor messages received by a Device like CUL, CUN, SIGNALduino etc.",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino",
+    "food",
+    "bbq",
+    "sensor"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::SD_WS",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+      }
+    },
+    "develop": {
+      "requires": {
+ 	    }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/RFD-FHEM/RFFHEM/issues/"
+    },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/t/FHEM/14_SD_WS_Maverick/testData.json",
+        "testname": "Testdata with SD_WS_Maverick sensors"
+      }
+    ],
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://github.com/RFD-FHEM/RFFHEM/tree/master"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/14_SD_WS_Maverick.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/14_SD_WS_Maverick.pm"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "description": "Sonstige Hausautomations-Systeme",
+      "forum": "FHEM Forum",
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=29",
+      "title": "FHEM Forum: Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    },
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SIGNALduino"
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut
