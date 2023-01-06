@@ -1295,20 +1295,22 @@ sub DbRep_Get {
       return "Dump is running - try again later !"                                if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       return "The operation \"$opt\" isn't available with database type $dbmodel" if($dbmodel ne 'MYSQL');
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       DbRep_setLastCmd (@a);
       DbRep_Main       ($hash, $opt, $prop);
   }
   elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       DbRep_setLastCmd (@a);
       DbRep_Main       ($hash, $opt, $prop);
   }
   elsif ($opt eq "blockinginfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       DbRep_setLastCmd          (@a);
-      DbRep_delread             ($hash);
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       DbRep_getblockinginfo     ($hash);
   }
@@ -1318,7 +1320,6 @@ sub DbRep_Get {
       $hash->{HELPER}{IDRETRIES} = 3;                                           # Anzahl wie oft versucht wird initiale Daten zu holen
 
       DbRep_setLastCmd          (@a);
-      DbRep_delread             ($hash);
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
       $prop //= '';
@@ -1333,14 +1334,22 @@ sub DbRep_Get {
 
       my $sqlcmd  = join ' ', @cmd;
       $sqlcmd     =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
-      $sqlcmd    .= ';' if ($sqlcmd !~ m/\;$/xs);
+      $sqlcmd    .= ';' if ($sqlcmd !~ m/\;$/x);
 
+      $sqlcmd                             = _DbRep_sqlFormOnline ($hash, $sqlcmd);           # SQL Statement online formatieren
+      $sqlcmd                             = DbRep_trim ($sqlcmd);
+      $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                                         # SQL incl. Formatierung zwischenspeichern
+
+      @cmd    = split /\s+/, $sqlcmd;
+      $sqlcmd = join ' ', @cmd;
+      
       DbRep_setLastCmd ($name, $opt, $sqlcmd);
 
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($name, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
       return DbRep_sqlCmdBlocking($name,$sqlcmd);
@@ -6506,15 +6515,15 @@ sub DbRep_impfile {
       Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");
 
       if($i_timestamp && $i_device && $i_reading) {
-          eval { $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit); 
+          eval { $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit);
                }
                or do { $err = encode_base64($@,"");
                        Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
                        close(FH);
-                       
+
                        $dbh->rollback;
                        $dbh->disconnect;
-                       
+
                        return "$name|$err";
                      };
 
@@ -6624,11 +6633,11 @@ sub DbRep_sqlCmd {
   my $sql = $cmd;
 
   my @pms;
-  
-  $err = _DbRep_setSessAttrVars ($name, $dbh);  
+
+  $err = _DbRep_setSessAttrVars ($name, $dbh);
   return "$name|$err" if ($err);
 
-  $err = _DbRep_setSessVars ($name, $dbh, \$sql);   
+  $err = _DbRep_setSessVars ($name, $dbh, \$sql);
   return "$name|$err" if ($err);
 
   $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
@@ -6722,12 +6731,9 @@ sub DbRep_sqlCmdBlocking {
 
   my ($ret);
 
-  readingsDelete            ($hash, "errortext");
-  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
   if ($err) {
-      _DbRep_setErrorState ($name, $err);
+      _DbRep_setErrorState ($hash, $err);
       return $err;
   }
 
@@ -6743,27 +6749,27 @@ sub DbRep_sqlCmdBlocking {
 
   $err = _DbRep_setSessAttrVars ($name, $dbh);
   if ($err) {
-      _DbRep_setErrorState ($name, $err);
+      _DbRep_setErrorState ($hash, $err);
       return $err;
   }
-            
+
   $err = _DbRep_setSessVars ($name, $dbh, \$sql);
   if ($err) {
-      _DbRep_setErrorState ($name, $err);
+      _DbRep_setErrorState ($hash, $err);
       return $err;
-  } 
+  }
 
   $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
   if ($err) {
-      _DbRep_setErrorState ($name, $err);
+      _DbRep_setErrorState ($hash, $err);
       return $err;
   }
-  
+
   $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
   if ($err) {
-      _DbRep_setErrorState ($name, $err);
+      _DbRep_setErrorState ($hash, $err);
       return $err;
-  } 
+  }
 
   my $st = [gettimeofday];                                                        # SQL-Startzeit
 
@@ -6784,14 +6790,14 @@ sub DbRep_sqlCmdBlocking {
       if ($@) {
           if($@ eq "Timeout\n") {                                                 # timeout
               $failed = $totxt;
-          } 
+          }
           else {                                                                  # ein anderer Fehler
               $failed = $@;
           }
       }
       1;
 
-  } 
+  }
   or $failed = $@;
 
   alarm(0);                                                                      # Schutz vor Race Condition
@@ -6800,14 +6806,13 @@ sub DbRep_sqlCmdBlocking {
       $err = $failed eq "Timeout\n" ? $totxt : $failed;
 
       Log3 ($name, 2, "DbRep $name - $err");
+      
+      my $encerr = encode_base64($err, "");
 
       $sth->finish if($sth);
       $dbh->disconnect;
 
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
-      ReadingsBulkUpdateValue ($hash, 'state',     'error');
-      readingsEndUpdate       ($hash, 1);
+      _DbRep_setErrorState ($hash, $encerr);
 
       return $err;
   }
@@ -6823,10 +6828,10 @@ sub DbRep_sqlCmdBlocking {
   }
   else {
       $nrows = $sth->rows;
-      
+
       $err = DbRep_commitOnly ($name, $dbh);
       if ($err) {
-          _DbRep_setErrorState ($name, $err);
+          _DbRep_setErrorState ($hash, $err);
           return $err;
       }
 
@@ -6842,6 +6847,12 @@ sub DbRep_sqlCmdBlocking {
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows");
 
   readingsBeginUpdate         ($hash);
+  
+  if (defined $data{DbRep}{$name}{sqlcache}{temp}) {                # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
+      my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};
+      ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);
+  }
+  
   ReadingsBulkUpdateTimeState ($hash, undef, $rt, 'done');
   readingsEndUpdate           ($hash, 1);
 
@@ -6849,7 +6860,7 @@ return $ret;
 }
 
 ################################################################
-#   Set Session Variablen "SET" oder PRAGMA aus 
+#   Set Session Variablen "SET" oder PRAGMA aus
 #   Attribut "sqlCmdVars"
 ################################################################
 sub _DbRep_setSessAttrVars {
@@ -6908,14 +6919,14 @@ return;
 }
 
 ################################################################
-# Abarbeitung aller Pragmas vor einem SQLite Statement, 
+# Abarbeitung aller Pragmas vor einem SQLite Statement,
 # SQL wird extrahiert wenn Pragmas im SQL vorangestellt sind
 ################################################################
 sub _DbRep_setSessPragma {
   my $name   = shift;
   my $dbh    = shift;
   my $sqlref = shift;
-  
+
   if(${$sqlref} =~ /^\s*PRAGMA.*;/i) {
       my @pms    = split ';', ${$sqlref};
       ${$sqlref} = q{};
@@ -6938,8 +6949,8 @@ return;
 }
 
 ####################################################################
-# Abarbeitung von PREPARE statement als Befehl als Bestandteil 
-# des SQL 
+# Abarbeitung von PREPARE statement als Befehl als Bestandteil
+# des SQL
 # Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
 # z.B. PREPARE statement FROM @CMD
 ####################################################################
@@ -6947,7 +6958,7 @@ sub _DbRep_execSessPrepare {
   my $name   = shift;
   my $dbh    = shift;
   my $sqlref = shift;
-  
+
   if(${$sqlref} =~ /^\s*PREPARE.*;/i) {
       my @pms    = split ';', ${$sqlref};
       ${$sqlref} = q{};
@@ -6975,13 +6986,19 @@ return;
 sub _DbRep_setErrorState {
   my $hash = shift;
   my $err  = shift;
-  
+
   my $name = $hash->{NAME};
   $err     = decode_base64 ($err);
 
   Log3 ($name, 2, "DbRep $name - ERROR - $err");
 
   readingsBeginUpdate     ($hash);
+  
+  if (defined $data{DbRep}{$name}{sqlcache}{temp}) {                # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
+      my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};
+      ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);
+  }
+  
   ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
   ReadingsBulkUpdateValue ($hash, 'state',     'error');
   readingsEndUpdate       ($hash, 1);
@@ -7060,12 +7077,17 @@ sub DbRep_sqlCmdDone {
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
   delete($hash->{HELPER}{RUNNING_PID});
-
+  
+  my $tmpsql           = delete $data{DbRep}{$name}{sqlcache}{temp};                    # SQL incl. Formatierung aus Zwischenspeicher holen
   my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
 
   if ($err) {
-    ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-    ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+    readingsBeginUpdate     ($hash);
+    ReadingsBulkUpdateValue ($hash, 'sqlCmd',    $tmpsql); 
+    ReadingsBulkUpdateValue ($hash, "errortext", $err   );
+    ReadingsBulkUpdateValue ($hash, "state",     "error");
+    readingsEndUpdate       ($hash, 1);
+    
     return;
   }
 
@@ -7078,7 +7100,7 @@ sub DbRep_sqlCmdDone {
   no warnings 'uninitialized';
 
   readingsBeginUpdate     ($hash);
-  ReadingsBulkUpdateValue ($hash, 'sqlCmd', $data{DbRep}{$name}{sqlcache}{temp});      # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
+  ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);      
   ReadingsBulkUpdateValue ($hash, 'sqlResultNumRows', $nrows);
 
   DbRep_addSQLcmdCache ($name);                                                        # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
@@ -7092,6 +7114,7 @@ sub DbRep_sqlCmdDone {
       my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
       my @rows = split( /§/, $rowstring );
       my $row;
+      
       for $row ( @rows ) {
           $row =~ s/\|°escaped°\|/§/g;
           $row =~ s/$srs/\|/g if($srs !~ /\|/);
@@ -7106,6 +7129,7 @@ sub DbRep_sqlCmdDone {
       my $res = "<html>";
       my @rows = split( /§/, $rowstring );
       my $row;
+      
       for $row ( @rows ) {
           $row =~ s/\|°escaped°\|/§/g;
           $res .= $row."<br>";
@@ -7120,6 +7144,7 @@ sub DbRep_sqlCmdDone {
       my $numd = ceil(log10($bigint));
       my $formatstr = sprintf('%%%d.%dd', $numd, $numd);
       my $i = 0;
+      
       for my $row ( @rows ) {
           $i++;
           $row =~ s/\|°escaped°\|/§/g;
@@ -7134,6 +7159,7 @@ sub DbRep_sqlCmdDone {
       my $numd = ceil(log10($bigint));
       my $formatstr = sprintf('%%%d.%dd', $numd, $numd);
       my $i = 0;
+      
       for my $row ( @rows ) {
           $i++;
           $row =~ s/\|°escaped°\|/§/g;
@@ -7144,8 +7170,8 @@ sub DbRep_sqlCmdDone {
       ReadingsBulkUpdateValue ($hash, "SqlResult", $json);
   }
 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
+  readingsEndUpdate           ($hash, 1);
 
 return;
 }
@@ -10261,7 +10287,10 @@ sub DbRep_ParseAborted {
   my $state  = $cause.$erread;
 
   $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  readingsBeginUpdate     ($hash);      
+  ReadingsBulkUpdateValue ($hash, "state", $state);
+  readingsEndUpdate       ($hash, 1);
 
   Log3 ($name, 2, "DbRep $name - Database command aborted: \"$cause\" ");
 
@@ -13504,8 +13533,12 @@ return;
 #                     Associated Devices setzen
 ###################################################################################
 sub DbRep_modAssociatedWith {
-  my ($hash,$cmd,$awdev) = @_;
-  my $name = $hash->{NAME};
+  my $hash  = shift;
+  my $cmd   = shift;
+  my $awdev = shift;
+  
+  my $name  = $hash->{NAME};
+  
   my (@naw,@edvs,@edvspcs,$edevswc);
   my ($edevs,$idevice,$edevice) = ('','','');
 
@@ -13518,14 +13551,16 @@ sub DbRep_modAssociatedWith {
 
   if($edevice) {
       @edvs = split(",",$edevice);
-      foreach my $e (@edvs) {
+      for my $e (@edvs) {
           $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen
           @edvspcs = devspec2array($e);
           @edvspcs = map { my $e = $_; $e =~ s/\.\*/%/xg; } @edvspcs;
+
           if((map {$_ =~ /%/;} @edvspcs) && $edevice !~ /^%$/) {      # Devices mit Wildcard (%) aussortieren, die nicht aufgelöst werden konnten
               $edevswc .= "|" if($edevswc);
               $edevswc .= join(" ",@edvspcs);
-          } else {
+          }
+          else {
               $edevs .= "|" if($edevs);
               $edevs .= join("|",@edvspcs);
           }
@@ -13534,10 +13569,12 @@ sub DbRep_modAssociatedWith {
 
   if($idevice) {
       my @nadev = split("[, ]", $idevice);
-      foreach my $d (@nadev) {
+
+      for my $d (@nadev) {
           $d    =~ s/%/\.*/g if($d !~ /^%$/);                         # SQL Wildcard % in Regex
           my @a = devspec2array($d);
-          foreach(@a) {
+
+          for (@a) {
               next if(!$defs{$_});
               push(@naw, $_) if($_ !~ /$edevs/);
           }
@@ -13546,7 +13583,8 @@ sub DbRep_modAssociatedWith {
 
   if(@naw) {
       ReadingsSingleUpdateValue ($hash, ".associatedWith", join(" ",@naw), 0);
-  } else {
+  }
+  else {
       readingsDelete($hash, ".associatedWith");
   }
 
@@ -15509,7 +15547,7 @@ sub dbval {
 
   <a id="DbRep-attr-averageCalcForm"></a>
   <li><b>averageCalcForm </b> <br><br>
-  
+
   Defines the calculation variant for determining the average value with "averageValue". <br><br>
 
   Currently the following variants are implemented: <br><br>
@@ -18402,7 +18440,7 @@ sub dbval {
 
   <a id="DbRep-attr-averageCalcForm"></a>
   <li><b>averageCalcForm </b> <br><br>
-  
+
   Legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" fest.
   <br><br>
 
