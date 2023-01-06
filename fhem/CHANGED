@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  14_Hideki.pm: output wind values always as floatingpoint
+ - bugix:   14_Hideki.pm: fixed wind direction
  - feature: 14_SD_WS.pm: new sensor Bresser 7-in-1 Comfort Wetter Center
                          new set command to allow battery replacement
                          new sensor SM60020 multi purpose environment sensor
@@ -31,8 +33,8 @@
                                 remote control RCnoName20_10 
                                 Temola TM 40 support
                                 remote control DC-1961-TG 
- - bugfix: SD_ProtocolData.pm: bugfix Bresser protocols
-                               prevents Perl warning WS2000
+ - bugfix:  SD_ProtocolData.pm: bugfix Bresser protocols
+                                prevents Perl warning WS2000
  - feature: 75_MSG: add new msg schema entry for Matrix and SignalBot
  - feature: 75_msgConfig: add commandref
  - bugfix:  98_todoist: key in header
