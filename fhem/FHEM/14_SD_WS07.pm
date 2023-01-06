@@ -30,18 +30,18 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
 #use Data::Dumper;
 
 
-sub
-SD_WS07_Initialize($)
+sub SD_WS07_Initialize
 {
   my ($hash) = @_;
   $hash->{Match}     = "^P7#[A-Fa-f0-9]{6}[AFaf][A-Fa-f0-9]{2,3}";    ## pos 7 ist aktuell immer 0xF oder 0xA
-  $hash->{DefFn}     = "SD_WS07_Define";
-  $hash->{UndefFn}   = "SD_WS07_Undef";
-  $hash->{ParseFn}   = "SD_WS07_Parse";
+  $hash->{DefFn}     = \&SD_WS07_Define;
+  $hash->{UndefFn}   = \&SD_WS07_Undef;
+  $hash->{ParseFn}   = \&SD_WS07_Parse;
   $hash->{AttrList}  = "do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                        "negation-batt:no,yes ".
                        "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
@@ -52,6 +52,7 @@ SD_WS07_Initialize($)
 			"SD_WS07_TH_.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"},
 			"SD_WS07_T_.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4:Temp,",  autocreateThreshold => "2:180"}
 			};
+  return FHEM::Meta::InitMod( __FILE__, $hash )
 }
 
 #############################
@@ -145,9 +146,9 @@ SD_WS07_Parse($$)
 	}
     
 	$model = $model."_".$models{$modelkey};
-    my $deviceCode;
-	my $longids = AttrVal($iohash->{NAME},'longids',0);
-	if ( ($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))	{
+  my $deviceCode;
+  my $longids = AttrVal($iohash->{NAME},'longids',0);
+  if ( ($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))	{
 		$deviceCode = $id.$channel;
 		Log3 $iohash,4, "$iohash->{NAME}: using longid $longids model $model";
 	} else {
@@ -457,4 +458,88 @@ SD_WS07_Parse($$)
 </ul>
 
 =end html_DE
+=for :application/json;q=META.json 14_SD_WS07.pm
+{
+  "abstract": "Supports weather sensors protocol 7 from SIGNALduino",
+  "author": [
+    "Sidey <>",
+    "ralf9 <>"
+  ],
+  "x_fhem_maintainer": [
+    "Sidey"
+  ],
+  "x_fhem_maintainer_github": [
+    "Sidey79",
+  	"HomeAutoUser",
+	  "elektron-bbs"
+  ],
+  "description": "The SD_WS07 module processes messages from various environmental sensors received from an IO device (CUL, CUN, SIGNALDuino, SignalESP etc.)",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino",
+    "weather",
+    "station",
+    "sensor"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::SD_WS",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+      }
+    },
+    "develop": {
+      "requires": {
+      }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/RFD-FHEM/RFFHEM/issues/"
+    },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/t/FHEM/14_SD_WS07/testData.json",
+        "testname": "Testdata with SD_WS07 sensors"
+      }
+    ],
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://github.com/RFD-FHEM/RFFHEM/tree/master"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/14_SD_WS07.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/14_SD_WS07.pm"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "description": "Sonstige Hausautomations-Systeme",
+      "forum": "FHEM Forum",
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=29",
+      "title": "FHEM Forum: Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    },
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/SIGNALduino"
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut
