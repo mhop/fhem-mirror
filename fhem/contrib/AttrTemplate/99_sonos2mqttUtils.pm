@@ -343,7 +343,7 @@ if ($reading eq 'Input') {
    my $currentTrack_TrackUri = ReadingsVal($name,'currentTrack_TrackUri','');
    return $currentTrack_TrackUri =~ 'x-rincon-stream'
       ? 'LineIn': $currentTrack_TrackUri =~ 'spdif'
-      ? 'TV'    : ReadingsVal($name,'enqueuedMetadata_UpnpClass','') eq 'object.item.audioItem.audioBroadcast' or $currentTrack_TrackUri =~ 'x-rincon-mp3radio'
+      ? 'TV'    : (ReadingsVal($name,'enqueuedMetadata_UpnpClass','') eq 'object.item.audioItem.audioBroadcast') or ($currentTrack_TrackUri =~ 'x-rincon-mp3radio')
       ? 'Radio' : 'Playlist'
   }
 }
