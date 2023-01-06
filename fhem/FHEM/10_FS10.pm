@@ -19,6 +19,7 @@ package FS10;
 use strict;
 use warnings;
 use GPUtils qw(GP_Import GP_Export);
+use FHEM::Meta;
 
 our $VERSION = '1.1';
 
@@ -89,7 +90,8 @@ sub Initialize {
 	                      "$main::readingFnAttributes " .
 	                      'model:'.join q{,} , sort keys %models;
 	$hash->{AutoCreate} = {'FS10.*' => {FILTER => '%NAME', autocreateThreshold => '5:180', GPLOT => q{}}};
-	return;
+
+	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub Attr {
@@ -553,4 +555,86 @@ __END__
 </ul>
 
 =end html_DE
+=for :application/json;q=META.json 10_FS10.pm
+{
+  "abstract": "devices communicating using the ELV FS10 protocol",
+  "author": [
+    "Sidey <>",
+	"elektron-bss <>"
+  ],
+  "x_fhem_maintainer": [
+  	"elektron-bss <>",
+    "Sidey"
+  ],
+  "x_fhem_maintainer_github": [
+    "Sidey79",
+	"HomeAutoUser",
+	"elektron-bbs"
+  ],
+  "description": "The FS10 module decrypts and sends FS10 messages, which are processed by the SIGNALduino",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino",
+    "FS10"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::FS10",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+		"GPUtils" : "0"
+	  }
+    },
+    "develop": {
+      "requires": {
+		"GPUtils" : "0"
+	  }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/RFD-FHEM/RFFHEM/issues/"
+    },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/RFD-FHEM/RFFHEM/master/t/FHEM/10_FS10/testData.json",
+        "testname": "Testdata with FS10 sensors"
+      }
+    ],
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/RFD-FHEM/RFFHEM.git",
+        "web": "https://github.com/RFD-FHEM/RFFHEM/tree/master"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/10_FS10.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/10_FS10.pm"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "description": "Sonstige Hausautomations-Systeme",
+      "forum": "FHEM Forum",
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=29",
+      "title": "FHEM Forum: Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut
