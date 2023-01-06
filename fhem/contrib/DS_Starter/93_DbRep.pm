@@ -6733,7 +6733,7 @@ sub DbRep_sqlCmdBlocking {
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
   if ($err) {
-      _DbRep_setErrorState ($hash, $err);
+      _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
 
@@ -6749,25 +6749,25 @@ sub DbRep_sqlCmdBlocking {
 
   $err = _DbRep_setSessAttrVars ($name, $dbh);
   if ($err) {
-      _DbRep_setErrorState ($hash, $err);
+      _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
 
   $err = _DbRep_setSessVars ($name, $dbh, \$sql);
   if ($err) {
-      _DbRep_setErrorState ($hash, $err);
+      _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
 
   $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
   if ($err) {
-      _DbRep_setErrorState ($hash, $err);
+      _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
 
   $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
   if ($err) {
-      _DbRep_setErrorState ($hash, $err);
+      _DbRep_sqlBlckgErrorState ($hash, $err);
       return $err;
   }
 
@@ -6812,7 +6812,7 @@ sub DbRep_sqlCmdBlocking {
       $sth->finish if($sth);
       $dbh->disconnect;
 
-      _DbRep_setErrorState ($hash, $encerr);
+      _DbRep_sqlBlckgErrorState ($hash, $encerr);
 
       return $err;
   }
@@ -6831,7 +6831,7 @@ sub DbRep_sqlCmdBlocking {
 
       $err = DbRep_commitOnly ($name, $dbh);
       if ($err) {
-          _DbRep_setErrorState ($hash, $err);
+          _DbRep_sqlBlckgErrorState ($hash, $err);
           return $err;
       }
 
@@ -6983,7 +6983,7 @@ return;
 ####################################################################
 #  Error -> Readings errortext und state
 ####################################################################
-sub _DbRep_setErrorState {
+sub _DbRep_sqlBlckgErrorState {
   my $hash = shift;
   my $err  = shift;
 
