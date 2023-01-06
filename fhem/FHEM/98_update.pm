@@ -249,6 +249,7 @@ doUpdate($$$$)
   my ($basePath, $ctrlFileName);
   $src =~ s'^http://fhem\.de'https://fhem.de' if($upd_hasSSL);
   $src =~ s'^https://'http://' if(!$upd_wantSSL);
+  uLog 1, "";
   uLog 1, "Downloading $src";
   if($src !~ m,^(.*)/([^/]*)$,) {
     uLog 1, "Cannot parse $src, probably not a valid http control file";
@@ -271,7 +272,6 @@ doUpdate($$$$)
   }
 
   if($max != 1) {
-    uLog 1, "";
     uLog 1, $srcName;
   }
 
