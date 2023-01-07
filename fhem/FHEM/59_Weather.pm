@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #     59_Weather.pm
-#     Copyright by Dr. Boris Neubert
+#     (c) 2009-2023 Copyright by Dr. Boris Neubert
 #     e-mail: omega at online dot de
 #
 #       Contributors:
@@ -31,8 +31,10 @@ package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
-#use HttpUtils;
+use Time::HiRes  qw(gettimeofday);
+use experimental qw /switch/;
+use Readonly;
+
 use FHEM::Meta;
 use vars qw($FW_ss);
 
@@ -205,50 +207,60 @@ my @iconlist = (
 );
 
 ###################################
-sub Weather_LanguageInitialize($) {
-    my ($lang) = @_;
+sub Weather_LanguageInitialize {
+    my $lang = shift;
 
-    if ( $lang eq "de" ) {
-        %wdays_txt_i18n          = %wdays_txt_de;
-        @directions_txt_i18n     = @directions_txt_de;
-        %pressure_trend_txt_i18n = %pressure_trend_txt_de;
-        %status_items_txt_i18n   = %status_items_txt_de;
+    given ($lang) {
+        when ('de') {
+            %wdays_txt_i18n          = %wdays_txt_de;
+            @directions_txt_i18n     = @directions_txt_de;
+            %pressure_trend_txt_i18n = %pressure_trend_txt_de;
+            %status_items_txt_i18n   = %status_items_txt_de;
+        }
+
+        when ('nl') {
+            %wdays_txt_i18n          = %wdays_txt_nl;
+            @directions_txt_i18n     = @directions_txt_nl;
+            %pressure_trend_txt_i18n = %pressure_trend_txt_nl;
+            %status_items_txt_i18n   = %status_items_txt_nl;
+        }
+
+        when ('fr') {
+            %wdays_txt_i18n          = %wdays_txt_fr;
+            @directions_txt_i18n     = @directions_txt_fr;
+            %pressure_trend_txt_i18n = %pressure_trend_txt_fr;
+            %status_items_txt_i18n   = %status_items_txt_fr;
+        }
+
+        when ('pl') {
+            %wdays_txt_i18n          = %wdays_txt_pl;
+            @directions_txt_i18n     = @directions_txt_pl;
+            %pressure_trend_txt_i18n = %pressure_trend_txt_pl;
+            %status_items_txt_i18n   = %status_items_txt_pl;
+        }
+
+        when ('it') {
+            %wdays_txt_i18n          = %wdays_txt_it;
+            @directions_txt_i18n     = @directions_txt_it;
+            %pressure_trend_txt_i18n = %pressure_trend_txt_it;
+            %status_items_txt_i18n   = %status_items_txt_it;
+        }
+
+        default {
+            %wdays_txt_i18n          = %wdays_txt_en;
+            @directions_txt_i18n     = @directions_txt_en;
+            %pressure_trend_txt_i18n = %pressure_trend_txt_en;
+            %status_items_txt_i18n   = %status_items_txt_en;
+        }
     }
-    elsif ( $lang eq "nl" ) {
-        %wdays_txt_i18n          = %wdays_txt_nl;
-        @directions_txt_i18n     = @directions_txt_nl;
-        %pressure_trend_txt_i18n = %pressure_trend_txt_nl;
-        %status_items_txt_i18n   = %status_items_txt_nl;
-    }
-    elsif ( $lang eq "fr" ) {
-        %wdays_txt_i18n          = %wdays_txt_fr;
-        @directions_txt_i18n     = @directions_txt_fr;
-        %pressure_trend_txt_i18n = %pressure_trend_txt_fr;
-        %status_items_txt_i18n   = %status_items_txt_fr;
-    }
-    elsif ( $lang eq "pl" ) {
-        %wdays_txt_i18n          = %wdays_txt_pl;
-        @directions_txt_i18n     = @directions_txt_pl;
-        %pressure_trend_txt_i18n = %pressure_trend_txt_pl;
-        %status_items_txt_i18n   = %status_items_txt_pl;
-    }
-    elsif ( $lang eq "it" ) {
-        %wdays_txt_i18n          = %wdays_txt_it;
-        @directions_txt_i18n     = @directions_txt_it;
-        %pressure_trend_txt_i18n = %pressure_trend_txt_it;
-        %status_items_txt_i18n   = %status_items_txt_it;
-    }
-    else {
-        %wdays_txt_i18n          = %wdays_txt_en;
-        @directions_txt_i18n     = @directions_txt_en;
-        %pressure_trend_txt_i18n = %pressure_trend_txt_en;
-        %status_items_txt_i18n   = %status_items_txt_en;
-    }
+
+    return;
 }
 
 ###################################
-sub Weather_DebugCodes($) {
-    my ($lang) = @_;
+sub Weather_DebugCodes {
+    my $lang = shift;
+
     my @YahooCodes_i18n = YahooWeatherAPI_getYahooCodes($lang);
 
     Debug "Weather Code List, see http://developer.yahoo.com/weather/#codes";
@@ -257,36 +269,44 @@ sub Weather_DebugCodes($) {
           sprintf( "%2d %30s %30s", $c, $iconlist[$c], $YahooCodes_i18n[$c] );
     }
 
+    return;
 }
 
 #####################################
-sub Weather_Initialize($) {
-    my ($hash) = @_;
+sub Weather_Initialize {
+    my $hash = shift;
 
-    $hash->{DefFn}   = 'Weather_Define';
-    $hash->{UndefFn} = 'Weather_Undef';
-    $hash->{GetFn}   = 'Weather_Get';
-    $hash->{SetFn}   = 'Weather_Set';
+    $hash->{DefFn}   = \&Weather_Define;
+    $hash->{UndefFn} = \&Weather_Undef;
+    $hash->{GetFn}   = \&Weather_Get;
+    $hash->{SetFn}   = \&Weather_Set;
+    $hash->{AttrFn}  = \&Weather_Attr;
     $hash->{AttrList} =
         'disable:0,1 '
-      . 'forecast:hourly,daily,every,off '
+      . 'forecast:multiple-strict,hourly,daily '
       . 'forecastLimit '
+      . 'alerts:0,1 '
       . $readingFnAttributes;
-    $hash->{NotifyFn} = 'Weather_Notify';
+    $hash->{NotifyFn}    = \&Weather_Notify;
+    $hash->{parseParams} = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 ###################################
 
-sub degrees_to_direction($@) {
-    my ( $degrees, @directions_txt_i18n ) = @_;
+sub degrees_to_direction {
+    my $degrees             = shift;
+    my $directions_txt_i18n = shift;
+
     my $mod = int( ( ( $degrees + 11.25 ) % 360 ) / 22.5 );
-    return $directions_txt_i18n[$mod];
+    return $directions_txt_i18n->[$mod];
 }
 
-sub Weather_ReturnWithError($$) {
-    my ( $hash, $responseRef ) = @_;
+sub Weather_ReturnWithError {
+    my $hash        = shift;
+    my $responseRef = shift;
+
     my $name = $hash->{NAME};
 
     readingsBeginUpdate($hash);
@@ -309,10 +329,48 @@ sub Weather_ReturnWithError($$) {
     return;
 }
 
-sub Weather_RetrieveCallbackFn($) {
-    my $name        = shift;
-    
-    return undef
+sub Weather_DeleteForecastReadings {
+    my $hash = shift;
+
+    my $name                    = $hash->{NAME};
+    my $forecastConfig          = Weather_ForcastConfig($hash);
+    my $forecastLimit           = AttrVal( $name, 'forecastLimit', 5 ) + 1;
+    my $forecastLimitNoForecast = 1;
+
+    $forecastLimit = $forecastLimitNoForecast
+      if ( !$forecastConfig->{daily} );
+    CommandDeleteReading( undef,
+        $name . ' ' . 'fc([' . $forecastLimit . '-9]|[0-9]{2})_.*' );
+
+    $forecastLimit = $forecastLimitNoForecast
+      if ( !$forecastConfig->{hourly} );
+    CommandDeleteReading( undef,
+        $name . ' ' . 'hfc([' . $forecastLimit . '-9]|[0-9]{2})_.*' );
+
+    return;
+}
+
+sub Weather_DeleteAlertsReadings {
+    my $hash        = shift;
+    my $alertsLimit = shift // 0;
+
+    my $name                = $hash->{NAME};
+    my $alertsConfig        = Weather_ForcastConfig($hash);
+    my $alertsLimitNoAlerts = 0;
+
+    $alertsLimit = $alertsLimitNoAlerts
+      if ( !$alertsConfig->{alerts} );
+
+    CommandDeleteReading( undef,
+        $name . ' ' . 'warn_([' . $alertsLimit . '-9]|[0-9]{2})_.*' );
+
+    return;
+}
+
+sub Weather_RetrieveCallbackFn {
+    my $name = shift;
+
+    return
       unless ( IsDevice($name) );
 
     my $hash        = $defs{$name};
@@ -324,54 +382,65 @@ sub Weather_RetrieveCallbackFn($) {
     else {
         Weather_ReturnWithError( $hash, $responseRef );
     }
+
+    return;
 }
 
-sub Weather_WriteReadings($$) {
-    my ( $hash, $dataRef ) = @_;
-    my $name = $hash->{NAME};
-    readingsBeginUpdate($hash);
+sub Weather_ForcastConfig {
+    my $hash = shift;
 
-    # delete some unused readings
-    delete( $hash->{READINGS}->{temp_f} )
-      if ( defined( $hash->{READINGS}->{temp_f} ) );
-    delete( $hash->{READINGS}->{unit_distance} )
-      if ( defined( $hash->{READINGS}->{unit_distance} ) );
-    delete( $hash->{READINGS}->{unit_speed} )
-      if ( defined( $hash->{READINGS}->{unit_speed} ) );
-    delete( $hash->{READINGS}->{unit_pressuree} )
-      if ( defined( $hash->{READINGS}->{unit_pressuree} ) );
-    delete( $hash->{READINGS}->{unit_temperature} )
-      if ( defined( $hash->{READINGS}->{unit_temperature} ) );
+    my $name = $hash->{NAME};
+    my %forecastConfig;
+
+    $forecastConfig{hourly} =
+      ( AttrVal( $name, 'forecast', '' ) =~ m{hourly}xms ? 1 : 0 );
+
+    $forecastConfig{daily} =
+      ( AttrVal( $name, 'forecast', '' ) =~ m{daily}xms ? 1 : 0 );
+
+    $forecastConfig{alerts} = AttrVal( $name, 'alerts', 0 );
+
+    return \%forecastConfig;
+}
+
+sub Weather_WriteReadings {
+    my $hash    = shift;
+    my $dataRef = shift;
+
+    my $forecastConfig = Weather_ForcastConfig($hash);
+    my $name           = $hash->{NAME};
+
+    readingsBeginUpdate($hash);
 
     # housekeeping information
     readingsBulkUpdate( $hash, 'lastError', '' );
     foreach my $r ( keys %{$dataRef} ) {
         readingsBulkUpdate( $hash, $r, $dataRef->{$r} )
-          if (  ref( $dataRef->{$r} ) ne 'HASH'
-            and ref( $dataRef->{$r} ) ne 'ARRAY' );
+          if ( ref( $dataRef->{$r} ) ne 'HASH'
+            && ref( $dataRef->{$r} ) ne 'ARRAY' );
         readingsBulkUpdate( $hash, '.license', $dataRef->{license}->{text} );
     }
 
     ### current
     if ( defined( $dataRef->{current} )
-        and ref( $dataRef->{current} ) eq 'HASH' )
+        && ref( $dataRef->{current} ) eq 'HASH' )
     {
         while ( my ( $r, $v ) = each %{ $dataRef->{current} } ) {
             readingsBulkUpdate( $hash, $r, $v )
-              if (  ref( $dataRef->{$r} ) ne 'HASH'
-                and ref( $dataRef->{$r} ) ne 'ARRAY' );
+              if ( ref( $dataRef->{$r} ) ne 'HASH'
+                && ref( $dataRef->{$r} ) ne 'ARRAY' );
         }
 
         readingsBulkUpdate( $hash, 'icon',
             $iconlist[ $dataRef->{current}->{code} ] );
-        if (    defined( $dataRef->{current}->{wind_direction} )
-            and $dataRef->{current}->{wind_direction}
-            and defined( $dataRef->{current}->{wind_speed} )
-            and $dataRef->{current}->{wind_speed} )
+        if (   defined( $dataRef->{current}->{wind_direction} )
+            && $dataRef->{current}->{wind_direction}
+            && defined( $dataRef->{current}->{wind_speed} )
+            && $dataRef->{current}->{wind_speed} )
         {
             my $wdir =
               degrees_to_direction( $dataRef->{current}->{wind_direction},
-                @directions_txt_i18n );
+                \@directions_txt_i18n );
             readingsBulkUpdate( $hash, 'wind_condition',
                     'Wind: '
                   . $wdir . ' '
@@ -382,27 +451,24 @@ sub Weather_WriteReadings($$) {
 
     ### forecast
     if ( ref( $dataRef->{forecast} ) eq 'HASH'
-        and AttrVal( $name, 'forecast', 'every' ) ne 'off' )
+        && ( $forecastConfig->{hourly} || $forecastConfig->{daily} ) )
     {
         ## hourly
-        if (
-                defined( $dataRef->{forecast}->{hourly} )
-            and ref( $dataRef->{forecast}->{hourly} ) eq 'ARRAY'
-            and scalar( @{ $dataRef->{forecast}->{hourly} } ) > 0
-            and (  AttrVal( $name, 'forecast', 'every' ) eq 'every'
-                or AttrVal( $name, 'forecast', 'hourly' ) eq 'hourly' )
-          )
+        if (   defined( $dataRef->{forecast}->{hourly} )
+            && ref( $dataRef->{forecast}->{hourly} ) eq 'ARRAY'
+            && scalar( @{ $dataRef->{forecast}->{hourly} } ) > 0
+            && $forecastConfig->{hourly} )
         {
-            my $i = 0;
-            my $limit = AttrVal( $name, 'forecastLimit', -1 );
+            my $i     = 0;
+            my $limit = AttrVal( $name, 'forecastLimit', 5 );
             foreach my $fc ( @{ $dataRef->{forecast}->{hourly} } ) {
                 $i++;
                 my $f = "hfc" . $i . "_";
 
                 while ( my ( $r, $v ) = each %{$fc} ) {
                     readingsBulkUpdate( $hash, $f . $r, $v )
-                      if (  ref( $dataRef->{$r} ) ne 'HASH'
-                        and ref( $dataRef->{$r} ) ne 'ARRAY' );
+                      if ( ref( $dataRef->{$r} ) ne 'HASH'
+                        && ref( $dataRef->{$r} ) ne 'ARRAY' );
                 }
                 readingsBulkUpdate(
                     $hash,
@@ -414,17 +480,17 @@ sub Weather_WriteReadings($$) {
                     defined(
                         $dataRef->{forecast}->{hourly}[ $i - 1 ]{wind_direction}
                     )
-                    and $dataRef->{forecast}->{hourly}[ $i - 1 ]{wind_direction}
-                    and defined(
+                    && $dataRef->{forecast}->{hourly}[ $i - 1 ]{wind_direction}
+                    && defined(
                         $dataRef->{forecast}->{hourly}[ $i - 1 ]{wind_speed}
                     )
-                    and $dataRef->{forecast}->{hourly}[ $i - 1 ]{wind_speed}
+                    && $dataRef->{forecast}->{hourly}[ $i - 1 ]{wind_speed}
                   )
                 {
                     my $wdir = degrees_to_direction(
                         $dataRef->{forecast}
                           ->{hourly}[ $i - 1 ]{wind_direction},
-                        @directions_txt_i18n
+                        \@directions_txt_i18n
                     );
                     readingsBulkUpdate(
                         $hash,
@@ -436,29 +502,26 @@ sub Weather_WriteReadings($$) {
                     );
                 }
 
-                last if ( $i == $limit and $limit > 0 );
+                last if ( $i == $limit && $limit > 0 );
             }
         }
 
         ## daily
-        if (
-                defined( $dataRef->{forecast}->{daily} )
-            and ref( $dataRef->{forecast}->{daily} ) eq 'ARRAY'
-            and scalar( @{ $dataRef->{forecast}->{daily} } ) > 0
-            and (  AttrVal( $name, 'forecast', 'every' ) eq 'every'
-                or AttrVal( $name, 'forecast', 'daily' ) eq 'daily' )
-          )
+        if (   defined( $dataRef->{forecast}->{daily} )
+            && ref( $dataRef->{forecast}->{daily} ) eq 'ARRAY'
+            && scalar( @{ $dataRef->{forecast}->{daily} } ) > 0
+            && $forecastConfig->{daily} )
         {
-            my $i = 0;
-            my $limit = AttrVal( $name, 'forecastLimit', -1 );
+            my $i     = 0;
+            my $limit = AttrVal( $name, 'forecastLimit', 5 );
             foreach my $fc ( @{ $dataRef->{forecast}->{daily} } ) {
                 $i++;
                 my $f = "fc" . $i . "_";
 
                 while ( my ( $r, $v ) = each %{$fc} ) {
                     readingsBulkUpdate( $hash, $f . $r, $v )
-                      if (  ref( $dataRef->{$r} ) ne 'HASH'
-                        and ref( $dataRef->{$r} ) ne 'ARRAY' );
+                      if ( ref( $dataRef->{$r} ) ne 'HASH'
+                        && ref( $dataRef->{$r} ) ne 'ARRAY' );
                 }
                 readingsBulkUpdate(
                     $hash,
@@ -470,16 +533,16 @@ sub Weather_WriteReadings($$) {
                     defined(
                         $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_direction}
                     )
-                    and $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_direction}
-                    and defined(
+                    && $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_direction}
+                    && defined(
                         $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_speed}
                     )
-                    and $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_speed}
+                    && $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_speed}
                   )
                 {
                     my $wdir = degrees_to_direction(
                         $dataRef->{forecast}->{daily}[ $i - 1 ]{wind_direction},
-                        @directions_txt_i18n
+                        \@directions_txt_i18n
                     );
                     readingsBulkUpdate(
                         $hash,
@@ -491,11 +554,44 @@ sub Weather_WriteReadings($$) {
                     );
                 }
 
-                last if ( $i == $limit and $limit > 0 );
+                last if ( $i == $limit && $limit > 0 );
             }
         }
     }
 
+    ### alerts
+    if (   defined( $dataRef->{alerts} )
+        && ref( $dataRef->{alerts} ) eq 'ARRAY'
+        && scalar( @{ $dataRef->{alerts} } ) > 0
+        && $forecastConfig->{alerts} )
+    {
+        my $i = 0;
+        foreach my $warn ( @{ $dataRef->{alerts} } ) {
+            my $w = "warn_" . $i . "_";
+
+            while ( my ( $r, $v ) = each %{$warn} ) {
+                readingsBulkUpdate( $hash, $w . $r, $v )
+                  if ( ref( $dataRef->{$r} ) ne 'HASH'
+                    && ref( $dataRef->{$r} ) ne 'ARRAY' );
+            }
+
+            $i++;
+        }
+
+        Weather_DeleteAlertsReadings( $hash,
+            scalar( @{ $dataRef->{alerts} } ) );
+        readingsBulkUpdate( $hash, 'warnCount',
+            scalar( @{ $dataRef->{alerts} } ) );
+    }
+    else {
+        Weather_DeleteAlertsReadings($hash);
+        readingsBulkUpdate( $hash, 'warnCount',
+            scalar( @{ $dataRef->{alerts} } ) )
+          if ( defined( $dataRef->{alerts} )
+            && ref( $dataRef->{alerts} ) eq 'ARRAY' );
+    }
+
+    ### state
     my $val = 'T: '
       . $dataRef->{current}->{temperature} . ' °C' . ' '
       . substr( $status_items_txt_i18n{1}, 0, 1 ) . ': '
@@ -510,16 +606,18 @@ sub Weather_WriteReadings($$) {
     readingsEndUpdate( $hash, 1 );
 
     Weather_RearmTimer( $hash, gettimeofday() + $hash->{INTERVAL} );
+
     return;
 
 }
 
 ###################################
-sub Weather_GetUpdate($) {
-    my ($hash) = @_;
+sub Weather_GetUpdate {
+    my $hash = shift;
+
     my $name = $hash->{NAME};
 
-    if ( $attr{$name} && $attr{$name}->{disable} ) {
+    if ( IsDisabled($name) ) {
         Log3 $hash, 5,
           "Weather $name: retrieval of weather data is disabled by attribute.";
         readingsBeginUpdate($hash);
@@ -529,20 +627,19 @@ sub Weather_GetUpdate($) {
         Weather_RearmTimer( $hash, gettimeofday() + $hash->{INTERVAL} );
     }
     else {
-        #       Weather_RetrieveData($name, 0);
         $hash->{fhem}->{api}->setRetrieveData;
     }
 
-    return 1;
+    return;
 }
 
 ###################################
-sub Weather_Get($@) {
-    my ( $hash, @a ) = @_;
+sub Weather_Get {
+    my $hash = shift // return;
+    my $aRef = shift // return;
 
-    return "argument is missing" if ( int(@a) != 2 );
-
-    my $reading = $a[1];
+    my $name    = shift @$aRef // return;
+    my $reading = shift @$aRef // return;
     my $value;
 
     if ( defined( $hash->{READINGS}->{$reading} ) ) {
@@ -557,42 +654,49 @@ sub Weather_Get($@) {
         return "Unknown reading $reading, choose one of " . $rt;
     }
 
-    return "$a[0] $reading => $value";
+    return "$name $reading => $value";
 }
 
 ###################################
-sub Weather_Set($@) {
-    my ( $hash, @a ) = @_;
+sub Weather_Set {
+    my $hash = shift // return;
+    my $aRef = shift // return;
 
-    my $cmd = $a[1];
+    my $name = shift @$aRef // return;
+    my $cmd  = shift @$aRef
+      // return qq{"set $name" needs at least one argument};
 
     # usage check
-    if ( ( @a == 2 ) && ( $a[1] eq "update" ) ) {
+    if ( scalar( @{$aRef} ) == 0
+        && $cmd eq 'update' )
+    {
         Weather_DisarmTimer($hash);
         Weather_GetUpdate($hash);
-        return undef;
-    }
-    elsif ( ( @a >= 2 ) && ( $a[1] eq "newLocation" ) ) {
-        if (   $hash->{API} eq 'DarkSkyAPI'
-            or $hash->{API} eq 'OpenWeatherMapAPI'
-            or $hash->{API} eq 'wundergroundAPI'
-          )
-        {
-            my ($lat,$long);
-            ($lat,$long) = split(',',$a[2])
-              if ( defined($a[2]) and $a[2] );
-            ($lat,$long) = split(',',$hash->{fhem}->{LOCATION})
-              unless ( defined($lat)
-                and defined($long)
-                and $lat =~ /(-?\d+(\.\d+)?)/
-                and $long =~ /(-?\d+(\.\d+)?)/ );
 
-            $hash->{fhem}->{api}->setLocation($lat,$long);
+        return;
+    }
+    elsif ( scalar( @{$aRef} ) == 1
+        && $cmd eq "newLocation" )
+    {
+        if (   $hash->{API} eq 'DarkSkyAPI'
+            || $hash->{API} eq 'OpenWeatherMapAPI'
+            || $hash->{API} eq 'wundergroundAPI' )
+        {
+            my ( $lat, $long );
+            ( $lat, $long ) = split( ',', $aRef->[0] )
+              if ( defined( $aRef->[0] ) && $aRef->[0] );
+            ( $lat, $long ) = split( ',', $hash->{fhem}->{LOCATION} )
+              unless ( defined($lat)
+                && defined($long)
+                && $lat  =~ m{(-?\d+(\.\d+)?)}xms
+                && $long =~ m{(-?\d+(\.\d+)?)}xms );
+
+            $hash->{fhem}->{api}->setLocation( $lat, $long );
             Weather_DisarmTimer($hash);
             Weather_GetUpdate($hash);
-            return undef;
+            return;
         }
-        else { return 'this API is not ' . $a[1] .' supported' }
+        else { return 'this API is not ' . $aRef->[0] . ' supported' }
     }
     else {
         return "Unknown argument $cmd, choose one of update:noArg newLocation";
@@ -600,36 +704,52 @@ sub Weather_Set($@) {
 }
 
 ###################################
-sub Weather_RearmTimer($$) {
-    my ( $hash, $t ) = @_;
+sub Weather_RearmTimer {
+    my $hash = shift;
+    my $t    = shift;
 
     Log3( $hash, 4, "Weather $hash->{NAME}: Rearm new Timer" );
     InternalTimer( $t, "Weather_GetUpdate", $hash, 0 );
 
+    return;
 }
 
-sub Weather_DisarmTimer($) {
-    my ($hash) = @_;
+sub Weather_DisarmTimer {
+    my $hash = shift;
 
     RemoveInternalTimer($hash);
+
+    return;
 }
 
-sub Weather_Notify($$) {
-    my ( $hash, $dev ) = @_;
+sub Weather_Notify {
+    my $hash = shift;
+    my $dev  = shift;
+
     my $name = $hash->{NAME};
     my $type = $hash->{TYPE};
 
     return if ( $dev->{NAME} ne "global" );
-    return if ( !grep( m/^INITIALIZED|REREADCFG$/, @{ $dev->{CHANGED} } ) );
 
-    # return if($attr{$name} && $attr{$name}->{disable});
+    # set forcast and alerts values to api object
+    if ( grep { /^MODIFIED.$name$/x } @{ $dev->{CHANGED} } ) {
+        $hash->{fhem}->{api}->setForecast( AttrVal( $name, 'forecast', '' ) );
+        $hash->{fhem}->{api}->setAlerts( AttrVal( $name, 'alerts', 0 ) );
+
+        Weather_GetUpdate($hash);
+    }
+
+    return
+      if (
+        !grep {
+/^INITIALIZED|REREADCFG|DELETEATTR.$name.disable|ATTR.$name.disable.[0-1]$/x
+        } @{ $dev->{CHANGED} }
+      );
 
     # update weather after initialization or change of configuration
     # wait 10 to 29 seconds to avoid congestion due to concurrent activities
     Weather_DisarmTimer($hash);
     my $delay = 10 + int( rand(20) );
-
-    #$delay= 3; # delay removed until further notice
 
     Log3 $hash, 5,
 "Weather $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
@@ -637,14 +757,16 @@ sub Weather_Notify($$) {
 
     ### quick run GetUpdate then Demo
     Weather_GetUpdate($hash)
-      if ( defined( $hash->{APIKEY} ) and lc( $hash->{APIKEY} ) eq 'demo' );
+      if ( defined( $hash->{APIKEY} ) && lc( $hash->{APIKEY} ) eq 'demo' );
 
-    return undef;
+    return;
 }
 
 #####################################
-sub Weather_Define($$) {
-    my ( $hash, $def ) = @_;
+sub Weather_Define {
+    my $hash = shift // return;
+    my $aRef = shift // return;
+    my $hRef = shift // undef;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
@@ -652,116 +774,147 @@ sub Weather_Define($$) {
     my $usage =
 "syntax: define <name> Weather [API=<API>] [apikey=<apikey>] [location=<location>] [interval=<interval>] [lang=<lang>]";
 
-    # defaults
-    my $API      = "DarkSkyAPI,cachemaxage:600";
-    my $interval = 3600;
-
-    # parse parameters
-    my ( $arrayref, $hashref ) = parseParams($def);
-    my @a = @{$arrayref};
-    my %h = %{$hashref};
-
     # check minimum syntax
-    return $usage unless ( scalar @a == 2 );
-    my $name = $a[0];
+    return $usage unless ( scalar @{$aRef} == 2 );
+    my $name = $aRef->[0];
 
-    my $location = $h{location} if exists $h{location};
-    my $apikey   = $h{apikey}   if exists $h{apikey};
-    my $lang     = $h{lang}     if exists $h{lang};
-    $interval = $h{interval} if exists $h{interval};
-    $API      = $h{API}      if exists $h{API};
+    my $location = $hRef->{location} // undef;
+    my $apikey   = $hRef->{apikey}   // undef;
+    my $lang     = $hRef->{lang}     // undef;
+    my $interval = $hRef->{interval} // 3600;
+    my $API      = $hRef->{API}      // "DarkSkyAPI,cachemaxage:600";
 
     # evaluate API options
     my ( $api, $apioptions ) = split( ',', $API, 2 );
     $apioptions = "" unless ( defined($apioptions) );
-    eval { require "$api.pm"; };
+    eval { require 'FHEM/APIs/Weather/' . $api . '.pm'; };
     return "$name: cannot load API $api: $@" if ($@);
 
     $hash->{NOTIFYDEV}          = "global";
     $hash->{fhem}->{interfaces} = "temperature;humidity;wind";
     $hash->{fhem}->{LOCATION}   = (
-        ( defined($location) and $location )
+        ( defined($location) && $location )
         ? $location
         : AttrVal( 'global', 'latitude', 'error' ) . ','
           . AttrVal( 'global', 'longitude', 'error' )
     );
     $hash->{INTERVAL} = $interval;
     $hash->{LANG}     = (
-        ( defined($lang) and $lang )
+        ( defined($lang) && $lang )
         ? $lang
         : lc( AttrVal( 'global', 'language', 'de' ) )
     );
-    $hash->{API}                                   = $api;
-    $hash->{MODEL}                                 = $api;
-    $hash->{APIKEY}                                = $apikey;
-    $hash->{APIOPTIONS}                            = $apioptions;
-    $hash->{VERSION}                               = version->parse($VERSION)->normal;
-    $hash->{fhem}->{allowCache}                    = 1;
+    $hash->{API}                = $api;
+    $hash->{MODEL}              = $api;
+    $hash->{APIKEY}             = $apikey;
+    $hash->{APIOPTIONS}         = $apioptions;
+    $hash->{VERSION}            = version->parse($VERSION)->normal;
+    $hash->{fhem}->{allowCache} = 1;
 
-    readingsSingleUpdate($hash,'current_date_time',TimeNow(),0);
-    readingsSingleUpdate($hash,'current_date_time','none',0);
+    readingsSingleUpdate( $hash, 'current_date_time', TimeNow(), 0 );
+    readingsSingleUpdate( $hash, 'current_date_time', 'none',    0 );
 
     readingsSingleUpdate( $hash, 'state', 'Initialized', 1 );
     Weather_LanguageInitialize( $hash->{LANG} );
 
-    my $apistring = $api . '::Weather';
+    my $apistring = 'FHEM::APIs::Weather::' . $api;
     $hash->{fhem}->{api} = $apistring->new(
         {
             devName    => $hash->{NAME},
             apikey     => $hash->{APIKEY},
             location   => $hash->{fhem}->{LOCATION},
             apioptions => $hash->{APIOPTIONS},
-            language   => $hash->{LANG}
+            language   => $hash->{LANG},
         }
     );
 
-    Weather_GetUpdate($hash) if ($init_done);
-
-    return undef;
+    return;
 }
 
 #####################################
-sub Weather_Undef($$) {
-    my ( $hash, $arg ) = @_;
+sub Weather_Undef {
+    my $hash = shift;
+    my $arg  = shift;
 
     RemoveInternalTimer($hash);
-    return undef;
+    return;
+}
+
+sub Weather_Attr {
+    my ( $cmd, $name, $attrName, $attrVal ) = @_;
+    my $hash = $defs{$name};
+
+    given ($attrName) {
+        when ('forecast') {
+            if ( $cmd eq 'set' ) {
+                $hash->{fhem}->{api}->setForecast($attrVal);
+            }
+            elsif ( $cmd eq 'del' ) {
+                $hash->{fhem}->{api}->setForecast();
+            }
+
+            InternalTimer( gettimeofday() + 0.5,
+                \&Weather_DeleteForecastReadings, $hash );
+        }
+
+        when ('forecastLimit') {
+            InternalTimer( gettimeofday() + 0.5,
+                \&Weather_DeleteForecastReadings, $hash );
+        }
+
+        when ('alerts') {
+            if ( $cmd eq 'set' ) {
+                $hash->{fhem}->{api}->setAlerts($attrVal);
+            }
+            elsif ( $cmd eq 'del' ) {
+                $hash->{fhem}->{api}->setAlerts();
+            }
+
+            InternalTimer( gettimeofday() + 0.5,
+                \&Weather_DeleteAlertsReadings, $hash );
+        }
+    }
+
+    return;
 }
 
 #####################################
 
 # Icon Parameter
 
-use constant ICONHIGHT => 120;
-use constant ICONWIDTH => 175;
-use constant ICONSCALE => 0.5;
+Readonly my $ICONWIDTH => 175;
+Readonly my $ICONSCALE => 0.5;
 
 #####################################
 
-sub WeatherIconIMGTag($) {
-    my $width  = int( ICONSCALE * ICONWIDTH );
-    my ($icon) = @_;
-    my $url    = FW_IconURL("weather/$icon");
-    my $style  = " width=$width";
+sub WeatherIconIMGTag {
+    my $icon = shift;
+
+    my $width = int( $ICONSCALE * $ICONWIDTH );
+    my $url   = FW_IconURL("weather/$icon");
+    my $style = " width=$width";
+
     return "<img src=\"$url\"$style alt=\"$icon\">";
 }
 
 #####################################
 
-sub WeatherAsHtmlV($;$$) {
-    my ( $d, $op1, $op2 ) = @_;
+sub WeatherAsHtmlV {
+    my $d   = shift;
+    my $op1 = shift;
+    my $op2 = shift;
 
-    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
+    my ( $f, $items ) = Weather_CheckOptions( $d, $op1, $op2 );
 
     my $h     = $defs{$d};
-    my $width = int( ICONSCALE * ICONWIDTH );
+    my $width = int( $ICONSCALE * $ICONWIDTH );
 
     my $ret = '<table class="weather">';
     my $fc;
     if (
         defined($f)
-        and (  $f eq 'h'
-            or $f eq 'd' )
+        && (   $f eq 'h'
+            || $f eq 'd' )
       )
     {
         $fc = ( $f eq 'd' ? 'fc' : 'hfc' );
@@ -770,7 +923,7 @@ sub WeatherAsHtmlV($;$$) {
         $fc = (
             (
                 defined( $h->{READINGS}->{fc1_day_of_week} )
-                  and $h->{READINGS}->{fc1_day_of_week}
+                  && $h->{READINGS}->{fc1_day_of_week}
             ) ? 'fc' : 'hfc'
         );
     }
@@ -787,7 +940,7 @@ sub WeatherAsHtmlV($;$$) {
 
     for ( my $i = 1 ; $i < $items ; $i++ ) {
         if ( defined( $h->{READINGS}->{"${fc}${i}_low_c"} )
-            and $h->{READINGS}->{"${fc}${i}_low_c"} )
+            && $h->{READINGS}->{"${fc}${i}_low_c"} )
         {
             $ret .= sprintf(
 '<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: %s</span><br><span class="weatherMin">min %s°C</span> <span class="weatherMax">max %s°C</span><br>%s</td></tr>',
@@ -817,21 +970,25 @@ sub WeatherAsHtmlV($;$$) {
     return $ret;
 }
 
-sub WeatherAsHtml($;$$) {
-    my ( $d, $op1, $op2 ) = @_;
+sub WeatherAsHtml {
+    my $d   = shift;
+    my $op1 = shift;
+    my $op2 = shift;
 
-    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
+    my ( $f, $items ) = Weather_CheckOptions( $d, $op1, $op2 );
 
-    WeatherAsHtmlV( $d, $f, $items );
+    return WeatherAsHtmlV( $d, $f, $items );
 }
 
-sub WeatherAsHtmlH($;$$) {
-    my ( $d, $op1, $op2 ) = @_;
+sub WeatherAsHtmlH {
+    my $d   = shift;
+    my $op1 = shift;
+    my $op2 = shift;
 
-    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
+    my ( $f, $items ) = Weather_CheckOptions( $d, $op1, $op2 );
 
     my $h     = $defs{$d};
-    my $width = int( ICONSCALE * ICONWIDTH );
+    my $width = int( $ICONSCALE * $ICONWIDTH );
 
     my $format =
 '<td><table border=1><tr><td class="weatherIcon" width=%d>%s</td></tr><tr><td class="weatherValue">%s</td></tr><tr><td class="weatherValue">%s°C %s%%</td></tr><tr><td class="weatherValue">%s</td></tr></table></td>';
@@ -840,8 +997,8 @@ sub WeatherAsHtmlH($;$$) {
     my $fc;
     if (
         defined($f)
-        and (  $f eq 'h'
-            or $f eq 'd' )
+        && (   $f eq 'h'
+            || $f eq 'd' )
       )
     {
         $fc = ( $f eq 'd' ? 'fc' : 'hfc' );
@@ -850,7 +1007,7 @@ sub WeatherAsHtmlH($;$$) {
         $fc = (
             (
                 defined( $h->{READINGS}->{fc1_day_of_week} )
-                  and $h->{READINGS}->{fc1_day_of_week}
+                  && $h->{READINGS}->{fc1_day_of_week}
             ) ? 'fc' : 'hfc'
         );
     }
@@ -885,7 +1042,7 @@ sub WeatherAsHtmlH($;$$) {
     );
     for ( my $i = 1 ; $i < $items ; $i++ ) {
         if ( defined( $h->{READINGS}->{"${fc}${i}_low_c"} )
-            and $h->{READINGS}->{"${fc}${i}_low_c"} )
+            && $h->{READINGS}->{"${fc}${i}_low_c"} )
         {
             $ret .= sprintf( '<td class="weatherMin">min %s°C</td>',
                 ReadingsVal( $d, "${fc}${i}_low_c", " - " ) );
@@ -903,7 +1060,7 @@ sub WeatherAsHtmlH($;$$) {
         ReadingsVal( $d, "wind_condition", "" ) );
     for ( my $i = 1 ; $i < $items ; $i++ ) {
         if ( defined( $h->{READINGS}->{"${fc}${i}_high_c"} )
-            and $h->{READINGS}->{"${fc}${i}_high_c"} )
+            && $h->{READINGS}->{"${fc}${i}_high_c"} )
         {
             $ret .= sprintf( '<td class="weatherMax">max %s°C</td>',
                 ReadingsVal( $d, "${fc}${i}_high_c", " - " ) );
@@ -915,10 +1072,12 @@ sub WeatherAsHtmlH($;$$) {
     return $ret;
 }
 
-sub WeatherAsHtmlD($;$$) {
-    my ( $d, $op1, $op2 ) = @_;
+sub WeatherAsHtmlD {
+    my $d   = shift;
+    my $op1 = shift;
+    my $op2 = shift;
 
-    my ( $f, $items ) = WeatherCheckOptions( $d, $op1, $op2 );
+    my ( $f, $items ) = Weather_CheckOptions( $d, $op1, $op2 );
 
     if ($FW_ss) {
         WeatherAsHtmlV( $d, $f, $items );
@@ -926,36 +1085,41 @@ sub WeatherAsHtmlD($;$$) {
     else {
         WeatherAsHtmlH( $d, $f, $items );
     }
+
+    return;
 }
 
-sub WeatherCheckOptions($@) {
-    my ( $d, $op1, $op2 ) = @_;
-
-    my $items = $op2;
-    my $f     = $op1;
-
-    if ( defined($op1) and $op1 and $op1 =~ /[0-9]/g ) { $items = $op1; }
-    if ( defined($op2) and $op2 and $op2 =~ /[dh]/g )  { $f     = $op2; }
-
-    $f =~ tr/dh/./cd if ( defined $f and $f );
-    $items =~ tr/0-9/./cd if ( defined($items) and $items );
-
-    $items = 6 if ( !$items );
+sub Weather_CheckOptions {
+    my $d   = shift;
+    my $op1 = shift;
+    my $op2 = shift;
 
     return "$d is not a Weather instance<br>"
       if ( !$defs{$d} || $defs{$d}->{TYPE} ne "Weather" );
 
-    if ( AttrVal( $d, 'forecast', 'none' ) ne 'none' ) {
-        $f = (
-            AttrVal( $d, 'forecast', 'none' ) eq 'daily'
-            ? 'd'
-            : ( AttrVal( $d, 'forecast', 'none' ) eq 'every' ? $f : 'h' )
-        );
-    }
+    my $hash  = $defs{$d};
+    my $items = $op2;
+    my $f     = $op1;
+
+    if ( defined($op1) && $op1 && $op1 =~ m{[0-9]}xms ) { $items = $op1; }
+    if ( defined($op2) && $op2 && $op2 =~ m{[dh]}xms )  { $f     = $op2; }
+
+    $f     =~ tr/dh/./cd  if ( defined $f      && $f );
+    $items =~ tr/0-9/./cd if ( defined($items) && $items );
+
+    $items = AttrVal( $d, 'forecastLimit', 5 )
+      if ( !$items );
+
+    my $forecastConfig = Weather_ForcastConfig($hash);
+    $f = (
+        $forecastConfig->{daily}
+        ? 'd'
+        : ( $forecastConfig->{daily} && $forecastConfig->{hourly} ? $f : 'h' )
+    ) if !( defined($f) and $f );
 
     $f = 'h' if ( !$f || length($f) > 1 );
 
-    return ( $f, $items );
+    return ( $f, $items + 1 );
 }
 
 #####################################
@@ -968,7 +1132,7 @@ sub WeatherCheckOptions($@) {
 =item summary_DE stellt Wetterbericht und -vorhersage bereit
 =begin html
 
-<a name="Weather"></a>
+<a id="Weather"></a>
 <h3>Weather</h3>
 <ul>
   Note: you need the JSON perl module. Use <code>apt-get install
@@ -984,8 +1148,8 @@ sub WeatherCheckOptions($@) {
   Such a virtual Weather device periodically gathers current and forecast
   weather conditions from the chosen weather API.<br><br>
 
-  <a name="Weatherdefine"></a>
-  <b>Define</b><br><br>
+  <a id="Weather-define"></a>
+  <h4>Define</h4><br><br>
     <ul>
       <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apioptions&gt;]] [apikey=&lt;apikey&gt;]
        [location=&lt;location&gt;] [interval=&lt;interval&gt;] [lang=&lt;lang&gt;]</code><br><br>
@@ -1020,25 +1184,11 @@ sub WeatherCheckOptions($@) {
 
     API-specific documentation follows.<p>
 
-        <b>Dark Sky</b><p>
+        <h4>Dark Sky</h4><p>
 
         <table>
         <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
-        <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
-          in seconds to retrieve the forecast from the cache instead from the API<br><code>extend=hourly</code>
-      <br>extends the number of hours forecast records to 149</td></tr>
-        <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
-          geographic coordinates in degrees of the location for which the
-          weather is forecast; if missing, the values of the attributes
-          of the <code>global</code> device are taken, if these exist.</td></tr>
-        </table>
-        <p><p>
-
-        <b>OpenWeatherMap</b><p>
-
-        <table>
-        <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
-        <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
+        <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code><br>duration
           in seconds to retrieve the forecast from the cache instead from the API</td></tr>
         <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
           geographic coordinates in degrees of the location for which the
@@ -1046,12 +1196,30 @@ sub WeatherCheckOptions($@) {
           of the <code>global</code> device are taken, if these exist.</td></tr>
         </table>
         <p><p>
+
+        <h4>OpenWeatherMap</h4><p>
+
+        <table>
+        <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
+        <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code><br>duration
+          in seconds to retrieve the forecast from the cache instead from the API</td>
+          <td><code>version:&lt;version&gt;</code> API version which should be used.
+          2.5 by default, 3.0 is still possible but only with an additional subscription</td>
+          <td><code>endpoint:onecall</code> only to test whether the API key which not
+          officially for onecall is not supported yet onecall via API version 2.5. IMPORTANT!!!
+          apioption version must not be set to 3.0</td></tr>
+        <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
+          geographic coordinates in degrees of the location for which the
+          weather is forecast; if missing, the values of the attributes
+          of the <code>global</code> device are taken, if these exist.</td></tr>
+        </table>
+        <p><p>
         
-        <b>Wunderground</b><p>
+        <h4>Wunderground</h4><p>
 
         <table>
         <tr><td>API</td><td><code>wundergroundAPI</code></td></tr>
-        <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
+        <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code><br>duration
           in seconds to retrieve the forecast from the cache instead from the API<br><code>stationId:ID-Num</code>
       <br>Station ID of the station to be read.</td></tr>
         <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br>
@@ -1079,17 +1247,19 @@ sub WeatherCheckOptions($@) {
   </ul>
   <br>
 
-  <a name="Weatherset"></a>
-  <b>Set </b>
+  <a id="Weather-set"></a>
+  <h4>Set</h4>
   <ul>
+    <a id="Weather-set-update"></a>
     <li>
-      <code>set &lt;name&gt; update</code><br><br>
+      <i>set &lt;name&gt; update</i><br><br>
 
       Forces the retrieval of the weather data. The next automatic retrieval is scheduled to occur
       <code>interval</code> seconds later.
     </li>
+    <a id="Weather-set-newLocation"></a>
     <li>
-      <code>set &lt;name&gt; newLocation latitude,longitude</code><br><br>
+      <i>set &lt;name&gt; newLocation latitude,longitude</i><br><br>
       
       set a new temporary location.
       the value pair Latitude Longitude is separated by a comma.
@@ -1098,39 +1268,65 @@ sub WeatherCheckOptions($@) {
   </ul>
   <br>
 
-  <a name="Weatherget"></a>
-  <b>Get</b>
+  <a id="Weather-get"></a>
+  <h4>Get</h4>
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
     Valid readings and their meaning (? can be one of 1, 2, 3, 4, 5 and stands
     for today, tomorrow, etc.):<br>
     <table>
+    <a id="Weather-get-.license"></a>
     <tr><td>.license</td><td>license of the API provider, if available</td></tr>
+    <a id="Weather-get-city"></a>
     <tr><td>city</td><td>name of town returned for location</td></tr>
+    <a id="Weather-get-code"></a>
     <tr><td>code</td><td>current condition code</td></tr>
+    <a id="Weather-get-condition"></a>
     <tr><td>condition</td><td>current condition</td></tr>
+    <a id="Weather-get-current_date_time"></a>
     <tr><td>current_date_time</td><td>last update of forecast on server</td></tr>
+     <a id="Weather-get-fc?_code"></a>
     <tr><td>fc?_code</td><td>forecast condition code</td></tr>
+    <a id="Weather-get-fc?_condition"></a>
     <tr><td>fc?_condition</td><td>forecast condition</td></tr>
+    <a id="Weather-get-fc?_day_of_week"></a>
     <tr><td>fc?_day_of_week</td><td>day of week for day +?</td></tr>
+    <a id="Weather-get-fc?_high_c"></a>
     <tr><td>fc?_high_c</td><td>forecasted daily high in degrees centigrade</td></tr>
+    <a id="Weather-get-fc?_icon"></a>
     <tr><td>fc?_icon</td><td>forecast icon</td></tr>
+    <a id="Weather-get-fc?_low_c"></a>
     <tr><td>fc?_low_c</td><td>forecasted daily low in degrees centigrade</td></tr>
+    <a id="Weather-get-humidity"></a>
     <tr><td>humidity</td><td>current humidity in %</td></tr>
+    <a id="Weather-get-icon"></a>
     <tr><td>icon</td><td>relative path for current icon</td></tr>
+    <a id="Weather-get-pressure"></a>
     <tr><td>pressure</td><td>air pressure in hPa</td></tr>
+    <a id="Weather-get-pressure_trend"></a>
     <tr><td>pressure_trend</td><td>air pressure trend (0= steady, 1= rising, 2= falling)</td></tr>
+    <a id="Weather-get-pressure_trend_txt"></a>
     <tr><td>pressure_trend_txt</td><td>textual representation of air pressure trend</td></tr>
+    <a id="Weather-get-pressure_trend_sym"></a>
     <tr><td>pressure_trend_sym</td><td>symbolic representation of air pressure trend</td></tr>
+    <a id="Weather-get-temperature"></a>
     <tr><td>temperature</td><td>current temperature in degrees centigrade</td></tr>
+    <a id="Weather-get-temp_c"></a>
     <tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
+    <a id="Weather-get-temp_f"></a>
     <tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
+    <a id="Weather-get-visibility"></a>
     <tr><td>visibility</td><td>visibility in km</td></tr>
+    <a id="Weather-get-wind"></a>
     <tr><td>wind</td><td>wind speed in km/h</td></tr>
+    <a id="Weather-get-wind_chill"></a>
     <tr><td>wind_chill</td><td>wind chill in degrees centigrade</td></tr>
+    <a id="Weather-get-wind_condition"></a>
     <tr><td>wind_condition</td><td>wind direction and speed</td></tr>
+    <a id="Weather-get-wind_direction"></a>
     <tr><td>wind_direction</td><td>direction wind comes from in degrees (0 = north wind)</td></tr>
+    <a id="Weather-get-wind_speed"></a>
     <tr><td>wind_speed</td><td>same as wind</td></tr>
     </table>
     <br>
@@ -1143,14 +1339,19 @@ sub WeatherCheckOptions($@) {
   </ul>
   <br>
 
-  <a name="Weatherattr"></a>
-  <b>Attributes</b>
+  <a id="Weather-attr"></a>
+  <h4>Attributes</h4>
   <ul>
-    <li>disable: disables the retrieval of weather data - the timer runs according to schedule,
+    <a id="Weather-attr-disable"></a>
+    <li><i>disable</i> - disables the retrieval of weather data - the timer runs according to schedule,
     though no data is requested from the API.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li>forecast - every/hourly/daily/off, show of forecast data. All, only hour forecast, only day forecast, none.</li>
-    <li>forecastLimit - Number of forecast data records which should be written as a reading.</li>
+    <a id="Weather-attr-forecast"></a>
+    <li><i>forecast</i> - hourly/daily, display of forecast data.</li>
+    <a id="Weather-attr-forecastLimit"></a>
+    <li><i>forecastLimit</i> - Number of forecast data records which should be written as a reading.</li>
+    <a id="Weather-attr-alerts"></a>
+    <li><i>alerts</i> - 0/1 should alert messages be written similar to Unwetterwarnung</li>
   </ul>
   <br>
 </ul>
@@ -1159,7 +1360,7 @@ sub WeatherCheckOptions($@) {
 =end html
 =begin html_DE
 
-<a name="Weather"></a>
+<a id="Weather"></a>
 <h3>Weather</h3>
 <ul>
     Hinweis: es wird das Perl-Modul JSON ben&ouml;tigt. Mit <code>apt-get install
@@ -1176,9 +1377,8 @@ sub WeatherCheckOptions($@) {
     Eine solche virtuelle Wetterstation sammelt periodisch aktuelle Wetterdaten
     und Wettervorhersagen aus dem verwendeten API.<br><br>
 
-
-  <a name="Weatherdefine"></a>
-  <b>Define</b><br><br>
+  <a id="Weather-define"></a>
+  <h4>Define</h4><br><br>
   <ul>
     <code>define &lt;name&gt; Weather [API=&lt;API&gt;[,&lt;apioptions&gt;]] [apikey=&lt;apikey&gt;]
      [location=&lt;location&gt;] [interval=&lt;interval&gt;] [lang=&lt;lang&gt;]</code><br><br>
@@ -1214,14 +1414,13 @@ sub WeatherCheckOptions($@) {
 
     Es folgt die API-spezifische Dokumentation.<p>
 
-    <b>Dark Sky</b><p>
+    <h4>Dark Sky</h4><p>
 
     <table>
     <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
-    <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>Zeitdauer in
+    <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code><br>Zeitdauer in
       Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
-      sondern aus dem Cache zur&uuml;ck geliefert wird.<br><code>extend=hourly</code>
-      <br>erweitert die Anzahl der Datens&auml;tze f&uuml;r die Stundenvorhersage auf 149</td></tr>
+      sondern aus dem Cache zur&uuml;ck geliefert wird.</td></tr>
     <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code><br> Geographische Breite
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
@@ -1229,13 +1428,20 @@ sub WeatherCheckOptions($@) {
     </table>
     <p><p>
 
-    <b>OpenWeatherMap</b><p>
+    <h4>OpenWeatherMap</h4><p>
 
     <table>
     <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
-    <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code> Zeitdauer in
+    <tr>
+      <td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code> Zeitdauer in
       Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
-      sondern aus dem Cache zur&uuml;ck geliefert wird.</td></tr>
+      sondern aus dem Cache zur&uuml;ck geliefert wird.</td>
+      <td><code>version:&lt;version&gt;</code> API Version welche verwendet werden soll.
+      Per Default 2.5, m&ouml;glich ist noch 3.0 aber nur mit Zusatzsubscription</td>
+      <td><code>endpoint:onecall</code> nur zum testen ob der API Key welcher nicht
+      offiziell für onecall ist nicht doch onecall über die API Version 2.5 unterst&uuml;tzt. WICHTIG!!!
+      apioption version darf nicht auf 3.0 gesetzt werden</td>
+    </tr>
     <tr><td>location</td><td><code>&lt;latitude,longitude&gt;</code> Geographische Breite
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
@@ -1243,11 +1449,11 @@ sub WeatherCheckOptions($@) {
     </table>
     <p><p>
     
-    <b>Wunderground</b><p>
+    <h4>Wunderground</h4><p>
 
     <table>
     <tr><td>API</td><td><code>wundergroundAPI</code></td></tr>
-    <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code> Zeitdauer in
+    <tr><td>apioptions</td><td><code>cachemaxage:&lt;cachemaxage&gt;</code> Zeitdauer in
       Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
       sondern aus dem Cache zur&uuml;ck geliefert wird.<br><code>stationId:ID-Num</code>
       <br>die ID der Station von welcher die Daten gelesen werden sollen.</td></tr>
@@ -1280,55 +1486,76 @@ sub WeatherCheckOptions($@) {
   </ul>
   <br>
 
-  <a name="Weatherset"></a>
-  <b>Set </b>
+  <a id="Weather-set"></a>
+    <h4>Set</h4>
   <ul>
-    <li>
-      <code>set &lt;name&gt; update</code><br><br>
-
-      Erzwingt eine Abfrage der Wetterdaten. Die darauffolgende Abfrage
-      wird gem&auml;&szlig; dem eingestellten
-      Intervall <code>interval</code> Sekunden sp&auml;ter durchgef&uuml;hrt.
+    <a id="Weather-set-update"></a>
+    <li><i>set &lt;name&gt; update</i><br><br>
+        Erzwingt eine Abfrage der Wetterdaten. Die darauffolgende Abfrage
+        wird gem&auml;&szlig; dem eingestellten
+        Intervall <code>interval</code> Sekunden sp&auml;ter durchgef&uuml;hrt.
     </li>
+    <a id="Weather-set-newLocation"></a>
     <li>
-      <code>set &lt;name&gt; newLocation latitude,longitude</code><br><br>
-      
+      <i>set &lt;name&gt; newLocation latitude,longitude</i><br><br>
       Gibt die M&ouml;glichkeit eine neue tempor&auml;re Location zu setzen.
       Das Wertepaar Latitude Longitude wird durch ein Komma getrennt &uuml;bergeben.
       Wird kein Wert mitgegebn (leere &Uuml;bergabe) wird automatisch die per Definition erkannte Location genommen<br><br>
     </li>
   </ul>
   <br>
-
-  <a name="Weatherget"></a>
-  <b>Get</b>
+  <a id="Weather-get"></a>
+  <h4>Get</h4>
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
     G&uuml;ltige ausgelesene Daten (readings) und ihre Bedeutung (das ? kann einen der Werte 1, 2, 3 , 4 oder 5 annehmen und steht f&uuml;r heute, morgen, &uuml;bermorgen etc.):<br><br>
     <table>
+    <a id="Weather-get-.license"></a>
     <tr><td>.license</td><td>Lizenz des jeweiligen API-Anbieters, sofern vorhanden</td></tr>
+    <a id="Weather-get-city"></a>
     <tr><td>city</td><td>Name der Stadt, der f&uuml;r die location &uuml;bermittelt wird</td></tr>
+    <a id="Weather-get-code"></a>
     <tr><td>code</td><td>Code f&uuml;r die aktuellen Wetterverh&auml;ltnisse</td></tr>
+    <a id="Weather-get-condition"></a>
     <tr><td>condition</td><td>aktuelle Wetterverh&auml;ltnisse</td></tr>
+    <a id="Weather-get-current_date_time"></a>
     <tr><td>current_date_time</td><td>Zeitstempel der letzten Aktualisierung der Wetterdaten vom Server</td></tr>
+    <a id="Weather-get-fc?_code"></a>
     <tr><td>fc?_code</td><td>Code f&uuml;r die vorhergesagten Wetterverh&auml;ltnisse</td></tr>
+    <a id="Weather-get-fc?_condition"></a>
     <tr><td>fc?_condition</td><td>vorhergesagte Wetterverh&auml;ltnisse</td></tr>
+    <a id="Weather-get-fc?_day_of_week"></a>
     <tr><td>fc?_day_of_week</td><td>Wochentag des Tages, der durch ? dargestellt wird</td></tr>
+    <a id="Weather-get-fc?_high_c"></a>
     <tr><td>fc?_high_c</td><td>vorhergesagte maximale Tagestemperatur in Grad Celsius</td></tr>
+    <a id="Weather-get-fc?_icon"></a>
     <tr><td>fc?_icon</td><td>Icon f&uuml;r Vorhersage</td></tr>
+    <a id="Weather-get-fc?_low_c"></a>
     <tr><td>fc?_low_c</td><td>vorhergesagte niedrigste Tagestemperatur in Grad Celsius</td></tr>
+    <a id="Weather-get-humidity"></a>
     <tr><td>humidity</td><td>gegenw&auml;rtige Luftfeuchtgkeit in %</td></tr>
+    <a id="Weather-get-icon"></a>
     <tr><td>icon</td><td>relativer Pfad f&uuml;r das aktuelle Icon</td></tr>
+    <a id="Weather-get-pressure"></a>
     <tr><td>pressure</td><td>Luftdruck in hPa</td></tr>
+    <a id="Weather-get-temperature"></a>
     <tr><td>temperature</td><td>gegenw&auml;rtige Temperatur in Grad Celsius</td></tr>
+    <a id="Weather-get-temp_c"></a>
     <tr><td>temp_c</td><td>gegenw&auml;rtige Temperatur in Grad Celsius</td></tr>
+    <a id="Weather-get-temp_f"></a>
     <tr><td>temp_f</td><td>gegenw&auml;rtige Temperatur in Grad Celsius</td></tr>
+    <a id="Weather-get-visibility"></a>
     <tr><td>visibility</td><td>Sichtweite in km</td></tr>
+    <a id="Weather-get-wind"></a>
     <tr><td>wind</td><td>Windgeschwindigkeit in km/h</td></tr>
+    <a id="Weather-get-wind_condition"></a>
     <tr><td>wind_condition</td><td>Windrichtung und -geschwindigkeit</td></tr>
+    <a id="Weather-get-wind_direction"></a>
     <tr><td>wind_direction</td><td>Gradangabe der Windrichtung (0 = Nordwind)</td></tr>
+    <a id="Weather-get-wind_speed"></a>
     <tr><td>wind_speed</td><td>Windgeschwindigkeit in km/h (mit wind identisch)</td></tr>
+    <a id="Weather-get-validity"></a>
     <tr><td>validity</td><td>stale, wenn der Ver&ouml;ffentlichungszeitpunkt auf dem entfernten Server vor dem Zeitpunkt der aktuellen Daten (readings) liegt</td></tr>
     </table>
     <br>
@@ -1340,15 +1567,21 @@ sub WeatherCheckOptions($@) {
   </ul>
   <br>
 
-  <a name="Weatherattr"></a>
-  <b>Attribute</b>
+  <a id="Weather-attr"></a>
+  <h4>Attribute</h4>
   <ul>
-    <li>disable: stellt die Abfrage der Wetterdaten ab - der Timer l&auml;ft
+    <a id="Weather-attr-disable"></a>
+    <li><i>disable</i> - stellt die Abfrage der Wetterdaten ab - der Timer l&auml;ft
     gem&auml;&szlig Plan doch es werden keine Daten vom
     API angefordert.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li>forecast - every/hourly/daily/off, Anzeige von forecast Daten. Alle, nur Stundenforecast, nur Tageforecast, keine.</li>
-    <li>forecastLimit - Anzahl der Forecast-Datens&auml;tze welche als Reading geschrieben werden sollen.</li>
+    <a id="Weather-attr-forecast"></a>
+    <li><i>forecast</i> - hourly/daily, Anzeige von forecast Daten.</li>
+    <a id="Weather-attr-forecastLimit"></a>
+    <li><i>forecastLimit</i> - Anzahl der Forecast-Datens&auml;tze welche als Reading geschrieben werden sollen.</li>
+    <a id="Weather-attr-alerts"></a>
+    <li><i>alerts</i> - 0/1 Sollen Alert Meldungen &auml;nlich Unwetterwarnung geschrieben werden.</li>
+
   </ul>
   <br>
 </ul>
@@ -1373,15 +1606,15 @@ sub WeatherCheckOptions($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.1.4",
+  "version": "v2.2.20",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
     "CoolTux"
   ],
   "x_fhem_maintainer_github": [
-    "LeonGaultier"
+    "CoolTuxNet"
   ],
   "prereqs": {
     "runtime": {

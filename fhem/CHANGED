@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 59_Weather: support for new openweathermap mod onecall
+            - rewrite old parts of api modules
+            - move apo modules to new directory structure
  - change:  93_DbRep: attr sqlFormatService for online formatting of sqlCmd,
                       sqlCmdBlocking customized like sqlCmd, minor bugfixes
  - change:  14_Hideki.pm: output wind values always as floatingpoint
