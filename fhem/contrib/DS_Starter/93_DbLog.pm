@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.10"  => "05.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ",
+  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ",
   "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
@@ -467,7 +467,7 @@ sub _DbLog_initOnStart {
   for my $r (@rdel) {
       readingsDelete ($hash, $r);
   }
-  
+
   DbLog_setSchemeTable ($hash);
 
   DbLog_SBP_CheckAndInit ($hash);
@@ -494,11 +494,8 @@ return;
 sub DbLog_Undef {
   my $hash = shift;
   my $name = shift;
-  my $dbh  = $hash->{DBHP};
 
   delete $hash->{HELPER}{LONGRUN_PID};
-
-  $dbh->disconnect() if(defined($dbh));
 
   RemoveInternalTimer($hash);
   delete $data{DbLog}{$name};
@@ -572,7 +569,6 @@ sub DbLog_Attr {
   my($cmd,$name,$aName,$aVal) = @_;
 
   my $hash = $defs{$name};
-  my $dbh  = $hash->{DBHP};
   my $do   = 0;
 
   if ($aName eq "traceHandles") {
@@ -651,10 +647,6 @@ sub DbLog_Attr {
   }
 
   if($aName eq "commitMode") {
-      if ($dbh) {
-          $dbh->disconnect();
-      }
-
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
@@ -710,7 +702,7 @@ sub DbLog_Attr {
       }
 
       $do = 0 if($cmd eq "del");
-      
+
       if ($do == 1) {
           DbLog_setSchemeTable ($hash, $aVal);
       }
@@ -939,12 +931,7 @@ sub _DbLog_setreopen {                   ## no critic "not used"
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop};
 
-  my $dbh = $hash->{DBHP};
   my $ret;
-
-  if ($dbh) {
-      $dbh->disconnect();
-  }
 
   DbLog_SBP_sendDbDisconnect ($hash);
 
@@ -990,13 +977,7 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
 
-  my $dbh = $hash->{DBHP};
-
   Log3 ($name, 3, "DbLog $name - Rereadcfg requested.");
-
-  if ($dbh) {
-      $dbh->disconnect();
-  }
 
   my $ret = DbLog_readCfg($hash);
   return $ret if $ret;
@@ -1731,7 +1712,7 @@ sub DbLog_Log {
       return if($hash->{HELPER}{REOPEN_RUNS});                                          # return wenn "reopen" mit Ablaufzeit gestartet ist
 
       readingsSingleUpdate($hash, 'CacheUsage', $memcount, ($ce == 1 ? 1 : 0)) if($DoIt);
-      
+
       $err = DbLog_execMemCacheSync ($hash);
       DbLog_setReadingstate ($hash, $err) if($err);
   }
@@ -2237,7 +2218,7 @@ sub DbLog_execMemCacheSync {
   my $memc = _DbLog_copyCache      ($name);
 
   readingsSingleUpdate($hash, 'CacheUsage', 0, 0);
-  
+
   $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                               # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
 
@@ -2305,7 +2286,7 @@ sub DbLog_SBP_onRun {
 
           $attr{$name}{verbose} = $verbose if(defined $verbose);                  # verbose Level übergeben
           my $bst               = [gettimeofday];                                 # Background-Startzeit
-          
+
           $doNext = _DbLog_SBP_onRun_checkDiscDelpars ({ subprocess => $subprocess,
                                                          name       => $name,
                                                          memc       => $memc,
@@ -2392,7 +2373,7 @@ sub DbLog_SBP_onRun {
               ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
               if ($error) {
-                  Log3 ($name, 2, "DbLog $name - Error: $error");
+                  Log3 ($name, 2, "DbLog $name - ERROR: $error");
 
                   $ret = {
                       name     => $name,
@@ -2423,7 +2404,7 @@ sub DbLog_SBP_onRun {
               ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
               if ($error) {
-                  Log3 ($name, 2, "DbLog $name - Error: $error");
+                  Log3 ($name, 2, "DbLog $name - ERROR: $error");
 
                   $ret = {
                       name     => $name,
@@ -2537,7 +2518,7 @@ return;
 }
 
 ###################################################################################
-#   prüfen ob Datenbankverbindung beendet werden soll und ob die 
+#   prüfen ob Datenbankverbindung beendet werden soll und ob die
 #   gespeicherten Verbindungsparameter gelöscht werden sollen
 ###################################################################################
 sub _DbLog_SBP_onRun_checkDiscDelpars {
@@ -2547,18 +2528,18 @@ sub _DbLog_SBP_onRun_checkDiscDelpars {
   my $name       = $paref->{name};
   my $memc       = $paref->{memc};
   my $store      = $paref->{store};                                        # Datenspeicher
-  
+
   my $dbdelpars  = $memc->{dbdelpars};                                     # 1 -> gespeicherte DB Parameter sollen gelöscht werden
   my $dbdisconn  = $memc->{dbdisconn};                                     # 1 -> die Datenbankverbindung lösen/löschen
   my $operation  = $memc->{operation} // 'unknown';
   my $doNext     = 0;
-  
-  if ($dbdisconn) {                                                       
+
+  if ($dbdisconn) {
       if (defined $store->{dbh}) {
           my $dbh = delete $store->{dbh};
           $dbh->disconnect();
       }
-      
+
       if ($dbdelpars) {
           delete $store->{dbparams};
       }
@@ -2567,7 +2548,7 @@ sub _DbLog_SBP_onRun_checkDiscDelpars {
       my $msg1 = 'Database disconnected by request.'.$msg0;
       my $msg2 = $msg1;
       $msg2    =~ s/<br>//xs;
-      
+
       Log3 ($name, 3, "DbLog $name - $msg2");
 
       my $ret = {
@@ -2578,7 +2559,7 @@ sub _DbLog_SBP_onRun_checkDiscDelpars {
       };
 
       __DbLog_SBP_sendToParent ($subprocess, $ret);
-      
+
       $doNext = 1;
   }
 
@@ -2617,7 +2598,7 @@ sub _DbLog_SBP_onRun_connectDB {
                                                                         ShowErrorStatement  => 1,
                                                                         AutoInactiveDestroy => 1
                                                                       }
-                                ); 1;
+                                );
          }
          elsif ($useac == 1) {
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
@@ -2626,7 +2607,7 @@ sub _DbLog_SBP_onRun_connectDB {
                                                                         ShowErrorStatement  => 1,
                                                                         AutoInactiveDestroy => 1
                                                                       }
-                                ); 1;
+                                );
          }
          else {                                                                                          # Server default
              $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0,
@@ -2634,11 +2615,12 @@ sub _DbLog_SBP_onRun_connectDB {
                                                                         ShowErrorStatement  => 1,
                                                                         AutoInactiveDestroy => 1
                                                                       }
-                                ); 1;
+                                );
          }
+         1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - Error: $err");
+              Log3 ($name, 2, "DbLog $name - ERROR: $err");
               return $err;
             };
 
@@ -2757,20 +2739,18 @@ sub _DbLog_SBP_onRun_LogBulk {
           my $row = $cdata->{$key};
           my @ao  = split '\\|', $row;
           s/_ESC_/\|/gxs for @ao;                                      # escaped Pipe back to "|"
-          
-          # TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT
-          
-          $ao[0] = $dbh->quote($ao[0]);
-          $ao[1] = $dbh->quote($ao[1]);
-          $ao[2] = $dbh->quote($ao[2]);
-          $ao[3] = $dbh->quote($ao[3]);
-          $ao[4] = $dbh->quote($ao[4]);
-          $ao[5] = $dbh->quote($ao[5]);
-          $ao[6] = $dbh->quote($ao[6]);
-          
+
+          $ao[0] = $dbh->quote($ao[0]);                                # TIMESTAMP
+          $ao[1] = $dbh->quote($ao[1]);                                # DEVICE
+          $ao[2] = $dbh->quote($ao[2]);                                # TYPE
+          $ao[3] = $dbh->quote($ao[3]);                                # EVENT
+          $ao[4] = $dbh->quote($ao[4]);                                # READING
+          $ao[5] = $dbh->quote($ao[5]);                                # VALUE
+          $ao[6] = $dbh->quote($ao[6]);                                # UNIT
+
           $sqlins .= "($ao[0],$ao[1],$ao[2],$ao[3],$ao[4],$ao[5],$ao[6]),";
       }
-      
+
       use warnings;
 
       chop $sqlins;
@@ -2972,7 +2952,7 @@ sub _DbLog_SBP_onRun_LogArray {
       if ($error) {                                                                  # Eventliste zurückgeben wenn z.B. Disk I/O Error bei SQLITE
           Log3 ($name, 2, "DbLog $name - Error: $error");
 
-          $dbh->disconnect();
+          __DbLog_SBP_disconnectOnly ($name, $dbh);
           delete $store->{dbh};
 
           $ret = {
@@ -4158,7 +4138,8 @@ sub __DbLog_SBP_beginTransaction {
   eval{ if($useta && $dbh->{AutoCommit}) {
            $dbh->begin_work();
            Log3 ($name, 4, "DbLog $name - $info");
-        }; 1;
+        }; 
+        1;
       }
       or do { $err = $@;
               Log3 ($name, 2, "DbLog $name - ERROR - $@");
@@ -4173,22 +4154,21 @@ return $err;
 sub __DbLog_SBP_commitOnly {
   my $name  = shift;
   my $dbh   = shift;
-  my $table = shift;
+  my $table = shift // 'unspecified';
 
   my $err  = q{};
 
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->commit();
-            Log3 ($name, 4, "DbLog $name - commit inserted data table $table");
-            1;
+            Log3 ($name, 4, qq{DbLog $name - commit inserted data table >$table<});
         }
         else {
-            Log3 ($name, 4, "DbLog $name - insert table $table committed by autocommit");
-            1;
+            Log3 ($name, 4, qq{DbLog $name - insert table >$table< committed by autocommit});
         }
+        1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - Error commit table $table - $err");
+              Log3 ($name, 2, qq{DbLog $name - ERROR commit table >$table<: $err});
             };
 
 return $err;
@@ -4207,15 +4187,33 @@ sub __DbLog_SBP_rollbackOnly {
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->rollback();
             Log3 ($name, 4, "DbLog $name - Transaction rollback table $table");
-            1;
         }
         else {
             Log3 ($name, 4, "DbLog $name - data auto rollback table $table");
-            1;
         }
+        1;
       }
       or do { $err = $@;
               Log3 ($name, 2, "DbLog $name - Error - $err");
+            };
+
+return $err;
+}
+
+####################################################################################################
+#       nur Datenbank disconnect
+####################################################################################################
+sub __DbLog_SBP_disconnectOnly {
+  my $name  = shift;
+  my $dbh   = shift;
+
+  my $err   = q{};
+
+  eval{ $dbh->disconnect() if(defined $dbh);
+        1;
+      }
+      or do { $err = $@;
+              Log3 ($name, 2, "DbLog $name - ERROR - $@");
             };
 
 return $err;
@@ -4264,20 +4262,17 @@ sub __DbLog_SBP_sthInsTable {
 
   eval { if ($usepk && $model eq 'MYSQL') {
              $sth = $dbh->prepare("INSERT IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-             1;
          }
          elsif ($usepk && $model eq 'SQLITE') {
              $sth = $dbh->prepare("INSERT OR IGNORE INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-             1;
          }
          elsif ($usepk && $model eq 'POSTGRESQL') {
              $sth = $dbh->prepare("INSERT INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING");
-             1;
          }
          else {
              $sth = $dbh->prepare("INSERT INTO $table (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-             1;
          }
+         1;
        }
        or do { $err = $@;
              };
@@ -4303,22 +4298,19 @@ sub __DbLog_SBP_sthUpdTable {
 
   eval { if ($usepk && $model eq 'MYSQL') {
              $sth = $dbh->prepare("REPLACE INTO $table (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
-             1;
          }
          elsif ($usepk && $model eq 'SQLITE') {
              $sth = $dbh->prepare("INSERT OR REPLACE INTO $table (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
-             1;
          }
          elsif ($usepk && $model eq 'POSTGRESQL') {
              $sth = $dbh->prepare("INSERT INTO $table (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pk)
                                                DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING,
                                                VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-             1;
          }
          else {
              $sth = $dbh->prepare("UPDATE $table SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
-             1;
          }
+         1;
        }
        or do { $err = $@;
              };
@@ -4937,8 +4929,8 @@ return;
 # Neuer dbh Handle zur allegmeinen Verwendung
 ###################################################################################
 sub _DbLog_ConnectNewDBH {
-  my $hash       = shift;
-  my $name       = $hash->{NAME};
+  my $hash = shift;
+  my $name = $hash->{NAME};
 
   my ($useac,$useta) = DbLog_commitMode ($name, AttrVal($name, 'commitMode', $dblog_cmdef));
 
@@ -4962,6 +4954,38 @@ sub _DbLog_ConnectNewDBH {
 return;
 }
 
+####################################################################################################
+#          SQL Query evaluieren und return ein Ergebnis-Array bei Erfolg
+####################################################################################################
+sub _DbLog_prepExecQueryOnly {
+  my $name = shift;
+  my $dbh  = shift;
+  my $sql  = shift;
+  my $info = shift // "SQL execute: $sql";
+
+  my $err  = q{};
+  my @sr   = ();
+
+  my ($sth,$result);
+
+  Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
+
+  eval{ $sth = $dbh->prepare($sql);
+        $sth->execute;
+        1;
+      }
+      or do { $err = $@;
+              Log3 ($name, 2, "DbLog $name - ERROR - $err");
+              return $err;
+            };
+            
+  @sr = $sth->fetchrow_array;
+  
+  Log3 ($name, 4, "DbLog $name - SQL result: ".join ' ', @sr);
+  
+return ($err, @sr);
+}
+
 ##########################################################################
 #
 # Prozedur zum Ausfuehren von SQL-Statements durch externe Module
@@ -4971,19 +4995,19 @@ return;
 #
 ##########################################################################
 sub DbLog_ExecSQL {
-  my ($hash,$sql) = @_;
-  my $name        = $hash->{NAME};
-  my $dbh         = _DbLog_ConnectNewDBH($hash);
+  my $hash = shift;
+  my $sql  = shift;
+  
+  my $name = $hash->{NAME};
+  my $dbh  = _DbLog_ConnectNewDBH($hash) || return;
 
   Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
 
-  return if(!$dbh);
   my $sth = DbLog_ExecSQL1($hash, $dbh, $sql);
 
   if (!$sth) {                                                      #retry
-      $dbh->disconnect();
-      $dbh = _DbLog_ConnectNewDBH($hash);
-      return if(!$dbh);
+      __DbLog_SBP_disconnectOnly ($name, $dbh);
+      $dbh = _DbLog_ConnectNewDBH($hash) || return;
 
       Log3 ($name, 2, "DbLog $name - Backdoor retry: $sql");
 
@@ -4991,15 +5015,15 @@ sub DbLog_ExecSQL {
 
       if(!$sth) {
           Log3($name, 2, "DbLog $name - Backdoor retry failed");
-          $dbh->disconnect();
-          return 0;
+          __DbLog_SBP_disconnectOnly ($name, $dbh);
+          return;
       }
 
       Log3 ($name, 2, "DbLog $name - Backdoor retry ok");
   }
 
-  eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-  $dbh->disconnect();
+  __DbLog_SBP_commitOnly     ($name, $dbh);
+  __DbLog_SBP_disconnectOnly ($name, $dbh);
 
 return $sth;
 }
@@ -5073,7 +5097,7 @@ sub DbLog_Get {
 
   }
   elsif(lc($outf) eq "webchart") {                           # redirect the get request to the DbLog_chartQuery function
-      return DbLog_chartQuery($hash, @_);
+      return DbLog_chartQuery ($hash, @_);
   }
 
   ########################
@@ -5135,8 +5159,8 @@ sub DbLog_Get {
   Log3 $name, 4, "DbLog $name - ################################################################";
   Log3($name, 4, "DbLog $name - main PID: $hash->{PID}, secondary PID: $$");
 
-  $dbh = _DbLog_ConnectNewDBH($hash);
-  return "Can't connect to database." if(!$dbh);
+  $dbh = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
+  #return "Can't connect to database." if(!$dbh);
 
   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{MODEL} eq "POSTGRESQL") {
@@ -5640,7 +5664,7 @@ sub DbLog_Get {
       $data{"maxdate$k"}   = $maxd[$j];
   }
 
-  $dbh->disconnect();
+  __DbLog_SBP_disconnectOnly ($name, $dbh);
 
   if($internal) {
       $internal_data = \$retval;
@@ -5703,7 +5727,7 @@ sub DbLog_configcheck {
   my ($check, $rec,%dbconfig);
 
   ### verfügbare Treiber
-  #######################################################################
+  ########################
   my @ary = DBI->available_drivers('true');
   my $dlst;
 
@@ -5718,17 +5742,18 @@ sub DbLog_configcheck {
   $check .= "<br><br>";
 
   ### Version check
-  #######################################################################
+  ###################
   my $pv      = sprintf("%vd",$^V);                                              # Perl Version
   my $dbi     = $DBI::VERSION;                                                   # DBI Version
   my %drivers = DBI->installed_drivers();
   my $dv      = "";
 
-  if($dbmodel =~ /MYSQL/xi) {
+  if ($dbmodel =~ /MYSQL/xi) {
       for (keys %drivers) {
           $dv = $_ if($_ =~ /mysql|mariadb/x);
       }
   }
+  
   my $dbd = ($dbmodel =~ /POSTGRESQL/xi)   ? "Pg: ".$DBD::Pg::VERSION:           # DBD Version
             ($dbmodel =~ /MYSQL/xi && $dv) ? "$dv: ".$DBD::mysql::VERSION:
             ($dbmodel =~ /SQLITE/xi)       ? "SQLite: ".$DBD::SQLite::VERSION:"Undefined";
@@ -5736,7 +5761,7 @@ sub DbLog_configcheck {
   my $dbdhint = "";
   my $dbdupd  = 0;
 
-  if($dbmodel =~ /MYSQL/xi && $dv) {                                             # check DBD Mindest- und empfohlene Version
+  if ($dbmodel =~ /MYSQL/xi && $dv) {                                             # check DBD Mindest- und empfohlene Version
       my $dbdver = $DBD::mysql::VERSION * 1;                                     # String to Zahl Konversion
       if($dbdver < 4.032) {
           $dbdhint = "<b>Caution:</b> Your DBD version doesn't support UTF8. ";
@@ -5759,11 +5784,11 @@ sub DbLog_configcheck {
   $check .= "Used DBI (Database independent interface) version: $dbi <br>";
   $check .= "Used DBD (Database driver) version $dbd <br>";
 
-  if($errcm) {
+  if ($errcm) {
       $check .= "<b>Recommendation:</b> ERROR - $errcm. $dbdhint <br><br>";
   }
 
-  if($supd) {
+  if ($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
       $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! $dbdhint <br><br>";
   }
@@ -5797,14 +5822,19 @@ sub DbLog_configcheck {
 
   ### Connection und Encoding check
   #######################################################################
+  my $st  = [gettimeofday];                                                                        # Startzeit
+  my $dbh = _DbLog_ConnectNewDBH ($hash) || return "Can't connect to database.";
+  my $ct  = sprintf("%.4f", tv_interval($st));                                                     # Laufzeit ermitteln
+  
   my (@ce,@se);
   my ($chutf8mod,$chutf8dat);
 
-  if($dbmodel =~ /MYSQL/) {
-      @ce        = DbLog_sqlget($hash,"SHOW VARIABLES LIKE 'character_set_connection'");
-      $chutf8mod = @ce ? uc($ce[1]) : "no result";
-      @se        = DbLog_sqlget($hash,"SHOW VARIABLES LIKE 'character_set_database'");
-      $chutf8dat = @se ? uc($se[1]) : "no result";
+  if ($dbmodel =~ /MYSQL/) {
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_connection'");
+      $chutf8mod  = @ce ? uc($ce[1]) : "no result";
+      
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW VARIABLES LIKE 'character_set_database'");
+      $chutf8dat  = @se ? uc($se[1]) : "no result";
 
       if($chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
@@ -5821,11 +5851,13 @@ sub DbLog_configcheck {
       }
 
   }
-  if($dbmodel =~ /POSTGRESQL/) {
-      @ce        = DbLog_sqlget($hash,"SHOW CLIENT_ENCODING");
-      $chutf8mod = @ce ? uc($ce[0]) : "no result";
-      @se        = DbLog_sqlget($hash,"select character_set_name from information_schema.character_sets");
-      $chutf8dat = @se ? uc($se[0]) : "no result";
+  
+  if ($dbmodel =~ /POSTGRESQL/) {
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW CLIENT_ENCODING");
+      $chutf8mod  = @ce ? uc($ce[0]) : "no result";
+      
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "select character_set_name from information_schema.character_sets");
+      $chutf8dat  = @se ? uc($se[0]) : "no result";
 
       if($chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
@@ -5834,26 +5866,42 @@ sub DbLog_configcheck {
           $rec = "This is only an information. PostgreSQL supports automatic character set conversion between server and client for certain character set combinations. The conversion information is stored in the pg_conversion system catalog. PostgreSQL comes with some predefined conversions.";
       }
   }
-  if($dbmodel =~ /SQLITE/) {
-      @ce        = DbLog_sqlget($hash,"PRAGMA encoding");
-      $chutf8dat = @ce ? uc($ce[0]) : "no result";
-      @se        = DbLog_sqlget($hash,"PRAGMA table_info($history)");
-      $rec       = "This is only an information about text encoding used by the main database.";
+  
+  if ($dbmodel =~ /SQLITE/) {
+      ($err, @ce) = _DbLog_prepExecQueryOnly ($name, $dbh, "PRAGMA encoding");
+      $chutf8dat  = @ce ? uc($ce[0]) : "no result";
+
+      ($err, @se) = _DbLog_prepExecQueryOnly ($name, $dbh, "PRAGMA table_info($history)");
+      $rec        = "This is only an information about text encoding used by the main database.";
   }
 
   $check .= "<u><b>Result of connection check</u></b><br><br>";
 
-  if(@ce && @se) {
-      $check .= "Connection to database $dbname successfully done. <br>";
-      $check .= "<b>Recommendation:</b> settings o.k. <br><br>";
+  if (!$err && @ce && @se) {
+      $check .= "Connection to database $dbname successfully done. <br>";    
+      $check .= "The time required to establish the connection was $ct seconds <br>";
+      
+      if ($ct > 5.0) {
+          $check .= "<b>Recommendation:</b> The time to establish a connection is much too long. There are performance problems that hinder operation. <br><br>";
+      }
+      elsif ($ct > 1.5) {
+          $check .= "<b>Recommendation:</b> The time to establish a connection is too long. There are performance problems that could hinder operation. <br><br>";
+      }
+      elsif ($ct > 0.3) {
+          $check .= "<b>Recommendation:</b> The time to establish a connection is relatively long. This could be an indication of performance problems and should be taken into account. <br><br>";
+      }
+      else {
+          $check .= "<b>Recommendation:</b> settings o.k. <br><br>";
+      }      
   }
 
-  if(!@ce || !@se) {
+  if ($err || !@ce || !@se) {
       $check .= "Connection to database was not successful. <br>";
       $check .= "<b>Recommendation:</b> Plese check logfile for further information. <br><br>";
       $check .= "</html>";
       return $check;
   }
+  
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
   $check .= "Encoding used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
   $check .= "Encoding used by DB $dbname: $chutf8dat <br>";
@@ -5867,7 +5915,8 @@ sub DbLog_configcheck {
   $sfx     = $sfx eq "EN" ? "" : "_$sfx";
 
   $check .= "<u><b>Result of insert mode check</u></b><br><br>";
-  if(!$bi) {
+  
+  if (!$bi) {
       $bi     = "Array";
       $check .= "Insert mode of DbLog-device $name is: $bi <br>";
       $rec    = "Setting attribute \"bulkInsert\" to \"1\" may result a higher write performance in most cases. ";
@@ -5882,37 +5931,39 @@ sub DbLog_configcheck {
 
   ### Check Plot Erstellungsmodus
   #######################################################################
-      $check          .= "<u><b>Result of plot generation method check</u></b><br><br>";
-      my @webdvs       = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-      my ($forks,$emb) = (1,1);
-      my $wall         = "";
+  $check          .= "<u><b>Result of plot generation method check</u></b><br><br>";
+  my @webdvs       = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+  my ($forks,$emb) = (1,1);
+  my $wall         = "";
 
-      for my $web (@webdvs) {
-          my $pf  = AttrVal($web,"plotfork",0);
-          my $pe  = AttrVal($web,"plotEmbed",0);
-          $forks  = 0 if(!$pf);
-          $emb    = 0 if($pe =~ /[01]/);
+  for my $web (@webdvs) {
+      my $pf = AttrVal($web,"plotfork",0);
+      my $pe = AttrVal($web,"plotEmbed",0);
+      $forks = 0 if(!$pf);
+      $emb   = 0 if($pe =~ /[01]/);
 
-          if(!$pf || $pe =~ /[01]/) {
-              $wall  .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe."</b><br>";
-          }
-          else {
-              $wall  .= $web.": plotfork=".$pf." / plotEmbed=".$pe."<br>";
-          }
-      }
-      if(!$forks || !$emb) {
-          $check .= "WARNING - at least one of your FHEMWEB devices has attribute \"plotfork = 1\" and/or attribute \"plotEmbed = 2\" not set. <br><br>";
-          $check .= $wall;
-          $rec    = "You should set attribute \"plotfork = 1\" and \"plotEmbed = 2\" in relevant devices. ".
-                    "If these attributes are not set, blocking situations may occure when creating plots. ".
-                    "<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
+      if(!$pf || $pe =~ /[01]/) {
+          $wall  .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe."</b><br>";
       }
       else {
-          $check .= $wall;
-          $rec    = "settings o.k.";
+          $wall  .= $web.": plotfork=".$pf." / plotEmbed=".$pe."<br>";
       }
-      $check .= "<br>";
-      $check .= "<b>Recommendation:</b> $rec <br><br>";
+  }
+  
+  if (!$forks || !$emb) {
+      $check .= "WARNING - at least one of your FHEMWEB devices has attribute \"plotfork = 1\" and/or attribute \"plotEmbed = 2\" not set. <br><br>";
+      $check .= $wall;
+      $rec    = "You should set attribute \"plotfork = 1\" and \"plotEmbed = 2\" in relevant devices. ".
+                "If these attributes are not set, blocking situations may occure when creating plots. ".
+                "<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
+  }
+  else {
+      $check .= $wall;
+      $rec    = "settings o.k.";
+  }
+  
+  $check .= "<br>";
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Spaltenbreite history
   #######################################################################
@@ -5920,38 +5971,42 @@ sub DbLog_configcheck {
   my ($cdat_dev,$cdat_typ,$cdat_evt,$cdat_rdg,$cdat_val,$cdat_unt);
   my ($cmod_dev,$cmod_typ,$cmod_evt,$cmod_rdg,$cmod_val,$cmod_unt);
 
-  if($dbmodel =~ /MYSQL/) {
-      @sr_dev = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='DEVICE'");
-      @sr_typ = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='TYPE'");
-      @sr_evt = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='EVENT'");
-      @sr_rdg = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='READING'");
-      @sr_val = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='VALUE'");
-      @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='UNIT'");
+  if ($dbmodel =~ /MYSQL/) {
+      ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='DEVICE'");
+      ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='TYPE'");
+      ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='EVENT'");
+      ($err, @sr_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='READING'");
+      ($err, @sr_val) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='VALUE'");
+      ($err, @sr_unt) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $history where FIELD='UNIT'");
   }
-  if($dbmodel =~ /POSTGRESQL/) {
+  
+  if ($dbmodel =~ /POSTGRESQL/) {
       my $sch = AttrVal($name, "dbSchema", "");
       my $h   = "history";
-      if($sch) {
-          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='device'");
-          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='type'");
-          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='event'");
-          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='reading'");
-          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='value'");
-          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='unit'");
+      
+      if ($sch) {
+          ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='device'");
+          ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='type'");
+          ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='event'");
+          ($err, @sr_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='reading'");
+          ($err, @sr_val) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='value'");
+          ($err, @sr_unt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='unit'");
       }
       else {
-          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='device'");
-          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='type'");
-          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='event'");
-          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='reading'");
-          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='value'");
-          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='unit'");
-
+          ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='device'");
+          ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='type'");
+          ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='event'");
+          ($err, @sr_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='reading'");
+          ($err, @sr_val) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='value'");
+          ($err, @sr_unt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='unit'");
       }
   }
-  if($dbmodel =~ /SQLITE/) {
-      my $dev     = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$history'"))[0];
-      $cdat_dev   = $dev // "no result";
+  
+  if ($dbmodel =~ /SQLITE/) {
+      my @dev;
+      ($err, @dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT sql FROM sqlite_master WHERE name = '$history'");
+            
+      $cdat_dev   = $dev[0] // "no result";
       $cdat_typ   = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
       ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
       ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
@@ -5960,6 +6015,7 @@ sub DbLog_configcheck {
       ($cdat_val) = $cdat_val =~ /VALUE.varchar\(([\d]+)\)/x;
       ($cdat_unt) = $cdat_unt =~ /UNIT.varchar\(([\d]+)\)/x;
   }
+  
   if ($dbmodel !~ /SQLITE/)  {
       $cdat_dev = @sr_dev ? ($sr_dev[1]) : "no result";
       $cdat_dev =~ tr/varchar\(|\)//d if($cdat_dev ne "no result");
@@ -5974,6 +6030,7 @@ sub DbLog_configcheck {
       $cdat_unt = @sr_unt ? ($sr_unt[1]) : "no result";
       $cdat_unt =~ tr/varchar\(|\)//d if($cdat_unt ne "no result");
   }
+  
   $cmod_dev = $hash->{HELPER}{DEVICECOL};
   $cmod_typ = $hash->{HELPER}{TYPECOL};
   $cmod_evt = $hash->{HELPER}{EVENTCOL};
@@ -5981,7 +6038,7 @@ sub DbLog_configcheck {
   $cmod_val = $hash->{HELPER}{VALUECOL};
   $cmod_unt = $hash->{HELPER}{UNITCOL};
 
-  if($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
+  if ($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
       $rec = "settings o.k.";
   }
   else {
@@ -6007,45 +6064,48 @@ sub DbLog_configcheck {
   }
 
   $check .= "<u><b>Result of table '$history' check</u></b><br><br>";
-  $check .= "Column width set in DB $history: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
-  $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
+  $check .= "Column width set in table $history: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width used by device $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Spaltenbreite current
   #######################################################################
-  if($dbmodel =~ /MYSQL/) {
-      @sr_dev = DbLog_sqlget($hash,"SHOW FIELDS FROM $current where FIELD='DEVICE'");
-      @sr_typ = DbLog_sqlget($hash,"SHOW FIELDS FROM $current where FIELD='TYPE'");
-      @sr_evt = DbLog_sqlget($hash,"SHOW FIELDS FROM $current where FIELD='EVENT'");
-      @sr_rdg = DbLog_sqlget($hash,"SHOW FIELDS FROM $current where FIELD='READING'");
-      @sr_val = DbLog_sqlget($hash,"SHOW FIELDS FROM $current where FIELD='VALUE'");
-      @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM $current where FIELD='UNIT'");
+  if ($dbmodel =~ /MYSQL/) {
+      ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='DEVICE'");
+      ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='TYPE'");
+      ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='EVENT'");
+      ($err, @sr_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='READING'");
+      ($err, @sr_val) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='VALUE'");
+      ($err, @sr_unt) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW FIELDS FROM $current where FIELD='UNIT'");
   }
 
-  if($dbmodel =~ /POSTGRESQL/) {
+  if ($dbmodel =~ /POSTGRESQL/) {
       my $sch = AttrVal($name, "dbSchema", "");
       my $c   = "current";
-      if($sch) {
-          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='device'");
-          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='type'");
-          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='event'");
-          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='reading'");
-          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='value'");
-          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='unit'");
+      
+      if ($sch) {
+          ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='device'");
+          ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='type'");
+          ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='event'");
+          ($err, @sr_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='reading'");
+          ($err, @sr_val) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='value'");
+          ($err, @sr_unt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='unit'");
       }
       else {
-          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='device'");
-          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='type'");
-          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='event'");
-          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='reading'");
-          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='value'");
-          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='unit'");
-
+          ($err, @sr_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='device'");
+          ($err, @sr_typ) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='type'");
+          ($err, @sr_evt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='event'");
+          ($err, @sr_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='reading'");
+          ($err, @sr_val) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='value'");
+          ($err, @sr_unt) = _DbLog_prepExecQueryOnly ($name, $dbh, "select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='unit'");
       }
   }
-  if($dbmodel =~ /SQLITE/) {
-      my $dev     = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$current'"))[0];
-      $cdat_dev   = $dev // "no result";
+  
+  if ($dbmodel =~ /SQLITE/) {
+      my @dev;
+      ($err, @dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT sql FROM sqlite_master WHERE name = '$current'");
+      
+      $cdat_dev   = $dev[0] // "no result";
       $cdat_typ   = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
       ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
       ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
@@ -6054,6 +6114,7 @@ sub DbLog_configcheck {
       ($cdat_val) = $cdat_val =~ /VALUE.varchar\(([\d]+)\)/x;
       ($cdat_unt) = $cdat_unt =~ /UNIT.varchar\(([\d]+)\)/x;
   }
+  
   if ($dbmodel !~ /SQLITE/)  {
       $cdat_dev = @sr_dev ? ($sr_dev[1]) : "no result";
       $cdat_dev =~ tr/varchar\(|\)//d if($cdat_dev ne "no result");
@@ -6068,43 +6129,43 @@ sub DbLog_configcheck {
       $cdat_unt = @sr_unt ? ($sr_unt[1]) : "no result";
       $cdat_unt =~ tr/varchar\(|\)//d if($cdat_unt ne "no result");
   }
-      $cmod_dev = $hash->{HELPER}{DEVICECOL};
-      $cmod_typ = $hash->{HELPER}{TYPECOL};
-      $cmod_evt = $hash->{HELPER}{EVENTCOL};
-      $cmod_rdg = $hash->{HELPER}{READINGCOL};
-      $cmod_val = $hash->{HELPER}{VALUECOL};
-      $cmod_unt = $hash->{HELPER}{UNITCOL};
+  
+  $cmod_dev = $hash->{HELPER}{DEVICECOL};
+  $cmod_typ = $hash->{HELPER}{TYPECOL};
+  $cmod_evt = $hash->{HELPER}{EVENTCOL};
+  $cmod_rdg = $hash->{HELPER}{READINGCOL};
+  $cmod_val = $hash->{HELPER}{VALUECOL};
+  $cmod_unt = $hash->{HELPER}{UNITCOL};
 
-      if($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
-          $rec = "settings o.k.";
+  if ($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
+      $rec = "settings o.k.";
+  }
+  else {
+      if ($dbmodel !~ /SQLITE/)  {
+          $rec  = "The relation between column width in table $current and the field width used in device $name don't meet the requirements. ";
+          $rec .= "Please make sure that the width of database field definition is equal or larger than the field width used by the module. Compare the given results.<br>";
+          $rec .= "Currently the default values for field width are: <br><br>";
+          $rec .= "DEVICE: $DbLog_columns{DEVICE} <br>";
+          $rec .= "TYPE: $DbLog_columns{TYPE} <br>";
+          $rec .= "EVENT: $DbLog_columns{EVENT} <br>";
+          $rec .= "READING: $DbLog_columns{READING} <br>";
+          $rec .= "VALUE: $DbLog_columns{VALUE} <br>";
+          $rec .= "UNIT: $DbLog_columns{UNIT} <br><br>";
+          $rec .= "You can change the column width in database by a statement like <b>'alter table $current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
+          $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
+          $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
       }
       else {
-          if ($dbmodel !~ /SQLITE/)  {
-              $rec  = "The relation between column width in table $current and the field width used in device $name don't meet the requirements. ";
-              $rec .= "Please make sure that the width of database field definition is equal or larger than the field width used by the module. Compare the given results.<br>";
-              $rec .= "Currently the default values for field width are: <br><br>";
-              $rec .= "DEVICE: $DbLog_columns{DEVICE} <br>";
-              $rec .= "TYPE: $DbLog_columns{TYPE} <br>";
-              $rec .= "EVENT: $DbLog_columns{EVENT} <br>";
-              $rec .= "READING: $DbLog_columns{READING} <br>";
-              $rec .= "VALUE: $DbLog_columns{VALUE} <br>";
-              $rec .= "UNIT: $DbLog_columns{UNIT} <br><br>";
-              $rec .= "You can change the column width in database by a statement like <b>'alter table $current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
-              $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
-              $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
-          }
-          else {
-              $rec  = "WARNING - The relation between column width in table $current and the field width used by device $name should be equal but it differs. ";
-              $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
-              $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
-          }
+          $rec  = "WARNING - The relation between column width in table $current and the field width used by device $name should be equal but it differs. ";
+          $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
+          $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
       }
+  }
 
-      $check .= "<u><b>Result of table '$current' check</u></b><br><br>";
-      $check .= "Column width set in DB $current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
-      $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
-      $check .= "<b>Recommendation:</b> $rec <br><br>";
-#}
+  $check .= "<u><b>Result of table '$current' check</u></b><br><br>";
+  $check .= "Column width set in table $current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+  $check .= "Column width used by device $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Vorhandensein Search_Idx mit den empfohlenen Spalten
   #######################################################################
@@ -6112,8 +6173,9 @@ sub DbLog_configcheck {
   my ($idef,$idef_dev,$idef_rdg,$idef_tsp);
   $check .= "<u><b>Result of check 'Search_Idx' availability</u></b><br><br>";
 
-  if($dbmodel =~ /MYSQL/) {
-      @six = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx'");
+  if ($dbmodel =~ /MYSQL/) {
+      ($err, @six) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Search_Idx'");
+      
       if (!@six) {
           $check .= "The index 'Search_Idx' is missing. <br>";
           $rec    = "You can create the index by executing statement <b>'CREATE INDEX Search_Idx ON `$history` (DEVICE, READING, TIMESTAMP) USING BTREE;'</b> <br>";
@@ -6122,9 +6184,9 @@ sub DbLog_configcheck {
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
       }
       else {
-          @six_dev = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='DEVICE'");
-          @six_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='READING'");
-          @six_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='TIMESTAMP'");
+          ($err, @six_dev) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='DEVICE'");
+          ($err, @six_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='READING'");
+          ($err, @six_tsp) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='TIMESTAMP'");
 
           if (@six_dev && @six_rdg && @six_tsp) {
               $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'TIMESTAMP', 'READING'. <br>";
@@ -6141,8 +6203,9 @@ sub DbLog_configcheck {
           }
       }
   }
-  if($dbmodel =~ /POSTGRESQL/) {
-      @six = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='$history' and indexname ='Search_Idx'");
+  
+  if ($dbmodel =~ /POSTGRESQL/) {
+      ($err, @six) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT * FROM pg_indexes WHERE tablename='$history' and indexname ='Search_Idx'");
 
       if (!@six) {
           $check .= "The index 'Search_Idx' is missing. <br>";
@@ -6172,8 +6235,9 @@ sub DbLog_configcheck {
           }
       }
   }
-  if($dbmodel =~ /SQLITE/) {
-      @six = DbLog_sqlget($hash,"SELECT name,sql FROM sqlite_master WHERE type='index' AND name='Search_Idx'");
+  
+  if ($dbmodel =~ /SQLITE/) {
+      ($err, @six) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT name,sql FROM sqlite_master WHERE type='index' AND name='Search_Idx'");
 
       if (!$six[0]) {
           $check .= "The index 'Search_Idx' is missing. <br>";
@@ -6214,18 +6278,20 @@ sub DbLog_configcheck {
   $check    .= "<u><b>Result of check 'Report_Idx' availability for DbRep-devices</u></b><br><br>";
 
   for my $dbrp (@repdvs) {
-      if(!$defs{$dbrp}) {
+      if (!$defs{$dbrp}) {
           Log3 ($name, 2, "DbLog $name - Device '$dbrp' found by configCheck doesn't exist !");
           next;
       }
+      
       if ($defs{$dbrp}->{DEF} eq $name) {                                      # DbRep Device verwendet aktuelles DbLog-Device
           Log3 ($name, 5, "DbLog $name - DbRep-Device '$dbrp' uses $name.");
           $isused = 1;
       }
   }
+  
   if ($isused) {
-      if($dbmodel =~ /MYSQL/) {
-          @dix = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Report_Idx'");
+      if ($dbmodel =~ /MYSQL/) {
+          ($err, @dix) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Report_Idx'");
 
           if (!@dix) {
               $check .= "At least one DbRep-device assigned to $name is used, but the recommended index 'Report_Idx' is missing. <br>";
@@ -6235,8 +6301,8 @@ sub DbLog_configcheck {
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
           }
           else {
-              @dix_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='READING'");
-              @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
+              ($err, @dix_rdg) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='READING'");
+              ($err, @dix_tsp) = _DbLog_prepExecQueryOnly ($name, $dbh, "SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
 
               if (@dix_rdg && @dix_tsp) {
                   $check .= "At least one DbRep-device assigned to $name is used. ";
@@ -6254,9 +6320,10 @@ sub DbLog_configcheck {
               }
           }
       }
-      if($dbmodel =~ /POSTGRESQL/) {
-          @dix = DbLog_sqlget($hash,"SELECT * FROM pg_indexes WHERE tablename='$history' and indexname ='Report_Idx'");
-
+      
+      if ($dbmodel =~ /POSTGRESQL/) {
+          ($err, @dix) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT * FROM pg_indexes WHERE tablename='$history' and indexname ='Report_Idx'");
+          
           if (!@dix) {
               $check .= "You use at least one DbRep-device assigned to $name, but the recommended index 'Report_Idx' is missing. <br>";
               $rec    = "You can create the index by executing statement <b>'CREATE INDEX \"Report_Idx\" ON $history USING btree (\"timestamp\", reading)'</b> <br>";
@@ -6283,9 +6350,10 @@ sub DbLog_configcheck {
               }
           }
       }
-      if($dbmodel =~ /SQLITE/) {
-          @dix = DbLog_sqlget($hash,"SELECT name,sql FROM sqlite_master WHERE type='index' AND name='Report_Idx'");
-
+      
+      if ($dbmodel =~ /SQLITE/) {
+          ($err, @dix) = _DbLog_prepExecQueryOnly ($name, $dbh, "SELECT name,sql FROM sqlite_master WHERE type='index' AND name='Report_Idx'");
+          
           if (!$dix[0]) {
               $check .= "The index 'Report_Idx' is missing. <br>";
               $rec    = "You can create the index by executing statement <b>'CREATE INDEX Report_Idx ON `$history` (TIMESTAMP,READING)'</b> <br>";
@@ -6318,9 +6386,11 @@ sub DbLog_configcheck {
       $check .= "No DbRep-device assigned to $name is used. Hence an index for DbRep isn't needed. <br>";
       $rec    = "settings o.k.";
   }
+  
   $check .= "<b>Recommendation:</b> $rec <br><br>";
-
   $check .= "</html>";
+  
+  __DbLog_SBP_disconnectOnly ($name, $dbh);
 
 return $check;
 }
@@ -6437,7 +6507,7 @@ sub DbLog_sqlget {
 
   Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
 
-  my $dbh = _DbLog_ConnectNewDBH($hash);
+  my $dbh = _DbLog_ConnectNewDBH ($hash);
   return if(!$dbh);
 
   eval { $sth = $dbh->prepare("$sql");
@@ -7002,7 +7072,7 @@ sub DbLog_sampleDataFn {
 
   my $currentPresent = AttrVal($dlName,'DbLogType','History');
 
-  my $dbhf = _DbLog_ConnectNewDBH($defs{$dlName});
+  my $dbhf = _DbLog_ConnectNewDBH ($defs{$dlName});
   return if(!$dbhf);
 
   my $prescurr = eval {$dbhf->selectrow_array("select count(*) from $current");} || 0;
@@ -7073,7 +7143,7 @@ return $json;
 sub DbLog_setSchemeTable {
   my $hash   = shift;
   my $scheme = shift // AttrVal($hash->{NAME}, 'dbSchema', '');
-  
+
  if ($scheme) {
       $hash->{HELPER}{TH} = $scheme.'.history';
       $hash->{HELPER}{TC} = $scheme.'.current';
@@ -7161,8 +7231,8 @@ sub DbLog_prepareSql {
         $yearstats .= "AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, ";
         $yearstats .= "COUNT(VALUE) AS COUNT FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
-
-    } elsif ($dbmodel eq "MYSQL") {
+    } 
+    elsif ($dbmodel eq "MYSQL") {
         ### MYSQL Queries for Statistics ###
         ### hour:
         $hourstats  = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(CAST(VALUE AS DECIMAL(12,4))) AS SUM, ";
@@ -7319,7 +7389,7 @@ sub DbLog_chartQuery {
 
     my ($hash, @a) = @_;
 
-    my $dbhf       = _DbLog_ConnectNewDBH($hash);
+    my $dbhf = _DbLog_ConnectNewDBH ($hash);
     return if(!$dbhf);
 
     my $totalcount;
@@ -7415,7 +7485,7 @@ sub DbLog_dbReadings {
 
   my $history  = $hash->{HELPER}{TH};
 
-  my $dbh = _DbLog_ConnectNewDBH($hash);
+  my $dbh = _DbLog_ConnectNewDBH ($hash);
   return if(!$dbh);
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
@@ -9072,8 +9142,8 @@ attr SMA_Energymeter DbLogValueFn
        attr &lt;device&gt; verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt;
        </code><br><br>
 
-       If verbose level 4 is used, only output of devices set in this attribute will be reported in FHEM central logfile. If this attribute
-       isn't set, output of all relevant devices will be reported if using verbose level 4.
+       If verbose level 4/5 is used, only output of devices set in this attribute will be reported in FHEM central logfile. 
+       If this attribute isn't set, output of all relevant devices will be reported if using verbose level 4/5.
        The given devices are evaluated as Regex. <br><br>
 
       <b>Example</b> <br>
@@ -10753,8 +10823,8 @@ attr SMA_Energymeter DbLogValueFn
        attr &lt;device&gt; verbose4Devs &lt;device1&gt;,&lt;device2&gt;,&lt;device..&gt;
        </code><br><br>
 
-       Mit verbose Level 4 werden nur Ausgaben bezüglich der in diesem Attribut aufgeführten Devices im Logfile protokolliert. Ohne dieses
-       Attribut werden mit verbose 4 Ausgaben aller relevanten Devices im Logfile protokolliert.
+       Mit verbose Level 4/5 werden nur Ausgaben bezüglich der in diesem Attribut aufgeführten Devices im Logfile 
+       protokolliert. Ohne dieses Attribut werden mit verbose 4/5 Ausgaben aller relevanten Devices im Logfile protokolliert.
        Die angegebenen Devices werden als Regex ausgewertet. <br><br>
 
       <b>Beispiel</b> <br>
