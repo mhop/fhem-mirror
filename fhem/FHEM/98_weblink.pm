@@ -257,10 +257,12 @@ webdev_AWaddPos($$$)
       define interactive_webcam weblink iframe http://w.x.y.z/webcam.cgi<br>
       define hr weblink htmlCode &lt;hr&gt<br>
       define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }<br>
-      define systemCommands weblink cmdList
-             pair:Pair:set+cul2+hmPairForSec+60
-             restart:Restart:shutdown+restart
-             update:UpdateCheck:update+check
+      define systemCommands weblink cmdList\
+      <ul>
+             pair:Pair:set+cul2+hmPairForSec+60\<br>
+             restart:Restart:shutdown+restart\<br>
+             update:UpdateCheck:update+check<br>
+      </ul>
       define aw weblink associatedWith rgr_Residents 3
       </code>
     </ul>
