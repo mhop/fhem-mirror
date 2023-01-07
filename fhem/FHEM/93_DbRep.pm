@@ -42,19 +42,25 @@ use warnings;
 use POSIX qw(strftime SIGALRM);
 use Time::HiRes qw(gettimeofday tv_interval);
 use Scalar::Util qw(looks_like_number);
-eval "use DBI;1"               or my $DbRepMMDBI = "DBI";
-eval "use FHEM::Meta;1"        or my $modMetaAbsent = 1;
+eval "use DBI;1"                                or my $DbRepMMDBI    = "DBI";
+eval "use FHEM::Meta;1"                         or my $modMetaAbsent = 1;
 use DBI::Const::GetInfoType;
 use Blocking;
-use Color;                           # colorpicker Widget
+use Color;                                                                       # colorpicker Widget
 use Time::Local;
+use HttpUtils;
 use Encode;
+
+use FHEM::SynoModules::SMUtils qw( evalDecodeJSON );
+
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
+                            "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
   "8.50.10" => "01.01.2023  Commandref edited ",
   "8.50.9"  => "28.12.2022  Commandref changed to a id-links ",
   "8.50.8"  => "21.12.2022  add call to DbRep_sqlCmd, DbRep_sqlCmdBlocking ",
@@ -400,8 +406,8 @@ my $dbrep_defdecplaces        = 4;                                              
 my $dbrep_dump_path_def       = $attr{global}{modpath}."/log/";                        # default Pfad für local Dumps
 my $dbrep_dump_remotepath_def = "./";                                                  # default Pfad für remote Dumps
 my $dbrep_fName               = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";   # default Pfad/Name SQL Cache File
-
-
+my $dbrep_deftonbl            = 86400;                                                 # default Timeout non-blocking Operationen
+my $dbrep_deftobl             = 10;                                                    # default Timeout blocking Operationen
 
 
 ###################################################################################
@@ -467,6 +473,7 @@ sub DbRep_Initialize {
                        "showTableInfo ".
                        "sqlCmdHistoryLength:slider,0,1,200 ".
                        "sqlCmdVars ".
+                       "sqlFormatService:https://sqlformat.org,none ".
                        "sqlResultFormat:separated,mline,sline,table,json ".
                        "sqlResultFieldSep:|,:,\/ ".
                        "timeYearPeriod ".
@@ -1019,71 +1026,68 @@ sub DbRep_Set {
       DbRep_Main       ($hash, $opt, $f);
   }
   elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
-      return "\"set $opt\" needs at least an argument" if ( @a < 3 );
+      return qq{"set $opt" needs at least an argument} if ( @a < 3 );
+
+      delete $data{DbRep}{$name}{sqlcache}{temp};
+
       my $sqlcmd;
 
       if($opt eq "sqlSpecial") {
           my ($tq,$gcl);
 
           if($prop eq "50mostFreqLogsLast2days") {
-              $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
-              $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
-              $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
+              $sqlcmd = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
+              $sqlcmd = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
           }
           elsif ($prop eq "allDevReadCount") {
-              $prop = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
+              $sqlcmd = "select device, reading, count(*) as count from history group by DEVICE, READING order by count desc;";
           }
           elsif ($prop eq "50DevReadCount") {
-              $prop = "select DEVICE AS device, READING AS reading, count(0) AS number from history group by DEVICE, READING order by number DESC limit 50;";
+              $sqlcmd = "select DEVICE AS device, READING AS reading, count(0) AS number from history group by DEVICE, READING order by number DESC limit 50;";
           }
           elsif ($prop eq "allDevCount") {
-              $prop = "select device, count(*) from history group by DEVICE;";
+              $sqlcmd = "select device, count(*) from history group by DEVICE;";
           }
           elsif ($prop eq "recentReadingsOfDevice") {
               if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
               if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
               if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
 
-              $prop = "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
-                       FROM history t1
-                       INNER JOIN
-                       (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
-                          from history where §device§ AND TIMESTAMP > ".$tq." group by ".$gcl.") x
-                       ON x.TIMESTAMP = t1.TIMESTAMP AND
-                          x.DEVICE    = t1.DEVICE    AND
-                          x.READING   = t1.READING;";
+              $sqlcmd = "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
+                         FROM history t1
+                         INNER JOIN
+                         (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
+                            from history where §device§ AND TIMESTAMP > ".$tq." group by ".$gcl.") x
+                         ON x.TIMESTAMP = t1.TIMESTAMP AND
+                            x.DEVICE    = t1.DEVICE    AND
+                            x.READING   = t1.READING;";
           }
           elsif ($prop eq "readingsDifferenceByTimeDelta") {
-              $prop = "SET \@diff=0;
-                       SET \@delta=NULL;
-                       SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA
-                       FROM (SELECT TIMESTAMP,READING,VALUE,
-                              cast((VALUE-\@diff) AS DECIMAL(12,4))   AS DIFF,
-                              \@diff:=VALUE                           AS curr_V,
-                              TIMESTAMPDIFF(MINUTE,\@delta,TIMESTAMP) AS TIME_DELTA,
-                              \@delta:=TIMESTAMP                      AS curr_T
-                                FROM  history
-                            WHERE §device§  AND
-                                  §reading§ AND
-                                  TIMESTAMP >= §timestamp_begin§ AND
-                                  TIMESTAMP <= §timestamp_end§
-                                  ORDER BY TIMESTAMP
-                            ) t1;";
+              $sqlcmd = 'SET @diff=0;
+                         SET @delta=NULL;
+                         SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA
+                         FROM (SELECT TIMESTAMP,READING,VALUE,
+                                cast((VALUE-@diff) AS DECIMAL(12,4))   AS DIFF,
+                                @diff:=VALUE                           AS curr_V,
+                                TIMESTAMPDIFF(MINUTE,@delta,TIMESTAMP) AS TIME_DELTA,
+                                @delta:=TIMESTAMP                      AS curr_T
+                                  FROM  history
+                              WHERE §device§  AND
+                                    §reading§ AND
+                                    TIMESTAMP >= §timestamp_begin§ AND
+                                    TIMESTAMP <= §timestamp_end§
+                                    ORDER BY TIMESTAMP
+                              ) t1;';
           }
-
-          $data{DbRep}{$name}{sqlcache}{temp} = $prop;                               # SQL incl. Formatierung zwischenspeichern
-
-          my @cmd = split(/\s+/, $prop);
-          $prop   = join " ", @cmd;
-          $sqlcmd = $prop;
       }
 
       if($opt eq "sqlCmd") {
           my @cmd = @a;
-          shift @cmd; shift @cmd;
+          shift @cmd;
+          shift @cmd;
 
-          $sqlcmd = join(" ", @cmd);
-          $sqlcmd = DbRep_trim ($sqlcmd);
+          $sqlcmd = join ' ', @cmd;
 
           if ($sqlcmd =~ /^ckey:/ix) {
               my $key = (split ":", $sqlcmd)[1];
@@ -1096,21 +1100,16 @@ sub DbRep_Set {
               }
           }
 
-          $sqlcmd .= ";" if ($sqlcmd !~ m/\;$/x);
-
-          $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                               # SQL incl. Formatierung zwischenspeichern
-
-          @cmd    = split(/\s/, $sqlcmd);
-          $sqlcmd = join(" ", @cmd);
+          $sqlcmd .= ';' if ($sqlcmd !~ m/\;$/x);
       }
 
       if($opt eq "sqlCmdHistory") {
-          $prop   =~ s/§/_ESC_ECS_/g;
-          $prop   =~ tr/ A-Za-z0-9!"#%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
-          $prop   =~ s/_ESC_ECS_/§/g;
-          $prop   =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
-          $prop   =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
           $sqlcmd = $prop;
+          $sqlcmd =~ s/§/_ESC_ECS_/g;
+          $sqlcmd =~ tr/ A-Za-z0-9!"#%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $sqlcmd =~ s/_ESC_ECS_/§/g;
+          $sqlcmd =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
+          $sqlcmd =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
 
           if($sqlcmd eq "___purge_sqlhistory___") {
               DbRep_deleteSQLcmdCache ($name);
@@ -1134,11 +1133,17 @@ sub DbRep_Set {
           }
       }
 
-      #$hash->{LASTCMD} = $sqlcmd ? "$opt $sqlcmd" : "$opt";
-
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }
+
+      $sqlcmd = _DbRep_sqlFormOnline ($hash, $sqlcmd);                                # SQL Statement online formatieren
+
+      $sqlcmd                             = DbRep_trim ($sqlcmd);
+      $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                                  # SQL incl. Formatierung zwischenspeichern
+
+      my @cmd = split /\s+/, $sqlcmd;
+      $sqlcmd = join ' ', @cmd;
 
       DbRep_setLastCmd ($name, $opt, $sqlcmd);
       DbRep_Main       ($hash, $opt, $sqlcmd);
@@ -1187,6 +1192,64 @@ return;
 }
 
 ###################################################################################
+#                SQL Statement online formatieren
+###################################################################################
+sub _DbRep_sqlFormOnline {
+  my $hash   = shift;
+  my $sqlcmd = shift;
+
+  my $name   = $hash->{NAME};
+  my $fs     = AttrVal ($name, 'sqlFormatService', 'none');
+
+  return $sqlcmd if($fs eq 'none');
+
+  if ($fs eq 'https://sqlformat.org') {
+      $fs .= '/api/v1/format';
+  }
+
+  my @cmds   = split ';', $sqlcmd;
+
+  my $newcmd;
+
+  for my $part (@cmds) {
+      $part           = urlEncode ($part);
+      my ($err, $dat) = HttpUtils_BlockingGet ({ url         => $fs,
+                                                 timeout     => 5,
+                                                 data        => "reindent=1&sql=$part",
+                                                 method      => 'POST',
+                                                 sslargs     => { SSL_verify_mode => 0 },
+                                                 httpversion => '1.1',
+                                                 loglevel    => 4
+                                               }
+                                              );
+
+      if ($err) {
+          Log3 ($name, 3, "DbRep $name - ERROR format SQL online: ".$err);
+          return $sqlcmd;
+      }
+      else {
+          my ($success, $decoded) = evalDecodeJSON ($hash, urlDecode ($dat));
+
+          my $res = $decoded->{result};
+          next if(!$res);
+
+          if ($success) {
+              $newcmd .= Encode::encode_utf8 ($res).';';
+
+          }
+          else {
+              Log3 ($name, 3, "DbRep $name - ERROR decode JSON from SQL online formatter");
+              return $sqlcmd;
+          }
+      }
+  }
+
+  Log3 ($name, 4, "DbRep $name - SQL online formatted: ".$newcmd);
+
+return $newcmd;
+}
+
+###################################################################################
 #                                  Get
 ###################################################################################
 sub DbRep_Get {
@@ -1200,7 +1263,7 @@ sub DbRep_Get {
   my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbmodel     = $dbloghash->{MODEL};
   my $dbname      = $hash->{DATABASE};
-  my $to          = AttrVal($name, "timeout", "86400");
+  my $to          = AttrVal ($name, 'timeout', $dbrep_deftonbl);
 
   my $getlist = "Unknown argument $opt, choose one of ".
                 "svrinfo:noArg ".
@@ -1232,54 +1295,62 @@ sub DbRep_Get {
       return "Dump is running - try again later !"                                if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
       return "The operation \"$opt\" isn't available with database type $dbmodel" if($dbmodel ne 'MYSQL');
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       DbRep_setLastCmd (@a);
       DbRep_Main       ($hash, $opt, $prop);
   }
   elsif ($opt eq "svrinfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       DbRep_setLastCmd (@a);
       DbRep_Main       ($hash, $opt, $prop);
   }
   elsif ($opt eq "blockinginfo") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       DbRep_setLastCmd          (@a);
-      DbRep_delread             ($hash);
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
       DbRep_getblockinginfo     ($hash);
   }
   elsif ($opt eq "minTimestamp" || $opt eq "initData") {
       return "Dump is running - try again later !" if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 
-      $hash->{HELPER}{IDRETRIES} = 3;                                           # Anzahl wie oft versucht wird initiale Daten zu holen
+      $hash->{HELPER}{IDRETRIES} = 3;                                                    # Anzahl wie oft versucht wird initiale Daten zu holen
 
-      DbRep_setLastCmd          (@a);
       DbRep_delread             ($hash);
+      DbRep_setLastCmd          (@a);
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
       $prop //= '';
       DbRep_firstconnect("$name|$opt|$prop");
   }
-  elsif ($opt =~ /sqlCmdBlocking|dbValue/) {
+  elsif ($opt =~ /sqlCmdBlocking/) {
       return qq{get "$opt" needs at least an argument} if ( @a < 3 );
 
-      if($opt eq "dbValue") {
-          Log3($name, 1, qq{$name - WARNING - the command "dbValue" is deprecated and will be removed soon. Please use "sqlCmdBlocking" instead.});
-      }
-
       my @cmd = @a;
-      shift @cmd; shift @cmd;
+      shift @cmd;
+      shift @cmd;
 
-      my $sqlcmd       = join " ", @cmd;
-      $sqlcmd          =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+      my $sqlcmd  = join ' ', @cmd;
+      $sqlcmd     =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+      $sqlcmd    .= ';' if ($sqlcmd !~ m/\;$/x);
 
+      $sqlcmd                             = _DbRep_sqlFormOnline ($hash, $sqlcmd);           # SQL Statement online formatieren
+      $sqlcmd                             = DbRep_trim ($sqlcmd);
+      $data{DbRep}{$name}{sqlcache}{temp} = $sqlcmd;                                         # SQL incl. Formatierung zwischenspeichern
+
+      @cmd    = split /\s+/, $sqlcmd;
+      $sqlcmd = join ' ', @cmd;
+      
       DbRep_setLastCmd ($name, $opt, $sqlcmd);
 
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($name, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }
 
+      DbRep_delread    ($hash);                                                          # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
       ReadingsSingleUpdateValue ($hash, "state", "running", 1);
 
       return DbRep_sqlCmdBlocking($name,$sqlcmd);
@@ -1893,7 +1964,7 @@ sub DbRep_firstconnect {
   my $string                  = shift;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
   my $hash                    = $defs{$name};
-  my $to                      = AttrVal($name, "timeout", "86400");
+  my $to                      = AttrVal ($name, 'timeout', $dbrep_deftonbl);
 
   RemoveInternalTimer ($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
@@ -2100,6 +2171,7 @@ sub _DbRep_getInitData_grants {
 
       eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();");
             $sth->execute();
+            1;
            }
            or do { Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
                    return $grants;
@@ -2232,9 +2304,9 @@ sub DbRep_Main {
  my $opt       = shift;
  my $prop      = shift // q{};
  my $name      = $hash->{NAME};
- my $to        = AttrVal($name, "timeout", "86400");
- my $reading   = AttrVal($name, "reading",     "%");
- my $device    = AttrVal($name, "device",      "%");
+ my $to        = AttrVal ($name, 'timeout', $dbrep_deftonbl);
+ my $reading   = AttrVal ($name, 'reading',             '%');
+ my $device    = AttrVal ($name, 'device',              '%');
  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbmodel   = $dbloghash->{MODEL};
 
@@ -3390,6 +3462,7 @@ sub DbRep_averval {
 
           eval { $tf = ($dbh->selectrow_array($sqlf))[0];
                  $tl = ($dbh->selectrow_array($sqll))[0];
+                 1;
                }
                or do { $err = encode_base64($@,"");
                        Log3 ($name, 2, "DbRep $name - $@");
@@ -3404,7 +3477,8 @@ sub DbRep_averval {
               my ($yyyyf, $mmf, $ddf, $hhf, $minf, $secf) = ($tf =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
               my ($yyyyl, $mml, $ddl, $hhl, $minl, $secl) = ($tl =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
 
-              $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-(timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));
+              $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-
+                      (timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));
 
               if ($IsTimeSet || $IsAggrSet) {
                   $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
@@ -6442,14 +6516,17 @@ sub DbRep_impfile {
       Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");
 
       if($i_timestamp && $i_device && $i_reading) {
-          eval { $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit); }
-                 or do { $err = encode_base64($@,"");
-                         Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
-                         close(FH);
-                         $dbh->rollback;
-                         $dbh->disconnect;
-                         return "$name|$err";
-                       };
+          eval { $sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit);
+               }
+               or do { $err = encode_base64($@,"");
+                       Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
+                       close(FH);
+
+                       $dbh->rollback;
+                       $dbh->disconnect;
+
+                       return "$name|$err";
+                     };
 
           $irowdone++;
       }
@@ -6557,84 +6634,18 @@ sub DbRep_sqlCmd {
   my $sql = $cmd;
 
   my @pms;
-  my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
 
-  if ($vars) {
-      @pms = split(";",$vars);
+  $err = _DbRep_setSessAttrVars ($name, $dbh);
+  return "$name|$err" if ($err);
 
-      for my $pm (@pms) {
-          if($pm !~ /PRAGMA|SET/i) {
-              next;
-          }
-          $pm = ltrim($pm).";";
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+  $err = _DbRep_setSessVars ($name, $dbh, \$sql);
+  return "$name|$err" if ($err);
 
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
+  $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
+  return "$name|$err" if ($err);
 
-  # Abarbeitung von Session Variablen vor einem SQL-Statement
-  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  if($cmd =~ /^\s*SET.*;/i) {
-      @pms = split(";",$cmd);
-      $sql = q{};
-
-      for my $pm (@pms) {
-
-          if($pm !~ /SET/i) {
-              $sql .= $pm.";";
-              next;
-          }
-
-          $pm = ltrim($pm).";";
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
-
-  # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
-  # wenn Pragmas im SQL vorangestellt sind
-  if($cmd =~ /^\s*PRAGMA.*;/i) {
-      @pms = split ";", $cmd;
-      $sql = q{};
-
-      for my $pm (@pms) {
-
-          if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
-              $sql .= $pm.";";
-              next;
-          }
-
-          $pm = ltrim($pm).";";
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
-
-  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
-  # z.B. PREPARE statement FROM @CMD
-  if($sql =~ /^\s*PREPARE.*;/i) {
-      @pms = split(";",$sql);
-      $sql = q{};
-      for my $pm (@pms) {
-
-          if($pm !~ /PREPARE/i) {
-              $sql .= $pm.";";
-              next;
-          }
-
-          $pm = ltrim($pm).";";
-          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
-
-          $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
-          return "$name|$err" if ($err);
-      }
-  }
+  $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
+  return "$name|$err" if ($err);
 
   # Ersetzung von Schlüsselwörtern für Timing, Gerät, Lesen (unter Verwendung der Attributsyntax)
   ($err, $sql) = _DbRep_sqlReplaceKeywords ( { hash    => $hash,
@@ -6646,7 +6657,7 @@ sub DbRep_sqlCmd {
                                                rsn     => $rsn
                                              }
                                            );
-  return $err if ($err);
+  return "$name|$err" if ($err);
 
   $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
 
@@ -6708,6 +6719,295 @@ return "$name|$err|$rowstring|$opt|$cmd|$nrows|$rt";
 }
 
 ####################################################################################################
+#     blockierende DB-Abfrage
+#     liefert Ergebnis sofort zurück, setzt keine Readings
+####################################################################################################
+sub DbRep_sqlCmdBlocking {
+  my $name   = shift;
+  my $cmd    = shift;
+
+  my $hash   = $defs{$name};
+  my $srs    = AttrVal ($name, 'sqlResultFieldSep',  '|');
+  my $to     = AttrVal ($name, 'timeout', $dbrep_deftobl);
+
+  my ($ret);
+
+  my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+
+  $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
+
+  $cmd   .= ";" if ($cmd !~ m/\;$/x);
+  my $sql = $cmd;
+
+  Log3 ($name, 4, "DbRep $name - -------- New selection --------- ");
+  Log3 ($name, 4, "DbRep $name - sqlCmdBlocking Command:\n$sql");
+
+  my @pms;
+
+  $err = _DbRep_setSessAttrVars ($name, $dbh);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+
+  $err = _DbRep_setSessVars ($name, $dbh, \$sql);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+
+  $err = _DbRep_setSessPragma ($name, $dbh, \$sql);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+
+  $err = _DbRep_execSessPrepare ($name, $dbh, \$sql);
+  if ($err) {
+      _DbRep_sqlBlckgErrorState ($hash, $err);
+      return $err;
+  }
+
+  my $st = [gettimeofday];                                                        # SQL-Startzeit
+
+  my $totxt = qq{Timeout occured (limit: $to seconds). You may be able to adjust the "Timeout" attribute.};
+
+  my ($sth,$r,$failed);
+
+  eval {                                                                          # outer eval fängt Alarm auf, der gerade vor diesem Alarm feuern könnte(0)
+      POSIX::sigaction(SIGALRM, POSIX::SigAction->new(sub {die "Timeout\n"}));    # \n ist nötig !
+
+      alarm($to);
+      eval {
+          $sth = $dbh->prepare($sql);
+          $r   = $sth->execute();
+      };
+      alarm(0);                                                                   # Alarm aufheben (wenn der Code schnell lief)
+
+      if ($@) {
+          if($@ eq "Timeout\n") {                                                 # timeout
+              $failed = $totxt;
+          }
+          else {                                                                  # ein anderer Fehler
+              $failed = $@;
+          }
+      }
+      1;
+
+  }
+  or $failed = $@;
+
+  alarm(0);                                                                      # Schutz vor Race Condition
+
+  if ($failed) {
+      $err = $failed eq "Timeout\n" ? $totxt : $failed;
+
+      Log3 ($name, 2, "DbRep $name - $err");
+      
+      my $encerr = encode_base64($err, "");
+
+      $sth->finish if($sth);
+      $dbh->disconnect;
+
+      _DbRep_sqlBlckgErrorState ($hash, $encerr);
+
+      return $err;
+  }
+
+  my $nrows = 0;
+  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
+      while (my @line = $sth->fetchrow_array()) {
+          Log3 ($name, 4, "DbRep $name - SQL result: @line");
+          $ret .= "\n" if($nrows);                                              # Forum: #103295
+          $ret .= join("$srs", @line);
+          $nrows++;                                                             # Anzahl der Datensätze
+      }
+  }
+  else {
+      $nrows = $sth->rows;
+
+      $err = DbRep_commitOnly ($name, $dbh);
+      if ($err) {
+          _DbRep_sqlBlckgErrorState ($hash, $err);
+          return $err;
+      }
+
+      $ret = $nrows;
+  }
+
+  $sth->finish;
+  $dbh->disconnect;
+
+  my $rt  = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
+  my $com = (split " ", $sql, 2)[0];
+
+  Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows");
+
+  readingsBeginUpdate         ($hash);
+  
+  if (defined $data{DbRep}{$name}{sqlcache}{temp}) {                # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
+      my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};
+      ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);
+  }
+  
+  ReadingsBulkUpdateTimeState ($hash, undef, $rt, 'done');
+  readingsEndUpdate           ($hash, 1);
+
+return $ret;
+}
+
+################################################################
+#   Set Session Variablen "SET" oder PRAGMA aus
+#   Attribut "sqlCmdVars"
+################################################################
+sub _DbRep_setSessAttrVars {
+  my $name = shift;
+  my $dbh  = shift;
+
+  my $vars = AttrVal($name, "sqlCmdVars", "");                                       # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
+
+  if ($vars) {
+      my @pms = split ';', $vars;
+
+      for my $pm (@pms) {
+          if($pm !~ /PRAGMA|SET/i) {
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                 # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Set VARIABLE or PRAGMA: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+################################################################
+# Abarbeitung von Session Variablen vor einem SQL-Statement
+# z.B. SET  @open:=NULL, @closed:=NULL; Select ...
+################################################################
+sub _DbRep_setSessVars {
+  my $name   = shift;
+  my $dbh    = shift;
+  my $sqlref = shift;
+
+  if(${$sqlref} =~ /^\s*SET.*;/i) {
+      my @pms    = split ';', ${$sqlref};
+      ${$sqlref} = q{};
+
+      for my $pm (@pms) {
+          if($pm !~ /SET/i) {
+              ${$sqlref} .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Set SQL session variable: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+################################################################
+# Abarbeitung aller Pragmas vor einem SQLite Statement,
+# SQL wird extrahiert wenn Pragmas im SQL vorangestellt sind
+################################################################
+sub _DbRep_setSessPragma {
+  my $name   = shift;
+  my $dbh    = shift;
+  my $sqlref = shift;
+
+  if(${$sqlref} =~ /^\s*PRAGMA.*;/i) {
+      my @pms    = split ';', ${$sqlref};
+      ${$sqlref} = q{};
+
+      for my $pm (@pms) {
+          if($pm !~ /PRAGMA.*=/i) {                                                 # PRAGMA ohne "=" werden als SQL-Statement mit Abfrageergebnis behandelt
+              ${$sqlref} .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PRAGMA Statement: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+####################################################################
+# Abarbeitung von PREPARE statement als Befehl als Bestandteil
+# des SQL
+# Forum: #114293  / https://forum.fhem.de/index.php?topic=114293.0
+# z.B. PREPARE statement FROM @CMD
+####################################################################
+sub _DbRep_execSessPrepare {
+  my $name   = shift;
+  my $dbh    = shift;
+  my $sqlref = shift;
+
+  if(${$sqlref} =~ /^\s*PREPARE.*;/i) {
+      my @pms    = split ';', ${$sqlref};
+      ${$sqlref} = q{};
+
+      for my $pm (@pms) {
+          if($pm !~ /PREPARE/i) {
+              ${$sqlref} .= $pm.';';
+              next;
+          }
+
+          $pm = ltrim($pm).';';
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+
+          my $err = DbRep_dbhDo ($name, $dbh, $pm, "Exec PREPARE statement: $pm");
+          return $err if ($err);
+      }
+  }
+
+return;
+}
+
+####################################################################
+#  Error -> Readings errortext und state
+####################################################################
+sub _DbRep_sqlBlckgErrorState {
+  my $hash = shift;
+  my $err  = shift;
+
+  my $name = $hash->{NAME};
+  $err     = decode_base64 ($err);
+
+  Log3 ($name, 2, "DbRep $name - ERROR - $err");
+
+  readingsBeginUpdate     ($hash);
+  
+  if (defined $data{DbRep}{$name}{sqlcache}{temp}) {                # SQL incl. Formatierung aus Zwischenspeicherzwischenspeichern
+      my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};
+      ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);
+  }
+  
+  ReadingsBulkUpdateValue ($hash, 'errortext',    $err);
+  ReadingsBulkUpdateValue ($hash, 'state',     'error');
+  readingsEndUpdate       ($hash, 1);
+
+return;
+}
+
+####################################################################################################
 #        Ersetzung von Schlüsselwörtern für Time*, Devices und Readings
 #        in SQL-Statements (unter Verwendung der Attributsyntax)
 ####################################################################################################
@@ -6721,7 +7021,7 @@ sub _DbRep_sqlReplaceKeywords {
   my $rsf     = $paref->{rsf};
   my $rsn     = $paref->{rsn};
 
-  my $ret  = q{};
+  my $err  = q{};
   my $name = $hash->{NAME};
   my $sfx  = AttrVal("global", "language", "EN");
   $sfx     = $sfx eq 'EN' ? '' : "_$sfx";
@@ -6729,7 +7029,7 @@ sub _DbRep_sqlReplaceKeywords {
   $sql =~ s/§timestamp_begin§/'$rsf'/g;
   $sql =~ s/§timestamp_end§/'$rsn'/g;
 
-  my ($rdspec,$err);
+  my $rdspec;
 
   my @keywords = qw(device reading);
 
@@ -6748,8 +7048,7 @@ sub _DbRep_sqlReplaceKeywords {
           $err = qq{<html> $err </html>};
           $err =~ s/"${kw}"/<a href='https:\/\/fhem.de\/commandref${sfx}.html#${kw}' target='_blank'>${kw}<\/a>/xs;
           $err = encode_base64($err,"");
-          $ret = "$name|$err";
-          return $ret;
+          return $err;
       }
 
       $rdspec = DbRep_createCommonSql( {hash => $hash, ${kw} => $vna, dbmodel => $dbmodel} );
@@ -6757,7 +7056,7 @@ sub _DbRep_sqlReplaceKeywords {
       $sql    =~ s/§${kw}§/$rdspec/xg;
   }
 
-return ($ret, $sql);
+return ($err, $sql);
 }
 
 ####################################################################################################
@@ -6779,12 +7078,17 @@ sub DbRep_sqlCmdDone {
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
   delete($hash->{HELPER}{RUNNING_PID});
-
+  
+  my $tmpsql           = delete $data{DbRep}{$name}{sqlcache}{temp};                    # SQL incl. Formatierung aus Zwischenspeicher holen
   my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
 
   if ($err) {
-    ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-    ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+    readingsBeginUpdate     ($hash);
+    ReadingsBulkUpdateValue ($hash, 'sqlCmd',    $tmpsql); 
+    ReadingsBulkUpdateValue ($hash, "errortext", $err   );
+    ReadingsBulkUpdateValue ($hash, "state",     "error");
+    readingsEndUpdate       ($hash, 1);
+    
     return;
   }
 
@@ -6797,10 +7101,10 @@ sub DbRep_sqlCmdDone {
   no warnings 'uninitialized';
 
   readingsBeginUpdate     ($hash);
-  ReadingsBulkUpdateValue ($hash, "sqlCmd", $cmd);
-  ReadingsBulkUpdateValue ($hash, "sqlResultNumRows", $nrows);
+  ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);      
+  ReadingsBulkUpdateValue ($hash, 'sqlResultNumRows', $nrows);
 
-  DbRep_addSQLcmdCache ($name);                                                 # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
+  DbRep_addSQLcmdCache ($name);                                                        # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
 
   if ($srf eq "sline") {
       $rowstring =~ s/§/]|[/g;
@@ -6811,6 +7115,7 @@ sub DbRep_sqlCmdDone {
       my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
       my @rows = split( /§/, $rowstring );
       my $row;
+      
       for $row ( @rows ) {
           $row =~ s/\|°escaped°\|/§/g;
           $row =~ s/$srs/\|/g if($srs !~ /\|/);
@@ -6825,6 +7130,7 @@ sub DbRep_sqlCmdDone {
       my $res = "<html>";
       my @rows = split( /§/, $rowstring );
       my $row;
+      
       for $row ( @rows ) {
           $row =~ s/\|°escaped°\|/§/g;
           $res .= $row."<br>";
@@ -6839,6 +7145,7 @@ sub DbRep_sqlCmdDone {
       my $numd = ceil(log10($bigint));
       my $formatstr = sprintf('%%%d.%dd', $numd, $numd);
       my $i = 0;
+      
       for my $row ( @rows ) {
           $i++;
           $row =~ s/\|°escaped°\|/§/g;
@@ -6853,6 +7160,7 @@ sub DbRep_sqlCmdDone {
       my $numd = ceil(log10($bigint));
       my $formatstr = sprintf('%%%d.%dd', $numd, $numd);
       my $i = 0;
+      
       for my $row ( @rows ) {
           $i++;
           $row =~ s/\|°escaped°\|/§/g;
@@ -6863,8 +7171,8 @@ sub DbRep_sqlCmdDone {
       ReadingsBulkUpdateValue ($hash, "SqlResult", $json);
   }
 
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
+  readingsEndUpdate           ($hash, 1);
 
 return;
 }
@@ -8562,6 +8870,7 @@ sub DbRep_mysql_RestoreServerSide {
 
   eval{ $sth = $dbh->prepare($sql);
         $drh = $sth->execute();
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - $@");
@@ -9979,7 +10288,10 @@ sub DbRep_ParseAborted {
   my $state  = $cause.$erread;
 
   $dbh->disconnect() if(defined($dbh));
-  ReadingsSingleUpdateValue ($hash, "state", $state, 1);
+  
+  readingsBeginUpdate     ($hash);      
+  ReadingsBulkUpdateValue ($hash, "state", $state);
+  readingsEndUpdate       ($hash, 1);
 
   Log3 ($name, 2, "DbRep $name - Database command aborted: \"$cause\" ");
 
@@ -10816,6 +11128,7 @@ sub DbRep_prepareExecuteQuery {
 
   eval{ $sth    = $dbh->prepare($sql);
         $result = $sth->execute();
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -10852,7 +11165,7 @@ return $err;
 }
 
 ####################################################################################################
-#          nur Datenbank "begin transaction"
+#       nur Datenbank "begin transaction"
 #       $dbh->{AutoCommit} = 0;  # enable transactions, if possible
 #           oder
 #       $dbh->begin_work();
@@ -10867,8 +11180,8 @@ sub DbRep_beginDatabaseTransaction {
   eval{ if($dbh->{AutoCommit}) {
             $dbh->begin_work();
             Log3 ($name, 4, "DbRep $name - $info");
-            1;
         }
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -10891,12 +11204,11 @@ sub DbRep_commitOnly {
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->commit();
             Log3 ($name, 4, "DbRep $name - $info");
-            1;
         }
         else {
             Log3 ($name, 4, "DbRep $name - data autocommitted");
-            1;
         }
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -10919,12 +11231,11 @@ sub DbRep_rollbackOnly {
   eval{ if(!$dbh->{AutoCommit}) {
             $dbh->rollback();
             Log3 ($name, 4, "DbRep $name - $info");
-            1;
         }
         else {
             Log3 ($name, 4, "DbRep $name - data auto rollback");
-            1;
         }
+        1;
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -11901,8 +12212,6 @@ sub DbRep_addSQLcmdCache {
   my $name = shift;
 
   my $hash = $defs{$name};
-
-  my $hlc = AttrVal($name, "sqlCmdHistoryLength", 0);                              # Anzahl der Einträge in Drop-Down Liste
 
   my $tmpsql = delete $data{DbRep}{$name}{sqlcache}{temp};                         # SQL incl. Formatierung aus Zwischenspeicher
   return if(!$tmpsql);
@@ -13122,178 +13431,6 @@ return;
 }
 
 ####################################################################################################
-#     blockierende DB-Abfrage
-#     liefert Ergebnis sofort zurück, setzt keine Readings
-####################################################################################################
-sub DbRep_sqlCmdBlocking {
-  my $name       = shift;
-  my $cmd        = shift;
-  my $hash       = $defs{$name};
-  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $dbuser     = $dbloghash->{dbuser};
-  my $dblogname  = $dbloghash->{NAME};
-  my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = $hash->{UTF8} // 0;
-
-  my $srs        = AttrVal($name, "sqlResultFieldSep", "|"  );
-  my $to         = AttrVal($name, "timeout",           10   );
-
-  my ($err,$ret,$dbh,@pms);
-
-  readingsDelete            ($hash, "errortext");
-  ReadingsSingleUpdateValue ($hash, "state", "running", 1);
-
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0,
-                                                                    RaiseError          => 1,
-                                                                    AutoCommit          => 1,
-                                                                    AutoInactiveDestroy => 1,
-                                                                    mysql_enable_utf8   => $utf8
-                                                                  }
-                            );
-  };
-
-  if ($@) {
-      $err = $@;
-      Log3 ($name, 2, "DbRep $name - $err");
-      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-      return $err;
-  }
-
-  my $sql = ($cmd =~ m/\;$/xs) ? $cmd : $cmd.";";
-
-  Log3 ($name, 4, "DbRep $name - -------- New selection --------- ");
-  Log3 ($name, 4, "DbRep $name - Command: sqlCmdBlocking");
-  Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
-
-  # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
-  my $vars = AttrVal($name, "sqlCmdVars", "");
-  if ($vars) {
-      @pms = split(";",$vars);
-
-      for my $pm (@pms) {
-          if($pm !~ /PRAGMA|SET/i) {
-              next;
-          }
-          $pm = ltrim($pm).";";
-          Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");
-          eval {$dbh->do($pm);} or do { Log3 ($name, 2, "DbRep $name - ERROR - $@");
-                                        $dbh->disconnect;
-                                        return $@;
-                                      }
-      }
-  }
-
-  my $set;
-  if($cmd =~ /^SET.*;/i) {                                                         # split SQL-Parameter Statement falls mitgegeben ->
-      $cmd =~ m/^(SET.*?;)(.*)/i;                                                  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-      $set = $1;
-      $sql = $2;
-  }
-
-  if($set) {
-      Log3($name, 4, "DbRep $name - Set SQL session variables: $set");
-      eval {$dbh->do($set);};                                                      # @\RB = Resetbit wenn neues Selektionsintervall beginnt
-  }
-
-  if ($@) {
-      $err = $@;
-      Log3 ($name, 2, "DbRep $name - $err");
-      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-      return ($err);
-  }
-
-  my $st = [gettimeofday];                                                        # SQL-Startzeit
-
-  my $totxt = qq{Timeout occured (limit: $to seconds). You may be able to adjust the "Timeout" attribute.};
-
-  my ($sth,$r,$failed);
-
-  eval {                                                                          # outer eval fängt Alarm auf, der gerade vor diesem Alarm feuern könnte(0)
-      POSIX::sigaction(SIGALRM, POSIX::SigAction->new(sub {die "Timeout\n"}));    # \n ist nötig !
-
-      alarm($to);
-      eval {
-          $sth = $dbh->prepare($sql);
-          $r   = $sth->execute();
-          1;
-      };
-      alarm(0);                                                                   # Alarm aufheben (wenn der Code schnell lief)
-
-      if ($@) {
-          if($@ eq "Timeout\n") {                                                 # timeout
-              $failed = $totxt;
-
-          } else {                                                                # ein anderer Fehler
-              $failed = $@;
-          }
-      }
-      1;
-
-  } or $failed = $@;
-
-  alarm(0);                                                                      # Schutz vor Race Condition
-
-  if ($failed) {
-      $err = $failed eq "Timeout\n" ? $totxt : $failed;
-
-      Log3 ($name, 2, "DbRep $name - $err");
-
-      $sth->finish if($sth);
-      $dbh->disconnect;
-
-      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-
-      return $err;
-  }
-
-  my $nrows = 0;
-  if($sql =~ m/^\s*(call|explain|select|pragma|show)/is) {
-      while (my @line = $sth->fetchrow_array()) {
-          Log3 ($name, 4, "DbRep $name - SQL result: @line");
-          $ret .= "\n" if($nrows);                                              # Forum: #103295
-          $ret .= join("$srs", @line);
-          $nrows++;                                                             # Anzahl der Datensätze
-      }
-  }
-  else {
-      $nrows = $sth->rows;
-
-      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-      if ($@) {
-          $err = $@;
-
-          Log3 ($name, 2, "DbRep $name - $err");
-
-          $dbh->disconnect;
-          ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
-          ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
-
-          return $err;
-      }
-
-      $ret = $nrows;
-  }
-
-  $sth->finish;
-  $dbh->disconnect;
-
-  my $rt  = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
-  my $com = (split " ", $sql, 2)[0];
-
-  Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
-
-  readingsBeginUpdate         ($hash);
-  ReadingsBulkUpdateTimeState ($hash,undef,$rt,"done");
-  readingsEndUpdate           ($hash, 1);
-
-return $ret;
-}
-
-####################################################################################################
 # blockierende DB-Abfrage
 # liefert den Wert eines Device:Readings des nächstmöglichen Logeintrags zum
 # angegebenen Zeitpunkt
@@ -13397,8 +13534,12 @@ return;
 #                     Associated Devices setzen
 ###################################################################################
 sub DbRep_modAssociatedWith {
-  my ($hash,$cmd,$awdev) = @_;
-  my $name = $hash->{NAME};
+  my $hash  = shift;
+  my $cmd   = shift;
+  my $awdev = shift;
+  
+  my $name  = $hash->{NAME};
+  
   my (@naw,@edvs,@edvspcs,$edevswc);
   my ($edevs,$idevice,$edevice) = ('','','');
 
@@ -13411,14 +13552,16 @@ sub DbRep_modAssociatedWith {
 
   if($edevice) {
       @edvs = split(",",$edevice);
-      foreach my $e (@edvs) {
+      for my $e (@edvs) {
           $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen
           @edvspcs = devspec2array($e);
           @edvspcs = map { my $e = $_; $e =~ s/\.\*/%/xg; } @edvspcs;
+
           if((map {$_ =~ /%/;} @edvspcs) && $edevice !~ /^%$/) {      # Devices mit Wildcard (%) aussortieren, die nicht aufgelöst werden konnten
               $edevswc .= "|" if($edevswc);
               $edevswc .= join(" ",@edvspcs);
-          } else {
+          }
+          else {
               $edevs .= "|" if($edevs);
               $edevs .= join("|",@edvspcs);
           }
@@ -13427,10 +13570,12 @@ sub DbRep_modAssociatedWith {
 
   if($idevice) {
       my @nadev = split("[, ]", $idevice);
-      foreach my $d (@nadev) {
+
+      for my $d (@nadev) {
           $d    =~ s/%/\.*/g if($d !~ /^%$/);                         # SQL Wildcard % in Regex
           my @a = devspec2array($d);
-          foreach(@a) {
+
+          for (@a) {
               next if(!$defs{$_});
               push(@naw, $_) if($_ !~ /$edevs/);
           }
@@ -13439,7 +13584,8 @@ sub DbRep_modAssociatedWith {
 
   if(@naw) {
       ReadingsSingleUpdateValue ($hash, ".associatedWith", join(" ",@naw), 0);
-  } else {
+  }
+  else {
       readingsDelete($hash, ".associatedWith");
   }
 
@@ -13705,68 +13851,61 @@ return;
 
     <li><b> cancelDump </b>   -  stops a running database dump. </li> <br>
 
-    <li><b> changeValue </b>  -  changes the stored value of a reading.
-                                 If the selection is limited to certain device/reading combinations by the attributes
-                                 <a href="#DbRep-attr-device">device</a> or <a href="#DbRep-attr-reading">reading</a>, they are taken into account
-                                 in the same way as set time limits (attributes time.*).  <br>
-                                 If these constraints are missing, the entire database is searched and the specified value is
-                                 is changed. <br><br>
+    <a id="DbRep-set-changeValue"></a>
+    <li><b> changeValue old="&lt;old String&gt;" new="&lt;new String&gt;" </b> <br><br>
 
-                                 <ul>
-                                 <b>Syntax: </b> <br>
-                                 set &lt;name&gt; changeValue old="&lt;old string&gt;" new="&lt;new string&gt;"  <br><br>
+    Changes the stored value of a reading. <br>
+    If the selection is limited to certain device/reading combinations by the attributes
+    <a href="#DbRep-attr-device">device</a> or <a href="#DbRep-attr-reading">reading</a>, they are taken into account
+    in the same way as set time limits (time.* attributes).  <br>
+    If these constraints are missing, the entire database is searched and the specified value is
+    is changed. <br><br>
 
-                                 The "string" can be: <br>
+    The "string" can be: <br>
+      <table>
+         <colgroup> <col width=20%> <col width=80%> </colgroup>
+         <tr><td><b>&lt;old String&gt; :</b>   </td><td><li>a simple string with/without spaces, e.g. "OL 12" </li>                                        </td></tr>
+         <tr><td>                              </td><td><li>a string with use of SQL wildcard, e.g. "%OL%"    </li>                                        </td></tr>
+         <tr><td> </td><td> </td></tr>
+         <tr><td> </td><td> </td></tr>
+         <tr><td><b>&lt;new String&gt; :</b>   </td><td><li>a simple string with/without spaces, e.g. "12 kWh" </li>                                       </td></tr>
+         <tr><td>                              </td><td><li>Perl code enclosed in {"..."} including quotes, e.g. {"($VALUE,$UNIT) = split(" ",$VALUE)"}    </td></tr>
+         <tr><td>                              </td><td>The variables $VALUE and $UNIT are passed to the Perl expression. They can be changed              </td></tr>
+         <tr><td>                              </td><td>within the Perl code. The returned value of $VALUE and $UNIT is stored                             </td></tr>
+         <tr><td>                              </td><td>in the VALUE or UNIT field of the record. </li>                                                    </td></tr>
+      </table>
+    <br>
 
-                                   <table>
-                                      <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>&lt;old String&gt; :</b>   </td><td><li>a simple string with/without spaces, e.g. "OL 12" </li>                                        </td></tr>
-                                      <tr><td>                              </td><td><li>a string with use of SQL wildcard, e.g. "%OL%"    </li>                                        </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td><b>&lt;new String&gt; :</b>   </td><td><li>a simple string with/without spaces, e.g. "12 kWh" </li>                                       </td></tr>
-                                      <tr><td>                              </td><td><li>Perl code enclosed in {"..."} including quotes, e.g. {"($VALUE,$UNIT) = split(" ",$VALUE)"}    </td></tr>
-                                      <tr><td>                              </td><td>The variables $VALUE and $UNIT are passed to the Perl expression. They can be changed              </td></tr>
-                                      <tr><td>                              </td><td>within the Perl code. The returned value of $VALUE and $UNIT is stored                             </td></tr>
-                                      <tr><td>                              </td><td>in the VALUE or UNIT field of the record. </li>                                                    </td></tr>
-                                   </table>
-                                 <br>
+    <b>Examples: </b> <br>
+    set &lt;name&gt; changeValue old="OL" new="12 OL"  <br>
+    # the old field value "OL" is changed to "12 OL".  <br><br>
 
-                                 <b>Examples: </b> <br>
-                                 set &lt;name&gt; changeValue "OL","12 OL"  <br>
-                                 # the old field value "OL" is changed to "12 OL".  <br><br>
+    set &lt;name&gt; changeValue old="%OL%" new="12 OL"  <br>
+    # contains the field VALUE the substring "OL", it is changed to "12 OL". <br><br>
 
-                                 set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
-                                 # contains the field VALUE the substring "OL", it is changed to "12 OL". <br><br>
+    set &lt;name&gt; changeValue old="12 kWh" new={"($VALUE,$UNIT) = split(" ",$VALUE)"}  <br>
+    # the old field value "12 kWh" is splitted to VALUE=12 and UNIT=kWh and saved into the database fields <br><br>
 
-                                 set &lt;name&gt; changeValue "12 kWh",{"($VALUE,$UNIT) = split(" ",$VALUE)"}  <br>
-                                 # the old field value "12 kWh" is splitted to VALUE=12 and UNIT=kWh and saved into the database fields <br><br>
+    set &lt;name&gt; changeValue old="24%" new={"$VALUE = (split(" ",$VALUE))[0]"}  <br>
+    # if the old field value begins with "24", it is splitted and VALUE=24 is saved (e.g. "24 kWh")
+    <br><br>
 
-                                 set &lt;name&gt; changeValue "24%",{"$VALUE = (split(" ",$VALUE))[0]"}  <br>
-                                 # if the old field value begins with "24", it is splitted and VALUE=24 is saved (e.g. "24 kWh")
-                                 <br><br>
+    Summarized the relevant attributes to control function changeValue are: <br><br>
 
-                                 Summarized the relevant attributes to control function changeValue are: <br><br>
-
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
-                                      <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                      <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or Perl-routine) before start of changeValue </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after changeValue is finished </td></tr>
-                                      <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
-                                      </table>
-                                   </ul>
-                                   <br>
-                                   <br>
-
-                                 <b>Note:</b> <br>
-                                 Even though the function itself is designed non-blocking, make sure the assigned DbLog-device
-                                 is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br>
-                                 </li> <br>
-                                 </ul>
+    <ul>
+      <table>
+      <colgroup> <col width=5%> <col width=95%> </colgroup>
+         <tr><td> <b>device</b>              </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+         <tr><td> <b>reading</b>             </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
+         <tr><td> <b>time.*</b>              </td><td>: a number of attributes to limit selection by time </td></tr>
+         <tr><td> <b>executeBeforeProc</b>   </td><td>: execute a FHEM command (or Perl-routine) before start of changeValue </td></tr>
+         <tr><td> <b>executeAfterProc</b>    </td><td>: execute a FHEM command (or Perl-routine) after changeValue is finished </td></tr>
+         <tr><td> <b>valueFilter</b>         </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+         </table>
+    </ul>
+    <br>
+    <br>
+    </li>
 
     <li><b> countEntries [history|current] </b> -  provides the number of table entries (default: history) between time period set
                                                    by time.* -<a href="#DbRep-attr">attributes</a> if set.
@@ -14839,113 +14978,113 @@ return;
                                  will are listed. <br><br>
                                  </li><br>
 
-    <li><b> sqlCmd </b>        - executes any user-specific command.  <br>
-                                 If this command contains a delete operation, for safety reasons the attribute
-                                 <a href="#DbRep-attr-allowDeletion">allowDeletion</a> has to be set. <br>
+    <li><b> sqlCmd </b> <br><br>
 
-                                 sqlCmd also accepts the setting of SQL session variables such as.
-                                 "SET @open:=NULL, @closed:=NULL;" or the use of SQLite PRAGMA prior to the
-                                 execution of the SQL statement.
-                                 If the session variable or PRAGMA has to be set every time before executing a SQL statement, the
-                                 attribute <a href="#DbRep-attr-sqlCmdVars">sqlCmdVars</a> can be set. <br><br>
+    Executes any user-specific command.  <br>
+    If this command contains a delete operation, for safety reasons the attribute
+    <a href="#DbRep-attr-allowDeletion">allowDeletion</a> has to be set. <br>
 
-                                 If the attributes <a href="#DbRep-attr-device">device</a>, <a href="#DbRep-attr-reading">reading</a>,
-                                 <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a> respectively
-                                 <a href="#DbRep-attr-timestamp_end">timestamp_end</a>
-                                 set in the module are to be taken into account in the statement,
-                                 the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
-                                 <b>§timestamp_end§</b> can be used for this purpose. <br>
-                                 It should be noted that the placeholders §device§ and §reading§ complex are resolved and
-                                 should be applied accordingly as in the example below.
-                                 <br><br>
+    sqlCmd also accepts the setting of SQL session variables such as.
+    "SET @open:=NULL, @closed:=NULL;" or the use of SQLite PRAGMA prior to the
+    execution of the SQL statement.
+    If the session variable or PRAGMA has to be set every time before executing a SQL statement, the
+    attribute <a href="#DbRep-attr-sqlCmdVars">sqlCmdVars</a> can be set. <br><br>
 
-                                 If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the
-                                 original timestamp. <br><br>
+    If the attributes <a href="#DbRep-attr-device">device</a>, <a href="#DbRep-attr-reading">reading</a>,
+    <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a> respectively
+    <a href="#DbRep-attr-timestamp_end">timestamp_end</a>
+    set in the module are to be taken into account in the statement,
+    the placeholders <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> respectively
+    <b>§timestamp_end§</b> can be used for this purpose. <br>
+    It should be noted that the placeholders §device§ and §reading§ complex are resolved and
+    should be applied accordingly as in the example below.
+    <br><br>
 
-                                 <ul>
-                                 <b>Examples of SQL-statements: </b> <br><br>
-                                 <ul>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-01-06 00:00:00" group by DEVICE having count(*) > 800 </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-05-06 00:00:00" group by DEVICE </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= §timestamp_begin§ group by DEVICE </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE like "Te%t" order by `TIMESTAMP` desc </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from history where `TIMESTAMP` > "2017-05-09 18:03:00" order by `TIMESTAMP` desc </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from current order by `TIMESTAMP` desc  </li>
-                                 <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM history where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
-                                 <li>set &lt;name&gt; sqlCmd delete from current  </li>
-                                 <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
-                                 <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
-                                 <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where §device§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE  </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, READING, count(*) from history where §device§ AND §reading§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE, READING  </li>
-                                 </ul>
-                                 <br>
+    If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the
+    original timestamp. <br><br>
 
-                                 Here you can see examples of a more complex statement (MySQL) with setting SQL session
-                                 variables and the SQLite PRAGMA usage: <br><br>
+    <b>Examples of SQL-statements: </b> <br><br>
+    <ul>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-01-06 00:00:00" group by DEVICE having count(*) > 800 </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-05-06 00:00:00" group by DEVICE </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= §timestamp_begin§ group by DEVICE </li>
+    <li>set &lt;name&gt; sqlCmd select * from history where DEVICE like "Te%t" order by `TIMESTAMP` desc </li>
+    <li>set &lt;name&gt; sqlCmd select * from history where `TIMESTAMP` > "2017-05-09 18:03:00" order by `TIMESTAMP` desc </li>
+    <li>set &lt;name&gt; sqlCmd select * from current order by `TIMESTAMP` desc  </li>
+    <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM history where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
+    <li>set &lt;name&gt; sqlCmd delete from current  </li>
+    <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
+    <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
+    <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
+    <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where §device§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE  </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, READING, count(*) from history where §device§ AND §reading§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE, READING  </li>
+    <br>
 
-                                 <ul>
-                                 <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
-                                        SELECT
-                                            TIMESTAMP, VALUE,DEVICE,
-                                            @open AS open,
-                                            @open := IF(VALUE = 'open', TIMESTAMP, NULL) AS curr_open,
-                                            @closed  := IF(VALUE = 'closed',  TIMESTAMP, NULL) AS closed
-                                        FROM history WHERE
-                                           DATE(TIMESTAMP) = CURDATE() AND
-                                           DEVICE = "HT_Fensterkontakt" AND
-                                           READING = "state" AND
-                                           (VALUE = "open" OR VALUE = "closed")
-                                           ORDER BY  TIMESTAMP; </li>
-                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=MEMORY; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL; PRAGMA cache_size=4000; select count(*) from history; </li>
-                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=FILE; PRAGMA temp_store_directory = '/opt/fhem/'; VACUUM; </li>
-                                 </ul>
-                                 <br>
+    Here you can see examples of a more complex statement (MySQL) with setting SQL session
+    variables and the SQLite PRAGMA usage: <br><br>
 
-                                 The formatting of result can be choosen by attribute <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
-                                 as well as the used field separator can be determined by attribute
-                                 <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>. <br><br>
+    <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
+           SELECT
+               TIMESTAMP, VALUE,DEVICE,
+               @open AS open,
+               @open := IF(VALUE = 'open', TIMESTAMP, NULL) AS curr_open,
+               @closed  := IF(VALUE = 'closed',  TIMESTAMP, NULL) AS closed
+           FROM history WHERE
+              DATE(TIMESTAMP) = CURDATE() AND
+              DEVICE = "HT_Fensterkontakt" AND
+              READING = "state" AND
+              (VALUE = "open" OR VALUE = "closed")
+              ORDER BY  TIMESTAMP; </li>
+    <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=MEMORY; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL; PRAGMA cache_size=4000; select count(*) from history; </li>
+    <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=FILE; PRAGMA temp_store_directory = '/opt/fhem/'; VACUUM; </li>
+    </ul>
+    <br>
 
-                                 The module provides a command history once a sqlCmd command was executed successfully.
-                                 To use this option, activate the attribute <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>
-                                 with list lenght you want. <br>
-                                 If the command history is enabled, an indexed list of stored SQL statements is available
-                                 with <b>___list_sqlhistory___</b> within the sqlCmdHistory command.
-                                 An SQL statement can be executed by specifying its index in <b>sqlCmd</b> in this form:
-                                 <br><br>
+    The formatting of result can be choosen by attribute <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a>,
+    as well as the used field separator can be determined by attribute
+    <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>. <br><br>
 
-                                   <ul>
-                                     set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
-                                   </ul>
-                                 <br>
+    The module provides a command history once a sqlCmd command was executed successfully.
+    To use this option, activate the attribute <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>
+    with list lenght you want. <br>
+    If the command history is enabled, an indexed list of stored SQL statements is available
+    with <b>___list_sqlhistory___</b> within the sqlCmdHistory command. <br><br>
 
-                                 The attributes relevant for controlling sqlCmd are: <br><br>
+    An SQL statement can be executed by specifying its index in this form:
+    <br><br>
+      <ul>
+        set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
+      </ul>
+    <br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets </td></tr>
-                                      <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
-                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result </td></tr>
-                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
-                                      <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
-                                      <tr><td> <b>sqlCmdVars</b>          </td><td>: set SQL session variable or PRAGMA before execute the SQL statement</td></tr>
-                                      <tr><td> <b>useAdminCredentials</b> </td><td>: use privileged user for the operation </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
-                                   <br>
+    The attributes relevant for controlling sqlCmd are: <br><br>
 
-                                 <b>Note:</b> <br>
-                                 Even though the module works non-blocking regarding to database operations, a huge
-                                 sample space (number of rows/readings) could block the browser session respectively
-                                 FHEMWEB.
-                                 If you are unsure about the result of the statement, you should preventively add a limit to
-                                 the statement. <br><br>
-                                 </li><br>
-                                 </ul>
+    <ul>
+    <table>
+    <colgroup> <col width=25%> <col width=75%> </colgroup>
+       <tr><td> <b>allowDeletion</b>       </td><td>: activates capabilty to delete datasets                                </td></tr>
+       <tr><td> <b>executeBeforeProc</b>   </td><td>: execution of FHEM command (or Perl-routine) before operation          </td></tr>
+       <tr><td> <b>executeAfterProc</b>    </td><td>: execution of FHEM command (or Perl-routine) after operation           </td></tr>
+       <tr><td> <b>sqlResultFormat</b>     </td><td>: determines presentation style of command result                       </td></tr>
+       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result                         </td></tr>
+       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length                                  </td></tr>
+       <tr><td> <b>sqlCmdVars</b>          </td><td>: set SQL session variable or PRAGMA before execute the SQL statement   </td></tr>
+       <tr><td> <b>sqlFormatService</b>    </td><td>: activates the formatting of the SQL statement via an online service   </td></tr>
+       <tr><td> <b>useAdminCredentials</b> </td><td>: use privileged user for the operation                                 </td></tr>
+    </table>
+    </ul>
+    <br>
+    <br>
+
+    <b>Note:</b> <br>
+    Even though the module works non-blocking regarding to database operations, a huge
+    sample space (number of rows/readings) could block the browser session respectively
+    FHEMWEB. <br>
+    If you are unsure about the result of the statement, you should preventively add a limit to
+    the statement. <br><br>
+    </li>
+    <br>
 
     <li><b> sqlCmdHistory </b>   - If activated with the attribute <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a>,
                                    a stored SQL statement can be selected from a list and executed.
@@ -15237,50 +15376,52 @@ return;
                             <br><br>
 
     <a id="DbRep-get-sqlCmdBlocking"></a>
-    <li><b> sqlCmdBlocking &lt;SQL-statement&gt;</b> -
-                            Executes the specified SQL statement <b>blocking</b> with a default timeout of 10 seconds.
-                            The timeout can be set with the attribute <a href="#DbRep-attr-timeout">timeout</a>.
-                            <br><br>
+    <li><b> sqlCmdBlocking &lt;SQL-statement&gt;</b> <br><br>
+    Executes the specified SQL statement <b>blocking</b> with a default timeout of 10 seconds.
+    The timeout can be set with the attribute <a href="#DbRep-attr-timeout">timeout</a>.
+    <br><br>
 
-                            <ul>
-                              <b>Examples:</b>  <br>
-                              { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-                            </ul>
-                            </li>
-                            <br>
+    <ul>
+      <b>Examples:</b>  <br>
+      { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+    </ul>
+    </li>
+    <br>
 
-                            Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
-                            The input accepts multi line commands and delivers multi line results as well.
-                            This command also accept the setting of SQL session variables like "SET @open:=NULL,
-                            @closed:=NULL;". <br>
-                            If several fields are selected and passed back, the fieds are separated by the separator defined
-                            by attribute <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Several result lines
-                            are separated by newline ("\n"). <br>
-                            This function only set/update status readings, the userExitFn function isn't called.
-                            <br><br>
+    Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
+    The input accepts multi line commands and delivers multi line results as well.
+    This command also accept the setting of SQL session variables like "SET @open:=NULL,
+    @closed:=NULL;" or PRAGMA for SQLite. <br>
+    If several fields are selected and passed back, the fieds are separated by the separator defined
+    by attribute <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Several result lines
+    are separated by newline ("\n"). <br>
+    This function only set/update status readings, the userExitFn function isn't called.
+    <br><br>
 
-                            If you create a little routine in 99_myUtils, for example:
-                            <br>
-                            <pre>
+    If you create a little routine in 99_myUtils, for example:
+    <br>
+
+    <pre>
 sub dbval {
   my $name = shift;
   my $cmd) = shift;
   my $ret = CommandGet(undef,"$name sqlCmdBlocking $cmd");
   return $ret;
 }
-                            </pre>
-                            it can be accessed with e.g. those calls:
-                            <br><br>
+    </pre>
 
-                            <ul>
-                               <b>Examples:</b>  <br>
-                               { dbval("&lt;name&gt;","select count(*) from history") } <br>
-                               $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
-                            </ul>
+    it can be accessed with e.g. those calls:
+    <br><br>
 
-                            <br><br>
+    <ul>
+       <b>Examples:</b>  <br>
+       { dbval("&lt;name&gt;","select count(*) from history") } <br>
+       $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+    </ul>
+
+    <br><br>
 
     <a id="DbRep-get-storedCredentials"></a>
     <li><b> storedCredentials </b> - Reports the users / passwords stored for database access by the device. <br>
@@ -15406,28 +15547,33 @@ sub dbval {
                               </li> <br>
 
   <a id="DbRep-attr-averageCalcForm"></a>
-  <li><b>averageCalcForm </b> - specifies the calculation variant of average peak by "averageValue". <br><br>
+  <li><b>averageCalcForm </b> <br><br>
 
-                                 At the moment the following methods are implemented: <br><br>
+  Defines the calculation variant for determining the average value with "averageValue". <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>avgArithmeticMean:</b>       </td><td>the arithmetic average is calculated (default)                                         </td></tr>
-                                      <tr><td>                                </td><td>                                                                                       </td></tr>
-                                      <tr><td><b>avgDailyMeanGWS:</b>         </td><td>calculates the daily medium temperature according the                                  </td></tr>
-                                      <tr><td>                                </td><td>specifications of german weather service (see also "get &lt;name&gt; versionNotes 2")  </td></tr>
-                                      <tr><td>                                </td><td>This variant uses aggregation "day" automatically.                                     </td></tr>
-                                      <tr><td>                                </td><td>                                                                                       </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>like "avgDailyMeanGWS" and additionally the grassland temperature sum                  </td></tr>
-                                      <tr><td>                                </td><td>If the value 200 is reached, the reading "reachedGTSthreshold" is created with the     </td></tr>
-                                      <tr><td>                                </td><td>date of the first time this threshold value is reached.                                </td></tr>                                        <tr><td>                                </td><td><b>Note:</b> the attribute timestamp_begin must be set to the beginning of a year !    </td></tr>
-                                      <tr><td>                                </td><td>(see also "get &lt;name&gt; versionNotes 5")                                           </td></tr>
-                                      <tr><td>                                </td><td>                                                                                       </td></tr>
-                                      <tr><td><b>avgTimeWeightMean:</b>       </td><td>calculates a time weighted average mean value is calculated                            </td></tr>
-                                   </table>
-                                   </ul>
-                                </li><br>
+  Currently the following variants are implemented: <br><br>
+
+  <ul>
+    <table>
+    <colgroup> <col width=20%> <col width=80%> </colgroup>
+       <tr><td><b>avgArithmeticMean:</b>       </td><td>The arithmetic average is calculated. (default)                                         </td></tr>
+       <tr><td>                                </td><td>                                                                                        </td></tr>
+       <tr><td><b>avgDailyMeanGWS:</b>         </td><td>Calculates the daily medium temperature according the                                   </td></tr>
+       <tr><td>                                </td><td>specifications of german weather service. (see also "get &lt;name&gt; versionNotes 2")  </td></tr>
+       <tr><td>                                </td><td>This variant uses aggregation "day" automatically.                                      </td></tr>
+       <tr><td>                                </td><td>                                                                                        </td></tr>
+       <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>Same as "avgDailyMeanGWS" and additionally calculates the grassland temperature sum.    </td></tr>
+       <tr><td>                                </td><td>If the value 200 is reached, the reading "reachedGTSthreshold" is created with the      </td></tr>
+       <tr><td>                                </td><td>date of the first time this threshold value is reached.                                 </td></tr>                                        <tr><td>                                </td><td><b>Note:</b> the attribute timestamp_begin must be set to the beginning of a year !    </td></tr>
+       <tr><td>                                </td><td><b>Note:</b> The attribute timestamp_begin must be set to the beginning of a year!      </td></tr>
+       <tr><td>                                </td><td>(see also "get &lt;name&gt; versionNotes 5")                                            </td></tr>
+       <tr><td>                                </td><td>                                                                                        </td></tr>
+       <tr><td><b>avgTimeWeightMean:</b>       </td><td>Calculates the time-weighted average.                                                   </td></tr>
+       <tr><td>                                </td><td><b>Note:</b> There must be at least two data points per aggregation period.             </td></tr>
+    </table>
+ </ul>
+ </li>
+ <br>
 
   <a id="DbRep-attr-countEntriesDetail"></a>
   <li><b>countEntriesDetail </b>   - If set, the function countEntries creates a detailed report of counted datasets of
@@ -15441,7 +15587,7 @@ sub dbval {
                                 devices in FHEM before carry out the SQL selection. <br>
                                 If the the device, list or device specification is prepended by "EXCLUDE=",
                                 the devices are excluded from database selection. <br>
-                                The database selection is executed as a logical AND operation of "device" and the attribute 
+                                The database selection is executed as a logical AND operation of "device" and the attribute
                                  <a href="#DbRep-attr-reading">reading</a>.
                                 <br><br>
 
@@ -15747,7 +15893,7 @@ sub bdump {
                                 SQL wildcard (%) can be used. <br>
                                 If the reading or the reading list is prepended by "EXCLUDE=", those readings are not
                                 included. <br>
-                                The database selection is executed as a logical AND operation of "reading" and the attribute 
+                                The database selection is executed as a logical AND operation of "reading" and the attribute
                                 <a href="#DbRep-attr-device">device</a>.
                                 <br><br>
 
@@ -15840,35 +15986,64 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-showTableInfo"></a>
-  <li><b>showTableInfo </b>   - Determine the tablenames which are selected by command "get &lt;name&gt; tableinfo". SQL-Wildcard
-                                (%) can be used.
-                                <br><br>
+  <li><b>showTableInfo </b> <br><br>
 
-                                <ul>
-                                <b>Example: </b><br>
-                                attr &lt;name&gt; showTableInfo current,history  <br>
-                                # Only informations about tables "current" and "history" will be shown <br>
-                                </ul><br>
-                                </li>
+  Limits the result set of the command "get &lt;name&gt; tableinfo". SQL wildcard (%) can be used.
+  <br><br>
+
+  <ul>
+    <b>Example: </b> <br>
+    attr &lt;name&gt; showTableInfo current,history  <br>
+    # Only information from the "current" and "history" tables is displayed. <br>
+  </ul>
+  <br>
+  </li>
 
   <a id="DbRep-attr-sqlCmdHistoryLength"></a>
-  <li><b>sqlCmdHistoryLength </b>
-                              - Activates the command history of "sqlCmd" and determines the length of it. </li> <br>
+  <li><b>sqlCmdHistoryLength </b> <br><br>
+
+    Activates the command history of "sqlCmd" with a value > 0 and defines the number of
+    SQL statements to be stored. <br>
+    (default: 0)
+
+  </li>
+  <br>
 
   <a id="DbRep-attr-sqlCmdVars"></a>
-  <li><b>sqlCmdVars </b>      - Set a SQL session variable or a PRAGMA every time before executing a SQL
-                                statement with "set &lt;name&gt; sqlCmd".  <br><br>
+  <li><b>sqlCmdVars </b> <br><br>
 
-                                <ul>
-                                <b>Examples:</b> <br>
-                                attr &lt;name&gt; sqlCmdVars SET @open:=NULL, @closed:=NULL; <br>
-                                attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
-                                </ul>
-                                <br>
-                                </li> <br>
+    Sets the specified SQL session variable(s) or PRAGMA before each SQL statement executed with sqlCmd.
+    SQL statement.  <br><br>
+
+    <ul>
+      <b>Example:</b> <br>
+      attr &lt;name&gt; sqlCmdVars SET @open:=NULL, @closed:=NULL; <br>
+      attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
+    </ul>
+  <br>
+  </li>
+  <br>
+
+  <a id="DbRep-attr-sqlFormatService"></a>
+  <li><b>sqlFormatService </b> <br><br>
+
+    Automated formatting of SQL statements can be activated via an online service. <br>
+    This option is especially useful for complex SQL statements of the setters sqlCmd, sqlCmdHistory, and sqlSpecial
+    to improve structuring and readability. <br>
+    An internet connection is required and the global attribute <b>dnsServer</b> should be set. <br>
+    (default: none)
+
+  </li>
+  <br>
 
   <a id="DbRep-attr-sqlResultFieldSep"></a>
-  <li><b>sqlResultFieldSep </b> - determines the used field separator (default: "|") in the result of some sql-commands.  </li> <br>
+  <li><b>sqlResultFieldSep </b> <br><br>
+
+    Sets the used field separator in the result of the command "set ... sqlCmd". <br>
+    (default: "|")
+
+  </li>
+  <br>
 
   <a id="DbRep-attr-sqlResultFormat"></a>
   <li><b>sqlResultFormat </b> - determines the formatting of the "set &lt;name&gt; sqlCmd" command result.
@@ -16536,74 +16711,61 @@ return;
 
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
 
+    <a id="DbRep-set-changeValue"></a>
+    <li><b> changeValue old="&lt;alter String&gt;" new="&lt;neuer String&gt;" </b> <br><br>
 
-    <li><b> changeValue </b>  -  ändert den gespeicherten Wert eines Readings.
-                                 Ist die Selektion auf bestimmte Device/Reading-Kombinationen durch die Attribute
-                                 <a href="#DbRep-attr-device">device</a> bzw. <a href="#DbRep-attr-reading">reading</a> beschränkt, werden sie genauso
-                                 berücksichtigt wie gesetzte Zeitgrenzen (Attribute time.*).  <br>
-                                 Fehlen diese Beschränkungen, wird die gesamte Datenbank durchsucht und der angegebene Wert
-                                 geändert. <br><br>
-                                 </li>
+    Ändert den gespeicherten Wert eines Readings. <br>
+    Ist die Selektion auf bestimmte Device/Reading-Kombinationen durch die Attribute
+    <a href="#DbRep-attr-device">device</a> bzw. <a href="#DbRep-attr-reading">reading</a> beschränkt, werden sie genauso
+    berücksichtigt wie gesetzte Zeitgrenzen (time.* Attribute).  <br>
+    Fehlen diese Beschränkungen, wird die gesamte Datenbank durchsucht und der angegebene Wert
+    geändert. <br><br>
 
-                                 <ul>
-                                   <b>Syntax: </b> <br>
-                                   set &lt;name&gt; changeValue old="&lt;alter String&gt;" new="&lt;neuer String&gt;"  <br><br>
+    "String" kann sein: <br>
+      <table>
+         <colgroup> <col width=20%> <col width=80%> </colgroup>
+         <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>                                  </td></tr>
+         <tr><td>                              </td><td><li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li>                                  </td></tr>
+         <tr><td> </td><td> </td></tr>
+         <tr><td> </td><td> </td></tr>
+         <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>                                 </td></tr>
+         <tr><td>                              </td><td><li>Perl Code eingeschlossen in {"..."} inkl. Quotes, z.B. {"($VALUE,$UNIT) = split(" ",$VALUE)"}  </td></tr>
+         <tr><td>                              </td><td>Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb            </td></tr>
+         <tr><td>                              </td><td>des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld         </td></tr>
+         <tr><td>                              </td><td>VALUE bzw. UNIT des Datensatzes gespeichert. </li>                                                 </td></tr>
+      </table>
+    <br>
 
-                                   "String" kann sein: <br>
+    <b>Beispiele: </b> <br>
+    set &lt;name&gt; changeValue old="OL" new="12 OL"   <br>
+    # der alte Feldwert "OL" wird in "12 OL" geändert.  <br><br>
 
-                                   <table>
-                                      <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>                                  </td></tr>
-                                      <tr><td>                              </td><td><li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li>                                  </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>                                 </td></tr>
-                                      <tr><td>                              </td><td><li>Perl Code eingeschlossen in {"..."} inkl. Quotes, z.B. {"($VALUE,$UNIT) = split(" ",$VALUE)"}  </td></tr>
-                                      <tr><td>                              </td><td>Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb            </td></tr>
-                                      <tr><td>                              </td><td>des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld         </td></tr>
-                                      <tr><td>                              </td><td>VALUE bzw. UNIT des Datensatzes gespeichert. </li>                                                 </td></tr>
-                                   </table>
-                                </ul>
-                                <br>
+    set &lt;name&gt; changeValue old="%OL%" new="12 OL"  <br>
+    # enthält das Feld VALUE den Teilstring "OL", wird es in "12 OL" geändert. <br><br>
 
-                                 <ul>
-                                 <b>Beispiele: </b> <br>
-                                 set &lt;name&gt; changeValue "OL","12 OL"  <br>
-                                 # der alte Feldwert "OL" wird in "12 OL" geändert.  <br><br>
+    set &lt;name&gt; changeValue old="12 kWh" new={"($VALUE,$UNIT) = split(" ",$VALUE)"}  <br>
+    # der alte Feldwert "12 kWh" wird in VALUE=12 und UNIT=kWh gesplittet und in den Datenbankfeldern gespeichert <br><br>
 
-                                 set &lt;name&gt; changeValue "%OL%","12 OL"  <br>
-                                 # enthält das Feld VALUE den Teilstring "OL", wird es in "12 OL" geändert. <br><br>
+    set &lt;name&gt; changeValue old="24%" new={"$VALUE = (split(" ",$VALUE))[0]"}  <br>
+    # beginnt der alte Feldwert mit "24", wird er gesplittet und VALUE=24 gespeichert (z.B. "24 kWh")
+    <br><br>
 
-                                 set &lt;name&gt; changeValue "12 kWh",{"($VALUE,$UNIT) = split(" ",$VALUE)"}  <br>
-                                 # der alte Feldwert "12 kWh" wird in VALUE=12 und UNIT=kWh gesplittet und in den Datenbankfeldern gespeichert <br><br>
+    Zusammengefasst sind die zur Steuerung von changeValue relevanten Attribute: <br><br>
 
-                                 set &lt;name&gt; changeValue "24%",{"$VALUE = (split(" ",$VALUE))[0]"}  <br>
-                                 # beginnt der alte Feldwert mit "24", wird er gesplittet und VALUE=24 gespeichert (z.B. "24 kWh")
-                                 <br><br>
-
-                                 Zusammengefasst sind die zur Steuerung von changeValue relevanten Attribute: <br><br>
-
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>                                  </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>aggregation</b>                             </td><td>: Auswahl einer Aggregationsperiode </td></tr>
-                                      <tr><td> <b>reading</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>time.*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start changeValue </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende changeValue </td></tr>
-                                      <tr><td> <b>valueFilter</b>                             </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
-                                      </table>
-                                   </ul>
-                                   <br>
-                                   <br>
-
-                                 <b>Hinweis:</b> <br>
-                                 Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
-                                 im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br>
-                                 <br>
-                                 </ul>
-
+      <ul>
+      <table>
+      <colgroup> <col width=5%> <col width=95%> </colgroup>
+         <tr><td> <b>device</b>                                  </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+         <tr><td> <b>reading</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+         <tr><td> <b>time.*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+         <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start changeValue </td></tr>
+         <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende changeValue </td></tr>
+         <tr><td> <b>valueFilter</b>                             </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+      </table>
+      </ul>
+    <br>
+    <br>
+    </li>
 
     <li><b> countEntries [history | current] </b>
                                  -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen
@@ -17701,111 +17863,112 @@ return;
                                  verbundenen Datenbank beginnt, aufgelistet . <br><br>
                                  </li><br>
 
-    <li><b> sqlCmd </b>        - führt ein beliebiges benutzerspezifisches Kommando aus. <br>
-                                 Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das Attribut
-                                 <a href="#DbRep-attr-allowDeletion">allowDeletion</a> gesetzt sein. <br>
-                                 sqlCmd akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
-                                 "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der
-                                 Ausführung des SQL-Statements.
-                                 Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements
-                                 gesetzt werden, kann dafür das Attribut <a href="#DbRep-attr-sqlCmdVars">sqlCmdVars</a>
-                                 verwendet werden. <br><br>
+    <li><b> sqlCmd </b> <br><br>
 
-                                 Sollen die im Modul gesetzten Attribute <a href="#DbRep-attr-device">device</a>, <a href="#DbRep-attr-reading">reading</a>,
-                                 <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a> bzw.
-                                 <a href="#DbRep-attr-timestamp_end">timestamp_end</a> im Statement berücksichtigt werden, können die Platzhalter
-                                 <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> bzw.
-                                 <b>§timestamp_end§</b> eingesetzt werden. <br>
-                                 Dabei ist zu beachten, dass die Platzhalter §device§ und §reading§ komplex aufgelöst werden
-                                 und dementsprechend wie im unten stehenden Beispiel anzuwenden sind.
-                                 <br><br>
+    Führt ein beliebiges benutzerspezifisches Kommando aus. <br>
+    Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das Attribut
+    <a href="#DbRep-attr-allowDeletion">allowDeletion</a> gesetzt sein. <br>
+    sqlCmd akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+    "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der
+    Ausführung des SQL-Statements.
+    Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements
+    gesetzt werden, kann dafür das Attribut <a href="#DbRep-attr-sqlCmdVars">sqlCmdVars</a>
+    verwendet werden. <br><br>
 
-                                 Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
-                                 originalen Timestamps zu verhindern. <br><br>
+    Sollen die im Modul gesetzten Attribute <a href="#DbRep-attr-device">device</a>, <a href="#DbRep-attr-reading">reading</a>,
+    <a href="#DbRep-attr-timestamp_begin">timestamp_begin</a> bzw.
+    <a href="#DbRep-attr-timestamp_end">timestamp_end</a> im Statement berücksichtigt werden, können die Platzhalter
+    <b>§device§</b>, <b>§reading§</b>, <b>§timestamp_begin§</b> bzw.
+    <b>§timestamp_end§</b> eingesetzt werden. <br>
+    Dabei ist zu beachten, dass die Platzhalter §device§ und §reading§ komplex aufgelöst werden
+    und dementsprechend wie im unten stehenden Beispiel anzuwenden sind.
+    <br><br>
 
-                                 <ul>
-                                 <b>Beispiele für Statements: </b> <br><br>
-                                 <ul>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-01-06 00:00:00" group by DEVICE having count(*) > 800 </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-05-06 00:00:00" group by DEVICE </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= §timestamp_begin§ group by DEVICE </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE like "Te%t" order by `TIMESTAMP` desc </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from history where `TIMESTAMP` > "2017-05-09 18:03:00" order by `TIMESTAMP` desc </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from current order by `TIMESTAMP` desc  </li>
-                                 <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM history where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
-                                 <li>set &lt;name&gt; sqlCmd delete from current  </li>
-                                 <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
-                                 <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
-                                 <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
-                                 <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where §device§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE  </li>
-                                 <li>set &lt;name&gt; sqlCmd select DEVICE, READING, count(*) from history where §device§ AND §reading§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE, READING  </li>
-                                 </ul>
-                                 <br>
+    Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
+    originalen Timestamps zu verhindern. <br><br>
 
-                                 Nachfolgend Beispiele für ein komplexeres Statement (MySQL) unter Mitgabe von
-                                 SQL Session Variablen und die SQLite PRAGMA-Verwendung: <br><br>
+    <b>Beispiele für Statements: </b> <br><br>
+    <ul>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-01-06 00:00:00" group by DEVICE having count(*) > 800 </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= "2017-05-06 00:00:00" group by DEVICE </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where TIMESTAMP >= §timestamp_begin§ group by DEVICE </li>
+    <li>set &lt;name&gt; sqlCmd select * from history where DEVICE like "Te%t" order by `TIMESTAMP` desc </li>
+    <li>set &lt;name&gt; sqlCmd select * from history where `TIMESTAMP` > "2017-05-09 18:03:00" order by `TIMESTAMP` desc </li>
+    <li>set &lt;name&gt; sqlCmd select * from current order by `TIMESTAMP` desc  </li>
+    <li>set &lt;name&gt; sqlCmd select sum(VALUE) as 'Einspeisung am 04.05.2017', count(*) as 'Anzahl' FROM history where `READING` = "Einspeisung_WirkP_Zaehler_Diff" and TIMESTAMP between '2017-05-04' AND '2017-05-05' </li>
+    <li>set &lt;name&gt; sqlCmd delete from current  </li>
+    <li>set &lt;name&gt; sqlCmd delete from history where TIMESTAMP < "2016-05-06 00:00:00" </li>
+    <li>set &lt;name&gt; sqlCmd update history set TIMESTAMP=TIMESTAMP,VALUE='Val' WHERE VALUE='TestValue' </li>
+    <li>set &lt;name&gt; sqlCmd select * from history where DEVICE = "Test" </li>
+    <li>set &lt;name&gt; sqlCmd insert into history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ('2017-05-09 17:00:14','Test','manuell','manuell','Tes§e','TestValue','°C') </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, count(*) from history where §device§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE  </li>
+    <li>set &lt;name&gt; sqlCmd select DEVICE, READING, count(*) from history where §device§ AND §reading§ AND TIMESTAMP >= §timestamp_begin§ group by DEVICE, READING  </li>
+    <br>
 
-                                 <ul>
-                                 <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
-                                        SELECT
-                                            TIMESTAMP, VALUE,DEVICE,
-                                            @open AS open,
-                                            @open := IF(VALUE = 'open', TIMESTAMP, NULL) AS curr_open,
-                                            @closed  := IF(VALUE = 'closed',  TIMESTAMP, NULL) AS closed
-                                        FROM history WHERE
-                                           DATE(TIMESTAMP) = CURDATE() AND
-                                           DEVICE = "HT_Fensterkontakt" AND
-                                           READING = "state" AND
-                                           (VALUE = "open" OR VALUE = "closed")
-                                           ORDER BY  TIMESTAMP; </li>
-                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=MEMORY; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL; PRAGMA cache_size=4000; select count(*) from history; </li>
-                                 <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=FILE; PRAGMA temp_store_directory = '/opt/fhem/'; VACUUM; </li>
-                                 </ul>
-                                 <br>
+    Nachfolgend Beispiele für ein komplexeres Statement (MySQL) unter Mitgabe von
+    SQL Session Variablen und die SQLite PRAGMA-Verwendung: <br><br>
 
-                                 Die Ergebnis-Formatierung kann durch das Attribut <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a> ausgewählt,
-                                 sowie der verwendete Feldtrenner durch das Attribut <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>
-                                 festgelegt werden. <br><br>
+    <li>set &lt;name&gt; sqlCmd SET @open:=NULL, @closed:=NULL;
+           SELECT
+               TIMESTAMP, VALUE,DEVICE,
+               @open AS open,
+               @open := IF(VALUE = 'open', TIMESTAMP, NULL) AS curr_open,
+               @closed  := IF(VALUE = 'closed',  TIMESTAMP, NULL) AS closed
+           FROM history WHERE
+              DATE(TIMESTAMP) = CURDATE() AND
+              DEVICE = "HT_Fensterkontakt" AND
+              READING = "state" AND
+              (VALUE = "open" OR VALUE = "closed")
+              ORDER BY  TIMESTAMP; </li>
+    <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=MEMORY; PRAGMA synchronous=FULL; PRAGMA journal_mode=WAL; PRAGMA cache_size=4000; select count(*) from history; </li>
+    <li>set &lt;name&gt; sqlCmd PRAGMA temp_store=FILE; PRAGMA temp_store_directory = '/opt/fhem/'; VACUUM; </li>
+    </ul>
+    <br>
 
-                                 Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich
-                                 ausgeführt wurde.
-                                 Um diese Option zu nutzen, ist das Attribut <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a> mit der
-                                 gewünschten Listenlänge zu aktivieren. <br>
-                                 Ist die Kommando-Historie aktiviert, ist mit <b>___list_sqlhistory___</b> innerhalb des Kommandos
-                                 sqlCmdHistory eine indizierte Liste der gespeicherten SQL-Statements verfügbar.
-                                 Ein SQL-Statement kann durch Angabe seines Index im <b>sqlCmd</b> ausgeführt werden mit:
-                                 <br><br>
+    Die Ergebnis-Formatierung kann durch das Attribut <a href="#DbRep-attr-sqlResultFormat">sqlResultFormat</a> ausgewählt,
+    sowie der verwendete Feldtrenner durch das Attribut <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a>
+    festgelegt werden. <br><br>
 
-                                   <ul>
-                                     set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
-                                   </ul>
-                                 <br>
+    Das Modul stellt optional eine Kommando-Historie zur Verfügung sobald ein SQL-Kommando erfolgreich
+    ausgeführt wurde.
+    Um diese Option zu nutzen, ist das Attribut <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a> mit der
+    gewünschten Listenlänge zu aktivieren. <br>
+    Ist die Kommando-Historie aktiviert, ist mit <b>___list_sqlhistory___</b> innerhalb des Kommandos
+    sqlCmdHistory eine indizierte Liste der gespeicherten SQL-Statements verfügbar. <br><br>
 
-                                 Die zur Steuerung von sqlCmd relevanten Attribute sind: <br><br>
+    Ein SQL-Statement kann durch Angabe seines Index im ausgeführt werden mit:
+    <br><br>
+      <ul>
+        set &lt;name&gt; sqlCmd ckey:&lt;Index&gt;    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g. ckey:4)
+      </ul>
+    <br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) vor der Operation ausführen </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen </td></tr>
-                                      <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
-                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnisses fest  </td></tr>
-                                      <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
-                                      <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang</td></tr>
-                                      <tr><td> <b>sqlCmdVars</b>          </td><td>: setzt SQL Session Variablen oder PRAGMA vor jeder Ausführung des SQL-Statements </td></tr>
-                                      <tr><td> <b>useAdminCredentials</b> </td><td>: benutzt einen privilegierten User für die Operation </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+    Die zur Steuerung von sqlCmd relevanten Attribute sind: <br><br>
 
-                                 <b>Hinweis:</b> <br>
-                                 Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine
-                                 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB
-                                 blockieren. Wenn man sich unsicher ist, sollte man vorsorglich dem Statement ein Limit
-                                 hinzufügen. <br><br>
-                                 </li> <br>
-                                 </ul>
+    <ul>
+    <table>
+    <colgroup> <col width=5%> <col width=95%> </colgroup>
+       <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) vor der Operation ausführen                     </td></tr>
+       <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen                    </td></tr>
+       <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit                                                        </td></tr>
+       <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnisses fest                                 </td></tr>
+       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis                                                   </td></tr>
+       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang                                    </td></tr>
+       <tr><td> <b>sqlCmdVars</b>          </td><td>: setzt SQL Session Variablen oder PRAGMA vor jeder Ausführung eines SQL-Statements </td></tr>
+       <tr><td> <b>sqlFormatService</b>    </td><td>: aktiviert die Formatierung des SQL Statements über einen Onlinedienst             </td></tr>
+       <tr><td> <b>useAdminCredentials</b> </td><td>: benutzt einen privilegierten User für die Operation                               </td></tr>
+    </table>
+    </ul>
+    <br>
+
+    <b>Hinweis:</b> <br>
+    Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine
+    zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB
+    blockieren. <br>
+    Wenn man sich unsicher ist, sollte man vorsorglich dem Statement ein Limit
+    hinzufügen. <br><br>
+    </li>
+    <br>
 
     <li><b> sqlCmdHistory </b>   - Wenn mit dem Attribut <a href="#DbRep-attr-sqlCmdHistoryLength">sqlCmdHistoryLength</a> aktiviert, kann
                                    ein gespeichertes SQL-Statement aus einer Liste ausgewählt und ausgeführt werden.
@@ -18102,52 +18265,55 @@ return;
                             <br><br>
 
     <a id="DbRep-get-sqlCmdBlocking"></a>
-    <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> -
-                            Führt das angegebene SQL-Statement <b>blockierend</b> mit einem Standardtimeout von 10 Sekunden aus.
-                            Der Timeout kann mit dem Attribut <a href="#DbRep-attr-timeout">timeout</a> eingestellt werden.
-                            <br><br>
+    <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> <br><br>
 
-                            <ul>
-                              <b>Beispiele:</b>  <br>
-                              { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                              get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-                            </ul>
-                            </li>
-                            <br>
+    Führt das angegebene SQL-Statement <b>blockierend</b> mit einem Standardtimeout von 10 Sekunden aus.
+    Der Timeout kann mit dem Attribut <a href="#DbRep-attr-timeout">timeout</a> eingestellt werden.
+    <br><br>
 
-                            Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
-                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
-                            Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
-                            "SET @open:=NULL, @closed:=NULL;". <br>
-                            Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner
-                            des Attributs <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Mehrere Ergebniszeilen
-                            werden mit Newline ("\n") separiert. <br>
-                            Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn"
-                            wird nicht aufgerufen.
-                            <br><br>
+    <ul>
+      <b>Beispiele:</b>  <br>
+      { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+      get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+    </ul>
+    </li>
+    <br>
 
-                            Erstellt man eine kleine Routine in 99_myUtils, wie z.B.:
-                            <br>
-                            <pre>
+    Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
+    Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
+    Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+    "SET @open:=NULL, @closed:=NULL;" oder PRAGMA für SQLite. <br>
+    Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner
+    des Attributs <a href="#DbRep-attr-sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Mehrere Ergebniszeilen
+    werden mit Newline ("\n") separiert. <br>
+    Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn"
+    wird nicht aufgerufen.
+    <br><br>
+
+    Erstellt man eine kleine Routine in 99_myUtils, wie z.B.:
+    <br>
+
+    <pre>
 sub dbval {
   my $name = shift;
   my $cmd  = shift;
   my $ret  = CommandGet(undef,"$name sqlCmdBlocking $cmd");
   return $ret;
 }
-                            </pre>
-                            kann sqlCmdBlocking vereinfacht verwendet werden mit Aufrufen wie:
-                            <br><br>
+    </pre>
 
-                             <ul>
-                               <b>Beispiele:</b>  <br>
-                               { dbval("&lt;name&gt;","select count(*) from history") } <br>
-                               oder <br>
-                               $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
-                             </ul>
+    kann sqlCmdBlocking vereinfacht verwendet werden mit Aufrufen wie:
+    <br><br>
 
-                             <br><br>
+     <ul>
+       <b>Beispiele:</b>  <br>
+       { dbval("&lt;name&gt;","select count(*) from history") } <br>
+       oder <br>
+       $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+     </ul>
+
+     <br><br>
 
     <a id="DbRep-get-storedCredentials"></a>
     <li><b> storedCredentials </b> - Listet die im Device gespeicherten User / Passworte für den Datenbankzugriff auf. <br>
@@ -18274,31 +18440,34 @@ sub dbval {
                               </li> <br>
 
   <a id="DbRep-attr-averageCalcForm"></a>
-  <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue"
-                                fest.
-                                <br><br>
+  <li><b>averageCalcForm </b> <br><br>
 
-                                Zur Zeit sind folgende Varianten implementiert: <br><br>
+  Legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" fest.
+  <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean:          </b></td><td>es wird der arithmetische Mittelwert berechnet (default)                                </td></tr>
-                                      <tr><td>                                </td><td>                                                                                            </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS:</b>        </td><td>berechnet die Tagesmitteltemperatur entsprechend den                                        </td></tr>
-                                      <tr><td>                                </td><td>Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2")         </td></tr>
-                                      <tr><td>                                </td><td>Diese Variante verwendet automatisch die Aggregation "day".                                 </td></tr>
-                                      <tr><td>                                </td><td>                                                                                            </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>wie "avgDailyMeanGWS" und berechnet zusätzlich die Grünlandtemperatursumme.                 </td></tr>
-                                      <tr><td>                                </td><td>Ist der Wert 200 erreicht, wird das Reading "reachedGTSthreshold" mit dem Datum             </td></tr>
-                                      <tr><td>                                </td><td>des erstmaligen Erreichens dieses Schwellenwertes erstellt.                                 </td></tr>
-                                      <tr><td>                                </td><td><b>Hinweis:</b> das Attribut timestamp_begin muß auf den Anfang eines Jahres gesetzt sein ! </td></tr>
-                                      <tr><td>                                </td><td>(siehe "get &lt;name&gt; versionNotes 5")                                                   </td></tr>
-                                      <tr><td>                                </td><td>                                                                                            </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean:</b>      </td><td>berechnet den zeitgewichteten Mittelwert                                                    </td></tr>
-                                   </table>
-                                   </ul>
-                                </li><br>
+  Zur Zeit sind folgende Varianten implementiert: <br><br>
+
+  <ul>
+     <table>
+     <colgroup> <col width=20%> <col width=80%> </colgroup>
+        <tr><td> <b>avgArithmeticMean:</b>      </td><td>Es wird der arithmetische Mittelwert berechnet. (default)                                     </td></tr>
+        <tr><td>                                </td><td>                                                                                              </td></tr>
+        <tr><td> <b>avgDailyMeanGWS:</b>        </td><td>Berechnet die Tagesmitteltemperatur entsprechend den                                          </td></tr>
+        <tr><td>                                </td><td>Vorschriften des deutschen Wetterdienstes. (siehe "get &lt;name&gt; versionNotes 2")          </td></tr>
+        <tr><td>                                </td><td>Diese Variante verwendet automatisch die Aggregation "day".                                   </td></tr>
+        <tr><td>                                </td><td>                                                                                              </td></tr>
+        <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>Wie "avgDailyMeanGWS" und berechnet zusätzlich die Grünlandtemperatursumme.                   </td></tr>
+        <tr><td>                                </td><td>Ist der Wert 200 erreicht, wird das Reading "reachedGTSthreshold" mit dem Datum               </td></tr>
+        <tr><td>                                </td><td>des erstmaligen Erreichens dieses Schwellenwertes erstellt.                                   </td></tr>
+        <tr><td>                                </td><td><b>Hinweis:</b> Das Attribut timestamp_begin muss auf den Beginn eines Jahres gesetzt werden! </td></tr>
+        <tr><td>                                </td><td>(siehe "get &lt;name&gt; versionNotes 5")                                                     </td></tr>
+        <tr><td>                                </td><td>                                                                                              </td></tr>
+        <tr><td> <b>avgTimeWeightMean:</b>      </td><td>Berechnet den zeitgewichteten Mittelwert.                                                     </td></tr>
+        <tr><td>                                </td><td><b>Hinweis:</b> Es müssen mindestens zwei Datenpunkte pro aggregation Periode vorhanden sein. </td></tr>
+     </table>
+  </ul>
+  </li>
+  <br>
 
   <a id="DbRep-attr-countEntriesDetail"></a>
   <li><b>countEntriesDetail </b>   - Wenn gesetzt, erstellt die Funktion "countEntries" eine detallierte Ausgabe der Datensatzzahl
@@ -18313,7 +18482,7 @@ sub dbval {
                                 vorhandenen Devices aufgelöst. <br>
                                 Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt,
                                 werden diese Devices von der Selektion ausgeschlossen. <br>
-                                Die Datenbankselektion wird als logische UND-Verknüpfung aus "device" und dem Attribut 
+                                Die Datenbankselektion wird als logische UND-Verknüpfung aus "device" und dem Attribut
                                 <a href="#DbRep-attr-reading">reading</a> ausgeführt.
                                 <br><br>
 
@@ -18622,7 +18791,7 @@ sub bdump {
                                 Es können SQL Wildcard (%) verwendet werden. <br>
                                 Wird dem Reading bzw. der Reading-Liste ein "EXCLUDE=" vorangestellt, werden diese Readings
                                 nicht inkludiert. <br>
-                                Die Datenbankselektion wird als logische UND Verknüpfung aus "reading" und dem Attribut 
+                                Die Datenbankselektion wird als logische UND Verknüpfung aus "reading" und dem Attribut
                                 <a href="#DbRep-attr-device">device</a> ausgeführt.
                                 <br><br>
 
@@ -18719,36 +18888,64 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-showTableInfo"></a>
-  <li><b>showTableInfo </b>   - grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können
-                                SQL-Wildcard (%) verwendet werden.
-                                <br><br>
+  <li><b>showTableInfo </b> <br><br>
 
-                                <ul>
-                                <b>Bespiel: </b> <br>
-                                attr &lt;name&gt; showTableInfo current,history  <br>
-                                # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
-                                </ul><br>
-                                </li>
+  Grenzt die Ergebnismenge des Befehls "get &lt;name&gt; tableinfo" ein. Es können SQL-Wildcard (%) verwendet werden.
+  <br><br>
+
+  <ul>
+    <b>Bespiel: </b> <br>
+    attr &lt;name&gt; showTableInfo current,history  <br>
+    # Es werden nur Information der Tabellen "current" und "history" angezeigt <br>
+  </ul>
+  <br>
+  </li>
 
   <a id="DbRep-attr-sqlCmdHistoryLength"></a>
-  <li><b>sqlCmdHistoryLength </b>
-                              - aktiviert die Kommandohistorie von "sqlCmd" und legt deren Länge fest  </li> <br>
+  <li><b>sqlCmdHistoryLength </b> <br><br>
+
+    Aktiviert mit einem Wert > 0 die Kommandohistorie von "sqlCmd" und legt die Anzahl der zu speichernden
+    SQL Statements fest. <br>
+    (default: 0)
+
+  </li>
+  <br>
 
   <a id="DbRep-attr-sqlCmdVars"></a>
-  <li><b>sqlCmdVars </b>      - Setzt eine SQL Session Variable oder PRAGMA vor jedem mit sqlCmd ausgeführten
-                                SQL-Statement   <br><br>
+  <li><b>sqlCmdVars </b> <br><br>
 
-                                <ul>
-                                <b>Beispiel:</b> <br>
-                                attr &lt;name&gt; sqlCmdVars SET @open:=NULL, @closed:=NULL; <br>
-                                attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
-                                </ul>
-                                <br>
-                                </li> <br>
+    Setzt die angegebene(n) SQL Session Variable(n) oder PRAGMA vor jedem mit sqlCmd ausgeführten
+    SQL-Statement.  <br><br>
+
+    <ul>
+      <b>Beispiel:</b> <br>
+      attr &lt;name&gt; sqlCmdVars SET @open:=NULL, @closed:=NULL; <br>
+      attr &lt;name&gt; sqlCmdVars PRAGMA temp_store=MEMORY;PRAGMA synchronous=FULL;PRAGMA journal_mode=WAL; <br>
+    </ul>
+  <br>
+  </li>
+  <br>
+
+  <a id="DbRep-attr-sqlFormatService"></a>
+  <li><b>sqlFormatService </b> <br><br>
+
+    Über einen Online-Dienst kann eine automatisierte Formatierung von SQL-Statements aktiviert werden. <br>
+    Diese Möglichkeit ist insbesondere für komplexe SQL-Statements der Setter sqlCmd, sqlCmdHistory und sqlSpecial
+    hilfreich um die Strukturierung und Lesbarkeit zu verbessern. <br>
+    Eine Internetverbindung wird benötigt und es sollte das globale Attribut <b>dnsServer</b> gesetzt sein. <br>
+    (default: none)
+
+  </li>
+  <br>
 
   <a id="DbRep-attr-sqlResultFieldSep"></a>
-  <li><b>sqlResultFieldSep </b> - legt den verwendeten Feldseparator (default: "|") im Ergebnis des Kommandos
-                                  "set ... sqlCmd" fest.  </li> <br>
+  <li><b>sqlResultFieldSep </b> <br><br>
+
+    Legt den verwendeten Feldseparator im Ergebnis des Kommandos "set ... sqlCmd" fest. <br>
+    (default: "|")
+
+  </li>
+  <br>
 
   <a id="DbRep-attr-sqlResultFormat"></a>
   <li><b>sqlResultFormat </b> - legt die Formatierung des Ergebnisses des Kommandos "set &lt;name&gt; sqlCmd" fest.
@@ -18769,6 +18966,7 @@ sub bdump {
                                                     des Datensatzes (Key) und dessen Wert zusammen. <br><br>
 
         Die Weiterverarbeitung des Ergebnisses kann z.B. mit der folgenden userExitFn in 99_myUtils.pm erfolgen: <br>
+
         <pre>
         sub resfromjson {
           my ($name,$reading,$value) = @_;

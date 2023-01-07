@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: attr sqlFormatService for online formatting of sqlCmd,
+                      sqlCmdBlocking customized like sqlCmd, minor bugfixes
  - change:  14_Hideki.pm: output wind values always as floatingpoint
  - bugix:   14_Hideki.pm: fixed wind direction
  - feature: 14_SD_WS.pm: new sensor Bresser 7-in-1 Comfort Wetter Center
