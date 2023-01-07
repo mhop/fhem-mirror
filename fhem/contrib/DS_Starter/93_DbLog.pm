@@ -495,6 +495,9 @@ return;
 sub DbLog_Undef {
   my $hash = shift;
   my $name = shift;
+  
+   my $dbh = $hash->{DBHU};
+   __DbLog_SBP_disconnectOnly ($name, $dbh);
 
   delete $hash->{HELPER}{LONGRUN_PID};
 
@@ -648,6 +651,9 @@ sub DbLog_Attr {
   }
 
   if($aName eq "commitMode") {
+      my $dbh = $hash->{DBHU};
+      __DbLog_SBP_disconnectOnly ($name, $dbh);
+      
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
@@ -933,8 +939,11 @@ sub _DbLog_setreopen {                   ## no critic "not used"
   my $prop  = $paref->{prop};
 
   my $ret;
+  
+   my $dbh = $hash->{DBHU};
+   __DbLog_SBP_disconnectOnly ($name, $dbh);                            # lokal
 
-  DbLog_SBP_sendDbDisconnect ($hash);
+  DbLog_SBP_sendDbDisconnect ($hash);                                   # an SBP
 
   if (!$prop) {
       Log3 ($name, 3, "DbLog $name - Reopen requested");
@@ -982,6 +991,9 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
 
   my $ret = DbLog_readCfg($hash);
   return $ret if $ret;
+  
+   my $dbh = $hash->{DBHU};
+   __DbLog_SBP_disconnectOnly ($name, $dbh);                        # lokal
 
   DbLog_SBP_sendDbDisconnect ($hash, 1);                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
@@ -5073,6 +5085,7 @@ sub DbLog_Get {
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $history    = $hash->{HELPER}{TH};
   my $current    = $hash->{HELPER}{TC};
+  
   my ($dbh,$err);
 
   if ($a[1] =~ m/^Readings/) {
@@ -5158,7 +5171,7 @@ sub DbLog_Get {
 
   # extract the Device:Reading arguments into @readings array
   # Ausgangspunkt ist z.B.: KS300:temperature KS300:rain::delta-h KS300:rain::delta-d
-  for(my $i = 0; $i < int(@a); $i++) {
+  for (my $i = 0; $i < int(@a); $i++) {
       @fld = split(":", $a[$i], 5);
       $readings[$i][0] = $fld[0];         # Device
       $readings[$i][1] = $fld[1];         # Reading
@@ -5174,8 +5187,33 @@ sub DbLog_Get {
   Log3 $name, 4, "DbLog $name - ################################################################";
   Log3($name, 4, "DbLog $name - main PID: $hash->{PID}, secondary PID: $$");
 
-  $dbh = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
-  #return "Can't connect to database." if(!$dbh);
+  my $samePID = $hash->{PID} == $$ ? 1 : 0;
+  
+  if ($samePID) {
+      if (defined $hash->{DBHU}) {
+          $dbh     = $hash->{DBHU};
+          my $bool = _DbLog_SBP_pingDB ($name, $dbh);
+          
+          if (!$bool) {
+              delete $hash->{DBHU};
+              $dbh          = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
+              $hash->{DBHU} = $dbh;
+              
+              Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$");              
+          }
+      }
+      else {        
+          $dbh          = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
+          $hash->{DBHU} = $dbh;
+          
+          Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$"); 
+      }
+  }
+  else {
+      $dbh = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
+      
+      Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$"); 
+  }
 
   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{MODEL} eq "POSTGRESQL") {
@@ -5679,7 +5717,10 @@ sub DbLog_Get {
       $data{"maxdate$k"}   = $maxd[$j];
   }
 
-  __DbLog_SBP_disconnectOnly ($name, $dbh);
+  if (!$samePID) {
+      __DbLog_SBP_disconnectOnly ($name, $dbh);
+      delete $hash->{DBHU};
+  }
 
   if($internal) {
       $internal_data = \$retval;
@@ -5898,7 +5939,7 @@ sub DbLog_configcheck {
 
   if (!$err && @ce && @se) {
       $check .= "Connection to database $dbname successfully done. <br>";    
-      $check .= "The time required to establish the connection was $ct seconds <br>";
+      $check .= "The time required to establish the connection was $ct seconds. <br>";
       
       if ($ct > 5.0) {
           $check .= "<b>Recommendation:</b> The time to establish a connection is much too long. There are performance problems that hinder operation. <br><br>";
