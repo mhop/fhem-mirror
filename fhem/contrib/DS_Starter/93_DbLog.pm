@@ -38,7 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ",
+  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ".
+                           "configCheck changed to use only one db connect + measuring the connection time ",
   "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
@@ -2394,8 +2395,7 @@ sub DbLog_SBP_onRun {
 
           $dbh = $store->{dbh};
 
-          my $bool;
-          eval { $bool = $dbh->ping; };
+          my $bool = _DbLog_SBP_pingDB ($name, $dbh);
 
           if (!$bool) {                                                                        # DB Session dead
               Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
@@ -2564,6 +2564,19 @@ sub _DbLog_SBP_onRun_checkDiscDelpars {
   }
 
 return $doNext;
+}
+
+#################################################################
+#          Datenbank Ping
+#################################################################
+sub _DbLog_SBP_pingDB {
+  my $name  = shift;
+  my $dbh   = shift;
+
+  my $bool;
+  eval { $bool = $dbh->ping; };   
+
+return $bool;
 }
 
 ###################################################################################
@@ -5011,7 +5024,7 @@ sub DbLog_ExecSQL {
 
       Log3 ($name, 2, "DbLog $name - Backdoor retry: $sql");
 
-      $sth = DbLog_ExecSQL1($hash,$dbh,$sql);
+      $sth = DbLog_ExecSQL1 ($hash, $dbh, $sql);
 
       if(!$sth) {
           Log3($name, 2, "DbLog $name - Backdoor retry failed");
@@ -5062,7 +5075,9 @@ sub DbLog_Get {
   my $current    = $hash->{HELPER}{TC};
   my ($dbh,$err);
 
-  return DbLog_dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
+  if ($a[1] =~ m/^Readings/) {
+      return DbLog_dbReadings($hash, @a);
+  }
 
   return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
      "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
@@ -5801,9 +5816,9 @@ sub DbLog_configcheck {
 
   ### Configuration read check
   #######################################################################
-  $check .= "<u><b>Result of configuration read check</u></b><br><br>";
-  my $st  = configDBUsed() ? "configDB (don't forget upload configuration file if changed. Use \"configdb filelist\" and look for your configuration file.)" : "file";
-  $check .= "Connection parameter store type: $st <br>";
+  $check  .= "<u><b>Result of configuration read check</u></b><br><br>";
+  my $cpst = configDBUsed() ? qq{configDB (don't forget upload configuration file if changed. Use "configdb filelist" and look for your configuration file.)} : "file";
+  $check  .= "Connection parameter store type: $cpst <br>";
 
   my ($err, @config) = FileRead($hash->{CONFIGURATION});
 
@@ -6498,41 +6513,6 @@ sub DbLog_updGetUrl {
   }
 
 return ($data,"");
-}
-
-#########################################################################################
-#                  Einen (einfachen) Datensatz aus DB lesen
-#########################################################################################
-sub DbLog_sqlget {
-  my ($hash,$sql) = @_;
-  my $name        = $hash->{NAME};
-
-  my ($sth,@sr);
-
-  Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
-
-  my $dbh = _DbLog_ConnectNewDBH ($hash);
-  return if(!$dbh);
-
-  eval { $sth = $dbh->prepare("$sql");
-         $sth->execute;
-       };
-  if($@) {
-      $dbh->disconnect if($dbh);
-      Log3 ($name, 2, "DbLog $name - $@");
-      return @sr;
-  }
-
-  @sr = $sth->fetchrow;
-
-  $sth->finish;
-  $dbh->disconnect;
-
-  no warnings 'uninitialized';
-  Log3 ($name, 4, "DbLog $name - SQL result: @sr");
-  use warnings;
-
-return @sr;
 }
 
 #########################################################################################
@@ -7487,17 +7467,18 @@ return $jsonstring;
 sub DbLog_dbReadings {
   my($hash,@a) = @_;
 
-  my $history  = $hash->{HELPER}{TH};
+  my $history = $hash->{HELPER}{TH};
 
-  my $dbh = _DbLog_ConnectNewDBH ($hash);
-  return if(!$dbh);
+  my $dbh = _DbLog_ConnectNewDBH ($hash) || return;
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
 
   my $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
 
   my ($reading,$timestamp) = $dbh->selectrow_array($query);
-  $dbh->disconnect();
+  
+  my $name = $hash->{NAME};
+  __DbLog_SBP_disconnectOnly ($name, $dbh);
 
   $reading   = defined $reading   ? $reading   : $a[4];
   $timestamp = defined $timestamp ? $timestamp : $a[4];
