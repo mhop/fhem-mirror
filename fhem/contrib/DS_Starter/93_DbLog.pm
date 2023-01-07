@@ -5725,6 +5725,8 @@ sub DbLog_configcheck {
   my $current = $hash->{HELPER}{TC};
 
   my ($check, $rec,%dbconfig);
+  
+  Log3 ($name, 4, "DbLog $name - ###  Start configCheck   ###");
 
   ### verfügbare Treiber
   ########################
@@ -5825,6 +5827,8 @@ sub DbLog_configcheck {
   my $st  = [gettimeofday];                                                                        # Startzeit
   my $dbh = _DbLog_ConnectNewDBH ($hash) || return "Can't connect to database.";
   my $ct  = sprintf("%.4f", tv_interval($st));                                                     # Laufzeit ermitteln
+  
+  Log3 ($name, 4, "DbLog $name - Time required to establish the database connection: ".$ct);
   
   my (@ce,@se);
   my ($chutf8mod,$chutf8dat);
