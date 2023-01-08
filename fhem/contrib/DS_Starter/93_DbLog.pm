@@ -5846,8 +5846,8 @@ sub DbLog_configcheck {
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
   $check .= "Encoding used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
   $check .= "Encoding used by DB $dbname: $chutf8dat <br>";
-  $check .= $dbmodel =~ /SQLITE/   ? "Rating: ".$ok."<br>"                                             :
-            $chutf8mod eq $chutf8dat && $dbdhint =~ /DBD\sversion\sfulfills/xs ? "Rating: ".$ok."<br>" : 
+  $check .= $dbmodel =~ /SQLITE/       ? "Rating: ".$ok."<br>"                                             :
+            $rec =~ /settings\so.k./xs ? "Rating: ".$ok."<br>" : 
             "Rating: ".$warn."<br>";
   $check .= "<b>Recommendation:</b> $rec $dbdhint <br><br>";
 
