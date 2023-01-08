@@ -1410,6 +1410,9 @@ sub weekprofile_createTempMap($;$) {
     my ($hash, $attrMap) = @_;
     my $me = $hash->{NAME};
     
+    #clear map
+    %{$hash->{TEMPMAP}} = ();
+    
     my $tempOn = AttrVal($me,"tempON", undef);
     if (defined($tempOn)) {
         $hash->{TEMPMAP}->{'on'} = tempValue($tempOn);
