@@ -47,6 +47,9 @@
 #     17.10.2020 Boris Neubert
 #       modified: fix for calculation of standard deviation
 #
+#     03.01.2023 Jens Beyer (jensb at forum dot fhem dot de)
+#       modified: fixed selftest for standard deviation
+#
 ##############################################################################
 
 package TimeSeries;
@@ -119,32 +122,32 @@ sub reset() {
 
   # statistics
   # _t and _v is taken care of in new() and in add()
-  $self->{n}= 0;	
-  $self->{mean}= undef;	
-  $self->{sd}= undef;	
-  $self->{integral}= 0;	
-  $self->{median}= undef;	
-  $self->{_M}= undef;	
+  $self->{n}= 0;
+  $self->{mean}= undef;
+  $self->{sd}= undef;
+  $self->{integral}= 0;
+  $self->{median}= undef;
+  $self->{_M}= undef;
   $self->{_S}= undef;
   $self->{_t0}= $self->{_t};
-  # 
-  $self->{count}= 0;		
-  $self->{lost}= 0;		
-  $self->{t0}= undef;	
-  $self->{t}= undef;	
+  #
+  $self->{count}= 0;
+  $self->{lost}= 0;
+  $self->{t0}= undef;
+  $self->{t}= undef;
   $self->{v0}= undef;
-  $self->{v}= undef;	
+  $self->{v}= undef;
   $self->{min}= undef;
   $self->{max}= undef;
-  #     
+  #
   $self->{tSeries}= undef;
   $self->{vSeries}= undef;
-  
+
   if (!defined($self->{autoreset})) {
-    $self->{_t0}= undef; 
-    $self->{_t}= undef; 
-    $self->{_v}= undef; 
-  } 
+    $self->{_t0}= undef;
+    $self->{_t}= undef;
+    $self->{_v}= undef;
+  }
 }
 
 #
@@ -152,10 +155,10 @@ sub reset() {
 #
 sub trimToHoldTime() {
   my $self= shift;
-  
+
   my $n = @{$self->{tSeries}};
   #main::Debug("TimeSeries::trimToHoldTime: old count=$n\n");
-  
+
   if (defined($self->{holdTime}) && defined($self->{tSeries})) {
     # trim series cache depth to holdTime relative to now
     my $keepTime = time() - $self->{holdTime};
@@ -166,57 +169,57 @@ sub trimToHoldTime() {
       }
       $trimCount++;
     }
-    
+
     if ($trimCount > 0) {
       # remove aged out samples
       splice(@{$self->{tSeries}}, 0, $trimCount);
       splice(@{$self->{vSeries}}, 0, $trimCount);
-      
+
       # update properties
-      # - lost is kept untouched because it cannot be consistently manipulated      
+      # - lost is kept untouched because it cannot be consistently manipulated
       $self->{count} = @{$self->{tSeries}};
       #main::Debug("TimeSeries::trimToHoldTime: new count=$count before\n");
       if ($self->{count} > 0) {
         $self->{t0} = $self->{tSeries}[0];
-        $self->{t}  = $self->{tSeries}[$#{$self->{tSeries}}]; 
+        $self->{t}  = $self->{tSeries}[$#{$self->{tSeries}}];
         $self->{v0} = $self->{vSeries}[0];
         $self->{v}  = $self->{vSeries}[$#{$self->{vSeries}}];
-        $self->{_t0}= $self->{t0}; 
-        $self->{_t} = $self->{t}; 
-        $self->{_v} = $self->{v}; 
+        $self->{_t0}= $self->{t0};
+        $self->{_t} = $self->{t};
+        $self->{_v} = $self->{v};
       } else {
-        $self->{t0} = undef; 
-        $self->{t}  = undef;  
+        $self->{t0} = undef;
+        $self->{t}  = undef;
         $self->{v0} = undef;
         $self->{v}  = undef;
-        $self->{_t0}= undef; 
-        $self->{_t} = undef; 
-        $self->{_v} = undef; 
-      }             
-   
-      # reset statistics 
+        $self->{_t0}= undef;
+        $self->{_t} = undef;
+        $self->{_v} = undef;
+      }
+
+      # reset statistics
       $self->{n}       = 0;
       $self->{min}     = undef;
       $self->{max}     = undef;
-      $self->{mean}    = undef; 
-      $self->{sd}      = undef; 
+      $self->{mean}    = undef;
+      $self->{sd}      = undef;
       $self->{integral}= 0;
-      $self->{_M}      = undef; 
+      $self->{_M}      = undef;
       $self->{_S}      = undef;
 
       # rebuild statistic for remaining samples
       for my $i (0 .. $#{$self->{tSeries}}) {
         my $tn= $self->{tSeries}[$i];
         my $vn= $self->{vSeries}[$i];
-            
+
         # min, max
         $self->{min}= $vn if(!defined($self->{min}) || $vn< $self->{min});
         $self->{max}= $vn if(!defined($self->{max}) || $vn> $self->{max});
-  
+
         # statistics
         if($self->{method} eq "none") {
           # no time-weighting
-          $self->_updatestat($vn); 
+          $self->_updatestat($vn);
         } else {
           # time-weighting
           if($i > 0) {
@@ -227,7 +230,7 @@ sub trimToHoldTime() {
               # steps
               $self->_updatestat($vo * $dt);
             } else {
-              # linear interpolation  
+              # linear interpolation
               $self->_updatestat(0.5 * ($vo + $vn) * $dt);
             }
           }
@@ -235,9 +238,9 @@ sub trimToHoldTime() {
       }
     }
   }
-  
+
   #my $count = @{$self->{tSeries}};
-  #main::Debug("TimeSeries::trimToHoldTime: new count=$count\n");  
+  #main::Debug("TimeSeries::trimToHoldTime: new count=$count\n");
 }
 
 sub _updatestat($$) {
@@ -258,8 +261,8 @@ sub _updatestat($$) {
     $self->{integral}= $V;
   }
   #main::Debug("STAT UPD n=$n");
-}  
-  
+}
+
 #
 # has autoreset period elapsed?
 # used by fhem.pl for downsampling
@@ -277,11 +280,11 @@ sub _housekeeping($) {
 
   if($self->elapsed($t) && !defined($self->{holdTime})) {
     #main::Debug("TimeSeries::_housekeeping: reset\n");
-    $self->reset(); 
-  } elsif(defined($self->{holdTime}) && defined($self->{_t0}) && ($t - $self->{_t0} >= $self->{holdTime})) { 
+    $self->reset();
+  } elsif(defined($self->{holdTime}) && defined($self->{_t0}) && ($t - $self->{_t0} >= $self->{holdTime})) {
     #main::Debug("TimeSeries::_housekeeping: trimToHoldTime\n");
     $self->trimToHoldTime();
-  } 
+  }
 }
 
 #
@@ -295,10 +298,10 @@ sub add($$$) {
     $self->{lost}++;
     return; # note: for consistency, the value is not considered at all
   }
- 
-  # reset or trim series 
+
+  # reset or trim series
   $self->_housekeeping($t);
-  
+
   #main::Debug("ADD ($t,$v)");  ###
 
   # add point to data buffer
@@ -309,15 +312,15 @@ sub add($$$) {
 
   # count
   $self->{count}++;
-  
+
   # statistics
   if($self->{method} eq "none") {
     # no time-weighting
     $self->_updatestat($v);
-    
+
     # median
-    if(defined($self->{holdTime})) {    
-      my @sortedVSeries = sort {$TimeSeries::a <=> $TimeSeries::b} @{$self->{vSeries}}; 
+    if(defined($self->{holdTime})) {
+      my @sortedVSeries = sort {$TimeSeries::a <=> $TimeSeries::b} @{$self->{vSeries}};
       my $center = int($self->{count} / 2);
       if($self->{count} % 2 == 0) {
         $self->{median} = ($sortedVSeries[$center - 1] + $sortedVSeries[$center]) / 2;
@@ -333,15 +336,15 @@ sub add($$$) {
         # steps
         $self->_updatestat($self->{_v} * $dt);
       } else {
-        # linear interpolation  
+        # linear interpolation
         $self->_updatestat(0.5 * ($self->{_v} + $v) * $dt);
       }
     }
   }
   $self->{_t}= $t;
   $self->{_v}= $v;
-  
-  # first point 
+
+  # first point
   if(!defined($self->{t0})) {
     $self->{t0}= $t;
     $self->{v0}= $v;
@@ -349,15 +352,15 @@ sub add($$$) {
   if(!defined($self->{_t0})) {
     $self->{_t0}= $t;
   }
-  
+
   # last point
-  $self->{t}= $t; 
+  $self->{t}= $t;
   $self->{v}= $v;
-  
+
   # min, max
   $self->{min}= $v if(!defined($self->{min}) || $v< $self->{min});
   $self->{max}= $v if(!defined($self->{max}) || $v> $self->{max});
-  
+
   # mean, standard deviation
   my $n= $self->{n};
   if($n) {
@@ -366,24 +369,24 @@ sub add($$$) {
       #main::Debug("T= $T  _M= " . $self->{_M} );
       $self->{mean}= $self->{_M} / $T;
       # in the time-weighted methods, this is just a measure for the variation of the values
-      $self->{sd}= sqrt($self->{_S}/ ($n-1)) / $T if($n> 1); 
-    }  
+      $self->{sd}= sqrt($self->{_S}/ ($n-1)) / $T if($n> 1);
+    }
   }
 
-  #main::Debug(Dumper($self)); ###  
+  #main::Debug(Dumper($self)); ###
 }
 
 #
 # get corresponding value for given timestamp (data buffer must be enabled by setting holdTime)
 #
-# - if there is no exact match found for timestamp, 
+# - if there is no exact match found for timestamp,
 #   the value of the next smallest timestamp available is returned
 # - if timestamp is not inside the current time range undef is returned
-# 
+#
 sub getValue($$) {
   my ($self, $t)= @_;
-  
-  my $v = undef;  
+
+  my $v = undef;
   if (defined($self->{tSeries}) && $t >= $self->{t0} && $t <= $self->{t}) {
     my $index = 0;
     for my $i (0 .. $#{$self->{tSeries}}) {
@@ -392,10 +395,10 @@ sub getValue($$) {
         last;
       }
       $index++;
-    }  
+    }
     $v = $self->{vSeries}[--$index];
   }
-  
+
   return $v;
 }
 
@@ -405,9 +408,9 @@ sub getValue($$) {
 sub selftest() {
   my ($self, @params) = @_;
   die "static sub selftest may not be called as object method" if ref($self);
-  
+
   my $success = 1;
-  
+
   # block operation tests
   my $tsb = TimeSeries->new( { method => "none", autoreset => 3 } );
   $tsb->add(0, 0.8);
@@ -423,8 +426,9 @@ sub selftest() {
   if ($tsb->{min} != 0.8)      { $success = 0; main::Debug("unweighed block add test failed: min mismatch $tsb->{min}/0.8\n"); }
   if ($tsb->{max} != 1.2)      { $success = 0; main::Debug("unweighed block add test failed: max mismatch $tsb->{max}/1.2\n"); }
   if ($tsb->{mean} != 1.0)     { $success = 0; main::Debug("unweighed block add test failed: mean mismatch $tsb->{mean}/1.0\n"); }
-  if (!defined($tsb->{sd}) || $tsb->{sd} ne sqrt(0.13/2)) { $success = 0; main::Debug("unweighed block add test failed: sd mismatch $tsb->{sd}/0.254950975679639\n"); }
+  if (!defined($tsb->{sd}) || $tsb->{sd} ne 0.2) { $success = 0; main::Debug("unweighed block add test failed: sd mismatch $tsb->{sd}/0.2\n"); }
   if ($tsb->{integral} != 3.0) { $success = 0; main::Debug("unweighed block add test failed: sum mismatch $tsb->{integral}/3.0\n"); }
+
   $tsb->add(3, 0.8);
   $tsb->add(4, 1.2);
   if ($tsb->{count} != 2)      { $success = 0; main::Debug("unweighed block autoreset test failed: count mismatch $tsb->{count}/2\n"); }
@@ -437,7 +441,7 @@ sub selftest() {
   if ($tsb->{min} != 0.8)      { $success = 0; main::Debug("unweighed block autoreset test failed: min mismatch $tsb->{min}/0.8\n"); }
   if ($tsb->{max} != 1.2)      { $success = 0; main::Debug("unweighed block autoreset test failed: max mismatch $tsb->{max}/1.2\n"); }
   if ($tsb->{mean} != 1.0)     { $success = 0; main::Debug("unweighed block autoreset test failed: mean mismatch $tsb->{mean}/1.0\n"); }
-  if (!defined($tsb->{sd}) || $tsb->{sd} ne "0.4") { $success = 0; main::Debug("unweighed block autoreset test failed: sd mismatch $tsb->{sd}/0.4\n"); }
+  if (!defined($tsb->{sd}) || $tsb->{sd} ne 0.282842712474619) { $success = 0; main::Debug("unweighed block autoreset test failed: sd mismatch $tsb->{sd}/0.282842712474619\n"); }
   if ($tsb->{integral} != 2.0) { $success = 0; main::Debug("unweighed block autoreset test failed: sum mismatch $tsb->{integral}/2.0\n"); }
 
   $tsb->reset();
@@ -458,10 +462,10 @@ sub selftest() {
   if ($tsb->{v} != 0.5)        { $success = 0; main::Debug("const weighed block add test failed: last value mismatch $tsb->{v}/0.5\n"); }
   if ($tsb->{min} != 0.5)      { $success = 0; main::Debug("const weighed block add test failed: min mismatch $tsb->{min}/0.5\n"); }
   if ($tsb->{max} != 2.0)      { $success = 0; main::Debug("const weighed block add test failed: max mismatch $tsb->{max}/2.0\n"); }
-  if ($tsb->{mean} ne (2.5/1.5)) { $success = 0; main::Debug("const weighed block add test failed: mean mismatch $tsb->{mean}/1.66666666666667\n"); }
-  if (!defined($tsb->{sd}) || $tsb->{sd} ne 2) { $success = 0; main::Debug("const weighed block add test failed: sd mismatch $tsb->{sd}/2\n"); }
+  if ($tsb->{mean} ne ((5.0/2)/(3.0/2))) { $success = 0; main::Debug("const weighed block add test failed: mean mismatch $tsb->{mean}/1.66666666666667\n"); }
+  if (!defined($tsb->{sd}) || $tsb->{sd} ne 1.41421356237309) { $success = 0; main::Debug("const weighed block add test failed: sd mismatch $tsb->{sd}/1.41421356237309\n"); }
   if ($tsb->{integral} != 5.0) { $success = 0; main::Debug("const weighed block add test failed: sum mismatch $tsb->{integral}/5.0\n"); }
-  
+
   # moving operation tests
   my $now = time();
   my $tsm = TimeSeries->new( { method => "none", holdTime => 3 } );
@@ -478,10 +482,10 @@ sub selftest() {
   if ($tsm->{min} != 0.8)      { $success = 0; main::Debug("unweighed moving add test failed: min mismatch $tsm->{min}/0.8\n"); }
   if ($tsm->{max} != 1.2)      { $success = 0; main::Debug("unweighed moving add test failed: max mismatch $tsm->{max}/1.2\n"); }
   if ($tsm->{mean} != 1.0)     { $success = 0; main::Debug("unweighed moving add test failed: mean mismatch $tsm->{mean}/1.0\n"); }
-  if (!defined($tsm->{sd}) || $tsm->{sd} ne sqrt(0.13/2)) { $success = 0; main::Debug("unweighed moving add test failed: sd mismatch $tsm->{sd}/0.254950975679639\n"); }
+  if (!defined($tsm->{sd}) || $tsm->{sd} ne 0.2) { $success = 0; main::Debug("unweighed moving add test failed: sd mismatch $tsm->{sd}/0.2\n"); }
   if ($tsm->{integral} != 3.0) { $success = 0; main::Debug("unweighed moving add test failed: sum mismatch $tsm->{integral}/3.0\n"); }
   if ($tsm->{median} != 1.0)   { $success = 0; main::Debug("unweighed moving add test failed: median mismatch $tsm->{median}/1.0\n"); }
-  sleep(3);  
+  sleep(3);
   $tsm->add($now+1, 1.0);
   $tsm->add($now+2, 0.8);
   if ($tsm->{count} != 3)      { $success = 0; main::Debug("unweighed moving holdTime test failed: count mismatch $tsm->{count}/3\n"); }
@@ -494,7 +498,7 @@ sub selftest() {
   if ($tsm->{min} != 0.8)      { $success = 0; main::Debug("unweighed moving holdTime test failed: min mismatch $tsm->{min}/0.8\n"); }
   if ($tsm->{max} != 1.2)      { $success = 0; main::Debug("unweighed moving holdTime test failed: max mismatch $tsm->{max}/1.2\n"); }
   if ($tsm->{mean} != 1.0)     { $success = 0; main::Debug("unweighed moving holdTime test failed: mean mismatch $tsm->{mean}/1.0\n"); }
-  if (!defined($tsm->{sd}) || $tsm->{sd} ne sqrt(0.13/2)) { $success = 0; main::Debug("unweighed moving holdTime test failed: sd mismatch $tsm->{sd}/0.254950975679639\n"); }
+  if (!defined($tsm->{sd}) || $tsm->{sd} ne 0.2) { $success = 0; main::Debug("unweighed moving holdTime test failed: sd mismatch $tsm->{sd}/0.2\n"); }
   if ($tsm->{integral} != 3.0) { $success = 0; main::Debug("unweighed moving holdTime test failed: sum mismatch $tsm->{integral}/3.0\n"); }
   if ($tsm->{median} != 1.0)   { $success = 0; main::Debug("unweighed block autoreset test failed: median mismatch $tsm->{median}/1.0\n"); }
 
@@ -515,7 +519,7 @@ sub selftest() {
   if ($tsm->{min} != -1.0)     { $success = 0; main::Debug("const weighed moving add test 1 failed: min mismatch $tsm->{min}/-1.0\n"); }
   if ($tsm->{max} != 2.0)      { $success = 0; main::Debug("const weighed moving add test 1 failed: max mismatch $tsm->{max}/2.0\n"); }
   if ($tsm->{mean} ne (2.5/1.5)) { $success = 0; main::Debug("const weighed moving add test 1 failed: mean mismatch $tsm->{mean}/1.66666666666667\n"); }
-  if (!defined($tsm->{sd}) || $tsm->{sd} ne 2) { $success = 0; main::Debug("const weighed moving add test 1 failed: sd mismatch $tsm->{sd}/2\n"); }
+  if (!defined($tsm->{sd}) || $tsm->{sd} ne 1.41421356237309) { $success = 0; main::Debug("const weighed moving add test 1 failed: sd mismatch $tsm->{sd}/1.41421356237309\n"); }
   if ($tsm->{integral} != 5.0) { $success = 0; main::Debug("const weighed moving add test 1 failed: sum mismatch $tsm->{integral}/5.0\n"); }
   $tsm->add($now,    0.5);
   if ($tsm->{count} != 4)      { $success = 0; main::Debug("const weighed moving add test 2 failed: count mismatch $tsm->{count}/4\n"); }
@@ -528,16 +532,16 @@ sub selftest() {
   if ($tsm->{min} != -1.0)     { $success = 0; main::Debug("const weighed moving add test 2 failed: min mismatch $tsm->{min}/-1.0\n"); }
   if ($tsm->{max} != 2.0)      { $success = 0; main::Debug("const weighed moving add test 2 failed: max mismatch $tsm->{max}/2.0\n"); }
   if ($tsm->{mean} != 1)       { $success = 0; main::Debug("const weighed moving add test 2 failed: mean mismatch $tsm->{mean}/1\n"); }
-  if (!defined($tsm->{sd}) || $tsm->{sd} ne sqrt(21.25/2)*3/4) { $success = 0; main::Debug("const weighed moving add test 2 failed: sd mismatch $tsm->{sd}/2.44470090195099\n"); }
-  if ($tsm->{integral} != 4.0) { $success = 0; main::Debug("const weighed moving add test 2 failed: sum mismatch $tsm->{integral}/4.0\n"); }  
-  
+  if (!defined($tsm->{sd}) || $tsm->{sd} ne 1.88745860881769) { $success = 0; main::Debug("const weighed moving add test 2 failed: sd mismatch $tsm->{sd}/1.88745860881769\n"); }
+  if ($tsm->{integral} != 4.0) { $success = 0; main::Debug("const weighed moving add test 2 failed: sum mismatch $tsm->{integral}/4.0\n"); }
+
   # get value tests
   if ($tsm->getValue($now-4) ne 1.0) { $success = 0; main::Debug("getValue test failed: first value mismatch ".$tsm->getValue($now-4)."/1.0\n"); }
   if ($tsm->getValue($now-3) ne 2.0) { $success = 0; main::Debug("getValue test failed: exact value mismatch ".$tsm->getValue($now-3)."/2.0\n"); }
   if ($tsm->getValue($now-2) ne 2.0) { $success = 0; main::Debug("getValue test failed: before value mismatch ".$tsm->getValue($now-2)."/2.0\n"); }
   if ($tsm->getValue($now) ne 0.5) { $success = 0; main::Debug("getValue test failed: last value mismatch ".$tsm->getValue($now)."/0.5\n"); }
   if (defined($tsm->getValue($now+1))) { $success = 0; main::Debug("getValue test failed: out of range value mismatch ".$tsm->getValue($now+1)."/undef\n"); }
-  
+
   if ($success) {
     return "selftest passed";
   } else {
@@ -545,7 +549,7 @@ sub selftest() {
   }
 }
 
-1;  
+1;
 
 
 =pod
@@ -556,28 +560,28 @@ B<TimeSeries> is a perl module to feed time/value data points and get some stati
   $ts->add(3.3, 2.1);
   $ts->add(5.1, 1.8);
   $ts->add(8.8, 2.4);
-  printf("count= %d, n= %d, lost= %d, first= %f, last= %f, min= %f, max= %f, mean= %f, sd= %f\n", 
+  printf("count= %d, n= %d, lost= %d, first= %f, last= %f, min= %f, max= %f, mean= %f, sd= %f\n",
       $ts->{count}, $ts->{n}, $ts->{lost}, $ts->{v0}, $ts->{v},
       $ts->{min}, $ts->{max},
       $ts->{mean}, $ts->{sd}
       );
-      
+
   Mean, standard deviation and integral calculation also depends on the property method. You may choose from
-  none (no time weighting), const (time weighted, step) or linear (time weighted, linear interpolation).
-  
+  "none" (no time weighting), "const" (time weighted, step) or "linear" (time weighted, linear interpolation).
+
   The statistics may be reset manually using
   $ts->reset();
-  
+
   By defining autoreset, the reset will occur automatically when the specified duration (seconds)
-  is accumulated. 
-  
+  is accumulated.
+
   If alternatively holdTime is defined, all data points are kept in a time limited data buffer that is
   re-evaluated each time a data point is added. Note that this may require significant amounts
   of memory depending on the sample rate and the holdTime.
-  
-  If method is none and holdtime is defined then the median of the values will be calculated additionally.
-      
-  It is also possible to define autoreset and holdtime at the same time. In this case the data buffer 
-  is enabled and will be cleared each time an autoreset occurs, independent of the value of holdtime.
-      
+
+  If method is "none" and holdTime is defined then the median of the values will be calculated additionally.
+
+  It is also possible to define autoreset and holdTime at the same time. In this case the data buffer
+  is enabled and will be cleared each time an autoreset occurs, independent of the value of holdTime.
+
 =cut
