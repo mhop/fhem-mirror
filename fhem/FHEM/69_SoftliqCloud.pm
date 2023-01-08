@@ -1182,7 +1182,7 @@ sub parseInfo {
     my $data = $cdata[0];
     Log3 $name, LOG_DEBUG, Dumper($data);
 
-    if ( defined( $data->{error} ) ) {
+    if ( $data->{error} ) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, "error",             $data->{error} );
         readingsBulkUpdate( $hash, "error_description", $data->{error_description} );
@@ -1426,6 +1426,12 @@ sub parseWebsocketId {
         readingsEndUpdate( $hash, 1 );
         return;
     }
+	else {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "realtime_error","ok");
+        readingsEndUpdate( $hash, 1 );
+	}
+
 
     $hash->{helper}{wsId} = $data->{connectionId};
     return if ( !$data->{connectionId} );
@@ -1484,6 +1490,27 @@ sub parseRealtime {
 
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
+
+    my $data;
+    Log3 $name, LOG_RECEIVE, qq($err / $json);
+
+    if ($json ne $EMPTY) {
+        $data = safe_decode_json( $hash, $json );
+        Log3 $name, LOG_DEBUG, Dumper($data);
+    }
+
+    if ( defined( $data->{error}{type} ) ) {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "realtime_error",$data->{error}{type} );
+        readingsEndUpdate( $hash, 1 );
+        return;
+    }
+	else {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "realtime_error","ok");
+        readingsEndUpdate( $hash, 1 );
+	}
+
     return;
 }
 ### stolen from HTTPMOD
@@ -2015,7 +2042,7 @@ sub wsReadDevIo {
     }
 
     foreach my $bufi (@bufs) {
-        Log3( $name, LOG_RECEIVE, "[$name] - Extracted" . $bufi );
+        Log3( $name, LOG_RECEIVE, "[$name] - Extracted: " . $bufi );
         parseWebsocketRead( $hash, $bufi );
     }
 
