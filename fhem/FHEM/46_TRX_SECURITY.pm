@@ -382,7 +382,7 @@ sub TRX_SECURITY_parse_X10Sec($$) {
         $firstdevice = 0;
         $def         = $modules{TRX_SECURITY}{defptr2}{$device_name};
         if ( !$def ) {
-            Log3 $hash, 1,
+            Log3 $hash, 5,
               "TRX_SECURITY_parse_X10Sec() UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
             Log3 $hash, 3, "TRX_SECURITY_parse_X10Sec() Unknown device $device_name, please define it";
             return "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
