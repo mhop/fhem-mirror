@@ -20,6 +20,9 @@ if($ARGV[0] eq "-d") {
     my $f = $1;
     next if(-f "config/$f");
     print("Creating: config/$f\n");
+    my $dir = $f;
+    $dir =~ s,/[^/]*$,,;
+    `mkdir -p config/$dir`;
     open(FH, ">config/$f") || die("open config/$f: $!\n");
     print FH $l;
     while($l = <STDIN>) {
@@ -33,7 +36,7 @@ if($ARGV[0] eq "-d") {
 
 print '<?xml version="1.0" encoding="utf-8"?>', "\n";
 print "<ProductList>\n";
-foreach my $file (`find $ARGV[0] -name \*.xml`) {
+foreach my $file (`find $ARGV[0] -name \\*.xml`) {
   chomp($file);
   my $name = $file;
   $name =~ s+.*config/++;
