@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id: 96_RenaultZE.pm  2023-01-04 plin $
+# $Id: 96_RenaultZE.pm  2023-01-05 plin $
 # 96_RenaultZE.pm
 #
 # Forum : https://forum.fhem.de/index.php/topic,116273.0.html
@@ -37,6 +37,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.05 fixed timing problem in update request
 # v 1.04 typo denbled corrected
 # v 1.03 hvac settings output corrected
 # v 1.02 some minor corrections
@@ -95,7 +96,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.04 / 04.01.2023";
+my $RenaultZE_version ="V1.05 / 07.01.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -411,7 +412,7 @@ sub RenaultZE_Main1($@) {
            }
 	   else
 	   {
-              Log3 $name, 5, "RenaultZE_Main1 - ze_Gigya_JWT_Token=>".$res."<";
+              Log3 $name, 5, "RenaultZE_Main1 - ze_Gigya_JWT_Token=>".$ze_Gigya_JWT_Token."<";
 	   }
            RenaultZE_Main2($hash);
            return undef;
@@ -476,14 +477,22 @@ sub RenaultZE_Main3($) {
 	      #my $res = RenaultZE_getData_Step1($hash);
               my $res = RenaultZE_gData_Step1($hash,'battery-status');
               Log3 $name, 5, "RenaultZE_gData_Step1 - battery-status - RC=".$res;
-              $res = RenaultZE_gData_Step1($hash,'cockpit');
-              Log3 $name, 5, "RenaultZE_gData_Step1 - cockpit - RC=".$res;
-              $res = RenaultZE_gData_Step1($hash,'location')				if ($phase eq "2");
-              Log3 $name, 5, "RenaultZE_gData_Step1 - location - RC=".$res		if ($phase eq "2");
-              $res = RenaultZE_gData_Step1($hash,'hvac-status')				if ($phase eq "1");
-              Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-status - RC=".$res		if ($phase eq "1");
-              $res = RenaultZE_gData_Step1($hash,'charge-mode');
-              Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res;
+	      InternalTimer( gettimeofday() + 1, sub() { my $a = 1; 
+                 $res = RenaultZE_gData_Step1($hash,'cockpit');
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - cockpit - RC=".$res;
+	      }, undef);
+	      InternalTimer( gettimeofday() + 2, sub() { my $a = 1; 
+                 $res = RenaultZE_gData_Step1($hash,'location')				if ($phase eq "2");
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - location - RC=".$res		if ($phase eq "2");
+	      }, undef);
+	      InternalTimer( gettimeofday() + 3, sub() { my $a = 1; 
+                 $res = RenaultZE_gData_Step1($hash,'hvac-status')				if ($phase eq "1");
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-status - RC=".$res		if ($phase eq "1");
+	      }, undef);
+	      InternalTimer( gettimeofday() + 4, sub() { my $a = 1; 
+                 $res = RenaultZE_gData_Step1($hash,'charge-mode');
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res;
+	      }, undef);
 	}
 
         if ($key eq "GET_vehicles")
@@ -984,17 +993,17 @@ sub RenaultZE_gData_Step2($)
     ### cockpit ###
     if($data =~ /totalMileage/) {
        readingsSingleUpdate($hash,"totalMileageKm",$decode_json->{data}->{attributes}->{totalMileage},1);
-        readingsBulkUpdate($hash,"fuelAutonomy",$decode_json->{data}->{attributes}->{fuelAutonomy})			if (my $decode_json->{data}->{attributes}->{fuelAutonomy} gt 0);
-        readingsBulkUpdate($hash,"fuelQuantity",$decode_json->{data}->{attributes}->{fuelQuantity})			if (my $decode_json->{data}->{attributes}->{fuelQuantity} gt 0);
-        return 0;
+       readingsBulkUpdate($hash,"fuelAutonomy",$decode_json->{data}->{attributes}->{fuelAutonomy})			if ($decode_json->{data}->{attributes}->{fuelAutonomy} gt 0);
+       readingsBulkUpdate($hash,"fuelQuantity",$decode_json->{data}->{attributes}->{fuelQuantity})			if ($decode_json->{data}->{attributes}->{fuelQuantity} gt 0);
+       return 0;
     }
 
     ### hvac-status ###
     if($data =~ /hvacStatus/) {
        readingsSingleUpdate($hash,"hvacStatus",$decode_json->{data}->{attributes}->{hvacStatus},1);
-        readingsBulkUpdate($hash,"socThreshold",$decode_json->{data}->{attributes}->{socThreshold})			if (my $decode_json->{data}->{attributes}->{socThreshold} gt 0);
-        readingsBulkUpdate($hash,"xternalTemperature",$decode_json->{data}->{attributes}->{xternalTemperature})		if (my $decode_json->{data}->{attributes}->{xternalTemperature} gt 0);
-        return 0;
+       readingsBulkUpdate($hash,"socThreshold",$decode_json->{data}->{attributes}->{socThreshold})			if ($decode_json->{data}->{attributes}->{socThreshold} gt 0);
+       readingsBulkUpdate($hash,"xternalTemperature",$decode_json->{data}->{attributes}->{xternalTemperature})		if ($decode_json->{data}->{attributes}->{xternalTemperature} gt 0);
+       return 0;
     }
 
     my $gpsLatitude = "";
@@ -1150,11 +1159,11 @@ sub RenaultZE_gData_Step2($)
         my $mtab = $decode_json->{data}->{attributes}->{schedules};
         my $sss = @$mtab;
         #print scalar @$mtab."\n";
-        my $output = "<html><body><b>Charging Settings</b><p>Mode=".$decode_json->{data}->{attributes}->{mode}."<br>";
+        my $output = "<html><body><b>Charging Settings</b><p>Mode=".$decode_json->{data}->{attributes}->{mode}."<p>&nbsp;<p>Schedules:<p>&nbsp;<p>";
         my @wdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "saturday" );
 	if  ( $sss > 0 ) {
            foreach my $item( @$mtab ) {
-             $output = $output."Schedules, activated =".$item->{activated}."<table border=1 center>";
+             $output = $output."activated =".$item->{activated}."<table border=1 center>";
              $output = $output."<tr>";
              $output = $output."<td align=center>Day of Week</td>";
              $output = $output."<td align=center>startTime</td>";
