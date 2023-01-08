@@ -726,9 +726,9 @@ sub _CreateForecastRef {
         {
             lat           => $self->{lat},
             long          => $self->{long},
-            apiMaintainer => 'Marko Oldenburg ('
-              . $META->{x_fhem_maintainer}[0] . ')',
-            apiVersion => version->parse( __PACKAGE__->VERSION() )->normal,
+            apiMaintainer => $META->{author}[0],
+            apiVersion => version->parse( __PACKAGE__->VERSION() )->normal . '-'
+              . $META->{release_status},
         }
     );
 
@@ -773,12 +773,19 @@ sub _strftimeWrapper {
       "abstract": "Wetter API für Weather DarkSky"
     }
   },
-  "version": "v1.2.10",
+  "keywords": [
+	    "fhem-mod-device",
+	    "Weather",
+        "API"
+	  ],
+  "release_status": "stable",
+  "license": "GPL_2",
+  "version": "v1.2.11",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
-    "CoolTux"
+    "<a href=https://forum.fhem.de/index.php?action=profile;u=13684>CoolTux</a>"
   ],
   "x_fhem_maintainer_github": [
     "CoolTuxNet"
@@ -786,8 +793,9 @@ sub _strftimeWrapper {
   "prereqs": {
     "runtime": {
       "requires": {
+        "FHEM": 5.00918799,
+        "HttpUtils": 5.023,
         "FHEM::Meta": 0,
-        "HttpUtils": 0,
         "strict": 0,
         "warnings": 0,
         "constant": 0,
