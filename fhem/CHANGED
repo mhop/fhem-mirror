@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  59_Weather: bugfix function WeatherAsHtmlD not working
  - bugfix:  98_weekprofile.pm: internal tempMap list if attr tempMap changed
  - feature: 59_Weather: fix multiple issues in API modules
  - feature: 59_Weather: support for new openweathermap mod onecall

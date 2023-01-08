@@ -1078,15 +1078,16 @@ sub WeatherAsHtmlD {
     my $op2 = shift;
 
     my ( $f, $items ) = Weather_CheckOptions( $d, $op1, $op2 );
+    my $ret;
 
     if ($FW_ss) {
-        WeatherAsHtmlV( $d, $f, $items );
+        $ret = WeatherAsHtmlV( $d, $f, $items );
     }
     else {
-        WeatherAsHtmlH( $d, $f, $items );
+        $ret = WeatherAsHtmlH( $d, $f, $items );
     }
 
-    return;
+    return $ret;
 }
 
 sub Weather_CheckOptions {
@@ -1606,7 +1607,7 @@ sub Weather_CheckOptions {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.20",
+  "version": "v2.2.21",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
