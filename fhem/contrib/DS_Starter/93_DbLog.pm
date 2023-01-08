@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26923 2022-12-29 10:28:14Z DS_Starter $
+# $Id: 93_DbLog.pm 26923 2023-01-08 10:28:14Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,8 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars), use dbh quote in _DbLog_SBP_onRun_LogBulk ".
-                           "configCheck changed to use only one db connect + measuring the connection time ",
+  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars) and others, use dbh quote in _DbLog_SBP_onRun_LogBulk ".
+                           "configCheck changed to use only one db connect + measuring the connection time, universal DBHU ",
   "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
   "5.5.8"   => "27.12.2022 two-line output of long state messages, define LONGRUN_PID threshold ",
@@ -66,7 +66,7 @@ my %DbLog_vNotesIntern = (
   "4.12.6"  => "17.01.2022 change log message deprecated to outdated, forum:#topic,41089.msg1201261.html#msg1201261 ",
   "4.12.5"  => "31.12.2021 standard unit assignment for readings beginning with 'temperature' and removed, forum:#125087 ",
   "4.12.4"  => "27.12.2021 change ParseEvent for FBDECT, warning messages for deprecated commands added ",
-  "4.12.3"  => "20.04.2021 change sub _DbLog_ConnectNewDBH for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
+  "4.12.3"  => "20.04.2021 change sub _DbLog_getNewDBHandle for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
   "4.12.2"  => "08.04.2021 change standard splitting ",
   "4.12.1"  => "07.04.2021 improve escaping the pipe ",
   "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
@@ -84,198 +84,7 @@ my %DbLog_vNotesIntern = (
   "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
   "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
-  "4.9.4"   => "29.12.2019 correct behavior if value is empty and attribute addStateEvent is set (default), Forum: #106769 ",
-  "4.9.3"   => "28.12.2019 check date/time format got from SVG, Forum: #101005 ",
-  "4.9.2"   => "16.12.2019 add \$DEVICE to attr DbLogValueFn for readonly access to the device name ",
-  "4.9.1"   => "13.11.2019 escape \ with \\ in DbLog_Push and DbLog_PushAsync ",
-  "4.9.0"   => "11.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ".
-                           "Forum: https://forum.fhem.de/index.php/topic,65860.msg972352.html#msg972352 ",
-  "4.8.0"   => "14.10.2019 change SQL-Statement for delta-h, delta-d (SVG getter) ",
-  "4.7.5"   => "07.10.2019 fix warning \"error valueFn: Global symbol \$CN requires ...\" in DbLog_addCacheLine ".
-                           "enhanced configCheck by insert mode check ",
-  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog ",
-  "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
-  "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
-  "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
-  "4.7.0"   => "04.09.2019 attribute traceHandles, extract db driver versions in configCheck ",
-  "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
-  "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
-  "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
-  "4.3.0"   => "14.08.2019 new attribute dbSchema, add database schema to subroutines ",
-  "4.2.0"   => "25.07.2019 DbLogValueFn as device specific function propagated in devices if dblog is used ",
-  "4.1.1"   => "25.05.2019 fix ignore MinInterval if value is \"0\", Forum: #100344 ",
-  "4.1.0"   => "17.04.2019 DbLog_Get: change reconnect for MySQL (Forum: #99719), change index suggestion in DbLog_configcheck ",
-  "4.0.0"   => "14.04.2019 rewrite DbLog_PushAsync / DbLog_Push / DbLog_Connectxx, new attribute \"bulkInsert\" ",
-  "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
-  "3.14.0"  => "05.04.2019 add support for Meta.pm and X_DelayedShutdownFn, attribute shutdownWait removed, ".
-                           "direct attribute help in FHEMWEB ",
-  "3.13.3"  => "04.03.2019 addLog better Log3 Outputs ",
-  "3.13.2"  => "09.02.2019 Commandref revised ",
-  "3.13.1"  => "27.11.2018 DbLog_ExecSQL log output changed ",
-  "3.13.0"  => "12.11.2018 adding attributes traceFlag, traceLevel ",
-  "3.12.7"  => "10.11.2018 addLog considers DbLogInclude (Forum:#92854) ",
-  "3.12.6"  => "22.10.2018 fix timer not deleted if reopen after reopen xxx (Forum: https://forum.fhem.de/index.php/topic,91869.msg848433.html#msg848433) ",
-  "3.12.5"  => "12.10.2018 charFilter: \"\\xB0C\" substitution by \"°C\" added and usage in DbLog_Log changed ",
-  "3.12.4"  => "10.10.2018 return non-saved datasets back in asynch mode only if transaction is used ",
-  "3.12.3"  => "08.10.2018 Log output of recuceLogNbl enhanced, some functions renamed ",
-  "3.12.2"  => "07.10.2018 \$hash->{HELPER}{REOPEN_RUNS_UNTIL} contains the time the DB is closed  ",
-  "3.12.1"  => "19.09.2018 use Time::Local (forum:#91285) ",
-  "3.12.0"  => "04.09.2018 corrected SVG-select (https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640) ",
-  "3.11.0"  => "02.09.2018 reduceLog, reduceLogNbl - optional \"days newer than\" part added ",
-  "3.10.10" => "05.08.2018 commandref revised reducelogNbl ",
-  "3.10.9"  => "23.06.2018 commandref added hint about special characters in passwords ",
-  "3.10.8"  => "21.04.2018 addLog - not available reading can be added as new one (forum:#86966) ",
-  "3.10.7"  => "16.04.2018 fix generate addLog-event if device or reading was not found by addLog ",
-  "3.10.6"  => "13.04.2018 verbose level in addlog changed if reading not found ",
-  "3.10.5"  => "12.04.2018 fix warnings ",
-  "3.10.4"  => "11.04.2018 fix addLog if no valueFn is used ",
-  "3.10.3"  => "10.04.2018 minor fixes in addLog ",
-  "3.10.2"  => "09.04.2018 add qualifier CN=<caller name> to addlog ",
-  "3.10.1"  => "04.04.2018 changed event parsing of Weather ",
-  "3.10.0"  => "02.04.2018 addLog consider DbLogExclude in Devices, keyword \"!useExcludes\" to switch off considering ".
-                           "DbLogExclude in addLog, DbLogExclude & DbLogInclude can handle \"/\" in Readingname ".
-                           "commandref (reduceLog) revised ",
-  "3.9.0"   => "17.03.2018 _DbLog_ConnectPush state-handling changed, attribute excludeDevs enhanced in DbLog_Log ",
-  "3.8.9"   => "10.03.2018 commandref revised ",
-  "3.8.8"   => "05.03.2018 fix device doesn't exit if configuration couldn't be read ",
-  "3.8.7"   => "28.02.2018 changed DbLog_sampleDataFn - no change limits got fron SVG, commandref revised ",
-  "3.8.6"   => "25.02.2018 commandref revised (forum:#84953) ",
-  "3.8.5"   => "16.02.2018 changed ParseEvent for Zwave ",
-  "3.8.4"   => "07.02.2018 minor fixes of \"\$\@\", code review, eval for userCommand, DbLog_ExecSQL1 (forum:#83973) ",
-  "3.8.3"   => "03.02.2018 call execmemcache only syncInterval/2 if cacheLimit reached and DB is not reachable, fix handling of ".
-                           "\"\$\@\" in DbLog_PushAsync ",
-  "3.8.2"   => "31.01.2018 RaiseError => 1 in _DbLog_ConnectPush, _DbLog_ConnectNewDBH, configCheck improved ",
-  "3.8.1"   => "29.01.2018 Use of uninitialized value \$txt if addlog has no value ",
-  "3.8.0"   => "26.01.2018 escape \"\|\" in events to log events containing it ",
-  "3.7.1"   => "25.01.2018 fix typo in commandref ",
-  "3.7.0"   => "21.01.2018 parsed event with Log 5 added, configCheck enhanced by configuration read check ",
-  "3.6.5"   => "19.01.2018 fix lot of logentries if disabled and db not available ",
-  "3.6.4"   => "17.01.2018 improve DbLog_Shutdown, extend configCheck by shutdown preparation check ",
-  "3.6.3"   => "14.01.2018 change verbose level of addlog \"no Reading of device ...\" message from 2 to 4  ",
-  "3.6.2"   => "07.01.2018 new attribute \"exportCacheAppend\", change function exportCache to respect attr exportCacheAppend, ".
-                           "fix DbLog_execMemCacheAsync verbose 5 message ",
-  "3.6.1"   => "04.01.2018 change SQLite PRAGMA from NORMAL to FULL (Default Value of SQLite) ",
-  "3.6.0"   => "20.12.2017 check global blockingCallMax in configCheck, configCheck now available for SQLITE ",
-  "3.5.0"   => "18.12.2017 importCacheFile, addCacheLine uses useCharfilter option, filter only \$event by charfilter  ",
-  "3.4.0"   => "10.12.2017 avoid print out {RUNNING_PID} by \"list device\" ",
-  "3.3.0"   => "07.12.2017 avoid print out the content of cache by \"list device\" ",
-  "3.2.0"   => "06.12.2017 change attribute \"autocommit\" to \"commitMode\", activate choice of autocommit/transaction in logging ".
-                           "Addlog/addCacheLine change \$TIMESTAMP check ".
-                           "rebuild DbLog_Push/DbLog_PushAsync due to bugfix in update current (Forum:#80519) ".
-                           "new attribute \"useCharfilter\" for Characterfilter usage ",
-  "3.1.1"   => "05.12.2017 Characterfilter added to avoid unwanted characters what may destroy transaction  ",
-  "3.1.0"   => "05.12.2017 new set command addCacheLine ",
-  "3.0.0"   => "03.12.2017 set begin_work depending of AutoCommit value, new attribute \"autocommit\", some minor corrections, ".
-                           "report working progress of reduceLog,reduceLogNbl in logfile (verbose 3), enhanced log output ".
-                           "(e.g. of execute_array) ",
-  "2.22.15" => "28.11.2017 some Log3 verbose level adapted ",
-  "2.22.14" => "18.11.2017 create state-events if state has been changed (Forum:#78867) ",
-  "2.22.13" => "20.10.2017 output of reopen command improved ",
-  "2.22.12" => "19.10.2017 avoid illegible messages in \"state\" ",
-  "2.22.11" => "13.10.2017 DbLogType expanded by SampleFill, DbLog_sampleDataFn adapted to sort case insensitive, commandref revised ",
-  "2.22.10" => "04.10.2017 Encode::encode_utf8 of \$error, DbLog_PushAsyncAborted adapted to use abortArg (Forum:77472) ",
-  "2.22.9"  => "04.10.2017 added hint to SVG/DbRep in commandref ",
-  "2.22.8"  => "29.09.2017 avoid multiple entries in Dopdown-list when creating SVG by group Device:Reading in DbLog_sampleDataFn ",
-  "2.22.7"  => "24.09.2017 minor fixes in configcheck ",
-  "2.22.6"  => "22.09.2017 commandref revised ",
-  "2.22.5"  => "05.09.2017 fix Internal MODE isn't set correctly after DEF is edited, nextsynch is not renewed if reopen is ".
-                           "set manually after reopen was set with a delay Forum:#76213, Link to 98_FileLogConvert.pm added ",
-  "2.22.4"  => "27.08.2017 fhem chrashes if database DBD driver is not installed (Forum:#75894) ",
-  "2.22.1"  => "07.08.2017 attribute \"suppressAddLogV3\" to suppress verbose3-logentries created by DbLog_AddLog  ",
-  "2.22.0"  => "25.07.2017 attribute \"addStateEvent\" added ",
-  "2.21.3"  => "24.07.2017 commandref revised ",
-  "2.21.2"  => "19.07.2017 changed readCfg to report more error-messages ",
-  "2.21.1"  => "18.07.2017 change configCheck for DbRep Report_Idx ",
-  "2.21.0"  => "17.07.2017 standard timeout increased to 86400, enhanced explaination in configCheck  ",
-  "2.20.0"  => "15.07.2017 state-Events complemented with state by using \$events = deviceEvents(\$dev_hash,1) ",
-  "2.19.0"  => "11.07.2017 replace {DBMODEL} by {MODEL} completely ",
-  "2.18.3"  => "04.07.2017 bugfix (links with \$FW_ME deleted), MODEL as Internal (for statistic) ",
-  "2.18.2"  => "29.06.2017 check of index for DbRep added ",
-  "2.18.1"  => "25.06.2017 DbLog_configCheck/ DbLog_sqlget some changes, commandref revised ",
-  "2.18.0"  => "24.06.2017 configCheck added (MySQL, PostgreSQL) ",
-  "2.17.1"  => "17.06.2017 fix log-entries \"utf8 enabled\" if SVG's called, commandref revised, enable UTF8 for DbLog_get ",
-  "2.17.0"  => "15.06.2017 enable UTF8 for MySQL (entry in configuration file necessary) ",
-  "2.16.11" => "03.06.2017 execmemcache changed for SQLite avoid logging if deleteOldDaysNbl or reduceLogNbL is running  ",
-  "2.16.10" => "15.05.2017 commandref revised ",
-  "2.16.9.1"=> "11.05.2017 set userCommand changed - Forum: https://forum.fhem.de/index.php/topic,71808.msg633607.html#msg633607 ",
-  "2.16.9"  => "07.05.2017 addlog syntax changed to \"addLog devspec:Reading [Value]\" ",
-  "2.16.8"  => "06.05.2017 in valueFN \$VALUE and \$UNIT can now be set to '' or 0 ",
-  "2.16.7"  => "20.04.2017 fix \$now at addLog ",
-  "2.16.6"  => "18.04.2017 AddLog set lasttime, lastvalue of dev_name, dev_reading ",
-  "2.16.5"  => "16.04.2017 DbLog_checkUsePK changed again, new attribute noSupportPK ",
-  "2.16.4"  => "15.04.2017 commandref completed, DbLog_checkUsePK changed (\@usepkh = \"\", \@usepkc = \"\") ",
-  "2.16.3"  => "07.04.2017 evaluate reading in DbLog_AddLog as regular expression ",
-  "2.16.0"  => "03.04.2017 new set-command addLog ",
-  "2.15.0"  => "03.04.2017 new attr valueFn using for perl expression which may change variables and skip logging ".
-                           "unwanted datasets, change _DbLog_ParseEvent for ZWAVE, ".
-                           "change DbLogExclude / DbLogInclude in DbLog_Log to \"\$lv = \"\" if(!defined(\$lv));\" ",
-  "2.14.4"  => "28.03.2017 pre-connection check in DbLog_execMemCacheAsync deleted (avoid possible blocking), attr excludeDevs ".
-                           "can be specified as devspec ",
-  "2.14.3"  => "24.03.2017 DbLog_Get, DbLog_Push changed for better plotfork-support ",
-  "2.14.2"  => "23.03.2017 new reading \"lastCachefile\" ",
-  "2.14.1"  => "22.03.2017 cacheFile will be renamed after successful import by set importCachefile                  ",
-  "2.14.0"  => "19.03.2017 new set-commands exportCache, importCachefile, new attr expimpdir, all cache relevant set-commands ".
-                           "only in drop-down list when asynch mode is used, minor fixes ",
-  "2.13.6"  => "13.03.2017 plausibility check in set reduceLog(Nbl) enhanced, minor fixes ",
-  "2.13.5"  => "20.02.2017 check presence of table current in DbLog_sampleDataFn ",
-  "2.13.3"  => "18.02.2017 default timeout of DbLog_PushAsync increased to 1800, ".
-                           "delete {HELPER}{xx_PID} in reopen function ",
-  "2.13.2"  => "16.02.2017 deleteOldDaysNbl added (non-blocking implementation of deleteOldDays) ",
-  "2.13.1"  => "15.02.2017 clearReadings limited to readings which won't be recreated periodicly in asynch mode and set readings only blank, ".
-                           "eraseReadings added to delete readings except reading \"state\", ".
-                           "countNbl non-blocking by DeeSPe, ".
-                           "rename reduceLog non-blocking to reduceLogNbl and implement the old reduceLog too ",
-  "2.13.0"  => "13.02.2017 made reduceLog non-blocking by DeeSPe ",
-  "2.12.5"  => "11.02.2017 add support for primary key of PostgreSQL DB (Rel. 9.5) in both modes for current table ",
-  "2.12.4"  => "09.02.2017 support for primary key of PostgreSQL DB (Rel. 9.5) in both modes only history table ",
-  "2.12.3"  => "07.02.2017 set command clearReadings added ",
-  "2.12.2"  => "07.02.2017 support for primary key of SQLITE DB in both modes ",
-  "2.12.1"  => "05.02.2017 support for primary key of MySQL DB in synch mode ",
-  "2.12"    => "04.02.2017 support for primary key of MySQL DB in asynch mode ",
-  "2.11.4"  => "03.02.2017 check of missing modules added ",
-  "2.11.3"  => "01.02.2017 make errorlogging of DbLog_PushAsync more identical to DbLog_Push ",
-  "2.11.2"  => "31.01.2017 if attr colEvent, colReading, colValue is set, the limitation of fieldlength is also valid ".
-                           "for SQLite databases ",
-  "2.11.1"  => "30.01.2017 output to central logfile enhanced for DbLog_Push ",
-  "2.11"    => "28.01.2017 DbLog_connect substituted by DbLog_connectPush completely ",
-  "2.10.8"  => "27.01.2017 DbLog_setinternalcols delayed at fhem start ",
-  "2.10.7"  => "25.01.2017 \$hash->{HELPER}{COLSET} in DbLog_setinternalcols, DbLog_Push changed due to ".
-                           "issue Turning on AutoCommit failed ",
-  "2.10.6"  => "24.01.2017 DbLog_connect changed \"connect_cashed\" to \"connect\", DbLog_Get, DbLog_chartQuery now uses ".
-                           "_DbLog_ConnectNewDBH, Attr asyncMode changed -> delete reading cacheusage reliable if mode was switched ",
-  "2.10.5"  => "23.01.2017 count, userCommand, deleteOldDays now uses _DbLog_ConnectNewDBH ".
-                           "DbLog_Push line 1107 changed ",
-  "2.10.4"  => "22.01.2017 new sub DbLog_setinternalcols, new attributes colEvent, colReading, colValue ",
-  "2.10.3"  => "21.01.2017 query of cacheEvents changed, attr timeout adjustable ",
-  "2.10.2"  => "19.01.2017 ReduceLog now uses _DbLog_ConnectNewDBH -> makes start of ReduceLog stable ",
-  "2.10.1"  => "19.01.2017 commandref edited, cache events don't get lost even if other errors than \"db not available\" occure ",
-  "2.10"    => "18.10.2017 new attribute cacheLimit, showNotifyTime ",
-  "2.9.3"   => "17.01.2017 new sub _DbLog_ConnectNewDBH (own new dbh for separate use in functions except logging functions), ".
-                           "DbLog_sampleDataFn, DbLog_dbReadings now use _DbLog_ConnectNewDBH ",
-  "2.9.2"   => "16.01.2017 new bugfix for SQLite issue SVGs, DbLog_Log changed to \$dev_hash->{CHANGETIME}, DbLog_Push ".
-                           "changed (db handle new separated) ",
-  "2.9.1"   => "14.01.2017 changed _DbLog_ParseEvent to CallInstanceFn, renamed flushCache to purgeCache, ".
-                           "renamed syncCache to commitCache, attr cacheEvents changed to 0,1,2 ",
-  "2.8.9"   => "11.01.2017 own \$dbhp (new _DbLog_ConnectPush) for synchronous logging, delete \$hash->{HELPER}{RUNNING_PID} ".
-                           "if DEAD, add func flushCache, syncCache ",
-  "2.8.8"   => "10.01.2017 connection check in Get added, avoid warning \"commit/rollback ineffective with AutoCommit enabled\" ",
-  "2.8.7"   => "10.01.2017 bugfix no dropdown list in SVG if asynchronous mode activated (func DbLog_sampleDataFn) ",
-  "2.8.6"   => "09.01.2017 Workaround for Warning begin_work failed: Turning off AutoCommit failed, start new timer of ".
-                           "DbLog_execMemCacheAsync after reducelog ",
-  "2.8.5"   => "08.01.2017 attr syncEvents, cacheEvents added to minimize events ",
-  "2.8.4"   => "08.01.2017 \$readingFnAttributes added ",
-  "2.8.3"   => "08.01.2017 set NOTIFYDEV changed to use notifyRegexpChanged (Forum msg555619), attr noNotifyDev added ",
-  "2.8.2"   => "06.01.2017 commandref maintained to cover new functions ",
-  "2.8.1"   => "05.01.2017 use Time::HiRes qw(gettimeofday tv_interval), bugfix \$hash->{HELPER}{RUNNING_PID} ",
-  "2.4.4"   => "28.12.2016 Attribut \"excludeDevs\" to exclude devices from db-logging (only if \$hash->{NOTIFYDEV} eq \"\.\*\") ",
-  "2.4.3"   => "28.12.2016 function DbLog_Log: changed separators of \@row_array -> better splitting ",
-  "2.4.2"   => "28.12.2016 Attribut \"verbose4Devs\" to restrict verbose4 loggings of specific devices  ",
-  "2.4.1"   => "27.12.2016 DbLog_Push: improved update/insert into current, analyze execute_array -> ArrayTupleStatus ",
-  "2.3.1"   => "23.12.2016 fix due to https://forum.fhem.de/index.php/topic,62998.msg545541.html#msg545541 ",
-  "1.9.3"   => "17.12.2016 \$hash->{NOTIFYDEV} added to process only events from devices are in Regex ",
-  "1.9.2"   => "17.12.2016 some improvemnts DbLog_Log, DbLog_Push ",
-  "1.9.1"   => "16.12.2016 DbLog_Log no using encode_base64 ",
-  "1.8.1"   => "16.12.2016 DbLog_Push changed ",
+  "4.9.4"   => "08.01.2023 all version informationen deleted from v 1.8.1 to v 4.9.4 ",
   "1.7.1"   => "15.12.2016 initial rework "
 );
 
@@ -498,6 +307,7 @@ sub DbLog_Undef {
   
    my $dbh = $hash->{DBHU};
    __DbLog_SBP_disconnectOnly ($name, $dbh);
+   delete $hash->{DBHU};
 
   delete $hash->{HELPER}{LONGRUN_PID};
 
@@ -653,6 +463,7 @@ sub DbLog_Attr {
   if($aName eq "commitMode") {
       my $dbh = $hash->{DBHU};
       __DbLog_SBP_disconnectOnly ($name, $dbh);
+      delete $hash->{DBHU};
       
       if ($init_done == 1) {
            DbLog_SBP_sendDbDisconnect ($hash, 1);                                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
@@ -940,10 +751,11 @@ sub _DbLog_setreopen {                   ## no critic "not used"
 
   my $ret;
   
-   my $dbh = $hash->{DBHU};
-   __DbLog_SBP_disconnectOnly ($name, $dbh);                            # lokal
-
-  DbLog_SBP_sendDbDisconnect ($hash);                                   # an SBP
+  my $dbh = $hash->{DBHU};
+  __DbLog_SBP_disconnectOnly ($name, $dbh);                            # lokal
+  delete $hash->{DBHU};
+  
+  DbLog_SBP_sendDbDisconnect ($hash);                                  # an SBP
 
   if (!$prop) {
       Log3 ($name, 3, "DbLog $name - Reopen requested");
@@ -992,9 +804,10 @@ sub _DbLog_setrereadcfg {                ## no critic "not used"
   my $ret = DbLog_readCfg($hash);
   return $ret if $ret;
   
-   my $dbh = $hash->{DBHU};
-   __DbLog_SBP_disconnectOnly ($name, $dbh);                        # lokal
-
+  my $dbh = $hash->{DBHU};
+  __DbLog_SBP_disconnectOnly ($name, $dbh);                         # lokal
+  delete $hash->{DBHU};
+  
   DbLog_SBP_sendDbDisconnect ($hash, 1);                            # DB Verbindung und Verbindungsdaten im SubProzess löschen
 
   my $rst = DbLog_SBP_sendConnectionData ($hash);                   # neue Verbindungsdaten an SubProzess senden
@@ -2297,17 +2110,19 @@ sub DbLog_SBP_onRun {
           ##  Vorbereitungen
           ####################
 
-          $attr{$name}{verbose} = $verbose if(defined $verbose);                  # verbose Level übergeben
-          my $bst               = [gettimeofday];                                 # Background-Startzeit
-
-          $doNext = _DbLog_SBP_onRun_checkDiscDelpars ({ subprocess => $subprocess,
+          $attr{$name}{verbose} = $verbose if(defined $verbose);                      # verbose Level übergeben
+          my $bst               = [gettimeofday];                                     # Background-Startzeit
+                                                                                      # prüfen ob Datenbankverbindung beendet werden soll
+          $doNext = _DbLog_SBP_onRun_checkDiscDelpars ({ subprocess => $subprocess,   
                                                          name       => $name,
                                                          memc       => $memc,
                                                          store      => $store
                                                        }
-                                                      );
-          next if($doNext);
-
+                                                     );
+          
+          if ($doNext) {
+              next;
+          }
 
           if ($dbstorepars) {                                                     # DB Verbindungsparameter speichern
               Log3 ($name, 3, "DbLog $name - DB connection parameters are stored in SubProcess");
@@ -2324,6 +2139,7 @@ sub DbLog_SBP_onRun {
               $store->{dbparams}{history}     = $memc->{history};                 # Name history-Tabelle
               $store->{dbparams}{current}     = $memc->{current};                 # Name current-Tabelle
               $store->{dbparams}{dbstorepars} = $memc->{dbstorepars};             # Status Speicherung DB Parameter 0|1
+              $store->{dbparams}{cofaults}    = 0;                                # Anzahl Connectfehler seit letztem erfolgreichen Connect
 
               if ($verbose == 5) {
                   DbLog_logHashContent ($name, $store->{dbparams}, 5);
@@ -2337,6 +2153,7 @@ sub DbLog_SBP_onRun {
               };
 
               __DbLog_SBP_sendToParent ($subprocess, $ret);
+              
               next;
           }
 
@@ -2358,10 +2175,11 @@ sub DbLog_SBP_onRun {
                   msg      => $error,
                   ot       => 0,
                   oper     => $operation,
-                  reqdbdat => 1                                                   # Request Übertragung DB Verbindungsparameter
+                  reqdbdat => 1                                                                  # Request Übertragung DB Verbindungsparameter
               };
 
               __DbLog_SBP_sendToParent ($subprocess, $ret);
+              
               next;
           }
 
@@ -2370,6 +2188,7 @@ sub DbLog_SBP_onRun {
 
           ## Verbindungsaufbau Datenbank
           ################################
+          my $isNew  = 0;                                                                       # wurde Database Handle neu erstellt ?
           my $params = { name       => $name,
                          dbconn     => $store->{dbparams}{dbconn},
                          dbname     => $store->{dbparams}{dbname},
@@ -2379,58 +2198,72 @@ sub DbLog_SBP_onRun {
                          useac      => $useac,
                          model      => $store->{dbparams}{model},
                          sltjm      => $store->{dbparams}{sltjm},
-                         sltcs      => $store->{dbparams}{sltcs}
+                         sltcs      => $store->{dbparams}{sltcs},
+                         cofaults   => $store->{dbparams}{cofaults}
                        };
 
           if (!defined $store->{dbh}) {
               ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
-
+              
               if ($error) {
-                  Log3 ($name, 2, "DbLog $name - ERROR: $error");
-
+                  Log3 ($name, 4, "DbLog $name - Database Connection impossible. Transferred data is returned to the cache.");
+                  
                   $ret = {
                       name     => $name,
                       msg      => $error,
                       ot       => 0,
                       oper     => $operation,
-                      rowlback => $cdata                                                        # Rückgabe alle übergebenen Log-Daten
+                      rowlback => $cdata                                                        # Rückgabe aller übergebenen Log-Daten
                   };
-
+                  
+                  $store->{dbparams}{cofaults}++;           
                   __DbLog_SBP_sendToParent ($subprocess, $ret);
+                  _DbLog_SBP_doWait        (1000000);
+                  
                   next;
               }
 
-              $store->{dbh} = $dbh;
+              $store->{dbparams}{cofaults} = 0;
+              $isNew                       = 1;
+              $store->{dbh}                = $dbh;
 
               Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
           }
 
           $dbh = $store->{dbh};
 
-          my $bool = _DbLog_SBP_pingDB ($name, $dbh);
+          if (!$isNew) {                                                                           # kein neuer Database Handle
+              my $bool = _DbLog_SBP_pingDB ($name, $dbh);
 
-          if (!$bool) {                                                                        # DB Session dead
-              Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
-              delete $store->{dbh};
+              if (!$bool) {                                                                        # DB Session dead
+                  delete $store->{dbh};
+                  
+                  Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
+                  
+                  ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
 
-              ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
+                  if ($error) {
+                      Log3 ($name, 4, "DbLog $name - Database Connection impossible. Transferred data is returned to the cache.");
+                      
+                      $ret = {
+                          name     => $name,
+                          msg      => $error,
+                          ot       => 0,
+                          oper     => $operation,
+                          rowlback => $cdata                                                        # Rückgabe aller übergebenen Log-Daten
+                      };
 
-              if ($error) {
-                  Log3 ($name, 2, "DbLog $name - ERROR: $error");
-
-                  $ret = {
-                      name     => $name,
-                      msg      => $error,
-                      ot       => 0,
-                      oper     => $operation,
-                      rowlback => $cdata                                                        # Rückgabe alle übergebenen Log-Daten
-                  };
-
-                  __DbLog_SBP_sendToParent ($subprocess, $ret);
-                  next;
+                      $store->{dbparams}{cofaults}++;
+                      __DbLog_SBP_sendToParent ($subprocess, $ret);
+                      _DbLog_SBP_doWait        (1000000);
+                      
+                      next;
+                  }
+                  
+                  $store->{dbparams}{cofaults} = 0;
+                  $store->{dbh}                = $dbh;
               }
-          };
-
+          }
 
           ##  Event Logging
           #########################################################
@@ -2523,7 +2356,7 @@ sub DbLog_SBP_onRun {
           }
       }
 
-  usleep(300000);                                                      # reduziert CPU Last im "Leerlauf"
+  _DbLog_SBP_doWait ();
   }
 
 return;
@@ -2579,6 +2412,18 @@ return $doNext;
 }
 
 #################################################################
+#          Wartezeit blockierend
+#          reduziert CPU Last im "Leerlauf"  
+#################################################################
+sub _DbLog_SBP_doWait {
+  my $wtus = shift // 300000;       # Mikrosekunden
+
+  usleep($wtus);
+
+return;
+}
+
+#################################################################
 #          Datenbank Ping
 #################################################################
 sub _DbLog_SBP_pingDB {
@@ -2612,6 +2457,7 @@ sub _DbLog_SBP_onRun_connectDB {
   my $model      = $paref->{model};
   my $sltjm      = $paref->{sltjm};
   my $sltcs      = $paref->{sltcs};
+  my $cofaults   = $paref->{cofaults} // 0;              # Anzahl Connectfehler seit letztem erfolgreichen Connect
 
   my $dbh = q{};
   my $err = q{};
@@ -2645,7 +2491,15 @@ sub _DbLog_SBP_onRun_connectDB {
          1;
       }
       or do { $err = $@;
-              Log3 ($name, 2, "DbLog $name - ERROR: $err");
+      
+              if ($cofaults <= 10) {
+                  Log3 ($name, 2, "DbLog $name - ERROR: $err");
+              }
+              
+              if ($cofaults == 10) {
+                  Log3 ($name, 2, "DbLog $name - There seems to be a permanent connection error to the database. Further error messages are suppressed.");
+              }
+              
               return $err;
             };
 
@@ -4923,37 +4777,74 @@ sub DbLog_readCfg {
 
   #check the database model
   if($hash->{dbconn} =~ m/pg:/i) {
-    $hash->{MODEL}="POSTGRESQL";
+      $hash->{MODEL}="POSTGRESQL";
   }
   elsif ($hash->{dbconn} =~ m/mysql:/i) {
-    $hash->{MODEL}="MYSQL";
+      $hash->{MODEL}="MYSQL";
   }
   elsif ($hash->{dbconn} =~ m/oracle:/i) {
-    $hash->{MODEL}="ORACLE";
+      $hash->{MODEL}="ORACLE";
   }
   elsif ($hash->{dbconn} =~ m/sqlite:/i) {
-    $hash->{MODEL}="SQLITE";
+      $hash->{MODEL}="SQLITE";
   }
   else {
-    $hash->{MODEL}="unknown";
+      $hash->{MODEL}="unknown";
 
-    Log3 $name, 1, "Unknown database model found in configuration file $configfilename.";
-    Log3 $name, 1, "Only MySQL/MariaDB, PostgreSQL, Oracle, SQLite are fully supported.";
+      Log3 $name, 1, "Unknown database model found in configuration file $configfilename.";
+      Log3 $name, 1, "Only MySQL/MariaDB, PostgreSQL, Oracle, SQLite are fully supported.";
 
-    return "unknown database type";
+      return "unknown database type";
   }
 
   if($hash->{MODEL} eq "MYSQL") {
-    $hash->{UTF8} = defined($dbconfig{utf8}) ? $dbconfig{utf8} : 0;
+      $hash->{UTF8} = defined($dbconfig{utf8}) ? $dbconfig{utf8} : 0;
+  }
+
+return;
+}
+
+#################################################################
+#    DBHU Verwaltung im Hauptprozess (Universal DB Handle)
+#
+#    Vorhandensein DBHU prüfen, Validität prüfen und verwenden
+#    ggf. DBHU neu erstellen
+#
+#    $hash->{DBHU} - universeller DB Handle
+#################################################################
+sub _DbLog_manageDBHU {
+  my $hash = shift;
+  
+  my $name = $hash->{NAME};
+
+  my $dbh;
+  
+  if (defined $hash->{DBHU}) {
+      $dbh     = $hash->{DBHU};
+      my $bool = _DbLog_SBP_pingDB ($name, $dbh);
+      
+      if (!$bool) {
+          delete $hash->{DBHU};
+          $dbh          = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
+          $hash->{DBHU} = $dbh;
+          
+          Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$");              
+      }
+  }
+  else {        
+      $dbh          = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
+      $hash->{DBHU} = $dbh;
+      
+      Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$"); 
   }
 
 return;
 }
 
 ###################################################################################
-# Neuer dbh Handle zur allegmeinen Verwendung
+# Neuer DB Handle zur allgemeinen Verwendung
 ###################################################################################
-sub _DbLog_ConnectNewDBH {
+sub _DbLog_getNewDBHandle {
   my $hash = shift;
   my $name = $hash->{NAME};
 
@@ -5022,30 +4913,16 @@ return ($err, @sr);
 sub DbLog_ExecSQL {
   my $hash = shift;
   my $sql  = shift;
+    
+  my $err = _DbLog_manageDBHU ($hash);
+  return $err if($err);
   
+  my $dbh  = $hash->{DBHU};
   my $name = $hash->{NAME};
-  my $dbh  = _DbLog_ConnectNewDBH($hash) || return;
 
   Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
 
   my $sth = DbLog_ExecSQL1($hash, $dbh, $sql);
-
-  if (!$sth) {                                                      #retry
-      __DbLog_SBP_disconnectOnly ($name, $dbh);
-      $dbh = _DbLog_ConnectNewDBH($hash) || return;
-
-      Log3 ($name, 2, "DbLog $name - Backdoor retry: $sql");
-
-      $sth = DbLog_ExecSQL1 ($hash, $dbh, $sql);
-
-      if(!$sth) {
-          Log3($name, 2, "DbLog $name - Backdoor retry failed");
-          __DbLog_SBP_disconnectOnly ($name, $dbh);
-          return;
-      }
-
-      Log3 ($name, 2, "DbLog $name - Backdoor retry ok");
-  }
 
   __DbLog_SBP_commitOnly     ($name, $dbh);
   __DbLog_SBP_disconnectOnly ($name, $dbh);
@@ -5054,11 +4931,11 @@ return $sth;
 }
 
 sub DbLog_ExecSQL1 {
-  my ($hash,$dbh,$sql)= @_;
+  my $hash = shift;
+  my $dbh  = shift;
+  my $sql  = shift;
+  
   my $name = $hash->{NAME};
-
-  $dbh->{RaiseError} = 1;
-  $dbh->{PrintError} = 0;
 
   my $sth;
 
@@ -5190,27 +5067,13 @@ sub DbLog_Get {
   my $samePID = $hash->{PID} == $$ ? 1 : 0;
   
   if ($samePID) {
-      if (defined $hash->{DBHU}) {
-          $dbh     = $hash->{DBHU};
-          my $bool = _DbLog_SBP_pingDB ($name, $dbh);
-          
-          if (!$bool) {
-              delete $hash->{DBHU};
-              $dbh          = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
-              $hash->{DBHU} = $dbh;
-              
-              Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$");              
-          }
-      }
-      else {        
-          $dbh          = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
-          $hash->{DBHU} = $dbh;
-          
-          Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$"); 
-      }
+      $err = _DbLog_manageDBHU ($hash);
+      return $err if($err);
+      
+      $dbh = $hash->{DBHU};
   }
   else {
-      $dbh = _DbLog_ConnectNewDBH($hash) || return "Can't connect to database.";
+      $dbh = _DbLog_getNewDBHandle($hash) || return "Can't connect to database.";
       
       Log3 ($name, 4, "DbLog $name - Created new DBHU for PID: $$"); 
   }
@@ -5478,7 +5341,7 @@ sub DbLog_Get {
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
 
                   if($lastd[$i] eq "undef") {
-                      %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+                      %lasttstamp       = DbLog_explode_datetime($sql_timestamp, ());
                       $lasttstamp{hour} = "00";
                   }
                   else {
@@ -5588,8 +5451,8 @@ sub DbLog_Get {
                   }
                   else {                                                         # generating plots
                       $out_tstamp =~ s/\ /_/g;                                   # needed by generating plots
-                      $retval .= "$out_tstamp $out_value\n";
-                      $retval .= $retvaldummy;
+                      $retval    .= "$out_tstamp $out_value\n";
+                      $retval    .= $retvaldummy;
                   }
               }
 
@@ -5626,8 +5489,8 @@ sub DbLog_Get {
                       }
 
                       $sum[$i] += $sql_value;
-                      $minval = $sql_value if($sql_value < $minval);
-                      $maxval = $sql_value if($sql_value > $maxval);
+                      $minval   = $sql_value if($sql_value < $minval);
+                      $maxval   = $sql_value if($sql_value > $maxval);
                   }
               }
               else {
@@ -5783,6 +5646,11 @@ sub DbLog_configcheck {
   my ($check, $rec,%dbconfig);
   
   Log3 ($name, 4, "DbLog $name - ###  Start configCheck   ###");
+  
+  my $ok   = FW_makeImage('10px-kreis-gruen.png',     '');
+  my $nok  = FW_makeImage('10px-kreis-rot.png',       '');
+  my $warn = FW_makeImage('message_attention@orange', '');
+  my $info = FW_makeImage('message_info',             '');
 
   ### verfügbare Treiber
   ########################
@@ -5812,15 +5680,16 @@ sub DbLog_configcheck {
       }
   }
   
-  my $dbd = ($dbmodel =~ /POSTGRESQL/xi)   ? "Pg: ".$DBD::Pg::VERSION:           # DBD Version
-            ($dbmodel =~ /MYSQL/xi && $dv) ? "$dv: ".$DBD::mysql::VERSION:
-            ($dbmodel =~ /SQLITE/xi)       ? "SQLite: ".$DBD::SQLite::VERSION:"Undefined";
+  my $dbd = ($dbmodel =~ /POSTGRESQL/xi)   ? "Pg: ".$DBD::Pg::VERSION         :  # DBD Version
+            ($dbmodel =~ /MYSQL/xi && $dv) ? "$dv: ".$DBD::mysql::VERSION     :
+            ($dbmodel =~ /SQLITE/xi)       ? "SQLite: ".$DBD::SQLite::VERSION :
+            "Undefined";
 
   my $dbdhint = "";
   my $dbdupd  = 0;
 
   if ($dbmodel =~ /MYSQL/xi && $dv) {                                             # check DBD Mindest- und empfohlene Version
-      my $dbdver = $DBD::mysql::VERSION * 1;                                     # String to Zahl Konversion
+      my $dbdver = $DBD::mysql::VERSION * 1;                                      # String to Zahl Konversion
       if($dbdver < 4.032) {
           $dbdhint = "<b>Caution:</b> Your DBD version doesn't support UTF8. ";
           $dbdupd  = 1;
@@ -5843,15 +5712,18 @@ sub DbLog_configcheck {
   $check .= "Used DBD (Database driver) version $dbd <br>";
 
   if ($errcm) {
+      $check .= "Rating: ".$nok."<br>";
       $check .= "<b>Recommendation:</b> ERROR - $errcm. $dbdhint <br><br>";
   }
 
   if ($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+      $check .= "Rating: ".$warn."<br>";
       $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! $dbdhint <br><br>";
   }
   else {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+      $check .= "Rating: ".$ok."<br>";
       $check .= "<b>Recommendation:</b> No update of DbLog is needed. $dbdhint <br><br>";
   }
 
@@ -5876,12 +5748,16 @@ sub DbLog_configcheck {
   else {
       $rec = $err;
   }
-  $check .= "Connection $rec <br><br>";
+  $check .= "Connection $rec <br>";
+  $check .= defined $dbconfig{connection} && defined $dbconfig{user} && defined $dbconfig{password} ? 
+            "Rating: ".$ok."<br>" :
+            "Rating: ".$nok."<br>";
+  $check .= "<br>";
 
   ### Connection und Encoding check
   #######################################################################
   my $st  = [gettimeofday];                                                                        # Startzeit
-  my $dbh = _DbLog_ConnectNewDBH ($hash) || return "Can't connect to database.";
+  my $dbh = _DbLog_getNewDBHandle ($hash) || return "Can't connect to database.";
   my $ct  = sprintf("%.4f", tv_interval($st));                                                     # Laufzeit ermitteln
   
   Log3 ($name, 4, "DbLog $name - Time required to establish the database connection: ".$ct);
@@ -5942,21 +5818,26 @@ sub DbLog_configcheck {
       $check .= "The time required to establish the connection was $ct seconds. <br>";
       
       if ($ct > 5.0) {
-          $check .= "<b>Recommendation:</b> The time to establish a connection is much too long. There are performance problems that hinder operation. <br><br>";
+          $check .= "Rating: ".$nok."<br>";
+          $check .= "<b>Recommendation:</b> The time to establish a connection is much too long. There are connection problems that can massively affect the operation. <br><br>";
       }
       elsif ($ct > 1.5) {
-          $check .= "<b>Recommendation:</b> The time to establish a connection is too long. There are performance problems that could hinder operation. <br><br>";
+          $check .= "Rating: ".$nok."<br>";
+          $check .= "<b>Recommendation:</b> The time to establish a connection is too long. There are connection problems that can hinder operation. <br><br>";
       }
       elsif ($ct > 0.3) {
+          $check .= "Rating: ".$warn."<br>";
           $check .= "<b>Recommendation:</b> The time to establish a connection is relatively long. This could be an indication of performance problems and should be taken into account. <br><br>";
       }
       else {
+          $check .= "Rating: ".$ok."<br>";
           $check .= "<b>Recommendation:</b> settings o.k. <br><br>";
       }      
   }
 
   if ($err || !@ce || !@se) {
       $check .= "Connection to database was not successful. <br>";
+      $check .= "Rating: ".$ok."<br>";
       $check .= "<b>Recommendation:</b> Plese check logfile for further information. <br><br>";
       $check .= "</html>";
       return $check;
@@ -5965,13 +5846,16 @@ sub DbLog_configcheck {
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
   $check .= "Encoding used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
   $check .= "Encoding used by DB $dbname: $chutf8dat <br>";
+  $check .= $dbmodel =~ /SQLITE/   ? "Rating: ".$ok."<br>"                                             :
+            $chutf8mod eq $chutf8dat && $dbdhint =~ /DBD\sversion\sfulfills/xs ? "Rating: ".$ok."<br>" : 
+            "Rating: ".$warn."<br>";
   $check .= "<b>Recommendation:</b> $rec $dbdhint <br><br>";
 
   ### Check Betriebsmodus
   #######################################################################
   my $mode = $hash->{MODE};
-  my $bi   = AttrVal($name, "bulkInsert", 0);
-  my $sfx  = AttrVal("global", "language", "EN");
+  my $bi   = AttrVal($name,    'bulkInsert',   0);
+  my $sfx  = AttrVal("global", 'language',  'EN');
   $sfx     = $sfx eq "EN" ? "" : "_$sfx";
 
   $check .= "<u><b>Result of insert mode check</u></b><br><br>";
@@ -5979,12 +5863,14 @@ sub DbLog_configcheck {
   if (!$bi) {
       $bi     = "Array";
       $check .= "Insert mode of DbLog-device $name is: $bi <br>";
+      $check .= "Rating: ".$ok."<br>";
       $rec    = "Setting attribute \"bulkInsert\" to \"1\" may result a higher write performance in most cases. ";
       $rec   .= "Feel free to try this mode.";
   }
   else {
       $bi     = "Bulk";
       $check .= "Insert mode of DbLog-device $name is: $bi <br>";
+      $check .= "Rating: ".$ok."<br>";
       $rec    = "settings o.k.";
   }
   $check .= "<b>Recommendation:</b> $rec <br><br>";
@@ -6013,16 +5899,19 @@ sub DbLog_configcheck {
   if (!$forks || !$emb) {
       $check .= "WARNING - at least one of your FHEMWEB devices has attribute \"plotfork = 1\" and/or attribute \"plotEmbed = 2\" not set. <br><br>";
       $check .= $wall;
+      $check .= "<br>";
+      $check .= "Rating: ".$warn."<br>";
       $rec    = "You should set attribute \"plotfork = 1\" and \"plotEmbed = 2\" in relevant devices. ".
                 "If these attributes are not set, blocking situations may occure when creating plots. ".
                 "<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
   }
   else {
       $check .= $wall;
+      $check .= "<br>";
+      $check .= "Rating: ".$ok."<br>";
       $rec    = "settings o.k.";
   }
   
-  $check .= "<br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Spaltenbreite history
@@ -6126,6 +6015,9 @@ sub DbLog_configcheck {
   $check .= "<u><b>Result of table '$history' check</u></b><br><br>";
   $check .= "Column width set in table $history: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
   $check .= "Column width used by device $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
+  $check .= $rec =~ /WARNING/xs                                           ? "Rating: ".$warn."<br>" :
+            $rec =~ /make\ssure\sthat\sthe\swidth\sof\sdatabase\sfield/xs ? "Rating: ".$nok."<br>"  :
+            "Rating: ".$ok."<br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Spaltenbreite current
@@ -6225,6 +6117,9 @@ sub DbLog_configcheck {
   $check .= "<u><b>Result of table '$current' check</u></b><br><br>";
   $check .= "Column width set in table $current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
   $check .= "Column width used by device $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
+  $check .= $rec =~ /WARNING/xs                                           ? "Rating: ".$warn."<br>" :
+            $rec =~ /make\ssure\sthat\sthe\swidth\sof\sdatabase\sfield/xs ? "Rating: ".$nok."<br>"  :
+            "Rating: ".$ok."<br>";
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Vorhandensein Search_Idx mit den empfohlenen Spalten
@@ -6327,7 +6222,11 @@ sub DbLog_configcheck {
           }
       }
   }
-
+   
+  $check .= !@six || !$six[0]          ? "Rating: ".$nok."<br>" :
+            $rec =~ /settings\so.k./xs ? "Rating: ".$ok."<br>"  :
+            "Rating: ".$warn."<br>";
+            
   $check .= "<b>Recommendation:</b> $rec <br><br>";
 
   ### Check Index Report_Idx für DbRep-Device falls DbRep verwendet wird
@@ -6447,6 +6346,10 @@ sub DbLog_configcheck {
       $rec    = "settings o.k.";
   }
   
+  $check .= !@dix || !$dix[0]          ? "Rating: ".$warn."<br>" :
+            $rec =~ /settings\so.k./xs ? "Rating: ".$ok."<br>"  :
+            "Rating: ".$warn."<br>";
+            
   $check .= "<b>Recommendation:</b> $rec <br><br>";
   $check .= "</html>";
   
@@ -7083,9 +6986,15 @@ return $ret;
 
 ################################################################
 #  Dropdown-Menü current-Tabelle SVG-Editor
+#  Datenlieferung für SVG EDitor
 ################################################################
 sub DbLog_sampleDataFn {
-  my ($dlName, $dlog, $max, $conf, $wName) = @_;
+  my $dlName  = shift;
+  my $dlog    = shift;
+  my $max     = shift;
+  my $conf    = shift;
+  my $wName   = shift;
+  
   my $desc    = "Device:Reading";
   my $hash    = $defs{$dlName};
   my $current = $hash->{HELPER}{TC};
@@ -7094,58 +7003,59 @@ sub DbLog_sampleDataFn {
   my @example;
   my @colregs;
   my $counter;
+ 
+  my $err = _DbLog_manageDBHU ($defs{$dlName});
+  return if($err);
+  
+  my $dbh = $hash->{DBHU};
 
-  my $currentPresent = AttrVal($dlName,'DbLogType','History');
+  my $currentPresent = AttrVal($dlName, 'DbLogType', 'History');
+  my $prescurr       = eval {$dbh->selectrow_array("select count(*) from $current");} || 0;
 
-  my $dbhf = _DbLog_ConnectNewDBH ($defs{$dlName});
-  return if(!$dbhf);
+  Log3 ($dlName, 5, "DbLog $dlName - Table $current present: $prescurr (0 = not present or no content)");
 
-  my $prescurr = eval {$dbhf->selectrow_array("select count(*) from $current");} || 0;
+  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {                                             # Table Current present, use it for sample data
+      my $query = "select device,reading from $current where device <> '' group by device,reading";
+      my $sth   = $dbh->prepare( $query );
 
-  Log3 ($dlName, 5, "DbLog $dlName: Table $current present : $prescurr (0 = not present or no content)");
+      $sth->execute();
 
-  if($currentPresent =~ m/Current|SampleFill/ && $prescurr) {                                         # Table Current present, use it for sample data
-    my $query = "select device,reading from $current where device <> '' group by device,reading";
-    my $sth   = $dbhf->prepare( $query );
+      while (my @line = $sth->fetchrow_array()) {
+          $counter++;
+          push @example, join " ", @line if($counter <= 8);                                               # show max 8 examples
+          push @colregs, "$line[0]:$line[1]";                                                             # push all eventTypes to selection list
+      }
 
-    $sth->execute();
+      #$dbh->disconnect();
+      my $cols = join ",", sort { "\L$a" cmp "\L$b" } @colregs;
 
-    while (my @line = $sth->fetchrow_array()) {
-      $counter++;
-      push (@example, join (" ",@line)) if($counter <= 8);                                            # show max 8 examples
-      push (@colregs, "$line[0]:$line[1]");                                                           # push all eventTypes to selection list
-    }
-
-    $dbhf->disconnect();
-    my $cols = join(",", sort { "\L$a" cmp "\L$b" } @colregs);
-
-    # $max = 8 if($max > 8);                                                            # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
-
-    for(my $r = 0; $r < $max; $r++) {
-      my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
-      my $ret = "";
-      $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
-#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
-#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
-#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
-      push @htmlArr, $ret;
-    }
-
+      for(my $r = 0; $r < $max; $r++) {
+          my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+          my $ret = "";
+          $ret .= SVG_sel("par_${r}_0", $cols, "$f[0]:$f[1]");
+#         $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
+#         $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
+#         $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+          push @htmlArr, $ret;
+      }
   }
-  else {                                                                               # Table Current not present, so create an empty input field
-    push @example, "No sample data due to missing table '$current'";
-    # $max = 8 if($max > 8);                                                           # auskommentiert 27.02.2018, Notwendigkeit unklar (forum:#76008)
-    for(my $r = 0; $r < $max; $r++) {
-      my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
-      my $ret = "";
-      no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
-      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
-      use warnings;
-#      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
-#      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
-#      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
-      push @htmlArr, $ret;
-    }
+  else {                                                                                   # Table Current not present, so create an empty input field
+      push @example, "No sample data due to missing table '$current'";
+    
+      for(my $r = 0; $r < $max; $r++) {
+          my @f   = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
+          my $ret = "";
+          
+          no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
+          $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
+          use warnings;
+
+#         $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
+#         $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
+#         $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
+          
+          push @htmlArr, $ret;
+      }
   }
 
 return ($desc, \@htmlArr, join("<br>", @example));
@@ -7204,10 +7114,115 @@ return;
 }
 
 ################################################################
+#
+# Do the query
+#
+################################################################
+sub DbLog_chartQuery {
+  my ($sql, $countsql) = _DbLog_createQuerySql (@_);
+
+  if ($sql eq "error") {
+     return DbLog_jsonError("Could not setup SQL String. Check your input data.");
+  }
+  elsif ($sql eq "errordb") {
+     return DbLog_jsonError("The Database Type is not supported!");
+  }
+
+  my ($hash, @a) = @_;
+
+  my $err = _DbLog_manageDBHU ($hash);
+  return $err if($err);
+  
+  my $dbh = $hash->{DBHU};
+
+  my $totalcount;
+
+  if (defined $countsql && $countsql ne "") {
+      my $query_handle = $dbh->prepare($countsql)
+      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$countsql);
+
+      $query_handle->execute()
+      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
+
+      my @data = $query_handle->fetchrow_array();
+      $totalcount = join ", ", @data;
+  }
+
+  # prepare the query
+  my $query_handle = $dbh->prepare($sql)
+      or return DbLog_jsonError("Could not prepare statement: " . $dbh->errstr . ", SQL was: " .$sql);
+
+  # execute the query
+  $query_handle->execute()
+      or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
+
+  my $columns = $query_handle->{'NAME'};
+  my $columncnt;
+
+  # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
+  if($columns) {
+      $columncnt = scalar @$columns;
+  }
+  else {
+      return '{"success": "true", "msg":"All ok"}';
+  }
+
+  my $i          = 0;
+  my $jsonstring = '{"data":[';
+
+  while ( my @data = $query_handle->fetchrow_array()) {
+      if($i == 0) {
+          $jsonstring .= '{';
+      }
+      else {
+          $jsonstring .= ',{';
+      }
+
+      for ($i = 0; $i < $columncnt; $i++) {
+          $jsonstring .= '"';
+          $jsonstring .= uc($query_handle->{NAME}->[$i]);
+          $jsonstring .= '":';
+
+          if (defined $data[$i]) {
+              my $fragment =  substr($data[$i],0,1);
+
+              if ($fragment eq "{") {
+                  $jsonstring .= $data[$i];
+              }
+              else {
+                  $jsonstring .= '"'.$data[$i].'"';
+              }
+          }
+          else {
+              $jsonstring .= '""'
+          }
+
+          if($i != ($columncnt -1)) {
+             $jsonstring .= ',';
+          }
+      }
+
+      $jsonstring .= '}';
+  }
+
+  $jsonstring .= ']';
+
+  if (defined $totalcount && $totalcount ne "") {
+      $jsonstring .= ',"totalCount": '.$totalcount.'}';
+  }
+  else {
+      $jsonstring .= '}';
+  }
+
+return $jsonstring;
+}
+
+################################################################
 #                Prepare the SQL String
 ################################################################
-sub DbLog_prepareSql {
+sub _DbLog_createQuerySql {
     my ($hash, @a) = @_;
+    
     my $starttime       = $_[5];
     $starttime          =~ s/_/ /;
     my $endtime         = $_[6];
@@ -7223,6 +7238,7 @@ sub DbLog_prepareSql {
     my $dbmodel         = $hash->{MODEL};
     my $history         = $hash->{HELPER}{TH};
     my $current         = $hash->{HELPER}{TC};
+    
     my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
 
     if ($dbmodel eq "POSTGRESQL") {
@@ -7330,64 +7346,68 @@ sub DbLog_prepareSql {
     if($userquery eq "getreadings") {
         $sql = "SELECT distinct(reading) FROM $history WHERE device = '".$device."'";
     }
-    elsif($userquery eq "getdevices") {
+    elsif ($userquery eq "getdevices") {
         $sql = "SELECT distinct(device) FROM $history";
     }
-    elsif($userquery eq "timerange") {
+    elsif ($userquery eq "timerange") {
         $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
     }
-    elsif($userquery eq "hourstats") {
+    elsif ($userquery eq "hourstats") {
         $sql = $hourstats;
     }
-    elsif($userquery eq "daystats") {
+    elsif ($userquery eq "daystats") {
         $sql = $daystats;
     }
-    elsif($userquery eq "weekstats") {
+    elsif ($userquery eq "weekstats") {
         $sql = $weekstats;
     }
-    elsif($userquery eq "monthstats") {
+    elsif ($userquery eq "monthstats") {
         $sql = $monthstats;
     }
-    elsif($userquery eq "yearstats") {
+    elsif ($userquery eq "yearstats") {
         $sql = $yearstats;
     }
-    elsif($userquery eq "savechart") {
+    elsif ($userquery eq "savechart") {
         $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
     }
-    elsif($userquery eq "renamechart") {
+    elsif ($userquery eq "renamechart") {
         $sql = "UPDATE frontend SET NAME = '$savename' WHERE ID = '$jsonChartConfig'";
     }
-    elsif($userquery eq "deletechart") {
+    elsif ($userquery eq "deletechart") {
         $sql = "DELETE FROM frontend WHERE TYPE = 'savedchart' AND ID = '".$savename."'";
     }
-    elsif($userquery eq "updatechart") {
+    elsif ($userquery eq "updatechart") {
         $sql = "UPDATE frontend SET VALUE = '$jsonChartConfig' WHERE ID = '".$savename."'";
     }
-    elsif($userquery eq "getcharts") {
+    elsif ($userquery eq "getcharts") {
         $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
     }
-    elsif($userquery eq "getTableData") {
+    elsif ($userquery eq "getTableData") {
         if ($device ne '""' && $yaxis ne '""') {
-            $sql = "SELECT * FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
-            $sql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
-            $countsql = "SELECT count(*) FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+            $sql       = "SELECT * FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
+            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            
+            $countsql  = "SELECT count(*) FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
             $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
         }
-        elsif($device ne '""' && $yaxis eq '""') {
-            $sql = "SELECT * FROM $history WHERE DEVICE = '$device' ";
-            $sql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
-            $countsql = "SELECT count(*) FROM $history WHERE DEVICE = '$device' ";
+        elsif ($device ne '""' && $yaxis eq '""') {
+            $sql       = "SELECT * FROM $history WHERE DEVICE = '$device' ";
+            $sql      .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            
+            $countsql  = "SELECT count(*) FROM $history WHERE DEVICE = '$device' ";
             $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
         }
         else {
-            $sql = "SELECT * FROM $history";
-            $sql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
-            $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
-            $countsql = "SELECT count(*) FROM $history";
+            $sql       = "SELECT * FROM $history";
+            $sql      .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
+            $sql      .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
+            
+            $countsql  = "SELECT count(*) FROM $history";
             $countsql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'";
         }
+
         return ($sql, $countsql);
     }
     else {
@@ -7395,110 +7415,6 @@ sub DbLog_prepareSql {
     }
 
 return $sql;
-}
-
-################################################################
-#
-# Do the query
-#
-################################################################
-sub DbLog_chartQuery {
-    my ($sql, $countsql) = DbLog_prepareSql(@_);
-
-    if ($sql eq "error") {
-       return DbLog_jsonError("Could not setup SQL String. Maybe the Database is busy, please try again!");
-    }
-    elsif ($sql eq "errordb") {
-       return DbLog_jsonError("The Database Type is not supported!");
-    }
-
-    my ($hash, @a) = @_;
-
-    my $dbhf = _DbLog_ConnectNewDBH ($hash);
-    return if(!$dbhf);
-
-    my $totalcount;
-
-    if (defined $countsql && $countsql ne "") {
-        my $query_handle = $dbhf->prepare($countsql)
-        or return DbLog_jsonError("Could not prepare statement: " . $dbhf->errstr . ", SQL was: " .$countsql);
-
-        $query_handle->execute()
-        or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
-
-        my @data = $query_handle->fetchrow_array();
-        $totalcount = join(", ", @data);
-
-    }
-
-    # prepare the query
-    my $query_handle = $dbhf->prepare($sql)
-        or return DbLog_jsonError("Could not prepare statement: " . $dbhf->errstr . ", SQL was: " .$sql);
-
-    # execute the query
-    $query_handle->execute()
-        or return DbLog_jsonError("Could not execute statement: " . $query_handle->errstr);
-
-    my $columns = $query_handle->{'NAME'};
-    my $columncnt;
-
-    # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
-    if($columns) {
-        $columncnt = scalar @$columns;
-    }
-    else {
-        return '{"success": "true", "msg":"All ok"}';
-    }
-
-    my $i          = 0;
-    my $jsonstring = '{"data":[';
-
-    while ( my @data = $query_handle->fetchrow_array()) {
-        if($i == 0) {
-            $jsonstring .= '{';
-        }
-        else {
-            $jsonstring .= ',{';
-        }
-
-        for ($i = 0; $i < $columncnt; $i++) {
-            $jsonstring .= '"';
-            $jsonstring .= uc($query_handle->{NAME}->[$i]);
-            $jsonstring .= '":';
-
-            if (defined $data[$i]) {
-                my $fragment =  substr($data[$i],0,1);
-
-                if ($fragment eq "{") {
-                    $jsonstring .= $data[$i];
-                }
-                else {
-                    $jsonstring .= '"'.$data[$i].'"';
-                }
-            }
-            else {
-                $jsonstring .= '""'
-            }
-
-            if($i != ($columncnt -1)) {
-               $jsonstring .= ',';
-            }
-        }
-
-        $jsonstring .= '}';
-    }
-
-    $dbhf->disconnect();
-    $jsonstring .= ']';
-
-    if (defined $totalcount && $totalcount ne "") {
-        $jsonstring .= ',"totalCount": '.$totalcount.'}';
-    }
-    else {
-        $jsonstring .= '}';
-    }
-
-return $jsonstring;
 }
 
 ################################################################
@@ -7510,16 +7426,16 @@ sub DbLog_dbReadings {
 
   my $history = $hash->{HELPER}{TH};
 
-  my $dbh = _DbLog_ConnectNewDBH ($hash) || return;
+  my $err = _DbLog_manageDBHU ($hash);
+  return $err if($err);
+  
+  my $dbh = $hash->{DBHU};
 
   return 'Wrong Syntax for ReadingsVal!' unless defined($a[4]);
 
   my $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
 
   my ($reading,$timestamp) = $dbh->selectrow_array($query);
-  
-  my $name = $hash->{NAME};
-  __DbLog_SBP_disconnectOnly ($name, $dbh);
 
   $reading   = defined $reading   ? $reading   : $a[4];
   $timestamp = defined $timestamp ? $timestamp : $a[4];
