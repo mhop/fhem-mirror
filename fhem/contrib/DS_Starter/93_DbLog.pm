@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26923 2023-01-08 10:28:14Z DS_Starter $
+# $Id: 93_DbLog.pm 26923 2023-01-09 10:28:14Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,7 +38,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_onRun_checkDiscDelpars) and others, use dbh quote in _DbLog_SBP_onRun_LogBulk ".
+  "5.5.11"  => "09.01.2023 more code rework / structured subroutines ",
+  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_checkDiscDelpars) and others, use dbh quote in _DbLog_SBP_onRun_LogBulk ".
                            "configCheck changed to use only one db connect + measuring the connection time, universal DBHU ",
   "5.5.9"   => "28.12.2022 optimize \$hash->{HELPER}{TH}, \$hash->{HELPER}{TC}, mode in Define ".
                            "Forum: https://forum.fhem.de/index.php/topic,130588.msg1254073.html#msg1254073 ",
@@ -84,7 +85,7 @@ my %DbLog_vNotesIntern = (
   "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
   "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
-  "4.9.4"   => "08.01.2023 all version informationen deleted from v 1.8.1 to v 4.9.4 ",
+  "4.9.4"   => "08.01.2023 all version informationen from v 1.8.1 to v 4.9.4 deleted ",
   "1.7.1"   => "15.12.2016 initial rework "
 );
 
@@ -2104,7 +2105,6 @@ sub DbLog_SBP_onRun {
 
           my $error       = q{};
           my $doNext      = 0;
-          my $dbh;
           my $ret;
 
           ##  Vorbereitungen
@@ -2113,12 +2113,12 @@ sub DbLog_SBP_onRun {
           $attr{$name}{verbose} = $verbose if(defined $verbose);                      # verbose Level übergeben
           my $bst               = [gettimeofday];                                     # Background-Startzeit
                                                                                       # prüfen ob Datenbankverbindung beendet werden soll
-          $doNext = _DbLog_SBP_onRun_checkDiscDelpars ({ subprocess => $subprocess,   
-                                                         name       => $name,
-                                                         memc       => $memc,
-                                                         store      => $store
-                                                       }
-                                                     );
+          $doNext = _DbLog_SBP_checkDiscDelpars ({ subprocess => $subprocess,   
+                                                   name       => $name,
+                                                   memc       => $memc,
+                                                   store      => $store
+                                                 }
+                                                );
           
           if ($doNext) {
               next;
@@ -2188,81 +2188,18 @@ sub DbLog_SBP_onRun {
 
           ## Verbindungsaufbau Datenbank
           ################################
-          my $isNew  = 0;                                                                       # wurde Database Handle neu erstellt ?
-          my $params = { name       => $name,
-                         dbconn     => $store->{dbparams}{dbconn},
-                         dbname     => $store->{dbparams}{dbname},
-                         dbuser     => $store->{dbparams}{dbuser},
-                         dbpassword => $store->{dbparams}{dbpassword},
-                         utf8       => $store->{dbparams}{utf8},
-                         useac      => $useac,
-                         model      => $store->{dbparams}{model},
-                         sltjm      => $store->{dbparams}{sltjm},
-                         sltcs      => $store->{dbparams}{sltcs},
-                         cofaults   => $store->{dbparams}{cofaults}
-                       };
-
-          if (!defined $store->{dbh}) {
-              ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
-              
-              if ($error) {
-                  Log3 ($name, 4, "DbLog $name - Database Connection impossible. Transferred data is returned to the cache.");
-                  
-                  $ret = {
-                      name     => $name,
-                      msg      => $error,
-                      ot       => 0,
-                      oper     => $operation,
-                      rowlback => $cdata                                                        # Rückgabe aller übergebenen Log-Daten
-                  };
-                  
-                  $store->{dbparams}{cofaults}++;           
-                  __DbLog_SBP_sendToParent ($subprocess, $ret);
-                  _DbLog_SBP_doWait        (1000000);
-                  
-                  next;
-              }
-
-              $store->{dbparams}{cofaults} = 0;
-              $isNew                       = 1;
-              $store->{dbh}                = $dbh;
-
-              Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
-          }
-
-          $dbh = $store->{dbh};
-
-          if (!$isNew) {                                                                           # kein neuer Database Handle
-              my $bool = _DbLog_SBP_pingDB ($name, $dbh);
-
-              if (!$bool) {                                                                        # DB Session dead
-                  delete $store->{dbh};
-                  
-                  Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
-                  
-                  ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
-
-                  if ($error) {
-                      Log3 ($name, 4, "DbLog $name - Database Connection impossible. Transferred data is returned to the cache.");
-                      
-                      $ret = {
-                          name     => $name,
-                          msg      => $error,
-                          ot       => 0,
-                          oper     => $operation,
-                          rowlback => $cdata                                                        # Rückgabe aller übergebenen Log-Daten
-                      };
-
-                      $store->{dbparams}{cofaults}++;
-                      __DbLog_SBP_sendToParent ($subprocess, $ret);
-                      _DbLog_SBP_doWait        (1000000);
-                      
-                      next;
-                  }
-                  
-                  $store->{dbparams}{cofaults} = 0;
-                  $store->{dbh}                = $dbh;
-              }
+          $doNext = _DbLog_SBP_manageDBconnect ({ subprocess => $subprocess,   
+                                                  name       => $name,
+                                                  memc       => $memc,
+                                                  store      => $store,
+                                                  operation  => $operation,
+                                                  useac      => $useac
+                                                }
+                                               );
+          
+          if ($doNext) {
+              _DbLog_SBP_doWait (1000000);
+              next;
           }
 
           ##  Event Logging
@@ -2366,7 +2303,7 @@ return;
 #   prüfen ob Datenbankverbindung beendet werden soll und ob die
 #   gespeicherten Verbindungsparameter gelöscht werden sollen
 ###################################################################################
-sub _DbLog_SBP_onRun_checkDiscDelpars {
+sub _DbLog_SBP_checkDiscDelpars {
   my $paref      = shift;
 
   my $subprocess = $paref->{subprocess};
@@ -2423,17 +2360,104 @@ sub _DbLog_SBP_doWait {
 return;
 }
 
-#################################################################
-#          Datenbank Ping
-#################################################################
-sub _DbLog_SBP_pingDB {
-  my $name  = shift;
-  my $dbh   = shift;
+###################################################################################
+#   Verbindungsmanagement Datenbank
+###################################################################################
+sub _DbLog_SBP_manageDBconnect {
+  my $paref      = shift;
 
-  my $bool;
-  eval { $bool = $dbh->ping; };   
+  my $subprocess = $paref->{subprocess};
+  my $name       = $paref->{name};
+  my $memc       = $paref->{memc};
+  my $store      = $paref->{store};                                           # Datenspeicher
+  my $useac      = $paref->{useac};
+  my $operation  = $paref->{operation};
+  
+  my $isNew      = 0;                                                         # wurde Database Handle neu erstellt ?
+  my $doNext     = 0;
+  
+  my ($err, $dbh, $ret);
+  
+  my $params = { name       => $name,
+                 dbconn     => $store->{dbparams}{dbconn},
+                 dbname     => $store->{dbparams}{dbname},
+                 dbuser     => $store->{dbparams}{dbuser},
+                 dbpassword => $store->{dbparams}{dbpassword},
+                 utf8       => $store->{dbparams}{utf8},
+                 useac      => $useac,
+                 model      => $store->{dbparams}{model},
+                 sltjm      => $store->{dbparams}{sltjm},
+                 sltcs      => $store->{dbparams}{sltcs},
+                 cofaults   => $store->{dbparams}{cofaults}
+               };
 
-return $bool;
+  if (!defined $store->{dbh}) {
+      ($err, $dbh) = _DbLog_SBP_connectDB ($params);
+      
+      if ($err) {
+          Log3 ($name, 4, "DbLog $name - Database Connection impossible. Transferred data is returned to the cache.");
+          
+          $ret = {
+              name     => $name,
+              msg      => $err,
+              ot       => 0,
+              oper     => $operation,
+              rowlback => $memc->{cdata}                                     # Rückgabe aller übergebenen Log-Daten
+          };
+          
+          $doNext = 1;
+          
+          $store->{dbparams}{cofaults}++;           
+          __DbLog_SBP_sendToParent ($subprocess, $ret);
+                    
+          return $doNext;
+      }
+
+      $store->{dbparams}{cofaults} = 0;
+      $isNew                       = 1;
+      $store->{dbh}                = $dbh;
+
+      Log3 ($name, 3, "DbLog $name - SubProcess connected to $store->{dbparams}{dbname}");
+  }
+
+  $dbh = $store->{dbh};
+
+  if (!$isNew) {                                                                           # kein neuer Database Handle
+
+      my $bool = _DbLog_SBP_pingDB ($name, $dbh);
+
+      if (!$bool) {                                                                        # DB Session dead
+          delete $store->{dbh};
+          
+          Log3 ($name, 4, "DbLog $name - Database Connection dead. Try reconnect ...");
+          
+          ($err, $dbh) = _DbLog_SBP_connectDB ($params);
+
+          if ($err) {
+              Log3 ($name, 4, "DbLog $name - Database Reconnect impossible. Transferred data is returned to the cache.");
+              
+              $ret = {
+                  name     => $name,
+                  msg      => $err,
+                  ot       => 0,
+                  oper     => $operation,
+                  rowlback => $memc->{cdata}                                               # Rückgabe aller übergebenen Log-Daten
+              };
+
+              $doNext = 1;
+              
+              $store->{dbparams}{cofaults}++;           
+              __DbLog_SBP_sendToParent ($subprocess, $ret);
+                        
+              return $doNext;
+          }
+          
+          $store->{dbparams}{cofaults} = 0;
+          $store->{dbh}                = $dbh;
+      }
+  }
+
+return $doNext;
 }
 
 ###################################################################################
@@ -2445,7 +2469,7 @@ return $bool;
 #                (which typically results in errors being printed to the screen
 #                when encountered)
 ###################################################################################
-sub _DbLog_SBP_onRun_connectDB {
+sub _DbLog_SBP_connectDB {
   my $paref      = shift;
 
   my $name       = $paref->{name};
@@ -2527,6 +2551,44 @@ sub _DbLog_SBP_onRun_connectDB {
   }
 
 return ($err, $dbh);
+}
+
+############################################################################
+#          Datenbank Ping
+# ohne alarm (timeout) bleibt ping hängen wenn DB nicht 
+# errichbar ist
+# https://perldoc.perl.org/functions/alarm
+#
+# andere: Variante (hat nicht funktioniert):
+# local $SIG{ALRM} = sub { die "Timeout\n" }; 
+# -> https://blogs.perl.org/users/leon_timmermans/2012/01/what-you-should-know-about-signal-based-timeouts.html
+############################################################################
+sub _DbLog_SBP_pingDB {
+  my $name = shift;
+  my $dbh  = shift;
+  my $to   = shift  // 10;
+  
+  my $bool;
+  
+  eval {                                                   
+      POSIX::sigaction(SIGALRM, POSIX::SigAction->new(sub {die "Timeout"}));
+      
+      alarm $to;
+      
+      eval { $bool = $dbh->ping;
+           };
+      
+      alarm 0; 
+      
+      if ($@ && $@ =~ /Timeout/xs) {
+          Log3 ($name, 2, "DbLog $name - Database Ping Timeout of >$to seconds< reached");
+      } 
+     
+  };
+  
+  alarm 0;                                                                              # Schutz vor Race Condition 
+      
+return $bool;
 }
 
 #################################################################
@@ -4863,7 +4925,7 @@ sub _DbLog_getNewDBHandle {
                };
 
 
-  my ($error, $dbh) = _DbLog_SBP_onRun_connectDB ($params);
+  my ($error, $dbh) = _DbLog_SBP_connectDB ($params);
 
   return $dbh if(!$error);
 
@@ -4897,7 +4959,9 @@ sub _DbLog_prepExecQueryOnly {
             
   @sr = $sth->fetchrow_array;
   
+  no warnings 'uninitialized'; 
   Log3 ($name, 4, "DbLog $name - SQL result: ".join ' ', @sr);
+  use warnings;
   
 return ($err, @sr);
 }
