@@ -387,7 +387,7 @@ FHEM/71_YAMAHA_NP.pm         ra666ack             Multimedia
 FHEM/71_ZM_Monitor.pm        delmar               Sonstige Systeme
 FHEM/72_FB_CALLLIST.pm       JoWiemann            Frontends
 FHEM/72_FB_CALLMONITOR.pm    JoWiemann            Unterstützende Dienste
-FHEM/72_FRITZBOX.pm          tupol                FRITZ!Box (link als PM an tupol)
+FHEM/72_FRITZBOX.pm          JoWiemann            FRITZ!Box (link als PM an JoWiemann)
 FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
 FHEM/72_UBUS_CALL.pm         xenos1984            Sonstige Systeme
 FHEM/72_UBUS_CLIENT.pm       xenos1984            Sonstige Systeme
