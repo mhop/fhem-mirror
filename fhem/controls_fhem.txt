@@ -1,4 +1,4 @@
-REV 27009
+REV 27013
 DIR unused
 UPD 2023-01-09_07:45:02 389594 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -717,7 +717,7 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2023-01-08_07:45:03 30991 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2023-01-10_07:45:03 31120 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2023-01-03_07:45:03 730724 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2023-01-03_07:45:03 173599 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2023-01-03_07:45:03 39700 FHEM/lib/zwave_alliancelinks.csv.gz
@@ -743,11 +743,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2023-01-09_07:45:07 4824839 docs/commandref.html
-UPD 2023-01-08_07:45:10 2863014 docs/commandref_DE.html
+UPD 2023-01-10_07:45:10 2863014 docs/commandref_DE.html
 UPD 2022-12-31_07:45:03 83653 docs/commandref_frame.html
-UPD 2022-12-31_07:45:03 93721 docs/commandref_frame_DE.html
-UPD 2023-01-09_07:45:11 296697 docs/commandref_modular.html
-UPD 2023-01-09_07:45:12 307954 docs/commandref_modular_DE.html
+UPD 2023-01-10_07:45:03 93721 docs/commandref_frame_DE.html
+UPD 2023-01-10_07:45:12 296697 docs/commandref_modular.html
+UPD 2023-01-10_07:45:13 307954 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
