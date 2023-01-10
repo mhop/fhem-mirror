@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 26923 2023-01-09 10:28:14Z DS_Starter $
+# $Id: 93_DbLog.pm 26923 2023-01-10 10:28:14Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.5.12"  => "10.01.2023 changed routine _DbLog_SBP_onRun_LogBulk ",   
   "5.5.11"  => "09.01.2023 more code rework / structured subroutines ",
   "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_checkDiscDelpars) and others, use dbh quote in _DbLog_SBP_onRun_LogBulk ".
                            "configCheck changed to use only one db connect + measuring the connection time, universal DBHU ",
@@ -2042,11 +2043,11 @@ sub DbLog_execMemCacheSync {
       DbLog_logHashContent ($name, $data{DbLog}{$name}{cache}{memcache}, 5, 'TempStore contains: ');
   }
 
-  my $memc = _DbLog_copyCache      ($name);
+  my $memc = _DbLog_copyCache ($name);
 
   readingsSingleUpdate($hash, 'CacheUsage', 0, 0);
 
-  $err     = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                               # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
+  $err = DbLog_SBP_sendLogData ($hash, 'log_synch', $memc);                               # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   return $err if($err);
 
 return;
@@ -2652,7 +2653,7 @@ sub _DbLog_SBP_onRun_LogBulk {
 
   my $ln = scalar keys %{$logstore};
 
-  if ($ln) {                                                           # temporär gespeicherte Daten hinzufügen
+  if ($ln) {                                                                         # temporär gespeicherte Daten hinzufügen
       for my $index (sort {$a<=>$b} keys %{$logstore}) {
           Log3 ($name, 4, "DbLog $name - add stored data: $index -> ".$logstore->{$index});
 
@@ -2664,63 +2665,81 @@ sub _DbLog_SBP_onRun_LogBulk {
       Log3 ($name, 4, "DbLog $name - logstore deleted - $ln stored datasets added for processing");
   }
 
-  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata);                 # Feldarrays erstellen
+  my $faref = __DbLog_SBP_fieldArrays ($name, $cdata);                               # Feldarrays erstellen mit Logausgabe
   my $ceti  = scalar keys %{$cdata};
+  my $rv    = 0;
+  
+  my (@ins,$st,$sth_ih,$ins_hist);
 
-  my ($st,$sth_ih,$sth_ic,$sth_uc,$sqlins,$ins_hist);
-
-  $st = [gettimeofday];                                                # SQL-Startzeit
-
-  if (lc($DbLogType) =~ m(history)) {                                  # insert history mit/ohne primary key
-      $sqlins = __DbLog_SBP_sqlInsHistory ($history, $model, $usepkh);
-
-      no warnings 'uninitialized';
-
+  if (lc($DbLogType) =~ m(history)) {                                                # insert history mit/ohne primary key
       for my $key (sort {$a<=>$b} keys %{$cdata}) {
-          my $row = $cdata->{$key};
-          my @ao  = split '\\|', $row;
-          s/_ESC_/\|/gxs for @ao;                                      # escaped Pipe back to "|"
+          my $row = $cdata->{$key};          
+          push @ins, $row;
+      }                 
+  }
+  
+  $st = [gettimeofday];                                                              # SQL-Startzeit
+  
+  if (lc($DbLogType) =~ m(history)) {                                                # insert history mit/ohne primary key
+      ($error, $sth_ih) = __DbLog_SBP_sthInsTable ( { table => $history,
+                                                      dbh   => $dbh,
+                                                      model => $model,
+                                                      usepk => $usepkh
+                                                    }
+                                                  );
 
-          $ao[0] = $dbh->quote($ao[0]);                                # TIMESTAMP
-          $ao[1] = $dbh->quote($ao[1]);                                # DEVICE
-          $ao[2] = $dbh->quote($ao[2]);                                # TYPE
-          $ao[3] = $dbh->quote($ao[3]);                                # EVENT
-          $ao[4] = $dbh->quote($ao[4]);                                # READING
-          $ao[5] = $dbh->quote($ao[5]);                                # VALUE
-          $ao[6] = $dbh->quote($ao[6]);                                # UNIT
+      if ($error) {                                                                  # Eventliste zurückgeben wenn z.B. Disk I/O Error bei SQLITE
+          Log3 ($name, 2, "DbLog $name - ERROR - $error");
 
-          $sqlins .= "($ao[0],$ao[1],$ao[2],$ao[3],$ao[4],$ao[5],$ao[6]),";
+          __DbLog_SBP_disconnectOnly ($name, $dbh);
+          delete $store->{dbh};
+
+          $ret = {
+              name     => $name,
+              msg      => $error,
+              ot       => 0,
+              oper     => $operation,
+              rowlback => $cdata
+          };
+
+          __DbLog_SBP_sendToParent ($subprocess, $ret);
+          return;
       }
 
-      use warnings;
-
-      chop $sqlins;
-
-      if ($usepkh && $model eq 'POSTGRESQL') {
-          $sqlins .= " ON CONFLICT DO NOTHING";
+      if ($tl) {                                                                     # Tracelevel setzen
+          $sth_ih->{TraceLevel} = "$tl|$tf";
+      }
+      else {
+          $sth_ih->{TraceLevel} = '0';
       }
 
       $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta);
-
-      eval { $sth_ih = $dbh->prepare($sqlins);
-
-             if ($tl) {                                                    # Tracelevel setzen
-                 $sth_ih->{TraceLevel} = "$tl|$tf";
-             }
-             else {
-                 $sth_ih->{TraceLevel} = '0';
-             }
-
-             $ins_hist = $sth_ih->execute();
-             $ins_hist = 0 if($ins_hist eq "0E0");
+      
+      if(!$useta) {                                                                  # generate errstr wenn keine TA
+          $dbh->{PrintError} = 1;
+          $dbh->{RaiseError} = 0;
+      }
+      
+      eval { for my $ds (@ins) {
+                 my @ao = split '\\|', $ds;
+                 s/_ESC_/\|/gxs for @ao;                                             # escaped Pipe back to "|"
+                 
+                 unless ($rv = $sth_ih->execute ($ao[0], $ao[1], $ao[2], $ao[3], $ao[4], $ao[5], $ao[6])) {
+                     Log3 ($name, 2, "DbLog $name - ERROR in >$operation< - ".$sth_ih->errstr);
+                 }
+                 else {
+                     #$rv        = 0 if($rv eq "0E0");
+                     $ins_hist += $rv;
+                 }
+             }             
              1;
            }
            or do { $error = $@;
 
-                   Log3 ($name, 2, "DbLog $name - Error table $history - $error");
+                   Log3 ($name, 2, "DbLog $name - ERROR table $history - $error");
 
                    if($useta) {
-                       $rowlback = $cdata;                                 # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
+                       $rowlback = $cdata;                                          # nicht gespeicherte Datensätze nur zurück geben wenn Transaktion ein
 
                        Log3 ($name, 4, "DbLog $name - Transaction is switched on. Transferred data is returned to the cache.");
                    }
@@ -2739,8 +2758,15 @@ sub _DbLog_SBP_onRun_LogBulk {
                    };
 
                    __DbLog_SBP_sendToParent ($subprocess, $ret);
+                   
+                   $dbh->{PrintError} = 0;
+                   $dbh->{RaiseError} = 1;   
+                   
                    return;
                  };
+                 
+      $dbh->{PrintError} = 0;
+      $dbh->{RaiseError} = 1;   
 
       if($ins_hist == $ceti) {
           Log3 ($name, 4, "DbLog $name - $ins_hist of $ceti events inserted into table $history".($usepkh ? " using PK on columns $pkh" : ""));
