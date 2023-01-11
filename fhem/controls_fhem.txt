@@ -1,8 +1,8 @@
-REV 27013
+REV 27020
 DIR unused
-UPD 2023-01-09_07:45:02 389594 ./CHANGED
+UPD 2023-01-11_07:45:02 389724 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2023-01-09_07:45:02 46102 ./MAINTAINER.txt
+UPD 2023-01-11_07:45:02 46106 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2022-12-18_11:54:24 173296 ./fhem.pl
@@ -382,7 +382,7 @@ UPD 2019-07-13_07:45:02 131256 FHEM/71_YAMAHA_NP.pm
 UPD 2019-11-07_07:45:03 19531 FHEM/71_ZM_Monitor.pm
 UPD 2021-11-29_07:45:03 89494 FHEM/72_FB_CALLLIST.pm
 UPD 2022-05-26_07:45:03 125055 FHEM/72_FB_CALLMONITOR.pm
-UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
+UPD 2023-01-11_07:45:02 332236 FHEM/72_FRITZBOX.pm
 UPD 2022-02-07_07:45:02 29303 FHEM/72_TA_CMI_JSON.pm
 UPD 2022-10-10_07:45:03 15950 FHEM/72_UBUS_CALL.pm
 UPD 2022-10-10_07:45:03 17284 FHEM/72_UBUS_CLIENT.pm
@@ -717,7 +717,7 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2023-01-10_07:45:03 31120 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2023-01-11_07:45:02 34301 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2023-01-03_07:45:03 730724 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2023-01-03_07:45:03 173599 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2023-01-03_07:45:03 39700 FHEM/lib/zwave_alliancelinks.csv.gz
@@ -742,18 +742,18 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-01-09_07:45:07 4824839 docs/commandref.html
-UPD 2023-01-10_07:45:10 2863014 docs/commandref_DE.html
+UPD 2023-01-11_07:45:07 4833455 docs/commandref.html
+UPD 2023-01-11_07:45:09 2872729 docs/commandref_DE.html
 UPD 2022-12-31_07:45:03 83653 docs/commandref_frame.html
 UPD 2023-01-10_07:45:03 93721 docs/commandref_frame_DE.html
-UPD 2023-01-10_07:45:12 296697 docs/commandref_modular.html
-UPD 2023-01-10_07:45:13 307954 docs/commandref_modular_DE.html
+UPD 2023-01-11_07:45:10 297336 docs/commandref_modular.html
+UPD 2023-01-11_07:45:12 308593 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
-UPD 2023-01-09_07:45:02 50152 lib/FHEM/APIs/Weather/DarkSkyAPI.pm
+UPD 2023-01-11_07:45:02 50143 lib/FHEM/APIs/Weather/DarkSkyAPI.pm
 UPD 2023-01-09_07:45:02 33466 lib/FHEM/APIs/Weather/OpenWeatherMapAPI.pm
 UPD 2023-01-08_07:45:03 36146 lib/FHEM/APIs/Weather/wundergroundAPI.pm
 UPD 2023-01-04_07:45:04 76671 lib/FHEM/Automation/ShuttersControl.pm
