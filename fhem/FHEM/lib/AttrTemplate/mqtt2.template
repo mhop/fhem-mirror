@@ -787,6 +787,26 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_human_body_movement_illuminance
 setreading DEVICE attrTemplateVersion 20201208
 
+#provided by barneybaer, forum https://forum.fhem.de/index.php/topic,94495.msg1257179.html#msg1257179
+name:zigbee2mqtt_human_body_presence_detector
+desc: Human body presence detector via zigbee2mqtt <br>Tested with: Xiaomi Aqara RTCZCGQ11LM Presence Detector FP1
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_08a001
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to people_sensor;{ AttrVal('DEVICE','icon','people_sensor') }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon Motion..true:people_sensor Motion..false:motion_detector
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Motion: presence
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList  \
+  mode:undirected,left_right $\DEVICETOPIC/set {"monitoring_mode":"$EVTPART1"}\
+  distance:far,medium,near $\DEVICETOPIC/set {"approach_distance":"$EVTPART1"}\
+  sensitivity:low,medium,high $\DEVICETOPIC/set {"motion_sensitivity":"$EVTPART1"}
+attr DEVICE model zigbee2mqtt_human_body_presence_detector
+setreading DEVICE attrTemplateVersion 20230111
+
 name:zigbee2mqtt_Light_Intensity_Sensor
 desc: Light Intensity Sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia light intensity sensor GZCGQ01LM
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
