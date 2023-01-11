@@ -26,6 +26,7 @@
     </Manufacturer>
     <Manufacturer id="0344" name="HELTUN">
       <Product config="heltun/HE-RS01.xml" id="0009" type="0004" name="RS01" forumNr="117879" />
+      <Product config="heltun/HE-HLS01_neu.xml" id="000a" name="High Load Switch HLS01" type="0004" forumNr="131295"/>
     </Manufacturer>
     <Manufacturer id="000c" name="HomeSeer Technologies">
       <Product type="201" id="8" name="HS-DS100+ Door/Window Sensor" config="homeseer/hs-ds100plus.xml"/>
