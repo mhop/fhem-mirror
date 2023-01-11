@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.1"  => "01.01.2023  write TYPE uppercase with writeToDB option, Commandref edited ",
   "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
                             "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
   "8.50.10" => "01.01.2023  Commandref edited ",
@@ -12713,8 +12714,11 @@ sub DbRep_OutputWriteToDB {
 
   if(!$dbloghash->{HELPER}{COLSET}) {
       $err = "No result of \"$hash->{LASTCMD}\" to database written. Cause: column width in \"$hash->{DEF}\" isn't set";
+      
       Log3 ($name, 2, "DbRep $name - ERROR - $err");
+      
       $err = encode_base64($err,"");
+      
       return ($err,$wrt,$irowdone);
   }
 
@@ -12723,7 +12727,7 @@ sub DbRep_OutputWriteToDB {
   my $aggr = (DbRep_checktimeaggr($hash))[2];
   $reading = $optxt."_".$aggr."_".AttrVal($name, "readingNameMap", $reading);
 
-  $type = $defs{$device}{TYPE} if($defs{$device});                # $type vom Device ableiten
+  $type = uc($defs{$device}{TYPE}) if($defs{$device});            # $type vom Device übernehmen
 
   if($optxt =~ /avg|sum/) {
       my @arr = split("\\|", $wrstr);
@@ -12770,7 +12774,6 @@ sub DbRep_OutputWriteToDB {
           }
 
           if (defined $value) {
-              # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
               ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
 
               if($i == 0) {
@@ -12801,9 +12804,9 @@ sub DbRep_OutputWriteToDB {
       my %rh = split("§", $wrstr);
 
       for my $key (sort(keys(%rh))) {
-          my @k         = split("\\|",$rh{$key});
-          $value        = defined($k[1])?sprintf("%.${ndp}f",$k[1]):undef;
-          $rsf          = $k[2];                                          # Datum / Zeit für DB-Speicherung
+          my @k  = split("\\|",$rh{$key});
+          $value = defined($k[1])?sprintf("%.${ndp}f",$k[1]):undef;
+          $rsf   = $k[2];                                                        # Datum / Zeit für DB-Speicherung
 
           ($date,$time) = split("_",$rsf);
           $time         =~ s/-/:/g if($time);
@@ -12820,7 +12823,6 @@ sub DbRep_OutputWriteToDB {
               }
           }
           if ($value) {
-              # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
               ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
               push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
           }
@@ -12831,8 +12833,11 @@ sub DbRep_OutputWriteToDB {
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
       if ($@) {
           $err = $@;
+          
           Log3 ($name, 2, "DbRep $name - ERROR - $@");
+          
           $err = encode_base64($err,"");
+          
           return ($err,$wrt,$irowdone);
       }
 
@@ -12894,8 +12899,7 @@ sub DbRep_OutputWriteToDB {
           Log3($name, 2, "DbRep $name - ERROR - $@");
       }
 
-      # SQL-Startzeit
-      my $wst = [gettimeofday];
+      my $wst = [gettimeofday];                                                   # SQL-Startzeit
 
       my $ihs = 0;
       my $uhs = 0;
@@ -12910,8 +12914,7 @@ sub DbRep_OutputWriteToDB {
           $value     = $a[5];
           $unit      = $a[6];
 
-          eval {
-              # update oder insert history
+          eval {                                                                        # update oder insert history
               if (lc($DbLogType) =~ m(history) ) {
                   my $rv_uh = $dbh->do("UPDATE history SET TIMESTAMP=\"$timestamp\", DEVICE=\"$device\", READING=\"$reading\", TYPE=\"$type\", EVENT=\"$event\", VALUE=\"$value\", UNIT=\"$unit\" WHERE TIMESTAMP=\"$timestamp\" AND DEVICE=\"$device\" AND READING=\"$reading\"");
                   $uhs += $rv_uh if($rv_uh);
@@ -12924,8 +12927,8 @@ sub DbRep_OutputWriteToDB {
                       Log3 $hash->{NAME}, 4, "DbRep $name - INSERT history: $row, RESULT: $rv_ih";
                   }
               }
-              # update oder insert current
-              if (lc($DbLogType) =~ m(current) ) {
+              
+              if (lc($DbLogType) =~ m(current) ) {                                     # update oder insert current
                   my $rv_uc = $dbh->do("UPDATE current SET TIMESTAMP=\"$timestamp\", DEVICE=\"$device\", READING=\"$reading\", TYPE=\"$type\", EVENT=\"$event\", VALUE=\"$value\", UNIT=\"$unit\" WHERE DEVICE=\"$device\" AND READING=\"$reading\"");
                   if ($rv_uc == 0) {
                       $sth_ic->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
@@ -12935,10 +12938,14 @@ sub DbRep_OutputWriteToDB {
 
           if ($@) {
               $err = $@;
+              
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
+              
               $dbh->rollback;
               $dbh->disconnect;
+              
               $err = encode_base64($err,"");
+              
               return ($err,$wrt,0);
           }
       }
@@ -12951,8 +12958,7 @@ sub DbRep_OutputWriteToDB {
       Log3 ($hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs");
       $irowdone = $ihs + $uhs;
 
-      # SQL-Laufzeit ermitteln
-      $wrt = tv_interval($wst);
+      $wrt = tv_interval($wst);                                                       # SQL-Laufzeit ermitteln
   }
 
 return ($err,$wrt,$irowdone);
@@ -14223,172 +14229,174 @@ return;
                                  </li><br>
 
 
-  <li><b> dumpMySQL [clientSide | serverSide]</b>
-                                 -  creates a dump of the connected MySQL database.  <br>
-                                 Depending from selected option the dump will be created on Client- or on Server-Side. <br>
-                                 The variants differs each other concerning the executing system, the creating location, the usage of
-                                 attributes, the function result and the needed hardware ressources. <br>
-                                 The option "clientSide" e.g. needs more powerful FHEM-Server hardware, but saves all available
-                                 tables inclusive possibly created views. <br>
-                                 With attribute "dumpCompress" a compression of dump file after creation can be switched on.
-                                 <br><br>
+  <li><b> dumpMySQL [clientSide | serverSide]</b> <br><br>
+                                 
+     Creates a dump of the connected MySQL database.  <br>
+     Depending from selected option the dump will be created on Client- or on Server-Side. <br>
+     The variants differs each other concerning the executing system, the creating location, the usage of
+     attributes, the function result and the needed hardware ressources. <br>
+     The option "clientSide" e.g. needs more powerful FHEM-Server hardware, but saves all available
+     tables inclusive possibly created views. <br>
+     With attribute "dumpCompress" a compression of dump file after creation can be switched on.
+     <br><br>
 
-                                 <ul>
-                                 <b><u>Option clientSide</u></b> <br>
-                                 The dump will be created by client (FHEM-Server) and will be saved in FHEM log-directory by
-                                 default.
-                                 The target directory can be set by attribute <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> and has to be
-                                 writable by the FHEM process. <br>
-                                 Before executing the dump a table optimization can be processed optionally (see attribute
-                                 "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeProc").
-                                 After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br><br>
+     <ul>
+     <b><u>Option clientSide</u></b> <br>
+     The dump will be created by client (FHEM-Server) and will be saved in FHEM log-directory ((typical /opt/fhem/log/)) by
+     default.
+     The target directory can be set by attribute <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> and has to be
+     writable by the FHEM process. <br>
+     Before executing the dump a table optimization can be processed optionally (see attribute
+     "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeProc").
+     After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br><br>
 
-                                 <b>Note: <br>
-                                 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
-                                 optimization want to be used ! </b> <br><br>
+     <b>Note: <br>
+     To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
+     optimization want to be used ! </b> <br><br>
 
-                                 By the attributes <a href="#DbRep-attr-dumpMemlimit">dumpMemlimit</a> and
-                                 <a href="#DbRep-attr-dumpSpeed">dumpSpeed</a> the run-time behavior of the function can be
-                                 controlled to optimize the performance and demand of ressources. <br><br>
+     By the attributes <a href="#DbRep-attr-dumpMemlimit">dumpMemlimit</a> and
+     <a href="#DbRep-attr-dumpSpeed">dumpSpeed</a> the run-time behavior of the function can be
+     controlled to optimize the performance and demand of ressources. <br><br>
 
-                                 The attributes relevant for function "dumpMySQL clientSide" are: <br><br>
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>dumpComment </b>              </td><td>: User comment in head of dump file  </td></tr>
-                                      <tr><td> <b>dumpCompress </b>             </td><td>: compress of dump files after creation </td></tr>
-                                      <tr><td> <b>dumpDirLocal </b>             </td><td>: the local destination directory for dump file creation </td></tr>
-                                      <tr><td> <b>dumpMemlimit </b>             </td><td>: limits memory usage </td></tr>
-                                      <tr><td> <b>dumpSpeed </b>                </td><td>: limits CPU utilization </td></tr>
-                                      <tr><td> <b>dumpFilesKeep </b>            </td><td>: number of dump files to keep </td></tr>
-                                      <tr><td> <b>executeBeforeProc </b>        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
-                                      <tr><td> <b>executeAfterProc </b>         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
-                                      <tr><td> <b>optimizeTablesBeforeDump </b> </td><td>: table optimization before dump </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+     The attributes relevant for function "dumpMySQL clientSide" are: <br><br>
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>dumpComment </b>              </td><td>: User comment in head of dump file  </td></tr>
+          <tr><td> <b>dumpCompress </b>             </td><td>: compress of dump files after creation </td></tr>
+          <tr><td> <b>dumpDirLocal </b>             </td><td>: the local destination directory for dump file creation </td></tr>
+          <tr><td> <b>dumpMemlimit </b>             </td><td>: limits memory usage </td></tr>
+          <tr><td> <b>dumpSpeed </b>                </td><td>: limits CPU utilization </td></tr>
+          <tr><td> <b>dumpFilesKeep </b>            </td><td>: number of dump files to keep </td></tr>
+          <tr><td> <b>executeBeforeProc </b>        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+          <tr><td> <b>executeAfterProc </b>         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
+          <tr><td> <b>optimizeTablesBeforeDump </b> </td><td>: table optimization before dump </td></tr>
+       </table>
+       </ul>
+       <br>
 
-                                 After a successfull finished dump the old dumpfiles are deleted and only the number of files
-                                 defined by attribute "dumpFilesKeep" (default: 3) remain in the target directory
-                                 "dumpDirLocal". If "dumpFilesKeep = 0" is set, all
-                                 dumpfiles (also the current created file), are deleted. This setting can be helpful, if FTP transmission is used
-                                 and the created dumps are only keep remain in the FTP destination directory. <br><br>
+     After a successfull finished dump the old dumpfiles are deleted and only the number of files
+     defined by attribute "dumpFilesKeep" (default: 3) remain in the target directory
+     "dumpDirLocal". If "dumpFilesKeep = 0" is set, all
+     dumpfiles (also the current created file), are deleted. This setting can be helpful, if FTP transmission is used
+     and the created dumps are only keep remain in the FTP destination directory. <br><br>
 
-                                 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql[.gzip] <br><br>
+     The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql[.gzip] <br><br>
 
-                                 To rebuild the database from a dump file the command: <br><br>
+     To rebuild the database from a dump file the command: <br><br>
 
-                                   <ul>
-                                   set &lt;name&gt; restoreMySQL &lt;filename&gt; <br><br>
-                                   </ul>
+       <ul>
+       set &lt;name&gt; restoreMySQL &lt;filename&gt; <br><br>
+       </ul>
 
-                                 can be used. <br><br>
+     can be used. <br><br>
 
-                                 The created dumpfile (uncompressed) can imported on the MySQL-Server by: <br><br>
+     The created dumpfile (uncompressed) can imported on the MySQL-Server by: <br><br>
 
-                                   <ul>
-                                   mysql -u &lt;user&gt; -p &lt;dbname&gt; < &lt;filename&gt;.sql <br><br>
-                                   </ul>
+       <ul>
+       mysql -u &lt;user&gt; -p &lt;dbname&gt; < &lt;filename&gt;.sql <br><br>
+       </ul>
 
-                                 as well to restore the database from dump file. <br><br><br>
+     as well to restore the database from dump file. <br><br><br>
 
 
-                                 <b><u>Option serverSide</u></b> <br>
-                                 The dump will be created on the MySQL-Server and will be saved in its Home-directory
-                                 by default. <br>
-                                 The whole history-table (not the current-table) will be exported <b>CSV-formatted</b> without
-                                 any restrictions. <br>
+     <b><u>Option serverSide</u></b> <br>
+     The dump will be created on the MySQL-Server and will be saved in its Home-directory
+     by default. <br>
+     The whole history-table (not the current-table) will be exported <b>CSV-formatted</b> without
+     any restrictions. <br>
 
-                                 Before executing the dump a table optimization can be processed optionally (see attribute
-                                 "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeProc"). <br><br>
+     Before executing the dump a table optimization can be processed optionally (see attribute
+     "optimizeTablesBeforeDump") as well as a FHEM-command (attribute "executeBeforeProc"). <br><br>
 
-                                 <b>Note: <br>
-                                 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
-                                 optimization is used ! </b> <br><br>
+     <b>Note: <br>
+     To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
+     optimization is used ! </b> <br><br>
 
-                                 After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br><br>
+     After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br><br>
 
-                                 The attributes relevant for function "dumpMySQL serverSide" are: <br><br>
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>dumpDirRemote </b>            </td><td>: destination directory of dump file on remote server  </td></tr>
-                                      <tr><td> <b>dumpCompress </b>             </td><td>: compress of dump files after creation </td></tr>
-                                      <tr><td> <b>dumpDirLocal </b>             </td><td>: the local mounted directory dumpDirRemote </td></tr>
-                                      <tr><td> <b>dumpFilesKeep </b>            </td><td>: number of dump files to keep </td></tr>
-                                      <tr><td> <b>executeBeforeProc </b>        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
-                                      <tr><td> <b>executeAfterProc </b>         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
-                                      <tr><td> <b>optimizeTablesBeforeDump </b> </td><td>: table optimization before dump </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+     The attributes relevant for function "dumpMySQL serverSide" are: <br><br>
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>dumpDirRemote </b>            </td><td>: destination directory of dump file on remote server  </td></tr>
+          <tr><td> <b>dumpCompress </b>             </td><td>: compress of dump files after creation </td></tr>
+          <tr><td> <b>dumpDirLocal </b>             </td><td>: the local mounted directory dumpDirRemote </td></tr>
+          <tr><td> <b>dumpFilesKeep </b>            </td><td>: number of dump files to keep </td></tr>
+          <tr><td> <b>executeBeforeProc </b>        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+          <tr><td> <b>executeAfterProc </b>         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
+          <tr><td> <b>optimizeTablesBeforeDump </b> </td><td>: table optimization before dump </td></tr>
+       </table>
+       </ul>
+       <br>
 
-                                 The target directory can be set by <a href="#DbRep-attr-dumpDirRemote">dumpDirRemote</a> attribute.
-                                 It must be located on the MySQL-Host and has to be writable by the MySQL-server process. <br>
-                                 The used database user must have the <b>FILE</b> privilege (see <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
+     The target directory can be set by <a href="#DbRep-attr-dumpDirRemote">dumpDirRemote</a> attribute.
+     It must be located on the MySQL-Host and has to be writable by the MySQL-server process. <br>
+     The used database user must have the <b>FILE</b> privilege (see <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
 
-                                 <b>Note:</b> <br>
-                                 If the internal version management of DbRep should be used and the size of the created dumpfile be
-                                 reported, you have to mount the remote  MySQL-Server directory "dumpDirRemote" on the client
-                                 and publish it to the DbRep-device by fill out the <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> attribute. <br>
-                                 Same is necessary if ftp transfer after dump is to be used (attribute "ftpUse" respectively "ftpUseSSL").
-                                 <br><br>
+     <b>Note:</b> <br>
+     If the internal version management of DbRep should be used and the size of the created dumpfile be
+     reported, you have to mount the remote  MySQL-Server directory "dumpDirRemote" on the client
+     and publish it to the DbRep-device by fill out the <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> attribute. <br>
+     Same is necessary if ftp transfer after dump is to be used (attribute "ftpUse" respectively "ftpUseSSL").
+     <br><br>
 
-                                 <ul>
-                                 <b>Example: </b> <br>
-                                 attr &lt;name&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
-                                 attr &lt;name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
-                                 attr &lt;name&gt; dumpFilesKeep 2 <br><br>
+     <ul>
+     <b>Example: </b> <br>
+     attr &lt;name&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
+     attr &lt;name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
+     attr &lt;name&gt; dumpFilesKeep 2 <br><br>
 
-                                 # The dump will be created remote on the MySQL-Server in directory
-                                 '/volume1/ApplicationBackup/dumps_FHEM/'. <br>
-                                 # The internal version management searches in local mounted directory '/sds1/backup/dumps_FHEM/'
-                                 for present dumpfiles and deletes these files except the last two versions. <br>
-                                 <br>
-                                 </ul>
+     # The dump will be created remote on the MySQL-Server in directory
+     '/volume1/ApplicationBackup/dumps_FHEM/'. <br>
+     # The internal version management searches in local mounted directory '/sds1/backup/dumps_FHEM/'
+     for present dumpfiles and deletes these files except the last two versions. <br>
+     <br>
+     </ul>
 
-                                 If the internal version management is used, after a successfull finished dump old dumpfiles will
-                                 be deleted and only the number of attribute "dumpFilesKeep" (default: 3) would remain in target
-                                 directory "dumpDirLocal" (the mounted "dumpDirRemote").
-                                 In that case FHEM needs write permissions to the directory "dumpDirLocal". <br><br>
+     If the internal version management is used, after a successfull finished dump old dumpfiles will
+     be deleted and only the number of attribute "dumpFilesKeep" (default: 3) would remain in target
+     directory "dumpDirLocal" (the mounted "dumpDirRemote").
+     In that case FHEM needs write permissions to the directory "dumpDirLocal". <br><br>
 
-                                 The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv[.gzip] <br><br>
+     The <b>naming convention of dump files</b> is:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv[.gzip] <br><br>
 
-                                 You can start a restore of table history from serverSide-Backup by command: <br><br>
-                                   <ul>
-                                   set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv[.gzip] <br><br>
-                                   </ul>
+     You can start a restore of table history from serverSide-Backup by command: <br><br>
+       <ul>
+       set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv[.gzip] <br><br>
+       </ul>
 
-                                 <br><br>
+     <br><br>
 
-                                 <b><u>FTP-Transfer after Dump</u></b> <br>
-                                 If those possibility is be used, the attribute <a href="#DbRep-attr-ftpUse">ftpUse</a> or
-                                 <a href="#DbRep-attr-ftpUseSSL">ftpUseSSL</a> has to be set. The latter if encoding for FTP is to be used.
-                                 The module also carries the version control of dump files in FTP-destination by attribute
-                                 "ftpDumpFilesKeep". <br>
-                                 Further attributes are: <br><br>
+     <b><u>FTP-Transfer after Dump</u></b> <br>
+     If those possibility is be used, the attribute <a href="#DbRep-attr-ftpUse">ftpUse</a> or
+     <a href="#DbRep-attr-ftpUseSSL">ftpUseSSL</a> has to be set. The latter if encoding for FTP is to be used.
+     The module also carries the version control of dump files in FTP-destination by attribute
+     "ftpDumpFilesKeep". <br>
+     Further attributes are: <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> ftpUse      </td><td>: FTP Transfer after dump will be switched on (without SSL encoding) </td></tr>
-                                      <tr><td> ftpUser     </td><td>: User for FTP-server login, default: anonymous </td></tr>
-                                      <tr><td> ftpUseSSL   </td><td>: FTP Transfer with SSL encoding after dump </td></tr>
-                                      <tr><td> ftpDebug    </td><td>: debugging of FTP communication for diagnostics </td></tr>
-                                      <tr><td> ftpDir      </td><td>: directory on FTP-server in which the file will be send into (default: "/") </td></tr>
-                                      <tr><td> ftpDumpFilesKeep </td><td>: leave the number of dump files in FTP-destination &lt;ftpDir&gt; (default: 3) </td></tr>
-                                      <tr><td> ftpPassive  </td><td>: set if passive FTP is to be used </td></tr>
-                                      <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
-                                      <tr><td> ftpPwd      </td><td>: password of FTP-User, not set by default </td></tr>
-                                      <tr><td> ftpServer   </td><td>: name or IP-address of FTP-server. <b>absolutely essential !</b> </td></tr>
-                                      <tr><td> ftpTimeout  </td><td>: timeout of FTP-connection in seconds (default: 30). </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
-                                   <br>
-                                 </ul>
-
-                                 </li><br>
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> ftpUse      </td><td>: FTP Transfer after dump will be switched on (without SSL encoding) </td></tr>
+          <tr><td> ftpUser     </td><td>: User for FTP-server login, default: anonymous </td></tr>
+          <tr><td> ftpUseSSL   </td><td>: FTP Transfer with SSL encoding after dump </td></tr>
+          <tr><td> ftpDebug    </td><td>: debugging of FTP communication for diagnostics </td></tr>
+          <tr><td> ftpDir      </td><td>: directory on FTP-server in which the file will be send into (default: "/") </td></tr>
+          <tr><td> ftpDumpFilesKeep </td><td>: leave the number of dump files in FTP-destination &lt;ftpDir&gt; (default: 3) </td></tr>
+          <tr><td> ftpPassive  </td><td>: set if passive FTP is to be used </td></tr>
+          <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
+          <tr><td> ftpPwd      </td><td>: password of FTP-User, not set by default </td></tr>
+          <tr><td> ftpServer   </td><td>: name or IP-address of FTP-server. <b>absolutely essential !</b> </td></tr>
+          <tr><td> ftpTimeout  </td><td>: timeout of FTP-connection in seconds (default: 30). </td></tr>
+       </table>
+       </ul>
+       <br>
+       <br>
+       
+     </ul>
+     </li>
+     <br>
 
     <li><b> dumpSQLite </b>   -  creates a dump of the connected SQLite database.  <br>
                                  This function uses the SQLite Online Backup API and allow to create a consistent backup of the
@@ -15923,29 +15931,31 @@ sub bdump {
                                        new operation starts  </li> <br>
 
   <a id="DbRep-attr-seqDoubletsVariance"></a>
-  <li><b>seqDoubletsVariance  &lt;positive variance [negative variance] [EDGE=negative|positive]&gt; </b> <br>
-                                    Accepted variance for the command "set &lt;name&gt; delSeqDoublets". <br>
-                                    The value of this attribute describes the variance up to consecutive numeric values (VALUE) of
-                                    datasets are handled as identical. If only one numeric value is declared, it is used as
-                                    postive as well as negative variance and both form the "deletion corridor".
-                                    Optional a second numeric value for a negative variance, separated by blank,can be
-                                    declared.
-                                    Always absolute, i.e. positive numeric values, have to be declared. <br>
-                                    If the supplement "EDGE=negative" is declared, values at a negative edge (e.g. when
-                                    value is changed from  4.0 -&gt; 1.0) are not deleted although they are in the "deletion corridor".
-                                    Equivalent is valid with "EDGE=positive" for the positive edge (e.g. the change
-                                    from 1.2 -&gt; 2.8).
-                                    <br><br>
+  <li><b>seqDoubletsVariance  &lt;positive variance [negative variance] [EDGE=negative|positive]&gt; </b> <br><br>
+  
+  Accepted variance for the command "set &lt;name&gt; delSeqDoublets". <br>
+  The value of this attribute describes the variance up to consecutive numeric values (VALUE) of
+  datasets are handled as identical. If only one numeric value is declared, it is used as
+  postive as well as negative variance and both form the "deletion corridor".
+  Optional a second numeric value for a negative variance, separated by blank,can be
+  declared.
+  Always absolute, i.e. positive numeric values, have to be declared. <br>
+  If the supplement "EDGE=negative" is declared, values at a negative edge (e.g. when
+  value is changed from  4.0 -&gt; 1.0) are not deleted although they are in the "deletion corridor".
+  Equivalent is valid with "EDGE=positive" for the positive edge (e.g. the change
+  from 1.2 -&gt; 2.8).
+  <br><br>
 
-                                    <ul>
-                                    <b>Examples:</b> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 1.5 EDGE=negative </code> <br>
-                                    </ul>
-                                    <br><br>
-                                    </li>
+  <ul>
+  <b>Examples:</b> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 1.5 EDGE=negative </code> <br>
+  </ul>
+  <br>
+  <br>
+  </li>
 
   <a id="DbRep-attr-showproctime"></a>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds)
@@ -17088,172 +17098,174 @@ return;
 
                                  </li> <br>
 
-    <li><b> dumpMySQL [clientSide | serverSide]</b>
-                                 -  erstellt einen Dump der angeschlossenen MySQL-Datenbank.  <br>
-                                 Abhängig von der ausgewählten Option wird der Dump auf der Client- bzw. Serverseite erstellt. <br>
-                                 Die Varianten unterscheiden sich hinsichtlich des ausführenden Systems, des Erstellungsortes, der
-                                 Attributverwendung, des erzielten Ergebnisses und der benötigten Hardwareressourcen. <br>
-                                 Die Option "clientSide" benötigt z.B. eine leistungsfähigere Hardware des FHEM-Servers, sichert aber alle
-                                 Tabellen inklusive eventuell angelegter Views. <br>
-                                 Mit dem Attribut "dumpCompress" kann eine Komprimierung der erstellten Dumpfiles eingeschaltet werden.
-                                 <br><br>
+    <li><b> dumpMySQL [clientSide | serverSide]</b> <br><br>
+    
+     Erstellt einen Dump der angeschlossenen MySQL-Datenbank.  <br>
+     Abhängig von der ausgewählten Option wird der Dump auf der Client- bzw. Serverseite erstellt. <br>
+     Die Varianten unterscheiden sich hinsichtlich des ausführenden Systems, des Erstellungsortes, der
+     Attributverwendung, des erzielten Ergebnisses und der benötigten Hardwareressourcen. <br>
+     Die Option "clientSide" benötigt z.B. eine leistungsfähigere Hardware des FHEM-Servers, sichert aber alle
+     Tabellen inklusive eventuell angelegter Views. <br>
+     Mit dem Attribut "dumpCompress" kann eine Komprimierung der erstellten Dumpfiles eingeschaltet werden.
+     <br><br>
 
-                                 <ul>
-                                 <b><u>Option clientSide</u></b> <br>
-                                 Der Dump wird durch den Client (FHEM-Rechner) erstellt und per default im log-Verzeichnis des Clients
-                                 gespeichert.
-                                 Das Zielverzeichnis kann mit dem Attribut <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> verändert werden und muß auf
-                                 dem Client durch FHEM beschreibbar sein. <br>
-                                 Vor dem Dump kann eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump") oder ein FHEM-Kommando
-                                 (Attribut "executeBeforeProc") optional zugeschaltet werden.
-                                 Nach dem Dump kann ebenfalls ein FHEM-Kommando (siehe Attribut "executeAfterProc") ausgeführt werden. <br><br>
+     <ul>
+     <b><u>Option clientSide</u></b> <br>
+     Der Dump wird durch den Client (FHEM-Rechner) erstellt und per default im log-Verzeichnis des Clients
+     (typisch /opt/fhem/log/) gespeichert.
+     Das Zielverzeichnis kann mit dem Attribut <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> verändert werden und muß auf
+     dem Client durch FHEM beschreibbar sein. <br>
+     Vor dem Dump kann eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump") oder ein FHEM-Kommando
+     (Attribut "executeBeforeProc") optional zugeschaltet werden.
+     Nach dem Dump kann ebenfalls ein FHEM-Kommando (siehe Attribut "executeAfterProc") ausgeführt werden. <br><br>
 
-                                 <b>Achtung ! <br>
-                                 Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
-                                 Tabellenoptimierung verwendet wird ! </b> <br><br>
+     <b>Achtung ! <br>
+     Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
+     Tabellenoptimierung verwendet wird ! </b> <br><br>
 
-                                 Über die Attribute <a href="#DbRep-attr-dumpMemlimit">dumpMemlimit</a> und <a href="#DbRep-attr-dumpSpeed">dumpSpeed</a>
-                                 kann das Laufzeitverhalten der
-                                 Funktion beeinflusst werden um eine Optimierung bezüglich Performance und Ressourcenbedarf zu erreichen. <br><br>
+     Über die Attribute <a href="#DbRep-attr-dumpMemlimit">dumpMemlimit</a> und <a href="#DbRep-attr-dumpSpeed">dumpSpeed</a>
+     kann das Laufzeitverhalten der
+     Funktion beeinflusst werden um eine Optimierung bezüglich Performance und Ressourcenbedarf zu erreichen. <br><br>
 
-                                 Die für "dumpMySQL clientSide" relevanten Attribute sind: <br><br>
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpComment              </td><td>: User-Kommentar im Dumpfile  </td></tr>
-                                      <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: das lokale Zielverzeichnis für die Erstellung des Dump </td></tr>
-                                      <tr><td> dumpMemlimit             </td><td>: Begrenzung der Speicherverwendung </td></tr>
-                                      <tr><td> dumpSpeed                </td><td>: Begrenzung die CPU-Belastung </td></tr>
-                                      <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-                                      <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
-                                      <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+     Die für "dumpMySQL clientSide" relevanten Attribute sind: <br><br>
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> dumpComment              </td><td>: User-Kommentar im Dumpfile  </td></tr>
+          <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
+          <tr><td> dumpDirLocal             </td><td>: das lokale Zielverzeichnis für die Erstellung des Dump </td></tr>
+          <tr><td> dumpMemlimit             </td><td>: Begrenzung der Speicherverwendung </td></tr>
+          <tr><td> dumpSpeed                </td><td>: Begrenzung die CPU-Belastung </td></tr>
+          <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
+          <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+          <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
+          <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
+       </table>
+       </ul>
+       <br>
 
-                                 Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files, definiert durch
-                                 das Attribut "dumpFilesKeep" (default: 3), verbleibt im Zielverzeichnis "dumpDirLocal". Falls "dumpFilesKeep = 0"
-                                 gesetzt ist, werden alle Dumpfiles (auch das aktuell erstellte File), gelöscht.
-                                 Diese Einstellung kann sinnvoll sein, wenn FTP aktiviert ist
-                                 und die erzeugten Dumps nur im FTP-Zielverzeichnis erhalten bleiben sollen. <br><br>
+     Nach einem erfolgreichen Dump werden alte Dumpfiles gelöscht und nur die Anzahl Files, definiert durch
+     das Attribut "dumpFilesKeep" (default: 3), verbleibt im Zielverzeichnis "dumpDirLocal". Falls "dumpFilesKeep = 0"
+     gesetzt ist, werden alle Dumpfiles (auch das aktuell erstellte File), gelöscht.
+     Diese Einstellung kann sinnvoll sein, wenn FTP aktiviert ist
+     und die erzeugten Dumps nur im FTP-Zielverzeichnis erhalten bleiben sollen. <br><br>
 
-                                 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql[.gzip] <br><br>
+     Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.sql[.gzip] <br><br>
 
-                                 Um die Datenbank aus dem Dumpfile wiederherzustellen kann das Kommmando: <br><br>
+     Um die Datenbank aus dem Dumpfile wiederherzustellen kann das Kommmando: <br><br>
 
-                                   <ul>
-                                   set &lt;name&gt; restoreMySQL &lt;filename&gt; <br><br>
-                                   </ul>
+       <ul>
+       set &lt;name&gt; restoreMySQL &lt;filename&gt; <br><br>
+       </ul>
 
-                                 verwendet werden. <br><br>
+     verwendet werden. <br><br>
 
-                                 Das erzeugte Dumpfile (unkomprimiert) kann ebenfalls mit: <br><br>
+     Das erzeugte Dumpfile (unkomprimiert) kann ebenfalls mit: <br><br>
 
-                                   <ul>
-                                   mysql -u &lt;user&gt; -p &lt;dbname&gt; < &lt;filename&gt;.sql <br><br>
-                                   </ul>
+       <ul>
+       mysql -u &lt;user&gt; -p &lt;dbname&gt; < &lt;filename&gt;.sql <br><br>
+       </ul>
 
-                                 auf dem MySQL-Server ausgeführt werden um die Datenbank aus dem Dump wiederherzustellen. <br><br>
-                                 <br>
+     auf dem MySQL-Server ausgeführt werden um die Datenbank aus dem Dump wiederherzustellen. <br><br>
+     <br>
 
-                                 <b><u>Option serverSide</u></b> <br>
-                                 Der Dump wird durch den MySQL-Server erstellt und per default im Home-Verzeichnis des MySQL-Servers
-                                 gespeichert. <br>
-                                 Es wird die gesamte history-Tabelle (nicht current-Tabelle) <b>im CSV-Format</b> ohne
-                                 Einschränkungen exportiert. <br>
-                                 Vor dem Dump kann eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump")
-                                 optional zugeschaltet werden . <br><br>
+     <b><u>Option serverSide</u></b> <br>
+     Der Dump wird durch den MySQL-Server erstellt und per default im Home-Verzeichnis des MySQL-Servers
+     gespeichert. <br>
+     Es wird die gesamte history-Tabelle (nicht current-Tabelle) <b>im CSV-Format</b> ohne
+     Einschränkungen exportiert. <br>
+     Vor dem Dump kann eine Tabellenoptimierung (Attribut "optimizeTablesBeforeDump")
+     optional zugeschaltet werden . <br><br>
 
-                                 <b>Achtung ! <br>
-                                 Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
-                                 Tabellenoptimierung verwendet wird ! </b> <br><br>
+     <b>Achtung ! <br>
+     Um ein Blockieren von FHEM zu vermeiden, muß DbLog im asynchronen Modus betrieben werden wenn die
+     Tabellenoptimierung verwendet wird ! </b> <br><br>
 
-                                 Vor und nach dem Dump kann ein FHEM-Kommando (siehe Attribute "executeBeforeProc", "executeAfterProc") ausgeführt
-                                 werden. <br><br>
+     Vor und nach dem Dump kann ein FHEM-Kommando (siehe Attribute "executeBeforeProc", "executeAfterProc") ausgeführt
+     werden. <br><br>
 
-                                 Die für "dumpMySQL serverSide" relevanten Attribute sind: <br><br>
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpDirRemote            </td><td>: das Erstellungsverzeichnis des Dumpfile auf dem entfernten Server </td></tr>
-                                      <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
-                                      <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-                                      <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
-                                      <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+     Die für "dumpMySQL serverSide" relevanten Attribute sind: <br><br>
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> dumpDirRemote            </td><td>: das Erstellungsverzeichnis des Dumpfile auf dem entfernten Server </td></tr>
+          <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
+          <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
+          <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
+          <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+          <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
+          <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
+       </table>
+       </ul>
+       <br>
 
-                                 Das Zielverzeichnis kann mit dem Attribut <a href="#DbRep-attr-dumpDirRemote">dumpDirRemote</a> verändert werden.
-                                 Es muß sich auf dem MySQL-Host gefinden und durch den MySQL-Serverprozess beschreibbar sein. <br>
-                                 Der verwendete Datenbankuser benötigt das <b>FILE</b> Privileg (siehe <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
+     Das Zielverzeichnis kann mit dem Attribut <a href="#DbRep-attr-dumpDirRemote">dumpDirRemote</a> verändert werden.
+     Es muß sich auf dem MySQL-Host gefinden und durch den MySQL-Serverprozess beschreibbar sein. <br>
+     Der verwendete Datenbankuser benötigt das <b>FILE</b> Privileg (siehe <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
 
-                                 <b>Hinweis:</b> <br>
-                                 Soll die interne Versionsverwaltung und die Dumpfilekompression des Moduls genutzt, sowie die Größe des erzeugten
-                                 Dumpfiles ausgegeben werden, ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten
-                                 und im Attribut <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> dem DbRep-Device bekannt zu machen. <br>
-                                 Gleiches gilt wenn der FTP-Transfer nach dem Dump genutzt werden soll (Attribut "ftpUse" bzw. "ftpUseSSL").
-                                 <br><br>
+     <b>Hinweis:</b> <br>
+     Soll die interne Versionsverwaltung und die Dumpfilekompression des Moduls genutzt, sowie die Größe des erzeugten
+     Dumpfiles ausgegeben werden, ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten
+     und im Attribut <a href="#DbRep-attr-dumpDirLocal">dumpDirLocal</a> dem DbRep-Device bekannt zu machen. <br>
+     Gleiches gilt wenn der FTP-Transfer nach dem Dump genutzt werden soll (Attribut "ftpUse" bzw. "ftpUseSSL").
+     <br><br>
 
-                                 <ul>
-                                 <b>Beispiel: </b> <br>
-                                 attr &lt;name&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
-                                 attr &lt;name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
-                                 attr &lt;name&gt; dumpFilesKeep 2 <br><br>
+     <ul>
+     <b>Beispiel: </b> <br>
+     attr &lt;name&gt; dumpDirRemote /volume1/ApplicationBackup/dumps_FHEM/ <br>
+     attr &lt;name&gt; dumpDirLocal /sds1/backup/dumps_FHEM/ <br>
+     attr &lt;name&gt; dumpFilesKeep 2 <br><br>
 
-                                 # Der Dump wird remote auf dem MySQL-Server im Verzeichnis '/volume1/ApplicationBackup/dumps_FHEM/'
-                                   erstellt. <br>
-                                 # Die interne Versionsverwaltung sucht im lokal gemounteten Verzeichnis '/sds1/backup/dumps_FHEM/'
-                                 vorhandene Dumpfiles und löscht diese bis auf die zwei letzten Versionen. <br>
-                                 <br>
-                                 </ul>
+     # Der Dump wird remote auf dem MySQL-Server im Verzeichnis '/volume1/ApplicationBackup/dumps_FHEM/'
+       erstellt. <br>
+     # Die interne Versionsverwaltung sucht im lokal gemounteten Verzeichnis '/sds1/backup/dumps_FHEM/'
+     vorhandene Dumpfiles und löscht diese bis auf die zwei letzten Versionen. <br>
+     <br>
+     </ul>
 
-                                 Wird die interne Versionsverwaltung genutzt, werden nach einem erfolgreichen Dump alte Dumpfiles gelöscht
-                                 und nur die Anzahl "dumpFilesKeep" (default: 3) verbleibt im Zielverzeichnis "dumpDirRemote".
-                                 FHEM benötigt in diesem Fall Schreibrechte auf dem Verzeichnis "dumpDirLocal". <br><br>
+     Wird die interne Versionsverwaltung genutzt, werden nach einem erfolgreichen Dump alte Dumpfiles gelöscht
+     und nur die Anzahl "dumpFilesKeep" (default: 3) verbleibt im Zielverzeichnis "dumpDirRemote".
+     FHEM benötigt in diesem Fall Schreibrechte auf dem Verzeichnis "dumpDirLocal". <br><br>
 
-                                 Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv[.gzip] <br><br>
+     Die <b>Namenskonvention der Dumpfiles</b> ist:  &lt;dbname&gt;_&lt;date&gt;_&lt;time&gt;.csv[.gzip] <br><br>
 
-                                 Ein Restore der Datenbank aus diesem Backup kann durch den Befehl: <br><br>
-                                   <ul>
-                                   set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv[.gzip] <br><br>
-                                   </ul>
+     Ein Restore der Datenbank aus diesem Backup kann durch den Befehl: <br><br>
+       <ul>
+       set &lt;name&gt; &lt;restoreMySQL&gt; &lt;filename&gt;.csv[.gzip] <br><br>
+       </ul>
 
-                                 gestartet werden. <br><br>
+     gestartet werden. <br><br>
 
 
-                                 <b><u>FTP Transfer nach Dump</u></b> <br>
-                                 Wenn diese Möglichkeit genutzt werden soll, ist das Attribut <a href="#DbRep-attr-ftpUse">ftpUse</a> oder
-                                 "ftpUseSSL" zu setzen. Letzteres gilt wenn eine verschlüsselte Übertragung genutzt werden soll. <br>
-                                 Das Modul übernimmt ebenfalls die Versionierung der Dumpfiles im FTP-Zielverzeichnis mit Hilfe des Attributes
-                                 "ftpDumpFilesKeep".
-                                 Für die FTP-Übertragung relevante Attribute sind: <br><br>
+     <b><u>FTP Transfer nach Dump</u></b> <br>
+     Wenn diese Möglichkeit genutzt werden soll, ist das Attribut <a href="#DbRep-attr-ftpUse">ftpUse</a> oder
+     "ftpUseSSL" zu setzen. Letzteres gilt wenn eine verschlüsselte Übertragung genutzt werden soll. <br>
+     Das Modul übernimmt ebenfalls die Versionierung der Dumpfiles im FTP-Zielverzeichnis mit Hilfe des Attributes
+     "ftpDumpFilesKeep".
+     Für die FTP-Übertragung relevante Attribute sind: <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> ftpUse      </td><td>: FTP Transfer nach dem Dump wird eingeschaltet (ohne SSL Verschlüsselung) </td></tr>
-                                      <tr><td> ftpUser     </td><td>: User zur Anmeldung am FTP-Server, default: anonymous </td></tr>
-                                      <tr><td> ftpUseSSL   </td><td>: FTP Transfer mit SSL Verschlüsselung nach dem Dump wird eingeschaltet </td></tr>
-                                      <tr><td> ftpDebug    </td><td>: Debugging des FTP Verkehrs zur Fehlersuche </td></tr>
-                                      <tr><td> ftpDir      </td><td>: Verzeichnis auf dem FTP-Server in welches das File übertragen werden soll (default: "/") </td></tr>
-                                      <tr><td> ftpDumpFilesKeep </td><td>: Es wird die angegebene Anzahl Dumpfiles im &lt;ftpDir&gt; belassen (default: 3) </td></tr>
-                                      <tr><td> ftpPassive  </td><td>: setzen wenn passives FTP verwendet werden soll </td></tr>
-                                      <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
-                                      <tr><td> ftpPwd      </td><td>: Passwort des FTP-Users, default nicht gesetzt </td></tr>
-                                      <tr><td> ftpServer   </td><td>: Name oder IP-Adresse des FTP-Servers. <b>notwendig !</b> </td></tr>
-                                      <tr><td> ftpTimeout  </td><td>: Timeout für die FTP-Verbindung in Sekunden (default: 30). </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
-                                   <br>
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> ftpUse      </td><td>: FTP Transfer nach dem Dump wird eingeschaltet (ohne SSL Verschlüsselung) </td></tr>
+          <tr><td> ftpUser     </td><td>: User zur Anmeldung am FTP-Server, default: anonymous </td></tr>
+          <tr><td> ftpUseSSL   </td><td>: FTP Transfer mit SSL Verschlüsselung nach dem Dump wird eingeschaltet </td></tr>
+          <tr><td> ftpDebug    </td><td>: Debugging des FTP Verkehrs zur Fehlersuche </td></tr>
+          <tr><td> ftpDir      </td><td>: Verzeichnis auf dem FTP-Server in welches das File übertragen werden soll (default: "/") </td></tr>
+          <tr><td> ftpDumpFilesKeep </td><td>: Es wird die angegebene Anzahl Dumpfiles im &lt;ftpDir&gt; belassen (default: 3) </td></tr>
+          <tr><td> ftpPassive  </td><td>: setzen wenn passives FTP verwendet werden soll </td></tr>
+          <tr><td> ftpPort     </td><td>: FTP-Port, default: 21 </td></tr>
+          <tr><td> ftpPwd      </td><td>: Passwort des FTP-Users, default nicht gesetzt </td></tr>
+          <tr><td> ftpServer   </td><td>: Name oder IP-Adresse des FTP-Servers. <b>notwendig !</b> </td></tr>
+          <tr><td> ftpTimeout  </td><td>: Timeout für die FTP-Verbindung in Sekunden (default: 30). </td></tr>
+       </table>
+       </ul>
+       <br>
+       <br>
 
-                                 </ul>
-                                 </li><br>
+     </ul>
+     </li>
+     <br>
 
     <li><b> dumpSQLite </b>   -  erstellt einen Dump der angeschlossenen SQLite-Datenbank.  <br>
                                  Diese Funktion nutzt die SQLite Online Backup API und ermöglicht es konsistente Backups der SQLite-DB
@@ -18535,6 +18547,7 @@ sub dbval {
 
   <a id="DbRep-attr-dumpDirLocal"></a>
   <li><b>dumpDirLocal </b>  <br><br>
+  
   <ul>
     Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide" oder "dumpSQLite".  <br>
 
@@ -18820,30 +18833,32 @@ sub bdump {
                                 </li> <br>
 
   <a id="DbRep-attr-seqDoubletsVariance"></a>
-  <li><b>seqDoubletsVariance  &lt;positive Abweichung [negative Abweichung] [EDGE=negative|positive]&gt; </b> <br>
-                                    Akzeptierte Abweichung für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
-                                    Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische
-                                    Werte (VALUE) von Datensätzen als gleich angesehen werden sollen.
-                                    Ist in "seqDoubletsVariance" nur ein Zahlenwert angegeben, wird er sowohl als positive als
-                                    auch negative Abweichung verwendet und bilden den "Löschkorridor".
-                                    Optional kann ein zweiter Zahlenwert für eine negative Abweichung, getrennt durch
-                                    Leerzeichen, angegeben werden.
-                                    Es sind immer absolute, d.h. positive Zahlenwerte anzugeben. <br>
-                                    Ist der Zusatz "EDGE=negative" angegeben, werden Werte an einer negativen Flanke
-                                    (z.B. beim Wechel von 4.0 -&gt; 1.0) nicht gelöscht auch wenn sie sich im "Löschkorridor"
-                                    befinden. Entsprechendes gilt bei "EDGE=positive" für die positive Flanke (z.B. beim Wechel
-                                    von 1.2 -&gt; 2.8).
-                                    <br><br>
+  <li><b>seqDoubletsVariance  &lt;positive Abweichung [negative Abweichung] [EDGE=negative|positive]&gt; </b> <br><br>
+  
+  Akzeptierte Abweichung für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
+  Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische
+  Werte (VALUE) von Datensätzen als gleich angesehen werden sollen.
+  Ist in "seqDoubletsVariance" nur ein Zahlenwert angegeben, wird er sowohl als positive als
+  auch negative Abweichung verwendet und bilden den "Löschkorridor".
+  Optional kann ein zweiter Zahlenwert für eine negative Abweichung, getrennt durch
+  Leerzeichen, angegeben werden.
+  Es sind immer absolute, d.h. positive Zahlenwerte anzugeben. <br>
+  Ist der Zusatz "EDGE=negative" angegeben, werden Werte an einer negativen Flanke
+  (z.B. beim Wechel von 4.0 -&gt; 1.0) nicht gelöscht auch wenn sie sich im "Löschkorridor"
+  befinden. Entsprechendes gilt bei "EDGE=positive" für die positive Flanke (z.B. beim Wechel
+  von 1.2 -&gt; 2.8).
+  <br><br>
 
-                                    <ul>
-                                    <b>Beispiele:</b> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
-                                    <code>attr &lt;name&gt; seqDoubletsVariance 1.5 EDGE=negative </code> <br>
-                                    </ul>
-                                    <br><br>
-                                    </li>
+  <ul>
+    <b>Beispiele:</b> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
+    <code>attr &lt;name&gt; seqDoubletsVariance 1.5 EDGE=negative </code> <br>
+  </ul>
+  <br>
+  <br>
+  </li>
 
   <a id="DbRep-attr-showproctime"></a>
   <li><b>showproctime </b>    - wenn gesetzt, zeigt das Reading "sql_processing_time" die benötigte Abarbeitungszeit (in Sekunden)
