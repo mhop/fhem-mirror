@@ -749,6 +749,10 @@ HttpUtils_Connect2($)
         HttpUtils_Close($hash);
         return $hash->{callback}($hash, "write error: $err", undef)
       }
+
+      Log 1, "Encoding problem in data/header (not UTF-8), check Forum #131207"
+        if(length($data) < $ret);
+
       $data = substr($data,$ret);
       if(length($data) == 0) {
         shutdown($hash->{conn}, 1) if($s);
