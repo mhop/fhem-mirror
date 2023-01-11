@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.1"  => "01.01.2023  write TYPE uppercase with writeToDB option, Commandref edited ",
+  "8.51.1"  => "01.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ",
   "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
                             "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
   "8.50.10" => "01.01.2023  Commandref edited ",
@@ -7080,7 +7080,7 @@ sub DbRep_sqlCmdDone {
 
   delete($hash->{HELPER}{RUNNING_PID});
   
-  my $tmpsql           = delete $data{DbRep}{$name}{sqlcache}{temp};                    # SQL incl. Formatierung aus Zwischenspeicher holen
+  my $tmpsql           = $data{DbRep}{$name}{sqlcache}{temp};                           # SQL incl. Formatierung aus Zwischenspeicher holen
   my ($erread, $state) = DbRep_afterproc ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen
 
   if ($err) {
@@ -7092,6 +7092,8 @@ sub DbRep_sqlCmdDone {
     
     return;
   }
+  
+  DbRep_addSQLcmdCache ($name);                                                        # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
 
   my ($rt,$brt)  = split ",", $bt;
   my $srf        = AttrVal($name, "sqlResultFormat", "separated");
@@ -7104,8 +7106,6 @@ sub DbRep_sqlCmdDone {
   readingsBeginUpdate     ($hash);
   ReadingsBulkUpdateValue ($hash, 'sqlCmd', $tmpsql);      
   ReadingsBulkUpdateValue ($hash, 'sqlResultNumRows', $nrows);
-
-  DbRep_addSQLcmdCache ($name);                                                        # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
 
   if ($srf eq "sline") {
       $rowstring =~ s/§/]|[/g;
