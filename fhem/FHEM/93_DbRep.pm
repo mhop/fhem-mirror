@@ -59,7 +59,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.1"  => "01.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ",
+  "8.51.1"  => "01.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
+                            "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
   "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
                             "sqlCmdBlocking customized like sqlCmd, bugfix avgTimeWeightMean ",
   "8.50.10" => "01.01.2023  Commandref edited ",
@@ -7762,7 +7763,12 @@ sub DbRep_optimizeTables {
 
       Log3 ($name, 3, "DbRep $name - Size of database $dbname before optimize (MB): $db_MB_start");
 
-      $query  ="VACUUM";
+      $query = "PRAGMA auto_vacuum = FULL;";
+
+      $err = _DbRep_setSessPragma ($name, $dbh, \$query);
+      return "$name|$err" if ($err);
+  
+      $query = "VACUUM";
 
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $query, "VACUUM database $dbname....");
       return "$name|$err" if ($err);
