@@ -399,7 +399,7 @@ FHEM/73_ElectricityCalculator.pm Sailor           Unterstützende Dienste https:
 FHEM/73_GardenaSmartBridge.pm CoolTux             Sonstige Systeme
 FHEM/73_GasCalculator        Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,47909.0.html
 FHEM/73_km200.pm             Sailor               Heizungssteuerung/Raumklima https://forum.fhem.de/index.php/topic,25540.0.html
-FHEM/73_MPD.pm               Wzut                 Multimedia
+FHEM/73_MPD.pm               Wzut/Beta-User       Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/73_PRESENCE.pm          JoWiemann            Unterstützende Dienste
 FHEM/73_WaterCalculator      Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html

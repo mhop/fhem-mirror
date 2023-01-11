@@ -2,6 +2,7 @@
 # Do not insert empty lines here, update check depends on it.
  - change:  93_DbRep: write TYPE uppercase with writeToDB option, 
                       Commandref edited
+ - bugfix:  73_MPD: adopt to newer mpd versions with more events
  - bugfix:  59_Weather: fix DarkSky API wrong funtion call
  - feature: 72_FRITZBOX: merged old 72_FRITZBOX with last Fork Version
  - bugfix:  59_Weather: bugfix function WeatherAsHtmlD not working
