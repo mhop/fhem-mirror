@@ -3360,7 +3360,7 @@ FW_devState($$@)
       $txt = $state;
       my ($icon, $isHtml);
       ($icon, $link, $isHtml) = FW_dev2image($d,$state);
-      $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
+      $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if(defined($icon));
 
       my $cmdlist = (defined($link) ? $link : "");
       my $h = "";
