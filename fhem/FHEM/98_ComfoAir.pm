@@ -368,7 +368,7 @@ sub Initialize {
         'queueDelay ' .
         'timeout ' .
         'queueMax ' . 
-        'alignTime' .
+        'alignTime ' .
         join (" ", @pollList) . " " .                               # Def der zyklisch abzufragenden Nachrichten
         $main::readingFnAttributes;
     return;
