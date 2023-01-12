@@ -1,8 +1,8 @@
-REV 27020
+REV 27031
 DIR unused
-UPD 2023-01-11_07:45:02 389724 ./CHANGED
+UPD 2023-01-12_07:45:03 390032 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2023-01-11_07:45:02 46106 ./MAINTAINER.txt
+UPD 2023-01-12_07:45:03 46106 ./MAINTAINER.txt
 UPD 2022-12-07_07:45:02 46565 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2022-12-18_11:54:24 173296 ./fhem.pl
@@ -393,7 +393,7 @@ UPD 2022-11-14_07:45:07 232639 FHEM/73_DoorBird.pm
 UPD 2022-11-14_07:45:07 148175 FHEM/73_ElectricityCalculator.pm
 UPD 2022-07-02_07:45:03 49975 FHEM/73_GardenaSmartBridge.pm
 UPD 2022-11-14_07:45:07 120483 FHEM/73_GasCalculator.pm
-UPD 2021-03-07_07:45:03 87485 FHEM/73_MPD.pm
+UPD 2023-01-12_07:45:03 90682 FHEM/73_MPD.pm
 UPD 2021-12-18_07:45:03 10412 FHEM/73_NUKIBridge.pm
 UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
 UPD 2022-11-14_07:45:07 130714 FHEM/73_WaterCalculator.pm
@@ -455,8 +455,8 @@ UPD 2020-09-22_07:45:02 10752 FHEM/91_sequence.pm
 UPD 2022-06-02_07:45:02 19537 FHEM/91_watchdog.pm
 UPD 2023-01-05_07:45:03 65739 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
-UPD 2022-12-30_07:45:03 469411 FHEM/93_DbLog.pm
-UPD 2023-01-08_07:45:03 974595 FHEM/93_DbRep.pm
+UPD 2023-01-12_07:45:03 464782 FHEM/93_DbLog.pm
+UPD 2023-01-12_07:45:03 966164 FHEM/93_DbRep.pm
 UPD 2022-12-29_07:45:03 23863 FHEM/93_FHEM2FHEM.pm
 UPD 2022-02-08_07:45:02 37562 FHEM/93_InfluxDBLogger.pm
 UPD 2021-03-02_07:45:03 176340 FHEM/93_Log2Syslog.pm
@@ -584,7 +584,7 @@ UPD 2019-06-21_07:45:02 2767 FHEM/GPUtils.pm
 UPD 2022-10-21_07:45:02 91542 FHEM/HMCCUConf.pm
 UPD 2021-10-31_07:45:02 203693 FHEM/HMConfig.pm
 UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
-UPD 2022-12-31_07:45:03 35767 FHEM/HttpUtils.pm
+UPD 2023-01-12_07:45:03 35883 FHEM/HttpUtils.pm
 UPD 2020-05-09_07:45:02 3459 FHEM/MaxCommon.pm
 UPD 2022-12-24_07:45:03 119890 FHEM/Meta.pm
 UPD 2017-04-18_07:45:02 272672 FHEM/ONKYOdb.pm
@@ -651,7 +651,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2022-01-15_07:45:03 10338 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2023-01-05_07:45:03 410609 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2023-01-12_07:45:03 412105 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2022-12-13_07:45:02 11263 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -717,9 +717,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2023-01-11_07:45:02 34301 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2023-01-12_07:45:03 41481 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2023-01-03_07:45:03 730724 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2023-01-03_07:45:03 173599 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2023-01-12_07:45:03 173718 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2023-01-03_07:45:03 39700 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2023-01-05_07:45:03 19832 FHEM/msgSchema.pm
@@ -742,12 +742,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2023-01-11_07:45:07 4833455 docs/commandref.html
-UPD 2023-01-11_07:45:09 2872729 docs/commandref_DE.html
+UPD 2023-01-12_07:45:08 4830169 docs/commandref.html
+UPD 2023-01-12_07:45:10 2869340 docs/commandref_DE.html
 UPD 2022-12-31_07:45:03 83653 docs/commandref_frame.html
 UPD 2023-01-10_07:45:03 93721 docs/commandref_frame_DE.html
-UPD 2023-01-11_07:45:10 297336 docs/commandref_modular.html
-UPD 2023-01-11_07:45:12 308593 docs/commandref_modular_DE.html
+UPD 2023-01-12_07:45:12 297805 docs/commandref_modular.html
+UPD 2023-01-12_07:45:13 309062 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
