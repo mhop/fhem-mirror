@@ -21,7 +21,9 @@
 #   First version: 25.12.2013
 #
 #   Todo:       
+#               check encodings in attr (find_encoding, none as special case)
 #               allow set inerval 0
+#               allow multiple values for set -> $val1, $val2, ...
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
@@ -141,7 +143,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.14 - 19.8.2022';
+my $Module_Version = '4.1.15 - 17.12.2022';
 
 my $AttrList = join (' ', 
       'reading[0-9]+(-[0-9]+)?Name', 
@@ -270,7 +272,8 @@ my $AttrList = join (' ',
       'memReading',                           # debuf -> create a reading for the virtual Memory of the Fhem process together with BufCounter if it is used
       'model',                                # for attr templates
       'regexDecode',
-      'bodyDecode', 
+      'bodyDecode',                             # implemented in the bodyDecode function in Utils
+      'bodyEncode',                             # also in utils
       'regexCompile',
       $main::readingFnAttributes);
 
@@ -2518,6 +2521,7 @@ sub PrepareCookies {
 
 #################################################################
 # set parameters for HttpUtils from request into hash
+# and do replacements
 sub FillHttpUtilsHash {
     my $hash     = shift;
     my $name     = $hash->{NAME};
@@ -2612,7 +2616,8 @@ sub ReadyForSending {
 }
 
 
-#######################################
+##############################################
+# prepare next queue entry and send it
 # Aufruf aus InternalTimer mit "queue:$name" 
 # oder direkt mit $direct:$name
 sub HandleSendQueue {
@@ -2648,7 +2653,7 @@ sub HandleSendQueue {
     $hash->{REQUEST}     = $request;
     $hash->{value}       = $request->{value};                   # make value accessible for user defined replacements / expressions
     
-    my $huHash = FillHttpUtilsHash($hash);
+    my $huHash = FillHttpUtilsHash($hash);                      # prepare hash, do replacements
 
     Log3 $name, 4,
           "$name: HandleSendQueue sends $request->{type} with timeout $huHash->{timeout} to "
@@ -3469,6 +3474,13 @@ sub AddToSendQueue {
             If no charset header is found, the body will remain undecoded.
             <br>
         </li>
+		<li><a id="HTTPMOD-attr-bodyEncode" data-pattern="bodyEncode">bodyEncode</a><br> 
+            defines an encoding to be used in a call to the perl function encode to convert the raw http response body data string 
+            read from the device before further processing / matching<br>
+            If you have trouble with JSON parsing you might need to use this feature and set it to utf8.
+            <br>
+        </li>
+
 		<li><a id="HTTPMOD-attr-regexDecode" data-pattern="regexDecode">regexDecode</a><br> 
             defines an encoding to be used in a call to the perl function decode to convert the raw data string from regex attributes before further processing / matching<br>
             If you have trouble matching special characters or if you need to get around a memory leak in Perl regex processing this might help
@@ -3552,6 +3564,8 @@ sub AddToSendQueue {
         </li>
 		<li><a id="HTTPMOD-attr-setIExpr" data-pattern="set.*IExpr">set[0-9]+IExpr</a><br>
             Perl Expression to compute the raw value to be sent to the device from the input value passed to the set.
+            E.g. "$val*100" will multiply $val by 100 after a set command, the thusly modified $val will then be used in subsequent processing, 
+            e.g. "(get|set)[0-9]*Data" will use the modified $val
         </li>
 		<li><a id="HTTPMOD-attr-setExpr" data-pattern="set.*\[?\+?]Expr">set[0-9]+Expr</a><br>
             This is the old syntax for (get|reading)[0-9]*IExpr. It should be replaced by (get|reading)[0-9]*IExpr. The set command upgradeAttributes which becomes visible when the attribute enableControlSet is set to 1, can do this renaming automatically.

@@ -54,6 +54,7 @@ our @EXPORT_OK = qw(UpdateTimer FhemCaller
                     IsOpen
                     FmtTimeMs
                     FmtDate
+                    FmtDateTimeNice
                     DateDiff
                     date_str2num
                     ReadableArray
@@ -282,11 +283,14 @@ sub EvalExpr {
     my $inCheckEval = ($checkOnly ? 0 : 1);
 
     my $assign = 'package main; ';
+    KEYLOOP:
     foreach my $key (keys %{$oRef}) {
+        next KEYLOOP if($key =~ /(checkOnly|nullIfNoExp|expr|action)/);
         my $type  = ref $oRef->{$key};
         my $vName = substr($key,1);
         my $vType = substr($key,0,1);
         
+        #Log3 $name, 3, "$name: EvalExpr: $action check key $key type $type and vType $vType";
         if ($type eq 'SCALAR') {
             $assign .= "my \$$vName = \${\$oRef->{'$key'}};";   # assign ref to scalar as scalar
         } 
@@ -631,7 +635,7 @@ sub ReadKeyValue {
 
 
 ###################################################
-# recoursive main part for HTTPMOD_FlattenJSON($$)
+# recoursive main part for FlattenJSON($$)
 # consumes a hash passed as parameter
 # and creates $hash->{ParserData}{JSON}{$prefix.$key}
 sub JsonFlatter {
@@ -732,6 +736,7 @@ sub BodyDecode {
     my $header     = shift // '';
     my $name       = $hash->{NAME};        # Fhem device name
     my $bodyDecode = AttrVal($name, 'bodyDecode', 'default');
+    my $bodyEncode = AttrVal($name, 'bodyEncode', '');
     my $bodyCharset;
     my $decoding;
 
@@ -776,6 +781,7 @@ sub BodyDecode {
         $hash->{'.bodyCharset'} = 'internal';
         #Log3 $name, 5, "$name: BodyDecode " . ($body ? "new body as utf-8 is: \n" . encode ('utf-8', $body) : "body empty");
     }
+    $body = encode($bodyEncode, $body) if ($bodyEncode && $bodyEncode !~ m{\A [Nn]one \z}xms );
     return $body;
 }
 
@@ -786,6 +792,7 @@ sub BodyDecode {
 # tcpserver
 sub IsOpen {
     my $hash = shift;
+    return 0 if (!$hash->{DeviceName});
     return 1 if ($hash->{DeviceName} eq 'none');
     return 1 if ($hash->{TCPServer} && $hash->{FD});
     return 1 if ($hash->{TCPChild}  && defined($hash->{CD}));
@@ -823,6 +830,16 @@ sub FmtTimeMs {
 sub FmtDate {
   my @t = localtime(shift);
   return sprintf("%04d-%02d-%02d", $t[5]+1900, $t[4]+1, $t[3]);
+}
+
+
+####################################################
+# format date and time as nicer string
+sub FmtDateTimeNice {
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(shift);
+    my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+    my @days   = qw(So Mo Di Mi Do Fr Sa);
+    return sprintf("%s %d.%s %04d %02d:%02d", $days[$wday], $mday, $months[$mon], $year+1900, $hour, $min);
 }
 
 
