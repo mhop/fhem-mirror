@@ -59,7 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.51.2"  => "12.01.2023  rewrite sub DbRep_OutputWriteToDB ",
+  "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
   "8.51.1"  => "11.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
                             "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
   "8.51.0"  => "02.01.2023  online formatting of sqlCmd, sqlCmdHistory, sqlSpecial, Commandref edited, get dbValue removed ".
@@ -642,7 +642,7 @@ sub DbRep_Set {
                 (($hash->{ROLE} ne "Agent") ? "tableCurrentPurge:noArg "                 : "").
                 (($hash->{ROLE} ne "Agent") ? "countEntries:history,current "            : "").
                 (($hash->{ROLE} ne "Agent") ? "sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime "          : "").
-                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime "      : "").
+                (($hash->{ROLE} ne "Agent") ? "averageValue:display,writeToDB,writeToDBSingle,writeToDBSingleStart,writeToDBInTime "      : "").
                 (($hash->{ROLE} ne "Agent") ? "delSeqDoublets:adviceRemain,adviceDelete,delete "                     : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)             ? "dumpMySQL:clientSide,serverSide "  : "").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)            ? "dumpSQLite:noArg "                 : "").
@@ -12857,8 +12857,8 @@ sub DbRep_OutputWriteToDB {
           $ntime             =~ s/-/:/g if($ntime);
 
           if($aggr =~ /no|day|week|month|year/) {
-              $time  = "00:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                            # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
-              $ntime = "23:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+              $time  = "00:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single(Start)?)*?\b/);                          # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+              $ntime = "23:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single(Start)?)*?\b/); 
               
               ($year,$mon,$mday) = split "-", $ndate;
               $corr              = $i != $ele ? 86400 : 0;
@@ -12869,13 +12869,13 @@ sub DbRep_OutputWriteToDB {
               ($hour,$minute) = split ":", $time;
 
               if($aggr eq "minute") {
-                  $time  = "$hour:$minute:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
-                  $ntime = "$hour:$minute:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+                  $time  = "$hour:$minute:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single(Start)?)*?\b/);                          # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $ntime = "$hour:$minute:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single(Start)?)*?\b/);
               }
 
               if($aggr eq "hour") {
-                  $time  = "$hour:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
-                  $ntime = "$hour:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+                  $time  = "$hour:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single(Start)?)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $ntime = "$hour:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single(Start)?)*?\b/); 
               }
           }
 
@@ -12884,7 +12884,7 @@ sub DbRep_OutputWriteToDB {
 
               if($i == 0) {
                   push @wr_arr, "$date $time|$device|$type|$event|$reading|$value|$unit"    if($hash->{LASTCMD} !~ /\bwriteToDBSingle\b/);
-                  push @wr_arr, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit";
+                  push @wr_arr, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit"  if($hash->{LASTCMD} !~ /\bwriteToDBSingleStart\b/);
               }
               else {
                   if ($aggr =~ /no|day|week|month|year/) {
@@ -12899,7 +12899,7 @@ sub DbRep_OutputWriteToDB {
                   }
 
                   push @wr_arr, "$date $time|$device|$type|$event|$reading|$value|$unit"    if($hash->{LASTCMD} !~ /\bwriteToDBSingle\b/);
-                  push @wr_arr, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit";
+                  push @wr_arr, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit"  if($hash->{LASTCMD} !~ /\bwriteToDBSingleStart\b/);
               }
           }
           $i++;
@@ -13917,61 +13917,64 @@ return;
 
                                </li> <br>
 
-    <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b>
-                                 - calculates an average value of the database field "VALUE" in the time limits
-                                 of the possible time.*-attributes. <br><br>
+    <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBSingleStart | writeToDBInTime]</b> <br><br>
+    
+     Calculates an average value of the database field "VALUE" in the time limits
+     of the possible time.*-attributes. <br><br>
 
-                                 The reading to be evaluated must be specified in the attribute <a href="#DbRep-attr-reading">reading</a>
-                                 must be specified.
-                                 With the attribute <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a> the calculation variant
-                                 is used for Averaging defined. <br><br>
+     The reading to be evaluated must be specified in the attribute <a href="#DbRep-attr-reading">reading</a>
+     must be specified.
+     With the attribute <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a> the calculation variant
+     is used for Averaging defined. <br><br>
 
-                                 If none or the option <b>display</b> is specified, the results are only displayed. With
-                                 the options <b>writeToDB</b>, <b>writeToDBSingle</b> or <b>writeToDBInTime</b> the calculation results are written
-                                 with a new reading name into the database. <br><br>
+     If none or the option <b>display</b> is specified, the results are only displayed. With
+     the options <b>writeToDB</b>, <b>writeToDBSingle</b>, <b>writeToDBSingleStart</b> or <b>writeToDBInTime</b> the 
+     calculation results are written with a new reading name into the database. 
+     <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=10%> <col width=90%> </colgroup>
-                                      <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+       <ul>
+       <table>
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> <b>writeToDB</b>              </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective evaluation period </td></tr>
+          <tr><td> <b>writeToDBSingle</b>        </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an evaluation period                    </td></tr>
+          <tr><td> <b>writeToDBSingleStart</b>   </td><td>: writes only one value with the time stamp XX:XX:01 at the begin of an evaluation period                  </td></tr>
+          <tr><td> <b>writeToDBInTime</b>        </td><td>: writes a value at the beginning and end of the time limits of an evaluation period                       </td></tr>
+       </table>
+       </ul>
+       <br>
 
-                                 The new reading name is formed from a prefix and the original reading name,
-                                 where the original reading name can be replaced by the attribute "readingNameMap".
-                                 The prefix consists of the educational function and the aggregation. <br>
-                                 The timestamp of the new readings in the database is determined by the set aggregation period
-                                 if no clear time of the result can be determined.
-                                 The field "EVENT" is filled with "calculated". <br><br>
+     The new reading name is formed from a prefix and the original reading name,
+     where the original reading name can be replaced by the attribute "readingNameMap".
+     The prefix consists of the educational function and the aggregation. <br>
+     The timestamp of the new readings in the database is determined by the set aggregation period
+     if no clear time of the result can be determined.
+     The field "EVENT" is filled with "calculated". <br><br>
 
-                                 <ul>
-                                 <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
-                                 avgam_day_totalpac <br>
-                                 # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>
-                                 </ul>
-                                 <br>
+     <ul>
+     <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
+     avgam_day_totalpac <br>
+     # &lt;creation function&gt;_&lt;aggregation&gt;_&lt;original reading&gt; <br>
+     </ul>
+     <br>
 
-                                 Summarized the relevant attributes to control this function are: <br><br>
+     Summarized the relevant attributes to control this function are: <br><br>
 
-                                 <ul>
-                                 <table>
-                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                    <tr><td> <b>averageCalcForm</b>                        </td><td>: choose the calculation variant for average determination </td></tr>
-                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                    <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
-                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
-                                    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
-                                    </table>
-                                 </ul>
-                                 <br>
-                                 <br>
+     <ul>
+     <table>
+     <colgroup> <col width=5%> <col width=95%> </colgroup>
+        <tr><td> <b>averageCalcForm</b>                        </td><td>: choose the calculation variant for average determination </td></tr>
+        <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+        <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+        <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
+        <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
+        <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
+        <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+        </table>
+     </ul>
+     <br>
+     <br>
 
-                                 </li>
+     </li>
 
     <li><b> cancelDump </b>   -  stops a running database dump. </li> <br>
 
@@ -16793,64 +16796,65 @@ return;
                                </li> <br>
 
 
-    <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b>
-                                 - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen
-                                 der möglichen time.*-Attribute. <br><br>
-                                 </li>
+    <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBSingleStart | writeToDBInTime]</b> <br><br>
+    
+     Berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen
+     der möglichen time.*-Attribute. <br><br>
 
-                                 Es muss das auszuwertende Reading im Attribut <a href="#DbRep-attr-reading">reading</a>
-                                 angegeben sein.
-                                 Mit dem Attribut <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a> wird die Berechnungsvariante zur
-                                 Mittelwertermittlung definiert. <br>
-                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit
-                                 den Optionen <b>writeToDB</b>, <b>writeToDBSingle</b> bzw. <b>writeToDBInTime</b> werden die Berechnungsergebnisse
-                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br><br>
+     Es muss das auszuwertende Reading im Attribut <a href="#DbRep-attr-reading">reading</a>
+     angegeben sein.
+     Mit dem Attribut <a href="#DbRep-attr-averageCalcForm">averageCalcForm</a> wird die Berechnungsvariante zur
+     Mittelwertermittlung definiert. <br>
+     Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit
+     den Optionen <b>writeToDB</b>, <b>writeToDBSingle</b>, <b>writeToDBSingleStart</b> bzw. <b>writeToDBInTime</b> 
+     werden die Berechnungsergebnisse mit einem neuen Readingnamen in der Datenbank gespeichert. <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=10%> <col width=90%> </colgroup>
-                                      <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln XX:XX:01 und XX:XX:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel XX:XX:59 am Ende einer Auswertungsperiode</td></tr>
-                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: schreibt jeweils einen Wert am Anfang und am Ende der Zeitgrenzen einer Auswertungsperiode </td></tr>
-                                   </table>
-                                   </ul>
-                                   <br>
+       <ul>
+       <table>
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> <b>writeToDB</b>             </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln XX:XX:01 und XX:XX:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
+          <tr><td> <b>writeToDBSingle</b>       </td><td>: schreibt nur einen Wert mit dem Zeitstempel XX:XX:59 am Ende einer Auswertungsperiode                              </td></tr>
+          <tr><td> <b>writeToDBSingleStart</b>  </td><td>: schreibt nur einen Wert mit dem Zeitstempel XX:XX:01 am Beginn einer Auswertungsperiode                            </td></tr>
+          <tr><td> <b>writeToDBInTime</b>       </td><td>: schreibt jeweils einen Wert am Anfang und am Ende der Zeitgrenzen einer Auswertungsperiode                         </td></tr>
+       </table>
+       </ul>
+       <br>
 
-                                 Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet,
-                                 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
-                                 Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
-                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode
-                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann.
-                                 Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+     Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet,
+     wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
+     Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
+     Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode
+     abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann.
+     Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
 
-                                 <ul>
-                                 <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
-                                 avgam_day_totalpac <br>
-                                 # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>
-                                 </ul>
-                                 <br>
+     <ul>
+     <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
+     avgam_day_totalpac <br>
+     # &lt;Bildungsfunktion&gt;_&lt;Aggregation&gt;_&lt;Originalreading&gt; <br>
+     </ul>
+     <br>
 
-                                 Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
+     Zusammengefasst sind die zur Steuerung dieser Funktion relevanten Attribute: <br><br>
 
-                                   <ul>
-                                   <table>
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
-                                      <tr><td> <b>averageCalcForm</b>                        </td><td>: Auswahl der Berechnungsvariante für den Durchschnitt</td></tr>
-                                      <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-                                      <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
-                                      <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
-                                      <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
-                                      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
-                                      </table>
-                                   </ul>
-                                   <br>
-                                   <br>
-
-                                <br>
-
+       <ul>
+       <table>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
+          <tr><td> <b>averageCalcForm</b>                        </td><td>: Auswahl der Berechnungsvariante für den Durchschnitt</td></tr>
+          <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+          <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+          <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
+          <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
+          <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
+          <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+          <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+          </table>
+       </ul>
+       <br>
+       <br>
+       
+    </li>
+    <br>
 
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
 
