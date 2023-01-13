@@ -316,7 +316,7 @@ sub Set {
   }
   else {
       my $as  = "--reset--,".allStreamDevs();
-      my $sd  = AttrVal($name, "adoptSubset", $as);
+      my $sd  = AttrVal($name, 'adoptSubset', $as);
       $sd     =~ s/\s+/#/gx;      
       
       my $rsd = $as;
@@ -984,8 +984,9 @@ sub sDevsWidget {
   my $ret        = "";
   my $cmdAdopt   = "adopt";
   my $as         = "--reset--,".allStreamDevs();
-  my $valAdopts  = AttrVal($name, "adoptSubset", $as);
+  my $valAdopts  = ">blank<,".AttrVal ($name, 'adoptSubset', $as);
   $valAdopts     =~ s/\s+/#/gx;
+  $valAdopts     =~ s/>blank</#/gx;
   
   for my $fn (sort keys %{$data{webCmdFn}}) {
       next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
