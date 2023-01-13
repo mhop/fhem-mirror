@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
-#       (c) 2018-2022 by Heiko Maaz
+#       (c) 2018-2023 by Heiko Maaz
 #       forked from 98_weblink.pm by Rudolf König
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.3" => "13.01.2023  change behavior of hideDisplayName, hideDisplayNameFTUI if device is disabled ",
   "2.15.2" => "01.01.2022  minor code change in _setpopupStream ",
   "2.15.1" => "15.10.2021  fix warnings 'my variable masks earlier' ",
   "2.15.0" => "27.09.2021  model lastsnap: add setter snap ",
@@ -239,8 +240,7 @@ sub Define {
   
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
   
-  # Versionsinformationen setzen
-  setVersionInfo($hash);
+  setVersionInfo($hash);                                                           # Versionsinformationen setzen
   
   my @r;
   push @r, "adoptSubset:--reset--" if(IsModelMaster($hash));                       # Init für FTUI Subset wenn benutzt (Attr adoptSubset)
@@ -584,7 +584,7 @@ sub Get {
  } 
  
  if ($cmd eq "ftui") {
-     return streamAsHtml($hash,"ftui");
+     return streamAsHtml($hash, 'ftui');
  }
  
 return;
@@ -677,21 +677,24 @@ sub FwFn {
   my $ret = "";
   
   if(IsModelMaster($hash) && $clink) {
-      my $alias = AttrVal($name, "alias", $name);                                                         # Linktext als Aliasname oder Devicename setzen
-      my $lang  = AttrVal("global", "language", "EN");
+      my $alias = AttrVal ($name, 'alias', $name);                                                         # Linktext als Aliasname oder Devicename setzen
+      my $lang  = AttrVal ('global', 'language', 'EN');
       my $txt   = "is Streaming master of";
       $txt      = "ist Streaming Master von " if($lang eq "DE");
       my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a> $txt ";
       $dlink    = "$alias $txt " if(AttrVal($name, "noLink", 0));                                         # keine Links im Stream-Dev generieren
-      $ret     .= "<span align=\"center\">$dlink </span>"   if(!AttrVal($name,"hideDisplayName",0));
+      
+      if(!AttrVal ($name, 'hideDisplayName', 0) && !IsDisabled($name)) {
+          $ret .= "<span align=\"center\">$dlink </span>";
+      }
   }
   
   if(IsDisabled($name)) {
-      if(AttrVal($name, "hideDisplayName", 0)) {
-          $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
+      if(AttrVal($name, 'hideDisplayName', 0)) {
+          $ret .= "Stream-device is disabled";
       } 
       else {
-          $ret .= "<html>Stream-device is disabled</html>";
+          $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
       } 
   } 
   else {
@@ -699,7 +702,7 @@ sub FwFn {
       $ret .= sDevsWidget($name) if(IsModelMaster($hash)); 
   }
    
-  my $al = AttrVal($name, "autoRefresh", 0);                                                             # Autorefresh nur des aufrufenden FHEMWEB-Devices
+  my $al = AttrVal ($name, 'autoRefresh', 0);                                                             # Autorefresh nur des aufrufenden FHEMWEB-Devices
   
   if($al) {  
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
@@ -821,11 +824,12 @@ sub streamAsHtml {
   
   if($ftui && $ftui eq "ftui") {
       $ftui = 1;
-  } else {
+  } 
+  else {
       $ftui = 0; 
   }
   
-  my $clink = ReadingsVal($name, "clientLink", "");
+  my $clink = ReadingsVal ($name, 'clientLink', '');
   
   explodeLinkData ($hash, $clink, 0);
     
@@ -844,10 +848,14 @@ sub streamAsHtml {
   
   my $ret = "<html>";
   if(IsDisabled($name)) {  
-      if(AttrVal($name,"hideDisplayName",0)) {
-          $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
-      } else {
+      if (!$ftui && AttrVal ($name, 'hideDisplayName', 0)) {
           $ret .= "Stream-device is disabled";
+      }
+      elsif ($ftui && AttrVal ($name, 'hideDisplayNameFTUI', 0)) {
+          $ret .= "Stream-device is disabled";
+      }  
+      else {
+          $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
       }
 
   } else {

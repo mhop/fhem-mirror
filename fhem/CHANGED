@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCamSTRM: change behavior of hideDisplayName, 
+                          hideDisplayNameFTUI if device is disabled
  - change:  93_DbLog: attribute 'bulkInsert' renamed to 'insertMode',
                       fixed some reported problems, Forum:#130588
  - change:  93_DbRep: write TYPE uppercase with writeToDB option, 
