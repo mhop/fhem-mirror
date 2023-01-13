@@ -2677,10 +2677,6 @@ sub FRITZBOX_Readout_Process($$)
    my $name = $hash->{NAME};
    my (%values) = split("\\|", $string);
 
-   if ($string =~ /\,/ ) {
-      FRITZBOX_Log $hash, 3, "DEBUG: Processing " . keys(%values) . " readouts.\n" . $string;
-   }
-
    my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
 
    readingsBeginUpdate($hash);
@@ -2944,10 +2940,6 @@ sub FRITZBOX_Readout_Add_Reading ($$$$@)
    $rValue = (grep { /^($rName)$/ } @reading_list) ? "" : $rValue;
 
    push @{$roReadings}, $rName . "|" . $rValue ;
-
-   if ($rName =~ /\,/) {
-     FRITZBOX_Log $hash, 1, "ERROR: (,) Reading: $rValue from caller -> $sub.$xline";
-   }
 
    FRITZBOX_Log $hash, 5, "DEBUG: $rName: $rValue";
 }
