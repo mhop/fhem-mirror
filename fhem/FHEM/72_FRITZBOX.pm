@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.0";
+my $ModulVersion = "07.50.3";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -216,11 +216,11 @@ sub FRITZBOX_Initialize($)
                 ."disableDectInfo:0,1 "
                 ."disableFonInfo:0,1 "
                 ."enableSIP:0,1 "
-                ."disableBoxReadings:multiple-strict,box_connect,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,box_fwVersion,"
+                ."disableBoxReadings:multiple-strict,box_connect,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
                                 ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,box_macFilter_active,box_ipExtern,box_ipv6Extern,"
-                                ."box_ipv6Prefix,box_last_connect_err,box_model,box_moh,box_powerRate,box_rateDown,"
+                                ."box_ipv6Prefix,box_last_connect_err,box_moh,box_powerRate,box_rateDown,"
                                 ."box_rateUp,box_stdDialPort,box_tr064,box_tr069,box_uptimeConnect,box_uptime,box_wlanCount,box_wlan_2.4GHz,"
-                                ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate "
+                                ."box_wlan_5GHz,box_vdsl_downStreamRate,box_vdsl_upStreamRate " #,box_model,box_oem
                # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
                 
@@ -345,9 +345,9 @@ sub FRITZBOX_Attr($@)
    }
 
    if ($aName eq "disableBoxReadings") {
-     my @reading_list = split("(,|\\|)", $aVal);
+     my @reading_list = split(/\,/, $aVal);
      foreach ( @reading_list ) {
-       readingsDelete($hash, $_) if defined $hash->{READINGS}{$_}{VAL};
+       readingsDelete($hash, $_) if exists $hash->{READINGS}{$_};
      }
    }
 
@@ -616,18 +616,24 @@ sub FRITZBOX_Set($$@)
       
       #xhr 1 idx 2 apply nop lang de page edit_dect_ring_block		 Klingelsperre aus
       #lockmode 0 nightsetting 1 lockday everyday starthh 00 startmm 00 endhh 00 endmm 00 Klingelsperre ein
-	  
+
+      #xhr: 1
+      #nightsetting: 1
+      #lockmode: 0
+      #lockday: everday
+      #starthh: 10
+      #startmm: 15
+      #endhh: 20
+      #endmm: 25
+      #idx: 1
+      #back_to_page: /fon_devices/fondevices_list.lua
+      #apply: 
+      #lang: de
+      #page: edit_dect_ring_block	  
+
       push @webCmdArray, "xhr"   => "1";
-      push @webCmdArray, "idx"   => substr($val[0], 4);
-      push @webCmdArray, "apply" => "";
-      push @webCmdArray, "lang"  => "de";
-      push @webCmdArray, "page"  => "edit_dect_ring_block";
 	  
       $queryStr .= "'xhr'   => '1'\n";
-      $queryStr .= "'idx'   => '" . substr($val[0], 4) . "'\n";
-      $queryStr .= "'apply' => ''\n";
-      $queryStr .= "'lang'  => 'de'\n";
-      $queryStr .= "'page'  => 'edit_dect_ring_block'\n";
 
       if ($val[1] eq "on") {
          push @webCmdArray, "lockmode"     => $lm_OnOff;
@@ -669,9 +675,19 @@ sub FRITZBOX_Set($$@)
 	 $queryStr .= "'endmm'        => '" . $end_mm . "'\n";
       }		
 
-      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd " . join(" ", @webCmdArray);
+      push @webCmdArray, "idx"   => substr($val[0], 4);
+      push @webCmdArray, "apply" => "";
+      push @webCmdArray, "lang"  => "de";
+      push @webCmdArray, "page"  => "edit_dect_ring_block";
+
+      $queryStr .= "'idx'   => '" . substr($val[0], 4) . "'\n";
+      $queryStr .= "'apply' => ''\n";
+      $queryStr .= "'lang'  => 'de'\n";
+      $queryStr .= "'page'  => 'edit_dect_ring_block'\n";
+
+      FRITZBOX_Log $hash, 4, "INFO: set $name $cmd \n" . join(" ", @webCmdArray);
 	     
-      FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd " . $queryStr;
+      FRITZBOX_Log $hash, 5, "DEBUG: get $name $cmd \n" . $queryStr;
 	  
       my $result = FRITZBOX_Lua_Data( $hash, \@webCmdArray) ;
 
@@ -1324,6 +1340,7 @@ sub FRITZBOX_API_Check_Run($)
    my $startTime = time();
    
    my $host = $hash->{HOST};
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
 
 # if no FritzBoxIP is set, check if FHEM runs on a FritzBox under root user
     # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
@@ -1465,34 +1482,35 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Log $hash, 2, "ERROR: Cannot create save file '$m3uFileLocal' because $!\n";
       }
 
-   # Box model per jason
+      # Box model per jason
       FRITZBOX_Log $hash, 5, "DEBUG: Read 'jason_boxinfo'";
       my $url = "http://".$host."/jason_boxinfo.xml";
       
       $response = $agent->get( $url );
       my $content  = $response->content;
-      # FRITZBOX_Log $hash, 5, "DEBUG: jason_boxinfo returned: $content";
+      if ($content =~ /<j:Name>/) {
+         FRITZBOX_Log $hash, 5, "DEBUG: jason_boxinfo returned: $content";
 
-      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)   if ( $content =~ /<j:Name>(.*)<\/j:Name>/ );    
-      
-      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)    if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
-      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1)    if $content =~ /<j:Version>(.*)<\/j:Version>/;
+         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)   if ( $content =~ /<j:Name>(.*)<\/j:Name>/ ); # && unless(grep { /^(box_model)$/ } @reading_list);    
+         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)    if $content =~ /<j:OEM>(.*)<\/j:OEM>/; # && unless(grep { /^(box_oem)$/ } @reading_list);
+         FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1)    if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
     
-    # Ansonsten Box-Model per system_status einlesen
-      unless ($content =~ /<j:Name>/) {
-      # Muss nochmal neu gesetzt werden, sonst gibt es einen Fehler (keine Ahnung warum)
+      } else { 
+         # Ansonsten Box-Model per system_status einlesen
+         # Muss nochmal neu gesetzt werden, sonst gibt es einen Fehler (keine Ahnung warum)
          $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
          $url = "http://".$host."/cgi-bin/system_status";
          FRITZBOX_Log $hash, 5, "DEBUG: Read 'system_status'";
          
          $response = $agent->get( $url );
          $content  = $response->content;
-         # FRITZBOX_Log $hash, 5, "DEBUG: system_status returned: $content";
+         FRITZBOX_Log $hash, 5, "DEBUG: system_status returned: $content";
          if ($response->is_success) {
             $content=$1    if $content =~ /<body>(.*)<\/body>/;
             
             my @result = split /-/, $content;
             # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+            # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
             # 0 FritzBox-Modell
             # 1 Annex/Erweiterte Kennzeichnung
             # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
@@ -1502,14 +1520,14 @@ sub FRITZBOX_API_Check_Run($)
             # 7 Firmwareversion
             # 8 Sub-Version/Unterversion der Firmware
             # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0]; # unless(grep { /^(box_model)$/ } @reading_list);
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result[7];
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9]; # unless(grep { /^(box_oem)$/ } @reading_list);
          }
          else {
-            FRITZBOX_Log $hash, 2, "ERROR: ".$response->status_line;
-         };
-      };
+            FRITZBOX_Log $hash, 2, "ERROR: " . $response->status_line;
+         } #;
+      } #;
    }
    
 # Check if telnet modul exists
@@ -1576,7 +1594,7 @@ sub FRITZBOX_Readout_Run_Shell($)
    return $name."|".encode_base64("Error|$result","")
       if $result;
 
-   my @reading_list = split("(,|\\|)", AttrVal($name, "disableBoxReadings", "none"));
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
    
    if ($slowRun == 1) {
       
@@ -1596,14 +1614,14 @@ sub FRITZBOX_Readout_Run_Shell($)
       push @readoutCmdArray, [ "fhem->is_double_wlan", "ctlmgr_ctl r wlan settings/feature_flags/DBDC", "01" ];
 
    # Box model and firmware and uptime
-      push @readoutCmdArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ] unless(grep { /^(box_model)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_oem", 'echo $OEM' ] unless(grep { /^(box_oem)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ] unless(grep { /^(box_fwVersion)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ] unless(grep { /^(box_fwUpdate)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ] unless(grep { /^(box_tr069)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ] unless(grep { /^(box_fwVersion)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_uptimeHours", "ctlmgr_ctl r logic status/uptime_hours" ] unless(grep { /^(box_uptime)$/ } @reading_list);
-      push @readoutCmdArray, [ "box_uptimeMinutes", "ctlmgr_ctl r logic status/uptime_minutes" ] unless(grep { /^(box_uptime)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ]; # unless(grep { /^(box_model)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_oem", 'echo $OEM' ]; # unless(grep { /^(box_oem)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
+      push @readoutCmdArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ]; #unless(grep { /^(box_fwUpdate)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ]; #unless(grep { /^(box_tr069)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ]; #unless(grep { /^(box_fwVersion)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_uptimeHours", "ctlmgr_ctl r logic status/uptime_hours" ]; #unless(grep { /^(box_uptime)$/ } @reading_list);
+      push @readoutCmdArray, [ "box_uptimeMinutes", "ctlmgr_ctl r logic status/uptime_minutes" ]; #unless(grep { /^(box_uptime)$/ } @reading_list);
 
 
    # Execute commands
@@ -1899,7 +1917,8 @@ sub FRITZBOX_Readout_Run_Web($)
    my $Min;
    my $Sek;
 
-   my @reading_list = split("(,|\\|)", AttrVal($name, "disableBoxReadings", "none"));
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
+   my $avmModel = InternalVal($name, "MODEL", "FRITZ!Box");
 
 #Start update 
    FRITZBOX_Log $hash, 4, "INFO: Prepare query string for luaQuery.";
@@ -2341,8 +2360,8 @@ sub FRITZBOX_Readout_Run_Web($)
                $gWlanCount++      if $_->{guest} eq "1";
                $dName .= " (";
                $dName .= "g"    if $_->{guest};
-               $dName .= "WLAN";
-               $dName .= ", " . $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s, ". $wlanList{$mac}{rssi}
+               $dName .= "WLAN: ";
+               $dName .= $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s RSSI: ". $wlanList{$mac}{rssi}
                       if defined $wlanList{$mac};
                $dName .= ")";
             }
@@ -2367,8 +2386,8 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
    }
-   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount) unless((grep { /^(box_wlanCount)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_guestWlanCount", $gWlanCount) unless((grep { /^(box_guestwlanCount)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount); #unless((grep { /^(box_wlanCount)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_guestWlanCount", $gWlanCount); #unless((grep { /^(box_guestwlanCount)$/ } @reading_list));
 
 # Remove inactive or non existing mac-readings in two steps
    foreach ( keys %oldLanDevice ) {
@@ -2382,17 +2401,17 @@ sub FRITZBOX_Readout_Run_Web($)
    }
 
 # WLANs
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff" unless((grep { /^(box_wlan_24GHz)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff" unless((grep { /^(box_wlan_5GHz)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff" unless((grep { /^(box_guestWlan)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain} unless((grep { /^(box_guestWlanRemain)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff" unless((grep { /^(box_macFilter_active)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff"; #unless((grep { /^(box_wlan_24GHz)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff"; #unless((grep { /^(box_wlan_5GHz)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff"; #unless((grep { /^(box_guestWlan)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain}; #unless((grep { /^(box_guestWlanRemain)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff"; #unless((grep { /^(box_macFilter_active)$/ } @reading_list));
 # Dect
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dect", $result->{box_dect}, "onoff" unless((grep { /^(box_dect)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dect", $result->{box_dect}, "onoff"; #unless((grep { /^(box_dect)$/ } @reading_list));
 # Music on Hold
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_moh", $result->{box_moh}, "mohtype" unless((grep { /^(box_moh)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_moh", $result->{box_moh}, "mohtype"; #unless((grep { /^(box_moh)$/ } @reading_list));
 # Power Rate
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_powerRate", $result->{box_powerRate} unless((grep { /^(box_powerRate)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_powerRate", $result->{box_powerRate}; #unless((grep { /^(box_powerRate)$/ } @reading_list));
 # Box Features
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->is_double_wlan", $result->{is_double_wlan}, "01";
 # Box model, firmware and uptimes
@@ -2408,7 +2427,13 @@ sub FRITZBOX_Readout_Run_Web($)
    $Std = int($result->{box_uptimeHours} - (24 * $Tag));
    $Sek = int($result->{box_uptimeHours} * 3600) + $result->{box_uptimeMinutes} * 60;
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptime", $Sek . " sec = " . $Tag . "T $Std:" . substr("0".$result->{box_uptimeMinutes},-2) . ":00" unless((grep { /^(box_uptime)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptime", $Sek . " sec = " . $Tag . "T $Std:" . substr("0".$result->{box_uptimeMinutes},-2) . ":00"; #unless((grep { /^(box_uptime)$/ } @reading_list));
+
+   if ($result->{box_fwVersion}) {
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion}; #unless(grep { /^(box_fwVersion)$/ } @reading_list);
+   } else { # Ab Version 6.90
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion_neu}; #unless(grep { /^(box_fwVersion_neu)$/ } @reading_list);
+   }
 
    if ( AttrVal( $name, "allowTR064Command", 0 )) {
       my $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#GetStatusInfo" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetStatusInfo xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
@@ -2416,10 +2441,10 @@ sub FRITZBOX_Readout_Run_Web($)
       FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
 
       if($strCurl =~ m/<NewConnectionStatus>(.*?)<\/NewConnectionStatus>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $1 unless((grep { /^(box_connect)$/ } @reading_list));
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $1; #unless((grep { /^(box_connect)$/ } @reading_list));
       }
       if($strCurl =~ m/<NewLastConnectionError>(.*?)<\/NewLastConnectionError>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_last_connect_err", $1 unless((grep { /^(box_connect_err)$/ } @reading_list));
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_last_connect_err", $1; #unless((grep { /^(box_connect_err)$/ } @reading_list));
       }
 
       if($strCurl =~ m/<NewUptime>(.*?)<\/NewUptime>/i) {
@@ -2433,7 +2458,7 @@ sub FRITZBOX_Readout_Run_Web($)
          $Min = substr("0".$Min,-2);
          $Sek = substr("0".$Sek,-2);
 
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptimeConnect", $1 . " sec = " . $Tag . "T $Std:$Min:$Sek" unless((grep { /^(box_uptimeConnect)$/ } @reading_list));
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptimeConnect", $1 . " sec = " . $Tag . "T $Std:$Min:$Sek"; #unless((grep { /^(box_uptimeConnect)$/ } @reading_list));
       }
 
       $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#GetExternalIPAddress" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
@@ -2441,53 +2466,63 @@ sub FRITZBOX_Readout_Run_Web($)
       FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
 
       if($strCurl =~ m/<NewExternalIPAddress>(.*?)<\/NewExternalIPAddress>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern", $1 unless(grep { /^(box_ipExtern)$/ } @reading_list);
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern", $1; #unless(grep { /^(box_ipExtern)$/ } @reading_list);
       }
 
       $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetExternalIPv6Address" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
 
       FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
 
-      if($strCurl =~ m/<NewExternalIPv6Address>(.*?)<\/NewExternalIPv6Address>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Extern", $1 unless(grep { /^(box_ipv6Extern)$/ } @reading_list);
+      if($strCurl =~ m/<NewPrefixLength>(.*?)<\/NewPrefixLength>/i) {
+         if ($1 != 0) {
+            if($strCurl =~ m/<NewExternalIPv6Address>(.*?)<\/NewExternalIPv6Address>/i) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Extern", $1; #unless(grep { /^(box_ipv6Extern)$/ } @reading_list);
+
+               $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetIPv6Prefix" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
+
+               FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+
+               if($strCurl =~ m/<NewIPv6Prefix>(.*?)<\/NewIPv6Prefix>/i) {
+                  FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Prefix", $1; #unless(grep { /^(box_ipv6Prefix)$/ } @reading_list);
+               }
+            }
+         }
       }
 
-      $strCurl = `curl "http://$host:49000/igdupnp/control/WANIPConn1" -H "Content-Type: text/xml; charset=\'utf-8\'" -H "SoapAction:urn:schemas-upnp-org:service:WANIPConnection:1#X_AVM_DE_GetIPv6Prefix" -d "<?xml version=\'1.0\' encoding=\'utf-8\'?> <s:Envelope s:encodingStyle=\'http://schemas.xmlsoap.org/soap/encoding/\' xmlns:s=\'http://schemas.xmlsoap.org/soap/envelope/\'> <s:Body> <u:GetExternalIPAddress xmlns:u=\'urn:schemas-upnp-org:service:WANIPConnection:1\' /> </s:Body> </s:Envelope>" -s`;
+      if ($avmModel =~ "Box") {
+         my @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
+         my @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+         if ($tr064Result[0]->{Error}) {
+            $strCurl = Dumper (@tr064Result);
+            FRITZBOX_Log $hash, 2, "ERROR: Curl-> " . $strCurl;
+         } else {
+            $strCurl = Dumper (@tr064Result);
+            FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
+            if ($strCurl =~ /.NewDownstreamCurrRate. => '(.*)'/) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", $1/1000; #unless(grep { /^(box_vdsl_downStreamRate)$/ } @reading_list);
+            } else {
+               FRITZBOX_Log $hash, 4, "INFO: box_vdsl_downStreamRate Curl-> " . $strCurl;
+            }
 
-      FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-
-      if($strCurl =~ m/<NewIPv6Prefix>(.*?)<\/NewIPv6Prefix>/i) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipv6Prefix", $1 unless(grep { /^(box_ipv6Prefix)$/ } @reading_list);
-      }
-
-      if ($result->{box_fwVersion}) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion} unless(grep { /^(box_fwVersion)$/ } @reading_list);
-      } else { # Ab Version 6.90
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion_neu} unless(grep { /^(box_fwVersion_neu)$/ } @reading_list);
-      }
-
-      my @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
-      my @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-      if ($tr064Result[0]->{Error}) {
-        $strCurl = Dumper (@tr064Result);
-        FRITZBOX_Log $hash, 2, "ERROR: Curl-> " . $strCurl;
+            if ($strCurl =~ /.NewUpstreamCurrRate. => '(.*)'/) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", $1/1000; #unless(grep { /^(box_vdsl_upStreamRate)$/ } @reading_list);
+            } else {
+               FRITZBOX_Log $hash, 4, "INFO: box_vdsl_upStreamRate Curl-> " . $strCurl;
+            }
+         }
       } else {
-        $strCurl = Dumper (@tr064Result);
-        FRITZBOX_Log $hash, 5, "DEBUG: Curl-> " . $strCurl;
-        $strCurl =~ /'NewDownstreamCurrRate' => '(.*)'/;
-        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", $1/1000 unless(grep { /^(box_vdsl_downStreamRate)$/ } @reading_list);
-        $strCurl =~ /'NewUpstreamCurrRate' => '(.*)'/;
-        FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", $1/1000 unless(grep { /^(box_vdsl_upStreamRate)$/ } @reading_list);
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_downStreamRate", ""; #unless(grep { /^(box_vdsl_downStreamRate)$/ } @reading_list);
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_vdsl_upStreamRate", ""; #unless(grep { /^(box_vdsl_upStreamRate)$/ } @reading_list);
       }
    }
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate} unless(grep { /^(box_fwUpdate)$/ } @reading_list);
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff" unless(grep { /^(box_tr064)$/ } @reading_list);
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff" unless(grep { /^(box_tr069)$/ } @reading_list);
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_stdDialPort", $result->{box_stdDialPort}, "dialport" unless(grep { /^(box_stdDialPort)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate}; #unless(grep { /^(box_fwUpdate)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff"; #unless(grep { /^(box_tr064)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff"; #unless(grep { /^(box_tr069)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_stdDialPort", $result->{box_stdDialPort}, "dialport"; #unless(grep { /^(box_stdDialPort)$/ } @reading_list);
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern",    $result->{box_ipExtern};
    # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect",     $result->{box_connect};
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp",     $result->{box_cpuTemp} unless(grep { /^(box_cpuTemp)$/ } @reading_list);
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp",     $result->{box_cpuTemp}; #unless(grep { /^(box_cpuTemp)$/ } @reading_list);
    if ( defined ($result->{dslStatGlobalOut}) && looks_like_number($result->{dslStatGlobalOut}) ) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_dsl_upStream", sprintf ("%.3f", $result->{dslStatGlobalOut}/1000000) unless (grep { /^(box_dsl_upStream)$/ } @reading_list);
    }
@@ -2641,9 +2676,12 @@ sub FRITZBOX_Readout_Process($$)
   
    my $name = $hash->{NAME};
    my (%values) = split("\\|", $string);
-   FRITZBOX_Log $hash, 4, "INFO: Processing " . keys(%values) . " readouts.";
 
-   my @reading_list = split("(,|\\|)", AttrVal($name, "disableBoxReadings", "none"));
+   if ($string =~ /\,/ ) {
+      FRITZBOX_Log $hash, 3, "DEBUG: Processing " . keys(%values) . " readouts.\n" . $string;
+   }
+
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
 
    readingsBeginUpdate($hash);
 
@@ -2668,7 +2706,7 @@ sub FRITZBOX_Readout_Process($$)
          $valueHigh *= 2**22;
          $valueLow /= 2**10;
          my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesReceivedLow"}{TIME});
-         $values{ "box_rateDown" } = sprintf ("%.3f", ($valueHigh+$valueLow) / $time ) unless(grep { /^(box_dsl_rateDown)$/ } @reading_list); 
+         $values{ "box_rateDown" } = (grep { /^(box_rateDown)$/ } @reading_list) ? "" : sprintf ("%.3f", ($valueHigh+$valueLow) / $time ) ; 
       }
       if ( defined $values{".box_TodayBytesSentLow"} && defined $hash->{READINGS}{".box_TodayBytesSentLow"} ) {
          my $valueHigh = $values{".box_TodayBytesSentHigh"} - $hash->{READINGS}{".box_TodayBytesSentHigh"}{VAL};
@@ -2681,7 +2719,7 @@ sub FRITZBOX_Readout_Process($$)
          $valueHigh *= 2**22;
          $valueLow /= 2**10;
          my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesSentLow"}{TIME});
-         $values{ "box_rateUp" } = sprintf ("%.3f", ($valueHigh+$valueLow) / $time ) unless(grep { /^(box_dsl_rateUp)$/ } @reading_list); 
+         $values{ "box_rateUp" } = (grep { /^(box_rateUp)$/ } @reading_list) ? "" : sprintf ("%.3f", ($valueHigh+$valueLow) / $time ) ; 
       }
 
    # Fill all handed over readings
@@ -2747,8 +2785,7 @@ sub FRITZBOX_Readout_Process($$)
             $newState .= "off";
          }
          $newState .=" gWLAN: ".$values{box_guestWlan} ;
-         $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)"
-            if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
+         $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
          readingsBulkUpdate( $hash, "state", $newState);
          FRITZBOX_Log $hash, 5, "DEBUG: SET state = '$newState'";
       }
@@ -2756,11 +2793,11 @@ sub FRITZBOX_Readout_Process($$)
    # adapt TR064-Mode
       if ( defined $values{box_tr064} ) {
          if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
-               FRITZBOX_Log $hash, 3, "INFO: TR-064 is switched off";
+            FRITZBOX_Log $hash, 3, "INFO: TR-064 is switched off";
             delete $hash->{SECPORT};
          }
          elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
-               FRITZBOX_Log $hash, 3, "INFO: TR-064 is switched on";
+            FRITZBOX_Log $hash, 3, "INFO: TR-064 is switched on";
             my $tr064Port = FRITZBOX_TR064_Init ($hash, $hash->{HOST});
             $hash->{SECPORT} = $tr064Port    if $tr064Port;
          }
@@ -2768,7 +2805,7 @@ sub FRITZBOX_Readout_Process($$)
 
       my $msg = keys( %values ) . " values captured in " . $values{readoutTime} . " s";
       readingsBulkUpdate( $hash, "lastReadout", $msg );
-      FRITZBOX_Log $hash, 4, "INFO: " . $msg;
+      FRITZBOX_Log $hash, 5, "DEBUG: BulkUpdate lastReadout: " . $msg;
    }
 
    readingsEndUpdate( $hash, 1 );
@@ -2894,16 +2931,22 @@ sub FRITZBOX_Readout_Add_Reading ($$$$@)
 {
    my ($hash, $roReadings, $rName, $rValue, $rFormat) = @_;
    my $xline       = ( caller(0) )[2];
-   
+
+   my $name = $hash->{NAME};
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
+
    my $xsubroutine = ( caller(1) )[3];
    my $sub         = ( split( ':', $xsubroutine ) )[2];
 
    $rFormat = "" unless defined $rFormat;
    $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
-   push @{$roReadings}, $rName . "|" . $rValue;
 
-   if ($rName eq ",") {
-     FRITZBOX_Log $hash, 1, "ERROR: $rName: $rValue from caller -> $sub.$xline";
+   $rValue = (grep { /^($rName)$/ } @reading_list) ? "" : $rValue;
+
+   push @{$roReadings}, $rName . "|" . $rValue ;
+
+   if ($rName =~ /\,/) {
+     FRITZBOX_Log $hash, 1, "ERROR: (,) Reading: $rValue from caller -> $sub.$xline";
    }
 
    FRITZBOX_Log $hash, 5, "DEBUG: $rName: $rValue";
@@ -4129,13 +4172,13 @@ sub FRITZBOX_GuestWlan_Run_Web($)
 
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
 
-   my @reading_list = split("(,|\\|)", AttrVal($name, "disableBoxReadings", "none"));
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff" unless((grep { /^(box_wlan_24GHz)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff" unless((grep { /^(box_wlan_5GHz)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff" unless((grep { /^(box_guestWlan)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain} unless((grep { /^(box_guestWlanRemain)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff" unless((grep { /^(box_macFilter_active)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff"; #unless((grep { /^(box_wlan_24GHz)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff"; #unless((grep { /^(box_wlan_5GHz)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff"; #unless((grep { /^(box_guestWlan)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain}; #unless((grep { /^(box_guestWlanRemain)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff"; #unless((grep { /^(box_macFilter_active)$/ } @reading_list));
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
@@ -4240,13 +4283,13 @@ sub FRITZBOX_Wlan_Run_Web($)
 
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
 
-   my @reading_list = split("(,|\\|)", AttrVal($name, "disableBoxReadings", "none"));
+   my @reading_list = split(/\,/, AttrVal($name, "disableBoxReadings", "none"));
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff" unless((grep { /^(box_wlan_24GHz)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff" unless((grep { /^(box_wlan_5GHz)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff" unless((grep { /^(box_guestWlan)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain} unless((grep { /^(box_guestWlanRemain)$/ } @reading_list));
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff" unless((grep { /^(box_macFilter_active)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff"; #unless((grep { /^(box_wlan_24GHz)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_5GHz", $result->{box_wlan_5GHz}, "onoff"; #unless((grep { /^(box_wlan_5GHz)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff"; #unless((grep { /^(box_guestWlan)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain}; #unless((grep { /^(box_guestWlanRemain)$/ } @reading_list));
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff"; #unless((grep { /^(box_macFilter_active)$/ } @reading_list));
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
