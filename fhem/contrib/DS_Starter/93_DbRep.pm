@@ -12963,7 +12963,7 @@ sub DbRep_OutputWriteToDB {
   ($err, my $sth_uh) = DbRep_prepareOnly           ($name, $dbh, $sql);
   return ($err,$wrt,$irowdone) if ($err);
   
-  $sql               = DbRep_createInsertSQLscheme ('current', $dbmodel, $usepkh);
+  $sql               = DbRep_createInsertSQLscheme ('current', $dbmodel, $usepkc);
   ($err, my $sth_ic) = DbRep_prepareOnly           ($name, $dbh, $sql);
   return ($err,$wrt,$irowdone) if ($err);
   
