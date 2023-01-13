@@ -11034,6 +11034,17 @@ return $sql;
 }
 
 ######################################################################################
+#            Erstelle Update SQL-Schema für Tabelle   
+######################################################################################
+sub DbRep_createUpdateSQLscheme {     
+  my $table = shift;
+          
+  my $sql = "UPDATE $table SET TIMESTAMP=?, DEVICE=?, READING=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE TIMESTAMP=? AND DEVICE=? AND READING=?";
+
+return $sql;
+}
+
+######################################################################################
 #    Connect zur Datenbank herstellen
 #
 #    $uac:  undef - Verwendung adminCredentials abhängig von Attr useAdminCredentials
@@ -11205,20 +11216,55 @@ return ($err, $rv);
 }
 
 ####################################################################################################
-#    führt ein sth execute aus
+#    führt ein sth execute prepared Insert aus
 #    return ERROR oder die Anzahl der betroffenen Zeilen
 ####################################################################################################
-sub DbRep_sthExecOnly {
-  my $name = shift;
-  my $sth  = shift;
-  my $arg  = shift;
-
-  my $err  = q{};
-  my $rv   = q{};
+sub DbRep_execInsertPrepared {
+  my $paref = shift;
   
-  my @args = split ",", $arg;
+  my $name      = $paref->{name};
+  my $sth       = $paref->{sth};
+  my $timestamp = $paref->{timestamp};
+  my $device    = $paref->{device};
+  my $type      = $paref->{type};
+  my $event     = $paref->{event};
+  my $reading   = $paref->{reading};
+  my $value     = $paref->{value};
+  my $unit      = $paref->{unit};
+  my $err       = q{};
+  my $rv        = q{};
 
-  eval{ $rv = $sth->execute(@args);
+  eval{ $rv = $sth->execute($timestamp, $device, $type, $event, $reading, $value, $unit);
+      }
+      or do { $err = encode_base64($@,"");
+              Log3 ($name, 2, "DbRep $name - ERROR - $@");
+            };
+            
+  $rv = 0 if($rv eq "0E0");
+
+return ($err, $rv);
+}
+
+####################################################################################################
+#    führt ein sth execute prepared Update aus
+#    return ERROR oder die Anzahl der betroffenen Zeilen
+####################################################################################################
+sub DbRep_execUpdatePrepared {
+  my $paref = shift;
+  
+  my $name      = $paref->{name};
+  my $sth       = $paref->{sth};
+  my $timestamp = $paref->{timestamp};
+  my $device    = $paref->{device};
+  my $type      = $paref->{type};
+  my $event     = $paref->{event};
+  my $reading   = $paref->{reading};
+  my $value     = $paref->{value};
+  my $unit      = $paref->{unit};
+  my $err       = q{};
+  my $rv        = q{};
+
+  eval{ $rv = $sth->execute($timestamp, $device, $reading, $type, $event, $value, $unit, $timestamp, $device, $reading);
       }
       or do { $err = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - ERROR - $@");
@@ -12774,7 +12820,7 @@ sub DbRep_OutputWriteToDB {
   my $irowdone   = 0;
   my $ndp        = AttrVal ($name, 'numDecimalPlaces', $dbrep_defdecplaces);
 
-  my ($dbh,$sth_ih,$sth_ic,$err,$value,$date,$time,$hour,$minute,$ndate,$ntime,$rsf,$rsn,@wr_arr);
+  my ($dbh,$err,$value,$date,$time,$hour,$minute,$ndate,$ntime,$rsf,$rsn,@wr_arr);
   my ($timestamp,$year,$mon,$mday,$t1,$corr);
 
   if(!$dbloghash->{HELPER}{COLSET}) {
@@ -12909,15 +12955,21 @@ sub DbRep_OutputWriteToDB {
       Log3 ($name, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog >$dblogname<");
   }
   
-  my $sql = DbRep_createInsertSQLscheme ('history', $dbmodel, $usepkh);
-  
-  ($err, $sth_ih) = DbRep_prepareOnly ($name, $dbh, $sql);
+  my $sql            = DbRep_createInsertSQLscheme ('history', $dbmodel, $usepkh);
+  ($err, my $sth_ih) = DbRep_prepareOnly           ($name, $dbh, $sql);
   return ($err,$wrt,$irowdone) if ($err);
   
-  $sql = DbRep_createInsertSQLscheme ('current', $dbmodel, $usepkh);
-
-  ($err, $sth_ic) = DbRep_prepareOnly ($name, $dbh, $sql);
+  $sql               = DbRep_createUpdateSQLscheme ('history');
+  ($err, my $sth_uh) = DbRep_prepareOnly           ($name, $dbh, $sql);
   return ($err,$wrt,$irowdone) if ($err);
+  
+  $sql               = DbRep_createInsertSQLscheme ('current', $dbmodel, $usepkh);
+  ($err, my $sth_ic) = DbRep_prepareOnly           ($name, $dbh, $sql);
+  return ($err,$wrt,$irowdone) if ($err);
+  
+  $sql               = DbRep_createUpdateSQLscheme ('current');
+  ($err, my $sth_uc) = DbRep_prepareOnly           ($name, $dbh, $sql);
+  return ($err,$wrt,$irowdone) if ($err);  
 
   $err = DbRep_beginDatabaseTransaction ($name, $dbh);
   return ($err,$wrt,$irowdone) if ($err);
@@ -12936,20 +12988,41 @@ sub DbRep_OutputWriteToDB {
       $event     = $a[3];
       $reading   = $a[4];
       $value     = $a[5];
-      $unit      = $a[6] // q{};
+      $unit      = $a[6];
 
-      if (lc($DbLogType) =~ m(history) ) {
-          my ($rv_uh, $rv_ih);
-          
-          ($err, $rv_uh) = DbRep_dbhDo ($name, $dbh, qq(UPDATE history SET TIMESTAMP="$timestamp", DEVICE="$device", READING="$reading", TYPE="$type", EVENT="$event", VALUE="$value", UNIT="$unit" WHERE TIMESTAMP="$timestamp" AND DEVICE="$device" AND READING="$reading";));
-          return ($err,$wrt,$irowdone) if ($err);
+      if (lc($DbLogType) =~ m(history) ) {          
+          ($err, my $rv_uh) = DbRep_execUpdatePrepared ( { name      => $name, 
+                                                           sth       => $sth_uh, 
+                                                           timestamp => $timestamp,
+                                                           device    => $device,
+                                                           type      => $type,
+                                                           event     => $event,
+                                                           reading   => $reading,
+                                                           value     => $value,
+                                                           unit      => $unit
+                                                         }                                                            
+                                                       );
+          if ($err) {
+              $dbh->disconnect;
+              return ($err,$wrt,$irowdone);                   
+          }
           
           $uhs += $rv_uh if($rv_uh);
 
           Log3 ($name, 4, "DbRep $name - UPDATE history: $row, RESULT: $rv_uh");
 
           if ($rv_uh == 0) {
-              ($err, $rv_ih) = DbRep_sthExecOnly ($name, $sth_ih, "$timestamp,$device,$type,$event,$reading,$value,$unit");
+              ($err, my $rv_ih) = DbRep_execInsertPrepared ( { name      => $name, 
+                                                               sth       => $sth_ih, 
+                                                               timestamp => $timestamp,
+                                                               device    => $device,
+                                                               type      => $type,
+                                                               event     => $event,
+                                                               reading   => $reading,
+                                                               value     => $value,
+                                                               unit      => $unit
+                                                             }                                                            
+                                                           );
               if ($err) {
                   $dbh->disconnect;
                   return ($err,$wrt,$irowdone);                   
@@ -12961,14 +13034,35 @@ sub DbRep_OutputWriteToDB {
           }
       }
       
-      if (lc($DbLogType) =~ m(current) ) { 
-          my $rv_uc;
-          
-          ($err, $rv_uc) = DbRep_dbhDo ($name, $dbh, qq(UPDATE current SET TIMESTAMP="$timestamp", DEVICE="$device", READING="$reading", TYPE="$type", EVENT="$event", VALUE="$value", UNIT="$unit" WHERE DEVICE="$device" AND READING="$reading";));
-          return ($err,$wrt,$irowdone) if ($err);
+      if (lc($DbLogType) =~ m(current) ) {          
+          ($err, my $rv_uc) = DbRep_execUpdatePrepared ( { name      => $name, 
+                                                           sth       => $sth_uc, 
+                                                           timestamp => $timestamp,
+                                                           device    => $device,
+                                                           type      => $type,
+                                                           event     => $event,
+                                                           reading   => $reading,
+                                                           value     => $value,
+                                                           unit      => $unit
+                                                         }                                                            
+                                                       );
+          if ($err) {
+              $dbh->disconnect;
+              return ($err,$wrt,$irowdone);                   
+          }
           
           if ($rv_uc == 0) {
-              $err = DbRep_sthExecOnly ($name, $sth_ic, "$timestamp,$device,$type,$event,$reading,$value,$unit");
+              ($err, undef) = DbRep_execInsertPrepared ( { name      => $name, 
+                                                           sth       => $sth_ic, 
+                                                           timestamp => $timestamp,
+                                                           device    => $device,
+                                                           type      => $type,
+                                                           event     => $event,
+                                                           reading   => $reading,
+                                                           value     => $value,
+                                                           unit      => $unit
+                                                         }                                                            
+                                                       );
           }
       }
   }
