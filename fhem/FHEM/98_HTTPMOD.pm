@@ -511,8 +511,8 @@ sub AttrFn {
             }    
         } 
         elsif ($aName =~ /((get|set)[0-9]*)?[Rr]eplacement([0-9]*)Value/) {
-            Log3 $name, 5, "$name: validating attr $name $aName $aVal";
-            if (AttrVal($name, "replacement${2}Mode", "text") eq "expression") {
+            Log3 $name, 5, "$name: validating attr $name $aName $aVal, check for replacement${2}Mode";
+            if (AttrVal($name, "replacement${3}Mode", "text") eq "expression") {
                 return "Invalid Expression $aVal" if (!EvalExpr($hash, 
                             {expr => $aVal, action => "attr $aName", checkOnly => 1}));
             }
