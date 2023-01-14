@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 50_SSChatBot.pm 23220 2020-11-23 18:07:13Z DS_Starter $
+# $Id: 50_SSChatBot.pm 23250 2020-11-28 12:38:53Z DS_Starter $
 #########################################################################################################################
 #       50_SSChatBot.pm
 #
-#       (c) 2019-2020 by Heiko Maaz
+#       (c) 2019-2023 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate as Bot for Synology Chat.
@@ -135,6 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.13.0" => "14.01.2023  new attr spareHost, sparePort ",
   "1.12.1" => "28.11.2020  fix cannot send after received anything, fix greedy regex in _botCGIcheckData ",
   "1.12.0" => "23.11.2020  generate event CHAT_INITIALIZED when users are once loaded, Forum: https://forum.fhem.de/index.php/topic,105714.msg1103700.html#msg1103700 ".
                            "postpone new operation is one ist still running ",
@@ -245,6 +246,8 @@ sub Initialize {
                      "allowedUserForOwn:--wait#for#userlist-- ".
                      "ownCommand1 ".
                      "showTokenInLog:1,0 ".
+                     "spareHost: ".
+                     "sparePort: ".
                      "httptimeout ".
                      $readingFnAttributes;   
          
@@ -366,6 +369,8 @@ return;
 }
 
 ################################################################
+#  Attr Management
+################################################################
 sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
@@ -395,6 +400,10 @@ sub Attr {
         readingsEndUpdate  ($hash, 1); 
     }
     
+    if (($aName =~ m/spare/x)) {
+        InternalTimer(gettimeofday()+1.5, "FHEM::SSChatBot::initOnBoot", $hash, 0) if($init_done);
+    } 
+    
     if ($cmd eq "set") {
         if ($aName =~ m/httptimeout/x) {
             unless ($aVal =~ /^\d+$/x) { return "The Value for $aName is not valid. Use only figures 1-9 !";}
@@ -403,8 +412,8 @@ sub Attr {
         if ($aName =~ m/ownCommand([1-9][0-9]*)$/x) {
             my $num = $1;
             return qq{The value of $aName must start with a slash like "/Weather ".} unless ($aVal =~ /^\//x);
-            addToDevAttrList($name, "ownCommand".($num+1));                        # add neue ownCommand dynamisch
-        }        
+            addToDevAttrList($name, "ownCommand".($num+1));                                                      # add neue ownCommand dynamisch
+        }       
     }
     
 return;
@@ -770,6 +779,7 @@ return $ret;
 sub initOnBoot {
   my $hash = shift;
   my $name = $hash->{NAME};
+  
   my ($ret,$csrf,$fuuid);
   
   RemoveInternalTimer($hash, "FHEM::SSChatBot::initOnBoot");
@@ -793,12 +803,12 @@ sub initOnBoot {
           }
 
           if (!defined($defs{$FW})) {                                       # wenn Device "WEBSSChat" wirklich nicht existiert
-              Log3($name, 3, "$name - Creating new FHEMWEB instance \"$FW\" with webname \"$FWname\"... ");
+              Log3 ($name, 3, "$name - Creating new FHEMWEB instance \"$FW\" with webname \"$FWname\"... ");
               $ret = CommandDefine(undef, "$FW FHEMWEB $port global");
           }
           
           if(!$ret) {
-              Log3($name, 3, "$name - FHEMWEB instance \"$FW\" with webname \"$FWname\" created");
+              Log3 ($name, 3, "$name - FHEMWEB instance \"$FW\" with webname \"$FWname\" created");
               $hash->{FW} = $FW;
               
               $fuuid = $defs{$FW}{FUUID};
@@ -812,7 +822,7 @@ sub initOnBoot {
               CommandAttr(undef, "$FW stylesheetPrefix default");
           } 
           else {
-              Log3($name, 2, "$name - ERROR while creating FHEMWEB instance ".$hash->{FW}." with webname \"$FWname\" !");
+              Log3 ($name, 2, "$name - ERROR while creating FHEMWEB instance ".$hash->{FW}." with webname \"$FWname\" !");
               readingsBeginUpdate($hash); 
               readingsBulkUpdate ($hash, "state", "ERROR in initialization - see logfile");                             
               readingsEndUpdate  ($hash,1);
@@ -820,21 +830,24 @@ sub initOnBoot {
       }
      
       if(!$ret) {
-          CommandGet(undef, "$name chatUserlist");                      # Chatuser Liste initial abrufen 
+          CommandGet(undef, "$name chatUserlist");                                     # Chatuser Liste initial abrufen 
       
-          my $host        = hostname();                                 # eigener Host
-          my $fqdn        = hostfqdn();                                 # MYFQDN eigener Host 
-          chop($fqdn)     if($fqdn =~ /\.$/x);                          # eventuellen "." nach dem FQDN entfernen
+          my $host        = hostname();                                                # eigener Host
+          my $fqdn        = hostfqdn();                                                # MYFQDN eigener Host 
+          chop($fqdn)     if($fqdn =~ /\.$/x);                                         # eventuellen "." nach dem FQDN entfernen
           my $FWchatport  = $defs{$FW}{PORT};
-          my $FWprot      = AttrVal($FW, "HTTPS", 0);
-          $FWname         = AttrVal($FW, "webname", 0);
+          my $FWprot      = AttrVal ($FW, 'HTTPS',         0);
+          $FWname         = AttrVal ($FW, 'webname', $FWname);
           
           CommandAttr(undef, "$FW csrfToken none") if(!AttrVal($FW, "csrfToken", ""));
           
           $csrf           = $defs{$FW}{CSRFTOKEN} // "";
-          $hash->{OUTDEF} = ($FWprot ? "https" : "http")."://".($fqdn // $host).":".$FWchatport."/".$FWname."/outchat?botname=".$name."&fwcsrf=".$csrf; 
+          my $sparehost   = AttrVal ($name, 'spareHost', ($fqdn // $host));            # Forum: https://forum.fhem.de/index.php/topic,105714.msg1256613.html#msg1256613
+          my $spareport   = AttrVal ($name, 'sparePort',      $FWchatport);            # Forum: https://forum.fhem.de/index.php/topic,105714.msg1256613.html#msg1256613
+          
+          $hash->{OUTDEF} = ($FWprot ? "https" : "http")."://".$sparehost.":".$spareport."/".$FWname."/outchat?botname=".$name."&fwcsrf=".$csrf; 
 
-          addExtension($name, "FHEM::SSChatBot::botCGI", "outchat");
+          addExtension ($name, 'FHEM::SSChatBot::botCGI', 'outchat');
           $hash->{HELPER}{INFIX} = "outchat"; 
       }            
   } 
@@ -1340,7 +1353,7 @@ sub addExtension {
   $data{FWEXT}{$url}{FUNC}       = $func;
   $data{FWEXT}{$url}{LINK}       = $link;
   
-  Log3($name, 3, "$name - SSChatBot \"$name\" for URL $url registered");
+  Log3 ($name, 3, "$name - SSChatBot \"$name\" for URL $url (new) registered");
   
 return;
 }
@@ -2044,9 +2057,9 @@ return ($cr, $state);
     
     <br><br>
 
-    <b>Allgemeine Information zum Nachrichtempfang </b> <br>
-    Um Befehle vom Chat Server an FHEM zu senden, werden Slash-Befehle (/) verwendet. Sie sind vor der Verwendung im Synology 
-    Chat und ggf. zusätzlich im SSChatBot Device (User spezifische Befehle) zu konfigurieren. <br><br>
+    <b>General information on message reception </b> <br>
+    To send commands from Chat Server to FHEM, slash commands (/) are used. They have to be configured before using them in Synology 
+    Chat and if necessary additionally in SSChatBot Device (User specific commands). <br><br>
 
     The following command forms are supported: <br><br>
     <ul> 
@@ -2295,6 +2308,32 @@ return ($cr, $state);
     
       </li><br>
     </ul>
+    
+    <ul>  
+      <a id="SSChatBot-attr-spareHost"></a>
+      <li><b>spareHost</b> <br> 
+  
+        Replaces the automatically determined hostname in the internal <b>OUTDEF</b> with a user-specific hostname or 
+        IP address. <br>
+        The URL of the internal OUTDEF is the target for outgoing messages (chat -> FHEM) and is evaluated when sending 
+        of SVG plot files. <br> 
+    
+      </li>
+      <br>
+    </ul>
+    
+    <ul>  
+      <a id="SSChatBot-attr-sparePort"></a>
+      <li><b>sparePort</b> <br> 
+  
+        Replaces the automatically determined port in the internal <b>OUTDEF</b> with a user-specific 
+        value. <br>
+        The URL of the internal OUTDEF is the target for outgoing messages (chat -> FHEM) and is evaluated when sending 
+        of SVG plot files. <br> 
+    
+      </li>
+      <br>
+    </ul>
  
   </ul>
 
@@ -2303,7 +2342,7 @@ return ($cr, $state);
 =end html
 =begin html_DE
 
-<a name="SSChatBot"></a>
+<a id="SSChatBot"></a>
 <h3>SSChatBot</h3>
 <ul>
   Mit diesem Modul erfolgt die Integration des Synology Chat Servers in FHEM. Dadurch ist es möglich, 
@@ -2312,7 +2351,7 @@ return ($cr, $state);
   <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">Wiki</a> vorhanden. <br>     
   <br><br> 
 
-  <a name="SSChatBotDefine"></a>
+  <a id="SSChatBot-define"></a>
   <b>Definition</b>
   <br><br>
   <ul>    
@@ -2343,7 +2382,7 @@ return ($cr, $state);
   </ul>
   <br><br> 
 
-  <a name="SSChatBotConfig"></a>
+  <a id="SSChatBot-config"></a>
   <b>Konfiguration</b>
   <br><br>
   <ul>    
@@ -2405,13 +2444,13 @@ return ($cr, $state);
   </ul>
   <br><br> 
 
-  <a name="SSChatBotSet"></a>
+  <a id="SSChatBot-set"></a>
   <b>Set </b>
   <br><br>
   <ul>
 
     <ul>
-      <a name="asyncSendItem"></a>
+      <a id="SSChatBot-set-asyncSendItem"></a>
       <li><b> asyncSendItem &lt;Item&gt; </b> <br>
   
       Sendet eine Nachricht an einen oder mehrere Chatempfänger. <br>      
@@ -2445,7 +2484,7 @@ return ($cr, $state);
     </ul>
    
     <ul>
-      <a name="botToken"></a>
+      <a id="SSChatBot-set-botToken"></a>
       <li><b> botToken &lt;Token&gt; </b> <br>
   
       Seichert den Token für den Zugriff auf den Chat als Bot.
@@ -2454,7 +2493,7 @@ return ($cr, $state);
     </ul>
     
     <ul>
-      <a name="listSendqueue"></a>
+      <a id="SSChatBot-set-listSendqueue"></a>
       <li><b> listSendqueue </b> <br>
   
       Zeigt die noch an den Chat zu übertragenden Nachrichten. <br>
@@ -2464,7 +2503,7 @@ return ($cr, $state);
     </ul>
    
     <ul>
-      <a name="purgeSendqueue"></a>
+      <a id="SSChatBot-set-purgeSendqueue"></a>
       <li><b> purgeSendqueue  &lt;-all- | -permError- | index&gt; </b> <br>
   
       Löscht Einträge aus der Sendequeue. <br><br>
@@ -2480,7 +2519,7 @@ return ($cr, $state);
     </ul>
     
     <ul>
-      <a name="restartSendqueue"></a>
+      <a id="SSChatBot-set-restartSendqueue"></a>
       <li><b> restartSendqueue [force] </b> <br>
   
       Startet die Abarbeitung der Sendequeue manuell neu. <br>
@@ -2492,13 +2531,13 @@ return ($cr, $state);
    
   </ul>
   
-  <a name="SSChatBotGet"></a>
+  <a id="SSChatBot-get"></a>
   <b>Get </b>
   <br><br>
   <ul>
   
     <ul>
-      <a name="apiInfo"></a>
+      <a id="SSChatBot-get-apiInfo"></a>
       <li><b> apiInfo </b> <br>
   
       Ruft die API Informationen des Synology Chat Servers ab und öffnet ein Popup mit diesen Informationen.
@@ -2507,7 +2546,7 @@ return ($cr, $state);
     </ul>
     
     <ul>
-      <a name="chatChannellist"></a>
+      <a id="SSChatBot-get-chatChannellist"></a>
       <li><b> chatChannellist </b> <br>
   
       Erstellt eine Liste der für den Bot sichtbaren Channels.
@@ -2516,7 +2555,7 @@ return ($cr, $state);
     </ul>
     
     <ul>
-      <a name="chatUserlist"></a>
+      <a id="SSChatBot-get-chatUserlist"></a>
       <li><b> chatUserlist </b> <br>
   
       Erstellt eine Liste der für den Bot sichtbaren Usern. <br>
@@ -2527,7 +2566,7 @@ return ($cr, $state);
     </ul>
     
     <ul>
-      <a name="storedToken"></a>
+      <a id="SSChatBot-get-storedToken"></a>
       <li><b> storedToken </b> <br>
   
       Zeigt den gespeicherten Token an.
@@ -2536,7 +2575,7 @@ return ($cr, $state);
     </ul>
     
     <ul>
-      <a name="versionNotes"></a>
+      <a id="SSChatBot-get-versionNotes"></a>
       <li><b> versionNotes </b> <br>
   
       Listet wesentliche Änderungen in der Versionshistorie des Moduls auf.
@@ -2546,13 +2585,13 @@ return ($cr, $state);
    
   </ul>
   
-  <a name="SSChatBotAttr"></a>
+  <a id="SSChatBot-attr"></a>
   <b>Attribute</b>
   <br><br>
   <ul>
   
     <ul>  
-      <a name="allowedUserForCode"></a>
+      <a id="SSChatBot-attr-allowedUserForCode"></a>
       <li><b>allowedUserForCode</b> <br> 
   
         Benennt die Chat-User, die Perl-Code in FHEM auslösen dürfen wenn der Slash-Befehl /code empfangen wurde. <br>
@@ -2562,7 +2601,7 @@ return ($cr, $state);
     </ul>
   
     <ul>  
-      <a name="allowedUserForGet"></a>
+      <a id="SSChatBot-attr-allowedUserForGet"></a>
       <li><b>allowedUserForGet</b> <br> 
   
         Benennt die Chat-User, die Get-Kommandos in FHEM auslösen dürfen wenn der Slash-Befehl /get empfangen wurde. <br>
@@ -2572,7 +2611,7 @@ return ($cr, $state);
     </ul>
     
     <ul>  
-      <a name="allowedUserForOwn"></a>
+      <a id="SSChatBot-attr-allowedUserForOwn"></a>
       <li><b>allowedUserForOwn</b> <br> 
   
         Benennt die Chat-User, die die im Attribut "ownCommand" definierte Kommandos in FHEM auslösen dürfen. <br>
@@ -2582,7 +2621,7 @@ return ($cr, $state);
     </ul>
   
     <ul>  
-      <a name="allowedUserForSet"></a>
+      <a id="SSChatBot-attr-allowedUserForSet"></a>
       <li><b>allowedUserForSet</b> <br> 
   
         Benennt die Chat-User, die Set-Kommandos in FHEM auslösen dürfen wenn der Slash-Befehl /set empfangen wurde. <br>
@@ -2592,7 +2631,7 @@ return ($cr, $state);
     </ul>
   
     <ul>  
-      <a name="defaultPeer"></a>
+      <a id="SSChatBot-attr-defaultPeer"></a>
       <li><b>defaultPeer</b> <br> 
   
         Ein oder mehrere (default) Empfänger für Nachrichten. Kann mit dem <b>users=</b> Tag im Befehl <b>asyncSendItem</b> 
@@ -2602,7 +2641,7 @@ return ($cr, $state);
     </ul>
     
     <ul>  
-      <a name="httptimeout"></a>
+      <a id="SSChatBot-attr-httptimeout"></a>
       <li><b>httptimeout &lt;Sekunden&gt; </b> <br> 
   
         Stellt den Verbindungstimeout zum Chatserver ein. <br>
@@ -2611,8 +2650,8 @@ return ($cr, $state);
       </li><br>
     </ul>
     
-    <ul>  
-      <a name="ownCommandx"></a>
+    <ul>
+      <a id="SSChatBot-attr-ownCommandx" data-pattern="ownCommand.*"></a>
       <li><b>ownCommandx &lt;Slash-Befehl&gt; &lt;Kommando&gt; </b> <br> 
   
         Definiert ein &lt;Slash-Befehl&gt; &lt;Kommando&gt; Paar. Der Slash-Befehl und das Kommando sind durch ein 
@@ -2626,17 +2665,45 @@ return ($cr, $state);
           attr &lt;Name&gt; ownCommand2 /Wetter get MyWetter wind_speed <br>
         </ul>       
     
-      </li><br>
+      </li>
+      <br>
     </ul>
     
     <ul>  
-      <a name="showTokenInLog"></a>
+      <a id="SSChatBot-attr-showTokenInLog"></a>
       <li><b>showTokenInLog</b> <br> 
   
         Wenn gesetzt, wird im Log mit verbose 4/5 der übermittelte Bot-Token angezeigt. <br>
         (default: 0)
     
-      </li><br>
+      </li>
+      <br>
+    </ul>
+    
+    <ul>  
+      <a id="SSChatBot-attr-spareHost"></a>
+      <li><b>spareHost</b> <br> 
+  
+        Ersetzt den automatisch ermittelten Hostnamen im Internal <b>OUTDEF</b> mit einem benutzerspezifischen 
+        Hostnamen oder einer IP-Adresse. <br>
+        Die URL des Internals OUTDEF ist das Ziel für ausgehende Nachrichten (Chat -> FHEM) und wird beim Versand 
+        von SVG Plot-Dateien ausgewertet. <br> 
+    
+      </li>
+      <br>
+    </ul>
+    
+    <ul>  
+      <a id="SSChatBot-attr-sparePort"></a>
+      <li><b>sparePort</b> <br> 
+  
+        Ersetzt den automatisch ermittelten Port im Internal <b>OUTDEF</b> mit einem benutzerspezifischen 
+        Wert. <br>
+        Die URL des Internals OUTDEF ist das Ziel für ausgehende Nachrichten (Chat -> FHEM) und wird beim Versand 
+        von SVG Plot-Dateien ausgewertet. <br> 
+    
+      </li>
+      <br>
     </ul>
  
   </ul>
