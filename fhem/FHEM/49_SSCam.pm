@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2022 by Heiko Maaz
+#       (c) 2015-2023 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -185,6 +185,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.10.8" => "14.01.2023  add blank line in setter runView ",
   "9.10.7" => "02.08.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
   "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
                            "set 'part1type' to default => text/html instead of text/plain",
@@ -1593,7 +1594,7 @@ sub Set {
                    "enable:noArg ".
                    "disable:noArg ".
                    "optimizeParams ".
-                   "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                   "runView:#,live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                    "stopView:noArg ".
                    (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
                    (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
@@ -2566,7 +2567,7 @@ sub _setrunView {                        ## no critic "not used"
   my $prop  = $paref->{prop};
   my $prop1 = $paref->{prop1};
   
-  return if(!IsModelCam($hash));
+  return if(!IsModelCam($hash) || !$prop);
 
   my $spec = join " ", @$aref;
   if($spec =~ /STRM:/x) {
