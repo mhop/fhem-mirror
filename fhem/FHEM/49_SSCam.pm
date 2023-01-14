@@ -185,7 +185,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.10.8" => "14.01.2023  add blank line in setter runView ",
+  "9.10.8" => "14.01.2023  add blank line in setter runView, goPreset, runPatrol ",
   "9.10.7" => "02.08.2022  allow placeholders #CAM, #DATE, #TIME, #FILE, #CTIME (also for Email) ",
   "9.10.6" => "18.07.2022  textField-long property set for recChatTxt, recEmailTxt, recTelegramTxt, snapChatTxt, snapEmailTxt, snapTelegramTxt, ".
                            "set 'part1type' to default => text/html instead of text/plain",
@@ -1579,30 +1579,31 @@ sub Set {
   } elsif(IsModelCam($hash)) {
       # selist für Cams
       my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
+      
       $setlist   = "Unknown argument $opt, choose one of ".
+                   "createSnapGallery:noArg ".
+                   "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
+                   "createReadingsGroup ".
                    "credentials ".
-                   "smtpcredentials ".
+                   "disable:noArg ".
+                   "enable:noArg ".
                    "expmode:auto,day,night ".
-                   "on ".
-                   "off:noArg ".
                    "motdetsc:disable,camera,SVS ".
                    "snap ".
                    (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
-                   "createReadingsGroup ".
-                   "createSnapGallery:noArg ".
-                   "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                   "enable:noArg ".
-                   "disable:noArg ".
+                   "on ".
+                   "off:noArg ".                   
                    "optimizeParams ".
                    "runView:#,live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                    "stopView:noArg ".
+                   "smtpcredentials ".
                    (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
                    (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
                    (IsCapPTZPan($hash)      ? "setPreset ": "").
                    (IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                    (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
-                   (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                   (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                   (IsCapPTZPan($hash)      ? "runPatrol:#,".ReadingsVal("$name", "Patrols", "")." " : "").
+                   (IsCapPTZPan($hash)      ? "goPreset:#,".ReadingsVal("$name", "Presets", "")." " : "").
                    (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
                    (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
                    (IsCapPTZDir($hash)      ? "move"." " : "").
@@ -9104,12 +9105,13 @@ sub ptzPanel {
   my $ftui        = $paref->{ftui};  
   
   my $hash        = $defs{$name};
-  my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
-  my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
-  my $valPresets  = ReadingsVal("$name", "Presets",             ""                );
-  my $valPatrols  = ReadingsVal("$name", "Patrols",             ""                );
+  my $iconpath    = AttrVal         ("$name", 'ptzPanel_iconPath',   'www/images/sscam');
+  my $iconprefix  = AttrVal         ("$name", 'ptzPanel_iconPrefix',       'black_btn_');
+  my $valPresets  = '#,'.ReadingsVal("$name", 'Presets',                             '');
+  my $valPatrols  = '#,'.ReadingsVal("$name", 'Patrols',                             '');
   my $rowisset    = 0;
   my ($pbs,$pbsf) = ("","");
+  
   my ($row,$ptz_ret);
   
   return "" if(myVersion($hash) <= 71);
@@ -9136,9 +9138,10 @@ sub ptzPanel {
       $rownr = sprintf("%2.2d",$rownr);
       $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
       next if (!$row);
+      
       $rowisset = 1;
       $ptz_ret .= "<tr>";
-      my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
+      my @btn   = split (",",$row);                                                                          # die Anzahl Buttons in einer Reihe
       
       for my $btnnr (0..$#btn) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
@@ -9206,6 +9209,7 @@ sub ptzPanel {
           } 
           else {                                                                                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
               my $iPath = FW_iconPath($img);                                                          # automatisches Suchen der Icons im FHEMWEB iconPath
+              
               if($iPath) {
                   $iPath = "$FW_ME/$FW_icondir/$iPath";
               } 
@@ -9225,7 +9229,6 @@ sub ptzPanel {
           $cmd1     = "ftui.setFhemStatus('set $name setZoom $cmd')" if($ftui); 
           
           $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
-
           $ptz_ret .= "</td>";  
       }
       
@@ -9294,7 +9297,7 @@ sub ptzPanel {
       return $ptz_ret;
   } 
   else {
-      return "";
+      return '';
   }
 }
 
