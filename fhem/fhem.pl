@@ -312,7 +312,7 @@ my $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 $init_done = 0;
 $lastDefChange = 0;
-$featurelevel = 6.1; # see also GlobalAttr
+$featurelevel = 6.2; # see also GlobalAttr
 $numCPUs = `grep -c ^processor /proc/cpuinfo 2>&1` if($^O eq "linux");
 $numCPUs = ($numCPUs && $numCPUs =~ m/(\d+)/ ? $1 : 1);
 
@@ -2918,7 +2918,7 @@ GlobalAttr($$$$)
   if($type eq "del") {
     my %noDel = ( modpath=>1, verbose=>1, logfile=>1, configfile=>1, encoding=>1 );
     return "The global attribute $name cannot be deleted" if($noDel{$name});
-    $featurelevel = 6.1 if($name eq "featurelevel");
+    $featurelevel = 6.2 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
     delete($defs{global}{ignoreRegexpObj}) if($name eq "ignoreRegexp");
     return undef;
