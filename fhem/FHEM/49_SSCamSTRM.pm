@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.4" => "14.01.2023  change ptzButtonSize, ptzButtonSizeFTUI starting with 10 ",
   "2.15.3" => "13.01.2023  change behavior of hideDisplayName, hideDisplayNameFTUI if device is disabled ",
   "2.15.2" => "01.01.2022  minor code change in _setpopupStream ",
   "2.15.1" => "15.10.2021  fix warnings 'my variable masks earlier' ",
@@ -206,8 +207,8 @@ sub Initialize {
                                 "popupWindowSize ".
                                 "popupStreamFW:$fwd ".
                                 "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
-                                "ptzButtonSize:selectnumbers,50,5,100,0,lin ".
-                                "ptzButtonSizeFTUI:selectnumbers,50,5,200,0,lin ".
+                                "ptzButtonSize:selectnumbers,10,5,100,0,lin ".
+                                "ptzButtonSizeFTUI:selectnumbers,10,5,200,0,lin ".
                                 $readingFnAttributes;
   $hash->{RenameFn}           = \&Rename;
   $hash->{CopyFn}             = \&Copy;
