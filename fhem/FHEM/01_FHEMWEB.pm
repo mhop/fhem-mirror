@@ -4145,6 +4145,9 @@ FW_log($$)
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
+       -fhemweb.js will prevent the loading of fhemweb.js, this (in combination
+       with the addition of a special fhemweb.js) may be a solution for very
+       old tablets.
        </li><br>
 
     <a id="FHEMWEB-attr-logDevice"></a>
@@ -4992,6 +4995,9 @@ FW_log($$)
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
+       -fhemweb.js verhindert das das Laden von fhemweb.js, was (in Kombination
+       mit einer speziellen fhemweb.js) bei sehr alten Tablets eine L&ouml;sung
+       sein kann.
        </li><br>
 
     <a id="FHEMWEB-attr-logDevice"></a>
