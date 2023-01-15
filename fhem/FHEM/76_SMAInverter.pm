@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.20.3" => "15.01.2023  fix show FVERSION ",
   "2.20.2" => "12.01.2023  new read SPOT_EPVTOTAL / SPOT_EPVTODAY (Hybrid Inverter)",
   "2.20.1" => "09.01.2023  fix BAT_UNLOADTODAY calculate",
   "2.20.0" => "08.01.2023  crypt Password",
@@ -2156,7 +2157,8 @@ sub SMAInverter_setVersionInfo($) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
       if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+          #$modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+		  $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
@@ -2754,7 +2756,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     "PV",
     "inverter"
   ],
-  "version": "v2.18.3",
+  "version": "v1.1.1",
   "release_status": "stable",
   "author": [
     "Maximilian Paries",
