@@ -3,6 +3,7 @@
  - feature: 6.2 released
 
 - 2023-01-14 (6.2)
+ - change:  50_Signalbot: added state reading, better (un)register handling
  - bugfix:  72_FRITZBOX: Fehlerbereinigungen
                          Handhabung "inaktive" lanDevices angepasst
  - feature: 76_SMAInverter: crypt Password
