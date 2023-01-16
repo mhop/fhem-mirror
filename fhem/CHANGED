@@ -3,6 +3,8 @@
  - feature: 6.2 released
 
 - 2023-01-14 (6.2)
+ - bugfix:  72_FRITZBOX: Fehlerbereinigungen
+                         Handhabung "inaktive" lanDevices angepasst
  - feature: 76_SMAInverter: crypt Password
                             add new Reading SPOT_EPVTOTAL / SPOT_EPVTODAY
                             add new Reading BAT_UNLOADTODAY / BAT_UNLOADTOTAL,
