@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.11";
+my $Signalbot_VERSION="3.12";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -65,6 +65,7 @@ use vars qw($FW_wname);
 	"getGroup"				=> "ay", #V0.10.0
 	"addDevice"				=> "s",
 	"listDevices"			=> "",
+	"unregister"			=> "",
 	"sendEndSessionMessage" => "as",		#unused
 	"sendRemoteDeleteMessage" => "xas",		#unused
 	"sendGroupRemoteDeletemessage" => "xay",#unused
@@ -180,8 +181,9 @@ sub Signalbot_Set($@) {					#
 				"updateGroup:textField ".
 				"quitGroup:textField ".
 				"joinGroup:textField " if $version <1000;
-	$sets.=		"group:widgetList,13,select,addMembers,removeMembers,addAdmins,removeAdmins,invite,create,delete,block,unblock,update,".
-				"quit,join,1,textField contact:widgetList,5,select,add,delete,block,unblock,1,textField " if $version >=1000;
+	$sets.=	"group:widgetList,13,select,addMembers,removeMembers,addAdmins,removeAdmins,invite,".
+	"create,delete,block,unblock,update,".
+	"quit,join,1,textField contact:widgetList,5,select,add,delete,block,unblock,1,textField " if $version >=1000;
 	my $sets_reg=	"link:textField ".
 					"register:textField ";
 	$sets_reg	.=	"captcha:textField " if defined ($hash->{helper}{register});
@@ -198,17 +200,18 @@ sub Signalbot_Set($@) {					#
 	
 	# Works always
 	if ( $cmd eq "reinit") {
-		my $ret = Signalbot_setup($hash);
-		$hash->{STATE} = $ret if defined $ret;
 		$hash->{helper}{qr}=undef;
 		$hash->{helper}{register}=undef;
 		$hash->{helper}{verification}=undef;
+		$hash->{helper}{captcha}=undef;
+		my $ret = Signalbot_setup($hash);
+		$hash->{STATE} = $ret if defined $ret;
 		Signalbot_createRegfiles($hash);
 		return undef;
 	}
 
 	#Pre-parse for " " embedded strings, except for "send" that does its own processing
-	if ( $cmd ne "send") {
+	if ( $cmd ne "send" && $cmd ne "msg") {
 		@args=parse_line(' ',0,join(" ",@args));
 	}
 
@@ -227,11 +230,11 @@ sub Signalbot_Set($@) {					#
 		my $ret = Signalbot_setAccount($hash, $number);
 		# undef is success
 		if (!defined $ret) {
-			$ret=Signalbot_setup($hash);
-			$hash->{STATE} = $ret if defined $ret;
 			$hash->{helper}{qr}=undef;
 			$hash->{helper}{register}=undef;
 			$hash->{helper}{verification}=undef;
+			$ret=Signalbot_setup($hash);
+			$hash->{STATE} = $ret if defined $ret;
 			return undef;
 		}
 		#if some error occured, register the old account
@@ -259,24 +262,51 @@ sub Signalbot_Set($@) {					#
 	} elsif ($cmd eq "removeDevice") {
 		my $devID = shift @args;
 		return Signalbot_removeDevice($hash,$devID);
+	} elsif ( $cmd eq "unregister") {
+		my $number=ReadingsVal($name,"account","");
+		my $vernum= shift @args;
+		if ($number eq $vernum) {
+			my $ret=Signalbot_CallS($hash,"unregister");
+			#delete account and do a reinit
+			Signalbot_disconnect($hash);
+			readingsSingleUpdate($hash, 'account', "none", 0);
+			$hash->{helper}{qr}=undef;
+			$hash->{helper}{register}=undef;
+			$hash->{helper}{verification}=undef;
+			$hash->{helper}{captcha}=undef;
+			my $ret = Signalbot_setup($hash);
+			$hash->{STATE} = $ret if defined $ret;
+			Signalbot_createRegfiles($hash);
+			return undef;
+		}
+		return "To unregister provide current account for safety reasons";
 	} elsif ( $cmd eq "register") {
 		my $account= shift @args;
 		return "Number needs to start with '+' followed by digits" if !defined Signalbot_checkNumber($account);
+		delete $hash->{helper}{captcha};
 		my $ret=Signalbot_Registration($hash,$account);
 		if (!defined $ret) {
 			my $err=ReadingsVal($name,"lastError","");
+			$hash->{helper}{verification}=undef;
+			$hash->{helper}{qr}=undef;
 			$err="Captcha";
 			if ($err =~ /Captcha/) {
 				$hash->{helper}{register}=$account;
-				$hash->{helper}{verification}=undef;
-				$hash->{helper}{qr}=undef;
 				Signalbot_createRegfiles($hash);
 				return;
+			} else {
+				$hash->{helper}{register}=undef;
 			}
-		}
+		} 			
 		$hash->{helper}{verification}=$account;
 		$hash->{helper}{register}=undef;
+		if (defined $ret && $ret==-1) {
+			#Special case: registration succeeded without captcha as it just was reactivated - no verification
+			$hash->{helper}{verification}=undef;
+			$ret=Signalbot_setAccount($hash,$account);
+		}
 		return;
+		
 	} elsif ( $cmd eq "captcha" ) {
 		my $captcha=shift @args;
 		if ($captcha =~ /signalcaptcha:\/\//) {
@@ -293,6 +323,9 @@ sub Signalbot_Set($@) {					#
 					my $peer=$hash->{CL}{PEER};
 					DoTrigger($web,"JS#$peer:location.href=".'"'."?detail=$name".'"');
 					return undef;
+				} else {
+					my $err=ReadingsVal($name,"lastError","");
+					return "Error with captcha:$err";
 				}
 			}
 		}
@@ -406,7 +439,7 @@ sub Signalbot_Set($@) {					#
 			return $ret if defined $ret;
 		}
 		return undef;
-	} elsif ( $cmd eq "send" || $cmd eq "reply") {
+	} elsif ( $cmd eq "send" || $cmd eq "reply" || $cmd eq "msg") {
 		return "Usage: set ".$hash->{NAME}." send [@<Recipient1> ... @<RecipientN>] [#<GroupId1> ... #<GroupIdN>] [&<Attachment1> ... &<AttachmentN>] [<Text>]" if ( @args==0); 
 		
 		return Signalbot_prepareSend($hash,$cmd,@args);
@@ -1046,6 +1079,7 @@ sub Signalbot_disconnect($@) {
 		delete $hash->{FD};
 		$selectlist{"$name.dbus"} = undef;
 		$hash->{STATE}="Disconnected";
+		readingsSingleUpdate($hash, 'state', "disconnected",1);
 	}; 
 	if ($@) {
 		Log3 $name, 4, "Error in disconnect:".$@;
@@ -1068,6 +1102,7 @@ sub Signalbot_setup($@){
 	if (!defined $dbus) {
 		Log3 $name, 3, $hash->{NAME}.": Error while initializing Dbus";
 		$hash->{helper}{dbus}=undef;
+		readingsSingleUpdate($hash, 'state', "unavailable",1);
 		return "Error setting up DBUS - is Protocol::Dbus installed?";
 	}
 	$hash->{helper}{dbus}=$dbus;
@@ -1077,6 +1112,7 @@ sub Signalbot_setup($@){
 	if (!defined $dbus2) {
 		Log3 $name, 3, $hash->{NAME}.": Error while initializing Dbus";
 		$hash->{helper}{dbuss}=undef;
+		readingsSingleUpdate($hash, 'state', "unavailable",1);
 		return "Error setting up DBUS - is Protocol::Dbus installed?";
 	}
 	$hash->{helper}{dbuss}=$dbus2;
@@ -1171,6 +1207,7 @@ sub Signalbot_setup2($@) {
 		],
 		);	
 	$hash->{STATE}="Connected to $signalpath";
+	readingsSingleUpdate($hash, 'state', $hash->{STATE},1);
 
 	#-u Mode or already registered
 	if ($num<0 || $account ne "none") {
@@ -1186,6 +1223,8 @@ sub Signalbot_setup2($@) {
 		readingsBulkUpdate($hash, 'account', "none");
 		readingsBulkUpdate($hash, 'joinedGroups', "");
 		readingsBulkUpdate($hash, 'lastError', "No account registered - use set account to connect to an existing registration, link or register to get a new account");
+		$hash->{STATE}="Disconnected";
+		readingsBulkupdate($hash, 'state', "disconnected");
 		readingsEndUpdate($hash, 1);
 		return undef;
 	}
@@ -1817,6 +1856,7 @@ sub Signalbot_Registration($$) {
 	if (!defined $captcha) {
 		#try without captcha (but never works nowadays)
 		$ret=Signalbot_CallS($hash,"register",$account,$method);
+		return -1 if (defined $ret)
 	} else {
 		$ret=Signalbot_CallS($hash,"registerWithCaptcha",$account,$method,$captcha);
 	}
@@ -1914,6 +1954,7 @@ sub Signalbot_Init($$) {				#
 	if (defined $DBus_missing) {
 		$hash->{STATE} ="Please make sure that Protocol::DBus is installed, e.g. by 'sudo cpan install Protocol::DBus'";
 		Log3 $hash->{NAME}, 2, $hash->{NAME}.": Init: $hash->{STATE}";
+		readingsSingleUpdate($hash, 'state', "unavailable",1);
 		return $hash->{STATE};
 	}
 	Log3 $hash->{NAME}, 4, $hash->{NAME}.": Protocol::DBus version found ".$Protocol::DBus::VERSION;
@@ -1930,10 +1971,7 @@ sub Signalbot_Init($$) {				#
 	Signalbot_Set($hash, $name, "setfromreading");
 	my $account=ReadingsVal($name,"account","none");
 	if ($account eq "none") {$account=$a[0]};
-	my $ret = Signalbot_setPath($hash,$account);
-	$hash->{STATE} = $ret if defined $ret;
-	return $ret if defined $ret;
-	return;
+	return Signalbot_setPath($hash,$account);
 }
 
 sub Signalbot_fetchFile($$$$) {
@@ -2009,26 +2047,14 @@ sub Signalbot_Detail {
 			$ret .= "You seem to access FHEM from a Linux Desktop. Please consider to download <a href=fhem/signal/signalcaptcha.desktop download>this mine scheme<\/a> and install under ~/.local/share/applications/signalcaptcha.desktop<br>";
 			$ret .= "To activate it execute <b>xdg-mime default signalcaptcha.desktop x-scheme-handler/signalcaptcha</b> from your shell. This helps to mostly automate the registration process, however seems only to work with Firefox (not with Chromium)<br><br>";
 		}
-		$ret .= "Visit <a href=https://signalcaptchas.org/registration/generate.html>Signal Messenger Captcha Page<\/a> or <a href=https://signalcaptchas.org/challenge/generate.html>Alternative Captcha Page<\/a> and complete the potential Captcha (often you will see an empty page which means you already passed just by visiting the page).<br><br>";
+		$ret .= "Visit <a href=https://signalcaptchas.org/registration/generate.html>Signal Messenger Captcha Page<\/a> or <a href=https://signalcaptchas.org/challenge/generate.html>Alternative Captcha Page<\/a> and complete the captcha.<br><br>";
 		if ($FW_userAgent =~ /\(Windows/) {
 		$ret .= "If you applied the Windows registry hack, confirm opening Windows PowerShell and the rest will run automatically.<br><br>"
 		}
 		$ret .="If you're not using an automation option, you will then have to copy&paste the Captcha string that looks something like:<br><br>";
-		$ret .="<i>signalcaptcha://03AGdBq24NskB_KwAsS9kSY0PzRp4vKx01PZ8nGsfaTV2x548zaUy3aMqedsj..........</i><br><br>";
-		$ret .="To do this you typically need to open the Developer Tools (F12) and reload the Captcha.<br><br>";
-		if ($FW_userAgent =~ /Chrome/ ) {
-		$ret .="You seem to use a Chrome compatible browser. Now find the 'Network' tab, then the line with the Status=(canceled)<br>";
-		$ret .="If you move over the Name column you will see that it actually starts with signalcaptcha://<br>";
-		$ret .="Right click and chose Copy->Link Adress<br>";
-		$ret .="Return here and use <b>set captcha</b> to paste it and continue registration.<br><br>";
-		$ret .='<img src="https://svn.fhem.de/fhem/trunk/fhem/contrib/signal/chrome-x11-snapshot.png"><br>';
-		}
-		if ($FW_userAgent =~ /Firefox/ ) {
-		$ret .="You seem to use Firefox. Here find the 'Console' tab. You should see a 'prevented navigation' entry.<br>";
-		$ret .="Copy&Paste the signalcaptcha:// string (between quotes).<br>";
-		$ret .="Return here and use <b>set captcha</b> to paste it and continue registration.<br><br>";
-		$ret .='<img src="https://svn.fhem.de/fhem/trunk/fhem/contrib/signal/firefox-x11-snapshot.png"><br>';
-		}
+		$ret .="<i>signalcaptcha://signal-recaptcha-v2.6LfBXs0bAAAAAAjkDyyI1Lk5gBAUWfhI_bIyox5W.challenge.03AEkXO..........</i><br><br>";
+		$ret .="After solving the captcha you will see a link below the captcha like 'open Signal'. Copy that link adress and<br><br>";
+		$ret .="return here to use <b>set captcha</b> to paste it and continue registration.<br><br>";
 	}
 
 	if (defined $verification) {
@@ -2082,7 +2108,6 @@ sub Signalbot_State($$$$) {			#reload readings at FHEM start
 sub Signalbot_Undef($$) {				#
 	my ($hash, $name) = @_;
 	Signalbot_disconnect($hash);
-	$hash->{STATE}="Disconnected";
 	return undef;
 }
 
@@ -2181,6 +2206,72 @@ sub Signalbot_getPNG(@) {
 	return;
 }
 
+#Special version with one Argument for returning the SVG as String
+sub 
+getSVGuiTable($) 
+{
+	my ($arg)=@_;
+	return readSVGuiTable($arg,"");
+}	
+#Special public routine to retrieve the uiTable from a DOIF an store the SVG into the reading of a device
+#Usage: getSVGuiTable("Device:Reading","DOIF_Device,device=source_device,val=reading");
+sub
+readSVGuiTable($$) 
+{
+	my ($doif,$device) = @_;
+	my @special=split(",",$doif);
+	my $sname = shift @special;
+	my $shash = $defs{$sname};
+	if ($shash->{TYPE} ne "DOIF") {
+		return "getSVGuiTable() needs to specify a valid DOIF device as first argument (found $sname)";
+	}
+	push @special, "svg=1";
+	my $svgdata=Signalbot_DOIFAsPng($shash,@special);
+	$svgdata='<?xml version="1.0" encoding="UTF-8"?><svg>'.$svgdata.'</svg>';
+	$svgdata=~/viewBox=\"(\d+) (\d+) (\d+) (\d+)\"/;
+	my $x=$1;
+	my $y=$2;
+	my $width=$3/2;
+	my $height=$4/2;
+	my $w=$3*2;
+	my $h=$4*2;
+	#$svgdata=~s/viewBox=\"(\d+) (\d+) (\d+) (\d+)\"/viewbox=\"$x $y $width $height\" width=\"$w\" height=\"$h\"/g;
+	
+	return $svgdata if ($device eq "");
+	my @reading=split(":",$device);
+	return "Please specifiy device:reading to store your svg" if (@reading != 2);
+	my $hash = $defs{$reading[0]};
+	#$svgdata=~s/\n//ge;
+	$svgdata=encode_utf8($svgdata);
+	readingsSingleUpdate($hash,$reading[1],$svgdata,1);
+}
+
+#Special public routine to retrieve the uiTable from a DOIF an store the SVG into a file
+#Usage: saveSVGuiTable("filename","DOIF_Device,device=source_device,val=reading");
+sub
+saveSVGuiTable($$) {
+	my ($doif,$file)= @_;
+	my @special=split(",",$doif);
+	return "Filename required" if (!defined $file || $file eq "");
+	my $sname = shift @special;
+	my $shash = $defs{$sname};
+	if ($shash->{TYPE} ne "DOIF") {
+		return "getSVGuiTable() needs to specify a valid DOIF device as first argument";
+	}
+	push @special, "svg=1";
+	my $svgdata=Signalbot_DOIFAsPng($shash,@special);
+	$svgdata='<?xml version="1.0" encoding="UTF-8"?>'.$svgdata;
+	my $fh;
+	if(!open($fh, ">", $file,)) {
+		#return undef since this is a fatal error
+		return undef;
+	}
+	#Suppress "wide character" warning that is generated if special characters are used
+	{no warnings; print $fh $svgdata; }
+	close($fh);
+	return $file;
+}
+
 sub
 Signalbot_DOIFAsPng($@)
 {
@@ -2194,7 +2285,8 @@ Signalbot_DOIFAsPng($@)
 	my $matchdev="";
 	my $matchread="";
 	my $target="uiTable";
-
+	my $svgonly=0;
+	
 	#If no further information given, take the first entry of uitables
 	if (@params == 0) {
 		$matchid=1;
@@ -2211,6 +2303,8 @@ Signalbot_DOIFAsPng($@)
 				$zoom=$val if looks_like_number($val);
 			} elsif ($cm eq "dev") {
 				$matchdev=$val;
+			} elsif ($cm eq "svg") {
+				$svgonly=$val;
 			} elsif ($cm eq "val") {
 				$matchread=$val;
 			} elsif ($cm eq "sizex") {
@@ -2262,15 +2356,24 @@ Signalbot_DOIFAsPng($@)
 	} else {
 		return "Error: uiTable format error";
 	}
-	
-	return "Error: getting converting uiTable to SVG for $cmd" if (! defined $svgdata);
-	$svgdata='<?xml version="1.0" encoding="UTF-8"?> <svg>'.$svgdata.'</svg>';
 
+	$svgdata=decode_utf8($svgdata) if !($unicodeEncoding);
+	$svgdata=~s/&#x(....)/chr(hex($1))/ge; #replace all html unicode with real characters since libsvg does not like'em
+
+	return "Error: getting converting uiTable to SVG for $cmd" if (! defined $svgdata);
+	if ($svgonly) {
+		#Remove the fixed size so ftui or any other receiver can scale it themselves
+		$svgdata =~ s/ width=\"(\d+)\" height=\"(\d+)\" style=\"width:(\d+)px; height:(\d+)px;\"//g;
+		#Add XML header with right encoding
+		return $svgdata;
+	}
+
+	$svgdata='<?xml version="1.0" encoding="UTF-8"?><svg>'.$svgdata.'</svg>';
+	
 	my $ret;
 	eval {
 		require Image::LibRSVG;
 		$rsvg = new Image::LibRSVG();
-		$svgdata=~s/&#x(....)/chr(hex($1))/ge; #replace all html unicode with real characters since libsvg does not like'em
 		if ($sizex != -1 && $sizey !=-1) {
 		$ret=$rsvg->loadFromStringAtZoomWithMax($svgdata, $zoom, $zoom, $sizex, $sizey  );
 		} else {
