@@ -4147,7 +4147,10 @@ FW_log($$)
        </code></ul>
        -fhemweb.js and/or -f18.js will prevent the loading of the corresponding
        file, this, in combination with the addition of an old version of the
-       file, may be a solution for old tablets with outdated browser.
+       file may be a solution for old tablets with an outdated browser.
+       <ul>
+         attr WEB_iOS6 JavaScripts -fhemweb.js -f18.js pgm2/iOS6_fhemweb.js pgm2/iOS6_f18.js
+       </ul>
        </li><br>
 
     <a id="FHEMWEB-attr-logDevice"></a>
@@ -4997,7 +5000,11 @@ FW_log($$)
        </code></ul>
        -fhemweb.js und/oder -f18.js verhindert das Laden diese Dateien, was, in
        Kombination mit einer alter Version der Datei, eine Abhilfe bei alten
-       Tablets mit nicht mehr aktulisierbaren Browser sein kann.
+       Tablets mit nicht mehr aktulisierbaren Browser sein kann:
+       <ul>
+         attr WEB_iOS6 JavaScripts -fhemweb.js -f18.js pgm2/iOS6_fhemweb.js pgm2/iOS6_f18.js
+       </ul>
+
        </li><br>
 
     <a id="FHEMWEB-attr-logDevice"></a>
