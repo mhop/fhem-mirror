@@ -274,7 +274,7 @@ sub Signalbot_Set($@) {					#
 			$hash->{helper}{register}=undef;
 			$hash->{helper}{verification}=undef;
 			$hash->{helper}{captcha}=undef;
-			my $ret = Signalbot_setup($hash);
+			$ret = Signalbot_setup($hash);
 			$hash->{STATE} = $ret if defined $ret;
 			Signalbot_createRegfiles($hash);
 			return undef;
@@ -1224,7 +1224,7 @@ sub Signalbot_setup2($@) {
 		readingsBulkUpdate($hash, 'joinedGroups', "");
 		readingsBulkUpdate($hash, 'lastError', "No account registered - use set account to connect to an existing registration, link or register to get a new account");
 		$hash->{STATE}="Disconnected";
-		readingsBulkupdate($hash, 'state', "disconnected");
+		readingsBulkUpdate($hash, 'state', "disconnected");
 		readingsEndUpdate($hash, 1);
 		return undef;
 	}
