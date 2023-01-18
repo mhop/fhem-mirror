@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.4";
+my $ModulVersion = "07.50.4a";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -1386,11 +1386,11 @@ sub FRITZBOX_API_Check_Run($)
 
       if ($response->is_success) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 1;
-         FRITZBOX_Log $hash, 4, "DEBUG: API webcm found (".$response->code.").";
+         FRITZBOX_Log $hash, 3, "INFO: API webcm found (".$response->code.").";
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 0;
-         FRITZBOX_Log $hash, 3, "INFO: API webcm does not exist (".$response->status_line.")";
+         FRITZBOX_Log $hash, 4, "DEBUG: API webcm does not exist (".$response->status_line.")";
       }
 
    # Check if query.lua exists
@@ -1540,7 +1540,7 @@ sub FRITZBOX_API_Check_Run($)
       if (!$telnet) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 0;
          $telnet = undef;
-         FRITZBOX_Log $hash, 3, "INFO: No telnet connection available for $host: $!";
+         FRITZBOX_Log $hash, 4, "DEBUG: No telnet connection available for $host: $!";
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TELNET", 1;
@@ -2433,11 +2433,13 @@ sub FRITZBOX_Readout_Run_Web($)
    # xhrId all
    # xhr 1 lang de page dslOv xhrId all
 
-   $Tag = int($result->{box_uptimeHours} / 24);
-   $Std = int($result->{box_uptimeHours} - (24 * $Tag));
-   $Sek = int($result->{box_uptimeHours} * 3600) + $result->{box_uptimeMinutes} * 60;
+   if($result->{box_uptimeHours}) {
+      $Tag = int($result->{box_uptimeHours} / 24);
+      $Std = int($result->{box_uptimeHours} - (24 * $Tag));
+      $Sek = int($result->{box_uptimeHours} * 3600) + $result->{box_uptimeMinutes} * 60;
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptime", $Sek . " sec = " . $Tag . "T $Std:" . substr("0".$result->{box_uptimeMinutes},-2) . ":00"; #unless((grep { /^(box_uptime)$/ } @reading_list));
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_uptime", $Sek . " sec = " . $Tag . "T $Std:" . substr("0".$result->{box_uptimeMinutes},-2) . ":00"; #unless((grep { /^(box_uptime)$/ } @reading_list));
+   }
 
    if ($result->{box_fwVersion}) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion}; #unless(grep { /^(box_fwVersion)$/ } @reading_list);
@@ -7558,13 +7560,18 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
       <br>
-      <li><b>box_dect</b> - Current state of the DECT base</li>
+      <li><b>box_cpuTemp</b> - Tempreture of the Fritx!Box CPU</li>
+      <li><b>box_dect</b> - Current state of the DECT base: activ, inactiv</li>
+      <li><b>box_dsl_downStream</b> - minimum effective data rate  (MBit/s)</li>
+      <li><b>box_dsl_upStream</b> - minimum effective data rate  (MBit/s)</li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
       <li><b>box_guestWlanCount</b> - Number of devices connected to guest WLAN</li>
       <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
       <li><b>box_ipExtern</b> - Internet IPv4 of the FRITZ!BOX</li>
       <li><b>box_ipv6Extern</b> - Internet IPv6 of the FRITZ!BOX</li>
+      <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix of the FRITZ!BOX for the LAN/WLAN</li>
+      <li><b>box_macFilter_active</b> - Status of the WLAN MAC filter (restrict WLAN access to known WLAN devices)</li>
       <li><b>box_model</b> - FRITZ!BOX model</li>
       <li><b>box_moh</b> - music-on-hold setting</li>
       <li><b>box_model</b> - FRITZ!BOX model</li>
@@ -7578,6 +7585,8 @@ sub FRITZBOX_fritztris($)
       <li><b>box_stdDialPort</b> - standard caller port when using the dial function of the box</li>
       <li><b>box_tr064</b> - application interface TR-064 (needed by this modul)</li>
       <li><b>box_tr069</b> - provider remote access TR-069 (safety issue!)</li>
+      <li><b>box_vdsl_downStreamRate</b> - Current date rate (MBit/s)</li>
+      <li><b>box_vdsl_upStreamRate</b> - Current date rate (MBit/s)</li>
       <li><b>box_wlanCount</b> - Number of devices connected via WLAN</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
@@ -7624,7 +7633,9 @@ sub FRITZBOX_fritztris($)
       <li><b>vpn</b><i>n</i> - Name of the VPN</li>
       <li><b>vpn</b><i>n</i><b>_access_type</b> - access type: User VPN | Lan2Lan | Corporate VPN</li>
       <li><b>vpn</b><i>n</i><b>_activated</b> - status if VPN <i>n</i> is active</li>
+      <li><b>vpn</b><i>n</i><b>_connected_since</b> - duaration of the vpn connection <i>n</i> is active</li>
       <li><b>vpn</b><i>n</i><b>_remote_ip</b> - IP from client site</li>
+      <li><b>vpn</b><i>n</i><b>_state</b> - not active | ready | none</li>
       <li><b>vpn</b><i>n</i><b>_user_connected</b> - status of VPN <i>n</i> connection</li>
       <br>
       <li><b>sip</b><i>n</i>_<i>phone-number</i> - Status</li>
@@ -8047,13 +8058,13 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><a name="disableDectInfo"></a>
-         <dt><code>enableDectInfo &lt;0 | 1&gt;</code></dt>
+         <dt><code>disableDectInfo &lt;0 | 1&gt;</code></dt>
          <br>
          Schaltet die übernahme von Dect Informatioen aus/ein.
       </li><br>
 
       <li><a name="disableFonInfo"></a>
-         <dt><code>enableFonInfo &lt;0 | 1&gt;</code></dt>
+         <dt><code>disableFonInfo &lt;0 | 1&gt;</code></dt>
          <br>
          Schaltet die übernahme von Telefon Informatioen aus/ein.
       </li><br>
@@ -8127,13 +8138,18 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
       <br>
-      <li><b>box_dect</b> - Aktueller Status des DECT-Basis</li>
+      <li><b>box_cpuTemp</b> - Temperatur der FritxBox CPU</li>
+      <li><b>box_dect</b> - Aktueller Status des DECT-Basis: aktiv, inaktiv</li>
+      <li><b>box_dsl_downStream</b> - Min Effektive Datenrate  (MBit/s)</li>
+      <li><b>box_dsl_upStream</b> - Min Effektive Datenrate  (MBit/s)</li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des Gäste-WLAN</li>
       <li><b>box_guestWlanCount</b> - Anzahl der Geräte die über das Gäste-WLAN verbunden sind</li>
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des Gäste-WLAN</li>
       <li><b>box_ipExtern</b> - Internet IPv4 der FRITZ!BOX</li>
       <li><b>box_ipv6Extern</b> - Internet IPv6 der FRITZ!BOX</li>
+      <li><b>box_ipv6Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX f�r das LAN/WLAN</li>
+      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-Ger�te beschr�nken)</li>
       <li><b>box_model</b> - FRITZ!BOX-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_connect</b> - Verbindungsstatus: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
@@ -8146,6 +8162,8 @@ sub FRITZBOX_fritztris($)
       <li><b>box_stdDialPort</b> - Anschluss der geräteseitig von der Wählhilfe genutzt wird</li>
       <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul benötigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
+      <li><b>box_vdsl_downStreamRate</b> - Aktuelle Datenrate (MBit/s)</li>
+      <li><b>box_vdsl_upStreamRate</b> - Aktuelle Datenrate (MBit/s)</li>
       <li><b>box_wlanCount</b> - Anzahl der Geräte die über WLAN verbunden sind</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
@@ -8194,8 +8212,10 @@ sub FRITZBOX_fritztris($)
       <br>
       <li><b>vpn</b><i>n</i> - Name des VPN</li>
       <li><b>vpn</b><i>n</i><b>_access_type</b> - Verbindungstyp: Benutzer VPN | Netzwert zu Netzwerk | Firmen VPN</li>
-      <li><b>vpn</b><i>n</i><b>_activated</b> - Status, ob Benutzer VPN <i>n</i> aktiv ist</li>
+      <li><b>vpn</b><i>n</i><b>_activated</b> - Status, ob VPN <i>n</i> aktiv ist</li>
+      <li><b>vpn</b><i>n</i><b>_connected_sice</b> - Dauer der Verbindung</li>
       <li><b>vpn</b><i>n</i><b>_remote_ip</b> - IP der Gegenstelle</li>
+      <li><b>vpn</b><i>n</i><b>_state</b> - not active | ready | none</li>
       <li><b>vpn</b><i>n</i><b>_user_connected</b> - Status, ob Benutzer VPN <i>n</i> verbunden ist</li>
       <br>
       <li><b>sip</b><i>n</i>_<i>Telefon-Nummer</i> - Status</li>
