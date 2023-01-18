@@ -8384,8 +8384,7 @@ return;
 	   <tr><td>     </td><td>In principle, the data is immediately available in the database.                                                                       </td></tr>
 	   <tr><td>     </td><td>Very little to no data is lost when FHEM crashes.                                                                                      </td></tr>
 	   <tr><td>     </td><td><b>Disadvantages:</b>                                                                                                                  </td></tr>
-	   <tr><td>     </td><td>The data is only short cached and will be lost if the database is unavailable or malfunctions.                                         </td></tr>
-	   <tr><td>     </td><td>Alternative storage in the file system is not supported.                                                                               </td></tr>
+	   <tr><td>     </td><td>An alternative storage in the file system (in case of database problems) is not supported.                                             </td></tr>
 	   <tr><td>     </td><td>                                                                                                                                       </td></tr>
 	   <tr><td> 1 - </td><td><b>Asynchroner Log-Modus.</b> The data to be logged is first cached in a memory cache and written to the database                      </td></tr>
 	   <tr><td>     </td><td>depending on a <a href="#DbLog-attr-syncInterval">time interval</a> or <a href="#DbLog-attr-cacheLimit">fill level</a> of the cache.   </td></tr>
@@ -10050,8 +10049,7 @@ attr SMA_Energymeter DbLogValueFn
 	   <tr><td>     </td><td>Die Daten stehen im Prinzip sofort in der Datenbank zur Verfügung.                                                    </td></tr>
 	   <tr><td>     </td><td>Bei einem Absturz von FHEM gehen sehr wenige bis keine Daten verloren.                                                </td></tr>
 	   <tr><td>     </td><td><b>Nachteile:</b>                                                                                                     </td></tr>
-	   <tr><td>     </td><td>Die Daten werden nur kurz zwischengespeichert und gehen verloren wenn die Datenbank nicht verfügbar ist               </td></tr>
-	   <tr><td>     </td><td>oder fehlerhaft arbeitet. Eine alternative Speicherung im Filesystem wird nicht unterstützt.                          </td></tr>
+	   <tr><td>     </td><td>Eine alternative Speicherung im Filesystem (bei Datenbankproblemen) wird nicht unterstützt.                           </td></tr>
 	   <tr><td>     </td><td>                                                                                                                      </td></tr>
 	   <tr><td>     </td><td>                                                                                                                      </td></tr>
 	   <tr><td> 1 - </td><td><b>Asynchroner Log-Modus.</b> Die zu loggenden Daten werden zunächst in einem Memory Cache zwischengespeichert        </td></tr>
