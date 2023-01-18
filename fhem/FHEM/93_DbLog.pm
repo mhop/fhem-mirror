@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2023 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2023 by DS_Starter
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster) adapted by DS_Starter
@@ -38,6 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
   "5.6.0"   => "11.01.2023 rename attribute 'bulkInsert' to 'insertMode' ",
   "5.5.12"  => "10.01.2023 changed routine _DbLog_SBP_onRun_LogSequential, edit CommandRef ",
   "5.5.11"  => "09.01.2023 more code rework / structured subroutines ",
@@ -2473,6 +2474,10 @@ return $doNext;
 #   PrintError - handle attribute tells DBI to call the Perl warn( ) function
 #                (which typically results in errors being printed to the screen
 #                when encountered)
+#
+# For maximum reliability and for robustness against database corruption,
+# SQLite should always be run with its default synchronous setting of FULL.
+# https://sqlite.org/howtocorrupt.html
 ###################################################################################
 sub _DbLog_SBP_connectDB {
   my $paref      = shift;
@@ -2537,25 +2542,54 @@ sub _DbLog_SBP_connectDB {
   if($utf8) {
       if($model eq "MYSQL") {
           $dbh->{mysql_enable_utf8} = 1;
-          $dbh->do('set names "UTF8"');
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'set names "UTF8"');
+          return ($err, q{}) if($err);
       }
 
       if($model eq "SQLITE") {
-        $dbh->do('PRAGMA encoding="UTF-8"');
+        ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, 'PRAGMA encoding="UTF-8"');
+        return ($err, q{}) if($err);
       }
   }
 
-  if ($model eq 'SQLITE') {
-      $dbh->do("PRAGMA temp_store=MEMORY");
-      $dbh->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption,
-                                               # SQLite should always be run with its default synchronous setting of FULL.
-                                               # https://sqlite.org/howtocorrupt.html
-
-      $dbh->do("PRAGMA journal_mode=$sltjm");
-      $dbh->do("PRAGMA cache_size=$sltcs");
+  if ($model eq 'SQLITE') {     
+      my @dos = ("PRAGMA temp_store=MEMORY", 
+                 "PRAGMA synchronous=FULL", 
+                 "PRAGMA journal_mode=$sltjm",
+                 "PRAGMA cache_size=$sltcs"
+                );
+      
+      for my $do (@dos) {
+          ($err, undef) = _DbLog_SBP_dbhDo ($name, $dbh, $do);  
+          return ($err, q{}) if($err);          
+      }
   }
 
 return ($err, $dbh);
+}
+
+####################################################################################################
+#  einfaches Sdbh->do, return ERROR-String wenn Fehler bzw. die Anzahl der betroffenen Zeilen
+####################################################################################################
+sub _DbLog_SBP_dbhDo {
+  my $name = shift;
+  my $dbh  = shift;
+  my $sql  = shift;
+  my $info = shift // "simple do statement: $sql";
+
+  my $err  = q{};
+  my $rv   = q{};
+
+  Log3 ($name, 4, "DbLog $name - $info");
+
+  eval{ $rv = $dbh->do($sql);
+        1;
+      }
+      or do { $err = $@;
+              Log3 ($name, 2, "DbLog $name - ERROR - $@");
+            };
+
+return ($err, $rv);
 }
 
 ############################################################################
@@ -3414,27 +3448,23 @@ sub _DbLog_SBP_onRun_deleteOldDays {
   my $st = [gettimeofday];                                           # SQL-Startzeit
 
   if(defined ($cmd)) {
-      eval { $numdel = $dbh->do($cmd);
-             1;
-           }
-           or do { $error = $@;
+      (my $err, $numdel) = _DbLog_SBP_dbhDo ($name, $dbh, $cmd);      
+      
+      if ($err) {
+          $dbh->disconnect();
+          delete $store->{dbh};
 
-                   Log3 ($name, 2, "DbLog $name - Error table $history - $error");
+          $ret = {
+              name     => $name,
+              msg      => $err,
+              ot       => 0,
+              oper     => $operation
+          };
 
-                   $dbh->disconnect();
-                   delete $store->{dbh};
-
-                   $ret = {
-                       name     => $name,
-                       msg      => $error,
-                       ot       => 0,
-                       oper     => $operation
-                   };
-
-                   __DbLog_SBP_sendToParent ($subprocess, $ret);
-                   return;
-                 };
-
+          __DbLog_SBP_sendToParent ($subprocess, $ret);
+          return;         
+      }
+      
       $numdel = 0 if($numdel == 0E0);
       $error  = __DbLog_SBP_commitOnly ($name, $dbh, $history);
 
@@ -5012,7 +5042,7 @@ return ($err, @sr);
 #
 # param1: DbLog-hash
 # param2: SQL-Statement
-#
+# 
 ##########################################################################
 sub DbLog_ExecSQL {
   my $hash = shift;
@@ -5025,29 +5055,12 @@ sub DbLog_ExecSQL {
   my $name = $hash->{NAME};
 
   Log3 ($name, 4, "DbLog $name - Backdoor executing: $sql");
-
-  my $sth = DbLog_ExecSQL1($hash, $dbh, $sql);
+  
+  ($err, my $sth) = _DbLog_SBP_dbhDo ($name, $dbh, $sql);  
+  $sth = 0 if($err); 
 
   __DbLog_SBP_commitOnly     ($name, $dbh);
   __DbLog_SBP_disconnectOnly ($name, $dbh);
-
-return $sth;
-}
-
-sub DbLog_ExecSQL1 {
-  my $hash = shift;
-  my $dbh  = shift;
-  my $sql  = shift;
-
-  my $name = $hash->{NAME};
-
-  my $sth;
-
-  eval { $sth = $dbh->do($sql); };
-  if($@) {
-      Log3 ($name, 2, "DbLog $name - ERROR: $@");
-      return 0;
-  }
 
 return $sth;
 }
