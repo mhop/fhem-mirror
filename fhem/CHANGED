@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FRITZBOX: Fehlerbereinigungen
+                         box_uptime FRITZ!OS < 7.00 Versionen nicht vorhanden
+                         INFO: API webcm / Telnet bei Verfügbarkeit
+                         commandRef ergänzt
  - feature: 50_SSChatBot: new attr spareHost, sparePort
  - feature: 6.2 released
 
