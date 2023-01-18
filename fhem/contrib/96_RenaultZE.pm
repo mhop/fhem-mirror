@@ -1,9 +1,10 @@
 ###############################################################################
 #
-# $Id: 96_RenaultZE.pm  2023-01-05 plin $
+# $Id: 96_RenaultZE.pm  2023-01-13 plin $
 # 96_RenaultZE.pm
 #
 # Forum : https://forum.fhem.de/index.php/topic,116273.0.html
+# Ref https://renault-api.readthedocs.io/en/latest/endpoints.html
 #
 ###############################################################################
 #
@@ -37,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.06 logging "well known error" Failed to forward request to remote service only at log level 5
 # v 1.05 fixed timing problem in update request
 # v 1.04 typo denbled corrected
 # v 1.03 hvac settings output corrected
@@ -96,7 +98,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.05 / 07.01.2023";
+my $RenaultZE_version ="V1.06 / 18.01.2023";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -408,7 +410,7 @@ sub RenaultZE_Main1($@) {
 
            if ( $ze_Gigya_JWT_Token eq ""  ||  $gigya_time < gettimeofday() - 70000 ) {
               my $res = RenaultZE_getCreds_Step1($hash);
-              Log3 $name, 5, "RenaultZE_Main1 - RC=".$res;
+              Log3 $name, 5, "RenaultZE_Main1 - RC=".$res		if defined($res);
            }
 	   else
 	   {
@@ -1496,7 +1498,8 @@ sub RenaultZE_Error_errorCode2($$$$$)
     my $errorCode    = $decode_json->{errors}[0]->{errorCode};
     my $errorMessage = $decode_json->{errors}[0]->{errorMessage};
     my $msg = "errorCode=".$errorCode.", errorMessage=".$errorMessage;
-    Log3 $name, 3, "ERROR: (2) ".$step.", error (data) while calling ".$url." - $msg";
+    Log3 $name, 3, "ERROR: (2) ".$step.", error (data) while calling ".$url." - $msg"		if($errorMessage !~ /Failed to forward request to remote service/);;
+    Log3 $name, 5, "ERROR: (2) ".$step.", error (data) while calling ".$url." - $msg"		if($errorMessage =~ /Failed to forward request to remote service/);;
 
     $msg = RenaultZE_pp_err($hash,$msg)                                             if($msg ne "");;
 
