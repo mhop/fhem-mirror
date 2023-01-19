@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 27031 2023-01-11 23:20:18Z DS_Starter $
+# $Id: 93_DbRep.pm 27047 2023-01-13 20:58:50Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -59,6 +59,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.51.3"  => "19.01.2023  extend DbRep_averval avgTimeWeightMean by alkazaa ",
   "8.51.2"  => "13.01.2023  rewrite sub DbRep_OutputWriteToDB, new averageValue option writeToDBSingleStart ",
   "8.51.1"  => "11.01.2023  write TYPE uppercase with writeToDB option, Commandref edited, fix add SQL Cache History ".
                             "set PRAGMA auto_vacuum = FULL when execute SQLite vacuum command",
@@ -3258,7 +3259,7 @@ sub DbRep_averval {
 
   my ($gts,$gtsstr) = (0,q{});                                                     # Variablen für Grünlandtemperatursumme GTS
 
-  my ($sql,$sth,$selspec,$addon,$gtsreached);
+  my ($sql,$sth,$selspec,$addon,$gtsreached,$bin_end,$val1);
 
   my $bst = [gettimeofday];                                                        # Background-Startzeit
 
@@ -3349,6 +3350,7 @@ sub DbRep_averval {
 
           @wsf    = split(" ",$runtime_string_first);
           @wsn    = split(" ",$runtime_string_next);
+          
           $wrstr .= $runtime_string."#".$line[0]."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
       }
       elsif ($acf =~ /avgDailyMeanGWS/x) {
@@ -3440,9 +3442,9 @@ sub DbRep_averval {
 
               $gtsstr .= $runtime_string."#".$gts."#".$rsf[0]."|";
           }
-          #############################################################################################
       }
       elsif ($acf eq "avgTimeWeightMean") {
+          #############################################################################################
           # zeitgewichteten Mittelwert berechnen
           # http://massmatics.de/merkzettel/#!837:Gewichteter_Mittelwert
           #
@@ -3454,9 +3456,12 @@ sub DbRep_averval {
           # .....
           # (val1*$dt/$tsum) + (val2*$dt/$tsum) + .... + (valn*$dt/$tsum)
           #
-
           # gesamte Zeitspanne $tsum zwischen ersten und letzten Datensatz der Zeitscheibe ermitteln
-          my ($tsum,$tf,$tl,$tn,$to,$dt,$val,$val1);
+
+          my $aval = (DbRep_checktimeaggr($hash))[2];                         # alkazaa moved this here because $aval is needed earlier
+
+          my ($tsum,$tf,$tl,$tn,$to,$dt,$val);  # alkazaa                                                                                                              
+          
           my $sum    = 0;
           my $addonf = 'ORDER BY TIMESTAMP ASC LIMIT 1';
           my $addonl = 'ORDER BY TIMESTAMP DESC LIMIT 1';
@@ -3472,8 +3477,48 @@ sub DbRep_averval {
                        $dbh->disconnect;
                        return "$name|$err";
                      };
+# <alkazaa>                  
+          if ($bin_end) {                                                     # das $bin_end des letzten Bin ist der effektive Zeitpunkt des letzten Datenwertes
+              $tf = $bin_end;                                                 # der vorherigen Periode, die in die aktuelle Periode übernommen wird
+          }                         
+          else {                                                              # dies ist der erste Mittelungsplatz, und mit einem "Peek-back-in-time" wird versucht, den Wert unmittelbar vor der Startzeit zu ermitteln
+              my ($year,$month,$day,$hour,$min,$sec) = $runtime_string_first =~ m/(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/xs;
+              my $time                               = timelocal ($sec,$min,$hour,$day,$month-1,$year);
+                
+              if ($aval eq 'hour' || $aval eq 'minute') {
+                  $time -= 3600;                                              # um 1 Stunde zurückblicken
+              }
+              elsif ($aval eq 'day') {
+                  $time -= 24 * 3600;                                         # peek back by 1 day
+              }
+              elsif ($aval eq 'week') {
+                  $time -= 3 * 24 * 3600;                                     # peek back by 3 days
+              }
+              elsif ($aval eq 'month') {
+                  $time -= 7 * 24 * 3600;                                     # peek back by 1 week
+              }
+              else {
+                  $time -= 30 * 24 * 3600;                                    # peek back by 1 month
+              };          
+              
+              my $newtime_string = strftime ("%Y-%m-%d %H:%M:%S", localtime ($time));   
+              $sql               = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$newtime_string'", "'$runtime_string_first'", $addonl);
+                
+              ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+              return "$name|$err" if ($err);
+                
+              my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
+                
+              for my $twmrow (@twm_array) {
+                  ($tn,$val1) = split("_ESC_",$twmrow);
+                  $val1       = DbRep_numval ($val1);                         # nichtnumerische Zeichen eliminieren
+                  $bin_end    = $runtime_string_first;                        # the last value before the full timeframe is 'faked to the start of the timeframe 
+                  $tf         = $runtime_string_first;
+              }
+          } 
 
-          if(!$tf || !$tl) {                                                   # kein Start- und/oder Ende Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich
+# old:    if(!$tf || !$tl) {                                                  # kein Start- und/oder Ende Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich
+          if(!$tf) {                                                          # kein Start-Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich                                                   # kein Start- und/oder Ende Timestamp in Zeitscheibe vorhanden -> keine Werteberechnung möglich
               $sum = "insufficient values";
           }
           else {
@@ -3482,6 +3527,9 @@ sub DbRep_averval {
 
               $tsum = (timelocal($secl, $minl, $hhl, $ddl, $mml-1, $yyyyl-1900))-
                       (timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900));
+              $tsum = 0;
+              $sum  = 0;
+# </alkazaa>                 
 
               if ($IsTimeSet || $IsAggrSet) {
                   $sql = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$runtime_string_first'", "'$runtime_string_next'", $addon);
@@ -3493,14 +3541,30 @@ sub DbRep_averval {
               ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
               return "$name|$err" if ($err);
 
-              my @twm_array =  map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
+              my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
 
+# <alkazaa>
+              if ($bin_end) {                                                                   # der letzte Datenwert aus dem vorherigen Bin wird dem aktuellen Bin vorangestellt, 
+                  unshift @twm_array, $bin_end.'_ESC_'.$val1;                                   # wobei das vorherige $bin_end als Zeitstempel verwendet wird
+                  Log3 ($name, 4, "DbRep $name - <last Bin> Time: $bin_end, Value: $val1");
+              }
+
+              # für jeden Bin word die Endzeit aufgezeichnet, um sie für den nächsten Bin zu verwenden
+              my ($yyyyf, $mmf, $ddf, $hhf, $minf, $secf) = $runtime_string_next =~ /(\d+)-*(\d+)*-*(\d+)*\s*(\d+)*:*(\d+)*:*(\d+)*/xs;
+              
+              $bin_end  = $runtime_string_next;
+              $bin_end .='-01' if (!$mmf);
+              $bin_end .='-01' if (!$ddf);
+              $bin_end .=' 00' if (!$hhf);
+              $bin_end .=':00' if (!$minf); 
+              $bin_end .=':00' if (!$secf);
+# <\alkazaa>
               for my $twmrow (@twm_array) {
-                  ($tn,$val) = split("_ESC_",$twmrow);
-                  $val       = DbRep_numval ($val);                                        # nichtnumerische Zeichen eliminieren
+                  ($tn,$val) = split "_ESC_", $twmrow;
+                  $val       = DbRep_numval ($val);                                             # nichtnumerische Zeichen eliminieren
 
-                  my ($yyyyt1, $mmt1, $ddt1, $hht1, $mint1, $sect1) = ($tn =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-                  $tn = timelocal($sect1, $mint1, $hht1, $ddt1, $mmt1-1, $yyyyt1-1900);
+                  my ($yyyyt1, $mmt1, $ddt1, $hht1, $mint1, $sect1) = $tn =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/xs;
+                  $tn                                               = timelocal ($sect1, $mint1, $hht1, $ddt1, $mmt1-1, $yyyyt1-1900);
 
                   if(!$to) {
                       $val1 = $val;
@@ -3508,17 +3572,24 @@ sub DbRep_averval {
                       next;
                   }
 
-                  $dt   = $tn - $to;
-                  $sum += $val1 * ($dt/$tsum) if($tsum);
-                  $val1 = $val;
-                  $to   = $tn;
+                  $dt    = $tn - $to;
+                  $tsum += $dt;                                                                 # alkazaa: Bildung der Zeitsumme für die spätere Division
+# alkazza, old:   $sum += $val1*$dt/$tsum) if($tsum);
+                  $sum  += $val1 * $dt;                                                         # alkazaa neu: die Division durch die Gesamtzeit wird am Ende, außerhalb der Schleife durchgeführt                                                                                                                   
+                  $val1  = $val;
+                  $to    = $tn;
 
                   Log3 ($name, 5, "DbRep $name - data element: $twmrow");
                   Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".($tsum ? $val1*($dt/$tsum) : 0));
               }
+     
+          $dt    = timelocal($secf, $minf, $hhf, $ddf, $mmf-1, $yyyyf-1900) - $to;              # alkazaa: die Zeitspanne des letzten Datenwertes in diesem Bin wird für diesen Bin berücksichtigt                                                                                               
+                                                                                                # das Ende dieses Bin ist das $to für das nächste Bin 
+          $tsum += $dt;                                                                         # $dt ist das Zeitgewicht des letzten Wertes in diesem Bin                
+          $sum  += $val1 * $dt;
+          $sum  /= $tsum if ($tsum > 0);
+# </alkazaa>              
           }
-
-          my $aval = (DbRep_checktimeaggr($hash))[2];
           
           if($aval eq "hour") {
               @rsf     = split /[ :]/,$runtime_string_first;
@@ -8019,7 +8090,7 @@ sub DbRep_mysql_DumpClientSide {
  $Jahr           += 1900;
  $Monat          += 1;
  $Jahrestag      += 1;
- my $CTIME_String = strftime "%Y-%m-%d %T",localtime(time);
+ my $CTIME_String = strftime "%Y-%m-%d %T", localtime(time);
  my $time_stamp   = $Jahr."_".sprintf("%02d",$Monat)."_".sprintf("%02d",$Monatstag)."_".sprintf("%02d",$Stunden)."_".sprintf("%02d",$Minuten);
  my $starttime    = sprintf("%02d",$Monatstag).".".sprintf("%02d",$Monat).".".$Jahr."  ".sprintf("%02d",$Stunden).":".sprintf("%02d",$Minuten);
 
@@ -13535,12 +13606,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 27031 2023-01-11 23:20:18Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 27047 2023-01-13 20:58:50Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 27031 2023-01-11 23:20:18Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 27047 2023-01-13 20:58:50Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -15412,11 +15483,14 @@ return;
       </table>
     </ul>
     <br>
-    <br>
 
-    <b>Hinweis:</b> <br>
-    When the vacuum command is executed, the PRAGMA <b>auto_vacuum = FULL</b> is automatically applied to SQLite databases.
+    <b>Note:</b> <br>
+    When the vacuum command is executed, the PRAGMA <b>auto_vacuum = FULL</b> is automatically applied to SQLite databases. <br>
+    The vacuum command requires additional temporary memory. If there is not enough space in the default TMPDIR directory, 
+    SQLite can be assigned a sufficiently large directory by setting the environment variable <b>SQLITE_TMPDIR</b>. <br>
+    (see also: <a href="https://www.sqlite.org/tempfiles.html">www.sqlite.org/tempfiles</a>)
     </li>
+    <br>
     <br>
 
     <br>
@@ -16593,7 +16667,7 @@ return;
         attr Rep.Agent role Agent         <br>
         attr Rep.Agent room DbLog         <br>
         attr Rep.Agent showproctime 1     <br>
-        attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
+        attr Rep.Agent stateFormat { ReadingsVal($name, 'state', '') eq 'running' ? 'renaming' : ReadingsVal($name, 'state', ''). ' &raquo;; ProcTime: '.ReadingsVal($name, 'sql_processing_time', '').' sec'}  <br>
         attr Rep.Agent timeout 86400      <br>
         </code>
         <br>
@@ -18318,12 +18392,16 @@ return;
       </table>
     </ul>
     <br>
-    <br>
 
     <b>Hinweis:</b> <br>
     Bei der Ausführung des vacuum Kommandos wird bei SQLite Datenbanken automatisch das PRAGMA <b>auto_vacuum = FULL</b>
-    angewendet.
+    angewendet. <br>
+    Das vacuum Kommando erfordert zusätzlichen temporären Speicherplatz. Sollte der Platz im Standard TMPDIR Verzeichnis
+    nicht ausreichen, kann SQLite durch setzen der Umgebungsvariable <b>SQLITE_TMPDIR</b> ein ausreichend großes Verzeichnis 
+    zugewiesen werden. <br>
+    (siehe: <a href="https://www.sqlite.org/tempfiles.html">www.sqlite.org/tempfiles</a>)
     </li>
+    <br>
     <br>
 
    <br>
@@ -19518,7 +19596,7 @@ return;
         attr Rep.Agent role Agent         <br>
         attr Rep.Agent room DbLog         <br>
         attr Rep.Agent showproctime 1     <br>
-        attr Rep.Agent stateFormat { ReadingsVal("$name","state", undef) eq "running" ? "renaming" : ReadingsVal("$name","state", undef). " &raquo;; ProcTime: ".ReadingsVal("$name","sql_processing_time", undef)." sec"}  <br>
+        attr Rep.Agent stateFormat { ReadingsVal($name, 'state', '') eq 'running' ? 'renaming' : ReadingsVal($name, 'state', ''). ' &raquo;; ProcTime: '.ReadingsVal($name, 'sql_processing_time', '').' sec'}  <br>
         attr Rep.Agent timeout 86400      <br>
         </code>
         <br>
