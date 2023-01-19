@@ -1244,7 +1244,7 @@ m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
                         foreach my $gatewayDev ( split /,/, $gatewayDevOr ) {
 
                             if ( $gatewayDev =~
-m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+]*):?([A-Za-z0-9._\-\/@+]*)$/
+m/^@?([A-Za-z0-9._]+):([A-Za-z0-9._\-\/@+\#]*):?([A-Za-z0-9._\-\/@+]*)$/
                               )
                             {
                                 $gatewayDev    = $1;
