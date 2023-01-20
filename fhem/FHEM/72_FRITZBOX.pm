@@ -41,7 +41,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "07.50.4b";
+my $ModulVersion = "07.50.4c";
 my $missingModul = "";
 my $missingModulTelnet = "";
 my $missingModulWeb = "";
@@ -2512,7 +2512,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
 
-      if (($avmModel =~ "Box") && ($avmModel !~ "40[2,4,6]0") ) { # 4020, 4040, 4060 ohne Modem
+      if (($avmModel =~ "Box") && (lc($avmModel) !~ "40[2,4,6]0|fiber|cable|68[2,5]0") ) { # FB ohne VDSL
          my @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
          my @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
          if ($tr064Result[0]->{UPnPError}) {
