@@ -4057,7 +4057,7 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-hiddengroupRegexp"></a>
     <li>hiddengroupRegexp<br>
-        One regexp for the same purpose as hiddengroup.
+        One <a href="#regexp">regexp</a> for the same purpose as hiddengroup.
         </li>
         <br>
 
@@ -4075,7 +4075,8 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-hiddenroomRegexp"></a>
     <li>hiddenroomRegexp<br>
-        One regexp for the same purpose as hiddenroom. Example:
+        One <a href="#regexp">regexp</a> for the same purpose as hiddenroom.
+        Example:
         <ul>
           attr WEB hiddenroomRegexp .*config
         </ul>
@@ -4908,7 +4909,8 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-hiddengroupRegexp"></a>
     <li>hiddengroupRegexp<br>
-        Ein regul&auml;rer Ausdruck, um Gruppen zu verstecken.
+        Ein <a href="#regexp">regul&auml;rer Ausdruck</a>, um Gruppen zu
+        verstecken.
         </li>
         <br>
 
@@ -4925,7 +4927,8 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-hiddenroomRegexp"></a>
     <li>hiddenroomRegexp<br>
-        Ein regul&auml;rer Ausdruck, um R&auml;ume zu verstecken. Beispiel:
+        Ein <a href="#regexp">regul&auml;rer Ausdruck</a>, um R&auml;ume zu
+        verstecken. Beispiel:
         <ul>
           attr WEB hiddenroomRegexp .*config
         </ul>

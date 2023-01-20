@@ -2190,6 +2190,67 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   <br>
 <!-- perl end - diese Zeile nicht entfernen! -->
 
+<a name="regexp"></a>
+<h3>Regexp</h3>
+  FHEM verwendet an vielen Stellen Regexps, womit Regul&auml;re Ausdr&uuml;cke
+  gemeint sind. Weitere Bezeichner sind regex oder re.<br>
+
+  Mit einem Regexp kann man pr&uuml;fen, ob eine Zeichenkette eine Andere
+  enth&auml;lt, oder man kann Teile einer Zeichenkette extrahieren.<br>
+
+  Regexp ist nicht mit dem aus dem Shell bekannten Globbing zu verwechseln:
+  zBsp. ist .* die Regexp &auml;quivalente von *, was man in dem Dateisystem
+  verwendet.</br>
+
+  Einige Beispiele:<ul>
+  <table>
+    <tr><th>Regexp</th><th>Erkl&auml;rung</th></tr>
+    <tr><td>.</td>
+        <td>Trifft f&uuml;r ein beliebiges Zeichen/Buchstabe zu.</td></tr>
+    <tr><td>x</td>
+        <td>Trifft f&uuml;r eine Zeichenkette zu, die x enth&auml;lt: x, xy,
+        aber nicht abc</td></tr>
+    <tr><td>^x</td>
+        <td>Trifft f&uuml;r eine Zeichenkette zu, die mit x anf&auml;ngt: x,
+            xy, aber nicht yx</td></tr>
+    <tr><td>x$</td>
+        <td>Trifft f&uuml;r eine Zeichenkette zu, die mit x endet: x, yx, aber
+            nicht xy</td></tr>
+    <tr><td>^x?$</td>
+        <td>Trifft f&uuml;r eine Zeichenkette zu, die leer ist, oder nur ein x
+            enth&auml;lt</td></tr>
+    <tr><td>^x*$</td>
+        <td>Trifft f&uuml;r eine Zeichenkette zu, die leer ist oder nur x
+        enht&auml;lt: "", x, xxxx, aber nicht xy oder yx</td></tr>
+    <tr><td>^x+$</td>
+        <td>Trifft f&uuml;r eine Zeichenkette zu, die x mindestens einmal
+            enthaelt: x, xxxx, aber nicht ""</td></tr>
+    <tr><td>^(xy|yx)$</td>
+        <td>Trifft f&uuml;r xy or yx zu.</td></tr>
+    <tr><td>*</td><td>Das ist kein Regexp! Das ist ein Glob.</td></tr>
+  </table>
+  </ul>
+  Das ist nicht mal die Spitze des Eisbergs, wenn man mehr wissen will, kann
+  man z.Bsp. die in der perl Installation vorhandene Dokumentation verwenden:
+  die Shell Befehle "perldoc perlretut" oder "perldoc perlre" (in dieser
+  Reihenfolge) liefern Seitenweise mehr Info.<br>
+
+  Falls man unsicher ist, sollte man die Regexps testen, z.Bsp. in einen der
+  online Tester wie
+    <a target="_blank" href="https://regex101.com">regex101.com</a>,
+    <a target="_blank" href="https://regexr.com">regexr.com</a> or
+    <a target="_blank" href="https://regextester.com">regextester.com</a>
+  .<br>
+
+  Man kann ein Regexp auch offline in FHEM testen, z.Bsp. wenn man es in der
+  Kommandozeile so eingibt:<br>
+  <ul>
+    { "StringToTest" =~ m/^Str/ }<br>
+    { "StringToTest" =~ m/^str$/ }<br>
+    { "StringToTest" =~ m/(To|From)/ }<br>
+  </ul>
+  <br>
+
 <a name="gnuplot-syntax"></a>
 <h3>gnuplot file syntax</h3>
 

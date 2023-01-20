@@ -112,6 +112,7 @@
 
   <br>
   <a href="#perl">Perl specials</a><br>
+  <a href="#regexp">Regexp</a><br>
   <a href="#gnuplot-syntax">gnuplot file syntax</a><br>
 </ul>
 
@@ -2037,6 +2038,57 @@ The following local attributes are used by a wider range of devices:
 
   <br>
 <!-- perl end - diese Zeile nicht entfernen! -->
+
+<a name="regexp"></a>
+<h3>Regexp</h3>
+  FHEM makes heavy use of regexp, which is short for regular expressions.
+  Other shorthands are regex or re.<br>
+
+  With a regexp you can check if a text/string contains the substrings what you
+  are looking for, or extract parts of this string for later usage.<br>
+
+  Regexp is not to be confused with glob, which is used in the shell: .* is the
+  regexp equivalent of the glob *<br>
+
+  Some examples:<ul>
+  <table>
+    <tr><th>Regexp</th><th>Explanation</th></tr>
+    <tr><td>.</td>
+        <td>Matches one arbitrary character.</td></tr>
+    <tr><td>x</td>
+        <td>Matches a string containing x: x, xy, but not abc</td></tr>
+    <tr><td>^x</td>
+        <td>Matches a string starting with x: x, xy, but not yx</td></tr>
+    <tr><td>x$</td>
+        <td>Matches a string ending with x: x, yx, but not xy</td></tr>
+    <tr><td>^x?$</td>
+        <td>Matches zero or one x: "", x, but not xx</td></tr>
+    <tr><td>^x*$</td>
+        <td>Matches zero or more x: "", x, xxxx, but not xy or yx</td></tr>
+    <tr><td>^x+$</td>
+        <td>Matches one or more x: x, xxxx, but not ""</td></tr>
+    <tr><td>^(xy|yx)$</td>
+        <td>Matches xy or yx</td></tr>
+    <tr><td>*</td><td>Not a valid regexp! This is a glob</td></tr>
+  </table>
+  </ul>
+  There is a lot more to know about regexps. There is an extensive
+  documentation coming with your perl installation: try in the OS commandline
+  perldoc perlretut first, and perldoc perlre for details.<br>
+
+  If unsure, test your regexp in an online regexp tester, like
+    <a target="_blank" href="https://regex101.com">regex101.com</a>,
+    <a target="_blank" href="https://regexr.com">regexr.com</a> or
+    <a target="_blank" href="https://regextester.com">regextester.com</a>
+  .<br>
+
+  You can also test your regexp in the FHEM commandline:<br>
+  <ul>
+    { "StringToTest" =~ m/^Str/ }<br>
+    { "StringToTest" =~ m/^str$/ }<br>
+    { "StringToTest" =~ m/(To|From)/ }<br>
+  </ul>
+  <br>
 
 <a name="gnuplot-syntax"></a>
 <h3>gnuplot file syntax</h3>
