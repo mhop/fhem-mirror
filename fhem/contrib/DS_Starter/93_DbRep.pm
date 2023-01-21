@@ -403,6 +403,13 @@ my %dbrep_hmainf = (
     changeValue        => { fn => "DbRep_changeVal",     fndone => "DbRep_changeDone",        fnabort => "DbRep_ParseAborted",     pk => "RUNNING_PID",       timeset => 1, dobp => 1, table => "history", renmode => "changeval" },
 );
 
+my %dbrep_havgfn = (                                                               # Schemafunktionen von averageValue                          
+  avgArithmeticMean       => { fn => \&_DbRep_avgArithmeticMean },
+  avgDailyMeanGWS         => { fn => \&_DbRep_avgDailyMeanGWS   },
+  avgDailyMeanGWSwithGTS  => { fn => \&_DbRep_avgDailyMeanGWS   },
+  avgTimeWeightMean       => { fn => \&_DbRep_avgTimeWeightMean },
+);
+
 
 # Variablendefinitionen
 my %dbrep_col                 = ("DEVICE"  => 64, "READING" => 64, );                  # Standard Feldbreiten falls noch nicht getInitData ausgeführt
@@ -3255,26 +3262,23 @@ sub DbRep_averval {
   my $ts      = $paref->{ts};
 
   my $bst     = [gettimeofday];                                                    # Background-Startzeit
-  my $acf     = AttrVal($name, "averageCalcForm", "avgArithmeticMean");            # Festlegung Berechnungsschema f. Mittelwert
+  my $acf     = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');           # Festlegung Berechnungsschema f. Mittelwert
   my $qlf     = "avg";
 
-  my ($gts,$gtsstr) = (0, q{});                                                    # Variablen für Grünlandtemperatursumme GTS
-  my ($sql,$sth,$selspec,$addon,$gtsreached, $bin_end, $val1);
+  my ($gts, $gtsstr) = (0, q{});                                                   # Variablen für Grünlandtemperatursumme GTS
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return "$name|$err" if ($err);
 
-  no warnings 'uninitialized';
-
   my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                         # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
   my @ts                     = split "\\|", $ts;                                   # Timestampstring to Array
   
-  $paref->{qlf}       = $qlf;
-  $paref->{tsaref}    = \@ts;
-  $paref->{dbmodel}   = $dbmodel;
-  $paref->{IsTimeSet} = $IsTimeSet;
-  $paref->{IsAggrSet} = $IsAggrSet;
-  $paref->{dbh}       = $dbh;
+  $paref->{qlf}              = $qlf;
+  $paref->{tsaref}           = \@ts;
+  $paref->{dbmodel}          = $dbmodel;
+  $paref->{IsTimeSet}        = $IsTimeSet;
+  $paref->{IsAggrSet}        = $IsAggrSet;
+  $paref->{dbh}              = $dbh;
   
   Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".$acf);
   Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
@@ -3282,121 +3286,9 @@ sub DbRep_averval {
 
   my $st = [gettimeofday];                                                         # SQL-Startzeit
 
-  my ($arrstr,$wrstr,@rsf,@rsn,@wsf,@wsn);                                         # DB-Abfrage zeilenweise für jeden Array-Eintrag
-
-  if($acf eq "avgArithmeticMean") {                                                # arithmetischer Mittelwert (Standard)
-      ($err, $arrstr, $wrstr, $qlf) = _DbRep_avgArithmeticMean ($paref);
-  }
-  elsif ($acf =~ /avgDailyMeanGWS/x) {
-      # Berechnung des Tagesmittelwertes (Temperatur) nach der Vorschrift des deutschen Wetterdienstes
-      # Berechnung der Tagesmittel aus 24 Stundenwerten, Bezugszeit für einen Tag i.d.R. 23:51 UTC des
-      # Vortages bis 23:50 UTC, d.h. 00:51 bis 23:50 MEZ
-      # Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC),
-      # d.h. 01, 07, 13, 19 MEZ
-      # https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html
-      #
-      # SELECT VALUE FROM $table WHERE DEVICE="MyWetter" AND READING="temperature" AND TIMESTAMP >= "2018-01-28 $i:00:00" AND TIMESTAMP <= "2018-01-28 ($i+1):00:00" ORDER BY TIMESTAMP DESC LIMIT 1;
-      $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
-      $selspec = "VALUE";
-      $qlf     = "avgdmgws";
-      
-      for my $row (@ts) {
-          my @a                     = split("#", $row);
-          my $runtime_string        = $a[0];
-          my $runtime_string_first  = $a[1];
-          my $runtime_string_next   = $a[2];
-          
-          my $sum = 0;
-          my $anz = 0;                                                               # Anzahl der Messwerte am Tag
-          my($t01,$t07,$t13,$t19);                                                   # Temperaturen der Haupttermine
-          my ($bdate,undef) = split(" ",$runtime_string_first);
-
-          for my $i (0..23) {
-              my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
-              my $esel = ($i<23) ? $bdate." ".sprintf("%02d",$i).":59:59" : $runtime_string_next;
-
-              $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
-
-              ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
-              return "$name|$err" if ($err);
-
-              my $val = $sth->fetchrow_array();
-
-              Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val);
-
-              $val = DbRep_numval ($val);                                            # nichtnumerische Zeichen eliminieren
-
-              if(defined($val) && looks_like_number($val)) {
-                  $sum += $val;
-                  $t01 = $val if($val && $i == 00);                                  # Wert f. Stunde 01 ist zw. letzter Wert vor 01
-                  $t07 = $val if($val && $i == 06);
-                  $t13 = $val if($val && $i == 12);
-                  $t19 = $val if($val && $i == 18);
-                  $anz++;
-              }
-          }
-
-          if($anz >= 21) {
-              $sum = $sum/24;
-          }
-          elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
-              $sum = ($t01+$t07+$t13+$t19)/4;
-          }
-          else {
-              $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
-          }
-
-          my $aval = (DbRep_checktimeaggr($hash))[2];
-
-          if($aval eq "hour") {
-              @rsf     = split(/[ :]/,$runtime_string_first);
-              @rsn     = split(/[ :]/,$runtime_string_next);
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
-          }
-          elsif ($aval eq "minute") {
-              @rsf     = split(/[ :]/,$runtime_string_first);
-              @rsn     = split(/[ :]/,$runtime_string_next);
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
-          }
-          else {
-              @rsf     = split(" ",$runtime_string_first);
-              @rsn     = split(" ",$runtime_string_next);
-              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
-          }
-
-          @wsf    = split(" ",$runtime_string_first);
-          @wsn    = split(" ",$runtime_string_next);
-          $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
-
-          ### Grünlandtemperatursumme lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme ###
-          my ($y,$m,$d) = split "-", $runtime_string;
-          
-          if ($acf eq "avgDailyMeanGWSwithGTS" && looks_like_number($sum)) {
-              $m    = DbRep_removeLeadingZero ($m);
-              $d    = DbRep_removeLeadingZero ($d);
-              $gts  = 0 if($m == 1 && $d == 1);
-
-              my $f = $sum <= 0 ? 0    :
-                      $m   >= 3 ? 1.00 :                                          # Faktorenberechnung lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme
-                      $m   == 2 ? 0.75 : 0.5;
-
-              $gts += $sum*$f;
-
-              if($gts >= 200) {
-                  $gtsreached = $gtsreached // $runtime_string;
-              }
-
-              $gtsstr .= $runtime_string."#".$gts."#".$rsf[0]."|";
-          }
-      }
-  }
-  elsif ($acf eq "avgTimeWeightMean") {
-      ($err, $arrstr, $wrstr, $qlf) = _DbRep_avgTimeWeightMean ($paref);
-  }
-  
+  ($err, my $arrstr, my $wrstr, $qlf, $gtsstr, my $gtsreached) = &{$dbrep_havgfn{$acf}{fn}} ($paref);
   return "$name|$err" if ($err);
 
-  $sth->finish if($sth);
   $dbh->disconnect;
 
   my $rt = tv_interval($st);                                                                         # SQL-Laufzeit ermitteln
@@ -3410,11 +3302,13 @@ sub DbRep_averval {
       $rt = $rt+$wrt;
   }
 
+  no warnings 'uninitialized';
+  
   $arrstr = encode_base64($arrstr, "");                                                              # Daten müssen als Einzeiler zurückgegeben werden
   $device = encode_base64($device, "");
   $gtsstr = encode_base64($gtsstr, "");
 
-  my $brt = tv_interval($bst);                                                                      # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                                                       # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
 
 return "$name|$err|$arrstr|$device|$reading|$rt|$irowdone|$gtsstr|$gtsreached";
@@ -3502,6 +3396,136 @@ return ($err, $arrstr, $wrstr, $qlf);
 }
 
 ####################################################################################################
+#      averageValue Typ avgDailyMeanGWS
+# Berechnung des Tagesmittelwertes (Temperatur) nach der Vorschrift des deutschen Wetterdienstes
+#
+# Berechnung der Tagesmittel aus 24 Stundenwerten, Bezugszeit für einen Tag i.d.R. 23:51 UTC des
+# Vortages bis 23:50 UTC, d.h. 00:51 bis 23:50 MEZ
+# Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC),
+# d.h. 01, 07, 13, 19 MEZ
+# https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html
+#
+####################################################################################################
+sub _DbRep_avgDailyMeanGWS {
+  my $paref     = shift;
+  
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $table     = $paref->{table};
+  my $device    = $paref->{device};
+  my $reading   = $paref->{reading};
+  my $qlf       = $paref->{qlf};
+  my $tsaref    = $paref->{tsaref};
+  my $dbh       = $paref->{dbh};
+                                               
+  my ($err, $sth, $arrstr, $wrstr, $gtsreached);
+  my (@rsf, @rsn);
+  
+  my ($gts,$gtsstr) = (0, q{});                                                    # Variablen für Grünlandtemperatursumme GTS
+  
+  my $acf     = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');           # Festlegung Berechnungsschema f. Mittelwert
+  my $addon   = "ORDER BY TIMESTAMP DESC LIMIT 1";
+  my $selspec = "VALUE";
+  $qlf        = "avgdmgws";
+  
+  for my $row (@{$tsaref}) {
+      my @ar                    = split "#", $row;
+      my $runtime_string        = $ar[0];
+      my $runtime_string_first  = $ar[1];
+      my $runtime_string_next   = $ar[2];
+      
+      my $sum = 0;
+      my $anz = 0;                                                                 # Anzahl der Messwerte am Tag
+      my ($t01,$t07,$t13,$t19);                                                    # Temperaturen der Haupttermine
+      my ($bdate,undef) = split(" ",$runtime_string_first);
+
+      for my $i (0..23) {
+          my $bsel = $bdate." ".sprintf("%02d",$i).":00:00";
+          my $esel = ($i < 23) ? $bdate." ".sprintf("%02d",$i).":59:59" : $runtime_string_next;
+
+          my $sql = DbRep_createSelectSql ($hash,$table,$selspec,$device,$reading,"'$bsel'","'$esel'",$addon);
+
+          ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
+          return $err if ($err);
+
+          my $val = $sth->fetchrow_array();
+
+          Log3 ($name, 5, "DbRep $name - SQL result: $val") if($val);
+
+          $val = DbRep_numval ($val);                                              # nichtnumerische Zeichen eliminieren
+
+          if(defined $val && looks_like_number($val)) {
+              $sum += $val;
+              $t01 = $val if($val && $i == 00);                                    # Wert f. Stunde 01 ist zw. letzter Wert vor 01
+              $t07 = $val if($val && $i == 06);
+              $t13 = $val if($val && $i == 12);
+              $t19 = $val if($val && $i == 18);
+              $anz++;
+          }
+      }
+
+      if($anz >= 21) {
+          $sum = $sum/24;
+      }
+      elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
+          $sum = ($t01+$t07+$t13+$t19)/4;
+      }
+      else {
+          $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
+      }
+
+      my $aval = (DbRep_checktimeaggr($hash))[2];
+
+      if($aval eq "hour") {
+          @rsf     = split /[ :]/, $runtime_string_first;
+          @rsn     = split /[ :]/, $runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+      }
+      elsif ($aval eq "minute") {
+          @rsf     = split /[ :]/, $runtime_string_first;
+          @rsn     = split /[ :]/, $runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
+      }
+      else {
+          @rsf     = split " ", $runtime_string_first;
+          @rsn     = split " ", $runtime_string_next;
+          $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
+      }
+
+      my @wsf = split " ", $runtime_string_first;
+      my @wsn = split " ", $runtime_string_next;
+      
+      $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
+
+      ### Grünlandtemperatursumme lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme ###
+      my ($y,$m,$d) = split "-", $runtime_string;
+      
+      if ($acf eq 'avgDailyMeanGWSwithGTS' && looks_like_number($sum)) {
+          $m    = DbRep_removeLeadingZero ($m);
+          $d    = DbRep_removeLeadingZero ($d);
+          $gts  = 0 if($m == 1 && $d == 1);
+
+          my $f = $sum <= 0 ? 0    :
+                  $m   >= 3 ? 1.00 :                                          # Faktorenberechnung lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme
+                  $m   == 2 ? 0.75 : 
+                  0.5;
+
+          $gts += $sum*$f;
+
+          if($gts >= 200) {
+              $gtsreached = $gtsreached // $runtime_string;
+          }
+
+          $gtsstr .= $runtime_string."#".$gts."#".$rsf[0]."|";
+      }
+  }
+  
+  $sth->finish;
+  
+return ($err, $arrstr, $wrstr, $qlf, $gtsstr, $gtsreached);
+}
+
+####################################################################################################
 #      averageValue Typ avgTimeWeightMean
 #      zeitgewichteter Mittelwert
 # 
@@ -3526,7 +3550,6 @@ sub _DbRep_avgTimeWeightMean {
   my $reading   = $paref->{reading};
   my $qlf       = $paref->{qlf};
   my $tsaref    = $paref->{tsaref};
-  my $dbmodel   = $paref->{dbmodel};
   my $dbh       = $paref->{dbh};
   my $IsTimeSet = $paref->{IsTimeSet};
   my $IsAggrSet = $paref->{IsAggrSet};
@@ -3573,7 +3596,7 @@ sub _DbRep_avgTimeWeightMean {
           $sql               = DbRep_createSelectSql($hash, $table, $selspec, $device, $reading, "'$newtime_string'", "'$runtime_string_first'", $addonl);
             
           ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
-          return "$name|$err" if ($err);
+          return $err if ($err);
             
           my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
             
@@ -3596,7 +3619,7 @@ sub _DbRep_avgTimeWeightMean {
       }
 
       ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
-      return "$name|$err" if ($err);
+      return $err if ($err);
 
       my @twm_array = map { $_->[0]."_ESC_".$_->[1] } @{$sth->fetchall_arrayref()};
                                         
