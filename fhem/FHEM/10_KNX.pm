@@ -115,6 +115,7 @@
 #              modify KNX_parse - reply msg code
 #              modify KNX_set
 #              add pulldown menu for attr IODev with vaild IO-devs
+#              KNX_scan now avail also from cmd-line
 
 
 package KNX; ## no critic 'package'
@@ -148,6 +149,7 @@ BEGIN {
           AssignIoPort IOWrite
           CommandDefMod CommandModify CommandDelete
           defs modules attr
+          cmds
           FW_detail FW_wname FW_directNotify
           readingFnAttributes
           InternalTimer RemoveInternalTimer
@@ -428,6 +430,10 @@ sub Initialize {
            "$readingFnAttributes ";       #standard attributes
 	$hash->{noAutocreatedFilelog} = 1; # autocreate devices create no FileLog
 	$hash->{AutoCreate} = {'KNX_.*'  => { ATTR => 'disable:1'} }; #autocreate devices are disabled by default
+
+	# register KNX_scan cmd (use from cmd-line)
+	$cmds{KNX_scan} = { Fn  => "KNX_scancmd", Hlp => '<devspec>, get values from KNX-devices',};
+
 	return;
 }
 
@@ -1921,6 +1927,13 @@ sub KNX_gadNameByNO {
 }
 
 ########## public utility functions ##########
+# when called from FHEM cmd-line
+sub main::KNX_scancmd {
+	my $cl = shift;
+	my $devs = shift;
+	$devs = undef if ($devs eq q{});
+	return main::KNX_scan($devs);
+}
 
 ### get state of devices from KNX_Hardware
 # called with devspec as argument
@@ -2341,19 +2354,27 @@ The result of the "get" cmd  will be stored in the respective readings - same as
 Returns number of "get's" issued.<br/>
 <br/>Examples:
 <pre>
-<code>KNX_scan()                    - scan all possible devices</code>
-<code>KNX_scan('dev-A')             - scan device-A only</code>
-<code>KNX_scan('dev-A,dev-B,dev-C') - scan device-A, device-B, device-C</code>
-<code>KNX_scan('room=Kueche')       - scan all KNX-devices in room Kueche</code>
-<code>{KNX_scan('device')}          - syntax when used from FHEM-cmdline</code>
-<code>knxscan device                - syntax when used from FHEM-cmdline via cmd-alias definition, see below</code>
+<code>syntax when used as perl-function (eg. in at, notify,...)</code>
+<code>   KNX_scan()                    - scan all possible devices</code>
+<code>   KNX_scan('dev-A')             - scan device-A only</code>
+<code>   KNX_scan('dev-A,dev-B,dev-C') - scan device-A, device-B, device-C</code>
+<code>   KNX_scan('room=Kueche')       - scan all KNX-devices in room Kueche</code>
+<code>   KNX_scan('EG_.*')             - scan all KNX-devices where device-names begin with EG_</code> 
+<code>syntax when used from FHEM-cmdline</code>
+<code>   KNX_scan                      - scan all possible devices</code>
+<code>   KNX_scan dev-A                - scan device-A only</code>
+<code>   KNX_scan dev-A,dev-B,dev-C    - scan device-A, device-B, device-C</code>
+<code>   KNX_scan room=Kueche          - scan all KNX-devices in room Kueche</code>
+<code>   KNX_scan EG_.*                - scan all KNX-devices where device-names begin with EG_</code>
 </pre>
-When using KNX_scan() or any 'set|get &lt;device&gt; ...' in a global:INITIALIZED notify, pls. ensure to have some delay in processing the cmd's by using <b>fhem sleep</b>.
+When using KNX_scan or any 'set or get &lt;device&gt; ...' in a global:INITIALIZED notify, pls. ensure to have some delay in processing the cmd's by using <b>fhem sleep</b>.
 <br/>Example:<br/>
-<code>defmod initialized_nf notify global:INITIALIZED sleep 10 quiet;; set KNX_date now;; set KNX_time now;; {KNX_scan();;}</code>
+<code>defmod initialized_nf notify global:INITIALIZED sleep 10 quiet;; set KNX_date now;; set KNX_time now;; KNX_scan;;</code>
 <br/>This avoids sending requests while the KNX-Gateway has not finished its initial handshake-procedure with FHEM (the KNX-IO-device).  
+<!--
 <br/><br/>If you want to use this function as a FHEM cmd, define a cmdalias-device, e.g:<br/>
 <code>defmod cmd_KNXscan cmdalias knxscan .* AS { my $res = KNX_scan($EVTPART0);; return 'Number of GAs scanned: '. $res;; }</code>
+-->
 <br/>
 </li>
 </ul>
